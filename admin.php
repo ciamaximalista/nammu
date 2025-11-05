@@ -470,6 +470,42 @@ function color_picker_value(string $value, string $fallback): string {
     return $fallback;
 }
 
+function nammu_slugify(string $text): string {
+    $text = trim($text);
+    if ($text === '') {
+        return '';
+    }
+
+    if (function_exists('iconv')) {
+        $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
+        if ($converted !== false) {
+            $text = $converted;
+        }
+    }
+
+    $text = strtolower($text);
+    $text = preg_replace('/[^a-z0-9]+/i', '-', $text) ?? '';
+    $text = trim($text, '-');
+
+    return $text;
+}
+
+function nammu_unique_filename(string $desired): string {
+    $slug = nammu_slugify($desired);
+    if ($slug === '') {
+        $slug = 'entrada';
+    }
+
+    $base = $slug;
+    $index = 1;
+    while (file_exists(CONTENT_DIR . '/' . $slug . '.md')) {
+        $slug = $base . '-' . $index;
+        $index++;
+    }
+
+    return $slug;
+}
+
 // --- Routing and Logic ---
 
 $page = $_GET['page'] ?? 'login';
@@ -497,14 +533,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: admin.php');
         exit;
     } elseif (isset($_POST['publish'])) {
-        $title = $_POST['title'] ?? '';
-        $category = $_POST['category'] ?? '';
-        $date = $_POST['date'] ? date('Y-m-d', strtotime($_POST['date'])) : date('Y-m-d');
-        $image = $_POST['image'] ?? '';
-        $description = $_POST['description'] ?? '';
+        $title = trim($_POST['title'] ?? '');
+        $category = trim($_POST['category'] ?? '');
+        $dateInput = $_POST['date'] ?? '';
+        $timestamp = $dateInput !== '' ? strtotime($dateInput) : time();
+        if ($timestamp === false) {
+            $timestamp = time();
+        }
+        $date = date('Y-m-d', $timestamp);
+        $image = trim($_POST['image'] ?? '');
+        $description = trim($_POST['description'] ?? '');
         $type = $_POST['type'] ?? 'Entrada';
         $type = $type === 'Página' ? 'Página' : 'Entrada';
-        
+        $filenameInput = trim($_POST['filename'] ?? '');
+
+        if ($filenameInput === '' && $title !== '') {
+            $filenameInput = $title;
+        }
+
+        $filename = nammu_unique_filename($filenameInput);
+
         $all_posts = get_all_posts_metadata();
         $max_ordo = 0;
         foreach ($all_posts as $post) {
@@ -516,7 +564,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $content = $_POST['content'] ?? '';
 
-        if (!empty($filename)) {
+        if ($filename !== '') {
             $filepath = CONTENT_DIR . '/' . $filename . '.md';
 
             $file_content = "---
@@ -540,9 +588,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
             $file_content .= $content;
 
-            file_put_contents($filepath, $file_content);
-            header('Location: admin.php?page=edit');
-            exit;
+            if (file_put_contents($filepath, $file_content) === false) {
+                $error = 'No se pudo guardar el contenido. Revisa los permisos de la carpeta content/.';
+            } else {
+                header('Location: admin.php?page=edit&created=' . urlencode($filename . '.md'));
+                exit;
+            }
         }
     } elseif (isset($_POST['update'])) {
         $filename = $_POST['filename'] ?? '';
@@ -1825,6 +1876,25 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                 }
 
+                .pagination.pagination-break,
+                .modal .pagination {
+
+                    flex-wrap: wrap;
+
+                    justify-content: center;
+
+                }
+
+                .pagination .page-break {
+
+                    flex-basis: 100%;
+
+                    height: 0;
+
+                    list-style: none;
+
+                }
+
                 .card-style-full .card-thumb {
 
                     grid-column: 1 / -1;
@@ -2099,6 +2169,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 <h2>Publicar</h2>
 
+                                <?php if (!empty($error)): ?>
+                                    <div class="alert alert-danger"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
+                                <?php endif; ?>
+
                                 <form method="post">
 
                                     <div class="form-group">
@@ -2273,15 +2347,21 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 <nav aria-label="Page navigation">
 
-                                    <ul class="pagination">
+                                    <ul class="pagination pagination-break">
 
-                                        <?php for ($i = 1; $i <= $posts_data['pages']; $i++): ?>
+                                        <?php
+                                        $pageGroupSize = 16;
+                                        for ($i = 1; $i <= $posts_data['pages']; $i++): ?>
 
                                             <li class="page-item <?= $i == $posts_data['current_page'] ? 'active' : '' ?>">
 
                                                 <a class="page-link" href="?page=edit&template=<?= urlencode($templateFilter) ?>&p=<?= $i ?>"><?= $i ?></a>
 
                                             </li>
+
+                                            <?php if ($i % $pageGroupSize === 0 && $i < $posts_data['pages']): ?>
+                                                <li class="page-break"></li>
+                                            <?php endif; ?>
 
                                         <?php endfor; ?>
 
@@ -2495,15 +2575,21 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 <nav aria-label="Page navigation">
 
-                                    <ul class="pagination">
+                                    <ul class="pagination pagination-break">
 
-                                        <?php for ($i = 1; $i <= $assets_data['pages']; $i++): ?>
+                                        <?php
+                                        $pageGroupSize = 16;
+                                        for ($i = 1; $i <= $assets_data['pages']; $i++): ?>
 
                                             <li class="page-item <?= $i == $assets_data['current_page'] ? 'active' : '' ?>">
 
                                                 <a class="page-link" href="?page=resources&p=<?= $i ?>"><?= $i ?></a>
 
                                             </li>
+
+                                            <?php if ($i % $pageGroupSize === 0 && $i < $assets_data['pages']): ?>
+                                                <li class="page-break"></li>
+                                            <?php endif; ?>
 
                                         <?php endfor; ?>
 
@@ -3316,7 +3402,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                         <nav aria-label="Page navigation">
 
-                            <ul class="pagination" id="image-pagination">
+                            <ul class="pagination pagination-break" id="image-pagination">
 
                             </ul>
 
@@ -3764,7 +3850,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                     if (i % groupSize === 0 && i !== totalPages) {
 
-                        pagination.append('<li class="w-100 d-none d-md-block"></li>');
+                        pagination.append('<li class="page-break"></li>');
 
                     }
 

@@ -15,6 +15,9 @@ class MarkdownConverter
         $html = [];
         $paragraphBuffer = [];
         $inList = false;
+        $inCodeBlock = false;
+        $codeBuffer = [];
+        $codeLanguage = '';
 
         $flushParagraph = function () use (&$paragraphBuffer, &$html) {
             if (empty($paragraphBuffer)) {
@@ -35,8 +38,39 @@ class MarkdownConverter
             }
         };
 
+        $flushCodeBlock = function () use (&$codeBuffer, &$codeLanguage, &$html, &$inCodeBlock) {
+            if (!$inCodeBlock) {
+                return;
+            }
+            $code = implode("\n", $codeBuffer);
+            $escaped = htmlspecialchars($code, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $classAttr = $codeLanguage !== '' ? ' class="language-' . htmlspecialchars($codeLanguage, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"' : '';
+            $html[] = '<pre><code' . $classAttr . '>' . $escaped . '</code></pre>';
+            $codeBuffer = [];
+            $codeLanguage = '';
+            $inCodeBlock = false;
+        };
+
         foreach ($lines as $line) {
             $trimmed = trim($line);
+
+            if (preg_match('/^```(?:(.+))?$/', $trimmed, $matches)) {
+                if ($inCodeBlock) {
+                    $flushCodeBlock();
+                } else {
+                    $flushParagraph();
+                    $closeList();
+                    $inCodeBlock = true;
+                    $codeBuffer = [];
+                    $codeLanguage = isset($matches[1]) ? trim($matches[1]) : '';
+                }
+                continue;
+            }
+
+            if ($inCodeBlock) {
+                $codeBuffer[] = rtrim($line, "\n");
+                continue;
+            }
 
             if ($trimmed === '') {
                 $flushParagraph();
@@ -68,6 +102,7 @@ class MarkdownConverter
 
         $flushParagraph();
         $closeList();
+        $flushCodeBlock();
 
         return implode("\n", $html);
     }

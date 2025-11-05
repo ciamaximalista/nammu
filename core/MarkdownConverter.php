@@ -16,8 +16,10 @@ class MarkdownConverter
         $paragraphBuffer = [];
         $inList = false;
         $inCodeBlock = false;
+        $inBlockquote = false;
         $codeBuffer = [];
         $codeLanguage = '';
+        $blockquoteBuffer = [];
 
         $flushParagraph = function () use (&$paragraphBuffer, &$html) {
             if (empty($paragraphBuffer)) {
@@ -36,6 +38,34 @@ class MarkdownConverter
                 $html[] = '</ul>';
                 $inList = false;
             }
+        };
+
+        $flushBlockquote = function () use (&$blockquoteBuffer, &$html, &$inBlockquote) {
+            if (!$inBlockquote) {
+                return;
+            }
+            $content = implode("\n", $blockquoteBuffer);
+            $content = trim($content);
+            if ($content === '') {
+                $blockquoteBuffer = [];
+                $inBlockquote = false;
+                return;
+            }
+            $segments = preg_split("/\n{2,}/", $content);
+            $parts = [];
+            foreach ($segments as $segment) {
+                $segment = trim($segment);
+                if ($segment === '') {
+                    continue;
+                }
+                $parts[] = '<p>' . $this->convertInline($segment) . '</p>';
+            }
+            if (empty($parts)) {
+                $parts[] = '<p>' . $this->convertInline($content) . '</p>';
+            }
+            $html[] = '<blockquote>' . implode("\n", $parts) . '</blockquote>';
+            $blockquoteBuffer = [];
+            $inBlockquote = false;
         };
 
         $flushCodeBlock = function () use (&$codeBuffer, &$codeLanguage, &$html, &$inCodeBlock) {
@@ -60,6 +90,7 @@ class MarkdownConverter
                 } else {
                     $flushParagraph();
                     $closeList();
+                    $flushBlockquote();
                     $inCodeBlock = true;
                     $codeBuffer = [];
                     $codeLanguage = isset($matches[1]) ? trim($matches[1]) : '';
@@ -73,6 +104,10 @@ class MarkdownConverter
             }
 
             if ($trimmed === '') {
+                if ($inBlockquote) {
+                    $blockquoteBuffer[] = '';
+                    continue;
+                }
                 $flushParagraph();
                 $closeList();
                 continue;
@@ -81,6 +116,7 @@ class MarkdownConverter
             if (preg_match('/^(#{1,6})\s+(.+)$/', $trimmed, $matches)) {
                 $flushParagraph();
                 $closeList();
+                $flushBlockquote();
                 $level = strlen($matches[1]);
                 $content = $this->convertInline($matches[2]);
                 $html[] = "<h{$level}>{$content}</h{$level}>";
@@ -89,6 +125,7 @@ class MarkdownConverter
 
             if (preg_match('/^[-*+]\s+(.+)$/', $trimmed, $matches)) {
                 $flushParagraph();
+                $flushBlockquote();
                 if (!$inList) {
                     $html[] = '<ul>';
                     $inList = true;
@@ -97,11 +134,27 @@ class MarkdownConverter
                 continue;
             }
 
+            if (preg_match('/^>\s?(.*)$/', $trimmed, $matches)) {
+                $flushParagraph();
+                $closeList();
+                if (!$inBlockquote) {
+                    $inBlockquote = true;
+                    $blockquoteBuffer = [];
+                }
+                $blockquoteBuffer[] = $matches[1];
+                continue;
+            }
+
+            if ($inBlockquote) {
+                $flushBlockquote();
+            }
+
             $paragraphBuffer[] = $line;
         }
 
         $flushParagraph();
         $closeList();
+        $flushBlockquote();
         $flushCodeBlock();
 
         return implode("\n", $html);

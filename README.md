@@ -1,4 +1,4 @@
-![Nammu Logo](assets/logo-fundacion-repoblacion.png)
+![Nammu Logo](nammu.png)
 
 # Nammu — Motor de Blog compatible con PicoCMS
 

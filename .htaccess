@@ -1,0 +1,24 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Friendly URLs: delegate RSS to the front controller too
+    RewriteRule ^rss\.xml$ index.php [L]
+
+    # Deny access to internal dirs and files by passing the URL to Pico
+    RewriteRule ^(config|content|core|template|vendor|CHANGELOG\.md|composer\.(json|lock|phar))(/|$) index.php [L]
+    RewriteRule (^\.|/\.)(?!well-known(/|sitemap\.xml$)) index.php [L]
+
+    # Enable URL rewriting
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+
+    <IfModule mod_env.c>
+        # Let Pico know about available URL rewriting
+        SetEnv PICO_URL_REWRITING 1
+    </IfModule>
+</IfModule>
+
+# Prevent file browsing
+Options -Indexes -MultiViews

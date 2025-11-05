@@ -1,4 +1,4 @@
-![Nammu Logo](nammu.png)
+![Nammu Logo](nammu-banner.png)
 
 # Nammu — Motor de Blog compatible con PicoCMS
 
@@ -7,10 +7,10 @@ Nammu es un motor ligero para blogs que reutiliza la estructura de contenidos de
 ## Características principales
 
 - Panel de administración (`admin.php`) para crear y editar entradas/páginas en Markdown.
-- Gestión directa de recursos multimedia (carpeta `assets/`), con recorte básico.
+- Gestión directa de recursos multimedia (carpeta `assets/`), con recorte básico, control de intensidad de color, brillo y contraste y filtro de pixelado.
 - Plantillas configurables desde la administración: tipografías Google Fonts, colores, cabeceras, maquetación de portada, footer, meta etiquetas sociales y logotipo flotante.
-- Generación automática de `rss.xml` con imágenes destacadas y compatibilidad con URLs amigables.
-- Parseador Markdown extensible con soporte para listas, encabezados, enlaces, imágenes, código en línea y bloques de código con triple acento grave.
+- Generación automática de `rss.xml`  (RSS 2.0) con imágenes destacadas y compatibilidad con URLs amigables.
+- Parseador Markdown extensible con soporte para listas, encabezados, enlaces, imágenes, código en línea, bloques de cita y bloques de código.
 - Compatible con la estructura de directorios de PicoCMS (`content/` y `assets/`), lo que simplifica migraciones.
 
 ## Requisitos
@@ -48,22 +48,13 @@ Nammu está pensado para reemplazar una instalación de PicoCMS reutilizando los
 4. Aplica los permisos comentados arriba (especialmente `content/`, `assets/` y `config/`).
 5. Accede a `admin.php`, configura las opciones de plantilla y redes sociales y verifica que las rutas amigables funcionan.
 
-> Consejo: si usabas plugins de PicoCMS, evalúa si aún los necesitas. El núcleo de Nammu ya integra RSS, cabecera personalizable y otras funciones habituales.
+> Consejo: si usabas plugins de PicoCMS, evalúa si aún los necesitas. El núcleo de Nammu ya integra RSS, cabecera personalizable y otras funciones habituales. Pronto añadiremos más.
 
 ## Administración y permisos
 
 - `admin.php` exige autenticación. El primer acceso genera un usuario administrador.
 - `content/` y `assets/` deben ser **escribibles** por el proceso web para guardar posts e imágenes.
 - `config/config.yml` almacena la configuración general y se actualiza desde el panel (plantilla, redes sociales, etc.). Si la edición falla, revisa que el archivo tenga permisos 664 y pertenezca al usuario/grupo del servidor.
-
-## Licencia
-
-Este proyecto se distribuye bajo **European Union Public Licence (EUPL)**. Consulta el texto completo de la licencia para conocer los términos de uso, distribución y modificación.
-
----
-
-¿Preguntas o incidencias? Abre un _issue_ en GitHub o contacta con el equipo de desarrollo. ¡Bienvenido a Nammu! 🪶
-
 
 ## Actualizaciones
 
@@ -79,3 +70,12 @@ sudo chmod 775 /var/www/html/blogs/memoria/{content,assets,config}
 ```
 
 Reemplaza `TU_USUARIO` por tu usuario SSH. Con esta secuencia podrás ejecutar `git pull` normalmente y mantener el servidor con permisos de escritura en las rutas necesarias.
+
+## Licencia
+
+Este proyecto se distribuye bajo **European Union Public Licence (EUPL)**. Consulta el texto completo de la licencia para conocer los términos de uso, distribución y modificación.
+
+---
+
+¿Preguntas o incidencias? Abre un _issue_ en GitHub o contacta con el equipo de desarrollo. ¡Bienvenido a Nammu! 
+

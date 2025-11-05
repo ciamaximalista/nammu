@@ -46,6 +46,10 @@ $hasPagination = is_array($pagination) && ($pagination['total'] ?? 1) > 1;
 $baseHref = $baseUrl ?? '/';
 $cardStyle = $homeSettings['card_style'] ?? 'full';
 $cardStyle = in_array($cardStyle, ['full', 'square-right', 'circle-right'], true) ? $cardStyle : 'full';
+$fullImageMode = $homeSettings['full_image_mode'] ?? 'natural';
+if (!in_array($fullImageMode, ['natural', 'crop'], true)) {
+    $fullImageMode = 'natural';
+}
 $blocksMode = $homeSettings['blocks'] ?? 'boxed';
 if (!in_array($blocksMode, ['boxed', 'flat'], true)) {
     $blocksMode = 'boxed';
@@ -217,6 +221,9 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
             $link = $postUrl($post['slug']);
             $imageUrl = $resolveImage($post['image']);
             $cardClassParts = ['post-card', 'style-' . $cardStyle];
+            if ($cardStyle === 'full') {
+                $cardClassParts[] = 'full-mode-' . $fullImageMode;
+            }
             if (in_array($cardStyle, ['square-right', 'circle-right'], true)) {
                 $cardClassParts[] = 'style-media-right';
             }
@@ -460,10 +467,22 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     }
     .post-card.style-full .post-thumb {
         width: 100%;
+        overflow: hidden;
     }
     .post-card.style-full .post-thumb img {
-        height: auto;
         border-radius: var(--nammu-radius-md);
+    }
+    .post-card.style-full.full-mode-natural .post-thumb img {
+        height: auto;
+        max-height: none;
+    }
+    .post-card.style-full.full-mode-crop .post-thumb {
+        aspect-ratio: 16 / 9;
+    }
+    .post-card.style-full.full-mode-crop .post-thumb img {
+        height: 100%;
+        width: 100%;
+        object-fit: cover;
     }
     .post-card.style-full .post-body {
         margin-top: 0.9rem;

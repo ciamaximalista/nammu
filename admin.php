@@ -201,6 +201,11 @@ function get_settings() {
         $homeBlocks = $defaults['home']['blocks'];
     }
     $home['blocks'] = $homeBlocks;
+    $fullImageMode = $home['full_image_mode'] ?? $defaults['home']['full_image_mode'];
+    if (!in_array($fullImageMode, ['natural', 'crop'], true)) {
+        $fullImageMode = $defaults['home']['full_image_mode'];
+    }
+    $home['full_image_mode'] = $fullImageMode;
     $headerConfig = $homeConfig['header'] ?? [];
     $home['header'] = array_merge($defaults['home']['header'], $headerConfig);
     $textStyle = $home['header']['text_style'] ?? $defaults['home']['header']['text_style'];
@@ -289,6 +294,8 @@ function get_default_template_settings(): array {
             'highlight' => '#f3f6f9',
             'accent' => '#0a4c8a',
             'brand' => '#1b1b1b',
+            'code_background' => '#000000',
+            'code_text' => '#90ee90',
         ],
         'footer' => '',
         'images' => [
@@ -302,6 +309,7 @@ function get_default_template_settings(): array {
             'per_page' => 'all',
             'card_style' => 'full',
             'blocks' => 'boxed',
+            'full_image_mode' => 'natural',
             'header' => [
                 'type' => 'none',
                 'image' => '',
@@ -755,7 +763,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        $colorKeys = ['h1', 'h2', 'h3', 'intro', 'text', 'background', 'highlight', 'accent', 'brand'];
+        $colorKeys = ['h1', 'h2', 'h3', 'intro', 'text', 'background', 'highlight', 'accent', 'brand', 'code_background', 'code_text'];
         $colors = [];
         foreach ($colorKeys as $colorKey) {
             $posted = trim($_POST['color_' . $colorKey] ?? '');
@@ -788,6 +796,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $homeCardStylePosted = in_array($homeCardStylePosted, ['full', 'square-right', 'circle-right'], true)
             ? $homeCardStylePosted
             : $defaults['home']['card_style'];
+        $homeFullImageModePosted = $_POST['home_card_full_mode'] ?? $defaults['home']['full_image_mode'];
+        if (!in_array($homeFullImageModePosted, ['natural', 'crop'], true)) {
+            $homeFullImageModePosted = $defaults['home']['full_image_mode'];
+        }
         $homeBlocksModePosted = $_POST['home_blocks_mode'] ?? $defaults['home']['blocks'];
         if (!in_array($homeBlocksModePosted, ['boxed', 'flat'], true)) {
             $homeBlocksModePosted = $defaults['home']['blocks'];
@@ -825,6 +837,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $homeHeaderTextStylePosted = $defaults['home']['header']['text_style'];
             $homeHeaderOrderPosted = $defaults['home']['header']['order'];
         }
+        if ($homeCardStylePosted !== 'full') {
+            $homeFullImageModePosted = $defaults['home']['full_image_mode'];
+        }
         $cornerStylePosted = $_POST['global_corners'] ?? $defaults['global']['corners'];
         if (!in_array($cornerStylePosted, ['rounded', 'square'], true)) {
             $cornerStylePosted = $defaults['global']['corners'];
@@ -842,6 +857,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'columns' => $homeColumnsPosted,
                 'per_page' => $homePerPageValue,
                 'card_style' => $homeCardStylePosted,
+                'full_image_mode' => $homeFullImageModePosted,
                 'blocks' => $homeBlocksModePosted,
                 'header' => [
                     'type' => $homeHeaderTypePosted,
@@ -1687,6 +1703,100 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                 }
 
+                .home-card-style-option .full-image-mode-figure {
+
+                    width: 104px;
+
+                    height: 64px;
+
+                    border-radius: 10px;
+
+                    border: 2px solid #d5dbe3;
+
+                    background: linear-gradient(145deg, #f4f7fb, #e7ecf4);
+
+                    display: flex;
+
+                    gap: 6px;
+
+                    padding: 6px;
+
+                    box-sizing: border-box;
+
+                }
+
+                .home-card-style-option .full-image-mode-figure .mode-column {
+
+                    display: flex;
+
+                    flex-direction: column;
+
+                    justify-content: flex-end;
+
+                    gap: 4px;
+
+                    flex: 1;
+
+                }
+
+                .home-card-style-option .full-image-mode-figure .mode-thumb {
+
+                    width: 100%;
+
+                    background: rgba(27, 142, 237, 0.35);
+
+                    border: 1px solid rgba(27, 142, 237, 0.5);
+
+                    border-radius: 8px;
+
+                    transition: all 0.2s ease;
+
+                }
+
+                .home-card-style-option .full-image-mode-figure .mode-thumb.primary {
+
+                    background: rgba(27, 142, 237, 0.45);
+
+                }
+
+                .home-card-style-option .full-image-mode-figure.full-mode-natural .mode-thumb.primary {
+
+                    height: 32px;
+
+                }
+
+                .home-card-style-option .full-image-mode-figure.full-mode-natural .mode-thumb.secondary {
+
+                    height: 20px;
+
+                }
+
+                .home-card-style-option .full-image-mode-figure.full-mode-crop .mode-thumb.primary,
+
+                .home-card-style-option .full-image-mode-figure.full-mode-crop .mode-thumb.secondary {
+
+                    height: 28px;
+
+                }
+
+                .home-card-style-option .full-image-mode-figure .mode-line {
+
+                    display: block;
+
+                    height: 4px;
+
+                    border-radius: 999px;
+
+                    background: rgba(27, 142, 237, 0.28);
+
+                }
+
+                .home-card-style-option .full-image-mode-figure .mode-line.title {
+
+                    background: rgba(27, 142, 237, 0.45);
+
+                }
+
                 .home-card-style-option .card-style-text {
 
                     display: flex;
@@ -2420,6 +2530,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 'highlight' => 'Color de Cajas Destacadas',
                                 'accent' => 'Color Destacado',
                                 'brand' => 'Color de Cabecera (.post-brand)',
+                                'code_background' => 'Color de fondo de código',
+                                'code_text' => 'Color del código',
                             ];
                             $defaults = get_default_template_settings();
                             $templateGlobal = $templateSettings['global'] ?? $defaults['global'];
@@ -2438,6 +2550,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             $homeCardStyle = $templateHome['card_style'] ?? $defaults['home']['card_style'];
                             if (!in_array($homeCardStyle, $cardStylesAllowed, true)) {
                                 $homeCardStyle = $defaults['home']['card_style'];
+                            }
+                            $homeFullImageMode = $templateHome['full_image_mode'] ?? $defaults['home']['full_image_mode'];
+                            if (!in_array($homeFullImageMode, ['natural', 'crop'], true)) {
+                                $homeFullImageMode = $defaults['home']['full_image_mode'];
                             }
                             $homeHeaderConfig = array_merge($defaults['home']['header'], $templateHome['header'] ?? []);
                             $homeHeaderTypes = ['none', 'graphic', 'text', 'mixed'];
@@ -2610,6 +2726,51 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                             <?php endforeach; ?>
                                         </div>
                                     </div>
+                                    <div class="mt-3" data-full-image-options <?= $homeCardStyle === 'full' ? '' : 'style="display:none;"' ?>>
+                                        <label>Imagen completa</label>
+                                        <p class="text-muted">Selecciona cómo se ajustan las miniaturas cuando ocupan todo el ancho de la tarjeta.</p>
+                                        <div class="home-card-style-options">
+                                            <?php
+                                            $fullImageModes = [
+                                                'natural' => [
+                                                    'label' => 'Respetar proporciones',
+                                                    'caption' => 'Cada imagen mantiene su altura natural',
+                                                    'figure' => 'full-mode-natural',
+                                                ],
+                                                'crop' => [
+                                                    'label' => 'Recortar para igualar',
+                                                    'caption' => 'Recorta para igualar la altura de todas las miniaturas',
+                                                    'figure' => 'full-mode-crop',
+                                                ],
+                                            ];
+                                            ?>
+                                            <?php foreach ($fullImageModes as $modeKey => $info): ?>
+                                                <?php $modeActive = ($homeFullImageMode === $modeKey); ?>
+                                                <label class="home-card-style-option <?= $modeActive ? 'active' : '' ?>" data-full-image-mode="1">
+                                                    <input type="radio"
+                                                        name="home_card_full_mode"
+                                                        value="<?= htmlspecialchars($modeKey, ENT_QUOTES, 'UTF-8') ?>"
+                                                        <?= $modeActive ? 'checked' : '' ?>>
+                                                    <span class="full-image-mode-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">
+                                                        <span class="mode-column">
+                                                            <span class="mode-thumb primary"></span>
+                                                            <span class="mode-line title"></span>
+                                                            <span class="mode-line text"></span>
+                                                        </span>
+                                                        <span class="mode-column">
+                                                            <span class="mode-thumb secondary"></span>
+                                                            <span class="mode-line title"></span>
+                                                            <span class="mode-line text"></span>
+                                                        </span>
+                                                    </span>
+                                                    <span class="card-style-text">
+                                                        <strong><?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                                        <small><?= htmlspecialchars($info['caption'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                    </span>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
 
                                     <h5 class="mt-4">Bloques de portada</h5>
                                     <p class="text-muted">Elige si las entradas se muestran dentro de una tarjeta o directamente sobre el fondo.</p>
@@ -2722,6 +2883,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                             <?php endforeach; ?>
                                         </div>
                                     </div>
+
+                                    <label class="d-block mt-4 mb-2">Estructura de la cabecera</label>
 
                                     <div class="home-header-options" data-header-options>
                                         <?php
@@ -2853,6 +3016,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                         </div>
                                     </div>
 
+                                    <h5 class="mt-4">Bucle</h5>
                                     <div class="form-group">
                                         <label for="home_per_page">Número de posts por página</label>
                                         <div class="input-group">
@@ -3269,11 +3433,20 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             refreshLayoutSelection();
 
             var cardStyleOptions = form.querySelectorAll('.home-card-style-option[data-card-style-option]');
+            var fullImageOptionsContainer = form.querySelector('[data-full-image-options]');
+            var fullImageModeOptions = form.querySelectorAll('.home-card-style-option[data-full-image-mode]');
             function refreshCardStyleSelection() {
+                var activeStyle = '';
                 cardStyleOptions.forEach(function(option) {
                     var radio = option.querySelector('input[type="radio"]');
                     option.classList.toggle('active', radio && radio.checked);
+                    if (radio && radio.checked) {
+                        activeStyle = radio.value;
+                    }
                 });
+                if (fullImageOptionsContainer) {
+                    fullImageOptionsContainer.style.display = activeStyle === 'full' ? '' : 'none';
+                }
             }
             cardStyleOptions.forEach(function(option) {
                 var radio = option.querySelector('input[type="radio"]');
@@ -3282,6 +3455,19 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
             });
             refreshCardStyleSelection();
+            function refreshFullImageModeSelection() {
+                fullImageModeOptions.forEach(function(option) {
+                    var radio = option.querySelector('input[type="radio"]');
+                    option.classList.toggle('active', radio && radio.checked);
+                });
+            }
+            fullImageModeOptions.forEach(function(option) {
+                var radio = option.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.addEventListener('change', refreshFullImageModeSelection);
+                }
+            });
+            refreshFullImageModeSelection();
 
             var blocksOptions = form.querySelectorAll('.home-card-style-option[data-blocks-option]');
             function refreshBlocksSelection() {

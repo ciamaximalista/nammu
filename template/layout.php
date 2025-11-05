@@ -21,6 +21,8 @@ $colorH3 = htmlspecialchars($themeColors['h3'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8'
 $colorHighlight = htmlspecialchars($themeColors['highlight'] ?? '#f3f6f9', ENT_QUOTES, 'UTF-8');
 $colorAccent = htmlspecialchars($themeColors['accent'] ?? '#0a4c8a', ENT_QUOTES, 'UTF-8');
 $colorBrand = htmlspecialchars($themeColors['brand'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8');
+$colorCodeBackground = htmlspecialchars($themeColors['code_background'] ?? '#000000', ENT_QUOTES, 'UTF-8');
+$colorCodeText = htmlspecialchars($themeColors['code_text'] ?? '#90ee90', ENT_QUOTES, 'UTF-8');
 $footerHtml = $theme['footer_html'] ?? '';
 $logoUrl = $theme['logo_url'] ?? null;
 $faviconUrl = $theme['favicon_url'] ?? null;
@@ -112,6 +114,29 @@ $cornerClass = $cornerStyle === 'square' ? 'corners-square' : 'corners-rounded';
         strong,
         b {
             color: <?= $colorAccent ?>;
+        }
+        pre,
+        code {
+            background-color: <?= $colorCodeBackground ?>;
+            color: <?= $colorCodeText ?>;
+            font-family: "Fira Code", "Source Code Pro", "Courier New", monospace;
+        }
+        pre {
+            padding: 1rem 1.25rem;
+            border-radius: var(--nammu-radius-md);
+            overflow: auto;
+            line-height: 1.45;
+            margin: 1.5rem 0;
+        }
+        code {
+            padding: 0.1rem 0.35rem;
+            border-radius: var(--nammu-radius-sm);
+            font-size: 0.95em;
+        }
+        pre code {
+            background: transparent;
+            color: inherit;
+            padding: 0;
         }
         .post-brand {
             color: <?= $colorBrand ?>;

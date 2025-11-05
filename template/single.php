@@ -6,6 +6,8 @@ $colorIntroBg = htmlspecialchars($colors['intro'] ?? '#f6f6f6', ENT_QUOTES, 'UTF
 $colorHighlight = htmlspecialchars($colors['highlight'] ?? '#f3f6f9', ENT_QUOTES, 'UTF-8');
 $colorAccent = htmlspecialchars($colors['accent'] ?? '#0a4c8a', ENT_QUOTES, 'UTF-8');
 $colorBrand = htmlspecialchars($colors['brand'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8');
+$colorCodeBg = htmlspecialchars($colors['code_background'] ?? '#000000', ENT_QUOTES, 'UTF-8');
+$colorCodeText = htmlspecialchars($colors['code_text'] ?? '#90ee90', ENT_QUOTES, 'UTF-8');
 $siteAuthor = htmlspecialchars($theme['author'] !== '' ? $theme['author'] : ($siteTitle ?? ''), ENT_QUOTES, 'UTF-8');
 $siteBlog = htmlspecialchars($theme['blog'] !== '' ? $theme['blog'] : ($siteDescription ?? ''), ENT_QUOTES, 'UTF-8');
 function nammu_format_date_es(?string $date): string {
@@ -152,5 +154,29 @@ $metaText = implode(' ', $metaTextParts);
         border-radius: var(--nammu-radius-md);
         display: block;
         margin: 1.5rem auto;
+    }
+    .post-body pre {
+        background: <?= $colorCodeBg ?>;
+        color: <?= $colorCodeText ?>;
+        padding: 1.25rem 1.5rem;
+        border-radius: var(--nammu-radius-md);
+        overflow: auto;
+        margin: 2rem 0;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+    }
+    .post-body code {
+        background: <?= $colorCodeBg ?>;
+        color: <?= $colorCodeText ?>;
+        padding: 0.15rem 0.35rem;
+        border-radius: var(--nammu-radius-sm);
+        font-size: 0.95em;
+    }
+    .post-body pre code {
+        background: transparent;
+        color: inherit;
+        padding: 0;
+        font-size: inherit;
     }
 </style>

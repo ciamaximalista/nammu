@@ -162,29 +162,88 @@ class MarkdownConverter
 
     private function convertInline(string $text): string
     {
-        $escaped = htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $segments = preg_split('/(<![^>]*>|<\/?[A-Za-z][^>]*>)/', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+        if ($segments === false) {
+            $segments = [$text];
+        }
 
-        $escaped = preg_replace_callback('/!\[([^\]]*)\]\(([^)]+)\)/', function ($matches) {
-            $alt = $matches[1];
-            $url = htmlspecialchars(trim($matches[2]), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-            return '<img src="' . $url . '" alt="' . $alt . '">';
-        }, $escaped);
+        $result = '';
 
-        $escaped = preg_replace_callback('/\[([^\]]+)\]\(([^)]+)\)/', function ($matches) {
-            $text = $matches[1];
-            $url = htmlspecialchars(trim($matches[2]), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-            return '<a href="' . $url . '">' . $text . '</a>';
-        }, $escaped);
+        foreach ($segments as $segment) {
+            if ($segment === '') {
+                continue;
+            }
 
-        $escaped = preg_replace_callback('/`([^`]+)`/', function ($matches) {
-            return '<code>' . $matches[1] . '</code>';
-        }, $escaped);
+            $isTag = isset($segment[0]) && $segment[0] === '<' && substr($segment, -1) === '>';
+            if ($isTag) {
+                $result .= $segment;
+                continue;
+            }
 
-        $escaped = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $escaped);
-        $escaped = preg_replace('/\*(.+?)\*/s', '<em>$1</em>', $escaped);
-        $escaped = preg_replace('/__(.+?)__/s', '<strong>$1</strong>', $escaped);
-        $escaped = preg_replace('/_(.+?)_/s', '<em>$1</em>', $escaped);
+            $escaped = htmlspecialchars($segment, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
-        return $escaped;
+            $escaped = preg_replace_callback('/!\[([^\]]*)\]\(([^)]+)\)/', function ($matches) {
+                $alt = $matches[1];
+                $url = htmlspecialchars(trim($matches[2]), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                return '<img src="' . $url . '" alt="' . $alt . '">';
+            }, $escaped);
+
+            $escaped = preg_replace_callback('/\[([^\]]+)\]\(([^)]+)\)/', function ($matches) {
+                $text = $matches[1];
+                $url = htmlspecialchars(trim($matches[2]), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                return '<a href="' . $url . '">' . $text . '</a>';
+            }, $escaped);
+
+            $escaped = preg_replace_callback('/`([^`]+)`/', function ($matches) {
+                return '<code>' . $matches[1] . '</code>';
+            }, $escaped);
+
+            $escaped = preg_replace('/\*\*\*(.+?)\*\*\*/s', '<strong><em>$1</em></strong>', $escaped);
+            $escaped = preg_replace('/___(.+?)___/s', '<strong><em>$1</em></strong>', $escaped);
+            $escaped = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $escaped);
+            $escaped = preg_replace('/__(.+?)__/s', '<strong>$1</strong>', $escaped);
+            $escaped = preg_replace('/\*(.+?)\*/s', '<em>$1</em>', $escaped);
+            $escaped = preg_replace('/_(.+?)_/s', '<em>$1</em>', $escaped);
+            $escaped = preg_replace('/~~(.+?)~~/s', '<del>$1</del>', $escaped);
+
+            $escaped = $this->convertSuperscript($escaped);
+
+            $result .= $escaped;
+        }
+
+        return $result;
+    }
+
+    private function convertSuperscript(string $text): string
+    {
+        $parts = preg_split('/(<code\b[^>]*>.*?<\/code>)/s', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+        if ($parts === false) {
+            $parts = [$text];
+        }
+
+        $result = '';
+
+        foreach ($parts as $part) {
+            if ($part === '') {
+                continue;
+            }
+
+            if (preg_match('/^<code\b/i', $part)) {
+                $result .= $part;
+                continue;
+            }
+
+            $converted = preg_replace_callback('/\^([^\^]+)\^/u', function ($matches) {
+                return '<sup>' . $matches[1] . '</sup>';
+            }, $part);
+
+            $converted = preg_replace_callback('/\^([0-9]+|[A-Za-zÁÉÍÓÚáéíóúÑñºª]{1,3})/u', function ($matches) {
+                return '<sup>' . $matches[1] . '</sup>';
+            }, $converted);
+
+            $result .= $converted;
+        }
+
+        return $result;
     }
 }

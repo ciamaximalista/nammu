@@ -3736,6 +3736,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                 pagination.empty();
 
+                var groupSize = 16;
+
                 for (var i = 1; i <= totalPages; i++) {
 
                     var li = $('<li class="page-item"><a class="page-link" href="#">' + i + '</a></li>');
@@ -3759,6 +3761,12 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     });
 
                     pagination.append(li);
+
+                    if (i % groupSize === 0 && i !== totalPages) {
+
+                        pagination.append('<li class="w-100 d-none d-md-block"></li>');
+
+                    }
 
                 }
 

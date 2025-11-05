@@ -201,7 +201,18 @@ function get_settings() {
         $homeBlocks = $defaults['home']['blocks'];
     }
     $home['blocks'] = $homeBlocks;
-    $home['header'] = array_merge($defaults['home']['header'], $homeConfig['header'] ?? []);
+    $headerConfig = $homeConfig['header'] ?? [];
+    $home['header'] = array_merge($defaults['home']['header'], $headerConfig);
+    $textStyle = $home['header']['text_style'] ?? $defaults['home']['header']['text_style'];
+    if (!in_array($textStyle, ['boxed', 'plain'], true)) {
+        $textStyle = $defaults['home']['header']['text_style'];
+    }
+    $home['header']['text_style'] = $textStyle;
+    $orderStyle = $home['header']['order'] ?? $defaults['home']['header']['order'];
+    if (!in_array($orderStyle, ['image-text', 'text-image'], true)) {
+        $orderStyle = $defaults['home']['header']['order'];
+    }
+    $home['header']['order'] = $orderStyle;
 
     $socialDefaults = [
         'default_description' => '',
@@ -295,6 +306,8 @@ function get_default_template_settings(): array {
                 'type' => 'none',
                 'image' => '',
                 'mode' => 'contain',
+                'text_style' => 'boxed',
+                'order' => 'image-text',
             ],
         ],
     ];
@@ -780,7 +793,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $homeBlocksModePosted = $defaults['home']['blocks'];
         }
         $homeHeaderTypePosted = $_POST['home_header_type'] ?? $defaults['home']['header']['type'];
-        $allowedHeaderTypes = ['none', 'graphic', 'text'];
+        $allowedHeaderTypes = ['none', 'graphic', 'text', 'mixed'];
         if (!in_array($homeHeaderTypePosted, $allowedHeaderTypes, true)) {
             $homeHeaderTypePosted = $defaults['home']['header']['type'];
         }
@@ -790,9 +803,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($homeHeaderModePosted, $allowedHeaderModes, true)) {
             $homeHeaderModePosted = $defaults['home']['header']['mode'];
         }
-        if ($homeHeaderTypePosted !== 'graphic') {
+        $homeHeaderTextStylePosted = $_POST['home_header_text_style'] ?? $defaults['home']['header']['text_style'];
+        $allowedTextStyles = ['boxed', 'plain'];
+        if (!in_array($homeHeaderTextStylePosted, $allowedTextStyles, true)) {
+            $homeHeaderTextStylePosted = $defaults['home']['header']['text_style'];
+        }
+        $homeHeaderOrderPosted = $_POST['home_header_order'] ?? $defaults['home']['header']['order'];
+        $allowedOrders = ['image-text', 'text-image'];
+        if (!in_array($homeHeaderOrderPosted, $allowedOrders, true)) {
+            $homeHeaderOrderPosted = $defaults['home']['header']['order'];
+        }
+        $headerTypeNeedsImage = in_array($homeHeaderTypePosted, ['graphic', 'mixed'], true);
+        if (!$headerTypeNeedsImage) {
             $homeHeaderImagePosted = '';
             $homeHeaderModePosted = $defaults['home']['header']['mode'];
+        }
+        if ($homeHeaderTypePosted === 'mixed' && $homeHeaderImagePosted === '') {
+            $homeHeaderTypePosted = 'text';
+        }
+        if (!in_array($homeHeaderTypePosted, ['text', 'mixed'], true)) {
+            $homeHeaderTextStylePosted = $defaults['home']['header']['text_style'];
+            $homeHeaderOrderPosted = $defaults['home']['header']['order'];
         }
         $cornerStylePosted = $_POST['global_corners'] ?? $defaults['global']['corners'];
         if (!in_array($cornerStylePosted, ['rounded', 'square'], true)) {
@@ -816,6 +847,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'type' => $homeHeaderTypePosted,
                     'image' => $homeHeaderImagePosted,
                     'mode' => $homeHeaderModePosted,
+                    'text_style' => $homeHeaderTextStylePosted,
+                    'order' => $homeHeaderOrderPosted,
                 ],
             ],
         ];
@@ -1188,6 +1221,108 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                 }
 
+                .home-header-figure.header-mixed {
+
+                    display: grid;
+
+                    grid-template-rows: 1fr 1fr;
+
+                    gap: 4px;
+
+                }
+
+                .home-header-figure.header-mixed span {
+
+                    position: relative;
+
+                    width: 70px;
+
+                    height: 46px;
+
+                    border-radius: 10px;
+
+                    background: rgba(27, 142, 237, 0.2);
+
+                    border: 1px solid rgba(27, 142, 237, 0.35);
+
+                    overflow: hidden;
+
+                }
+
+                .home-header-figure.header-mixed span::before {
+
+                    content: '';
+
+                    position: absolute;
+
+                    top: 4px;
+
+                    left: 50%;
+
+                    transform: translateX(-50%);
+
+                    width: 48px;
+
+                    height: 20px;
+
+                    border-radius: 8px;
+
+                    background: rgba(27, 142, 237, 0.35);
+
+                    border: 1px solid rgba(27, 142, 237, 0.45);
+
+                }
+
+                .home-header-figure.header-mixed span::after {
+
+                    content: '';
+
+                    position: absolute;
+
+                    bottom: 6px;
+
+                    left: 10px;
+
+                    width: 50px;
+
+                    height: 12px;
+
+                    border-radius: 6px;
+
+                    background: rgba(27, 142, 237, 0.22);
+
+                    border: 1px solid rgba(27, 142, 237, 0.3);
+
+                }
+
+                .home-header-figure.header-graphic.mode-contain span {
+
+                    width: 70px;
+
+                    height: 46px;
+
+                    border-radius: 10px;
+
+                    background: rgba(27, 142, 237, 0.35);
+
+                    border: 1px solid rgba(27, 142, 237, 0.5);
+
+                }
+
+                .home-header-figure.header-graphic.mode-cover span {
+
+                    width: 100%;
+
+                    height: 46px;
+
+                    border-radius: 8px;
+
+                    background: rgba(27, 142, 237, 0.35);
+
+                    border: 1px solid rgba(27, 142, 237, 0.5);
+
+                }
+
                 .home-header-figure.header-text span {
 
                     width: 70px;
@@ -1319,6 +1454,80 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 .home-corner-figure.corner-square span {
 
                     border-radius: 0;
+
+                }
+
+                .home-header-text-figure {
+
+                    width: 92px;
+
+                    height: 62px;
+
+                    border: 2px solid #d5dbe3;
+
+                    border-radius: 12px;
+
+                    background: linear-gradient(145deg, #f4f7fb, #e7ecf4);
+
+                    display: grid;
+
+                    grid-template-rows: repeat(3, 1fr);
+
+                    gap: 6px;
+
+                    padding: 10px;
+
+                }
+
+                .home-header-text-figure .text-line {
+
+                    display: block;
+
+                    border-radius: 8px;
+
+                    background: rgba(27, 142, 237, 0.28);
+
+                    border: 1px solid rgba(27, 142, 237, 0.35);
+
+                }
+
+                .home-header-text-figure .text-line.title {
+
+                    height: 14px;
+
+                }
+
+                .home-header-text-figure .text-line.subtitle {
+
+                    height: 10px;
+
+                    background: rgba(27, 142, 237, 0.2);
+
+                }
+
+                .home-header-text-figure .text-line.tagline {
+
+                    height: 12px;
+
+                    background: rgba(27, 142, 237, 0.18);
+
+                }
+
+                .home-header-text-figure.text-header-plain {
+
+                    background: transparent;
+
+                    border-style: dashed;
+
+                    border-color: #d0d6df;
+
+                }
+
+                .home-header-text-figure.text-header-plain .text-line {
+
+                    background: rgba(27, 142, 237, 0.22);
+
+                    border-style: dashed;
 
                 }
 
@@ -1522,17 +1731,29 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                 }
 
-                .card-style-square-right .card-thumb,
-
-                .card-style-circle-right .card-thumb {
+                .card-style-square-right .card-thumb {
 
                     grid-column: 2;
 
+                    width: 34px;
+
+                    height: 34px;
+
+                    display: block;
+
+                    background: rgba(27, 142, 237, 0.35);
+
+                    border: 1px solid rgba(27, 142, 237, 0.5);
+
+                    justify-self: center;
+
+                    align-self: center;
+
+                    border-radius: 8px;
+
                 }
 
-                .card-style-square-right .card-lines,
-
-                .card-style-circle-right .card-lines {
+                .card-style-square-right .card-lines {
 
                     grid-column: 1;
 
@@ -1540,7 +1761,83 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                 .card-style-circle-right .card-thumb {
 
+                    grid-column: 2;
+
+                    width: 34px;
+
+                    height: 34px;
+
+                    display: block;
+
+                    background: rgba(27, 142, 237, 0.35);
+
+                    border: 1px solid rgba(27, 142, 237, 0.5);
+
+                    justify-self: center;
+
+                    align-self: center;
+
                     border-radius: 50%;
+
+                }
+
+                .card-style-circle-right .card-lines {
+
+                    grid-column: 1;
+
+                }
+
+                .card-style-circle-right .card-thumb + .card-lines {
+
+                    align-self: center;
+
+                }
+
+                .header-graphic-figure {
+
+                    width: 92px;
+
+                    height: 58px;
+
+                    border-radius: 12px;
+
+                    border: 2px solid #d5dbe3;
+
+                    background: linear-gradient(145deg, #f4f7fb, #e7ecf4);
+
+                    display: grid;
+
+                    place-items: center;
+
+                    padding: 8px;
+
+                }
+
+                .header-graphic-figure .graphic-preview {
+
+                    display: block;
+
+                    border-radius: 10px;
+
+                    background: rgba(27, 142, 237, 0.35);
+
+                    border: 1px solid rgba(27, 142, 237, 0.45);
+
+                    width: 100%;
+
+                    height: 32px;
+
+                }
+
+                .header-graphic-figure.contain .graphic-preview {
+
+                    width: 60%;
+
+                }
+
+                .header-graphic-figure.cover .graphic-preview {
+
+                    width: 100%;
 
                 }
 
@@ -2143,13 +2440,22 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 $homeCardStyle = $defaults['home']['card_style'];
                             }
                             $homeHeaderConfig = array_merge($defaults['home']['header'], $templateHome['header'] ?? []);
-                            $homeHeaderTypes = ['none', 'graphic', 'text'];
+                            $homeHeaderTypes = ['none', 'graphic', 'text', 'mixed'];
                             $homeHeaderType = in_array($homeHeaderConfig['type'], $homeHeaderTypes, true) ? $homeHeaderConfig['type'] : $defaults['home']['header']['type'];
                             $homeHeaderImage = $homeHeaderConfig['image'] ?? '';
                             $homeHeaderModes = ['contain', 'cover'];
                             $homeHeaderMode = in_array($homeHeaderConfig['mode'], $homeHeaderModes, true) ? $homeHeaderConfig['mode'] : $defaults['home']['header']['mode'];
-                            if ($homeHeaderType === 'graphic' && trim((string) $homeHeaderImage) === '') {
-                                $homeHeaderType = 'none';
+                            $textHeaderStyles = ['boxed', 'plain'];
+                            $homeHeaderTextStyle = $homeHeaderConfig['text_style'] ?? $defaults['home']['header']['text_style'];
+                            if (!in_array($homeHeaderTextStyle, $textHeaderStyles, true)) {
+                                $homeHeaderTextStyle = $defaults['home']['header']['text_style'];
+                            }
+                            $homeHeaderOrder = $homeHeaderConfig['order'] ?? $defaults['home']['header']['order'];
+                            if (!in_array($homeHeaderOrder, ['image-text', 'text-image'], true)) {
+                                $homeHeaderOrder = $defaults['home']['header']['order'];
+                            }
+                            if (in_array($homeHeaderType, ['graphic', 'mixed'], true) && trim((string) $homeHeaderImage) === '') {
+                                $homeHeaderType = $homeHeaderType === 'mixed' ? 'text' : 'none';
                                 $homeHeaderMode = $defaults['home']['header']['mode'];
                             }
                             $allowedCorners = ['rounded', 'square'];
@@ -2379,6 +2685,44 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                     <h5 class="mt-4">Cabecera</h5>
                                     <p class="text-muted">Selecciona cómo se mostrará la cabecera en la portada.</p>
+                                    <div class="mt-3" data-header-text <?= in_array($homeHeaderType, ['text', 'mixed'], true) ? '' : 'style="display:none;"' ?>>
+                                        <label>Estilo</label>
+                                        <div class="home-card-style-options">
+                                            <?php
+                                            $textHeaderOptions = [
+                                                'boxed' => [
+                                                    'label' => 'Cabecera en caja',
+                                                    'caption' => 'Con fondo destacado similar al post individual',
+                                                    'figure' => 'text-header-boxed',
+                                                ],
+                                                'plain' => [
+                                                    'label' => 'Sobre el fondo',
+                                                    'caption' => 'Sin caja, directamente sobre el fondo de la portada',
+                                                    'figure' => 'text-header-plain',
+                                                ],
+                                            ];
+                                            ?>
+                                            <?php foreach ($textHeaderOptions as $textKey => $info): ?>
+                                                <?php $textActive = ($homeHeaderTextStyle === $textKey); ?>
+                                                <label class="home-card-style-option <?= $textActive ? 'active' : '' ?>" data-header-text-option="1">
+                                                    <input type="radio"
+                                                        name="home_header_text_style"
+                                                        value="<?= htmlspecialchars($textKey, ENT_QUOTES, 'UTF-8') ?>"
+                                                        <?= $textActive ? 'checked' : '' ?>>
+                                                    <span class="home-header-text-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">
+                                                        <span class="text-line title"></span>
+                                                        <span class="text-line subtitle"></span>
+                                                        <span class="text-line tagline"></span>
+                                                    </span>
+                                                    <span class="card-style-text">
+                                                        <strong><?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                                        <small><?= htmlspecialchars($info['caption'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                    </span>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+
                                     <div class="home-header-options" data-header-options>
                                         <?php
                                         $headerTypeOptions = [
@@ -2396,6 +2740,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 'label' => 'Cabecera de texto',
                                                 'caption' => 'Usar cabecera similar a la de los artículos',
                                                 'figure' => 'header-text',
+                                            ],
+                                            'mixed' => [
+                                                'label' => 'Imagen + texto',
+                                                'caption' => 'Combina imagen con la cabecera textual',
+                                                'figure' => 'header-mixed',
                                             ],
                                         ];
                                         ?>
@@ -2417,7 +2766,44 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                         <?php endforeach; ?>
                                     </div>
 
-                                    <div class="mt-3" data-header-graphic <?= $homeHeaderType === 'graphic' ? '' : 'style="display:none;"' ?>>
+                                    <div class="mt-3" data-header-order <?= $homeHeaderType === 'mixed' ? '' : 'style="display:none;"' ?>>
+                                        <label>Orden de la cabecera</label>
+                                        <div class="home-card-style-options">
+                                            <?php
+                                            $headerOrderOptions = [
+                                                'image-text' => [
+                                                    'label' => 'Imagen arriba, texto abajo',
+                                                    'caption' => 'La imagen precede al bloque textual',
+                                                    'figure' => 'order-image-text',
+                                                ],
+                                                'text-image' => [
+                                                    'label' => 'Texto arriba, imagen abajo',
+                                                    'caption' => 'El bloque textual queda por encima de la imagen',
+                                                    'figure' => 'order-text-image',
+                                                ],
+                                            ];
+                                            ?>
+                                            <?php foreach ($headerOrderOptions as $orderKey => $info): ?>
+                                                <?php $orderActive = ($homeHeaderOrder === $orderKey); ?>
+                                                <label class="home-card-style-option <?= $orderActive ? 'active' : '' ?>" data-header-order-option="1">
+                                                    <input type="radio"
+                                                        name="home_header_order"
+                                                        value="<?= htmlspecialchars($orderKey, ENT_QUOTES, 'UTF-8') ?>"
+                                                        <?= $orderActive ? 'checked' : '' ?>>
+                                                    <span class="home-header-order-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">
+                                                        <span class="order-block image"></span>
+                                                        <span class="order-block text"></span>
+                                                    </span>
+                                                    <span class="card-style-text">
+                                                        <strong><?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                                        <small><?= htmlspecialchars($info['caption'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                    </span>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-3" data-header-graphic <?= in_array($homeHeaderType, ['graphic', 'mixed'], true) ? '' : 'style="display:none;"' ?>>
                                         <div class="form-group">
                                             <label for="home_header_image">Imagen de cabecera</label>
                                             <div class="input-group">
@@ -2430,35 +2816,32 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                             <small class="form-text text-muted">Selecciona una imagen desde Recursos para la cabecera de la portada.</small>
                                         </div>
 
-                                        <div class="form-group" data-header-graphic-mode <?= ($homeHeaderType === 'graphic') ? '' : 'style="display:none;"' ?>>
-                                            <label>Estilo de la imagen</label>
-                                            <div class="home-card-style-options">
-                                                <?php
-                                                $graphicModes = [
-                                                    'contain' => [
-                                                        'label' => 'Imagen centrada',
-                                                        'caption' => '160px de alto, respeta la proporción original',
-                                                    ],
-                                                    'cover' => [
-                                                        'label' => 'Imagen a ancho completo',
-                                                        'caption' => 'Recorta a 160px ocupando todo el ancho',
-                                                    ],
-                                                ];
-                                                ?>
-                                                <?php foreach ($graphicModes as $modeKey => $modeInfo): ?>
-                                                    <?php $modeActive = ($homeHeaderMode === $modeKey); ?>
-                                                    <label class="home-card-style-option <?= $modeActive ? 'active' : '' ?>" data-header-mode-option="1">
-                                                        <input type="radio"
-                                                            name="home_header_graphic_mode"
-                                                            value="<?= htmlspecialchars($modeKey, ENT_QUOTES, 'UTF-8') ?>"
-                                                            <?= $modeActive ? 'checked' : '' ?>>
-                                                        <span class="card-style-figure card-style-<?= htmlspecialchars($modeKey === 'contain' ? 'full' : 'square-right', ENT_QUOTES, 'UTF-8') ?>">
-                                                            <span class="card-thumb"></span>
-                                                            <span class="card-lines">
-                                                                <span class="line primary"></span>
-                                                                <span class="line meta"></span>
-                                                                <span class="line body"></span>
-                                                            </span>
+                                            <div class="form-group" data-header-graphic-mode <?= in_array($homeHeaderType, ['graphic', 'mixed'], true) ? '' : 'style="display:none;"' ?>>
+                                                <label>Estilo de la imagen</label>
+                                                <div class="home-card-style-options">
+                                                    <?php
+                                                    $graphicModes = [
+                                                        'contain' => [
+                                                            'label' => 'Imagen centrada',
+                                                            'caption' => '160px de alto, respeta la proporción original',
+                                                            'figure' => 'contain',
+                                                        ],
+                                                        'cover' => [
+                                                            'label' => 'Imagen a ancho completo',
+                                                            'caption' => 'Recorta a 160px ocupando todo el ancho',
+                                                            'figure' => 'cover',
+                                                        ],
+                                                    ];
+                                                    ?>
+                                                    <?php foreach ($graphicModes as $modeKey => $modeInfo): ?>
+                                                        <?php $modeActive = ($homeHeaderMode === $modeKey); ?>
+                                                        <label class="home-card-style-option <?= $modeActive ? 'active' : '' ?>" data-header-mode-option="1">
+                                                            <input type="radio"
+                                                                name="home_header_graphic_mode"
+                                                                value="<?= htmlspecialchars($modeKey, ENT_QUOTES, 'UTF-8') ?>"
+                                                                <?= $modeActive ? 'checked' : '' ?>>
+                                                        <span class="header-graphic-figure <?= htmlspecialchars($modeInfo['figure'], ENT_QUOTES, 'UTF-8') ?>">
+                                                            <span class="graphic-preview"></span>
                                                         </span>
                                                         <span class="card-style-text">
                                                             <strong><?= htmlspecialchars($modeInfo['label'], ENT_QUOTES, 'UTF-8') ?></strong>
@@ -2945,7 +3328,31 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var headerOptions = form.querySelectorAll('.home-header-option');
             var headerGraphicContainer = form.querySelector('[data-header-graphic]');
             var headerGraphicModeContainer = form.querySelector('[data-header-graphic-mode]');
+            var headerTextContainer = form.querySelector('[data-header-text]');
+            var headerOrderContainer = form.querySelector('[data-header-order]');
             var headerTypeInputs = form.querySelectorAll('input[name="home_header_type"]');
+
+            function getHeaderGraphicModeOptions() {
+                if (!headerGraphicModeContainer) {
+                    return [];
+                }
+                return Array.prototype.slice.call(headerGraphicModeContainer.querySelectorAll('.home-card-style-option[data-header-mode-option]'));
+            }
+
+            function getHeaderTextOptions() {
+                if (!headerTextContainer) {
+                    return [];
+                }
+                return Array.prototype.slice.call(headerTextContainer.querySelectorAll('.home-card-style-option[data-header-text-option]'));
+            }
+
+            function getHeaderOrderOptions() {
+                if (!headerOrderContainer) {
+                    return [];
+                }
+                return Array.prototype.slice.call(headerOrderContainer.querySelectorAll('.home-card-style-option[data-header-order-option]'));
+            }
+
             function refreshHeaderSelection() {
                 var activeType = 'none';
                 headerOptions.forEach(function(option) {
@@ -2956,32 +3363,74 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                         activeType = radio.value;
                     }
                 });
+
+                var showImageConfig = (activeType === 'graphic' || activeType === 'mixed');
+                var showTextConfig = (activeType === 'text' || activeType === 'mixed');
                 if (headerGraphicContainer) {
-                    headerGraphicContainer.style.display = activeType === 'graphic' ? '' : 'none';
+                    headerGraphicContainer.style.display = showImageConfig ? '' : 'none';
                 }
                 if (headerGraphicModeContainer) {
-                    headerGraphicModeContainer.style.display = activeType === 'graphic' ? '' : 'none';
+                    headerGraphicModeContainer.style.display = showImageConfig ? '' : 'none';
                 }
+                if (headerTextContainer) {
+                    headerTextContainer.style.display = showTextConfig ? '' : 'none';
+                }
+                if (headerOrderContainer) {
+                    headerOrderContainer.style.display = activeType === 'mixed' ? '' : 'none';
+                }
+
+                refreshHeaderModeSelection();
+                refreshHeaderTextSelection();
+                refreshHeaderOrderSelection();
             }
+
             headerTypeInputs.forEach(function(input) {
                 input.addEventListener('change', refreshHeaderSelection);
             });
-            refreshHeaderSelection();
 
-            var headerGraphicModes = headerGraphicModeContainer ? headerGraphicModeContainer.querySelectorAll('.home-card-style-option[data-header-mode-option]') : [];
             function refreshHeaderModeSelection() {
-                headerGraphicModes.forEach(function(option) {
+                getHeaderGraphicModeOptions().forEach(function(option) {
                     var radio = option.querySelector('input[type="radio"]');
                     option.classList.toggle('active', radio && radio.checked);
                 });
             }
-            headerGraphicModes.forEach(function(option) {
+
+            getHeaderGraphicModeOptions().forEach(function(option) {
                 var radio = option.querySelector('input[type="radio"]');
                 if (radio) {
                     radio.addEventListener('change', refreshHeaderModeSelection);
                 }
             });
-            refreshHeaderModeSelection();
+
+            function refreshHeaderTextSelection() {
+                getHeaderTextOptions().forEach(function(option) {
+                    var radio = option.querySelector('input[type="radio"]');
+                    option.classList.toggle('active', radio && radio.checked);
+                });
+            }
+
+            getHeaderTextOptions().forEach(function(option) {
+                var radio = option.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.addEventListener('change', refreshHeaderTextSelection);
+                }
+            });
+
+            function refreshHeaderOrderSelection() {
+                getHeaderOrderOptions().forEach(function(option) {
+                    var radio = option.querySelector('input[type="radio"]');
+                    option.classList.toggle('active', radio && radio.checked);
+                });
+            }
+
+            getHeaderOrderOptions().forEach(function(option) {
+                var radio = option.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.addEventListener('change', refreshHeaderOrderSelection);
+                }
+            });
+
+            refreshHeaderSelection();
 
             var cornerOptions = form.querySelectorAll('.home-card-style-option[data-corners-option]');
             function refreshCornerSelection() {

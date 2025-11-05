@@ -413,7 +413,7 @@ function nammu_template_settings(): array
     $home['blocks'] = $homeBlocks;
     $homeHeaderDefaults = $defaults['home']['header'];
     $homeHeader = array_merge($homeHeaderDefaults, $homeConfig['header'] ?? []);
-    $headerTypes = ['none', 'graphic', 'text'];
+    $headerTypes = ['none', 'graphic', 'text', 'mixed'];
     if (!in_array($homeHeader['type'], $headerTypes, true)) {
         $homeHeader['type'] = $homeHeaderDefaults['type'];
     }
@@ -421,12 +421,19 @@ function nammu_template_settings(): array
     if (!in_array($homeHeader['mode'], $headerModes, true)) {
         $homeHeader['mode'] = $homeHeaderDefaults['mode'];
     }
-    if ($homeHeader['type'] === 'graphic' && trim((string) $homeHeader['image']) === '') {
-        $homeHeader['type'] = 'none';
+    $textHeaderStyles = ['boxed', 'plain'];
+    if (!in_array($homeHeader['text_style'], $textHeaderStyles, true)) {
+        $homeHeader['text_style'] = $homeHeaderDefaults['text_style'];
     }
-    if ($homeHeader['type'] !== 'graphic') {
+    if (in_array($homeHeader['type'], ['graphic', 'mixed'], true) && trim((string) $homeHeader['image']) === '') {
+        $homeHeader['type'] = $homeHeader['type'] === 'mixed' ? 'text' : 'none';
+    }
+    if ($homeHeader['type'] !== 'graphic' && $homeHeader['type'] !== 'mixed') {
         $homeHeader['image'] = '';
         $homeHeader['mode'] = $homeHeaderDefaults['mode'];
+    }
+    if ($homeHeader['type'] !== 'text' && $homeHeader['type'] !== 'mixed') {
+        $homeHeader['text_style'] = $homeHeaderDefaults['text_style'];
     }
     $home['header'] = $homeHeader;
     $author = $config['site_author'] ?? '';
@@ -492,6 +499,8 @@ function nammu_default_template_settings(): array
                 'type' => 'none',
                 'image' => '',
                 'mode' => 'contain',
+                'text_style' => 'boxed',
+                'order' => 'image-text',
             ],
         ],
     ];

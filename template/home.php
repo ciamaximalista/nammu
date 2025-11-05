@@ -35,6 +35,7 @@ if (is_string($accentRaw)) {
 }
 $brandColor = htmlspecialchars($colors['brand'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8');
 $headingColor = htmlspecialchars($colors['h1'] ?? '#1b8eed', ENT_QUOTES, 'UTF-8');
+$headingSecondaryColor = htmlspecialchars($colors['h2'] ?? '#ea2f28', ENT_QUOTES, 'UTF-8');
 $homeSettings = $theme['home'] ?? [];
 $columns = (int) ($homeSettings['columns'] ?? 2);
 if ($columns < 1 || $columns > 3) {
@@ -50,26 +51,75 @@ if (!in_array($blocksMode, ['boxed', 'flat'], true)) {
     $blocksMode = 'boxed';
 }
 $headerConfig = $homeSettings['header'] ?? [];
-$headerTypes = ['none', 'graphic', 'text'];
+$headerTypes = ['none', 'graphic', 'text', 'mixed'];
 $headerType = in_array($headerConfig['type'] ?? 'none', $headerTypes, true) ? $headerConfig['type'] : 'none';
 $headerImageSetting = trim($headerConfig['image'] ?? '');
 $headerMode = in_array($headerConfig['mode'] ?? 'contain', ['contain', 'cover'], true) ? $headerConfig['mode'] : 'contain';
+$textHeaderStyle = $headerConfig['text_style'] ?? 'boxed';
+if (!in_array($textHeaderStyle, ['boxed', 'plain'], true)) {
+    $textHeaderStyle = 'boxed';
+}
+$headerOrder = $headerConfig['order'] ?? 'image-text';
+if (!in_array($headerOrder, ['image-text', 'text-image'], true)) {
+    $headerOrder = 'image-text';
+}
+
 $headerImageUrl = null;
-if ($headerType === 'graphic' && $headerImageSetting !== '') {
-    $headerImageUrl = $resolveImage($headerImageSetting);
-    if ($headerImageUrl === null) {
-        $headerType = 'none';
+if ($headerImageSetting !== '') {
+    $resolvedImage = $resolveImage($headerImageSetting);
+    if ($resolvedImage !== null) {
+        $headerImageUrl = $resolvedImage;
     }
 }
+$hasHeaderImage = $headerImageUrl !== null;
+
 $homeBrandTitle = $theme['author'] ?? '';
 $homeHeroTitle = $theme['blog'] ?? $siteTitle ?? '';
-
 $defaultDescription = $socialConfig['default_description'] ?? '';
 $homeHeroTagline = $defaultDescription !== '' ? $defaultDescription : ($siteDescription ?? '');
 $hasTextHeaderContent = ($homeBrandTitle !== '' || $homeHeroTitle !== '' || $homeHeroTagline !== '');
-if ($headerType === 'text' && !$hasTextHeaderContent) {
+
+if ($headerType === 'mixed' && !$hasHeaderImage && !$hasTextHeaderContent) {
+    $headerType = 'none';
+} elseif ($headerType === 'mixed' && !$hasHeaderImage) {
+    $headerType = 'text';
+} elseif ($headerType === 'mixed' && !$hasTextHeaderContent) {
+    $headerType = 'graphic';
+}
+
+if ($headerType === 'graphic' && !$hasHeaderImage) {
     $headerType = 'none';
 }
+
+if (($headerType === 'text' || $headerType === 'mixed') && !$hasTextHeaderContent) {
+    if ($headerType === 'mixed' && $hasHeaderImage) {
+        $headerType = 'graphic';
+    } else {
+        $headerType = 'none';
+    }
+}
+$mixedBoxedHeader = $headerType === 'mixed' && $textHeaderStyle === 'boxed';
+$mixedHasImage = $headerType === 'mixed' && $hasHeaderImage;
+$mixedBoxedFullWidth = $mixedBoxedHeader && $headerMode === 'cover';
+$renderHomeHeroText = static function () use ($homeBrandTitle, $homeHeroTitle, $homeHeroTagline): void {
+    if ($homeBrandTitle !== '') {
+        ?>
+        <div class="home-brand">
+            <span class="home-brand-title"><?= htmlspecialchars($homeBrandTitle, ENT_QUOTES, 'UTF-8') ?></span>
+        </div>
+        <?php
+    }
+    if ($homeHeroTitle !== '') {
+        ?>
+        <h1><?= htmlspecialchars($homeHeroTitle, ENT_QUOTES, 'UTF-8') ?></h1>
+        <?php
+    }
+    if ($homeHeroTagline !== '') {
+        ?>
+        <p class="home-hero-tagline"><?= htmlspecialchars($homeHeroTagline, ENT_QUOTES, 'UTF-8') ?></p>
+        <?php
+    }
+};
 $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     ? $paginationUrl
     : static function (int $page) use ($baseHref): string {
@@ -88,19 +138,69 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     <section class="home-hero home-hero-graphic mode-<?= htmlspecialchars($headerMode, ENT_QUOTES, 'UTF-8') ?>">
         <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio">
     </section>
-<?php elseif ($headerType === 'text'): ?>
-    <section class="home-hero home-hero-text">
-        <?php if ($homeBrandTitle !== ''): ?>
-            <div class="home-brand">
-                <span class="home-brand-title"><?= htmlspecialchars($homeBrandTitle, ENT_QUOTES, 'UTF-8') ?></span>
+<?php elseif ($headerType === 'mixed'): ?>
+    <?php
+    $mixedLayoutClass = $mixedBoxedHeader ? 'mixed-boxed' : 'mixed-split';
+    $mixedOrderClass = 'order-' . $headerOrder;
+    $mixedSectionClasses = trim($mixedLayoutClass . ' ' . $mixedOrderClass);
+    $textClassParts = [
+        'home-hero-text',
+        'variant-' . $textHeaderStyle,
+    ];
+    if ($mixedBoxedHeader && $mixedHasImage) {
+        $textClassParts[] = 'mixed-has-image';
+    }
+    if ($mixedBoxedFullWidth) {
+        $textClassParts[] = 'full-width';
+    }
+    $textClasses = implode(' ', $textClassParts);
+    ?>
+    <section class="home-hero home-hero-mixed <?= htmlspecialchars($mixedSectionClasses, ENT_QUOTES, 'UTF-8') ?>">
+        <?php if ($mixedBoxedHeader): ?>
+            <div class="<?= htmlspecialchars($textClasses, ENT_QUOTES, 'UTF-8') ?>">
+                <?php if ($headerOrder === 'image-text' && $hasHeaderImage): ?>
+                    <?php
+                    $insideGraphicClass = 'home-hero-graphic inside mode-' . $headerMode;
+                    if ($mixedBoxedFullWidth) {
+                        $insideGraphicClass .= ' full';
+                    }
+                    ?>
+                    <div class="<?= htmlspecialchars($insideGraphicClass, ENT_QUOTES, 'UTF-8') ?>">
+                        <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio">
+                    </div>
+                <?php endif; ?>
+                <?php $renderHomeHeroText(); ?>
+                <?php if ($headerOrder === 'text-image' && $hasHeaderImage): ?>
+                    <?php
+                    $insideGraphicClass = 'home-hero-graphic inside mode-' . $headerMode;
+                    if ($mixedBoxedFullWidth) {
+                        $insideGraphicClass .= ' full';
+                    }
+                    ?>
+                    <div class="<?= htmlspecialchars($insideGraphicClass, ENT_QUOTES, 'UTF-8') ?>">
+                        <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio">
+                    </div>
+                <?php endif; ?>
             </div>
+        <?php else: ?>
+            <?php if ($headerOrder === 'image-text' && $hasHeaderImage): ?>
+                <div class="home-hero-graphic mode-<?= htmlspecialchars($headerMode, ENT_QUOTES, 'UTF-8') ?> full">
+                    <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio">
+                </div>
+            <?php endif; ?>
+            <div class="<?= htmlspecialchars($textClasses, ENT_QUOTES, 'UTF-8') ?>">
+                <?php $renderHomeHeroText(); ?>
+            </div>
+            <?php if ($headerOrder === 'text-image' && $hasHeaderImage): ?>
+                <div class="home-hero-graphic mode-<?= htmlspecialchars($headerMode, ENT_QUOTES, 'UTF-8') ?> full">
+                    <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio">
+                </div>
+            <?php endif; ?>
         <?php endif; ?>
-        <?php if ($homeHeroTitle !== ''): ?>
-            <h1><?= htmlspecialchars($homeHeroTitle, ENT_QUOTES, 'UTF-8') ?></h1>
-        <?php endif; ?>
-        <?php if ($homeHeroTagline !== ''): ?>
-            <p class="home-hero-tagline"><?= htmlspecialchars($homeHeroTagline, ENT_QUOTES, 'UTF-8') ?></p>
-        <?php endif; ?>
+    </section>
+<?php elseif ($headerType === 'text'): ?>
+    <section class="home-hero home-hero-text variant-<?= htmlspecialchars($textHeaderStyle, ENT_QUOTES, 'UTF-8') ?>">
+        <?php $renderHomeHeroText(); ?>
     </section>
 <?php endif; ?>
 
@@ -196,6 +296,12 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         justify-content: center;
         overflow: hidden;
     }
+    .home-hero-graphic.full {
+        width: 100%;
+    }
+    .home-hero-graphic.full img {
+        width: 100%;
+    }
     .home-hero-graphic img {
         display: block;
         border-radius: inherit;
@@ -210,14 +316,60 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         height: 160px;
         object-fit: cover;
     }
+
+    .home-hero-mixed {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        align-items: stretch;
+    }
+    .home-hero-mixed.mixed-split .home-hero-graphic {
+        margin: 0 auto;
+        width: 100%;
+        max-width: min(960px, 100%);
+    }
+    .home-hero-mixed .home-hero-text {
+        width: 100%;
+    }
     .home-hero-text {
         display: grid;
         gap: 0.75rem;
         text-align: center;
         border-radius: var(--nammu-radius-lg);
         padding: 2rem clamp(1.5rem, 4vw, 3rem);
+        border: 1px solid transparent;
+        max-width: min(760px, 100%);
+        margin: 0 auto;
+        box-sizing: border-box;
+    }
+    .home-hero-text.variant-boxed {
         background: <?= $highlight ?>;
-        border: 1px solid rgba(0,0,0,0.05);
+        border-color: rgba(0,0,0,0.05);
+        overflow: hidden;
+    }
+    .home-hero-text.variant-plain {
+        background: transparent;
+        border: none;
+    }
+    .home-hero-text.variant-boxed .home-hero-graphic {
+        border-radius: 0;
+    }
+    .home-hero-text.mixed-has-image {
+        gap: 1.25rem;
+    }
+    .home-hero-text.mixed-has-image .home-hero-graphic {
+        margin: 0;
+        width: 100%;
+    }
+    .home-hero-text.mixed-has-image .home-hero-graphic img {
+        width: 100%;
+        display: block;
+    }
+    .home-hero-text.full-width {
+        max-width: none;
+        width: 100%;
+        margin-left: auto;
+        margin-right: auto;
     }
     .home-brand {
         display: flex;
@@ -343,7 +495,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         margin: 0;
         font-size: 1.3rem;
         line-height: 1.25;
-        color: <?= $headingColor ?>;
+        color: <?= $headingSecondaryColor ?>;
     }
     .post-grid.columns-1 .post-card h2 {
         font-size: clamp(1.6rem, 3.2vw, 2.05rem);
@@ -355,7 +507,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         font-size: clamp(1.25rem, 2vw, 1.45rem);
     }
     .post-card h2 a {
-        color: <?= $headingColor ?>;
+        color: <?= $headingSecondaryColor ?>;
         transition: color 0.2s ease;
     }
     .post-card h2 a:hover {

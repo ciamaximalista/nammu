@@ -71,8 +71,8 @@ Cuando apliques nuevas versiones desde GitHub, asegúrate de que los permisos no
 
 ```bash
 sudo chown -R TU_USUARIO:www-data /var/www/html/blogs/memoria
-find /var/www/html/blogs/memoria -type d -exec chmod 775 {} \\;
-find /var/www/html/blogs/memoria -type f -exec chmod 664 {} \\;
+find /var/www/html/blogs/memoria -type d -exec chmod 775 {} \;
+find /var/www/html/blogs/memoria -type f -exec chmod 664 {} \;
 
 sudo chown -R www-data:www-data /var/www/html/blogs/memoria/{content,assets,config}
 sudo chmod 775 /var/www/html/blogs/memoria/{content,assets,config}

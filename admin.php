@@ -240,9 +240,18 @@ function get_user_data() {
 }
 
 function register_user($username, $password) {
+    $dir = dirname(USER_FILE);
+    if (!is_dir($dir)) {
+        if (!mkdir($dir, 0755, true) && !is_dir($dir)) {
+            throw new RuntimeException('No se pudo crear el directorio de configuración');
+        }
+    }
+
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
     $content = "<?php return ['username' => '" . addslashes($username) . "', 'password' => '" . $hashed_password . "'];";
-    file_put_contents(USER_FILE, $content);
+    if (file_put_contents(USER_FILE, $content) === false) {
+        throw new RuntimeException('No se pudo escribir el archivo de usuario');
+    }
 }
 
 function verify_user($username, $password) {

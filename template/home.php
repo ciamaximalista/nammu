@@ -343,6 +343,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         margin: 0;
         font-size: 1.3rem;
         line-height: 1.25;
+        color: <?= $headingColor ?>;
     }
     .post-grid.columns-1 .post-card h2 {
         font-size: clamp(1.6rem, 3.2vw, 2.05rem);
@@ -354,10 +355,12 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         font-size: clamp(1.25rem, 2vw, 1.45rem);
     }
     .post-card h2 a {
-        color: <?= $accentColor ?>;
+        color: <?= $headingColor ?>;
+        transition: color 0.2s ease;
     }
     .post-card h2 a:hover {
         text-decoration: underline;
+        color: <?= $accentColor ?>;
     }
     .post-meta {
         margin: 0;

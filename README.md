@@ -1,3 +1,5 @@
+![Nammu Logo](assets/logo-fundacion-repoblacion.png)
+
 # Nammu — Motor de Blog compatible con PicoCMS
 
 Nammu es un motor ligero para blogs que reutiliza la estructura de contenidos de **PicoCMS** y añade herramientas de edición, plantillas personalizables, generación de RSS y administración de recursos. El proyecto se distribuye bajo licencia **EUPL** y puede ejecutarse en cualquier alojamiento que soporte PHP 8+.
@@ -62,3 +64,18 @@ Este proyecto se distribuye bajo **European Union Public Licence (EUPL)**. Consu
 
 ¿Preguntas o incidencias? Abre un _issue_ en GitHub o contacta con el equipo de desarrollo. ¡Bienvenido a Nammu! 🪶
 
+
+## Actualizaciones
+
+Cuando apliques nuevas versiones desde GitHub, asegúrate de que los permisos no impidan la escritura en el repositorio. Si delegaste la propiedad en el usuario del servidor web, puedes recuperar el control con tu usuario SSH:
+
+```bash
+sudo chown -R TU_USUARIO:www-data /var/www/html/blogs/memoria
+find /var/www/html/blogs/memoria -type d -exec chmod 775 {} \\;
+find /var/www/html/blogs/memoria -type f -exec chmod 664 {} \\;
+
+sudo chown -R www-data:www-data /var/www/html/blogs/memoria/{content,assets,config}
+sudo chmod 775 /var/www/html/blogs/memoria/{content,assets,config}
+```
+
+Reemplaza `TU_USUARIO` por tu usuario SSH. Con esta secuencia podrás ejecutar `git pull` normalmente y mantener el servidor con permisos de escritura en las rutas necesarias.

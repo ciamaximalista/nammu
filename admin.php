@@ -2782,7 +2782,14 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 selectElement.appendChild(placeholder);
 
                 let currentFound = false;
-                fonts.forEach(function(font) {
+                const orderedFonts = Array.isArray(fonts) ? fonts.slice().sort(function(a, b) {
+                    return (a.family || '').localeCompare(b.family || '', 'es', { sensitivity: 'base' });
+                }) : [];
+
+                orderedFonts.forEach(function(font) {
+                    if (!font || !font.family) {
+                        return;
+                    }
                     const option = document.createElement('option');
                     option.value = font.family;
                     option.textContent = font.family;

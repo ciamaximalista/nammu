@@ -12,6 +12,8 @@ $themeFonts = $theme['fonts'] ?? [];
 $themeColors = $theme['colors'] ?? [];
 $titleFont = htmlspecialchars($themeFonts['title'] ?? 'Gabarito', ENT_QUOTES, 'UTF-8');
 $bodyFont = htmlspecialchars($themeFonts['body'] ?? 'Roboto', ENT_QUOTES, 'UTF-8');
+$codeFont = htmlspecialchars($themeFonts['code'] ?? 'VT323', ENT_QUOTES, 'UTF-8');
+$quoteFont = htmlspecialchars($themeFonts['quote'] ?? 'Castoro', ENT_QUOTES, 'UTF-8');
 $fontLink = $theme['fontUrl'] ?? null;
 $colorBackground = htmlspecialchars($themeColors['background'] ?? '#ffffff', ENT_QUOTES, 'UTF-8');
 $colorText = htmlspecialchars($themeColors['text'] ?? '#222222', ENT_QUOTES, 'UTF-8');
@@ -119,7 +121,7 @@ $cornerClass = $cornerStyle === 'square' ? 'corners-square' : 'corners-rounded';
         code {
             background-color: <?= $colorCodeBackground ?>;
             color: <?= $colorCodeText ?>;
-            font-family: "Fira Code", "Source Code Pro", "Courier New", monospace;
+            font-family: "<?= $codeFont ?>", "Fira Code", "Source Code Pro", "Courier New", monospace;
         }
         pre {
             padding: 1rem 1.25rem;
@@ -137,6 +139,22 @@ $cornerClass = $cornerStyle === 'square' ? 'corners-square' : 'corners-rounded';
             background: transparent;
             color: inherit;
             padding: 0;
+        }
+        blockquote {
+            margin: 2rem auto;
+            padding: 1.5rem 1.75rem;
+            border-left: 4px solid <?= $colorAccent ?>;
+            background: <?= $colorHighlight ?>;
+            border-radius: var(--nammu-radius-md);
+            font-family: "<?= $quoteFont ?>", "Georgia", serif;
+            font-style: italic;
+            color: <?= $colorText ?>;
+        }
+        blockquote p {
+            margin: 0 0 0.85rem 0;
+        }
+        blockquote p:last-child {
+            margin-bottom: 0;
         }
         .post-brand {
             color: <?= $colorBrand ?>;

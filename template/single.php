@@ -8,6 +8,9 @@ $colorAccent = htmlspecialchars($colors['accent'] ?? '#0a4c8a', ENT_QUOTES, 'UTF
 $colorBrand = htmlspecialchars($colors['brand'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8');
 $colorCodeBg = htmlspecialchars($colors['code_background'] ?? '#000000', ENT_QUOTES, 'UTF-8');
 $colorCodeText = htmlspecialchars($colors['code_text'] ?? '#90ee90', ENT_QUOTES, 'UTF-8');
+$fonts = $theme['fonts'] ?? [];
+$codeFont = htmlspecialchars($fonts['code'] ?? 'VT323', ENT_QUOTES, 'UTF-8');
+$quoteFont = htmlspecialchars($fonts['quote'] ?? 'Castoro', ENT_QUOTES, 'UTF-8');
 $siteAuthor = htmlspecialchars($theme['author'] !== '' ? $theme['author'] : ($siteTitle ?? ''), ENT_QUOTES, 'UTF-8');
 $siteBlog = htmlspecialchars($theme['blog'] !== '' ? $theme['blog'] : ($siteDescription ?? ''), ENT_QUOTES, 'UTF-8');
 function nammu_format_date_es(?string $date): string {
@@ -165,6 +168,7 @@ $metaText = implode(' ', $metaTextParts);
         font-size: 0.95rem;
         line-height: 1.5;
         box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+        font-family: "<?= $codeFont ?>", "Fira Code", "Source Code Pro", "Courier New", monospace;
     }
     .post-body code {
         background: <?= $colorCodeBg ?>;
@@ -172,11 +176,28 @@ $metaText = implode(' ', $metaTextParts);
         padding: 0.15rem 0.35rem;
         border-radius: var(--nammu-radius-sm);
         font-size: 0.95em;
+        font-family: "<?= $codeFont ?>", "Fira Code", "Source Code Pro", "Courier New", monospace;
     }
     .post-body pre code {
         background: transparent;
         color: inherit;
         padding: 0;
         font-size: inherit;
+    }
+    .post-body blockquote {
+        margin: 2rem auto;
+        padding: 1.5rem 1.75rem;
+        background: <?= $colorHighlight ?>;
+        border-left: 4px solid <?= $colorAccent ?>;
+        border-radius: var(--nammu-radius-md);
+        font-family: "<?= $quoteFont ?>", "Georgia", serif;
+        font-style: italic;
+        color: <?= $colorText ?>;
+    }
+    .post-body blockquote p {
+        margin: 0 0 0.9rem 0;
+    }
+    .post-body blockquote p:last-child {
+        margin-bottom: 0;
     }
 </style>

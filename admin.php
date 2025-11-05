@@ -283,6 +283,8 @@ function get_default_template_settings(): array {
         'fonts' => [
             'title' => 'Gabarito',
             'body' => 'Roboto',
+            'code' => 'VT323',
+            'quote' => 'Castoro',
         ],
         'colors' => [
             'h1' => '#1b8eed',
@@ -755,6 +757,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fonts = [
             'title' => trim($_POST['title_font'] ?? ''),
             'body' => trim($_POST['body_font'] ?? ''),
+            'code' => trim($_POST['code_font'] ?? ''),
+            'quote' => trim($_POST['quote_font'] ?? ''),
         ];
 
         foreach ($fonts as $key => $value) {
@@ -2515,6 +2519,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             $templateSettings = $settings['template'] ?? get_default_template_settings();
                             $fontTitle = $templateSettings['fonts']['title'] ?? '';
                             $fontBody = $templateSettings['fonts']['body'] ?? '';
+                            $fontCode = $templateSettings['fonts']['code'] ?? '';
+                            $fontQuote = $templateSettings['fonts']['quote'] ?? '';
                             $templateColors = $templateSettings['colors'] ?? [];
                             $templateImages = $templateSettings['images'] ?? [];
                             $logoImage = $templateImages['logo'] ?? '';
@@ -2615,6 +2621,28 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 <?php endif; ?>
                                             </select>
                                             <small class="form-text text-muted">Recuerda incluir todos los pesos necesarios desde Google Fonts.</small>
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group col-md-6">
+                                            <label for="code_font">Fuente para código</label>
+                                            <select name="code_font" id="code_font" class="form-control" data-current-font="<?= htmlspecialchars($fontCode) ?>">
+                                                <option value="">Selecciona una fuente</option>
+                                                <?php if ($fontCode): ?>
+                                                    <option value="<?= htmlspecialchars($fontCode) ?>" selected><?= htmlspecialchars($fontCode) ?> (actual)</option>
+                                                <?php endif; ?>
+                                            </select>
+                                            <small class="form-text text-muted">Se aplicará a bloques `code` y `pre`.</small>
+                                        </div>
+                                        <div class="form-group col-md-6">
+                                            <label for="quote_font">Fuente para citas</label>
+                                            <select name="quote_font" id="quote_font" class="form-control" data-current-font="<?= htmlspecialchars($fontQuote) ?>">
+                                                <option value="">Selecciona una fuente</option>
+                                                <?php if ($fontQuote): ?>
+                                                    <option value="<?= htmlspecialchars($fontQuote) ?>" selected><?= htmlspecialchars($fontQuote) ?> (actual)</option>
+                                                <?php endif; ?>
+                                            </select>
+                                            <small class="form-text text-muted">Se utilizará en los bloques de cita (&gt;).</small>
                                         </div>
                                     </div>
                                     <div id="fonts-alert"></div>
@@ -3315,10 +3343,14 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             const apiKey = form.dataset.googleFontsKey || '';
             const titleSelect = document.getElementById('title_font');
             const bodySelect = document.getElementById('body_font');
+            const codeSelect = document.getElementById('code_font');
+            const quoteSelect = document.getElementById('quote_font');
             const fontsAlert = document.getElementById('fonts-alert');
 
             const currentTitleFont = titleSelect ? titleSelect.dataset.currentFont || '' : '';
             const currentBodyFont = bodySelect ? bodySelect.dataset.currentFont || '' : '';
+            const currentCodeFont = codeSelect ? codeSelect.dataset.currentFont || '' : '';
+            const currentQuoteFont = quoteSelect ? quoteSelect.dataset.currentFont || '' : '';
 
             function fillSelect(selectElement, fonts, current) {
                 if (!selectElement) return;
@@ -3356,7 +3388,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
             }
 
-            if (apiKey && (titleSelect || bodySelect)) {
+            if (apiKey && (titleSelect || bodySelect || codeSelect || quoteSelect)) {
                 fetch('https://www.googleapis.com/webfonts/v1/webfonts?key=' + encodeURIComponent(apiKey) + '&sort=popularity')
                     .then(function(response) {
                         if (!response.ok) {
@@ -3368,6 +3400,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                         const fonts = data && Array.isArray(data.items) ? data.items : [];
                         fillSelect(titleSelect, fonts, currentTitleFont);
                         fillSelect(bodySelect, fonts, currentBodyFont);
+                        fillSelect(codeSelect, fonts, currentCodeFont);
+                        fillSelect(quoteSelect, fonts, currentQuoteFont);
                     })
                     .catch(function(error) {
                         if (fontsAlert) {

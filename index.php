@@ -411,6 +411,11 @@ function nammu_template_settings(): array
         $homeBlocks = $defaults['home']['blocks'];
     }
     $home['blocks'] = $homeBlocks;
+    $fullImageMode = $home['full_image_mode'] ?? $defaults['home']['full_image_mode'];
+    if (!in_array($fullImageMode, ['natural', 'crop'], true)) {
+        $fullImageMode = $defaults['home']['full_image_mode'];
+    }
+    $home['full_image_mode'] = $fullImageMode;
     $homeHeaderDefaults = $defaults['home']['header'];
     $homeHeader = array_merge($homeHeaderDefaults, $homeConfig['header'] ?? []);
     $headerTypes = ['none', 'graphic', 'text', 'mixed'];
@@ -439,11 +444,39 @@ function nammu_template_settings(): array
     $author = $config['site_author'] ?? '';
     $blog = $config['site_name'] ?? '';
 
-    $families = [];
-    foreach (array_unique([$fonts['title'], $fonts['body']]) as $font) {
-        if ($font !== null && $font !== '') {
-            $families[] = str_replace(' ', '+', $font) . ':wght@400;700';
+    $fontRequests = [];
+    $titleFont = $fonts['title'] ?? '';
+    $bodyFont = $fonts['body'] ?? '';
+    $codeFont = $fonts['code'] ?? '';
+    $quoteFont = $fonts['quote'] ?? '';
+
+    if ($titleFont !== '') {
+        $fontRequests[$titleFont] = 'wght@400;700';
+    }
+    if ($bodyFont !== '') {
+        $fontRequests[$bodyFont] = 'wght@400;700';
+    }
+    if ($quoteFont !== '') {
+        if (!isset($fontRequests[$quoteFont])) {
+            $fontRequests[$quoteFont] = 'wght@400;700';
         }
+    }
+    if ($codeFont !== '') {
+        if (!isset($fontRequests[$codeFont])) {
+            $fontRequests[$codeFont] = 'wght@400';
+        }
+    }
+
+    $families = [];
+    foreach ($fontRequests as $fontName => $variant) {
+        if ($fontName === '' || $fontName === null) {
+            continue;
+        }
+        $family = str_replace(' ', '+', $fontName);
+        if ($variant !== '') {
+            $family .= ':' . $variant;
+        }
+        $families[] = $family;
     }
 
     $fontUrl = null;
@@ -471,6 +504,8 @@ function nammu_default_template_settings(): array
         'fonts' => [
             'title' => 'Gabarito',
             'body' => 'Roboto',
+            'code' => 'VT323',
+            'quote' => 'Castoro',
         ],
         'colors' => [
             'h1' => '#1b8eed',
@@ -482,6 +517,8 @@ function nammu_default_template_settings(): array
             'highlight' => '#f3f6f9',
             'accent' => '#0a4c8a',
             'brand' => '#1b1b1b',
+            'code_background' => '#000000',
+            'code_text' => '#90ee90',
         ],
         'footer' => '',
         'images' => [
@@ -495,6 +532,7 @@ function nammu_default_template_settings(): array
             'per_page' => 'all',
             'card_style' => 'full',
             'blocks' => 'boxed',
+            'full_image_mode' => 'natural',
             'header' => [
                 'type' => 'none',
                 'image' => '',

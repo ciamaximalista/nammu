@@ -369,8 +369,9 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         width: 100%;
     }
     .home-hero-text.mixed-has-image .home-hero-graphic img {
-        width: 100%;
         display: block;
+        max-width: 100%;
+        height: auto;
     }
     .home-hero-text.full-width {
         max-width: none;

@@ -11,6 +11,8 @@ Nammu es un motor ligero para blogs que reutiliza la estructura de contenidos de
 - Plantillas configurables desde la administración: tipografías Google Fonts, colores, cabeceras, maquetación de portada, footer, meta etiquetas sociales y logotipo flotante.
 - Generación automática de `rss.xml`  (RSS 2.0) con imágenes destacadas y compatibilidad con URLs amigables.
 - Parseador Markdown extensible con soporte para listas, encabezados, enlaces, imágenes, código en línea, bloques de cita y bloques de código.
+- Buscador avanzado (`buscar.php`) con soporte para frases exactas, exclusiones con `-palabra`, filtros por campos (`title:`, `category:`, `content:`), selector de tipo (entradas/páginas) e integración visual configurable desde la plantilla.
+- Índice de categorías (`/categorias`) y páginas por categoría (`/categoria/{slug}`) que reutilizan la maquetación elegida para la portada e incluyen miniaturas automáticas basadas en la última entrada de cada categoría.
 - Compatible con la estructura de directorios de PicoCMS (`content/` y `assets/`), lo que simplifica migraciones.
 
 ## Requisitos
@@ -99,4 +101,3 @@ Este proyecto se distribuye bajo **European Union Public Licence (EUPL)**. Consu
 ---
 
 ¿Preguntas o incidencias? Abre un _issue_ en GitHub o contacta con el equipo de desarrollo. ¡Bienvenido a Nammu! 
-

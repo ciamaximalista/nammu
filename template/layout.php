@@ -33,6 +33,13 @@ $socialMeta = $socialMeta ?? [];
 $themeGlobal = $theme['global'] ?? [];
 $cornerStyle = $theme['corners'] ?? ($themeGlobal['corners'] ?? 'rounded');
 $cornerClass = $cornerStyle === 'square' ? 'corners-square' : 'corners-rounded';
+$searchSettings = $theme['search'] ?? [];
+$searchFloatingEnabled = ($searchSettings['floating'] ?? 'off') === 'on';
+$baseHref = $baseUrl ?? '/';
+$searchBaseNormalized = rtrim($baseHref === '' ? '/' : $baseHref, '/');
+$floatingSearchAction = $searchBaseNormalized === '' ? '/buscar.php' : $searchBaseNormalized . '/buscar.php';
+$floatingCategoriesUrl = $searchBaseNormalized === '' ? '/categorias' : $searchBaseNormalized . '/categorias';
+$showFloatingSearch = $searchFloatingEnabled && !empty($showLogo) && !empty($logoUrl);
 ?><!DOCTYPE html>
 <html lang="es">
 <head>
@@ -202,8 +209,91 @@ $cornerClass = $cornerStyle === 'square' ? 'corners-square' : 'corners-rounded';
             object-fit: cover;
             display: block;
         }
+        .floating-search {
+            position: fixed;
+            top: calc(2.5rem + 48px + 0.9rem);
+            right: clamp(1.5rem, 5vw, 2.5rem);
+            width: clamp(210px, 24vw, 250px);
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: var(--nammu-radius-md);
+            border: 1px solid rgba(0,0,0,0.08);
+            box-shadow: 0 18px 32px rgba(0,0,0,0.12);
+            padding: 0.6rem 0.75rem;
+            z-index: 1099;
+            backdrop-filter: blur(6px);
+        }
+        .floating-search-form {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+        .floating-search-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: <?= $colorHighlight ?>;
+            border: 1px solid rgba(0,0,0,0.08);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+        }
+        .floating-search-icon svg {
+            display: block;
+        }
+        .floating-search-form input[type="text"] {
+            flex: 1 1 auto;
+            border: none;
+            border-bottom: 1px solid rgba(0,0,0,0.12);
+            padding: 0.35rem 0.25rem;
+            font-size: 0.95rem;
+            background: transparent;
+            color: <?= $colorText ?>;
+        }
+        .floating-search-form input[type="text"]::placeholder {
+            color: rgba(0,0,0,0.5);
+        }
+        .floating-search-form input[type="text"]:focus {
+            outline: none;
+            border-color: <?= $colorAccent ?>;
+        }
+        .floating-search-form button {
+            border: none;
+            background: <?= $colorAccent ?>;
+            width: 36px;
+            height: 36px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex: 0 0 auto;
+        }
+        .floating-search-form button svg {
+            display: block;
+        }
+        .floating-search-categories {
+            width: 36px;
+            height: 36px;
+            border-radius: 12px;
+            background: <?= $colorHighlight ?>;
+            border: 1px solid rgba(0,0,0,0.08);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            transition: background 0.2s ease, border-color 0.2s ease;
+            flex: 0 0 auto;
+        }
+        .floating-search-categories:hover {
+            background: rgba(0,0,0,0.08);
+            border-color: rgba(0,0,0,0.12);
+        }
         @media (max-width: 1024px) {
             .floating-logo {
+                display: none;
+            }
+            .floating-search {
                 display: none;
             }
         }
@@ -226,6 +316,31 @@ $cornerClass = $cornerStyle === 'square' ? 'corners-square' : 'corners-rounded';
         <a class="floating-logo" href="<?= htmlspecialchars($baseUrl ?? '/', ENT_QUOTES, 'UTF-8') ?>" aria-label="Ir a la portada">
             <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
         </a>
+    <?php endif; ?>
+    <?php if ($showFloatingSearch): ?>
+        <div class="floating-search">
+            <form class="floating-search-form" method="get" action="<?= htmlspecialchars($floatingSearchAction, ENT_QUOTES, 'UTF-8') ?>">
+                <span class="floating-search-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="8" cy="8" r="6" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                        <line x1="12.5" y1="12.5" x2="17" y2="17" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </span>
+                <input type="text" name="q" placeholder="Buscar en el sitio..." required>
+                <button type="submit" aria-label="Buscar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M21 4L9 16L4 11" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <a class="floating-search-categories" href="<?= htmlspecialchars($floatingCategoriesUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Índice de categorías">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                        <line x1="8" y1="9" x2="16" y2="9" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                        <line x1="8" y1="13" x2="16" y2="13" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                    </svg>
+                </a>
+            </form>
+        </div>
     <?php endif; ?>
 </body>
 </html>

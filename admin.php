@@ -219,6 +219,23 @@ function get_settings() {
         $orderStyle = $defaults['home']['header']['order'];
     }
     $home['header']['order'] = $orderStyle;
+    $searchDefaults = $defaults['search'] ?? ['mode' => 'single', 'position' => 'footer', 'floating' => 'off'];
+    $searchConfig = array_merge($searchDefaults, $templateConfig['search'] ?? []);
+    $searchMode = $searchConfig['mode'] ?? 'none';
+    if (!in_array($searchMode, ['none', 'home', 'single', 'both'], true)) {
+        $searchMode = $searchDefaults['mode'];
+    }
+    $searchPosition = $searchConfig['position'] ?? 'title';
+    if (!in_array($searchPosition, ['title', 'footer'], true)) {
+        $searchPosition = $searchDefaults['position'];
+    }
+    $searchFloating = $searchConfig['floating'] ?? ($searchDefaults['floating'] ?? 'off');
+    if (!in_array($searchFloating, ['off', 'on'], true)) {
+        $searchFloating = $searchDefaults['floating'] ?? 'off';
+    }
+    $searchConfig['mode'] = $searchMode;
+    $searchConfig['position'] = $searchPosition;
+    $searchConfig['floating'] = $searchFloating;
 
     $socialDefaults = [
         'default_description' => '',
@@ -238,9 +255,10 @@ function get_settings() {
             'colors' => $colors,
             'images' => $images,
             'footer' => $footer,
-            'global' => $global,
-            'home' => $home,
-        ],
+        'global' => $global,
+        'home' => $home,
+        'search' => $searchConfig,
+    ],
         'social' => $social,
     ];
 }
@@ -320,6 +338,11 @@ function get_default_template_settings(): array {
                 'text_style' => 'boxed',
                 'order' => 'image-text',
             ],
+        ],
+        'search' => [
+            'mode' => 'none',
+            'position' => 'title',
+            'floating' => 'off',
         ],
     ];
 }
@@ -932,6 +955,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($cornerStylePosted, ['rounded', 'square'], true)) {
             $cornerStylePosted = $defaults['global']['corners'];
         }
+        $searchDefaults = $defaults['search'] ?? ['mode' => 'single', 'position' => 'footer', 'floating' => 'off'];
+        $searchModePosted = $_POST['search_mode'] ?? $searchDefaults['mode'];
+        if (!in_array($searchModePosted, ['none', 'home', 'single', 'both'], true)) {
+            $searchModePosted = $searchDefaults['mode'];
+        }
+        $searchPositionPosted = $_POST['search_position'] ?? $searchDefaults['position'];
+        if (!in_array($searchPositionPosted, ['title', 'footer'], true)) {
+            $searchPositionPosted = $searchDefaults['position'];
+        }
+        if ($searchModePosted === 'none') {
+            $searchPositionPosted = $searchDefaults['position'];
+        }
+        $searchFloatingPosted = $_POST['search_floating'] ?? ($searchDefaults['floating'] ?? 'off');
+        if (!in_array($searchFloatingPosted, ['off', 'on'], true)) {
+            $searchFloatingPosted = $searchDefaults['floating'] ?? 'off';
+        }
 
         $config['template'] = [
             'fonts' => $fonts,
@@ -954,6 +993,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'text_style' => $homeHeaderTextStylePosted,
                     'order' => $homeHeaderOrderPosted,
                 ],
+            ],
+            'search' => [
+                'mode' => $searchModePosted,
+                'position' => $searchPositionPosted,
+                'floating' => $searchFloatingPosted,
             ],
         ];
 
@@ -1909,6 +1953,141 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                 }
 
+                .search-mode-figure,
+                .search-position-figure {
+                    width: 90px;
+                    height: 60px;
+                    border-radius: 12px;
+                    border: 2px solid #d5dbe3;
+                    background: linear-gradient(145deg, #f4f7fb, #e7ecf4);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    position: relative;
+                }
+                .search-mode-figure .search-box,
+                .search-position-figure .search-box {
+                    width: 70px;
+                    height: 26px;
+                    border-radius: 999px;
+                    background: #ffffff;
+                    border: 1px solid rgba(27, 142, 237, 0.35);
+                    display: flex;
+                    align-items: center;
+                    padding: 0 8px;
+                    gap: 6px;
+                }
+                .search-mode-figure .icon,
+                .search-position-figure .icon {
+                    width: 16px;
+                    height: 16px;
+                    border: 2px solid rgba(27, 142, 237, 0.75);
+                    border-radius: 50%;
+                    position: relative;
+                }
+                .search-mode-figure .icon::after,
+                .search-position-figure .icon::after {
+                    content: '';
+                    width: 8px;
+                    height: 2px;
+                    background: rgba(27, 142, 237, 0.75);
+                    position: absolute;
+                    right: -5px;
+                    bottom: -2px;
+                    transform: rotate(35deg);
+                    border-radius: 999px;
+                }
+                .search-mode-figure .line,
+                .search-position-figure .line {
+                    flex: 1;
+                    height: 4px;
+                    background: rgba(27, 142, 237, 0.25);
+                    border-radius: 999px;
+                }
+                .search-mode-figure.search-none .search-box {
+                    opacity: 0.2;
+                }
+                .search-mode-figure.search-single::after {
+                    content: '';
+                    position: absolute;
+                    bottom: 5px;
+                    width: 28px;
+                    height: 6px;
+                    border-radius: 999px;
+                    background: rgba(27,142,237,0.25);
+                }
+                .search-mode-figure.search-home::before,
+                .search-mode-figure.search-both::before {
+                    content: '';
+                    position: absolute;
+                    top: 8px;
+                    left: 8px;
+                    width: 24px;
+                    height: 10px;
+                    border-radius: 6px;
+                    background: rgba(27,142,237,0.25);
+                }
+                .search-mode-figure.search-both::after {
+                    content: '';
+                    position: absolute;
+                    bottom: 8px;
+                    width: 24px;
+                    height: 10px;
+                    border-radius: 6px;
+                    background: rgba(27,142,237,0.25);
+                }
+                .search-floating-figure {
+                    width: 90px;
+                    height: 60px;
+                    border-radius: 12px;
+                    border: 2px solid #d5dbe3;
+                    background: linear-gradient(145deg, #f4f7fb, #e7ecf4);
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 6px;
+                    position: relative;
+                }
+                .search-floating-figure .search-box {
+                    width: 52px;
+                    height: 20px;
+                    border-radius: 999px;
+                    background: #ffffff;
+                    border: 1px solid rgba(27, 142, 237, 0.35);
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .search-floating-figure .icon {
+                    width: 14px;
+                    height: 14px;
+                    border: 2px solid rgba(27, 142, 237, 0.75);
+                    border-radius: 50%;
+                    position: relative;
+                }
+                .search-floating-figure .icon::after {
+                    content: '';
+                    width: 7px;
+                    height: 2px;
+                    background: rgba(27, 142, 237, 0.75);
+                    position: absolute;
+                    right: -4px;
+                    bottom: -2px;
+                    transform: rotate(35deg);
+                    border-radius: 999px;
+                }
+                .search-floating-figure .search-hint {
+                    width: 70%;
+                    height: 8px;
+                    border-radius: 999px;
+                    background: rgba(27,142,237,0.25);
+                }
+                .search-floating-figure.search-float-off .search-box,
+                .search-floating-figure.search-float-off .search-hint {
+                    opacity: 0.25;
+                }
+
                 .pagination.pagination-break,
                 .modal .pagination {
 
@@ -2708,6 +2887,17 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             if (!in_array($globalCornerStyle, $allowedCorners, true)) {
                                 $globalCornerStyle = $defaults['global']['corners'];
                             }
+                            $searchDefaults = $defaults['search'] ?? ['mode' => 'single', 'position' => 'footer', 'floating' => 'off'];
+                            $templateSearch = array_merge($searchDefaults, $templateSettings['search'] ?? []);
+                            $searchModesAllowed = ['none', 'home', 'single', 'both'];
+                            $searchPositionsAllowed = ['title', 'footer'];
+                            $searchMode = in_array($templateSearch['mode'], $searchModesAllowed, true) ? $templateSearch['mode'] : $searchDefaults['mode'];
+                            $searchPosition = in_array($templateSearch['position'], $searchPositionsAllowed, true) ? $templateSearch['position'] : $searchDefaults['position'];
+                            $searchFloatingValue = $templateSearch['floating'] ?? $searchDefaults['floating'];
+                            if (!in_array($searchFloatingValue, ['off', 'on'], true)) {
+                                $searchFloatingValue = $searchDefaults['floating'];
+                            }
+                            $searchFloating = $searchFloatingValue;
                             ?>
 
                             <div class="tab-pane active">
@@ -3192,6 +3382,131 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                         <small class="form-text text-muted">Define cuántas entradas se muestran antes de paginar. Marca “Todos” para mostrar todas las entradas sin paginación.</small>
                                     </div>
 
+                                    <h4 class="mt-4">Buscador</h4>
+                                    <p class="text-muted">Decide si quieres mostrar una caja de búsqueda en el sitio y dónde se colocará.</p>
+                                    <div class="home-card-style-options" data-search-mode-options>
+                                        <?php
+                                        $searchModeOptions = [
+                                            'none' => [
+                                                'label' => 'Sin caja de búsqueda',
+                                                'caption' => 'No se muestra ningún buscador en el sitio',
+                                                'figure' => 'search-none',
+                                            ],
+                                            'home' => [
+                                                'label' => 'Sólo en la portada',
+                                                'caption' => 'Una caja en la página principal',
+                                                'figure' => 'search-home',
+                                            ],
+                                            'single' => [
+                                                'label' => 'Sólo en las entradas',
+                                                'caption' => 'Aparece en cada artículo',
+                                                'figure' => 'search-single',
+                                            ],
+                                            'both' => [
+                                                'label' => 'Portada y entradas',
+                                                'caption' => 'Visible en todos los listados y artículos',
+                                                'figure' => 'search-both',
+                                            ],
+                                        ];
+                                        ?>
+                                        <?php foreach ($searchModeOptions as $modeKey => $info): ?>
+                                            <?php $modeActive = ($searchMode === $modeKey); ?>
+                                            <label class="home-card-style-option <?= $modeActive ? 'active' : '' ?>" data-search-mode-option="1">
+                                                <input type="radio"
+                                                    name="search_mode"
+                                                    value="<?= htmlspecialchars($modeKey, ENT_QUOTES, 'UTF-8') ?>"
+                                                    <?= $modeActive ? 'checked' : '' ?>>
+                                                <span class="search-mode-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">
+                                                    <span class="search-box">
+                                                        <span class="icon"></span>
+                                                        <span class="line"></span>
+                                                    </span>
+                                                </span>
+                                                <span class="card-style-text">
+                                                    <strong><?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                                    <small><?= htmlspecialchars($info['caption'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                </span>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <div class="mt-3" data-search-position <?= $searchMode === 'none' ? 'style="display:none;"' : '' ?>>
+                                        <label>Ubicación de la caja</label>
+                                        <div class="home-card-style-options">
+                                            <?php
+                                            $searchPositionOptions = [
+                                                'title' => [
+                                                    'label' => 'Bajo el título',
+                                                    'caption' => 'Caja alineada con el encabezado principal',
+                                                    'figure' => 'search-pos-title',
+                                                ],
+                                                'footer' => [
+                                                    'label' => 'Sobre el footer',
+                                                    'caption' => 'Bloque destacado antes del pie de página',
+                                                    'figure' => 'search-pos-footer',
+                                                ],
+                                            ];
+                                            ?>
+                                            <?php foreach ($searchPositionOptions as $posKey => $info): ?>
+                                                <?php $posActive = ($searchPosition === $posKey); ?>
+                                                <label class="home-card-style-option <?= $posActive ? 'active' : '' ?>" data-search-position-option="1">
+                                                    <input type="radio"
+                                                        name="search_position"
+                                                        value="<?= htmlspecialchars($posKey, ENT_QUOTES, 'UTF-8') ?>"
+                                                        <?= $posActive ? 'checked' : '' ?>>
+                                                    <span class="search-position-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">
+                                                        <span class="search-box">
+                                                            <span class="icon"></span>
+                                                            <span class="line"></span>
+                                                        </span>
+                                                    </span>
+                                                    <span class="card-style-text">
+                                                        <strong><?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                                        <small><?= htmlspecialchars($info['caption'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                    </span>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3" data-search-floating>
+                                        <label>Buscador flotante</label>
+                                        <p class="text-muted mb-2">Muestra una caja compacta flotando bajo el logotipo en páginas internas.</p>
+                                        <div class="home-card-style-options">
+                                            <?php
+                                            $searchFloatingOptions = [
+                                                'off' => [
+                                                    'label' => 'Desactivado',
+                                                    'caption' => 'No se muestra buscador flotante',
+                                                    'figure' => 'search-float-off',
+                                                ],
+                                                'on' => [
+                                                    'label' => 'Flotando en el margen',
+                                                    'caption' => 'Caja ligera junto al logotipo en vistas interiores',
+                                                    'figure' => 'search-float-on',
+                                                ],
+                                            ];
+                                            ?>
+                                            <?php foreach ($searchFloatingOptions as $floatKey => $info): ?>
+                                                <?php $floatActive = ($searchFloating === $floatKey); ?>
+                                                <label class="home-card-style-option <?= $floatActive ? 'active' : '' ?>" data-search-floating-option="1">
+                                                    <input type="radio"
+                                                        name="search_floating"
+                                                        value="<?= htmlspecialchars($floatKey, ENT_QUOTES, 'UTF-8') ?>"
+                                                        <?= $floatActive ? 'checked' : '' ?>>
+                                                    <span class="search-floating-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">
+                                                        <span class="search-box">
+                                                            <span class="icon"></span>
+                                                        </span>
+                                                        <span class="search-hint"></span>
+                                                    </span>
+                                                    <span class="card-style-text">
+                                                        <strong><?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                                        <small><?= htmlspecialchars($info['caption'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                    </span>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+
                                     <h4 class="mt-4">Footer</h4>
                                     <p class="text-muted">Este contenido se mostrará al final de cada página. Introduce HTML directamente (por ejemplo, &lt;strong&gt;...&lt;/strong&gt; o enlaces con &lt;a&gt; ).</p>
                                     <div class="form-group">
@@ -3592,6 +3907,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var cardStyleOptions = form.querySelectorAll('.home-card-style-option[data-card-style-option]');
             var fullImageOptionsContainer = form.querySelector('[data-full-image-options]');
             var fullImageModeOptions = form.querySelectorAll('.home-card-style-option[data-full-image-mode]');
+            var searchModeOptions = form.querySelectorAll('.home-card-style-option[data-search-mode-option]');
+            var searchPositionOptions = form.querySelectorAll('.home-card-style-option[data-search-position-option]');
+            var searchFloatingOptions = form.querySelectorAll('.home-card-style-option[data-search-floating-option]');
+            var searchPositionContainer = form.querySelector('[data-search-position]');
             function refreshCardStyleSelection() {
                 var activeStyle = '';
                 cardStyleOptions.forEach(function(option) {
@@ -3625,6 +3944,57 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
             });
             refreshFullImageModeSelection();
+
+            function refreshSearchModeSelection() {
+                var activeMode = 'none';
+                searchModeOptions.forEach(function(option) {
+                    var radio = option.querySelector('input[type="radio"]');
+                    var checked = radio && radio.checked;
+                    if (checked && radio) {
+                        activeMode = radio.value;
+                    }
+                    option.classList.toggle('active', checked);
+                });
+                if (searchPositionContainer) {
+                    searchPositionContainer.style.display = activeMode === 'none' ? 'none' : '';
+                }
+            }
+            function refreshSearchPositionSelection() {
+                searchPositionOptions.forEach(function(option) {
+                    var radio = option.querySelector('input[type="radio"]');
+                    option.classList.toggle('active', radio && radio.checked);
+                });
+            }
+            function refreshSearchFloatingSelection() {
+                searchFloatingOptions.forEach(function(option) {
+                    var radio = option.querySelector('input[type="radio"]');
+                    option.classList.toggle('active', radio && radio.checked);
+                });
+            }
+            searchModeOptions.forEach(function(option) {
+                var radio = option.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.addEventListener('change', function() {
+                        refreshSearchModeSelection();
+                        refreshSearchPositionSelection();
+                    });
+                }
+            });
+            searchPositionOptions.forEach(function(option) {
+                var radio = option.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.addEventListener('change', refreshSearchPositionSelection);
+                }
+            });
+            refreshSearchModeSelection();
+            refreshSearchPositionSelection();
+            searchFloatingOptions.forEach(function(option) {
+                var radio = option.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.addEventListener('change', refreshSearchFloatingSelection);
+                }
+            });
+            refreshSearchFloatingSelection();
 
             var blocksOptions = form.querySelectorAll('.home-card-style-option[data-blocks-option]');
             function refreshBlocksSelection() {

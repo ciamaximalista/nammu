@@ -54,6 +54,42 @@ $blocksMode = $homeSettings['blocks'] ?? 'boxed';
 if (!in_array($blocksMode, ['boxed', 'flat'], true)) {
     $blocksMode = 'boxed';
 }
+$searchSettings = $theme['search'] ?? [];
+$searchMode = in_array($searchSettings['mode'] ?? 'none', ['none', 'home', 'single', 'both'], true) ? $searchSettings['mode'] : 'none';
+$searchPositionSetting = in_array($searchSettings['position'] ?? 'title', ['title', 'footer'], true) ? $searchSettings['position'] : 'title';
+$showHomeSearch = in_array($searchMode, ['home', 'both'], true);
+$homeSearchTop = $showHomeSearch && $searchPositionSetting === 'title';
+$homeSearchBottom = $showHomeSearch && $searchPositionSetting === 'footer';
+$searchActionBase = $baseHref ?? '/';
+$searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
+$renderSearchBox = static function (string $variant) use ($searchAction, $accentColor, $highlight, $textColor, $searchActionBase): string {
+    ob_start(); ?>
+    <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
+        <form class="site-search-form" method="get" action="<?= htmlspecialchars($searchAction, ENT_QUOTES, 'UTF-8') ?>">
+            <span class="search-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="8" cy="8" r="6" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                    <line x1="12.5" y1="12.5" x2="17" y2="17" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </span>
+            <input type="text" name="q" placeholder="Buscar en el sitio..." required>
+            <button type="submit" aria-label="Buscar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 4L9 16L4 11" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <a class="search-categories-link" href="<?= htmlspecialchars(rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/categorias', ENT_QUOTES, 'UTF-8') ?>" aria-label="Índice de categorías">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                    <line x1="8" y1="9" x2="16" y2="9" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                    <line x1="8" y1="13" x2="16" y2="13" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                </svg>
+            </a>
+        </form>
+    </div>
+    <?php
+    return (string) ob_get_clean();
+};
 $headerConfig = $homeSettings['header'] ?? [];
 $headerTypes = ['none', 'graphic', 'text', 'mixed'];
 $headerType = in_array($headerConfig['type'] ?? 'none', $headerTypes, true) ? $headerConfig['type'] : 'none';
@@ -208,6 +244,12 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     </section>
 <?php endif; ?>
 
+<?php if ($homeSearchTop): ?>
+    <section class="site-search-block placement-top">
+        <?= $renderSearchBox('variant-inline minimal') ?>
+    </section>
+<?php endif; ?>
+
 <?php if ($bioHtml !== ''): ?>
     <section class="site-bio">
         <?= $bioHtml ?>
@@ -241,8 +283,12 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
             if (($post['date'] ?? '') !== '') {
                 $metaText = 'Publicado el ' . $post['date'];
             }
+            $categoryLinkHtml = '';
             if ($category !== '') {
-                $metaText .= $metaText !== '' ? ' · ' . $category : $category;
+                $categorySlug = nammu_slugify_label($category);
+                $categoryUrl = ($baseHref ?? '/') !== '' ? rtrim($baseHref, '/') . '/categoria/' . rawurlencode($categorySlug) : '/categoria/' . rawurlencode($categorySlug);
+                $categoryLinkHtml = '<a class="category-tag-link" href="' . htmlspecialchars($categoryUrl, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($category, ENT_QUOTES, 'UTF-8') . '</a>';
+                $metaText .= $metaText !== '' ? ' · ' . $categoryLinkHtml : $categoryLinkHtml;
             }
             ?>
             <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
@@ -254,7 +300,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
                 <div class="post-body">
                     <h2><a href="<?= htmlspecialchars($link, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?></a></h2>
                     <?php if ($metaText !== ''): ?>
-                        <p class="post-meta"><?= htmlspecialchars($metaText, ENT_QUOTES, 'UTF-8') ?></p>
+                        <p class="post-meta"><?= $metaText ?></p>
                     <?php endif; ?>
                     <?php if ($post['description'] !== ''): ?>
                         <p class="post-description"><?= htmlspecialchars($post['description'], ENT_QUOTES, 'UTF-8') ?></p>
@@ -291,9 +337,104 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     </nav>
 <?php endif; ?>
 
+<?php if ($homeSearchBottom): ?>
+    <section class="site-search-block placement-bottom">
+        <?= $renderSearchBox('variant-panel') ?>
+    </section>
+<?php endif; ?>
+
 <style>
     .home-hero {
         margin-bottom: 2rem;
+    }
+    .site-search-block {
+        margin: 1.5rem auto 2rem;
+        max-width: min(760px, 100%);
+    }
+    .site-search-block.placement-top {
+        margin: 0.75rem auto 1.25rem;
+    }
+    .site-search-box {
+        background: <?= $highlight ?>;
+        border-radius: var(--nammu-radius-lg);
+        padding: 1rem 1.25rem;
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+    .site-search-box.variant-panel {
+        background: #fff;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    }
+    .site-search-box.minimal {
+        background: transparent;
+        border: none;
+        padding: 0;
+    }
+    .site-search-form {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .site-search-form input[type="text"] {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        border-radius: var(--nammu-radius-md);
+        border: 1px solid rgba(0,0,0,0.1);
+        font-size: 1rem;
+    }
+    .site-search-form button {
+        border: none;
+        background: <?= $accentColor ?>;
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+    .search-categories-link {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: rgba(0,0,0,0.05);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        transition: background 0.2s ease;
+    }
+    .search-categories-link:hover {
+        background: rgba(0,0,0,0.1);
+    }
+    .site-search-form button svg {
+        display: block;
+    }
+    .site-search-form .search-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.04);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .site-search-form input:focus {
+        outline: 2px solid <?= $accentColor ?>;
+        border-color: <?= $accentColor ?>;
+    }
+    .search-categories-link {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: rgba(0,0,0,0.05);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        transition: background 0.2s ease;
+    }
+    .search-categories-link:hover {
+        background: rgba(0,0,0,0.12);
     }
     .home-hero-graphic {
         min-height: 160px;
@@ -499,15 +640,18 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         margin-bottom: 0.5rem;
         shape-outside: inset(0 round var(--nammu-radius-lg));
         -webkit-shape-outside: inset(0 round var(--nammu-radius-lg));
-    }
-    .post-card.style-media-right .post-thumb img {
-        height: 100%;
+        overflow: hidden;
         border-radius: var(--nammu-radius-lg);
     }
-    .post-card.style-circle-right .post-thumb img {
-        border-radius: 50%;
+    .post-card.style-media-right .post-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        border-radius: inherit;
     }
     .post-card.style-circle-right .post-thumb {
+        border-radius: 50%;
         shape-outside: circle();
         -webkit-shape-outside: circle();
     }
@@ -545,6 +689,19 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         color: <?= $accentColor ?>;
         border-radius: var(--nammu-radius-sm);
     }
+    .category-tag-link {
+        color: <?= $accentColor ?>;
+        text-decoration: none;
+        border-bottom: 1px dotted rgba(0,0,0,0.5);
+        padding-bottom: 0.05rem;
+    }
+    .category-tag-link {
+        color: <?= $accentColor ?>;
+        text-decoration: none;
+        border-bottom: 1px dotted rgba(0,0,0,0.5);
+        padding-bottom: 0.05rem;
+    }
+
     .post-description {
         margin: 0;
         font-size: 1.02rem;
@@ -597,6 +754,16 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         }
         .post-card.style-media-right .post-thumb img {
             border-radius: var(--nammu-radius-md);
+        }
+    }
+    @media (max-width: 640px) {
+        .site-search-form {
+            flex-direction: column;
+        }
+        .site-search-form input[type="text"],
+        .site-search-form button,
+        .search-categories-link {
+            width: 100%;
         }
     }
     .post-grid.blocks-flat {

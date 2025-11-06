@@ -7,6 +7,7 @@ ini_set('display_startup_errors', '1');
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/core/bootstrap.php';
+require_once __DIR__ . '/core/helpers.php';
 
 use Nammu\Core\ContentRepository;
 use Nammu\Core\MarkdownConverter;
@@ -95,6 +96,46 @@ $renderer->setGlobal('baseUrl', $publicBaseUrl !== '' ? $publicBaseUrl : '/');
 $renderer->setGlobal('socialConfig', $socialConfig);
 
 $routePath = nammu_route_path();
+$renderNotFound = static function (string $title, string $description, string $path) use (
+    $renderer,
+    $siteTitle,
+    $homeDescription,
+    $socialConfig,
+    $publicBaseUrl,
+    $homeImage,
+    $siteNameForMeta
+): void {
+    http_response_code(404);
+    $content = $renderer->render('404', [
+        'pageTitle' => $title,
+    ]);
+    $social = nammu_build_social_meta([
+        'type' => 'website',
+        'title' => $title . ' — ' . $siteTitle,
+        'description' => $description !== '' ? $description : $homeDescription,
+        'url' => ($publicBaseUrl !== '' ? $publicBaseUrl : '') . $path,
+        'image' => $homeImage,
+        'site_name' => $siteNameForMeta,
+    ], $socialConfig);
+    echo $renderer->render('layout', [
+        'pageTitle' => $title,
+        'metaDescription' => $description !== '' ? $description : 'La página solicitada no se encuentra disponible',
+        'content' => $content,
+        'socialMeta' => $social,
+        'showLogo' => false,
+    ]);
+    exit;
+};
+$isCategoriesIndex = (bool) preg_match('#^/categorias/?$#i', $routePath);
+$categorySlugRequest = null;
+if (!$isCategoriesIndex && preg_match('#^/categoria/([^/]+)/?$#i', $routePath, $matchCategory)) {
+    $categorySlugRequest = strtolower($matchCategory[1]);
+} elseif (!$isCategoriesIndex && isset($_GET['categoria'])) {
+    $candidate = trim((string) $_GET['categoria']);
+    if ($candidate !== '') {
+        $categorySlugRequest = strtolower($candidate);
+    }
+}
 $currentPage = 1;
 $isPaginationRoute = false;
 if ($routePath !== '/' && $routePath !== '/index.php') {
@@ -127,6 +168,113 @@ if ($routePath === '/rss.xml') {
 }
 
 $slug = null;
+
+if ($isCategoriesIndex) {
+    $allPosts = $contentRepository->all();
+    $categoryMap = nammu_collect_categories_from_posts($allPosts);
+    $categoriesList = [];
+    foreach ($categoryMap as $slugKey => $data) {
+        $categoriesList[] = [
+            'slug' => $slugKey,
+            'name' => $data['name'],
+            'count' => $data['count'],
+            'url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/categoria/' . rawurlencode($slugKey),
+            'image' => $data['latest_image'] ?? null,
+        ];
+    }
+    usort($categoriesList, static fn ($a, $b) => strcasecmp($a['name'], $b['name']));
+
+    $content = $renderer->render('category-index', [
+        'categories' => $categoriesList,
+        'total' => count($categoriesList),
+    ]);
+
+    $canonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/categorias';
+    $socialMeta = nammu_build_social_meta([
+        'type' => 'website',
+        'title' => 'Categorías — ' . $siteNameForMeta,
+        'description' => 'Explora todas las categorías publicadas en ' . $siteNameForMeta,
+        'url' => $canonical,
+        'image' => $homeImage,
+        'site_name' => $siteNameForMeta,
+    ], $socialConfig);
+
+    echo $renderer->render('layout', [
+        'pageTitle' => 'Categorías',
+        'metaDescription' => 'Listado completo de categorías disponibles en el sitio.',
+        'content' => $content,
+        'socialMeta' => $socialMeta,
+        'showLogo' => true,
+    ]);
+    exit;
+}
+
+if ($categorySlugRequest !== null) {
+    $allPosts = $contentRepository->all();
+    $categoryMap = nammu_collect_categories_from_posts($allPosts);
+    $slugKey = strtolower($categorySlugRequest);
+    if (!isset($categoryMap[$slugKey])) {
+        $renderNotFound('Categoría no encontrada', 'No existe ninguna publicación asociada a esta categoría.', $routePath);
+    }
+    $categoryData = $categoryMap[$slugKey];
+    $categoryPosts = $categoryData['posts'];
+    usort($categoryPosts, static function (Post $a, Post $b): int {
+        $dateA = $a->getDate();
+        $dateB = $b->getDate();
+        if ($dateA && $dateB) {
+            return $dateA < $dateB ? 1 : -1;
+        }
+        if ($dateA) {
+            return -1;
+        }
+        if ($dateB) {
+            return 1;
+        }
+        return strcmp($a->getSlug(), $b->getSlug());
+    });
+    $postsForCategory = array_map(
+        static function (Post $post): array {
+            $date = $post->getDate();
+            $rawDate = $post->getRawDate();
+            return [
+                'slug' => $post->getSlug(),
+                'title' => $post->getTitle(),
+                'description' => $post->getDescription(),
+                'date' => nammu_format_date_spanish($date, $rawDate ?? ''),
+                'category' => $post->getCategory(),
+                'image' => $post->getImage(),
+            ];
+        },
+        $categoryPosts
+    );
+
+    $categoryTitle = $categoryData['name'];
+    $countPosts = count($categoryPosts);
+    $content = $renderer->render('category', [
+        'category' => $categoryTitle,
+        'count' => $countPosts,
+        'posts' => $postsForCategory,
+    ]);
+
+    $canonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/categoria/' . rawurlencode($slugKey);
+    $socialMeta = nammu_build_social_meta([
+        'type' => 'website',
+        'title' => 'Categoría: ' . $categoryTitle . ' — ' . $siteNameForMeta,
+        'description' => 'Artículos publicados dentro de la categoría ' . $categoryTitle,
+        'url' => $canonical,
+        'image' => $homeImage,
+        'site_name' => $siteNameForMeta,
+    ], $socialConfig);
+
+    echo $renderer->render('layout', [
+        'pageTitle' => 'Categoría: ' . $categoryTitle,
+        'metaDescription' => 'Listado de artículos publicados en la categoría ' . $categoryTitle,
+        'content' => $content,
+        'socialMeta' => $socialMeta,
+        'showLogo' => true,
+    ]);
+    exit;
+}
 if (isset($_GET['post'])) {
     $candidateSlug = trim((string) $_GET['post']);
     if ($candidateSlug !== '') {
@@ -156,25 +304,7 @@ if ($currentPage < 1) {
 if ($slug !== null && $slug !== '') {
     $post = $contentRepository->findBySlug($slug);
     if (!$post) {
-        http_response_code(404);
-        $content = $renderer->render('404', [
-            'pageTitle' => 'Contenido no encontrado',
-        ]);
-        echo $renderer->render('layout', [
-            'pageTitle' => '404',
-            'metaDescription' => 'La página solicitada no se encuentra disponible',
-            'content' => $content,
-            'socialMeta' => nammu_build_social_meta([
-                'type' => 'website',
-                'title' => '404 — ' . $siteTitle,
-                'description' => $homeDescription,
-                'url' => ($publicBaseUrl !== '' ? $publicBaseUrl : '') . $routePath,
-                'image' => $homeImage,
-                'site_name' => $siteNameForMeta,
-            ], $socialConfig),
-            'showLogo' => false,
-        ]);
-        exit;
+        $renderNotFound('Contenido no encontrado', 'La página solicitada no se encuentra disponible.', $routePath);
     }
 
     $converted = $markdown->toHtml($post->getContent());
@@ -308,7 +438,7 @@ echo $renderer->render('layout', [
     'metaDescription' => $siteDescription,
     'content' => $content,
     'socialMeta' => $homeSocialMeta,
-    'showLogo' => false,
+    'showLogo' => ($routePath !== '/' && $routePath !== '/index.php'),
 ]);
 
 if ($publicBaseUrl !== '') {
@@ -317,461 +447,4 @@ if ($publicBaseUrl !== '') {
         static fn (Post $post): string => '/' . rawurlencode($post->getSlug()),
         $markdown
     ));
-}
-
-function nammu_base_url(): string
-{
-    $explicit = getenv('NAMMU_BASE_URL');
-    if ($explicit !== false && $explicit !== '') {
-        return rtrim($explicit, '/');
-    }
-
-    $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '';
-    $host = trim($host);
-    if ($host === '') {
-        return '';
-    }
-
-    $scheme = 'http';
-    if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
-        $forwarded = explode(',', (string) $_SERVER['HTTP_X_FORWARDED_PROTO']);
-        $schemeCandidate = strtolower(trim($forwarded[0]));
-        if (in_array($schemeCandidate, ['http', 'https'], true)) {
-            $scheme = $schemeCandidate;
-        }
-    } elseif (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
-        $scheme = 'https';
-    } elseif (!empty($_SERVER['REQUEST_SCHEME'])) {
-        $schemeCandidate = strtolower((string) $_SERVER['REQUEST_SCHEME']);
-        if (in_array($schemeCandidate, ['http', 'https'], true)) {
-            $scheme = $schemeCandidate;
-        }
-    }
-
-    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
-    $dir = str_replace('\\', '/', dirname($scriptName !== '' ? $scriptName : '/'));
-    if ($dir === '/' || $dir === '.') {
-        $dir = '';
-    } else {
-        $dir = rtrim($dir, '/');
-    }
-
-    $portSuffix = '';
-    if (isset($_SERVER['SERVER_PORT']) && !str_contains($host, ':')) {
-        $port = (int) $_SERVER['SERVER_PORT'];
-        if (($scheme === 'http' && $port !== 80) || ($scheme === 'https' && $port !== 443)) {
-            $portSuffix = ':' . $port;
-        }
-    }
-
-    return rtrim($scheme . '://' . $host . $portSuffix . $dir, '/');
-}
-
-function nammu_route_path(): string
-{
-    $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
-    $path = parse_url($requestUri, PHP_URL_PATH) ?? '/';
-
-    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
-    $baseDir = str_replace('\\', '/', dirname($scriptName));
-    $baseDir = $baseDir === '/' ? '' : rtrim($baseDir, '/');
-
-    if ($baseDir !== '' && str_starts_with($path, $baseDir)) {
-        $path = substr($path, strlen($baseDir));
-        if ($path === false || $path === '') {
-            $path = '/';
-        }
-    }
-
-    return $path === '' ? '/' : $path;
-}
-
-function nammu_template_settings(): array
-{
-    $defaults = nammu_default_template_settings();
-    $config = nammu_load_config();
-
-    $template = $config['template'] ?? [];
-    $fonts = array_merge($defaults['fonts'], $template['fonts'] ?? []);
-    $colors = array_merge($defaults['colors'], $template['colors'] ?? []);
-    $images = array_merge($defaults['images'], $template['images'] ?? []);
-    $footer = $template['footer'] ?? ($defaults['footer'] ?? '');
-    $globalConfig = $template['global'] ?? [];
-    $global = array_merge($defaults['global'], $globalConfig);
-    $cornerStyle = $global['corners'] ?? $defaults['global']['corners'];
-    if (!in_array($cornerStyle, ['rounded', 'square'], true)) {
-        $cornerStyle = $defaults['global']['corners'];
-    }
-    $global['corners'] = $cornerStyle;
-
-    $homeConfig = $template['home'] ?? [];
-    $home = array_merge($defaults['home'], $homeConfig);
-    $homeBlocks = $home['blocks'] ?? $defaults['home']['blocks'];
-    if (!in_array($homeBlocks, ['boxed', 'flat'], true)) {
-        $homeBlocks = $defaults['home']['blocks'];
-    }
-    $home['blocks'] = $homeBlocks;
-    $fullImageMode = $home['full_image_mode'] ?? $defaults['home']['full_image_mode'];
-    if (!in_array($fullImageMode, ['natural', 'crop'], true)) {
-        $fullImageMode = $defaults['home']['full_image_mode'];
-    }
-    $home['full_image_mode'] = $fullImageMode;
-    $homeHeaderDefaults = $defaults['home']['header'];
-    $homeHeader = array_merge($homeHeaderDefaults, $homeConfig['header'] ?? []);
-    $headerTypes = ['none', 'graphic', 'text', 'mixed'];
-    if (!in_array($homeHeader['type'], $headerTypes, true)) {
-        $homeHeader['type'] = $homeHeaderDefaults['type'];
-    }
-    $headerModes = ['contain', 'cover'];
-    if (!in_array($homeHeader['mode'], $headerModes, true)) {
-        $homeHeader['mode'] = $homeHeaderDefaults['mode'];
-    }
-    $textHeaderStyles = ['boxed', 'plain'];
-    if (!in_array($homeHeader['text_style'], $textHeaderStyles, true)) {
-        $homeHeader['text_style'] = $homeHeaderDefaults['text_style'];
-    }
-    if (in_array($homeHeader['type'], ['graphic', 'mixed'], true) && trim((string) $homeHeader['image']) === '') {
-        $homeHeader['type'] = $homeHeader['type'] === 'mixed' ? 'text' : 'none';
-    }
-    if ($homeHeader['type'] !== 'graphic' && $homeHeader['type'] !== 'mixed') {
-        $homeHeader['image'] = '';
-        $homeHeader['mode'] = $homeHeaderDefaults['mode'];
-    }
-    if ($homeHeader['type'] !== 'text' && $homeHeader['type'] !== 'mixed') {
-        $homeHeader['text_style'] = $homeHeaderDefaults['text_style'];
-    }
-    $home['header'] = $homeHeader;
-    $author = $config['site_author'] ?? '';
-    $blog = $config['site_name'] ?? '';
-
-    $fontRequests = [];
-    $titleFont = $fonts['title'] ?? '';
-    $bodyFont = $fonts['body'] ?? '';
-    $codeFont = $fonts['code'] ?? '';
-    $quoteFont = $fonts['quote'] ?? '';
-
-    if ($titleFont !== '') {
-        $fontRequests[$titleFont] = 'wght@400;700';
-    }
-    if ($bodyFont !== '') {
-        $fontRequests[$bodyFont] = 'wght@400;700';
-    }
-    if ($quoteFont !== '') {
-        if (!isset($fontRequests[$quoteFont])) {
-            $fontRequests[$quoteFont] = 'wght@400;700';
-        }
-    }
-    if ($codeFont !== '') {
-        if (!isset($fontRequests[$codeFont])) {
-            $fontRequests[$codeFont] = 'wght@400';
-        }
-    }
-
-    $families = [];
-    foreach ($fontRequests as $fontName => $variant) {
-        if ($fontName === '' || $fontName === null) {
-            continue;
-        }
-        $family = str_replace(' ', '+', $fontName);
-        if ($variant !== '') {
-            $family .= ':' . $variant;
-        }
-        $families[] = $family;
-    }
-
-    $fontUrl = null;
-    if (!empty($families)) {
-        $fontUrl = 'https://fonts.googleapis.com/css2?family=' . implode('&family=', $families) . '&display=swap';
-    }
-
-    return [
-        'fonts' => $fonts,
-        'colors' => $colors,
-        'images' => $images,
-        'fontUrl' => $fontUrl,
-        'footer' => $footer,
-        'global' => $global,
-        'corners' => $cornerStyle,
-        'home' => $home,
-        'author' => $author,
-        'blog' => $blog,
-    ];
-}
-
-function nammu_default_template_settings(): array
-{
-    return [
-        'fonts' => [
-            'title' => 'Gabarito',
-            'body' => 'Roboto',
-            'code' => 'VT323',
-            'quote' => 'Castoro',
-        ],
-        'colors' => [
-            'h1' => '#1b8eed',
-            'h2' => '#ea2f28',
-            'h3' => '#1b1b1b',
-            'intro' => '#f6f6f6',
-            'text' => '#222222',
-            'background' => '#ffffff',
-            'highlight' => '#f3f6f9',
-            'accent' => '#0a4c8a',
-            'brand' => '#1b1b1b',
-            'code_background' => '#000000',
-            'code_text' => '#90ee90',
-        ],
-        'footer' => '',
-        'images' => [
-            'logo' => '',
-        ],
-        'global' => [
-            'corners' => 'rounded',
-        ],
-        'home' => [
-            'columns' => 2,
-            'per_page' => 'all',
-            'card_style' => 'full',
-            'blocks' => 'boxed',
-            'full_image_mode' => 'natural',
-            'header' => [
-                'type' => 'none',
-                'image' => '',
-                'mode' => 'contain',
-                'text_style' => 'boxed',
-                'order' => 'image-text',
-            ],
-        ],
-    ];
-}
-
-function nammu_load_config(): array
-{
-    $configFile = __DIR__ . '/config/config.yml';
-    if (!is_file($configFile)) {
-        return [];
-    }
-
-    if (function_exists('yaml_parse_file')) {
-        $parsed = @yaml_parse_file($configFile);
-        return is_array($parsed) ? $parsed : [];
-    }
-
-    $raw = file_get_contents($configFile);
-    if ($raw === false) {
-        return [];
-    }
-
-    $parsed = nammu_simple_yaml_parse($raw);
-    return is_array($parsed) ? $parsed : [];
-}
-
-function nammu_simple_yaml_parse(string $yaml): array
-{
-    $lines = preg_split("/\r?\n/", $yaml);
-    $result = [];
-    $stack = [&$result];
-    $indentStack = [0];
-
-    foreach ($lines as $line) {
-        if ($line === '' || trim($line) === '' || preg_match('/^\s*#/', $line)) {
-            continue;
-        }
-        $indent = strlen($line) - strlen(ltrim($line, ' '));
-        $trimmed = trim($line);
-        if (!str_contains($trimmed, ':')) {
-            continue;
-        }
-        [$rawKey, $rawValue] = explode(':', $trimmed, 2);
-        $key = trim($rawKey);
-        $value = ltrim($rawValue, " \t");
-
-        while ($indent < end($indentStack)) {
-            array_pop($stack);
-            array_pop($indentStack);
-        }
-
-        $current = &$stack[count($stack) - 1];
-        if ($value === '') {
-            $current[$key] = [];
-            $stack[] = &$current[$key];
-            $indentStack[] = $indent + 2;
-        } else {
-            $current[$key] = nammu_simple_yaml_unescape($value);
-        }
-    }
-
-    return $result;
-}
-
-function nammu_simple_yaml_unescape(string $value): string
-{
-    $value = trim($value);
-    if ($value === "''" || $value === '""') {
-        return '';
-    }
-    if ($value !== '' && substr($value, -1) === $value[0]) {
-        if ($value[0] === '"') {
-            $inner = substr($value, 1, -1);
-            $decoded = stripcslashes($inner);
-            return str_replace('\\n', "\n", $decoded);
-        }
-        if ($value[0] === "'") {
-            $inner = substr($value, 1, -1);
-            $decoded = str_replace("''", "'", $inner);
-            return str_replace('\\n', "\n", $decoded);
-        }
-    }
-    return str_replace('\\n', "\n", $value);
-}
-
-function nammu_social_settings(): array
-{
-    $config = nammu_load_config();
-    $defaults = [
-        'default_description' => '',
-        'home_image' => '',
-        'twitter' => '',
-        'facebook_app_id' => '',
-    ];
-    $social = $config['social'] ?? [];
-    if (!is_array($social)) {
-        $social = [];
-    }
-    return array_merge($defaults, $social);
-}
-
-function nammu_build_social_meta(array $data, array $socialConfig): array
-{
-    $title = trim($data['title'] ?? '');
-    $description = trim($data['description'] ?? '');
-    if ($description !== '') {
-        $description = preg_replace('/\s+/u', ' ', $description);
-    }
-    $url = $data['url'] ?? '';
-    $image = $data['image'] ?? '';
-    $siteName = trim($data['site_name'] ?? '');
-
-    $properties = [
-        'og:type' => $data['type'] ?? 'website',
-        'og:title' => $title,
-        'og:description' => $description,
-        'og:url' => $url,
-    ];
-
-    if ($image !== '') {
-        $properties['og:image'] = $image;
-    }
-    if ($siteName !== '') {
-        $properties['og:site_name'] = $siteName;
-    }
-    if (!empty($socialConfig['facebook_app_id'])) {
-        $properties['fb:app_id'] = $socialConfig['facebook_app_id'];
-    }
-
-    $names = [
-        'twitter:card' => 'summary_large_image',
-        'twitter:title' => $title,
-        'twitter:description' => $description,
-    ];
-
-    if ($url !== '') {
-        $names['twitter:url'] = $url;
-    }
-    if ($image !== '') {
-        $names['twitter:image'] = $image;
-    }
-    if (!empty($socialConfig['twitter'])) {
-        $handle = $socialConfig['twitter'];
-        if ($handle !== '' && $handle[0] !== '@') {
-            $handle = '@' . $handle;
-        }
-        $names['twitter:site'] = $handle;
-    }
-
-    return [
-        'canonical' => $url,
-        'properties' => $properties,
-        'names' => $names,
-    ];
-}
-
-function nammu_excerpt_text(string $html, int $length = 200): string
-{
-    $text = trim(strip_tags($html));
-    $text = preg_replace('/\s+/u', ' ', $text);
-    if (mb_strlen($text) <= $length) {
-        return $text;
-    }
-    return rtrim(mb_substr($text, 0, $length - 1)) . '…';
-}
-
-function nammu_format_date_spanish(?DateTimeImmutable $date, ?string $fallback = ''): string
-{
-    if ($date instanceof DateTimeImmutable) {
-        $months = [
-            1 => 'enero',
-            2 => 'febrero',
-            3 => 'marzo',
-            4 => 'abril',
-            5 => 'mayo',
-            6 => 'junio',
-            7 => 'julio',
-            8 => 'agosto',
-            9 => 'septiembre',
-            10 => 'octubre',
-            11 => 'noviembre',
-            12 => 'diciembre',
-        ];
-        $monthIndex = (int) $date->format('n');
-        $monthName = $months[$monthIndex] ?? $date->format('m');
-        return ltrim($date->format('j')) . ' de ' . $monthName . ' de ' . $date->format('Y');
-    }
-
-    $fallback = $fallback !== null ? trim($fallback) : '';
-    if ($fallback === '') {
-        return '';
-    }
-
-    $knownFormats = ['Y-m-d', 'd/m/Y', 'd-m-Y', 'Y/m/d'];
-    foreach ($knownFormats as $format) {
-        $parsed = DateTimeImmutable::createFromFormat($format, $fallback);
-        if ($parsed instanceof DateTimeImmutable) {
-            return nammu_format_date_spanish($parsed, '');
-        }
-    }
-
-    $timestamp = strtotime($fallback);
-    if ($timestamp !== false) {
-        $parsed = (new DateTimeImmutable())->setTimestamp($timestamp);
-        return nammu_format_date_spanish($parsed, '');
-    }
-
-    return $fallback;
-}
-
-function nammu_resolve_asset(?string $path, string $baseUrl): ?string
-{
-    if ($path === null) {
-        return null;
-    }
-
-    $path = trim($path);
-    if ($path === '') {
-        return null;
-    }
-
-    if (preg_match('#^https?://#i', $path)) {
-        return $path;
-    }
-
-    $normalized = ltrim($path, '/');
-    if (!str_starts_with($normalized, 'assets/')) {
-        $normalized = 'assets/' . $normalized;
-    }
-
-    if ($baseUrl !== '') {
-        return rtrim($baseUrl, '/') . '/' . $normalized;
-    }
-
-    return '/' . $normalized;
 }

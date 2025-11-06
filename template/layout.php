@@ -196,17 +196,27 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
         .site-footer-block a {
             color: <?= $colorAccent ?>;
         }
-        .footer-logo-link {
+        .footer-logo-wrapper {
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 56px;
-            height: 56px;
+        }
+        .footer-logo-wrapper.footer-logo-top {
+            margin-bottom: 1.2rem;
+        }
+        .footer-logo-wrapper.footer-logo-bottom {
+            margin-top: 1.2rem;
+        }
+        .footer-logo-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 58px;
+            height: 58px;
             border-radius: 50%;
             overflow: hidden;
             background: #ffffff;
             box-shadow: 0 6px 16px rgba(0,0,0,0.15);
-            margin: 0 auto;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
         .footer-logo-link img {
@@ -218,12 +228,6 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
         .footer-logo-link:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 22px rgba(0,0,0,0.18);
-        }
-        .footer-logo-link.footer-logo-top {
-            margin-bottom: 0.85rem;
-        }
-        .footer-logo-link.footer-logo-bottom {
-            margin-top: 0.85rem;
         }
         .footer-html-content {
             max-width: min(760px, 100%);
@@ -350,9 +354,11 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
             <footer>
                 <div class="site-footer-block">
                     <?php if ($hasFooterLogo && $footerLogoPosition === 'top'): ?>
-                        <a class="footer-logo-link footer-logo-top" href="<?= htmlspecialchars($baseUrl ?? '/', ENT_QUOTES, 'UTF-8') ?>" aria-label="Ir a la portada">
-                            <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
-                        </a>
+                        <div class="footer-logo-wrapper footer-logo-top">
+                            <a class="footer-logo-link" href="<?= htmlspecialchars($baseUrl ?? '/', ENT_QUOTES, 'UTF-8') ?>" aria-label="Ir a la portada">
+                                <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
+                            </a>
+                        </div>
                     <?php endif; ?>
                     <?php if ($footerHtml !== ''): ?>
                         <div class="footer-html-content">
@@ -360,9 +366,11 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
                         </div>
                     <?php endif; ?>
                     <?php if ($hasFooterLogo && $footerLogoPosition === 'bottom'): ?>
-                        <a class="footer-logo-link footer-logo-bottom" href="<?= htmlspecialchars($baseUrl ?? '/', ENT_QUOTES, 'UTF-8') ?>" aria-label="Ir a la portada">
-                            <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
-                        </a>
+                        <div class="footer-logo-wrapper footer-logo-bottom">
+                            <a class="footer-logo-link" href="<?= htmlspecialchars($baseUrl ?? '/', ENT_QUOTES, 'UTF-8') ?>" aria-label="Ir a la portada">
+                                <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
+                            </a>
+                        </div>
                     <?php endif; ?>
                 </div>
             </footer>

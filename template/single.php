@@ -317,6 +317,8 @@ $metaText = implode(' ', $metaTextParts);
         font-family: "<?= $codeFont ?>", "Fira Code", "Source Code Pro", "Courier New", monospace;
         box-sizing: border-box;
         max-width: 100%;
+        white-space: pre-wrap;
+        word-break: break-word;
     }
     .post-body code {
         background: <?= $colorCodeBg ?>;

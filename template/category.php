@@ -85,7 +85,9 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
             $link = $postUrl($post['slug']);
             $imageUrl = $resolveImage($post['image']);
             $cardClassParts = ['post-card', 'style-' . $cardStyle];
-            if (in_array($cardStyle, ['square-right', 'circle-right'], true)) {
+            if ($cardStyle === 'full') {
+                $cardClassParts[] = 'full-mode-' . $fullImageMode;
+            } elseif (in_array($cardStyle, ['square-right', 'circle-right'], true)) {
                 $cardClassParts[] = 'style-media-right';
             }
             $cardClass = implode(' ', $cardClassParts);
@@ -274,6 +276,26 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         position: relative;
         overflow: hidden;
     }
+    .post-card::after {
+        content: '';
+        display: table;
+        clear: both;
+    }
+    .post-card .post-thumb {
+        display: block;
+    }
+    .post-card .post-thumb img {
+        width: 100%;
+        display: block;
+        object-fit: cover;
+        border-radius: var(--nammu-radius-md);
+    }
+    .post-card .post-body {
+        display: block;
+    }
+    .post-card .post-body > *:not(:last-child) {
+        margin-bottom: 0.6rem;
+    }
     .post-card.style-media-right .post-thumb {
         float: right;
         width: clamp(110px, 34%, 170px);
@@ -299,6 +321,7 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
     }
     .post-card.style-full .post-thumb {
         width: 100%;
+        overflow: hidden;
     }
     .post-card.style-full .post-thumb img {
         border-radius: var(--nammu-radius-md);
@@ -315,8 +338,8 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         height: 100%;
         object-fit: cover;
     }
-    .post-card .post-body > *:not(:last-child) {
-        margin-bottom: 0.6rem;
+    .post-card.style-full .post-body {
+        margin-top: 0.9rem;
     }
     .post-card h2 {
         margin: 0;

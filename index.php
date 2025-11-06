@@ -14,6 +14,7 @@ use Nammu\Core\MarkdownConverter;
 use Nammu\Core\Post;
 use Nammu\Core\RssGenerator;
 use Nammu\Core\TemplateRenderer;
+use Nammu\Core\SitemapGenerator;
 
 $contentRepository = new ContentRepository(__DIR__ . '/content');
 $markdown = new MarkdownConverter();
@@ -96,6 +97,110 @@ $renderer->setGlobal('baseUrl', $publicBaseUrl !== '' ? $publicBaseUrl : '/');
 $renderer->setGlobal('socialConfig', $socialConfig);
 
 $routePath = nammu_route_path();
+$buildSitemapEntries = static function (array $posts, array $theme, string $publicBaseUrl): array {
+    $entries = [];
+    $timestampFromPost = static function (Post $post): ?int {
+        $date = $post->getDate();
+        if ($date) {
+            return $date->setTime(0, 0)->getTimestamp();
+        }
+        $raw = $post->getRawDate();
+        if ($raw) {
+            $ts = strtotime($raw);
+            if ($ts !== false) {
+                return $ts;
+            }
+        }
+        return null;
+    };
+
+    $latestTimestamp = null;
+    foreach ($posts as $post) {
+        $ts = $timestampFromPost($post);
+        if ($ts !== null) {
+            $latestTimestamp = $latestTimestamp === null ? $ts : max($latestTimestamp, $ts);
+        }
+    }
+
+    $entries[] = [
+        'loc' => '/',
+        'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
+        'changefreq' => 'daily',
+        'priority' => 1.0,
+    ];
+
+    foreach ($posts as $post) {
+        $postTimestamp = $timestampFromPost($post);
+        $entries[] = [
+            'loc' => '/' . rawurlencode($post->getSlug()),
+            'lastmod' => $postTimestamp !== null ? gmdate('c', $postTimestamp) : null,
+            'changefreq' => 'weekly',
+            'priority' => 0.8,
+        ];
+    }
+
+    $categories = nammu_collect_categories_from_posts($posts);
+    $latestCategoryTimestamp = null;
+    foreach ($categories as $slug => $data) {
+        $categoryTimestamp = null;
+        foreach ($data['posts'] as $categoryPost) {
+            if (!$categoryPost instanceof Post) {
+                continue;
+            }
+            $ts = $timestampFromPost($categoryPost);
+            if ($ts !== null) {
+                $categoryTimestamp = $categoryTimestamp === null ? $ts : max($categoryTimestamp, $ts);
+            }
+        }
+        if ($categoryTimestamp !== null) {
+            $latestCategoryTimestamp = $latestCategoryTimestamp === null ? $categoryTimestamp : max($latestCategoryTimestamp, $categoryTimestamp);
+        }
+        $entries[] = [
+            'loc' => '/categoria/' . rawurlencode($slug),
+            'lastmod' => $categoryTimestamp !== null ? gmdate('c', $categoryTimestamp) : null,
+            'changefreq' => 'weekly',
+            'priority' => 0.7,
+        ];
+    }
+    if (!empty($categories)) {
+        $entries[] = [
+            'loc' => '/categorias',
+            'lastmod' => $latestCategoryTimestamp !== null ? gmdate('c', $latestCategoryTimestamp) : ($latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null),
+            'changefreq' => 'weekly',
+            'priority' => 0.7,
+        ];
+    }
+
+    $homeSettings = $theme['home'] ?? [];
+    $perPageSetting = $homeSettings['per_page'] ?? 'all';
+    $perPage = null;
+    if (is_string($perPageSetting)) {
+        if (strtolower($perPageSetting) !== 'all') {
+            $intCandidate = filter_var($perPageSetting, FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 1],
+            ]);
+            if ($intCandidate !== false) {
+                $perPage = (int) $intCandidate;
+            }
+        }
+    } elseif (is_int($perPageSetting)) {
+        $perPage = $perPageSetting;
+    }
+
+    if ($perPage !== null && $perPage > 0) {
+        $totalPages = max(1, (int) ceil(count($posts) / $perPage));
+        for ($page = 2; $page <= $totalPages; $page++) {
+            $entries[] = [
+                'loc' => '/pagina/' . $page,
+                'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
+                'changefreq' => 'weekly',
+                'priority' => 0.6,
+            ];
+        }
+    }
+
+    return $entries;
+};
 $renderNotFound = static function (string $title, string $description, string $path) use (
     $renderer,
     $siteTitle,
@@ -164,6 +269,17 @@ if ($routePath === '/rss.xml') {
     if ($publicBaseUrl !== '') {
         @file_put_contents(__DIR__ . '/rss.xml', $rss);
     }
+    exit;
+}
+
+if ($routePath === '/sitemap.xml') {
+    $posts = $contentRepository->all();
+    $sitemapGenerator = new SitemapGenerator($publicBaseUrl);
+    $entries = $buildSitemapEntries($posts, $theme, $publicBaseUrl);
+    $sitemapXml = $sitemapGenerator->generate($entries);
+    header('Content-Type: application/xml; charset=UTF-8');
+    echo $sitemapXml;
+    @file_put_contents(__DIR__ . '/sitemap.xml', $sitemapXml);
     exit;
 }
 
@@ -448,3 +564,6 @@ if ($publicBaseUrl !== '') {
         $markdown
     ));
 }
+$sitemapGenerator = new SitemapGenerator($publicBaseUrl);
+$sitemapXml = $sitemapGenerator->generate($buildSitemapEntries($posts, $theme, $publicBaseUrl));
+@file_put_contents(__DIR__ . '/sitemap.xml', $sitemapXml);

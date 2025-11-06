@@ -25,14 +25,22 @@ Nammu es un motor ligero para blogs que reutiliza la estructura de contenidos de
    ```bash
    git clone https://github.com/<tu-organizacion>/nammu.git memoria
    ```
-2. Coloca los archivos en el directorio público (`/var/www/html/memoria`, por ejemplo).
+   Alternativamente si quieres instalarlo directamente en en una carpeta pública determinada:
+   
+    ```bash
+    git init
+    git config --global --add safe.directory /var/www/html/<carpeta-publica-de-tu-sitio>
+    git remote add origin https://github.com/ciamaximalista/nammu.git
+    git pull origin main
+    ```
+2. Coloca los archivos en el directorio público en la carpeta que tengas asociada a tu dominio (`/var/www/html/<carpeta-publica-de-tu-sitio>`).
 3. Asegura los permisos:
    ```bash
-   sudo chown -R www-data:www-data /var/www/html/memoria
-   sudo find /var/www/html/memoria -type d -exec chmod 755 {} \;
-   sudo find /var/www/html/memoria -type f -exec chmod 644 {} \;
-   sudo chmod 664 /var/www/html/memoria/config/config.yml
-   sudo chmod 775 /var/www/html/memoria/content /var/www/html/memoria/assets
+   sudo chown -R www-data:www-data /var/www/html/<carpeta-publica-de-tu-sitio>
+   sudo find /var/www/html/<carpeta-publica-de-tu-sitio> -type d -exec chmod 755 {} \;
+   sudo find /var/www/html/<carpeta-publica-de-tu-sitio> -type f -exec chmod 644 {} \;
+   sudo chmod 775 /var/www/html/<carpeta-publica-de-tu-sitio>/config
+   sudo chmod 775 /var/www/html/<carpeta-publica-de-tu-sitio>/content /var/www/html/<carpeta-publica-de-tu-sitio>/assets
    ```
    Ajusta el usuario/grupo (`www-data`) según tu servidor.
 4. Configura el host virtual y asegúrate de que `AllowOverride All` esté habilitado si deseas utilizar el `.htaccess`.
@@ -44,9 +52,21 @@ Nammu está pensado para reemplazar una instalación de PicoCMS reutilizando los
 
 1. **Haz copia de seguridad** de tu sitio actual.
 2. Dentro del directorio de PicoCMS, **elimina todo** excepto las carpetas `content/` y `assets/`.
-3. Descarga la última versión de Nammu desde GitHub y coloca los archivos en ese directorio.
-4. Aplica los permisos comentados arriba (especialmente `content/`, `assets/` y `config/`).
-5. Accede a `admin.php`, configura las opciones de plantilla y redes sociales y verifica que las rutas amigables funcionan.
+
+Ahora ya está todo listo para descargar y poner permisos:
+
+    ```bash
+    git init
+    git config --global --add safe.directory /var/www/html/<carpeta-publica-de-tu-sitio>
+    git remote add origin https://github.com/ciamaximalista/nammu.git
+    git pull origin main
+
+    sudo chown -R <tu-usuario>:www-data /var/www/html/<carpeta-publica-de-tu-sitio>
+    sudo find /var/www/html/<carpeta-publica-de-tu-sitio> -type d -exec chmod 755 {} \;
+    sudo find /var/www/html/<carpeta-publica-de-tu-sitio> -type f -exec chmod 644 {} \;
+    sudo chmod 775 /var/www/html/<carpeta-publica-de-tu-sitio>/config
+    sudo chmod 775 /var/www/html/<carpeta-publica-de-tu-sitio>/content /var/www/html/<carpeta-publica-de-tu-sitio>/assets
+    ```
 
 > Consejo: si usabas plugins de PicoCMS, evalúa si aún los necesitas. El núcleo de Nammu ya integra RSS, cabecera personalizable y otras funciones habituales. Pronto añadiremos más.
 

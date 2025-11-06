@@ -85,7 +85,7 @@ class ContentRepository
         [$metadata, $content] = $this->extractFrontMatter($raw);
 
         $template = strtolower($metadata['Template'] ?? $metadata['template'] ?? '');
-        if ($template !== 'single') {
+        if (!in_array($template, ['single', 'post'], true)) {
             return null;
         }
 

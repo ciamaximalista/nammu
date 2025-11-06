@@ -57,7 +57,8 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single') {
         $content = file_get_contents($file);
         $metadata = parse_yaml_front_matter($content);
         $template = strtolower($metadata['Template'] ?? '');
-        if ($templateFilter === 'single' && $template !== 'single') {
+        $isEntry = in_array($template, ['single', 'post'], true);
+        if ($templateFilter === 'single' && !$isEntry) {
             continue;
         }
         if ($templateFilter === 'page' && $template !== 'page') {
@@ -577,7 +578,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
             $file_content .= "Title: " . $title . "
 ";
-            $file_content .= "Template: " . ($type === 'Página' ? 'page' : 'single') . "
+            $file_content .= "Template: " . ($type === 'Página' ? 'page' : 'post') . "
 ";
             $file_content .= "Category: " . $category . "
 ";
@@ -604,7 +605,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['update'])) {
         $filename = $_POST['filename'] ?? '';
         $title = $_POST['title'] ?? '';
-        $template = 'single';
+        $template = 'post';
         $category = $_POST['category'] ?? '';
         $date = $_POST['date'] ? date('Y-m-d', strtotime($_POST['date'])) : date('Y-m-d');
         $image = $_POST['image'] ?? '';
@@ -616,7 +617,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $existing_post_data = get_post_content($filename);
             $ordo = $existing_post_data['metadata']['Ordo'] ?? '';
             if ($type === null) {
-                $currentTemplate = strtolower($existing_post_data['metadata']['Template'] ?? 'single');
+                $currentTemplate = strtolower($existing_post_data['metadata']['Template'] ?? 'post');
                 $type = $currentTemplate === 'page' ? 'Página' : 'Entrada';
             }
         } else {
@@ -624,7 +625,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $type = $type === 'Página' ? 'Página' : 'Entrada';
-        $template = $type === 'Página' ? 'page' : 'single';
+                $template = $type === 'Página' ? 'page' : 'post';
 
         $content = $_POST['content'] ?? '';
 
@@ -698,24 +699,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $all_posts = get_all_posts_metadata();
         
         $single_posts = [];
+        $postTemplates = ['single', 'post'];
         foreach ($all_posts as $post) {
-            if (isset($post['metadata']['Template']) && $post['metadata']['Template'] === 'single') {
-                $date = $post['metadata']['Date'] ?? '01/01/1970';
-                $dt = DateTime::createFromFormat('d/m/Y', $date);
-                if ($dt) {
-                    $timestamp = $dt->getTimestamp();
-                } else {
-                    $timestamp = strtotime($date);
-                }
-                if ($timestamp === false) {
-                    $timestamp = 0;
-                }
-                
-                $single_posts[] = [
-                    'filename' => $post['filename'],
-                    'timestamp' => $timestamp,
-                ];
+            $templateValue = strtolower($post['metadata']['Template'] ?? '');
+            if (!in_array($templateValue, $postTemplates, true)) {
+                continue;
             }
+
+            $date = $post['metadata']['Date'] ?? '01/01/1970';
+            $dt = DateTime::createFromFormat('d/m/Y', $date);
+            if ($dt) {
+                $timestamp = $dt->getTimestamp();
+            } else {
+                $timestamp = strtotime($date);
+            }
+            if ($timestamp === false) {
+                $timestamp = 0;
+            }
+            
+            $single_posts[] = [
+                'filename' => $post['filename'],
+                'timestamp' => $timestamp,
+            ];
         }
 
         usort($single_posts, function($a, $b) {
@@ -2392,7 +2397,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 $post_data = get_post_content($filename);
 
                                 if ($post_data):
-                                    $currentTemplateValue = strtolower($post_data['metadata']['Template'] ?? 'single');
+                                    $currentTemplateValue = strtolower($post_data['metadata']['Template'] ?? 'post');
                                     $currentTypeValue = $currentTemplateValue === 'page' ? 'Página' : 'Entrada';
                                     $editHeading = $currentTypeValue === 'Página' ? 'Editar Página' : 'Editar Entrada';
                                 ?>

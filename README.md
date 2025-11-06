@@ -81,15 +81,16 @@ Ahora ya está todo listo para descargar y poner permisos:
 Cuando apliques nuevas versiones desde GitHub, asegúrate de que los permisos no impidan la escritura en el repositorio. Si delegaste la propiedad en el usuario del servidor web, puedes recuperar el control con tu usuario SSH:
 
 ```bash
-sudo chown -R TU_USUARIO:www-data /var/www/html/blogs/memoria
-find /var/www/html/blogs/memoria -type d -exec chmod 775 {} \;
-find /var/www/html/blogs/memoria -type f -exec chmod 664 {} \;
+sudo chown -R <tu-usuario>:www-data /var/www/html/blogs/memoria
+find /var/www/html/<carpeta-publica-de-tu-sitio> -type d -exec chmod 775 {} \;
+find /var/www/html/<carpeta-publica-de-tu-sitio> -type f -exec chmod 664 {} \;
 
-sudo chown -R www-data:www-data /var/www/html/blogs/memoria/{content,assets,config}
-sudo chmod 775 /var/www/html/blogs/memoria/{content,assets,config}
+sudo chown -R www-data:www-data /var/www/html/<carpeta-publica-de-tu-sitio>/{content,assets,config}
+sudo chmod 775 /var/www/html/<carpeta-publica-de-tu-sitio>{content,assets,config}
+sudo chmod 664 /var/www/html/<carpeta-publica-de-tu-sitio>/config/config.yml
 ```
 
-Reemplaza `TU_USUARIO` por tu usuario SSH. Con esta secuencia podrás ejecutar `git pull` normalmente y mantener el servidor con permisos de escritura en las rutas necesarias.
+Reemplaza <tu-usuario> por tu usuario SSH. Con esta secuencia podrás ejecutar `git pull` normalmente y mantener el servidor con permisos de escritura en las rutas necesarias.
 
 ## Licencia
 

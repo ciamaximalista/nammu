@@ -516,9 +516,15 @@ $user_exists = file_exists(USER_FILE);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['register'])) {
         if (!$user_exists) {
-            register_user($_POST['username'], $_POST['password']);
-            header('Location: admin.php');
-            exit;
+            try {
+                register_user($_POST['username'], $_POST['password']);
+                header('Location: admin.php');
+                exit;
+            } catch (Throwable $e) {
+                $error = 'No se pudo crear el usuario inicial. Comprueba los permisos de la carpeta config/ y vuelve a intentarlo. Detalle: ' . $e->getMessage();
+            }
+        } else {
+            $error = 'Ya existe un usuario registrado.';
         }
     } elseif (isset($_POST['login'])) {
         if (verify_user($_POST['username'], $_POST['password'])) {
@@ -2047,6 +2053,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                         <h2 class="text-center">Registrarse</h2>
 
+                        <?php if (!empty($error)): ?>
+                            <div class="alert alert-danger"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
+                        <?php endif; ?>
+
                         <form method="post">
 
                             <div class="form-group">
@@ -2075,7 +2085,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                         <?php if ($error): ?>
 
-                            <div class="alert alert-danger"><?= $error ?></div>
+                            <div class="alert alert-danger"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
 
                         <?php endif; ?>
 

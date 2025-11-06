@@ -308,12 +308,15 @@ $metaText = implode(' ', $metaTextParts);
         color: <?= $colorCodeText ?>;
         padding: 1.25rem 1.5rem;
         border-radius: var(--nammu-radius-md);
-        overflow: auto;
+        overflow-x: auto;
+        overflow-y: auto;
         margin: 2rem 0;
         font-size: 0.95rem;
         line-height: 1.5;
         box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
         font-family: "<?= $codeFont ?>", "Fira Code", "Source Code Pro", "Courier New", monospace;
+        box-sizing: border-box;
+        max-width: 100%;
     }
     .post-body code {
         background: <?= $colorCodeBg ?>;

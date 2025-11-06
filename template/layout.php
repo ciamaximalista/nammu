@@ -26,6 +26,10 @@ $colorBrand = htmlspecialchars($themeColors['brand'] ?? '#1b1b1b', ENT_QUOTES, '
 $colorCodeBackground = htmlspecialchars($themeColors['code_background'] ?? '#000000', ENT_QUOTES, 'UTF-8');
 $colorCodeText = htmlspecialchars($themeColors['code_text'] ?? '#90ee90', ENT_QUOTES, 'UTF-8');
 $footerHtml = $theme['footer_html'] ?? '';
+$footerLogoPosition = $theme['footer_logo'] ?? 'none';
+if (!in_array($footerLogoPosition, ['none', 'top', 'bottom'], true)) {
+    $footerLogoPosition = 'none';
+}
 $logoUrl = $theme['logo_url'] ?? null;
 $faviconUrl = $theme['favicon_url'] ?? null;
 $showLogo = $showLogo ?? false;
@@ -40,6 +44,8 @@ $searchBaseNormalized = rtrim($baseHref === '' ? '/' : $baseHref, '/');
 $floatingSearchAction = $searchBaseNormalized === '' ? '/buscar.php' : $searchBaseNormalized . '/buscar.php';
 $floatingCategoriesUrl = $searchBaseNormalized === '' ? '/categorias' : $searchBaseNormalized . '/categorias';
 $showFloatingSearch = $searchFloatingEnabled && !empty($showLogo) && !empty($logoUrl);
+$hasFooterLogo = $footerLogoPosition !== 'none' && !empty($logoUrl);
+$showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
 ?><!DOCTYPE html>
 <html lang="es">
 <head>
@@ -190,6 +196,42 @@ $showFloatingSearch = $searchFloatingEnabled && !empty($showLogo) && !empty($log
         .site-footer-block a {
             color: <?= $colorAccent ?>;
         }
+        .footer-logo-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #ffffff;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+            margin: 0 auto;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .footer-logo-link img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .footer-logo-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 22px rgba(0,0,0,0.18);
+        }
+        .footer-logo-link.footer-logo-top {
+            margin-bottom: 0.85rem;
+        }
+        .footer-logo-link.footer-logo-bottom {
+            margin-top: 0.85rem;
+        }
+        .footer-html-content {
+            max-width: min(760px, 100%);
+            margin: 0 auto;
+        }
+        .footer-html-content p:last-child {
+            margin-bottom: 0;
+        }
         .floating-logo {
             position: fixed;
             top: 2.5rem;
@@ -304,10 +346,24 @@ $showFloatingSearch = $searchFloatingEnabled && !empty($showLogo) && !empty($log
         <main>
             <?= $content ?>
         </main>
-        <?php if ($footerHtml !== ''): ?>
+        <?php if ($showFooterBlock): ?>
             <footer>
                 <div class="site-footer-block">
-                    <?= $footerHtml ?>
+                    <?php if ($hasFooterLogo && $footerLogoPosition === 'top'): ?>
+                        <a class="footer-logo-link footer-logo-top" href="<?= htmlspecialchars($baseUrl ?? '/', ENT_QUOTES, 'UTF-8') ?>" aria-label="Ir a la portada">
+                            <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($footerHtml !== ''): ?>
+                        <div class="footer-html-content">
+                            <?= $footerHtml ?>
+                        </div>
+                    <?php endif; ?>
+                    <?php if ($hasFooterLogo && $footerLogoPosition === 'bottom'): ?>
+                        <a class="footer-logo-link footer-logo-bottom" href="<?= htmlspecialchars($baseUrl ?? '/', ENT_QUOTES, 'UTF-8') ?>" aria-label="Ir a la portada">
+                            <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
+                        </a>
+                    <?php endif; ?>
                 </div>
             </footer>
         <?php endif; ?>

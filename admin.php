@@ -195,6 +195,10 @@ function get_settings() {
         $cornerStyle = $defaults['global']['corners'];
     }
     $global['corners'] = $cornerStyle;
+    $footerLogo = $templateConfig['footer_logo'] ?? ($defaults['footer_logo'] ?? 'none');
+    if (!in_array($footerLogo, ['none', 'top', 'bottom'], true)) {
+        $footerLogo = $defaults['footer_logo'] ?? 'none';
+    }
     $homeConfig = $templateConfig['home'] ?? [];
     $home = array_merge($defaults['home'], $homeConfig);
     $homeBlocks = $home['blocks'] ?? $defaults['home']['blocks'];
@@ -255,10 +259,11 @@ function get_settings() {
             'colors' => $colors,
             'images' => $images,
             'footer' => $footer,
-        'global' => $global,
-        'home' => $home,
-        'search' => $searchConfig,
-    ],
+            'footer_logo' => $footerLogo,
+            'global' => $global,
+            'home' => $home,
+            'search' => $searchConfig,
+        ],
         'social' => $social,
     ];
 }
@@ -319,6 +324,7 @@ function get_default_template_settings(): array {
             'code_text' => '#90ee90',
         ],
         'footer' => '',
+        'footer_logo' => 'top',
         'images' => [
             'logo' => '',
         ],
@@ -885,6 +891,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $footerMd = trim($_POST['footer_md'] ?? '');
+        $footerLogoPosted = $_POST['footer_logo_position'] ?? $defaults['footer_logo'];
+        if (!in_array($footerLogoPosted, ['none', 'top', 'bottom'], true)) {
+            $footerLogoPosted = $defaults['footer_logo'];
+        }
         $logoImage = trim($_POST['logo_image'] ?? '');
         $images = ['logo' => $logoImage];
         $homeColumnsPosted = isset($_POST['home_columns']) ? (int) $_POST['home_columns'] : $defaults['home']['columns'];
@@ -977,6 +987,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'colors' => $colors,
             'images' => $images,
             'footer' => $footerMd,
+            'footer_logo' => $footerLogoPosted,
             'global' => [
                 'corners' => $cornerStylePosted,
             ],
@@ -2087,6 +2098,61 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 .search-floating-figure.search-float-off .search-hint {
                     opacity: 0.25;
                 }
+                .footer-logo-figure {
+                    width: 90px;
+                    height: 60px;
+                    border-radius: 12px;
+                    border: 2px solid #d5dbe3;
+                    background: linear-gradient(145deg, #f4f7fb, #e7ecf4);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    position: relative;
+                }
+                .footer-logo-figure .footer-logo-area {
+                    width: 68px;
+                    height: 34px;
+                    border-radius: 12px;
+                    background: #ffffff;
+                    border: 1px solid rgba(27,142,237,0.3);
+                    position: absolute;
+                    left: 50%;
+                    top: 50%;
+                    transform: translate(-50%, -50%);
+                }
+                .footer-logo-figure .footer-logo-dot {
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 50%;
+                    background: rgba(27,142,237,0.6);
+                    border: 2px solid #ffffff;
+                    position: absolute;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+                }
+                .footer-logo-figure.logo-top .footer-logo-area {
+                    bottom: 10px;
+                    top: auto;
+                    transform: translateX(-50%);
+                }
+                .footer-logo-figure.logo-top .footer-logo-dot {
+                    top: 8px;
+                }
+                .footer-logo-figure.logo-bottom .footer-logo-area {
+                    top: 10px;
+                    transform: translateX(-50%);
+                }
+                .footer-logo-figure.logo-bottom .footer-logo-dot {
+                    bottom: 8px;
+                }
+                .footer-logo-figure.logo-none .footer-logo-dot {
+                    display: none;
+                }
+                .footer-logo-figure.logo-none .footer-logo-area {
+                    top: 50%;
+                    transform: translate(-50%, -50%);
+                }
 
                 .pagination.pagination-break,
                 .modal .pagination {
@@ -2827,6 +2893,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             $templateImages = $templateSettings['images'] ?? [];
                             $logoImage = $templateImages['logo'] ?? '';
                             $footerMd = $templateSettings['footer'] ?? '';
+                            $footerLogoPosition = $templateSettings['footer_logo'] ?? $defaults['footer_logo'];
+                            if (!in_array($footerLogoPosition, ['none', 'top', 'bottom'], true)) {
+                                $footerLogoPosition = $defaults['footer_logo'];
+                            }
                             $templateHome = $templateSettings['home'] ?? [];
                             $colorLabels = [
                                 'h1' => 'Color H1',
@@ -3508,7 +3578,46 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                     </div>
 
                                     <h4 class="mt-4">Footer</h4>
-                                    <p class="text-muted">Este contenido se mostrará al final de cada página. Introduce HTML directamente (por ejemplo, &lt;strong&gt;...&lt;/strong&gt; o enlaces con &lt;a&gt; ).</p>
+                                    <p class="text-muted mb-2">Decide si quieres mostrar el logotipo del sitio en el pie de página.</p>
+                                    <div class="home-card-style-options" data-footer-logo-options>
+                                        <?php
+                                        $footerLogoOptions = [
+                                            'none' => [
+                                                'label' => 'Sin logo',
+                                                'caption' => 'Sólo se mostrará el contenido del footer',
+                                                'figure' => 'logo-none',
+                                            ],
+                                            'top' => [
+                                                'label' => 'Logo arriba',
+                                                'caption' => 'El logotipo aparecerá centrado sobre el footer',
+                                                'figure' => 'logo-top',
+                                            ],
+                                            'bottom' => [
+                                                'label' => 'Logo abajo',
+                                                'caption' => 'El logotipo aparecerá centrado bajo el footer',
+                                                'figure' => 'logo-bottom',
+                                            ],
+                                        ];
+                                        ?>
+                                        <?php foreach ($footerLogoOptions as $logoKey => $info): ?>
+                                            <?php $logoActive = ($footerLogoPosition === $logoKey); ?>
+                                            <label class="home-card-style-option <?= $logoActive ? 'active' : '' ?>" data-footer-logo-option="1">
+                                                <input type="radio"
+                                                    name="footer_logo_position"
+                                                    value="<?= htmlspecialchars($logoKey, ENT_QUOTES, 'UTF-8') ?>"
+                                                    <?= $logoActive ? 'checked' : '' ?>>
+                                                <span class="footer-logo-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">
+                                                    <span class="footer-logo-area"></span>
+                                                    <span class="footer-logo-dot"></span>
+                                                </span>
+                                                <span class="card-style-text">
+                                                    <strong><?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                                    <small><?= htmlspecialchars($info['caption'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                </span>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <p class="text-muted mt-3">Este contenido se mostrará al final de cada página. Introduce HTML directamente (por ejemplo, &lt;strong&gt;...&lt;/strong&gt; o enlaces con &lt;a&gt; ).</p>
                                     <div class="form-group">
                                         <label for="footer_md">Contenido del footer (HTML)</label>
                                         <textarea name="footer_md" id="footer_md" rows="6" class="form-control" placeholder="Bloque de contacto, enlaces legales..."><?= htmlspecialchars($footerMd ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
@@ -3910,6 +4019,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var searchModeOptions = form.querySelectorAll('.home-card-style-option[data-search-mode-option]');
             var searchPositionOptions = form.querySelectorAll('.home-card-style-option[data-search-position-option]');
             var searchFloatingOptions = form.querySelectorAll('.home-card-style-option[data-search-floating-option]');
+            var footerLogoOptions = form.querySelectorAll('.home-card-style-option[data-footer-logo-option]');
             var searchPositionContainer = form.querySelector('[data-search-position]');
             function refreshCardStyleSelection() {
                 var activeStyle = '';
@@ -3971,6 +4081,12 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     option.classList.toggle('active', radio && radio.checked);
                 });
             }
+            function refreshFooterLogoSelection() {
+                footerLogoOptions.forEach(function(option) {
+                    var radio = option.querySelector('input[type="radio"]');
+                    option.classList.toggle('active', radio && radio.checked);
+                });
+            }
             searchModeOptions.forEach(function(option) {
                 var radio = option.querySelector('input[type="radio"]');
                 if (radio) {
@@ -3995,6 +4111,13 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
             });
             refreshSearchFloatingSelection();
+            footerLogoOptions.forEach(function(option) {
+                var radio = option.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.addEventListener('change', refreshFooterLogoSelection);
+                }
+            });
+            refreshFooterLogoSelection();
 
             var blocksOptions = form.querySelectorAll('.home-card-style-option[data-blocks-option]');
             function refreshBlocksSelection() {

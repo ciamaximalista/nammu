@@ -1,4 +1,5 @@
 assets/
 content/
-config/
 rss.xml
+config/user.php
+config/config.yml

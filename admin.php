@@ -471,6 +471,28 @@ function color_picker_value(string $value, string $fallback): string {
     return $fallback;
 }
 
+function format_date_for_input(?string $raw): string {
+    if ($raw === null || trim($raw) === '') {
+        return date('Y-m-d');
+    }
+
+    $raw = trim($raw);
+    $knownFormats = ['Y-m-d', 'd/m/Y', 'd-m-Y', 'Y/m/d'];
+    foreach ($knownFormats as $format) {
+        $dt = DateTime::createFromFormat($format, $raw);
+        if ($dt instanceof DateTime) {
+            return $dt->format('Y-m-d');
+        }
+    }
+
+    $timestamp = strtotime($raw);
+    if ($timestamp !== false) {
+        return date('Y-m-d', $timestamp);
+    }
+
+    return date('Y-m-d');
+}
+
 function nammu_slugify(string $text): string {
     $text = trim($text);
     if ($text === '') {
@@ -2442,7 +2464,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                         <label for="date">Fecha</label>
 
-                                        <input type="date" name="date" id="date" class="form-control" value="<?= $post_data['metadata']['Date'] ?? date('Y-m-d') ?>" required>
+                                        <input type="date" name="date" id="date" class="form-control" value="<?= htmlspecialchars(format_date_for_input($post_data['metadata']['Date'] ?? null), ENT_QUOTES, 'UTF-8') ?>" required>
 
                                     </div>
 

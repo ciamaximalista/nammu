@@ -654,7 +654,11 @@ $homeSocialMeta = nammu_build_social_meta([
     'site_name' => $siteNameForMeta,
 ], $socialConfig);
 
-$homePageTitle = $displaySiteTitle;
+$blogOwner = $theme['author'] ?? '';
+if ($blogOwner === '') {
+    $blogOwner = $siteTitle;
+}
+$homePageTitle = $displaySiteTitle . ' por ' . $blogOwner;
 if ($perPage !== null && $currentPage > 1) {
     $homePageTitle .= ' - Página ' . $currentPage;
 }

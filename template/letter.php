@@ -10,6 +10,26 @@ $colors = $theme['colors'] ?? [];
 $highlight = htmlspecialchars($colors['highlight'] ?? '#f3f6f9', ENT_QUOTES, 'UTF-8');
 $textColor = htmlspecialchars($colors['text'] ?? '#222222', ENT_QUOTES, 'UTF-8');
 $accentColor = htmlspecialchars($colors['accent'] ?? '#0a4c8a', ENT_QUOTES, 'UTF-8');
+$accentRaw = $colors['accent'] ?? '#0a4c8a';
+$accentBackground = 'rgba(0, 0, 0, 0.08)';
+$accentBorder = 'rgba(0, 0, 0, 0.18)';
+if (is_string($accentRaw)) {
+    if (preg_match('/^#([0-9a-f]{6})$/i', $accentRaw, $matches)) {
+        $hex = $matches[1];
+        $r = hexdec(substr($hex, 0, 2));
+        $g = hexdec(substr($hex, 2, 2));
+        $b = hexdec(substr($hex, 4, 2));
+        $accentBackground = sprintf('rgba(%d, %d, %d, 0.12)', $r, $g, $b);
+        $accentBorder = sprintf('rgba(%d, %d, %d, 0.28)', $r, $g, $b);
+    } elseif (preg_match('/^#([0-9a-f]{3})$/i', $accentRaw, $matches)) {
+        $hex = $matches[1];
+        $r = hexdec(str_repeat(substr($hex, 0, 1), 2));
+        $g = hexdec(str_repeat(substr($hex, 1, 1), 2));
+        $b = hexdec(str_repeat(substr($hex, 2, 1), 2));
+        $accentBackground = sprintf('rgba(%d, %d, %d, 0.12)', $r, $g, $b);
+        $accentBorder = sprintf('rgba(%d, %d, %d, 0.28)', $r, $g, $b);
+    }
+}
 $brandColor = htmlspecialchars($colors['brand'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8');
 $headingSecondaryColor = htmlspecialchars($colors['h2'] ?? '#ea2f28', ENT_QUOTES, 'UTF-8');
 $homeSettings = $theme['home'] ?? [];
@@ -351,6 +371,60 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         shape-outside: circle();
         -webkit-shape-outside: circle();
     }
+    @media (max-width: 720px) {
+        .post-card.style-media-right {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .post-card.style-media-right .post-thumb {
+            float: none;
+            width: min(240px, 75vw);
+            margin: 0 auto 0.85rem auto;
+            shape-outside: none;
+            -webkit-shape-outside: none;
+        }
+        .post-card.style-media-right .post-thumb img {
+            border-radius: var(--nammu-radius-md);
+        }
+        .post-card.style-circle-right .post-thumb {
+            width: min(200px, 60vw);
+        }
+    }
+    .post-grid.columns-1 .post-card.style-media-right {
+        display: block;
+        text-align: center;
+    }
+    .post-grid.columns-1 .post-card.style-media-right .post-thumb {
+        float: none;
+        width: 100%;
+        margin: 0 0 0.85rem 0;
+        shape-outside: none;
+        -webkit-shape-outside: none;
+        border-radius: var(--nammu-radius-lg);
+    }
+    .post-grid.columns-1 .post-card.style-media-right .post-thumb img {
+        border-radius: inherit;
+    }
+    .post-grid.columns-1 .post-card.style-circle-right .post-thumb {
+        width: 100%;
+        border-radius: 50%;
+    }
+    .post-grid.columns-1 .post-card.style-media-right {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .post-grid.columns-1 .post-card.style-media-right .post-thumb {
+        float: none;
+        width: min(240px, 70%);
+        margin: 0 auto 0.85rem auto;
+        shape-outside: none;
+        -webkit-shape-outside: none;
+    }
+    .post-grid.columns-1 .post-card.style-circle-right .post-thumb {
+        width: min(200px, 55%);
+    }
     .post-card h2 {
         margin: 0;
         font-size: 1.6rem;
@@ -361,8 +435,14 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
     }
     .post-card .post-meta {
         margin: 0;
+        display: block;
+        padding: 0.5rem 0.75rem;
         font-size: 0.9rem;
+        letter-spacing: 0.012em;
+        background: <?= htmlspecialchars($accentBackground, ENT_QUOTES, 'UTF-8') ?>;
+        border: 1px solid <?= htmlspecialchars($accentBorder, ENT_QUOTES, 'UTF-8') ?>;
         color: <?= $accentColor ?>;
+        border-radius: var(--nammu-radius-sm);
     }
     .post-card .post-description {
         margin: 0;
@@ -375,8 +455,10 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         border: none;
         padding: 0;
     }
-    .post-grid.blocks-flat .post-card.style-media-right .post-thumb {
-        margin-left: clamp(1rem, 3vw, 1.5rem);
+    @media (min-width: 721px) {
+        .post-grid.blocks-flat:not(.columns-1) .post-card.style-media-right .post-thumb {
+            margin-left: clamp(1rem, 3vw, 1.5rem);
+        }
     }
     .post-grid.blocks-flat .post-card.style-full .post-body {
         margin-top: 1.15rem;

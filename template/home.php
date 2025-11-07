@@ -810,17 +810,40 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         .post-card.style-media-right {
             display: flex;
             flex-direction: column;
+            align-items: center;
         }
         .post-card.style-media-right .post-thumb {
             float: none;
-            width: 100%;
-            margin: 0 0 0.75rem 0;
+            width: min(240px, 75vw);
+            margin: 0 auto 0.85rem auto;
             shape-outside: none;
             -webkit-shape-outside: none;
         }
         .post-card.style-media-right .post-thumb img {
             border-radius: var(--nammu-radius-md);
         }
+        .post-card.style-circle-right .post-thumb {
+            width: min(200px, 60vw);
+        }
+    }
+    .post-grid.columns-1 .post-card.style-media-right {
+        display: block;
+        text-align: center;
+    }
+    .post-grid.columns-1 .post-card.style-media-right .post-thumb {
+        float: none;
+        width: 100%;
+        margin: 0 0 0.85rem 0;
+        shape-outside: none;
+        -webkit-shape-outside: none;
+        border-radius: var(--nammu-radius-lg);
+    }
+    .post-grid.columns-1 .post-card.style-media-right .post-thumb img {
+        border-radius: inherit;
+    }
+    .post-grid.columns-1 .post-card.style-circle-right .post-thumb {
+        width: 100%;
+        border-radius: 50%;
     }
     @media (max-width: 640px) {
         .site-search-form {
@@ -841,8 +864,10 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         border: none;
         padding: 0;
     }
-    .post-grid.blocks-flat .post-card.style-media-right .post-thumb {
-        margin-left: clamp(1rem, 3vw, 1.5rem);
+    @media (min-width: 721px) {
+        .post-grid.blocks-flat:not(.columns-1) .post-card.style-media-right .post-thumb {
+            margin-left: clamp(1rem, 3vw, 1.5rem);
+        }
     }
     .post-grid.blocks-flat .post-card.style-full .post-body {
         margin-top: 1.15rem;

@@ -1,8 +1,8 @@
 ![Nammu Logo](nammu-banner.png)
 
-# Nammu — Motor de Blog compatible con PicoCMS
+# Nammu — Motor de Blog y Diccionario compatible con PicoCMS
 
-Nammu es un motor ligero para blogs que reutiliza la estructura de contenidos de **PicoCMS** y añade herramientas de edición, plantillas personalizables, generación de RSS y administración de recursos. El proyecto se distribuye bajo licencia **EUPL** y puede ejecutarse en cualquier alojamiento que soporte PHP 8+.
+Nammu es un motor ligero para blogs y diccionarios online que reutiliza la estructura de contenidos de **PicoCMS** y añade herramientas de edición, plantillas personalizables, generación de RSS y administración de recursos. El proyecto se distribuye bajo licencia **EUPL** y puede ejecutarse en cualquier alojamiento que soporte PHP 8+.
 
 ## Características principales
 
@@ -12,11 +12,10 @@ Nammu es un motor ligero para blogs que reutiliza la estructura de contenidos de
 - Generación automática de `rss.xml`  (RSS 2.0) con imágenes destacadas y compatibilidad con URLs amigables.
 - Generación automática de `sitemap.xml` para facilitar la indexación por Google y otros buscadores.
 - Parseador Markdown extensible con soporte para listas, encabezados, enlaces, imágenes, código en línea, bloques de cita y bloques de código.
-- Soporte para listas anidadas y numeradas con niveles múltiples: respeta el número de inicio, cambia el formato (1, a, i, …) por nivel e interpreta las indentaciones (tabs o espacios) para construir sublistas correctamente.
 - Buscador avanzado (`buscar.php`) con soporte para frases exactas, exclusiones con `-palabra`, filtros por campos (`title:`, `category:`, `content:`), selector de tipo (entradas/páginas) e integración visual configurable desde la plantilla.
-- Botón extra en las cajas de búsqueda (portada, categorías, post individual, etc.) que enlaza al índice alfabético cuando se usa la ordenación por título.
+- Botón extra en las cajas de búsqueda (portada, categorías, post individual, etc.) que enlaza al índice alfabético cuando se usa la ordenación por título (modo diccionario).
 - Índice de categorías (`/categorias`) y páginas por categoría (`/categoria/{slug}`) que reutilizan la maquetación elegida para la portada e incluyen miniaturas automáticas basadas en la última entrada de cada categoría.
-- ÍNDICE ALFABÉTICO: al elegir la ordenación alfabética en Configuración, la portada agrupa las entradas por letra (A, B, C…, “Otros”), se activa el índice de letras (`/letras`) y las vistas por letra (`/letra/{slug}`) que reutilizan la maquetación elegida.
+- Índice alfabético: al elegir la ordenación alfabética en Configuración, la portada agrupa las entradas por letra (A, B, C…, “Otros”), se activa el índice de letras (`/letras`) y las vistas por letra (`/letra/{slug}`) que reutilizan la maquetación elegida.
 - Compatible con la estructura de directorios de PicoCMS (`content/` y `assets/`), lo que simplifica migraciones.
 
 ## Requisitos

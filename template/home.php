@@ -825,25 +825,25 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         .post-card.style-circle-right .post-thumb {
             width: min(200px, 60vw);
         }
-    }
-    .post-grid.columns-1 .post-card.style-media-right {
-        display: block;
-        text-align: center;
-    }
-    .post-grid.columns-1 .post-card.style-media-right .post-thumb {
-        float: none;
-        width: 100%;
-        margin: 0 0 0.85rem 0;
-        shape-outside: none;
-        -webkit-shape-outside: none;
-        border-radius: var(--nammu-radius-lg);
-    }
-    .post-grid.columns-1 .post-card.style-media-right .post-thumb img {
-        border-radius: inherit;
-    }
-    .post-grid.columns-1 .post-card.style-circle-right .post-thumb {
-        width: 100%;
-        border-radius: 50%;
+        .post-grid.columns-1 .post-card.style-media-right {
+            display: block;
+            text-align: center;
+        }
+        .post-grid.columns-1 .post-card.style-media-right .post-thumb {
+            float: none;
+            width: 100%;
+            margin: 0 0 0.85rem 0;
+            shape-outside: none;
+            -webkit-shape-outside: none;
+            border-radius: var(--nammu-radius-lg);
+        }
+        .post-grid.columns-1 .post-card.style-media-right .post-thumb img {
+            border-radius: inherit;
+        }
+        .post-grid.columns-1 .post-card.style-circle-right .post-thumb {
+            width: 100%;
+            border-radius: 50%;
+        }
     }
     @media (max-width: 640px) {
         .site-search-form {

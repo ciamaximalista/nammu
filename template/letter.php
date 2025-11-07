@@ -390,40 +390,40 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         .post-card.style-circle-right .post-thumb {
             width: min(200px, 60vw);
         }
-    }
-    .post-grid.columns-1 .post-card.style-media-right {
-        display: block;
-        text-align: center;
-    }
-    .post-grid.columns-1 .post-card.style-media-right .post-thumb {
-        float: none;
-        width: 100%;
-        margin: 0 0 0.85rem 0;
-        shape-outside: none;
-        -webkit-shape-outside: none;
-        border-radius: var(--nammu-radius-lg);
-    }
-    .post-grid.columns-1 .post-card.style-media-right .post-thumb img {
-        border-radius: inherit;
-    }
-    .post-grid.columns-1 .post-card.style-circle-right .post-thumb {
-        width: 100%;
-        border-radius: 50%;
-    }
-    .post-grid.columns-1 .post-card.style-media-right {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-    .post-grid.columns-1 .post-card.style-media-right .post-thumb {
-        float: none;
-        width: min(240px, 70%);
-        margin: 0 auto 0.85rem auto;
-        shape-outside: none;
-        -webkit-shape-outside: none;
-    }
-    .post-grid.columns-1 .post-card.style-circle-right .post-thumb {
-        width: min(200px, 55%);
+        .post-grid.columns-1 .post-card.style-media-right {
+            display: block;
+            text-align: center;
+        }
+        .post-grid.columns-1 .post-card.style-media-right .post-thumb {
+            float: none;
+            width: 100%;
+            margin: 0 0 0.85rem 0;
+            shape-outside: none;
+            -webkit-shape-outside: none;
+            border-radius: var(--nammu-radius-lg);
+        }
+        .post-grid.columns-1 .post-card.style-media-right .post-thumb img {
+            border-radius: inherit;
+        }
+        .post-grid.columns-1 .post-card.style-circle-right .post-thumb {
+            width: 100%;
+            border-radius: 50%;
+        }
+        .post-grid.columns-1 .post-card.style-media-right {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .post-grid.columns-1 .post-card.style-media-right .post-thumb {
+            float: none;
+            width: min(240px, 70%);
+            margin: 0 auto 0.85rem auto;
+            shape-outside: none;
+            -webkit-shape-outside: none;
+        }
+        .post-grid.columns-1 .post-card.style-circle-right .post-thumb {
+            width: min(200px, 55%);
+        }
     }
     .post-card h2 {
         margin: 0;

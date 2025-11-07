@@ -206,17 +206,21 @@ function nammu_collect_documents(string $contentDir, MarkdownConverter $markdown
 
         [$metadata, $body] = nammu_extract_document($raw);
         $slug = basename($file, '.md');
-        $template = strtolower($metadata['Template'] ?? $metadata['template'] ?? '');
+        $templateRaw = $metadata['Template'] ?? $metadata['template'] ?? '';
+        $template = strtolower(nammu_meta_value_to_string($templateRaw));
         $type = match ($template) {
             'page' => 'page',
             'single', 'post' => 'post',
             default => 'other',
         };
 
-        $title = trim($metadata['Title'] ?? $slug);
-        $description = trim($metadata['Description'] ?? '');
-        $category = trim($metadata['Category'] ?? '');
-        $dateRaw = trim($metadata['Date'] ?? '');
+        $title = nammu_meta_value_to_string($metadata['Title'] ?? $slug);
+        if ($title === '') {
+            $title = $slug;
+        }
+        $description = nammu_meta_value_to_string($metadata['Description'] ?? '');
+        $category = nammu_meta_value_to_string($metadata['Category'] ?? '');
+        $dateRaw = nammu_meta_value_to_string($metadata['Date'] ?? '');
         $dateIso = $dateRaw;
         $dateDisplay = $dateRaw;
 
@@ -282,6 +286,25 @@ function nammu_extract_document(string $raw): array
     $body = ltrim($matches[2] ?? '');
 
     return [$meta, $body];
+}
+
+function nammu_meta_value_to_string(mixed $value): string
+{
+    if (is_array($value)) {
+        $parts = [];
+        foreach ($value as $item) {
+            if (is_scalar($item)) {
+                $parts[] = (string) $item;
+            } elseif (is_object($item) && method_exists($item, '__toString')) {
+                $parts[] = (string) $item;
+            }
+        }
+        $value = implode(', ', $parts);
+    } elseif (is_object($value)) {
+        $value = method_exists($value, '__toString') ? (string) $value : '';
+    }
+
+    return trim((string) $value);
 }
 
 /**

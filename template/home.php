@@ -7,6 +7,8 @@
  * @var array|null $pagination
  * @var callable $paginationUrl
  * @var array $theme
+ * @var array<string, string> $letterGroupUrls
+ * @var bool $isAlphabetical
  */
 $colors = $theme['colors'] ?? [];
 $highlight = htmlspecialchars($colors['highlight'] ?? '#f3f6f9', ENT_QUOTES, 'UTF-8');
@@ -62,7 +64,12 @@ $homeSearchTop = $showHomeSearch && $searchPositionSetting === 'title';
 $homeSearchBottom = $showHomeSearch && $searchPositionSetting === 'footer';
 $searchActionBase = $baseHref ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
-$renderSearchBox = static function (string $variant) use ($searchAction, $accentColor, $highlight, $textColor, $searchActionBase): string {
+$letterIndexUrlValue = $lettersIndexUrl ?? null;
+$showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
+$isAlphabetical = !empty($isAlphabetical);
+$letterGroups = $letterGroups ?? [];
+$letterGroupUrls = $letterGroupUrls ?? [];
+$renderSearchBox = static function (string $variant) use ($searchAction, $accentColor, $highlight, $textColor, $searchActionBase, $letterIndexUrlValue, $showLetterButton): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
         <form class="site-search-form" method="get" action="<?= htmlspecialchars($searchAction, ENT_QUOTES, 'UTF-8') ?>">
@@ -85,9 +92,71 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $accent
                     <line x1="8" y1="13" x2="16" y2="13" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
                 </svg>
             </a>
+            <?php if ($showLetterButton && $letterIndexUrlValue): ?>
+                <a class="search-letters-link" href="<?= htmlspecialchars($letterIndexUrlValue, ENT_QUOTES, 'UTF-8') ?>" aria-label="Índice alfabético">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M5 18L9 6L13 18" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <line x1="6.5" y1="13" x2="11.5" y2="13" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M15 6H20L15 18H20" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </a>
+            <?php endif; ?>
         </form>
     </div>
     <?php
+    return (string) ob_get_clean();
+};
+$renderPostCards = static function (array $subset, bool $hideMeta = false) use ($postUrl, $resolveImage, $cardStyle, $fullImageMode, $blocksMode, $baseHref, $headingSecondaryColor, $accentColor, $accentBackground, $accentBorder): string {
+    ob_start();
+    foreach ($subset as $post) {
+        $link = $postUrl($post['slug']);
+        $imageUrl = $resolveImage($post['image']);
+        $cardClassParts = ['post-card', 'style-' . $cardStyle];
+        if ($cardStyle === 'full') {
+            $cardClassParts[] = 'full-mode-' . $fullImageMode;
+        } elseif (in_array($cardStyle, ['square-right', 'circle-right'], true)) {
+            $cardClassParts[] = 'style-media-right';
+        }
+        $cardClass = implode(' ', $cardClassParts);
+        $thumbClassParts = ['post-thumb'];
+        if ($cardStyle === 'full') {
+            $thumbClassParts[] = 'thumb-wide';
+        } else {
+            $thumbClassParts[] = 'thumb-right';
+            $thumbClassParts[] = $cardStyle === 'square-right' ? 'thumb-square' : 'thumb-circle';
+        }
+        $thumbClass = implode(' ', $thumbClassParts);
+        $category = $post['category'] ?? '';
+        $metaText = '';
+        if (($post['date'] ?? '') !== '') {
+            $metaText = 'Publicado el ' . $post['date'];
+        }
+        $categoryLinkHtml = '';
+        if ($category !== '') {
+            $categorySlug = nammu_slugify_label($category);
+            $categoryUrl = ($baseHref ?? '/') !== '' ? rtrim($baseHref, '/') . '/categoria/' . rawurlencode($categorySlug) : '/categoria/' . rawurlencode($categorySlug);
+            $categoryLinkHtml = '<a class="category-tag-link" href="' . htmlspecialchars($categoryUrl, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($category, ENT_QUOTES, 'UTF-8') . '</a>';
+            $metaText .= $metaText !== '' ? ' · ' . $categoryLinkHtml : $categoryLinkHtml;
+        }
+        ?>
+        <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
+            <?php if ($imageUrl): ?>
+                <a class="<?= htmlspecialchars($thumbClass, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($link, ENT_QUOTES, 'UTF-8') ?>">
+                    <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?>">
+                </a>
+            <?php endif; ?>
+            <div class="post-body">
+                <h2><a href="<?= htmlspecialchars($link, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?></a></h2>
+                <?php if (!$hideMeta && $metaText !== ''): ?>
+                    <p class="post-meta"><?= $metaText ?></p>
+                <?php endif; ?>
+                <?php if (($post['description'] ?? '') !== ''): ?>
+                    <p class="post-description"><?= htmlspecialchars($post['description'], ENT_QUOTES, 'UTF-8') ?></p>
+                <?php endif; ?>
+            </div>
+        </article>
+        <?php
+    }
     return (string) ob_get_clean();
 };
 $headerConfig = $homeSettings['header'] ?? [];
@@ -256,58 +325,29 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     </section>
 <?php endif; ?>
 
-<?php if (!empty($posts)): ?>
-    <section class="post-grid columns-<?= $columns ?> blocks-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?>">
-        <?php foreach ($posts as $post): ?>
-            <?php
-            $link = $postUrl($post['slug']);
-            $imageUrl = $resolveImage($post['image']);
-            $cardClassParts = ['post-card', 'style-' . $cardStyle];
-            if ($cardStyle === 'full') {
-                $cardClassParts[] = 'full-mode-' . $fullImageMode;
-            }
-            if (in_array($cardStyle, ['square-right', 'circle-right'], true)) {
-                $cardClassParts[] = 'style-media-right';
-            }
-            $cardClass = implode(' ', $cardClassParts);
-            $thumbClassParts = ['post-thumb'];
-            if ($cardStyle === 'full') {
-                $thumbClassParts[] = 'thumb-wide';
-            } else {
-                $thumbClassParts[] = 'thumb-right';
-                $thumbClassParts[] = $cardStyle === 'square-right' ? 'thumb-square' : 'thumb-circle';
-            }
-            $thumbClass = implode(' ', $thumbClassParts);
-            $category = $post['category'] ?? '';
-            $metaText = '';
-            if (($post['date'] ?? '') !== '') {
-                $metaText = 'Publicado el ' . $post['date'];
-            }
-            $categoryLinkHtml = '';
-            if ($category !== '') {
-                $categorySlug = nammu_slugify_label($category);
-                $categoryUrl = ($baseHref ?? '/') !== '' ? rtrim($baseHref, '/') . '/categoria/' . rawurlencode($categorySlug) : '/categoria/' . rawurlencode($categorySlug);
-                $categoryLinkHtml = '<a class="category-tag-link" href="' . htmlspecialchars($categoryUrl, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($category, ENT_QUOTES, 'UTF-8') . '</a>';
-                $metaText .= $metaText !== '' ? ' · ' . $categoryLinkHtml : $categoryLinkHtml;
-            }
-            ?>
-            <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
-                <?php if ($imageUrl): ?>
-                    <a class="<?= htmlspecialchars($thumbClass, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($link, ENT_QUOTES, 'UTF-8') ?>">
-                        <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?>">
+<?php if ($isAlphabetical && !empty($letterGroups)): ?>
+    <?php foreach ($letterGroups as $letter => $groupPosts): ?>
+        <?php $letterHeadingUrl = $letterGroupUrls[$letter] ?? null; ?>
+        <section class="letter-block">
+            <div class="letter-heading-wrapper">
+                <?php if ($letterHeadingUrl): ?>
+                    <a class="letter-heading-link" href="<?= htmlspecialchars($letterHeadingUrl, ENT_QUOTES, 'UTF-8') ?>">
+                        <?= htmlspecialchars(nammu_letter_display_name($letter), ENT_QUOTES, 'UTF-8') ?>
                     </a>
+                <?php else: ?>
+                    <span class="letter-heading-link">
+                        <?= htmlspecialchars(nammu_letter_display_name($letter), ENT_QUOTES, 'UTF-8') ?>
+                    </span>
                 <?php endif; ?>
-                <div class="post-body">
-                    <h2><a href="<?= htmlspecialchars($link, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?></a></h2>
-                    <?php if ($metaText !== ''): ?>
-                        <p class="post-meta"><?= $metaText ?></p>
-                    <?php endif; ?>
-                    <?php if ($post['description'] !== ''): ?>
-                        <p class="post-description"><?= htmlspecialchars($post['description'], ENT_QUOTES, 'UTF-8') ?></p>
-                    <?php endif; ?>
-                </div>
-            </article>
-        <?php endforeach; ?>
+            </div>
+            <section class="post-grid columns-<?= $columns ?> blocks-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?>">
+                <?= $renderPostCards($groupPosts, true) ?>
+            </section>
+        </section>
+    <?php endforeach; ?>
+<?php elseif (!empty($posts)): ?>
+    <section class="post-grid columns-<?= $columns ?> blocks-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?>">
+        <?= $renderPostCards($posts, false) ?>
     </section>
 <?php else: ?>
     <p>No hay publicaciones disponibles todavía.</p>
@@ -392,7 +432,8 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         justify-content: center;
         cursor: pointer;
     }
-    .search-categories-link {
+    .search-categories-link,
+    .search-letters-link {
         width: 44px;
         height: 44px;
         border-radius: 12px;
@@ -403,7 +444,8 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         text-decoration: none;
         transition: background 0.2s ease;
     }
-    .search-categories-link:hover {
+    .search-categories-link:hover,
+    .search-letters-link:hover {
         background: rgba(0,0,0,0.1);
     }
     .site-search-form button svg {
@@ -422,7 +464,8 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         outline: 2px solid <?= $accentColor ?>;
         border-color: <?= $accentColor ?>;
     }
-    .search-categories-link {
+    .search-categories-link,
+    .search-letters-link {
         width: 44px;
         height: 44px;
         border-radius: 12px;
@@ -433,7 +476,8 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         text-decoration: none;
         transition: background 0.2s ease;
     }
-    .search-categories-link:hover {
+    .search-categories-link:hover,
+    .search-letters-link:hover {
         background: rgba(0,0,0,0.12);
     }
     .home-hero-graphic {
@@ -553,6 +597,28 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     }
     .site-bio p {
         margin: 0 0 1rem 0;
+    }
+    .letter-block {
+        margin-bottom: 2.5rem;
+    }
+    .letter-heading-wrapper {
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    .letter-heading-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: clamp(2.2rem, 6vw, 3.6rem);
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: <?= $headingSecondaryColor ?>;
+        text-decoration: none;
+        border-bottom: 2px solid transparent;
+    }
+    .letter-heading-link:hover {
+        border-color: <?= $accentColor ?>;
     }
     .post-grid {
         display: grid;
@@ -762,7 +828,8 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         }
         .site-search-form input[type="text"],
         .site-search-form button,
-        .search-categories-link {
+        .search-categories-link,
+        .search-letters-link {
             width: 100%;
         }
     }

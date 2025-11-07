@@ -41,6 +41,15 @@ $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
                         <line x1="8" y1="13" x2="16" y2="13" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
                     </svg>
                 </a>
+                <?php if ($showLetterButton && $letterIndexUrlValue): ?>
+                    <a class="search-letters-link" href="<?= htmlspecialchars($letterIndexUrlValue, ENT_QUOTES, 'UTF-8') ?>" aria-label="Índice alfabético">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M5 18L9 6L13 18" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <line x1="6.5" y1="13" x2="11.5" y2="13" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                            <path d="M15 6H20L15 18H20" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </a>
+                <?php endif; ?>
             </div>
             <div class="search-hints">
                 Frases exactas entre comillas (“bosque mediterráneo”), excluye con <code>-urbano</code>, filtra por campo (<code>title:plantación</code>) o tipo (<code>tipo:página</code>).
@@ -161,7 +170,8 @@ $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
         font-weight: 600;
         cursor: pointer;
     }
-    .search-categories-link {
+    .search-categories-link,
+    .search-letters-link {
         flex: 0 0 auto;
         width: 48px;
         height: 48px;
@@ -173,7 +183,8 @@ $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
         text-decoration: none;
         transition: background 0.2s ease;
     }
-    .search-categories-link:hover {
+    .search-categories-link:hover,
+    .search-letters-link:hover {
         background: rgba(0,0,0,0.12);
     }
     .search-hints {
@@ -305,7 +316,8 @@ $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
         .search-form input,
         .search-form select,
         .search-form button,
-        .search-categories-link {
+        .search-categories-link,
+        .search-letters-link {
             width: 100%;
         }
         .search-result-card footer {

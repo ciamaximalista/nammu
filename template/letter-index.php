@@ -1,6 +1,6 @@
 <?php
 /**
- * @var array<int, array{name:string,slug:string,count:int,url:string}> $categories
+ * @var array<int, array{letter:string,display:string,slug:string,count:int,url:string}> $letters
  * @var int $total
  */
 $colors = $theme['colors'] ?? [];
@@ -57,10 +57,10 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
     return (string) ob_get_clean();
 };
 ?>
-<section class="category-hero">
-    <div class="category-hero-inner">
-        <h1>Explora por categorías</h1>
-        <p>Tenemos <?= htmlspecialchars((string) $total, ENT_QUOTES, 'UTF-8') ?> categoría<?= $total === 1 ? '' : 's' ?> activas. Elige un tema y navega por sus contenidos.</p>
+<section class="letters-hero">
+    <div class="letters-hero-inner">
+        <h1>Entradas por letra</h1>
+        <p>Explora <?= htmlspecialchars((string) $total, ENT_QUOTES, 'UTF-8') ?> bloque<?= $total === 1 ? '' : 's' ?> ordenados alfabéticamente.</p>
     </div>
 </section>
 
@@ -70,27 +70,17 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
     </section>
 <?php endif; ?>
 
-<?php if (empty($categories)): ?>
-    <section class="category-empty">
-        <p>Todavía no hay categorías con contenido publicado.</p>
+<?php if (empty($letters)): ?>
+    <section class="letters-empty">
+        <p>Todavía no hay publicaciones disponibles para construir el índice alfabético.</p>
     </section>
 <?php else: ?>
-    <section class="category-grid">
-        <?php foreach ($categories as $category): ?>
-            <?php $coverUrl = $resolveImage($category['image'] ?? null); ?>
-            <article class="category-card">
-                <?php if ($coverUrl): ?>
-                    <div class="category-cover">
-                        <img src="<?= htmlspecialchars($coverUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($category['name'], ENT_QUOTES, 'UTF-8') ?>">
-                    </div>
-                <?php endif; ?>
-                <header>
-                    <span class="category-count"><?= htmlspecialchars((string) $category['count'], ENT_QUOTES, 'UTF-8') ?> <?= $category['count'] === 1 ? 'entrada' : 'entradas' ?></span>
-                </header>
-                <h2><a href="<?= htmlspecialchars($category['url'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($category['name'], ENT_QUOTES, 'UTF-8') ?></a></h2>
-                <footer>
-                    <a class="category-link" href="<?= htmlspecialchars($category['url'], ENT_QUOTES, 'UTF-8') ?>">Ver artículos</a>
-                </footer>
+    <section class="letters-grid">
+        <?php foreach ($letters as $letter): ?>
+            <article class="letter-card">
+                <div class="letter-symbol"><?= htmlspecialchars($letter['display'], ENT_QUOTES, 'UTF-8') ?></div>
+                <p class="letter-count"><?= htmlspecialchars((string) $letter['count'], ENT_QUOTES, 'UTF-8') ?> <?= $letter['count'] === 1 ? 'entrada' : 'entradas' ?></p>
+                <a class="letter-link" href="<?= htmlspecialchars($letter['url'], ENT_QUOTES, 'UTF-8') ?>">Ver publicaciones</a>
             </article>
         <?php endforeach; ?>
     </section>
@@ -103,81 +93,58 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
 <?php endif; ?>
 
 <style>
-    .category-hero {
+    .letters-hero {
         margin-bottom: 2rem;
     }
-    .category-hero-inner {
+    .letters-hero-inner {
         background: <?= $highlight ?>;
         border-radius: var(--nammu-radius-lg);
         padding: 1.5rem 2rem;
         border: 1px solid rgba(0,0,0,0.05);
         text-align: center;
     }
-    .category-hero-inner h1 {
+    .letters-hero-inner h1 {
         margin: 0 0 0.5rem 0;
         color: <?= $h1Color ?>;
     }
-    .category-hero-inner p {
+    .letters-hero-inner p {
         margin: 0;
         color: <?= $textColor ?>;
     }
-    .category-grid {
+    .letters-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 1rem;
     }
-    .category-card {
+    .letter-card {
         border: 1px solid rgba(0,0,0,0.06);
         border-radius: var(--nammu-radius-md);
-        padding: 1rem 1.25rem;
+        padding: 1.25rem;
         background: #fff;
-        box-shadow: 0 3px 12px rgba(0,0,0,0.03);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.04);
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
+        gap: 0.4rem;
+        align-items: center;
+        text-align: center;
     }
-    .category-cover {
-        width: 100%;
-        aspect-ratio: 4 / 3;
-        border-radius: var(--nammu-radius-md);
-        overflow: hidden;
-        margin-bottom: 0.5rem;
-        border: 1px solid rgba(0,0,0,0.05);
-        background: rgba(0,0,0,0.02);
-    }
-    .category-cover img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
-    }
-    .category-card h2 {
-        margin: 0;
-        font-size: 1.25rem;
+    .letter-symbol {
+        font-size: clamp(2.3rem, 6vw, 3.2rem);
+        font-weight: 700;
         color: <?= $brandColor ?>;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
     }
-    .category-card h2 a {
-        color: inherit;
-    }
-    .category-card header {
-        display: flex;
-        justify-content: flex-end;
-    }
-    .category-count {
-        padding: 0.15rem 0.55rem;
-        border-radius: var(--nammu-radius-pill);
-        background: rgba(0,0,0,0.05);
+    .letter-count {
+        margin: 0;
         color: <?= $textColor ?>;
-        font-size: 0.85rem;
     }
-    .category-card footer {
+    .letter-link {
         margin-top: auto;
-    }
-    .category-link {
         color: <?= $accentColor ?>;
         font-weight: 600;
     }
-    .category-empty {
+    .letters-empty {
         padding: 1.5rem;
         border-radius: var(--nammu-radius-md);
         border: 1px dashed rgba(0,0,0,0.4);
@@ -237,10 +204,6 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         display: inline-flex;
         align-items: center;
         justify-content: center;
-    }
-    .site-search-form input:focus {
-        outline: 2px solid <?= $accentColor ?>;
-        border-color: <?= $accentColor ?>;
     }
     .search-categories-link,
     .search-letters-link {

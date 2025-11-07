@@ -19,7 +19,9 @@ $singleSearchTop = $showSingleSearch && $searchPositionSetting === 'title';
 $singleSearchBottom = $showSingleSearch && $searchPositionSetting === 'footer';
 $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
-$renderSearchBox = static function (string $variant) use ($searchAction, $colorHighlight, $colorAccent, $colorText, $searchActionBase): string {
+$letterIndexUrlValue = $lettersIndexUrl ?? null;
+$showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
+$renderSearchBox = static function (string $variant) use ($searchAction, $colorHighlight, $colorAccent, $colorText, $searchActionBase, $letterIndexUrlValue, $showLetterButton): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
         <form class="site-search-form" method="get" action="<?= htmlspecialchars($searchAction, ENT_QUOTES, 'UTF-8') ?>">
@@ -42,6 +44,15 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $colorH
                     <line x1="8" y1="13" x2="16" y2="13" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
                 </svg>
             </a>
+            <?php if ($showLetterButton && $letterIndexUrlValue): ?>
+                <a class="search-letters-link" href="<?= htmlspecialchars($letterIndexUrlValue, ENT_QUOTES, 'UTF-8') ?>" aria-label="Índice alfabético">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M5 18L9 6L13 18" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <line x1="6.5" y1="13" x2="11.5" y2="13" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M15 6H20L15 18H20" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </a>
+            <?php endif; ?>
         </form>
     </div>
     <?php
@@ -82,6 +93,18 @@ if ($category !== '') {
     $metaTextParts[] = 'en la sección ' . $categoryLinkHtml;
 }
 $metaText = implode(' ', $metaTextParts);
+$isAlphabeticalOrder = !empty($isAlphabeticalOrder);
+$updateMetaText = '';
+if ($isAlphabeticalOrder) {
+    $updatePieces = [];
+    if ($formattedDate !== '') {
+        $updatePieces[] = 'Actualizado por última vez el ' . htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') . '.';
+    }
+    if ($categoryLinkHtml !== '') {
+        $updatePieces[] = 'Guardado en la sección ' . $categoryLinkHtml . '.';
+    }
+    $updateMetaText = implode(' ', $updatePieces);
+}
 ?>
 <article class="post">
     <div class="post-header">
@@ -99,7 +122,7 @@ $metaText = implode(' ', $metaTextParts);
             <?php endif; ?>
         </div>
         <h1><?= htmlspecialchars($post->getTitle(), ENT_QUOTES, 'UTF-8') ?></h1>
-        <?php if ($metaText !== ''): ?>
+        <?php if (!$isAlphabeticalOrder && $metaText !== ''): ?>
             <div class="post-meta-band"><?= $metaText ?></div>
         <?php endif; ?>
         <?php if ($post->getDescription() !== ''): ?>
@@ -119,6 +142,9 @@ $metaText = implode(' ', $metaTextParts);
     <div class="post-body">
         <?= $htmlContent ?>
     </div>
+    <?php if ($isAlphabeticalOrder && $updateMetaText !== ''): ?>
+        <div class="post-meta-update"><?= $updateMetaText ?></div>
+    <?php endif; ?>
     <?php if ($singleSearchBottom): ?>
         <div class="site-search-block placement-bottom">
             <?= $renderSearchBox('variant-panel') ?>
@@ -184,7 +210,8 @@ $metaText = implode(' ', $metaTextParts);
         }
         .site-search-form input[type="text"],
         .site-search-form button,
-        .search-categories-link {
+        .search-categories-link,
+        .search-letters-link {
             width: 100%;
         }
     }
@@ -208,7 +235,8 @@ $metaText = implode(' ', $metaTextParts);
         align-items: center;
         justify-content: center;
     }
-    .search-categories-link {
+    .search-categories-link,
+    .search-letters-link {
         width: 44px;
         height: 44px;
         border-radius: 12px;
@@ -219,7 +247,8 @@ $metaText = implode(' ', $metaTextParts);
         text-decoration: none;
         transition: background 0.2s ease;
     }
-    .search-categories-link:hover {
+    .search-categories-link:hover,
+    .search-letters-link:hover {
         background: rgba(0,0,0,0.1);
     }
     .post {
@@ -349,10 +378,20 @@ $metaText = implode(' ', $metaTextParts);
     }
     .post-body blockquote p:last-child {
         margin-bottom: 0;
-    }    .category-tag-link {
+    }
+    .category-tag-link {
         color: <?= $colorAccent ?>;
         text-decoration: none;
         border-bottom: 1px dotted rgba(0,0,0,0.5);
         padding-bottom: 0.05rem;
+    }
+    .post-meta-update {
+        margin: 2rem auto 0;
+        max-width: min(760px, 100%);
+        padding: 0.85rem 1.25rem;
+        border-radius: var(--nammu-radius-md);
+        background: <?= $colorHighlight ?>;
+        color: <?= $colorText ?>;
+        font-size: 0.95rem;
     }
 </style>

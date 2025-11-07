@@ -565,3 +565,129 @@ function nammu_collect_categories_from_posts(array $posts): array
 
     return $categories;
 }
+
+function nammu_letter_key_from_title(string $title): string
+{
+    $title = trim($title);
+    if ($title === '') {
+        return '#';
+    }
+    $firstChar = mb_substr($title, 0, 1, 'UTF-8');
+    $upper = mb_strtoupper($firstChar, 'UTF-8');
+    $mapping = [
+        'Á' => 'A',
+        'À' => 'A',
+        'Â' => 'A',
+        'Ã' => 'A',
+        'Ä' => 'A',
+        'Å' => 'A',
+        'É' => 'E',
+        'È' => 'E',
+        'Ê' => 'E',
+        'Ë' => 'E',
+        'Í' => 'I',
+        'Ì' => 'I',
+        'Î' => 'I',
+        'Ï' => 'I',
+        'Ó' => 'O',
+        'Ò' => 'O',
+        'Ô' => 'O',
+        'Õ' => 'O',
+        'Ö' => 'O',
+        'Ú' => 'U',
+        'Ù' => 'U',
+        'Û' => 'U',
+        'Ü' => 'U',
+        'Ý' => 'Y',
+    ];
+    $upper = strtr($upper, $mapping);
+    if ($upper === 'Ñ') {
+        return 'Ñ';
+    }
+    if (preg_match('/^[A-Z]$/u', $upper)) {
+        return $upper;
+    }
+    return '#';
+}
+
+function nammu_letter_slug(string $letter): string
+{
+    return $letter === '#' ? 'otros' : strtolower($letter);
+}
+
+function nammu_letter_from_slug(string $slug): string
+{
+    $slug = strtolower($slug);
+    if ($slug === 'otros') {
+        return '#';
+    }
+    $char = mb_substr($slug, 0, 1, 'UTF-8');
+    $upper = mb_strtoupper($char, 'UTF-8');
+    return $upper !== '' ? $upper : '#';
+}
+
+function nammu_letter_display_name(string $letter): string
+{
+    return $letter === '#' ? 'Otros' : $letter;
+}
+
+/**
+ * @template T
+ * @param array<int, T> $items
+ * @param callable|null $formatter
+ * @return array<string, array<mixed>>
+ */
+function nammu_group_items_by_letter(array $items, ?callable $formatter = null): array
+{
+    $groups = [];
+    foreach ($items as $item) {
+        $title = '';
+        if ($item instanceof Post) {
+            $title = $item->getTitle();
+        } elseif (is_array($item) && isset($item['title'])) {
+            $title = (string) $item['title'];
+        } elseif (is_object($item) && method_exists($item, 'getTitle')) {
+            $title = (string) $item->getTitle();
+        }
+        $letter = nammu_letter_key_from_title($title);
+        if (!isset($groups[$letter])) {
+            $groups[$letter] = [];
+        }
+        $groups[$letter][] = $formatter ? $formatter($item) : $item;
+    }
+
+    return nammu_sort_letter_groups($groups);
+}
+
+/**
+ * @param array<string, array<mixed>> $groups
+ * @return array<string, array<mixed>>
+ */
+function nammu_sort_letter_groups(array $groups): array
+{
+    $keys = array_keys($groups);
+    usort($keys, static function (string $a, string $b): int {
+        return nammu_letter_sort_weight($a) <=> nammu_letter_sort_weight($b);
+    });
+    $sorted = [];
+    foreach ($keys as $key) {
+        $sorted[$key] = $groups[$key];
+    }
+    return $sorted;
+}
+
+function nammu_letter_sort_weight(string $letter): int
+{
+    if ($letter === '#') {
+        return 1000;
+    }
+    if ($letter === 'Ñ') {
+        return ord('N') + 1;
+    }
+    $char = $letter[0] ?? 'Z';
+    $ord = ord($char);
+    if ($ord < ord('A') || $ord > ord('Z')) {
+        return 900;
+    }
+    return $ord;
+}

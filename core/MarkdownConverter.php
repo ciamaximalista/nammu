@@ -14,7 +14,6 @@ class MarkdownConverter
         $lines = explode("\n", $markdown);
         $html = [];
         $paragraphBuffer = [];
-        $inList = false;
         $inCodeBlock = false;
         $inBlockquote = false;
         $codeBuffer = [];
@@ -31,13 +30,6 @@ class MarkdownConverter
                 $html[] = '<p>' . $this->convertInline($text) . '</p>';
             }
             $paragraphBuffer = [];
-        };
-
-        $closeList = function () use (&$inList, &$html) {
-            if ($inList) {
-                $html[] = '</ul>';
-                $inList = false;
-            }
         };
 
         $flushBlockquote = function () use (&$blockquoteBuffer, &$html, &$inBlockquote) {
@@ -68,6 +60,75 @@ class MarkdownConverter
             $inBlockquote = false;
         };
 
+        $listStack = [];
+
+        $closeAllLists = function () use (&$listStack, &$html) {
+            while (!empty($listStack)) {
+                $list = array_pop($listStack);
+                $html[] = "</{$list['tag']}>";
+            }
+        };
+
+        $closeListsDeeperThan = function (int $indentLevel) use (&$listStack, &$html) {
+            while (!empty($listStack)) {
+                $lastIndex = array_key_last($listStack);
+                if ($lastIndex === null) {
+                    break;
+                }
+                if ($listStack[$lastIndex]['indent'] > $indentLevel) {
+                    $list = array_pop($listStack);
+                    $html[] = "</{$list['tag']}>";
+                } else {
+                    break;
+                }
+            }
+        };
+
+        $openList = function (string $type, int $indentLevel, ?int $startNumber = null) use (&$listStack, &$html) {
+            $attributes = '';
+            if ($type === 'ol') {
+                if ($startNumber !== null && $startNumber !== 1) {
+                    $attributes .= ' start="' . $startNumber . '"';
+                }
+                $typeAttr = $this->orderedListTypeForLevel($indentLevel);
+                if ($typeAttr !== '1') {
+                    $attributes .= ' type="' . $typeAttr . '"';
+                }
+            }
+            $html[] = '<' . $type . $attributes . '>';
+            $listStack[] = [
+                'tag' => $type,
+                'indent' => $indentLevel,
+            ];
+        };
+
+        $ensureList = function (string $type, int $indentLevel, ?int $startNumber = null) use (&$listStack, $closeListsDeeperThan, $openList, &$html) {
+            $currentIndent = empty($listStack) ? -1 : $listStack[array_key_last($listStack)]['indent'];
+            $maxIndent = $currentIndent + 1;
+            if (empty($listStack)) {
+                $maxIndent = 0;
+            }
+            if ($indentLevel > $maxIndent) {
+                $indentLevel = $maxIndent;
+            }
+
+            $closeListsDeeperThan($indentLevel);
+
+            if (!empty($listStack)) {
+                $lastIndex = array_key_last($listStack);
+                if ($lastIndex !== null && $listStack[$lastIndex]['indent'] === $indentLevel && $listStack[$lastIndex]['tag'] !== $type) {
+                    $list = array_pop($listStack);
+                    $html[] = "</{$list['tag']}>";
+                }
+            }
+
+            if (empty($listStack) || $listStack[array_key_last($listStack)]['indent'] < $indentLevel || $listStack[array_key_last($listStack)]['tag'] !== $type) {
+                $openList($type, $indentLevel, $type === 'ol' ? $startNumber : null);
+            }
+
+            return $indentLevel;
+        };
+
         $flushCodeBlock = function () use (&$codeBuffer, &$codeLanguage, &$html, &$inCodeBlock) {
             if (!$inCodeBlock) {
                 return;
@@ -89,7 +150,7 @@ class MarkdownConverter
                     $flushCodeBlock();
                 } else {
                     $flushParagraph();
-                    $closeList();
+                    $closeAllLists();
                     $flushBlockquote();
                     $inCodeBlock = true;
                     $codeBuffer = [];
@@ -109,13 +170,13 @@ class MarkdownConverter
                     continue;
                 }
                 $flushParagraph();
-                $closeList();
+                $closeAllLists();
                 continue;
             }
 
             if (preg_match('/^(#{1,6})\s+(.+)$/', $trimmed, $matches)) {
                 $flushParagraph();
-                $closeList();
+                $closeAllLists();
                 $flushBlockquote();
                 $level = strlen($matches[1]);
                 $content = $this->convertInline($matches[2]);
@@ -123,20 +184,27 @@ class MarkdownConverter
                 continue;
             }
 
-            if (preg_match('/^[-*+]\s+(.+)$/', $trimmed, $matches)) {
+            if (preg_match('/^(\s*)(\d+)[\.\)]\s+(.+)$/', $line, $matches)) {
                 $flushParagraph();
                 $flushBlockquote();
-                if (!$inList) {
-                    $html[] = '<ul>';
-                    $inList = true;
-                }
-                $html[] = '<li>' . $this->convertInline($matches[1]) . '</li>';
+                $indentLevel = $this->calculateIndentLevel($matches[1]);
+                $indentLevel = $ensureList('ol', $indentLevel, (int) $matches[2]);
+                $html[] = '<li>' . $this->convertInline($matches[3]) . '</li>';
+                continue;
+            }
+
+            if (preg_match('/^(\s*)[-*+]\s+(.+)$/', $line, $matches)) {
+                $flushParagraph();
+                $flushBlockquote();
+                $indentLevel = $this->calculateIndentLevel($matches[1]);
+                $indentLevel = $ensureList('ul', $indentLevel);
+                $html[] = '<li>' . $this->convertInline($matches[2]) . '</li>';
                 continue;
             }
 
             if (preg_match('/^>\s?(.*)$/', $trimmed, $matches)) {
                 $flushParagraph();
-                $closeList();
+                $closeAllLists();
                 if (!$inBlockquote) {
                     $inBlockquote = true;
                     $blockquoteBuffer = [];
@@ -153,7 +221,7 @@ class MarkdownConverter
         }
 
         $flushParagraph();
-        $closeList();
+        $closeAllLists();
         $flushBlockquote();
         $flushCodeBlock();
 
@@ -245,5 +313,35 @@ class MarkdownConverter
         }
 
         return $result;
+    }
+
+    private function orderedListTypeForLevel(int $level): string
+    {
+        $types = ['1', 'a', 'i', 'A', 'I'];
+        return $types[$level % count($types)];
+    }
+
+    private function calculateIndentLevel(string $whitespace): int
+    {
+        $indent = 0;
+        $spaceCount = 0;
+        $length = strlen($whitespace);
+        for ($i = 0; $i < $length; $i++) {
+            $char = $whitespace[$i];
+            if ($char === "\t") {
+                $indent++;
+                $spaceCount = 0;
+            } elseif ($char === ' ') {
+                $spaceCount++;
+                if ($spaceCount === 4) {
+                    $indent++;
+                    $spaceCount = 0;
+                }
+            } else {
+                break;
+            }
+        }
+
+        return $indent;
     }
 }

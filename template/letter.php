@@ -1,8 +1,9 @@
 <?php
 /**
- * @var string $category
+ * @var string $letter
+ * @var string $letterDisplay
  * @var int $count
- * @var array<int, array{slug:string,title:string,description:string,date:string,category:string,image:?string}> $posts
+ * @var array<int, array{slug:string,title:string,description:string,date:string,category:?string,image:?string}> $posts
  * @var bool $hideMetaBand
  */
 $colors = $theme['colors'] ?? [];
@@ -34,7 +35,6 @@ $searchTop = $shouldShowSearch && $searchPositionSetting === 'title';
 $searchBottom = $shouldShowSearch && $searchPositionSetting === 'footer';
 $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
-$hideMetaBand = !empty($hideMetaBand);
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
 $renderSearchBox = static function (string $variant) use ($searchAction, $searchActionBase, $accentColor, $letterIndexUrlValue, $showLetterButton): string {
@@ -75,11 +75,11 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
     return (string) ob_get_clean();
 };
 ?>
-<section class="category-detail-hero">
+<section class="letter-detail-hero">
     <div>
-        <p class="category-label">Categoría</p>
-        <h1><?= htmlspecialchars($category, ENT_QUOTES, 'UTF-8') ?></h1>
-        <p class="category-count"><?= htmlspecialchars((string) $count, ENT_QUOTES, 'UTF-8') ?> <?= $count === 1 ? 'entrada publicada' : 'entradas publicadas' ?></p>
+        <p class="letter-label">Letra</p>
+        <h1><?= htmlspecialchars($letterDisplay, ENT_QUOTES, 'UTF-8') ?></h1>
+        <p class="letter-count"><?= htmlspecialchars((string) $count, ENT_QUOTES, 'UTF-8') ?> <?= $count === 1 ? 'entrada publicada' : 'entradas publicadas' ?></p>
     </div>
 </section>
 
@@ -90,7 +90,7 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
 <?php endif; ?>
 
 <?php if (empty($posts)): ?>
-    <p>No hay publicaciones en esta categoría todavía.</p>
+    <p>No hay publicaciones que comiencen por esta letra.</p>
 <?php else: ?>
     <section class="post-grid columns-<?= $columns ?> blocks-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?>">
         <?php foreach ($posts as $post): ?>
@@ -131,9 +131,9 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
                 <?php endif; ?>
                 <div class="post-body">
                     <h2><a href="<?= htmlspecialchars($link, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?></a></h2>
-            <?php if (!$hideMetaBand && $metaHtml !== ''): ?>
-                <p class="post-meta"><?= $metaHtml ?></p>
-            <?php endif; ?>
+                    <?php if (!$hideMetaBand && $metaHtml !== ''): ?>
+                        <p class="post-meta"><?= $metaHtml ?></p>
+                    <?php endif; ?>
                     <?php if ($post['description'] !== ''): ?>
                         <p class="post-description"><?= htmlspecialchars($post['description'], ENT_QUOTES, 'UTF-8') ?></p>
                     <?php endif; ?>
@@ -150,26 +150,28 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
 <?php endif; ?>
 
 <style>
-    .category-detail-hero {
+<style>
+    .letter-detail-hero {
         margin-bottom: 2rem;
         background: <?= $highlight ?>;
         border-radius: var(--nammu-radius-lg);
         padding: 1.7rem 2rem;
         border: 1px solid rgba(0,0,0,0.05);
+        text-align: center;
     }
-    .category-label {
+    .letter-label {
         margin: 0;
         text-transform: uppercase;
         letter-spacing: 0.1em;
         font-size: 0.85rem;
         color: <?= $accentColor ?>;
     }
-    .category-detail-hero h1 {
+    .letter-detail-hero h1 {
         margin: 0.3rem 0 0;
         font-size: clamp(2rem, 5vw, 2.8rem);
         color: <?= $brandColor ?>;
     }
-    .category-count {
+    .letter-count {
         margin: 0.3rem 0 0;
         color: <?= $textColor ?>;
         opacity: 0.8;
@@ -227,10 +229,6 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         display: inline-flex;
         align-items: center;
         justify-content: center;
-    }
-    .site-search-form input:focus {
-        outline: 2px solid <?= $accentColor ?>;
-        border-color: <?= $accentColor ?>;
     }
     .search-categories-link,
     .search-letters-link {
@@ -312,6 +310,24 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
     .post-card .post-body > *:not(:last-child) {
         margin-bottom: 0.6rem;
     }
+    .post-card.style-full .post-thumb {
+        width: 100%;
+    }
+    .post-card.style-full .post-thumb img {
+        border-radius: var(--nammu-radius-md);
+    }
+    .post-card.style-full.full-mode-natural .post-thumb img {
+        height: auto;
+        width: 100%;
+    }
+    .post-card.style-full.full-mode-crop .post-thumb {
+        aspect-ratio: 16 / 9;
+    }
+    .post-card.style-full.full-mode-crop .post-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
     .post-card.style-media-right .post-thumb {
         float: right;
         width: clamp(110px, 34%, 170px);
@@ -334,28 +350,6 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         border-radius: 50%;
         shape-outside: circle();
         -webkit-shape-outside: circle();
-    }
-    .post-card.style-full .post-thumb {
-        width: 100%;
-        overflow: hidden;
-    }
-    .post-card.style-full .post-thumb img {
-        border-radius: var(--nammu-radius-md);
-    }
-    .post-card.style-full.full-mode-natural .post-thumb img {
-        height: auto;
-        width: 100%;
-    }
-    .post-card.style-full.full-mode-crop .post-thumb {
-        aspect-ratio: 16 / 9;
-    }
-    .post-card.style-full.full-mode-crop .post-thumb img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-    .post-card.style-full .post-body {
-        margin-top: 0.9rem;
     }
     .post-card h2 {
         margin: 0;
@@ -393,10 +387,5 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         border-bottom: 1px dotted rgba(0,0,0,0.5);
         padding-bottom: 0.05rem;
     }
-    .category-tag-link {
-        color: <?= $accentColor ?>;
-        text-decoration: none;
-        border-bottom: 1px dotted rgba(0,0,0,0.5);
-        padding-bottom: 0.05rem;
-    }
 </style>
+$hideMetaBand = !empty($hideMetaBand);

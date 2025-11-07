@@ -55,6 +55,12 @@ $homeImage = nammu_resolve_asset($socialConfig['home_image'] ?? '', $publicBaseU
 
 $displaySiteTitle = $theme['blog'] !== '' ? $theme['blog'] : $siteTitle;
 
+$configData = nammu_load_config();
+$sortOrderValue = strtolower((string) ($configData['pages_order_by'] ?? 'date'));
+$sortOrder = in_array($sortOrderValue, ['date', 'alpha'], true) ? $sortOrderValue : 'date';
+$isAlphabeticalOrder = ($sortOrder === 'alpha');
+$lettersIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/letras';
+
 $renderer = new TemplateRenderer(__DIR__ . '/template', [
     'siteTitle' => $displaySiteTitle,
     'siteDescription' => $siteDescription,
@@ -62,6 +68,8 @@ $renderer = new TemplateRenderer(__DIR__ . '/template', [
     'baseUrl' => $homeUrl,
     'theme' => $theme,
 ]);
+$renderer->setGlobal('lettersIndexUrl', $isAlphabeticalOrder ? $lettersIndexUrl : null);
+$renderer->setGlobal('showLetterIndexButton', $isAlphabeticalOrder);
 
 $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseUrl): ?string {
     if ($image === null || $image === '') {
@@ -95,8 +103,29 @@ $renderer->setGlobal('markdownToHtml', function (string $markdownText) use ($mar
 });
 $renderer->setGlobal('baseUrl', $publicBaseUrl !== '' ? $publicBaseUrl : '/');
 $renderer->setGlobal('socialConfig', $socialConfig);
+$renderer->setGlobal('isAlphabeticalOrder', $isAlphabeticalOrder);
 
 $routePath = nammu_route_path();
+$alphabeticalSorter = static function (Post $a, Post $b): int {
+    return strcasecmp($a->getTitle(), $b->getTitle());
+};
+$postToViewArray = static function (Post $post): array {
+    $date = $post->getDate();
+    $rawDate = $post->getRawDate();
+    return [
+        'slug' => $post->getSlug(),
+        'title' => $post->getTitle(),
+        'description' => $post->getDescription(),
+        'date' => nammu_format_date_spanish($date, $rawDate ?? ''),
+        'category' => $post->getCategory(),
+        'image' => $post->getImage(),
+    ];
+};
+$isLettersIndex = (bool) preg_match('#^/letras/?$#i', $routePath);
+$letterSlugRequest = null;
+if (!$isLettersIndex && preg_match('#^/letra/([^/]+)/?$#i', $routePath, $matchLetter)) {
+    $letterSlugRequest = strtolower($matchLetter[1]);
+}
 $buildSitemapEntries = static function (array $posts, array $theme, string $publicBaseUrl): array {
     $entries = [];
     $timestampFromPost = static function (Post $post): ?int {
@@ -283,6 +312,95 @@ if ($routePath === '/sitemap.xml') {
     exit;
 }
 
+if ($isLettersIndex) {
+    if (!$isAlphabeticalOrder) {
+        $renderNotFound('Índice alfabético no disponible', 'Activa la ordenación alfabética para acceder a esta vista.', $routePath);
+    }
+    $allPosts = $contentRepository->all();
+    if ($isAlphabeticalOrder) {
+        usort($allPosts, $alphabeticalSorter);
+    }
+    $letterGroups = nammu_group_items_by_letter($allPosts);
+    $lettersData = [];
+    foreach ($letterGroups as $letter => $groupPosts) {
+        $lettersData[] = [
+            'letter' => $letter,
+            'display' => nammu_letter_display_name($letter),
+            'slug' => nammu_letter_slug($letter),
+            'count' => count($groupPosts),
+            'url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/letra/' . rawurlencode(nammu_letter_slug($letter)),
+        ];
+    }
+
+    $content = $renderer->render('letter-index', [
+        'letters' => $lettersData,
+        'total' => count($lettersData),
+    ]);
+
+    $canonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/letras';
+    $socialMeta = nammu_build_social_meta([
+        'type' => 'website',
+        'title' => 'Índice alfabético — ' . $siteNameForMeta,
+        'description' => 'Explora todas las entradas agrupadas por la letra inicial de su título.',
+        'url' => $canonical,
+        'image' => $homeImage,
+        'site_name' => $siteNameForMeta,
+    ], $socialConfig);
+
+    echo $renderer->render('layout', [
+        'pageTitle' => 'Índice alfabético',
+        'metaDescription' => 'Listado completo de letras iniciales disponibles en el sitio.',
+        'content' => $content,
+        'socialMeta' => $socialMeta,
+        'showLogo' => true,
+    ]);
+    exit;
+}
+
+if ($letterSlugRequest !== null) {
+    if (!$isAlphabeticalOrder) {
+        $renderNotFound('Letra no disponible', 'Activa la ordenación alfabética para acceder a esta vista.', $routePath);
+    }
+    $targetLetter = nammu_letter_from_slug($letterSlugRequest);
+    $allPosts = $contentRepository->all();
+    if ($isAlphabeticalOrder) {
+        usort($allPosts, $alphabeticalSorter);
+    }
+    $letterGroups = nammu_group_items_by_letter($allPosts);
+    if (!isset($letterGroups[$targetLetter])) {
+        $renderNotFound('Letra no encontrada', 'No hay publicaciones que comiencen con esta letra.', $routePath);
+    }
+    $postsForLetter = array_map($postToViewArray, $letterGroups[$targetLetter]);
+    $letterDisplay = nammu_letter_display_name($targetLetter);
+
+    $content = $renderer->render('letter', [
+        'letter' => $targetLetter,
+        'letterDisplay' => $letterDisplay,
+        'posts' => $postsForLetter,
+        'count' => count($postsForLetter),
+        'hideMetaBand' => true,
+    ]);
+
+    $canonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/letra/' . rawurlencode(nammu_letter_slug($targetLetter));
+    $socialMeta = nammu_build_social_meta([
+        'type' => 'website',
+        'title' => 'Entradas que empiezan por ' . $letterDisplay . ' — ' . $siteNameForMeta,
+        'description' => 'Artículos cuyo título comienza por la letra ' . $letterDisplay . '.',
+        'url' => $canonical,
+        'image' => $homeImage,
+        'site_name' => $siteNameForMeta,
+    ], $socialConfig);
+
+    echo $renderer->render('layout', [
+        'pageTitle' => 'Letra: ' . $letterDisplay,
+        'metaDescription' => 'Listado de publicaciones que comienzan por la letra ' . $letterDisplay . '.',
+        'content' => $content,
+        'socialMeta' => $socialMeta,
+        'showLogo' => true,
+    ]);
+    exit;
+}
+
 $slug = null;
 
 if ($isCategoriesIndex) {
@@ -370,6 +488,7 @@ if ($categorySlugRequest !== null) {
         'category' => $categoryTitle,
         'count' => $countPosts,
         'posts' => $postsForCategory,
+        'hideMetaBand' => $isAlphabeticalOrder,
     ]);
 
     $canonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/categoria/' . rawurlencode($slugKey);
@@ -459,6 +578,9 @@ if ($slug !== null && $slug !== '') {
 }
 
 $posts = $contentRepository->all();
+if ($isAlphabeticalOrder) {
+    usort($posts, $alphabeticalSorter);
+}
 
 $homeSettings = $theme['home'] ?? [];
 $perPageSetting = $homeSettings['per_page'] ?? 'all';
@@ -503,21 +625,15 @@ if ($perPage !== null && $totalPages > 1) {
     ];
 }
 
-$postsForView = array_map(
-    static function (Post $post): array {
-        $date = $post->getDate();
-        $rawDate = $post->getRawDate();
-        return [
-            'slug' => $post->getSlug(),
-            'title' => $post->getTitle(),
-            'description' => $post->getDescription(),
-            'date' => nammu_format_date_spanish($date, $rawDate ?? ''),
-            'category' => $post->getCategory(),
-            'image' => $post->getImage(),
-        ];
-    },
-    $paginatedPosts
-);
+$postsForView = array_map($postToViewArray, $paginatedPosts);
+$letterGroupsForView = [];
+$letterGroupUrls = [];
+if ($isAlphabeticalOrder) {
+    $letterGroupsForView = nammu_group_items_by_letter($postsForView);
+    foreach ($letterGroupsForView as $letter => $_group) {
+        $letterGroupUrls[$letter] = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/letra/' . rawurlencode(nammu_letter_slug($letter));
+    }
+}
 
 $bioHtml = $siteBio !== '' ? $markdown->toHtml($siteBio) : '';
 
@@ -547,6 +663,9 @@ $content = $renderer->render('home', [
     'posts' => $postsForView,
     'bioHtml' => $bioHtml,
     'pagination' => $paginationData,
+    'letterGroups' => $letterGroupsForView,
+    'isAlphabetical' => $isAlphabeticalOrder,
+    'letterGroupUrls' => $letterGroupUrls,
 ]);
 
 echo $renderer->render('layout', [

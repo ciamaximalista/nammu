@@ -812,6 +812,10 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
             flex-direction: column;
             align-items: center;
         }
+        .post-card.style-media-right .post-body {
+            width: 100%;
+            text-align: left;
+        }
         .post-card.style-media-right .post-thumb {
             float: none;
             width: min(240px, 75vw);
@@ -827,7 +831,6 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         }
         .post-grid.columns-1 .post-card.style-media-right {
             display: block;
-            text-align: center;
         }
         .post-grid.columns-1 .post-card.style-media-right .post-thumb {
             float: none;

@@ -361,6 +361,10 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
             flex-direction: column;
             align-items: center;
         }
+        .post-card.style-media-right .post-body {
+            width: 100%;
+            text-align: left;
+        }
         .post-card.style-media-right .post-thumb {
             float: none;
             width: min(240px, 75vw);
@@ -376,7 +380,6 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         }
         .post-grid.columns-1 .post-card.style-media-right {
             display: block;
-            text-align: center;
         }
         .post-grid.columns-1 .post-card.style-media-right .post-thumb {
             float: none;

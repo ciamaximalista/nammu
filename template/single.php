@@ -409,7 +409,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         border-left: 4px solid <?= $colorAccent ?>;
         border-radius: var(--nammu-radius-md);
         font-family: "<?= $quoteFont ?>", "Georgia", serif;
-        font-style: italic;
+        font-style: normal;
         color: <?= $colorText ?>;
     }
     .post-body blockquote p {

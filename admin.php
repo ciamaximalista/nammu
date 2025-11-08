@@ -713,7 +713,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
-    } elseif (isset($_POST['update']) || isset($_POST['publish_draft_entry']) || isset($_POST['publish_draft_page'])) {
+    } elseif (isset($_POST['update']) || isset($_POST['publish_draft_entry']) || isset($_POST['publish_draft_page']) || isset($_POST['convert_to_draft'])) {
         $filename = $_POST['filename'] ?? '';
         $title = $_POST['title'] ?? '';
         $category = $_POST['category'] ?? '';
@@ -724,6 +724,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $statusPosted = strtolower(trim($_POST['status'] ?? ''));
         $publishDraftAsEntry = isset($_POST['publish_draft_entry']);
         $publishDraftAsPage = isset($_POST['publish_draft_page']);
+        $convertToDraft = isset($_POST['convert_to_draft']);
 
         // Preserve existing Ordo value on update
         $normalizedFilename = nammu_normalize_filename($filename);
@@ -747,6 +748,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $template = $type === 'Página' ? 'page' : 'post';
         if ($publishDraftAsEntry || $publishDraftAsPage) {
             $status = 'published';
+        } elseif ($convertToDraft) {
+            $status = 'draft';
         } else {
             $status = $statusPosted === 'draft' ? 'draft' : 'published';
         }
@@ -2971,6 +2974,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                         <?php if ($isDraftEditing): ?>
                                             <button type="submit" name="publish_draft_entry" value="1" class="btn btn-success ml-2">Publicar como entrada</button>
                                             <button type="submit" name="publish_draft_page" value="1" class="btn btn-success ml-2">Publicar como página</button>
+                                        <?php elseif ($currentTypeValue === 'Entrada' && !$isDraftEditing): ?>
+                                            <button type="submit" name="convert_to_draft" value="1" class="btn btn-outline-secondary ml-2">Pasar a borrador</button>
                                         <?php endif; ?>
                                     </div>
 

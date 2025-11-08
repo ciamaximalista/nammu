@@ -789,7 +789,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($error === null) {
-            $targetPath = CONTENT_DIR . '/' . $targetFilename;
+            $finalPath = CONTENT_DIR . '/' . $targetFilename;
 
             $file_content = "---
 ";
@@ -814,18 +814,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
             $file_content .= $content;
 
-            if (file_put_contents($targetPath, $file_content) === false) {
+            $tempPath = tempnam(CONTENT_DIR, 'upd_');
+            if ($tempPath === false) {
+                $error = 'No se pudo crear un archivo temporal para actualizar el contenido.';
+            } elseif (file_put_contents($tempPath, $file_content) === false) {
+                @unlink($tempPath);
                 $error = 'No se pudo guardar el contenido actualizado. Revisa los permisos de la carpeta content/.';
             } else {
-                if ($renameRequested && $normalizedFilename !== '' && $normalizedFilename !== $targetFilename) {
-                    $previousPath = CONTENT_DIR . '/' . $normalizedFilename;
-                    if ($previousPath !== $targetPath && is_file($previousPath)) {
-                        @unlink($previousPath);
+                $writeSucceeded = false;
+                if (@rename($tempPath, $finalPath)) {
+                    $writeSucceeded = true;
+                } else {
+                    @unlink($tempPath);
+                    if (file_put_contents($finalPath, $file_content) !== false) {
+                        $writeSucceeded = true;
                     }
                 }
-                $redirectTemplate = $status === 'draft' ? 'draft' : ($template === 'page' ? 'page' : 'single');
-                header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&updated=' . urlencode($targetFilename));
-                exit;
+
+                if ($writeSucceeded) {
+                    if ($renameRequested && $normalizedFilename !== '' && $normalizedFilename !== $targetFilename) {
+                        $previousPath = CONTENT_DIR . '/' . $normalizedFilename;
+                        if ($previousPath !== $finalPath && is_file($previousPath)) {
+                            @unlink($previousPath);
+                        }
+                    }
+                    $redirectTemplate = $status === 'draft' ? 'draft' : ($template === 'page' ? 'page' : 'single');
+                    header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&updated=' . urlencode($targetFilename));
+                    exit;
+                } else {
+                    $error = 'No se pudo guardar el contenido actualizado. Revisa los permisos de la carpeta content/.';
+                }
             }
         }
     } elseif (isset($_POST['delete_post'])) {

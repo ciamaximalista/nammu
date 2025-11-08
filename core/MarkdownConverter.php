@@ -4,6 +4,8 @@ namespace Nammu\Core;
 
 class MarkdownConverter
 {
+    private const TOC_TOKEN = '__NAMMU_TOC_PLACEHOLDER__';
+
     public function toHtml(string $markdown): string
     {
         $markdown = str_replace(["\r\n", "\r"], "\n", trim($markdown));
@@ -19,6 +21,9 @@ class MarkdownConverter
         $codeBuffer = [];
         $codeLanguage = '';
         $blockquoteBuffer = [];
+        $headings = [];
+        $headingSlugCounts = [];
+        $tocRequested = false;
 
         $flushParagraph = function () use (&$paragraphBuffer, &$html) {
             if (empty($paragraphBuffer)) {
@@ -180,7 +185,18 @@ class MarkdownConverter
                 $flushBlockquote();
                 $level = strlen($matches[1]);
                 $content = $this->convertInline($matches[2]);
-                $html[] = "<h{$level}>{$content}</h{$level}>";
+                $plainHeading = $this->plainTextFromHtml($content);
+                $headingId = $this->generateHeadingId($plainHeading, $headingSlugCounts);
+                $idAttr = $headingId !== '' ? ' id="' . htmlspecialchars($headingId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"' : '';
+                $html[] = "<h{$level}{$idAttr}>{$content}</h{$level}>";
+                if ($level <= 4) {
+                    $headingLabel = $plainHeading !== '' ? $plainHeading : 'Sección';
+                    $headings[] = [
+                        'level' => $level,
+                        'text' => $headingLabel,
+                        'id' => $headingId,
+                    ];
+                }
                 continue;
             }
 
@@ -217,6 +233,14 @@ class MarkdownConverter
                 $flushBlockquote();
             }
 
+            if (strcasecmp($trimmed, '[toc]') === 0) {
+                $flushParagraph();
+                $closeAllLists();
+                $tocRequested = true;
+                $html[] = self::TOC_TOKEN;
+                continue;
+            }
+
             $paragraphBuffer[] = $line;
         }
 
@@ -225,7 +249,13 @@ class MarkdownConverter
         $flushBlockquote();
         $flushCodeBlock();
 
-        return implode("\n", $html);
+        $document = implode("\n", $html);
+        if ($tocRequested) {
+            $tocHtml = $this->renderToc($headings);
+            $document = str_replace(self::TOC_TOKEN, $tocHtml, $document);
+        }
+
+        return $document;
     }
 
     private function convertInline(string $text): string
@@ -313,6 +343,92 @@ class MarkdownConverter
         }
 
         return $result;
+    }
+
+    private function plainTextFromHtml(string $html): string
+    {
+        $text = strip_tags($html);
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $text = preg_replace('/\s+/u', ' ', $text ?? '');
+        return trim((string) $text);
+    }
+
+    private function generateHeadingId(string $text, array &$registry): string
+    {
+        $base = $this->slugifyHeading($text);
+        if ($base === '') {
+            $base = 'seccion';
+        }
+        $count = $registry[$base] ?? 0;
+        $registry[$base] = $count + 1;
+        return $count === 0 ? $base : $base . '-' . ($count + 1);
+    }
+
+    private function slugifyHeading(string $text): string
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return '';
+        }
+        $decoded = html_entity_decode($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        if (function_exists('transliterator_transliterate')) {
+            $decoded = transliterator_transliterate('Any-Latin; Latin-ASCII', $decoded);
+        } elseif (function_exists('iconv')) {
+            $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $decoded);
+            if ($converted !== false) {
+                $decoded = $converted;
+            }
+        }
+        $lower = function_exists('mb_strtolower') ? mb_strtolower($decoded, 'UTF-8') : strtolower($decoded);
+        $lower = preg_replace('/[^a-z0-9]+/i', '-', $lower) ?? '';
+        return trim($lower, '-');
+    }
+
+    private function renderToc(array $headings): string
+    {
+        $filtered = array_values(array_filter($headings, static function ($heading) {
+            return isset($heading['id'], $heading['text'], $heading['level'])
+                && $heading['id'] !== ''
+                && $heading['text'] !== ''
+                && $heading['level'] >= 1
+                && $heading['level'] <= 4;
+        }));
+        if (empty($filtered)) {
+            return '';
+        }
+
+        $toc = '<nav class="nammu-toc" aria-label="Tabla de contenidos">';
+        $currentLevel = 0;
+        foreach ($filtered as $heading) {
+            $level = max(1, min(4, (int) $heading['level']));
+            if ($currentLevel === 0) {
+                for ($i = 1; $i <= $level; $i++) {
+                    $toc .= '<ol class="toc-level toc-level-' . $i . '">';
+                }
+            } elseif ($level > $currentLevel) {
+                for ($i = $currentLevel + 1; $i <= $level; $i++) {
+                    $toc .= '<ol class="toc-level toc-level-' . $i . '">';
+                }
+            } elseif ($level < $currentLevel) {
+                for ($i = $currentLevel; $i > $level; $i--) {
+                    $toc .= '</li></ol>';
+                }
+                $toc .= '</li>';
+            } else {
+                $toc .= '</li>';
+            }
+            $toc .= '<li><a href="#' . htmlspecialchars($heading['id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">'
+                . htmlspecialchars($heading['text'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+                . '</a>';
+            $currentLevel = $level;
+        }
+
+        for ($i = $currentLevel; $i >= 1; $i--) {
+            $toc .= '</li></ol>';
+        }
+
+        $toc .= '</nav>';
+        return $toc;
     }
 
     private function orderedListTypeForLevel(int $level): string

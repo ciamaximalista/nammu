@@ -24,7 +24,7 @@ class ContentRepository
     {
         $posts = [];
         foreach ($this->listMarkdownFiles() as $file) {
-            $post = $this->buildPostFromFile($file);
+            $post = $this->buildPostFromFile($file, true);
             if ($post !== null) {
                 $posts[] = $post;
             }
@@ -42,7 +42,7 @@ class ContentRepository
             return null;
         }
 
-        return $this->buildPostFromFile($filepath);
+        return $this->buildPostFromFile($filepath, false);
     }
 
     public function getDocument(string $slug): ?array
@@ -75,7 +75,7 @@ class ContentRepository
         return $files;
     }
 
-    private function buildPostFromFile(string $file): ?Post
+    private function buildPostFromFile(string $file, bool $restrictToEntries = true): ?Post
     {
         $raw = file_get_contents($file);
         if ($raw === false) {
@@ -85,7 +85,11 @@ class ContentRepository
         [$metadata, $content] = $this->extractFrontMatter($raw);
 
         $template = strtolower($metadata['Template'] ?? $metadata['template'] ?? '');
-        if (!in_array($template, ['single', 'post'], true)) {
+        $allowedTemplates = ['single', 'post'];
+        if (!$restrictToEntries) {
+            $allowedTemplates[] = 'page';
+        }
+        if (!in_array($template, $allowedTemplates, true)) {
             return null;
         }
 

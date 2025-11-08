@@ -47,9 +47,15 @@ function parse_yaml_front_matter($content) {
     return $metadata;
 }
 
-function get_posts($page = 1, $per_page = 16, $templateFilter = 'single') {
+function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string $searchTerm = '') {
     $settings = get_settings();
     $sort_order = $settings['sort_order'] ?? 'date';
+    $normalizedSearch = '';
+    if ($searchTerm !== '') {
+        $normalizedSearch = function_exists('mb_strtolower')
+            ? mb_strtolower($searchTerm, 'UTF-8')
+            : strtolower($searchTerm);
+    }
 
     $posts = [];
     $files = glob(CONTENT_DIR . '/*.md');
@@ -63,6 +69,20 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single') {
         }
         if ($templateFilter === 'page' && $template !== 'page') {
             continue;
+        }
+        if ($normalizedSearch !== '') {
+            $haystackParts = [
+                $metadata['Title'] ?? '',
+                $metadata['Description'] ?? '',
+                $metadata['Category'] ?? '',
+                basename($file),
+            ];
+            $haystack = function_exists('mb_strtolower')
+                ? mb_strtolower(implode(' ', $haystackParts), 'UTF-8')
+                : strtolower(implode(' ', $haystackParts));
+            if (strpos($haystack, $normalizedSearch) === false) {
+                continue;
+            }
         }
         $date = $metadata['Date'] ?? '01/01/1970';
         $dt = DateTime::createFromFormat('d/m/Y', $date);
@@ -80,7 +100,7 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single') {
             'title' => $metadata['Title'] ?? '',
             'description' => $metadata['Description'] ?? '',
             'date' => $date,
-            'timestamp' => $timestamp
+            'timestamp' => $timestamp,
         ];
     }
 
@@ -708,6 +728,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: admin.php?page=edit');
             exit;
         }
+    } elseif (isset($_POST['delete_post'])) {
+        $filename = $_POST['delete_filename'] ?? '';
+        $filename = trim($filename);
+        $templateTarget = $_POST['delete_template'] ?? 'single';
+        $templateTarget = $templateTarget === 'page' ? 'page' : 'single';
+        $templateParam = urlencode($templateTarget);
+        if ($filename !== '') {
+            // Ensure only filenames from content directory are used
+            $basename = basename($filename);
+            $filepath = CONTENT_DIR . '/' . $basename;
+            if (is_file($filepath)) {
+                @unlink($filepath);
+                header('Location: admin.php?page=edit&template=' . $templateParam . '&deleted=' . urlencode($basename));
+                exit;
+            }
+        }
+        header('Location: admin.php?page=edit&template=' . $templateParam . '&deleted=0');
+        exit;
     } elseif (isset($_POST['upload_asset'])) {
         if (isset($_FILES['asset_file']) && $_FILES['asset_file']['error'] == 0) {
             $target_dir = ASSETS_DIR . '/';
@@ -804,6 +842,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     } elseif (isset($_POST['save_settings'])) {
         $sort_order = $_POST['sort_order'] ?? 'date';
+        $sort_order = $sort_order === 'alpha' ? 'alpha' : 'date';
         $google_fonts_api = trim($_POST['google_fonts_api'] ?? '');
         $site_author = trim($_POST['site_author'] ?? '');
         $site_name = trim($_POST['site_name'] ?? '');
@@ -2553,13 +2592,32 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 $templateFilter = $_GET['template'] ?? 'single';
                                 $templateFilter = $templateFilter === 'page' ? 'page' : 'single';
                                 $currentTypeLabel = $templateFilter === 'page' ? 'Páginas' : 'Entradas';
+                                $searchQuery = trim($_GET['q'] ?? '');
+                                $searchQueryParam = $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '';
                                 ?>
 
-                                <h2>Editar Entradas / Páginas</h2>
+                                <h2>Editar</h2>
+
+                                <form class="form-inline mb-3 edit-search-form" method="get">
+                                    <input type="hidden" name="page" value="edit">
+                                    <input type="hidden" name="template" value="<?= htmlspecialchars($templateFilter, ENT_QUOTES, 'UTF-8') ?>">
+                                    <label for="edit-search-input" class="sr-only">Buscar</label>
+                                    <input type="search"
+                                        class="form-control form-control-sm mr-2"
+                                        id="edit-search-input"
+                                        name="q"
+                                        placeholder="Buscar por título, descripción o archivo"
+                                        value="<?= htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8') ?>"
+                                        style="min-width: 220px;">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary mr-2">Buscar</button>
+                                    <?php if ($searchQuery !== ''): ?>
+                                        <a class="btn btn-sm btn-link" href="?page=edit&template=<?= htmlspecialchars($templateFilter, ENT_QUOTES, 'UTF-8') ?>">Limpiar</a>
+                                    <?php endif; ?>
+                                </form>
 
                                 <div class="btn-group mb-3" role="group" aria-label="Filtrar por tipo">
-                                    <a href="?page=edit&template=single" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'single' ? 'active' : '' ?>">Entradas</a>
-                                    <a href="?page=edit&template=page" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'page' ? 'active' : '' ?>">Páginas</a>
+                                    <a href="?page=edit&template=single<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'single' ? 'active' : '' ?>">Entradas</a>
+                                    <a href="?page=edit&template=page<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'page' ? 'active' : '' ?>">Páginas</a>
                                 </div>
 
                                 <p class="text-muted">Mostrando <?= strtolower($currentTypeLabel) ?>.</p>
@@ -2590,7 +2648,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                         $current_page = $_GET['p'] ?? 1;
 
-                                        $posts_data = get_posts($current_page, 16, $templateFilter);
+                                        $posts_data = get_posts($current_page, 16, $templateFilter, $searchQuery);
 
                                         if (empty($posts_data['posts'])):
                                         ?>
@@ -2612,7 +2670,20 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                                 <td><?= htmlspecialchars($post['filename']) ?></td>
 
-                                                <td><a href="?page=edit-post&file=<?= urlencode($post['filename']) ?>" class="btn btn-sm btn-primary">Editar</a></td>
+                                                <td class="text-right">
+                                                    <div class="d-flex flex-column align-items-end">
+                                                        <a href="?page=edit-post&file=<?= urlencode($post['filename']) ?>" class="btn btn-sm btn-primary mb-2">Editar</a>
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-danger"
+                                                                data-delete-file="<?= htmlspecialchars($post['filename'], ENT_QUOTES, 'UTF-8') ?>"
+                                                                data-delete-title="<?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?>"
+                                                                data-delete-type="<?= htmlspecialchars($templateFilter, ENT_QUOTES, 'UTF-8') ?>"
+                                                                data-toggle="modal"
+                                                                data-target="#deletePostModal">
+                                                            Borrar
+                                                        </button>
+                                                    </div>
+                                                </td>
 
                                             </tr>
 
@@ -2637,7 +2708,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                             <li class="page-item <?= $i == $posts_data['current_page'] ? 'active' : '' ?>">
 
-                                                <a class="page-link" href="?page=edit&template=<?= urlencode($templateFilter) ?>&p=<?= $i ?>"><?= $i ?></a>
+                                                <a class="page-link" href="?page=edit&template=<?= urlencode($templateFilter) ?>&p=<?= $i ?><?= $searchQueryParam ?>"><?= $i ?></a>
 
                                             </li>
 
@@ -3635,6 +3706,19 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 <h2>Configuración</h2>
 
                                 <form method="post">
+                                    <input type="hidden" name="sort_order" id="sort_order" value="<?= htmlspecialchars($settings['sort_order'] ?? 'date', ENT_QUOTES, 'UTF-8') ?>">
+
+                                    <div class="form-group">
+                                        <label class="d-block">Modo de funcionamiento</label>
+                                        <div class="btn-group btn-group-sm" role="group" data-blog-mode-toggle>
+                                            <?php
+                                            $modeIsAlpha = ($settings['sort_order'] ?? 'date') === 'alpha';
+                                            ?>
+                                            <button type="button" class="btn btn-outline-primary <?= !$modeIsAlpha ? 'active' : '' ?>" data-mode-value="date">Modo Blog</button>
+                                            <button type="button" class="btn btn-outline-primary <?= $modeIsAlpha ? 'active' : '' ?>" data-mode-value="alpha">Modo Diccionario</button>
+                                        </div>
+                                        <small class="form-text text-muted">El modo blog ordena por fecha, el modo diccionario agrupa las entradas por orden alfabético.</small>
+                                    </div>
 
                                     <div class="form-group">
                                         <label for="site_author">Nombre del autor u organización</label>
@@ -3644,20 +3728,6 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                     <div class="form-group">
                                         <label for="site_name">Nombre del blog</label>
                                         <input type="text" name="site_name" id="site_name" class="form-control" value="<?= htmlspecialchars($settings['site_name'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Memoria">
-                                    </div>
-
-                                    <div class="form-group">
-
-                                        <label for="sort_order">Ordenar posts por:</label>
-
-                                        <select name="sort_order" id="sort_order" class="form-control">
-
-                                            <option value="date" <?= $settings['sort_order'] == 'date' ? 'selected' : '' ?>>Fecha (más recientes primero)</option>
-
-                                            <option value="alpha" <?= $settings['sort_order'] == 'alpha' ? 'selected' : '' ?>>Orden alfabético (A-Z)</option>
-
-                                        </select>
-
                                     </div>
 
                                     <div class="form-group">
@@ -3878,6 +3948,32 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
         </div>
 
         
+
+        <div class="modal fade" id="deletePostModal" tabindex="-1" role="dialog" aria-labelledby="deletePostModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <form method="post">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="deletePostModalLabel">Borrar contenido</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Vas a borrar <strong data-delete-post-title></strong>.</p>
+                            <p class="text-muted small mb-3">Archivo: <span data-delete-post-file></span></p>
+                            <p class="mb-0">Esta acción no se puede deshacer.</p>
+                            <input type="hidden" name="delete_filename" id="delete-post-filename">
+                            <input type="hidden" name="delete_template" id="delete-post-template" value="single">
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                            <button type="submit" name="delete_post" class="btn btn-danger">Borrar definitivamente</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
 
 <?php if ($page === 'template'): ?>
         <script>
@@ -5307,6 +5403,52 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
         </script>
 
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var deleteModal = $('#deletePostModal');
+            if (!deleteModal.length) {
+                return;
+            }
+            deleteModal.on('show.bs.modal', function (event) {
+                var button = $(event.relatedTarget);
+                var filename = button.data('delete-file') || '';
+                var title = button.data('delete-title') || filename;
+                var type = button.data('delete-type') || 'single';
+                var modal = $(this);
+                modal.find('[data-delete-post-title]').text(title || '(sin título)');
+                modal.find('[data-delete-post-file]').text(filename || '');
+                modal.find('#delete-post-filename').val(filename);
+                modal.find('#delete-post-template').val(type === 'page' ? 'page' : 'single');
+            });
+        });
+        </script>
+
+<?php if ($page === 'configuracion'): ?>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var blogModeInput = document.getElementById('sort_order');
+            var blogModeGroup = document.querySelector('[data-blog-mode-toggle]');
+            if (!blogModeInput || !blogModeGroup) {
+                return;
+            }
+            var blogModeButtons = blogModeGroup.querySelectorAll('[data-mode-value]');
+            function refreshBlogModeButtons() {
+                blogModeButtons.forEach(function(btn) {
+                    btn.classList.toggle('active', btn.dataset.modeValue === blogModeInput.value);
+                });
+            }
+            blogModeButtons.forEach(function(btn) {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    var value = btn.dataset.modeValue === 'alpha' ? 'alpha' : 'date';
+                    blogModeInput.value = value;
+                    refreshBlogModeButtons();
+                });
+            });
+            refreshBlogModeButtons();
+        });
+        </script>
+<?php endif; ?>
         </body>
 
         </html>

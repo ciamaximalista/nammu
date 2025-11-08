@@ -78,9 +78,38 @@ function nammu_format_date_es(?string $date): string {
     $anio = date('Y', $timestamp);
     return $dia . ' de ' . $meses[$mes - 1] . ' de ' . $anio;
 }
+
+function nammu_page_date_fallback(array $metadata, ?string $filePath): ?string {
+    $candidates = ['updated', 'ultimaactualizacion', 'últimaactualización', 'fecha', 'lastmod', 'modified'];
+    foreach ($metadata as $key => $value) {
+        $normalizedKey = strtolower(trim((string) $key));
+        if (in_array($normalizedKey, $candidates, true)) {
+            $cleanValue = trim((string) $value);
+            if ($cleanValue !== '') {
+                return $cleanValue;
+            }
+        }
+    }
+    if ($filePath && is_file($filePath)) {
+        $timestamp = filemtime($filePath);
+        if ($timestamp !== false) {
+            return date('Y-m-d', $timestamp);
+        }
+    }
+    return null;
+}
+$postTemplate = method_exists($post, 'getTemplate') ? $post->getTemplate() : strtolower($post->getMetadata()['Template'] ?? '');
+$isPageTemplate = ($postTemplate === 'page');
 $category = $post->getMetadata()['Category'] ?? '';
+$postFilePath = $postFilePath ?? null;
 $rawDate = $post->getRawDate();
+if ($isPageTemplate && (trim((string) $rawDate) === '')) {
+    $rawDate = nammu_page_date_fallback($post->getMetadata(), $postFilePath);
+}
 $formattedDate = nammu_format_date_es($rawDate);
+if ($formattedDate === '' && is_string($rawDate) && trim($rawDate) !== '') {
+    $formattedDate = trim($rawDate);
+}
 $metaTextParts = [];
 if ($formattedDate !== '') {
     $metaTextParts[] = 'Publicado el ' . htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8');
@@ -93,17 +122,9 @@ if ($category !== '') {
     $metaTextParts[] = 'en la sección ' . $categoryLinkHtml;
 }
 $metaText = implode(' ', $metaTextParts);
-$isAlphabeticalOrder = !empty($isAlphabeticalOrder);
-$updateMetaText = '';
-if ($isAlphabeticalOrder) {
-    $updatePieces = [];
-    if ($formattedDate !== '') {
-        $updatePieces[] = 'Actualizado por última vez el ' . htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') . '.';
-    }
-    if ($categoryLinkHtml !== '') {
-        $updatePieces[] = 'Guardado en la sección ' . $categoryLinkHtml . '.';
-    }
-    $updateMetaText = implode(' ', $updatePieces);
+$pageUpdateMetaText = '';
+if ($isPageTemplate && $formattedDate !== '') {
+    $pageUpdateMetaText = 'Página actualizada por última vez el ' . htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') . '.';
 }
 ?>
 <article class="post">
@@ -122,7 +143,7 @@ if ($isAlphabeticalOrder) {
             <?php endif; ?>
         </div>
         <h1><?= htmlspecialchars($post->getTitle(), ENT_QUOTES, 'UTF-8') ?></h1>
-        <?php if (!$isAlphabeticalOrder && $metaText !== ''): ?>
+        <?php if ($metaText !== ''): ?>
             <div class="post-meta-band"><?= $metaText ?></div>
         <?php endif; ?>
         <?php if ($post->getDescription() !== ''): ?>
@@ -142,8 +163,8 @@ if ($isAlphabeticalOrder) {
     <div class="post-body">
         <?= $htmlContent ?>
     </div>
-    <?php if ($isAlphabeticalOrder && $updateMetaText !== ''): ?>
-        <div class="post-meta-update"><?= $updateMetaText ?></div>
+    <?php if ($isPageTemplate && $pageUpdateMetaText !== ''): ?>
+        <div class="post-meta-update"><?= $pageUpdateMetaText ?></div>
     <?php endif; ?>
     <?php if ($singleSearchBottom): ?>
         <div class="site-search-block placement-bottom">

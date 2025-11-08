@@ -55,6 +55,12 @@ class Post
         return $this->metadata;
     }
 
+    public function getTemplate(): string
+    {
+        $template = $this->metadata['Template'] ?? $this->metadata['template'] ?? '';
+        return strtolower(trim((string) $template));
+    }
+
     public function getDate(): ?DateTimeImmutable
     {
         return $this->date;

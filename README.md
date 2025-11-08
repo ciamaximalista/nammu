@@ -16,6 +16,8 @@ Nammu es un motor ligero para blogs y diccionarios online que reutiliza la estru
 - Botón extra en las cajas de búsqueda (portada, categorías, post individual, etc.) que enlaza al índice alfabético cuando se usa la ordenación por título (modo diccionario).
 - Índice de categorías (`/categorias`) y páginas por categoría (`/categoria/{slug}`) que reutilizan la maquetación elegida para la portada e incluyen miniaturas automáticas basadas en la última entrada de cada categoría.
 - Índice alfabético: al elegir la ordenación alfabética en Configuración, la portada agrupa las entradas por letra (A, B, C…, “Otros”), se activa el índice de letras (`/letras`) y las vistas por letra (`/letra/{slug}`) que reutilizan la maquetación elegida.
+- Parseador Markdown con extras: soporta código en bloque (```` ``` ````), blockquotes, superíndices con `^texto`, tachado con `~~`, negrita/cursiva combinadas y genera automáticamente una **tabla de contenidos** cuando encuentra `[toc]` o `[TOC]`, enlazando con los títulos `h1–h4`.
+- Tratamiento diferenciado de entradas y páginas: las páginas usan la misma ruta amigable `/slug`, pero muestran cintillas de actualización específicas (con fecha calculada a partir del YAML o, si falta, de los metadatos del archivo) y pueden compartir maquetación con las entradas según la plantilla elegida.
 - Compatible con la estructura de directorios de PicoCMS (`content/` y `assets/`), lo que simplifica migraciones.
 
 ## Requisitos
@@ -79,6 +81,7 @@ Ahora ya está todo listo para descargar y poner permisos:
 - `admin.php` exige autenticación. El primer acceso genera un usuario administrador.
 - `content/` y `assets/` deben ser **escribibles** por el proceso web para guardar posts e imágenes.
 - `config/config.yml` almacena la configuración general y se actualiza desde el panel (plantilla, redes sociales, etc.). Si la edición falla, revisa que el archivo tenga permisos 664 y pertenezca al usuario/grupo del servidor.
+- En la pestaña **Editar** ahora tienes un buscador interno minimalista que filtra por título, descripción, categoría o nombre de archivo. El filtro se mantiene al cambiar entre “Entradas” y “Páginas”, lo que facilita localizar rápidamente el contenido que quieres modificar o borrar.
 
 ## Orden alfabético, índices y buscador
 

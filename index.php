@@ -547,6 +547,7 @@ if ($slug !== null && $slug !== '') {
         'pageTitle' => $post->getTitle(),
         'post' => $post,
         'htmlContent' => $converted,
+        'postFilePath' => __DIR__ . '/content/' . $post->getSlug() . '.md',
     ]);
 
     $postImage = nammu_resolve_asset($post->getImage(), $publicBaseUrl);

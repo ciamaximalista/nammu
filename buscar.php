@@ -208,6 +208,10 @@ function nammu_collect_documents(string $contentDir, MarkdownConverter $markdown
         $slug = basename($file, '.md');
         $templateRaw = $metadata['Template'] ?? $metadata['template'] ?? '';
         $template = strtolower(nammu_meta_value_to_string($templateRaw));
+        $statusRaw = strtolower(nammu_meta_value_to_string($metadata['Status'] ?? 'published'));
+        if ($statusRaw === 'draft') {
+            continue;
+        }
         $type = match ($template) {
             'page' => 'page',
             'single', 'post' => 'post',

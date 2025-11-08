@@ -24,7 +24,7 @@ class ContentRepository
     {
         $posts = [];
         foreach ($this->listMarkdownFiles() as $file) {
-            $post = $this->buildPostFromFile($file, true);
+            $post = $this->buildPostFromFile($file, true, false);
             if ($post !== null) {
                 $posts[] = $post;
             }
@@ -42,7 +42,7 @@ class ContentRepository
             return null;
         }
 
-        return $this->buildPostFromFile($filepath, false);
+        return $this->buildPostFromFile($filepath, false, true);
     }
 
     public function getDocument(string $slug): ?array
@@ -75,7 +75,7 @@ class ContentRepository
         return $files;
     }
 
-    private function buildPostFromFile(string $file, bool $restrictToEntries = true): ?Post
+    private function buildPostFromFile(string $file, bool $restrictToEntries = true, bool $includeDrafts = false): ?Post
     {
         $raw = file_get_contents($file);
         if ($raw === false) {
@@ -92,10 +92,14 @@ class ContentRepository
         if (!in_array($template, $allowedTemplates, true)) {
             return null;
         }
+        $status = strtolower($metadata['Status'] ?? 'published');
+        if (!$includeDrafts && $status === 'draft') {
+            return null;
+        }
 
         $slug = basename($file, '.md');
 
-        return new Post($slug, $metadata, $content);
+        return new Post($slug, $metadata, $content, $status);
     }
 
     /**

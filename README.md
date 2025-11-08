@@ -18,6 +18,7 @@ Nammu es un motor ligero para blogs y diccionarios online que reutiliza la estru
 - Índice alfabético: al elegir la ordenación alfabética en Configuración, la portada agrupa las entradas por letra (A, B, C…, “Otros”), se activa el índice de letras (`/letras`) y las vistas por letra (`/letra/{slug}`) que reutilizan la maquetación elegida.
 - Parseador Markdown con extras: soporta código en bloque (```` ``` ````), blockquotes, superíndices con `^texto`, tachado con `~~`, negrita/cursiva combinadas y genera automáticamente una **tabla de contenidos** cuando encuentra `[toc]` o `[TOC]`, enlazando con los títulos `h1–h4`.
 - Tratamiento diferenciado de entradas y páginas: las páginas usan la misma ruta amigable `/slug`, pero muestran cintillas de actualización específicas (con fecha calculada a partir del YAML o, si falta, de los metadatos del archivo) y pueden compartir maquetación con las entradas según la plantilla elegida.
+- Modo borradores: desde “Publicar” puedes guardar contenidos como borrador; la pestaña “Editar” incorpora un filtro “Entradas | Páginas | Borradores” y las entradas en borrador quedan fuera de RSS, sitemap, índices, búsqueda y portada. Si accedes por URL directa, el post muestra un sello rojo “Borrador” en la vista individual.
 - Compatible con la estructura de directorios de PicoCMS (`content/` y `assets/`), lo que simplifica migraciones.
 
 ## Requisitos
@@ -82,6 +83,7 @@ Ahora ya está todo listo para descargar y poner permisos:
 - `content/` y `assets/` deben ser **escribibles** por el proceso web para guardar posts e imágenes.
 - `config/config.yml` almacena la configuración general y se actualiza desde el panel (plantilla, redes sociales, etc.). Si la edición falla, revisa que el archivo tenga permisos 664 y pertenezca al usuario/grupo del servidor.
 - En la pestaña **Editar** ahora tienes un buscador interno minimalista que filtra por título, descripción, categoría o nombre de archivo. El filtro se mantiene al cambiar entre “Entradas” y “Páginas”, lo que facilita localizar rápidamente el contenido que quieres modificar o borrar.
+- Los borradores se gestionan desde la misma pestaña: el nuevo botón “Guardar como borrador” en **Publicar** crea contenidos que no se publican hasta que los promociones con “Publicar como entrada” o “Publicar como página” dentro del formulario de edición.
 
 ## Orden alfabético, índices y buscador
 

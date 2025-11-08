@@ -50,6 +50,7 @@ function parse_yaml_front_matter($content) {
 function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string $searchTerm = '') {
     $settings = get_settings();
     $sort_order = $settings['sort_order'] ?? 'date';
+    $templateFilter = in_array($templateFilter, ['single', 'page', 'draft'], true) ? $templateFilter : 'single';
     $normalizedSearch = '';
     if ($searchTerm !== '') {
         $normalizedSearch = function_exists('mb_strtolower')
@@ -63,12 +64,23 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string
         $content = file_get_contents($file);
         $metadata = parse_yaml_front_matter($content);
         $template = strtolower($metadata['Template'] ?? '');
+        $status = strtolower($metadata['Status'] ?? 'published');
         $isEntry = in_array($template, ['single', 'post'], true);
-        if ($templateFilter === 'single' && !$isEntry) {
-            continue;
-        }
-        if ($templateFilter === 'page' && $template !== 'page') {
-            continue;
+        $isDraft = ($status === 'draft');
+        if ($templateFilter === 'draft') {
+            if (!$isDraft) {
+                continue;
+            }
+        } else {
+            if ($isDraft) {
+                continue;
+            }
+            if ($templateFilter === 'single' && !$isEntry) {
+                continue;
+            }
+            if ($templateFilter === 'page' && $template !== 'page') {
+                continue;
+            }
         }
         if ($normalizedSearch !== '') {
             $haystackParts = [
@@ -101,6 +113,7 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string
             'description' => $metadata['Description'] ?? '',
             'date' => $date,
             'timestamp' => $timestamp,
+            'status' => $isDraft ? 'draft' : 'published',
         ];
     }
 
@@ -610,7 +623,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         session_destroy();
         header('Location: admin.php');
         exit;
-    } elseif (isset($_POST['publish'])) {
+    } elseif (isset($_POST['publish']) || isset($_POST['save_draft'])) {
         $title = trim($_POST['title'] ?? '');
         $category = trim($_POST['category'] ?? '');
         $dateInput = $_POST['date'] ?? '';
@@ -624,6 +637,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $type = $_POST['type'] ?? 'Entrada';
         $type = $type === 'Página' ? 'Página' : 'Entrada';
         $filenameInput = trim($_POST['filename'] ?? '');
+        $isDraft = isset($_POST['save_draft']);
+        $statusValue = $isDraft ? 'draft' : 'published';
 
         if ($filenameInput === '' && $title !== '') {
             $filenameInput = $title;
@@ -659,6 +674,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
             $file_content .= "Description: " . $description . "
 ";
+            $file_content .= "Status: " . $statusValue . "
+";
             $file_content .= "Ordo: " . $ordo . "
 ";
             $file_content .= "---
@@ -669,19 +686,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (file_put_contents($filepath, $file_content) === false) {
                 $error = 'No se pudo guardar el contenido. Revisa los permisos de la carpeta content/.';
             } else {
-                header('Location: admin.php?page=edit&created=' . urlencode($filename . '.md'));
+                $redirectTemplate = $isDraft ? 'draft' : ($type === 'Página' ? 'page' : 'single');
+                header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&created=' . urlencode($filename . '.md'));
                 exit;
             }
         }
-    } elseif (isset($_POST['update'])) {
+    } elseif (isset($_POST['update']) || isset($_POST['publish_draft_entry']) || isset($_POST['publish_draft_page'])) {
         $filename = $_POST['filename'] ?? '';
         $title = $_POST['title'] ?? '';
-        $template = 'post';
         $category = $_POST['category'] ?? '';
         $date = $_POST['date'] ? date('Y-m-d', strtotime($_POST['date'])) : date('Y-m-d');
         $image = $_POST['image'] ?? '';
         $description = $_POST['description'] ?? '';
         $type = $_POST['type'] ?? null;
+        $statusPosted = strtolower(trim($_POST['status'] ?? ''));
+        $publishDraftAsEntry = isset($_POST['publish_draft_entry']);
+        $publishDraftAsPage = isset($_POST['publish_draft_page']);
 
         // Preserve existing Ordo value on update
         if (!empty($filename)) {
@@ -696,7 +716,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $type = $type === 'Página' ? 'Página' : 'Entrada';
-                $template = $type === 'Página' ? 'page' : 'post';
+        if ($publishDraftAsEntry) {
+            $type = 'Entrada';
+        } elseif ($publishDraftAsPage) {
+            $type = 'Página';
+        }
+        $template = $type === 'Página' ? 'page' : 'post';
+        if ($publishDraftAsEntry || $publishDraftAsPage) {
+            $status = 'published';
+        } else {
+            $status = $statusPosted === 'draft' ? 'draft' : 'published';
+        }
 
         $content = $_POST['content'] ?? '';
 
@@ -717,6 +747,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
             $file_content .= "Description: " . $description . "
 ";
+            $file_content .= "Status: " . $status . "
+";
             $file_content .= "Ordo: " . $ordo . "
 ";
             $file_content .= "---
@@ -725,14 +757,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $file_content .= $content;
 
             file_put_contents($filepath, $file_content);
-            header('Location: admin.php?page=edit');
+            $redirectTemplate = $status === 'draft' ? 'draft' : ($template === 'page' ? 'page' : 'single');
+            header('Location: admin.php?page=edit&template=' . $redirectTemplate);
             exit;
         }
     } elseif (isset($_POST['delete_post'])) {
         $filename = $_POST['delete_filename'] ?? '';
         $filename = trim($filename);
         $templateTarget = $_POST['delete_template'] ?? 'single';
-        $templateTarget = $templateTarget === 'page' ? 'page' : 'single';
+        $templateTarget = in_array($templateTarget, ['single', 'page', 'draft'], true) ? $templateTarget : 'single';
         $templateParam = urlencode($templateTarget);
         if ($filename !== '') {
             // Ensure only filenames from content directory are used
@@ -2578,7 +2611,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                     </div>
 
-                                    <button type="submit" name="publish" class="btn btn-primary">Publicar</button>
+                                    <div class="mt-3">
+                                        <button type="submit" name="publish" class="btn btn-primary mr-2">Publicar</button>
+                                        <button type="submit" name="save_draft" value="1" class="btn btn-outline-secondary">Guardar como borrador</button>
+                                    </div>
 
                                 </form>
 
@@ -2590,8 +2626,15 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 <?php
                                 $templateFilter = $_GET['template'] ?? 'single';
-                                $templateFilter = $templateFilter === 'page' ? 'page' : 'single';
-                                $currentTypeLabel = $templateFilter === 'page' ? 'Páginas' : 'Entradas';
+                                $allowedFilters = ['single', 'page', 'draft'];
+                                if (!in_array($templateFilter, $allowedFilters, true)) {
+                                    $templateFilter = 'single';
+                                }
+                                $currentTypeLabel = [
+                                    'single' => 'Entradas',
+                                    'page' => 'Páginas',
+                                    'draft' => 'Borradores',
+                                ][$templateFilter];
                                 $searchQuery = trim($_GET['q'] ?? '');
                                 $searchQueryParam = $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '';
                                 ?>
@@ -2618,6 +2661,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 <div class="btn-group mb-3" role="group" aria-label="Filtrar por tipo">
                                     <a href="?page=edit&template=single<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'single' ? 'active' : '' ?>">Entradas</a>
                                     <a href="?page=edit&template=page<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'page' ? 'active' : '' ?>">Páginas</a>
+                                    <a href="?page=edit&template=draft<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'draft' ? 'active' : '' ?>">Borradores</a>
                                 </div>
 
                                 <p class="text-muted">Mostrando <?= strtolower($currentTypeLabel) ?>.</p>
@@ -2738,6 +2782,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                     $currentTemplateValue = strtolower($post_data['metadata']['Template'] ?? 'post');
                                     $currentTypeValue = $currentTemplateValue === 'page' ? 'Página' : 'Entrada';
                                     $editHeading = $currentTypeValue === 'Página' ? 'Editar Página' : 'Editar Entrada';
+                                    $currentStatusValue = strtolower($post_data['metadata']['Status'] ?? 'published');
+                                    if (!in_array($currentStatusValue, ['draft', 'published'], true)) {
+                                        $currentStatusValue = 'published';
+                                    }
+                                    $isDraftEditing = $currentStatusValue === 'draft';
                                 ?>
 
                                 <h2><?= $editHeading ?></h2>
@@ -2745,6 +2794,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 <form method="post">
 
                                     <input type="hidden" name="filename" value="<?= htmlspecialchars($filename) ?>">
+                                    <input type="hidden" name="status" value="<?= htmlspecialchars($currentStatusValue, ENT_QUOTES, 'UTF-8') ?>">
 
                                     <div class="form-group">
 
@@ -2820,7 +2870,13 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                     </div>
 
-                                    <button type="submit" name="update" class="btn btn-primary">Actualizar</button>
+                                    <div class="mt-3">
+                                        <button type="submit" name="update" class="btn btn-primary">Actualizar</button>
+                                        <?php if ($isDraftEditing): ?>
+                                            <button type="submit" name="publish_draft_entry" value="1" class="btn btn-success ml-2">Publicar como entrada</button>
+                                            <button type="submit" name="publish_draft_page" value="1" class="btn btn-success ml-2">Publicar como página</button>
+                                        <?php endif; ?>
+                                    </div>
 
                                 </form>
 
@@ -5418,7 +5474,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 modal.find('[data-delete-post-title]').text(title || '(sin título)');
                 modal.find('[data-delete-post-file]').text(filename || '');
                 modal.find('#delete-post-filename').val(filename);
-                modal.find('#delete-post-template').val(type === 'page' ? 'page' : 'single');
+                if (['single', 'page', 'draft'].indexOf(type) === -1) {
+                    type = 'single';
+                }
+                modal.find('#delete-post-template').val(type);
             });
         });
         </script>

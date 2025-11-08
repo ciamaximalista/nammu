@@ -100,6 +100,7 @@ function nammu_page_date_fallback(array $metadata, ?string $filePath): ?string {
 }
 $postTemplate = method_exists($post, 'getTemplate') ? $post->getTemplate() : strtolower($post->getMetadata()['Template'] ?? '');
 $isPageTemplate = ($postTemplate === 'page');
+$isDraftPost = method_exists($post, 'isDraft') ? $post->isDraft() : false;
 $category = $post->getMetadata()['Category'] ?? '';
 $postFilePath = $postFilePath ?? null;
 $rawDate = $post->getRawDate();
@@ -127,7 +128,10 @@ if ($isPageTemplate && $formattedDate !== '') {
     $pageUpdateMetaText = 'Página actualizada por última vez el ' . htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') . '.';
 }
 ?>
-<article class="post">
+<article class="post<?= $isDraftPost ? ' post-draft' : '' ?>">
+    <?php if ($isDraftPost): ?>
+        <div class="draft-stamp" aria-hidden="true">Borrador</div>
+    <?php endif; ?>
     <div class="post-header">
         <div class="post-brand">
             <?php if ($siteAuthor !== ''): ?>
@@ -143,7 +147,7 @@ if ($isPageTemplate && $formattedDate !== '') {
             <?php endif; ?>
         </div>
         <h1><?= htmlspecialchars($post->getTitle(), ENT_QUOTES, 'UTF-8') ?></h1>
-        <?php if ($metaText !== ''): ?>
+        <?php if ($isPageTemplate && $metaText !== ''): ?>
             <div class="post-meta-band"><?= $metaText ?></div>
         <?php endif; ?>
         <?php if ($post->getDescription() !== ''): ?>
@@ -414,5 +418,32 @@ if ($isPageTemplate && $formattedDate !== '') {
         background: <?= $colorHighlight ?>;
         color: <?= $colorText ?>;
         font-size: 0.95rem;
+    }
+    .post.post-draft {
+        position: relative;
+        overflow: hidden;
+    }
+    .post.post-draft .draft-stamp {
+        position: absolute;
+        top: 1.5rem;
+        right: -3rem;
+        padding: 0.5rem 3.5rem;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.9);
+        background: rgba(184, 28, 28, 0.9);
+        text-transform: uppercase;
+        letter-spacing: 0.2rem;
+        transform: rotate(-18deg);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+        pointer-events: none;
+        z-index: 2;
+    }
+    @media (max-width: 640px) {
+        .post.post-draft .draft-stamp {
+            top: 0.75rem;
+            font-size: 1rem;
+            right: -2rem;
+        }
     }
 </style>

@@ -10,13 +10,16 @@ class Post
     private array $metadata;
     private string $content;
     private ?DateTimeImmutable $date;
+    private string $status;
 
-    public function __construct(string $slug, array $metadata, string $content)
+    public function __construct(string $slug, array $metadata, string $content, string $status = 'published')
     {
         $this->slug = $slug;
         $this->metadata = $metadata;
         $this->content = $content;
         $this->date = $this->parseDate($metadata['Date'] ?? null);
+        $status = strtolower(trim($status));
+        $this->status = $status === 'draft' ? 'draft' : 'published';
     }
 
     public function getSlug(): string
@@ -53,6 +56,16 @@ class Post
     public function getMetadata(): array
     {
         return $this->metadata;
+    }
+
+    public function getStatus(): string
+    {
+        return $this->status;
+    }
+
+    public function isDraft(): bool
+    {
+        return $this->status === 'draft';
     }
 
     public function getTemplate(): string

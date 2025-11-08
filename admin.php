@@ -752,6 +752,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $newFilenameInput = trim($_POST['new_filename'] ?? '');
+        $originalSlugBase = $normalizedFilename !== '' ? pathinfo($normalizedFilename, PATHINFO_FILENAME) : '';
+        $originalSlugNormalized = $originalSlugBase !== '' ? nammu_slugify($originalSlugBase) : '';
         $content = $_POST['content'] ?? '';
 
         $targetFilename = $normalizedFilename;
@@ -761,17 +763,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($desiredSlug === '' && $title !== '') {
                 $desiredSlug = nammu_slugify($title);
             }
+            if ($desiredSlug === '' && $originalSlugNormalized !== '') {
+                $desiredSlug = $originalSlugNormalized;
+            }
             if ($desiredSlug === '') {
                 $desiredSlug = 'entrada';
             }
-            $candidateFilename = nammu_normalize_filename($desiredSlug . '.md');
-            if ($candidateFilename === '') {
-                $error = 'El nombre de archivo proporcionado no es válido.';
-            } elseif ($candidateFilename !== $normalizedFilename && file_exists(CONTENT_DIR . '/' . $candidateFilename)) {
-                $error = 'Ya existe otro contenido con ese nombre de archivo.';
+            if ($desiredSlug === $originalSlugNormalized) {
+                $newFilenameInput = '';
             } else {
-                $targetFilename = $candidateFilename;
-                $renameRequested = $targetFilename !== $normalizedFilename;
+                $candidateFilename = nammu_normalize_filename($desiredSlug . '.md');
+                if ($candidateFilename === '') {
+                    $error = 'El nombre de archivo proporcionado no es válido.';
+                } elseif ($candidateFilename !== $normalizedFilename && file_exists(CONTENT_DIR . '/' . $candidateFilename)) {
+                    $error = 'Ya existe otro contenido con ese nombre de archivo.';
+                } else {
+                    $targetFilename = $candidateFilename;
+                    $renameRequested = $targetFilename !== $normalizedFilename;
+                }
             }
         }
 

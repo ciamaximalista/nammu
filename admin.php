@@ -142,7 +142,11 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string
 }
 
 function get_post_content($filename) {
-    $filepath = CONTENT_DIR . '/' . $filename;
+    $safeFilename = nammu_normalize_filename($filename);
+    if ($safeFilename === '') {
+        return null;
+    }
+    $filepath = CONTENT_DIR . '/' . $safeFilename;
     if (!file_exists($filepath)) {
         return null;
     }
@@ -591,6 +595,19 @@ function nammu_unique_filename(string $desired): string {
     return $slug;
 }
 
+function nammu_normalize_filename(string $filename, bool $ensureExtension = true): string {
+    $clean = trim((string) $filename);
+    $clean = str_replace(["\0", "\r", "\n"], '', $clean);
+    $basename = basename($clean);
+    if ($basename === '') {
+        return '';
+    }
+    if ($ensureExtension && !str_ends_with(strtolower($basename), '.md')) {
+        $basename .= '.md';
+    }
+    return $basename;
+}
+
 // --- Routing and Logic ---
 
 $page = $_GET['page'] ?? 'login';
@@ -658,37 +675,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $content = $_POST['content'] ?? '';
 
         if ($filename !== '') {
-            $filepath = CONTENT_DIR . '/' . $filename . '.md';
-
-            $file_content = "---
-";
-            $file_content .= "Title: " . $title . "
-";
-            $file_content .= "Template: " . ($type === 'Página' ? 'page' : 'post') . "
-";
-            $file_content .= "Category: " . $category . "
-";
-            $file_content .= "Date: " . $date . "
-";
-            $file_content .= "Image: " . $image . "
-";
-            $file_content .= "Description: " . $description . "
-";
-            $file_content .= "Status: " . $statusValue . "
-";
-            $file_content .= "Ordo: " . $ordo . "
-";
-            $file_content .= "---
-
-";
-            $file_content .= $content;
-
-            if (file_put_contents($filepath, $file_content) === false) {
-                $error = 'No se pudo guardar el contenido. Revisa los permisos de la carpeta content/.';
+            $targetFilename = nammu_normalize_filename($filename . '.md');
+            if ($targetFilename === '') {
+                $error = 'El nombre de archivo no es válido.';
             } else {
-                $redirectTemplate = $isDraft ? 'draft' : ($type === 'Página' ? 'page' : 'single');
-                header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&created=' . urlencode($filename . '.md'));
-                exit;
+                $filepath = CONTENT_DIR . '/' . $targetFilename;
+
+                $file_content = "---
+";
+                $file_content .= "Title: " . $title . "
+";
+                $file_content .= "Template: " . ($type === 'Página' ? 'page' : 'post') . "
+";
+                $file_content .= "Category: " . $category . "
+";
+                $file_content .= "Date: " . $date . "
+";
+                $file_content .= "Image: " . $image . "
+";
+                $file_content .= "Description: " . $description . "
+";
+                $file_content .= "Status: " . $statusValue . "
+";
+                $file_content .= "Ordo: " . $ordo . "
+";
+                $file_content .= "---
+
+";
+                $file_content .= $content;
+
+                if (file_put_contents($filepath, $file_content) === false) {
+                    $error = 'No se pudo guardar el contenido. Revisa los permisos de la carpeta content/.';
+                } else {
+                    $redirectTemplate = $isDraft ? 'draft' : ($type === 'Página' ? 'page' : 'single');
+                    header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&created=' . urlencode($targetFilename));
+                    exit;
+                }
             }
         }
     } elseif (isset($_POST['update']) || isset($_POST['publish_draft_entry']) || isset($_POST['publish_draft_page'])) {
@@ -704,8 +726,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $publishDraftAsPage = isset($_POST['publish_draft_page']);
 
         // Preserve existing Ordo value on update
-        if (!empty($filename)) {
-            $existing_post_data = get_post_content($filename);
+        $normalizedFilename = nammu_normalize_filename($filename);
+        if ($normalizedFilename !== '') {
+            $existing_post_data = get_post_content($normalizedFilename);
             $ordo = $existing_post_data['metadata']['Ordo'] ?? '';
             if ($type === null) {
                 $currentTemplate = strtolower($existing_post_data['metadata']['Template'] ?? 'post');
@@ -728,10 +751,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $status = $statusPosted === 'draft' ? 'draft' : 'published';
         }
 
+        $newFilenameInput = trim($_POST['new_filename'] ?? '');
         $content = $_POST['content'] ?? '';
 
-        if (!empty($filename)) {
-            $filepath = CONTENT_DIR . '/' . $filename;
+        $targetFilename = $normalizedFilename;
+        $renameRequested = false;
+        if ($newFilenameInput !== '') {
+            $desiredSlug = nammu_slugify($newFilenameInput);
+            if ($desiredSlug === '' && $title !== '') {
+                $desiredSlug = nammu_slugify($title);
+            }
+            if ($desiredSlug === '') {
+                $desiredSlug = 'entrada';
+            }
+            $candidateFilename = nammu_normalize_filename($desiredSlug . '.md');
+            if ($candidateFilename === '') {
+                $error = 'El nombre de archivo proporcionado no es válido.';
+            } elseif ($candidateFilename !== $normalizedFilename && file_exists(CONTENT_DIR . '/' . $candidateFilename)) {
+                $error = 'Ya existe otro contenido con ese nombre de archivo.';
+            } else {
+                $targetFilename = $candidateFilename;
+                $renameRequested = $targetFilename !== $normalizedFilename;
+            }
+        }
+
+        if ($targetFilename === '') {
+            $error = 'No se pudo identificar el archivo a actualizar.';
+        }
+
+        if ($error === null) {
+            $targetPath = CONTENT_DIR . '/' . $targetFilename;
 
             $file_content = "---
 ";
@@ -756,10 +805,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
             $file_content .= $content;
 
-            file_put_contents($filepath, $file_content);
-            $redirectTemplate = $status === 'draft' ? 'draft' : ($template === 'page' ? 'page' : 'single');
-            header('Location: admin.php?page=edit&template=' . $redirectTemplate);
-            exit;
+            if (file_put_contents($targetPath, $file_content) === false) {
+                $error = 'No se pudo guardar el contenido actualizado. Revisa los permisos de la carpeta content/.';
+            } else {
+                if ($renameRequested && $normalizedFilename !== '' && $normalizedFilename !== $targetFilename) {
+                    $previousPath = CONTENT_DIR . '/' . $normalizedFilename;
+                    if ($previousPath !== $targetPath && is_file($previousPath)) {
+                        @unlink($previousPath);
+                    }
+                }
+                $redirectTemplate = $status === 'draft' ? 'draft' : ($template === 'page' ? 'page' : 'single');
+                header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&updated=' . urlencode($targetFilename));
+                exit;
+            }
         }
     } elseif (isset($_POST['delete_post'])) {
         $filename = $_POST['delete_filename'] ?? '';
@@ -2605,7 +2663,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                     <div class="form-group">
 
-                                        <label for="filename">Nombre de archivo (sin .md)</label>
+                                        <label for="filename">Slug del post (nombre de archivo sin .md)</label>
 
                                         <input type="text" name="filename" id="filename" class="form-control" required>
 
@@ -2774,9 +2832,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 <?php
 
-                                $filename = $_GET['file'] ?? '';
+                                $requestedFile = $_GET['file'] ?? '';
+                                $safeEditFilename = nammu_normalize_filename($requestedFile);
 
-                                $post_data = get_post_content($filename);
+                                $post_data = $safeEditFilename !== '' ? get_post_content($safeEditFilename) : null;
 
                                 if ($post_data):
                                     $currentTemplateValue = strtolower($post_data['metadata']['Template'] ?? 'post');
@@ -2791,9 +2850,9 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 <h2><?= $editHeading ?></h2>
 
-                                <form method="post">
+                                    <form method="post">
 
-                                    <input type="hidden" name="filename" value="<?= htmlspecialchars($filename) ?>">
+                                    <input type="hidden" name="filename" value="<?= htmlspecialchars($safeEditFilename, ENT_QUOTES, 'UTF-8') ?>">
                                     <input type="hidden" name="status" value="<?= htmlspecialchars($currentStatusValue, ENT_QUOTES, 'UTF-8') ?>">
 
                                     <div class="form-group">
@@ -2868,6 +2927,16 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                         <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor">Insertar imagen</button>
 
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="new_filename">Slug del post (nombre de archivo sin .md)</label>
+                                        <input type="text"
+                                               name="new_filename"
+                                               id="new_filename"
+                                               class="form-control"
+                                               value="<?= htmlspecialchars(pathinfo($safeEditFilename, PATHINFO_FILENAME), ENT_QUOTES, 'UTF-8') ?>">
+                                        <small class="form-text text-muted">Opcional. Úsalo para cambiar la URL del contenido.</small>
                                     </div>
 
                                     <div class="mt-3">

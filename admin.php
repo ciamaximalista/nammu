@@ -3863,16 +3863,33 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 <h2>Configuración</h2>
 
                                 <form method="post">
-                                    <input type="hidden" name="sort_order" id="sort_order" value="<?= htmlspecialchars($settings['sort_order'] ?? 'date', ENT_QUOTES, 'UTF-8') ?>">
 
                                     <div class="form-group">
                                         <label class="d-block">Modo de funcionamiento</label>
-                                        <div class="btn-group btn-group-sm" role="group" data-blog-mode-toggle>
+                                        <div class="btn-group btn-group-sm btn-group-toggle" role="group" data-toggle="buttons">
                                             <?php
                                             $modeIsAlpha = ($settings['sort_order'] ?? 'date') === 'alpha';
                                             ?>
-                                            <button type="button" class="btn btn-outline-primary <?= !$modeIsAlpha ? 'active' : '' ?>" data-mode-value="date">Modo Blog</button>
-                                            <button type="button" class="btn btn-outline-primary <?= $modeIsAlpha ? 'active' : '' ?>" data-mode-value="alpha">Modo Diccionario</button>
+                                            <label class="btn btn-outline-primary <?= !$modeIsAlpha ? 'active' : '' ?>">
+                                                <input type="radio"
+                                                    name="sort_order"
+                                                    id="sort_order_date"
+                                                    value="date"
+                                                    class="sr-only"
+                                                    autocomplete="off"
+                                                    <?= !$modeIsAlpha ? 'checked' : '' ?>>
+                                                Modo Blog
+                                            </label>
+                                            <label class="btn btn-outline-primary <?= $modeIsAlpha ? 'active' : '' ?>">
+                                                <input type="radio"
+                                                    name="sort_order"
+                                                    id="sort_order_alpha"
+                                                    value="alpha"
+                                                    class="sr-only"
+                                                    autocomplete="off"
+                                                    <?= $modeIsAlpha ? 'checked' : '' ?>>
+                                                Modo Diccionario
+                                            </label>
                                         </div>
                                         <small class="form-text text-muted">El modo blog ordena por fecha, el modo diccionario agrupa las entradas por orden alfabético.</small>
                                     </div>
@@ -5583,32 +5600,6 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
         });
         </script>
 
-<?php if ($page === 'configuracion'): ?>
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var blogModeInput = document.getElementById('sort_order');
-            var blogModeGroup = document.querySelector('[data-blog-mode-toggle]');
-            if (!blogModeInput || !blogModeGroup) {
-                return;
-            }
-            var blogModeButtons = blogModeGroup.querySelectorAll('[data-mode-value]');
-            function refreshBlogModeButtons() {
-                blogModeButtons.forEach(function(btn) {
-                    btn.classList.toggle('active', btn.dataset.modeValue === blogModeInput.value);
-                });
-            }
-            blogModeButtons.forEach(function(btn) {
-                btn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    var value = btn.dataset.modeValue === 'alpha' ? 'alpha' : 'date';
-                    blogModeInput.value = value;
-                    refreshBlogModeButtons();
-                });
-            });
-            refreshBlogModeButtons();
-        });
-        </script>
-<?php endif; ?>
         </body>
 
         </html>

@@ -285,6 +285,10 @@ function get_settings() {
         'facebook_app_id' => '',
     ];
     $social = array_merge($socialDefaults, $config['social'] ?? []);
+    $userData = get_user_data();
+    $account = [
+        'username' => $userData['username'] ?? '',
+    ];
 
     return [
         'sort_order' => $sort_order,
@@ -302,6 +306,7 @@ function get_settings() {
             'search' => $searchConfig,
         ],
         'social' => $social,
+        'account' => $account,
     ];
 }
 
@@ -316,7 +321,7 @@ function get_user_data() {
     return include USER_FILE;
 }
 
-function register_user($username, $password) {
+function write_user_file(string $username, string $passwordHash): void {
     $dir = dirname(USER_FILE);
     if (!is_dir($dir)) {
         if (!mkdir($dir, 0755, true) && !is_dir($dir)) {
@@ -324,11 +329,15 @@ function register_user($username, $password) {
         }
     }
 
-    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-    $content = "<?php return ['username' => '" . addslashes($username) . "', 'password' => '" . $hashed_password . "'];";
+    $content = "<?php return ['username' => '" . addslashes($username) . "', 'password' => '" . $passwordHash . "'];";
     if (file_put_contents(USER_FILE, $content) === false) {
         throw new RuntimeException('No se pudo escribir el archivo de usuario');
     }
+}
+
+function register_user($username, $password) {
+    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+    write_user_file($username, $hashed_password);
 }
 
 function verify_user($username, $password) {
@@ -613,6 +622,12 @@ function nammu_normalize_filename(string $filename, bool $ensureExtension = true
 $page = $_GET['page'] ?? 'login';
 $error = null;
 $user_exists = file_exists(USER_FILE);
+$accountFeedback = $_SESSION['account_feedback'] ?? null;
+if (!is_array($accountFeedback) || !isset($accountFeedback['message'], $accountFeedback['type'])) {
+    $accountFeedback = null;
+} else {
+    unset($_SESSION['account_feedback']);
+}
 
 // Handle POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -1021,6 +1036,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = "Error guardando la configuración: " . $e->getMessage();
         }
 
+        header('Location: admin.php?page=configuracion');
+        exit;
+    } elseif (isset($_POST['update_account'])) {
+        $currentPassword = $_POST['current_password'] ?? '';
+        $newUsername = trim($_POST['new_username'] ?? '');
+        $newPassword = $_POST['new_password'] ?? '';
+        $confirmPassword = $_POST['confirm_password'] ?? '';
+
+        $userData = get_user_data();
+        $feedback = null;
+        if (!$userData) {
+            $feedback = ['type' => 'danger', 'message' => 'No existe un usuario configurado.'];
+        } elseif ($currentPassword === '' || !password_verify($currentPassword, $userData['password'])) {
+            $feedback = ['type' => 'danger', 'message' => 'La contraseña actual no es correcta.'];
+        } elseif ($newUsername === '') {
+            $feedback = ['type' => 'danger', 'message' => 'El nombre de usuario no puede estar vacío.'];
+        } elseif ($newPassword !== '' && $newPassword !== $confirmPassword) {
+            $feedback = ['type' => 'danger', 'message' => 'Las nuevas contraseñas no coinciden.'];
+        } else {
+            $passwordHash = $userData['password'];
+            if ($newPassword !== '') {
+                $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
+            }
+            try {
+                write_user_file($newUsername, $passwordHash);
+                $feedback = ['type' => 'success', 'message' => 'Los datos de acceso se actualizaron correctamente.'];
+            } catch (Throwable $e) {
+                $feedback = ['type' => 'danger', 'message' => 'No se pudo actualizar la cuenta. ' . $e->getMessage()];
+            }
+        }
+
+        $_SESSION['account_feedback'] = $feedback;
         header('Location: admin.php?page=configuracion');
         exit;
 } elseif (isset($_POST['save_template'])) {
@@ -3862,6 +3909,12 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 <h2>Configuración</h2>
 
+                                <?php if ($accountFeedback !== null): ?>
+                                    <div class="alert alert-<?= $accountFeedback['type'] === 'success' ? 'success' : 'danger' ?>">
+                                        <?= htmlspecialchars($accountFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                <?php endif; ?>
+
                                 <form method="post">
 
                                     <div class="form-group">
@@ -3947,6 +4000,38 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                     <button type="submit" name="save_settings" class="btn btn-primary">Guardar</button>
 
+                                </form>
+
+                                <?php
+                                $accountSettings = $settings['account'] ?? [];
+                                $currentUsername = $accountSettings['username'] ?? '';
+                                ?>
+
+                                <hr class="my-5">
+                                <h3>Cuenta de acceso</h3>
+                                <p class="text-muted">Actualiza las credenciales utilizadas para acceder al panel. Necesitas confirmar la contraseña actual.</p>
+
+                                <form method="post" autocomplete="off">
+                                    <div class="form-group">
+                                        <label for="new_username">Nombre de usuario</label>
+                                        <input type="text" name="new_username" id="new_username" class="form-control" value="<?= htmlspecialchars($currentUsername, ENT_QUOTES, 'UTF-8') ?>" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="current_password">Contraseña actual</label>
+                                        <input type="password" name="current_password" id="current_password" class="form-control" required>
+                                        <small class="form-text text-muted">Se utiliza para verificar que eres la persona autorizada.</small>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group col-md-6">
+                                            <label for="new_password">Nueva contraseña</label>
+                                            <input type="password" name="new_password" id="new_password" class="form-control" autocomplete="new-password" placeholder="Deja en blanco para mantener la actual">
+                                        </div>
+                                        <div class="form-group col-md-6">
+                                            <label for="confirm_password">Confirmar nueva contraseña</label>
+                                            <input type="password" name="confirm_password" id="confirm_password" class="form-control" autocomplete="new-password" placeholder="Repite la nueva contraseña">
+                                        </div>
+                                    </div>
+                                    <button type="submit" name="update_account" class="btn btn-outline-primary">Actualizar cuenta</button>
                                 </form>
 
                                 

@@ -2730,9 +2730,29 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                     <div class="form-group">
 
-                                        <label for="content">Contenido (Markdown)</label>
+                                        <label for="content_publish">Contenido (Markdown)</label>
+                                        <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#content_publish">
+                                            <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="bold" title="Negrita" aria-label="Negrita"><strong>B</strong></button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="italic" title="Cursiva" aria-label="Cursiva"><em>I</em></button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="strike" title="Tachado" aria-label="Tachado">S̶</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="code" title="Código en línea" aria-label="Código en línea">&lt;/&gt;</button>
+                                            </div>
+                                            <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="link" title="Enlace" aria-label="Enlace">Link</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="quote" title="Cita" aria-label="Cita">&gt;</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="sup" title="Superíndice" aria-label="Superíndice">x<sup>2</sup></button>
+                                            </div>
+                                            <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="ul" title="Lista" aria-label="Lista">•</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="ol" title="Lista numerada" aria-label="Lista numerada">1.</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="heading" title="Encabezado" aria-label="Encabezado">H2</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="code-block" title="Bloque de código" aria-label="Bloque de código">{ }</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="hr" title="Separador" aria-label="Separador">—</button>
+                                            </div>
+                                        </div>
 
-                                        <textarea name="content" id="content" class="form-control" rows="15"></textarea>
+                                        <textarea name="content" id="content_publish" class="form-control" rows="15" data-markdown-editor="1"></textarea>
 
                                         <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor">Insertar imagen</button>
 
@@ -2998,9 +3018,29 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                     <div class="form-group">
 
-                                        <label for="content">Contenido (Markdown)</label>
+                                        <label for="content_edit">Contenido (Markdown)</label>
+                                        <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#content_edit">
+                                            <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="bold" title="Negrita" aria-label="Negrita"><strong>B</strong></button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="italic" title="Cursiva" aria-label="Cursiva"><em>I</em></button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="strike" title="Tachado" aria-label="Tachado">S̶</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="code" title="Código en línea" aria-label="Código en línea">&lt;/&gt;</button>
+                                            </div>
+                                            <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="link" title="Enlace" aria-label="Enlace">Link</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="quote" title="Cita" aria-label="Cita">&gt;</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="sup" title="Superíndice" aria-label="Superíndice">x<sup>2</sup></button>
+                                            </div>
+                                            <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="ul" title="Lista" aria-label="Lista">•</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="ol" title="Lista numerada" aria-label="Lista numerada">1.</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="heading" title="Encabezado" aria-label="Encabezado">H2</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="code-block" title="Bloque de código" aria-label="Bloque de código">{ }</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="hr" title="Separador" aria-label="Separador">—</button>
+                                            </div>
+                                        </div>
 
-                                        <textarea name="content" id="content" class="form-control" rows="15"><?= htmlspecialchars($post_data['content']) ?></textarea>
+                                        <textarea name="content" id="content_edit" class="form-control" rows="15" data-markdown-editor="1"><?= htmlspecialchars($post_data['content']) ?></textarea>
 
                                         <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor">Insertar imagen</button>
 
@@ -4651,6 +4691,241 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
         </script>
 <?php endif; ?>
 
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var toolbars = document.querySelectorAll('[data-markdown-toolbar]');
+            if (!toolbars.length) {
+                return;
+            }
+
+            toolbars.forEach(function(toolbar) {
+                var targetSelector = toolbar.getAttribute('data-target');
+                var textarea = null;
+                if (targetSelector) {
+                    textarea = document.querySelector(targetSelector);
+                }
+                if (!textarea) {
+                    var sibling = toolbar.nextElementSibling;
+                    if (sibling && sibling.tagName === 'TEXTAREA') {
+                        textarea = sibling;
+                    }
+                }
+                if (!textarea) {
+                    toolbar.querySelectorAll('button').forEach(function(btn) {
+                        btn.disabled = true;
+                    });
+                    return;
+                }
+                toolbar.addEventListener('click', function(event) {
+                    var button = findActionButton(event.target, toolbar);
+                    if (!button) {
+                        return;
+                    }
+                    event.preventDefault();
+                    var action = button.getAttribute('data-md-action');
+                    if (action) {
+                        applyMarkdownAction(textarea, action);
+                    }
+                });
+            });
+
+            function findActionButton(element, container) {
+                if (!element) {
+                    return null;
+                }
+                if (typeof element.closest === 'function') {
+                    var closest = element.closest('button[data-md-action]');
+                    if (closest && container.contains(closest)) {
+                        return closest;
+                    }
+                }
+                while (element && element !== container) {
+                    if (element.matches && element.matches('button[data-md-action]')) {
+                        return element;
+                    }
+                    element = element.parentElement;
+                }
+                return null;
+            }
+
+            function applyMarkdownAction(textarea, action) {
+                switch (action) {
+                    case 'bold':
+                        wrapSelection(textarea, '**', '**', 'Texto en negrita');
+                        break;
+                    case 'italic':
+                        wrapSelection(textarea, '*', '*', 'Texto en cursiva');
+                        break;
+                    case 'strike':
+                        wrapSelection(textarea, '~~', '~~', 'Texto tachado');
+                        break;
+                    case 'code':
+                        wrapSelection(textarea, '`', '`', 'codigo');
+                        break;
+                    case 'sup':
+                        wrapSelection(textarea, '^', '^', 'superíndice');
+                        break;
+                    case 'link':
+                        insertLink(textarea);
+                        break;
+                    case 'quote':
+                        applyLinePrefix(textarea, '> ', 'Texto citado');
+                        break;
+                    case 'ul':
+                        applyUnorderedList(textarea);
+                        break;
+                    case 'ol':
+                        applyOrderedList(textarea);
+                        break;
+                    case 'heading':
+                        insertHeading(textarea);
+                        break;
+                    case 'code-block':
+                        insertCodeBlock(textarea);
+                        break;
+                    case 'hr':
+                        insertHorizontalRule(textarea);
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            function getRange(textarea) {
+                var start = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : textarea.value.length;
+                var end = typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : start;
+                return {
+                    start: start,
+                    end: end,
+                    text: textarea.value.slice(start, end)
+                };
+            }
+
+            function replaceSelection(textarea, replacement, selectionStartOffset, selectionEndOffset) {
+                var value = textarea.value;
+                var range = getRange(textarea);
+                textarea.value = value.slice(0, range.start) + replacement + value.slice(range.end);
+                var selStart = range.start + (typeof selectionStartOffset === 'number' ? selectionStartOffset : replacement.length);
+                var selEnd = range.start + (typeof selectionEndOffset === 'number' ? selectionEndOffset : replacement.length);
+                setSelection(textarea, selStart, selEnd);
+            }
+
+            function setSelection(textarea, start, end) {
+                textarea.focus();
+                if (typeof textarea.setSelectionRange === 'function') {
+                    textarea.setSelectionRange(start, end);
+                }
+                triggerInput(textarea);
+            }
+
+            function triggerInput(textarea) {
+                try {
+                    var event = new Event('input', { bubbles: true });
+                    textarea.dispatchEvent(event);
+                } catch (err) {
+                    var legacyEvent = document.createEvent('Event');
+                    legacyEvent.initEvent('input', true, true);
+                    textarea.dispatchEvent(legacyEvent);
+                }
+            }
+
+            function wrapSelection(textarea, before, after, placeholder) {
+                var range = getRange(textarea);
+                var selected = range.text || placeholder;
+                var replacement = before + selected + after;
+                replaceSelection(textarea, replacement, before.length, before.length + selected.length);
+            }
+
+            function applyLinePrefix(textarea, prefix, placeholder) {
+                var range = getRange(textarea);
+                var text = range.text || placeholder;
+                var lines = text.split(/\r?\n/);
+                var transformed = lines.map(function(line) {
+                    var clean = line.replace(/^\s*>+\s?/, '');
+                    if (clean.trim() === '' && text === placeholder) {
+                        clean = placeholder;
+                    }
+                    return prefix + clean;
+                }).join('\n');
+                replaceSelection(textarea, transformed, 0, transformed.length);
+            }
+
+            function applyUnorderedList(textarea) {
+                var range = getRange(textarea);
+                var text = range.text || 'Elemento de lista';
+                var lines = text.split(/\r?\n/);
+                var transformed = lines.map(function(line) {
+                    var clean = line.replace(/^\s*([-*+]|\d+\.)\s*/, '').trim();
+                    if (clean === '') {
+                        clean = 'Elemento de lista';
+                    }
+                    return '- ' + clean;
+                }).join('\n');
+                replaceSelection(textarea, transformed, 0, transformed.length);
+            }
+
+            function applyOrderedList(textarea) {
+                var range = getRange(textarea);
+                var text = range.text || 'Elemento de lista';
+                var lines = text.split(/\r?\n/);
+                var counter = 1;
+                var transformed = lines.map(function(line) {
+                    var clean = line.replace(/^\s*\d+\.?\s*/, '').trim();
+                    if (clean === '') {
+                        clean = 'Elemento ' + counter;
+                    }
+                    var current = counter + '. ' + clean;
+                    counter += 1;
+                    return current;
+                }).join('\n');
+                replaceSelection(textarea, transformed, 0, transformed.length);
+            }
+
+            function insertHeading(textarea) {
+                var range = getRange(textarea);
+                var text = range.text || 'Título de sección';
+                var parts = text.split(/\r?\n/);
+                var firstLine = parts.shift() || 'Título de sección';
+                firstLine = firstLine.replace(/^#{1,6}\s*/, '');
+                var heading = '## ' + firstLine;
+                if (parts.length) {
+                    parts.unshift(heading);
+                    var replacement = parts.join('\n');
+                    replaceSelection(textarea, replacement, 3, heading.length);
+                } else {
+                    replaceSelection(textarea, heading, 3, heading.length);
+                }
+            }
+
+            function insertCodeBlock(textarea) {
+                var range = getRange(textarea);
+                var text = range.text || 'Tu código aquí';
+                var replacement = '```\n' + text + '\n```\n';
+                replaceSelection(textarea, replacement, 4, 4 + text.length);
+            }
+
+            function insertHorizontalRule(textarea) {
+                var insertText = '\n\n---\n\n';
+                replaceSelection(textarea, insertText, insertText.length, insertText.length);
+            }
+
+            function insertLink(textarea) {
+                var range = getRange(textarea);
+                var label = range.text || 'Texto del enlace';
+                var defaultUrl = '';
+                if (range.text && /^https?:\/\//i.test(range.text.trim())) {
+                    defaultUrl = range.text.trim();
+                }
+                var url = window.prompt('Introduce la URL del enlace', defaultUrl || 'https://');
+                if (!url) {
+                    return;
+                }
+                var replacement = '[' + label + '](' + url + ')';
+                replaceSelection(textarea, replacement, 1, 1 + label.length);
+            }
+        });
+        </script>
+
         <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
 
         <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
@@ -4777,17 +5052,27 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
         
 
             function insertImageInContent(imageName) {
-
-                var contentTextArea = document.getElementById('content');
-
-                var cursorPosition = contentTextArea.selectionStart;
-
+                var contentTextArea = document.querySelector('[data-markdown-editor]') || document.getElementById('content');
+                if (!contentTextArea) {
+                    return;
+                }
+                var cursorPosition = typeof contentTextArea.selectionStart === 'number' ? contentTextArea.selectionStart : contentTextArea.value.length;
                 var content = contentTextArea.value;
-
                 var textToInsert = '![](assets/' + imageName + ')';
-
                 contentTextArea.value = content.substring(0, cursorPosition) + textToInsert + content.substring(cursorPosition);
-
+                if (typeof contentTextArea.setSelectionRange === 'function') {
+                    var newPos = cursorPosition + textToInsert.length;
+                    contentTextArea.focus();
+                    contentTextArea.setSelectionRange(newPos, newPos);
+                }
+                try {
+                    var event = new Event('input', { bubbles: true });
+                    contentTextArea.dispatchEvent(event);
+                } catch (evtError) {
+                    var legacy = document.createEvent('Event');
+                    legacy.initEvent('input', true, true);
+                    contentTextArea.dispatchEvent(legacy);
+                }
             }
 
         

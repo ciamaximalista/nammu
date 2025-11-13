@@ -289,6 +289,7 @@ function get_settings() {
     $account = [
         'username' => $userData['username'] ?? '',
     ];
+    $telegram = admin_extract_telegram_settings($config);
 
     return [
         'sort_order' => $sort_order,
@@ -307,6 +308,7 @@ function get_settings() {
         ],
         'social' => $social,
         'account' => $account,
+        'telegram' => $telegram,
     ];
 }
 
@@ -346,6 +348,168 @@ function verify_user($username, $password) {
         return true;
     }
     return false;
+}
+
+function admin_base_url(): string {
+    $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '';
+    $host = trim((string) $host);
+    if ($host === '') {
+        return '';
+    }
+    $scheme = 'http';
+    if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
+        $forwarded = explode(',', (string) $_SERVER['HTTP_X_FORWARDED_PROTO']);
+        $candidate = strtolower(trim($forwarded[0]));
+        if (in_array($candidate, ['http', 'https'], true)) {
+            $scheme = $candidate;
+        }
+    } elseif (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        $scheme = 'https';
+    } elseif (!empty($_SERVER['REQUEST_SCHEME'])) {
+        $candidate = strtolower((string) $_SERVER['REQUEST_SCHEME']);
+        if (in_array($candidate, ['http', 'https'], true)) {
+            $scheme = $candidate;
+        }
+    }
+    $portSuffix = '';
+    if (isset($_SERVER['SERVER_PORT']) && !str_contains($host, ':')) {
+        $port = (int) $_SERVER['SERVER_PORT'];
+        if (($scheme === 'http' && $port !== 80) || ($scheme === 'https' && $port !== 443)) {
+            $portSuffix = ':' . $port;
+        }
+    }
+    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+    $dir = str_replace('\\', '/', dirname($scriptName !== '' ? $scriptName : '/'));
+    if ($dir === '/' || $dir === '.') {
+        $dir = '';
+    } else {
+        $dir = rtrim($dir, '/');
+    }
+    $base = rtrim($scheme . '://' . $host . $portSuffix . $dir, '/');
+    return $base;
+}
+
+function admin_public_post_url(string $slug): string {
+    $base = admin_base_url();
+    $path = '/' . ltrim($slug, '/');
+    if ($base === '') {
+        return $path;
+    }
+    return $base . $path;
+}
+
+function admin_extract_telegram_settings(?array $config = null): array {
+    $defaults = [
+        'token' => '',
+        'channel' => '',
+        'auto_post' => 'off',
+    ];
+    if ($config === null) {
+        $config = load_config_file();
+    }
+    $stored = [];
+    if (isset($config['telegram']) && is_array($config['telegram'])) {
+        $stored = $config['telegram'];
+    }
+    $telegram = array_merge($defaults, $stored);
+    $telegram['token'] = trim((string) $telegram['token']);
+    $telegram['channel'] = trim((string) $telegram['channel']);
+    if ($telegram['channel'] !== '' && $telegram['channel'][0] !== '@' && !preg_match('/^-?\d+$/', $telegram['channel'])) {
+        $telegram['channel'] = '@' . ltrim($telegram['channel'], '@');
+    }
+    $telegram['auto_post'] = $telegram['auto_post'] === 'on' ? 'on' : 'off';
+    return $telegram;
+}
+
+function admin_cached_telegram_settings(): array {
+    return admin_extract_telegram_settings();
+}
+
+function admin_send_post_to_telegram(string $slug, string $title, string $description, array $telegramSettings): bool {
+    $token = $telegramSettings['token'] ?? '';
+    $channel = $telegramSettings['channel'] ?? '';
+    if ($token === '' || $channel === '') {
+        return false;
+    }
+    $parts = [];
+    $title = trim($title);
+    $description = trim($description);
+    if ($title !== '') {
+        $parts[] = $title;
+    }
+    if ($description !== '') {
+        $parts[] = $description;
+    }
+    $url = admin_public_post_url($slug);
+    if ($url !== '') {
+        $parts[] = $url;
+    }
+    if (empty($parts)) {
+        $parts[] = $url !== '' ? $url : 'Nueva publicación disponible';
+    }
+    $message = implode("\n\n", $parts);
+    return admin_send_telegram_message($token, $channel, $message);
+}
+
+function admin_send_telegram_message(string $token, string $chatId, string $text): bool {
+    $endpoint = 'https://api.telegram.org/bot' . $token . '/sendMessage';
+    $payload = [
+        'chat_id' => $chatId,
+        'text' => $text,
+        'disable_web_page_preview' => false,
+    ];
+    $body = http_build_query($payload);
+    $responseBody = null;
+    $httpCode = null;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($endpoint);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $responseBody = curl_exec($ch);
+        if ($responseBody !== false) {
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        }
+        curl_close($ch);
+    } else {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => "Content-Type: application/x-www-form-urlencoded\r\nContent-Length: " . strlen($body),
+                'content' => $body,
+                'timeout' => 10,
+            ],
+        ]);
+        $responseBody = @file_get_contents($endpoint, false, $context);
+        if (isset($http_response_header) && is_array($http_response_header)) {
+            foreach ($http_response_header as $headerLine) {
+                if (preg_match('#HTTP/\d\.\d\s+(\d+)#', $headerLine, $matches)) {
+                    $httpCode = (int) $matches[1];
+                    break;
+                }
+            }
+        }
+    }
+    if ($responseBody === false || $responseBody === null) {
+        return false;
+    }
+    $decoded = json_decode($responseBody, true);
+    if (is_array($decoded) && isset($decoded['ok'])) {
+        return (bool) $decoded['ok'];
+    }
+    if ($httpCode !== null) {
+        return $httpCode >= 200 && $httpCode < 300;
+    }
+    return false;
+}
+
+function admin_maybe_auto_post_to_telegram(string $filename, string $title, string $description): void {
+    $telegram = admin_cached_telegram_settings();
+    if (($telegram['auto_post'] ?? 'off') !== 'on') {
+        return;
+    }
+    admin_send_post_to_telegram(pathinfo($filename, PATHINFO_FILENAME), $title, $description, $telegram);
 }
 
 function get_default_template_settings(): array {
@@ -628,6 +792,12 @@ if (!is_array($accountFeedback) || !isset($accountFeedback['message'], $accountF
 } else {
     unset($_SESSION['account_feedback']);
 }
+$telegramFeedback = $_SESSION['telegram_feedback'] ?? null;
+if (!is_array($telegramFeedback) || !isset($telegramFeedback['message'], $telegramFeedback['type'])) {
+    $telegramFeedback = null;
+} else {
+    unset($_SESSION['telegram_feedback']);
+}
 
 // Handle POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -722,6 +892,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (file_put_contents($filepath, $file_content) === false) {
                     $error = 'No se pudo guardar el contenido. Revisa los permisos de la carpeta content/.';
                 } else {
+                    if (!$isDraft && $type !== 'Página') {
+                        admin_maybe_auto_post_to_telegram($targetFilename, $title, $description);
+                    }
                     $redirectTemplate = $isDraft ? 'draft' : ($type === 'Página' ? 'page' : 'single');
                     header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&created=' . urlencode($targetFilename));
                     exit;
@@ -729,6 +902,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif (isset($_POST['update']) || isset($_POST['publish_draft_entry']) || isset($_POST['publish_draft_page']) || isset($_POST['convert_to_draft'])) {
+        $existing_post_data = null;
         $filename = $_POST['filename'] ?? '';
         $title = $_POST['title'] ?? '';
         $category = $_POST['category'] ?? '';
@@ -743,9 +917,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Preserve existing Ordo value on update
         $normalizedFilename = nammu_normalize_filename($filename);
+        $previousStatus = 'published';
         if ($normalizedFilename !== '') {
             $existing_post_data = get_post_content($normalizedFilename);
             $ordo = $existing_post_data['metadata']['Ordo'] ?? '';
+            $previousStatus = strtolower($existing_post_data['metadata']['Status'] ?? 'published');
             if ($type === null) {
                 $currentTemplate = strtolower($existing_post_data['metadata']['Template'] ?? 'post');
                 $type = $currentTemplate === 'page' ? 'Página' : 'Entrada';
@@ -850,6 +1026,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 if ($writeSucceeded) {
+                    $shouldAutoTelegram = false;
+                    if ($template === 'post' && $status === 'published') {
+                        if ($publishDraftAsEntry || $previousStatus === 'draft') {
+                            $shouldAutoTelegram = true;
+                        }
+                    }
+                    if ($shouldAutoTelegram) {
+                        admin_maybe_auto_post_to_telegram($targetFilename, $title, $description);
+                    }
                     if ($renameRequested && $normalizedFilename !== '' && $normalizedFilename !== $targetFilename) {
                         $previousPath = CONTENT_DIR . '/' . $normalizedFilename;
                         if ($previousPath !== $finalPath && is_file($previousPath)) {
@@ -864,6 +1049,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
+    } elseif (isset($_POST['send_telegram_post'])) {
+        $filename = $_POST['telegram_filename'] ?? '';
+        $filename = nammu_normalize_filename($filename);
+        $templateTarget = $_POST['telegram_template'] ?? 'single';
+        $templateTarget = in_array($templateTarget, ['single', 'page', 'draft'], true) ? $templateTarget : 'single';
+        $redirectTemplate = urlencode($templateTarget);
+        $feedback = [
+            'type' => 'danger',
+            'message' => 'No se pudo encontrar la entrada solicitada.',
+        ];
+        if ($filename !== '' && is_file(CONTENT_DIR . '/' . $filename)) {
+            $postData = get_post_content($filename);
+            if ($postData) {
+                $metadata = $postData['metadata'] ?? [];
+                $template = strtolower($metadata['Template'] ?? 'post');
+                if (in_array($template, ['single', 'post'], true)) {
+                    $telegram = admin_cached_telegram_settings();
+                    if (($telegram['token'] ?? '') === '' || ($telegram['channel'] ?? '') === '') {
+                        $feedback['message'] = 'Configura el token y el canal de Telegram en la pestaña Configuración antes de enviar.';
+                    } else {
+                        $slug = pathinfo($filename, PATHINFO_FILENAME);
+                        $title = $metadata['Title'] ?? $slug;
+                        $description = $metadata['Description'] ?? '';
+                        if (admin_send_post_to_telegram($slug, $title, $description, $telegram)) {
+                            $feedback = [
+                                'type' => 'success',
+                                'message' => 'La publicación se envió correctamente a Telegram.',
+                            ];
+                        } else {
+                            $feedback['message'] = 'No se pudo enviar el mensaje a Telegram. Comprueba el token y el canal.';
+                        }
+                    }
+                } else {
+                    $feedback['message'] = 'Sólo las entradas pueden enviarse a Telegram.';
+                }
+            }
+        }
+        $_SESSION['telegram_feedback'] = $feedback;
+        header('Location: admin.php?page=edit&template=' . $redirectTemplate);
+        exit;
     } elseif (isset($_POST['delete_post'])) {
         $filename = $_POST['delete_filename'] ?? '';
         $filename = trim($filename);
@@ -990,6 +1215,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $social_twitter = substr($social_twitter, 1);
         }
         $social_facebook_app_id = trim($_POST['social_facebook_app_id'] ?? '');
+        $telegram_token = trim($_POST['telegram_token'] ?? '');
+        $telegram_channel = trim($_POST['telegram_channel'] ?? '');
+        $telegram_auto = isset($_POST['telegram_auto']) ? 'on' : 'off';
 
         try {
             $config = load_config_file();
@@ -1028,6 +1256,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $config['social'] = $social;
             } else {
                 unset($config['social']);
+            }
+            if ($telegram_token !== '' || $telegram_channel !== '' || $telegram_auto === 'on') {
+                $config['telegram'] = [
+                    'token' => $telegram_token,
+                    'channel' => $telegram_channel,
+                    'auto_post' => $telegram_auto,
+                ];
+            } else {
+                unset($config['telegram']);
             }
 
             save_config_file($config);
@@ -2601,8 +2838,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
 
                         <a class="navbar-brand" href="#"><img src="nammu.png" alt="Nammu Logo" style="max-width: 100px;"></a>
+                        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#adminNavbar" aria-controls="adminNavbar" aria-expanded="false" aria-label="Mostrar navegación">
+                            <span class="navbar-toggler-icon"></span>
+                        </button>
 
-                        <div class="collapse navbar-collapse">
+                        <div class="collapse navbar-collapse" id="adminNavbar">
 
                             <ul class="navbar-nav mr-auto">
 
@@ -2638,7 +2878,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                             </ul>
 
-                            <form method="post" class="form-inline my-2 my-lg-0">
+                            <form method="post" class="form-inline my-2 my-lg-0 ml-lg-3">
 
                                 <button type="submit" name="logout" class="btn btn-outline-danger my-2 my-sm-0">Cerrar sesión</button>
 
@@ -2795,6 +3035,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 ?>
 
                                 <h2>Editar</h2>
+                                <?php if ($telegramFeedback !== null): ?>
+                                    <div class="alert alert-<?= $telegramFeedback['type'] === 'success' ? 'success' : 'warning' ?>">
+                                        <?= htmlspecialchars($telegramFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                <?php endif; ?>
 
                                 <form class="form-inline mb-3 edit-search-form" method="get">
                                     <input type="hidden" name="page" value="edit">
@@ -2835,6 +3080,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                             <th>Nombre de archivo</th>
 
+                                            <th class="text-center">Telegram</th>
+
                                             <th></th>
 
                                         </tr>
@@ -2852,7 +3099,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                         if (empty($posts_data['posts'])):
                                         ?>
                                             <tr>
-                                                <td colspan="5" class="text-center text-muted">No hay <?= strtolower($currentTypeLabel) ?> disponibles.</td>
+                                                <td colspan="6" class="text-center text-muted">No hay <?= strtolower($currentTypeLabel) ?> disponibles.</td>
                                             </tr>
                                         <?php
                                         else:
@@ -2868,6 +3115,18 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 <td><?= htmlspecialchars($post['date']) ?></td>
 
                                                 <td><?= htmlspecialchars($post['filename']) ?></td>
+
+                                                <td class="text-center">
+                                                    <?php if ($templateFilter === 'single'): ?>
+                                                        <form method="post">
+                                                            <input type="hidden" name="telegram_filename" value="<?= htmlspecialchars($post['filename'], ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="telegram_template" value="<?= htmlspecialchars($templateFilter, ENT_QUOTES, 'UTF-8') ?>">
+                                                            <button type="submit" name="send_telegram_post" class="btn btn-sm btn-outline-primary">Enviar</button>
+                                                        </form>
+                                                    <?php else: ?>
+                                                        <span class="text-muted">—</span>
+                                                    <?php endif; ?>
+                                                </td>
 
                                                 <td class="text-right">
                                                     <div class="d-flex flex-column align-items-end">
@@ -3954,6 +4213,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                         <?= htmlspecialchars($accountFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
                                     </div>
                                 <?php endif; ?>
+                                <?php
+                                $telegramSettings = $settings['telegram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
+                                $telegramAutoEnabled = ($telegramSettings['auto_post'] ?? 'off') === 'on';
+                                ?>
 
                                 <form method="post">
 
@@ -4036,6 +4299,23 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                             <label for="social_facebook_app_id">Facebook App ID</label>
                                             <input type="text" name="social_facebook_app_id" id="social_facebook_app_id" class="form-control" value="<?= htmlspecialchars($socialFacebookAppId, ENT_QUOTES, 'UTF-8') ?>" placeholder="Opcional">
                                         </div>
+                                    </div>
+
+                                    <h4 class="mt-4">Telegram (opcional)</h4>
+                                    <p class="text-muted">Conecta un bot y un canal/grupo para compartir automáticamente las nuevas entradas.</p>
+                                    <div class="form-group">
+                                        <label for="telegram_token">Token del bot</label>
+                                        <input type="text" name="telegram_token" id="telegram_token" class="form-control" value="<?= htmlspecialchars($telegramSettings['token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="123456789:ABCDef...">
+                                        <small class="form-text text-muted">Creado con @BotFather. Nunca compartas este token en público.</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="telegram_channel">Canal o grupo</label>
+                                        <input type="text" name="telegram_channel" id="telegram_channel" class="form-control" value="<?= htmlspecialchars($telegramSettings['channel'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="@nombre_canal">
+                                        <small class="form-text text-muted">Usa el @ del canal o el ID numérico del grupo donde el bot es administrador.</small>
+                                    </div>
+                                    <div class="form-check mb-3">
+                                        <input type="checkbox" class="form-check-input" name="telegram_auto" id="telegram_auto" value="1" <?= $telegramAutoEnabled ? 'checked' : '' ?>>
+                                        <label for="telegram_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
                                     </div>
 
                                     <button type="submit" name="save_settings" class="btn btn-primary">Guardar</button>

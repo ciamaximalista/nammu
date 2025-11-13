@@ -3114,7 +3114,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                                 <td><?= htmlspecialchars($post['date']) ?></td>
 
-                                                <td><?= htmlspecialchars($post['filename']) ?></td>
+                                                <?php
+                                                $postSlug = pathinfo($post['filename'], PATHINFO_FILENAME);
+                                                $postLink = admin_public_post_url($postSlug);
+                                                ?>
+                                                <td><a href="<?= htmlspecialchars($postLink, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($post['filename']) ?></a></td>
 
                                                 <td class="text-center">
                                                     <?php if ($templateFilter === 'single'): ?>

@@ -424,6 +424,33 @@ if ($isPageTemplate && $formattedDate !== '') {
         border-bottom: 1px dotted rgba(0,0,0,0.5);
         padding-bottom: 0.05rem;
     }
+    .embedded-video,
+    .embedded-pdf {
+        margin: 2rem auto;
+        text-align: center;
+        width: min(100%, 1200px);
+        min-width: min(800px, 100%);
+    }
+    .embedded-video video,
+    .embedded-video iframe,
+    .embedded-pdf iframe {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        min-width: min(800px, 100%);
+        border: none;
+        border-radius: var(--nammu-radius-md);
+        margin: 0 auto;
+        background: #000;
+    }
+    .embedded-video video,
+    .embedded-video iframe {
+        aspect-ratio: 16 / 9;
+    }
+    .embedded-pdf iframe {
+        background: #fff;
+        height: clamp(480px, 70vh, 900px);
+    }
     .post-meta-update {
         margin: 2rem auto 0;
         max-width: min(760px, 100%);

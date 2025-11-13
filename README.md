@@ -15,6 +15,8 @@ Nammu es un motor ligero para blogs y diccionarios online que reutiliza la estru
 - Buscador avanzado (`buscar.php`) con soporte para frases exactas, exclusiones con `-palabra`, filtros por campos (`title:`, `category:`, `content:`), selector de tipo (entradas/páginas) e integración visual configurable desde la plantilla.
 - Botón extra en las cajas de búsqueda (portada, categorías, post individual, etc.) que enlaza al índice alfabético cuando se usa la ordenación por título (modo diccionario).
 - Índice de categorías (`/categorias`) y páginas por categoría (`/categoria/{slug}`) que reutilizan la maquetación elegida para la portada e incluyen miniaturas automáticas basadas en la última entrada de cada categoría.
+- Selector de recursos multimedia compatible con imágenes, vídeos (MP4, WebM, MOV…) y documentos PDF. Al insertar desde el modal, los vídeos se convierten en bloques `<video>` centrados, los PDF se incrustan como `<iframe>` a ancho completo y las URLs directas de YouTube se transforman automáticamente en iframes responsivos.
+- Integración opcional con Telegram, WhatsApp Cloud API, Facebook Pages y Twitter/X para enviarlas automáticamente al publicar (también se puede reenviar manualmente desde la tabla de “Editar”).
 - Índice alfabético: al elegir la ordenación alfabética en Configuración, la portada agrupa las entradas por letra (A, B, C…, “Otros”), se activa el índice de letras (`/letras`) y las vistas por letra (`/letra/{slug}`) que reutilizan la maquetación elegida.
 - Parseador Markdown con extras: soporta código en bloque (```` ``` ````), blockquotes, superíndices con `^texto`, tachado con `~~`, negrita/cursiva combinadas y genera automáticamente una **tabla de contenidos** cuando encuentra `[toc]` o `[TOC]`, enlazando con los títulos `h1–h4`.
 - Tratamiento diferenciado de entradas y páginas: las páginas usan la misma ruta amigable `/slug`, pero muestran cintillas de actualización específicas (con fecha calculada a partir del YAML o, si falta, de los metadatos del archivo) y pueden compartir maquetación con las entradas según la plantilla elegida.
@@ -53,6 +55,7 @@ Nammu es un motor ligero para blogs y diccionarios online que reutiliza la estru
    Ajusta el usuario/grupo (`www-data`) según tu servidor.
 4. Configura el host virtual y asegúrate de que `AllowOverride All` esté habilitado si deseas utilizar el `.htaccess`.
 5. Visita `https://tu-dominio/admin.php`, crea el usuario inicial y empieza a publicar.
+6. Si vas a subir vídeos medianos o grandes, recuerda aumentar `upload_max_filesize` y `post_max_size` en tu `php.ini` (o `.user.ini`) a un valor superior al del archivo más pesado que quieras aceptar y reinicia PHP/FPM.
 
 ## Migración desde PicoCMS
 
@@ -84,6 +87,8 @@ Ahora ya está todo listo para descargar y poner permisos:
 - `config/config.yml` almacena la configuración general y se actualiza desde el panel (plantilla, redes sociales, etc.). Si la edición falla, revisa que el archivo tenga permisos 664 y pertenezca al usuario/grupo del servidor.
 - En la pestaña **Editar** ahora tienes un buscador interno minimalista que filtra por título, descripción, categoría o nombre de archivo. El filtro se mantiene al cambiar entre “Entradas” y “Páginas”, lo que facilita localizar rápidamente el contenido que quieres modificar o borrar.
 - Los borradores se gestionan desde la misma pestaña: el nuevo botón “Guardar como borrador” en **Publicar** crea contenidos que no se publican hasta que los promociones con “Publicar como entrada” o “Publicar como página” dentro del formulario de edición.
+- El modal de recursos permite insertar vídeos (locales o de YouTube) y documentos PDF en el cuerpo del post; los vídeos locales se incrustan como `<video>` HTML5, las URLs de YouTube pegadas en una línea se transforman automáticamente en un iframe responsive y los PDF se muestran como un `<iframe>` a ancho completo.
+- Cada entrada puede anunciarse en Telegram, WhatsApp Cloud, Facebook Pages o Twitter/X si configuras los tokens desde **Configuración → Redes sociales**. Puedes activar el envío automático o dispararlo manualmente con el botón “Enviar” de la tabla de “Editar”.
 
 ## Orden alfabético, índices y buscador
 

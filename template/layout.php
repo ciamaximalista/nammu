@@ -117,6 +117,31 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
             text-decoration: underline;
             color: <?= $colorAccent ?>;
         }
+        .embedded-video,
+        .embedded-pdf {
+            margin: 2rem auto;
+            text-align: center;
+            width: min(100%, 1200px);
+            min-width: min(800px, 100%);
+        }
+        .embedded-video video,
+        .embedded-video iframe,
+        .embedded-pdf iframe {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            min-width: min(800px, 100%);
+            aspect-ratio: 16 / 9;
+            border: none;
+            border-radius: var(--nammu-radius-md);
+            background: #000;
+            margin: 0 auto;
+        }
+        .embedded-pdf iframe {
+            aspect-ratio: auto;
+            height: clamp(480px, 70vh, 900px);
+            background: #fff;
+        }
         h1, h2, h3, h4, h5, h6 {
             font-family: "<?= $titleFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }

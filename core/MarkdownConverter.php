@@ -179,6 +179,15 @@ class MarkdownConverter
                 continue;
             }
 
+            $youtubeId = $this->extractYoutubeId($trimmed);
+            if ($youtubeId !== null) {
+                $flushParagraph();
+                $closeAllLists();
+                $flushBlockquote();
+                $html[] = $this->renderYoutubeEmbed($youtubeId);
+                continue;
+            }
+
             if (preg_match('/^(#{1,6})\s+(.+)$/', $trimmed, $matches)) {
                 $flushParagraph();
                 $closeAllLists();
@@ -429,6 +438,47 @@ class MarkdownConverter
 
         $toc .= '</nav>';
         return $toc;
+    }
+
+    private function extractYoutubeId(string $text): ?string
+    {
+        $url = trim($text);
+        if ($url === '') {
+            return null;
+        }
+        $parsed = @parse_url($url);
+        if ($parsed === false || !isset($parsed['host'])) {
+            return null;
+        }
+        $host = strtolower($parsed['host']);
+        $path = $parsed['path'] ?? '';
+        $id = null;
+
+        if (str_contains($host, 'youtube.com')) {
+            if (strpos($path, '/watch') === 0 && isset($parsed['query'])) {
+                parse_str($parsed['query'], $query);
+                if (!empty($query['v'])) {
+                    $id = $query['v'];
+                }
+            } elseif (preg_match('#^/(embed|shorts)/([^/?]+)#', $path, $matches)) {
+                $id = $matches[2];
+            }
+        } elseif ($host === 'youtu.be') {
+            $id = ltrim($path, '/');
+        }
+
+        if ($id === null || $id === '') {
+            return null;
+        }
+
+        $id = preg_replace('/[^A-Za-z0-9_\-]/', '', $id);
+        return $id !== '' ? $id : null;
+    }
+
+    private function renderYoutubeEmbed(string $videoId): string
+    {
+        $src = 'https://www.youtube.com/embed/' . htmlspecialchars($videoId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        return '<div class="embedded-video"><iframe src="' . $src . '" title="YouTube video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>';
     }
 
     private function orderedListTypeForLevel(int $level): string

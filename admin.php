@@ -174,41 +174,95 @@ function get_post_content($filename) {
     ];
 }
 
-function get_images($page = 1, $per_page = 8) {
-    $images = glob(ASSETS_DIR . '/*.{jpg,jpeg,png,gif}', GLOB_BRACE);
-    usort($images, function($a, $b) {
-        return filemtime($b) - filemtime($a);
+function nammu_allowed_media_extensions(): array {
+    return ['jpg','jpeg','png','gif','webp','svg','mp4','webm','mov','m4v','ogv','ogg','pdf'];
+}
+
+function get_media_items($page = 1, $per_page = 24) {
+    $extensions = nammu_allowed_media_extensions();
+    $patterns = array_merge($extensions, array_map('strtoupper', $extensions));
+    $pattern = ASSETS_DIR . '/*.{'.implode(',', $patterns).'}';
+    $files = glob($pattern, GLOB_BRACE) ?: [];
+    $items = [];
+    foreach ($files as $file) {
+        $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+        $type = 'image';
+        if (in_array($ext, ['mp4','webm','mov','m4v','ogv','ogg'], true)) {
+            $type = 'video';
+        } elseif ($ext === 'pdf') {
+            $type = 'document';
+        }
+        if ($type === 'video') {
+            $mime = admin_video_mime_from_extension($ext);
+        } elseif ($type === 'document') {
+            $mime = 'application/pdf';
+        } else {
+            $mime = admin_image_mime_from_extension($ext);
+        }
+        $items[] = [
+            'path' => $file,
+            'name' => basename($file),
+            'relative' => str_replace(ASSETS_DIR . '/', '', $file),
+            'type' => $type,
+            'extension' => $ext,
+            'mime' => $mime,
+            'modified' => filemtime($file),
+        ];
+    }
+    usort($items, static function ($a, $b) {
+        return ($b['modified'] ?? 0) <=> ($a['modified'] ?? 0);
     });
-    $total = count($images);
-    $pages = ceil($total / $per_page);
-    $offset = ($page - 1) * $per_page;
+    $total = count($items);
+    $pages = $per_page > 0 ? max(1, (int) ceil($total / $per_page)) : 1;
+    $offset = $per_page > 0 ? ($page - 1) * $per_page : 0;
     return [
-        'images' => array_slice($images, $offset, $per_page),
+        'items' => $per_page > 0 ? array_slice($items, $offset, $per_page) : $items,
         'total' => $total,
         'pages' => $pages,
-        'current_page' => $page
+        'current_page' => $page,
     ];
 }
 
-function get_assets($page = 1, $per_page = 40) {
-    $files = [];
-    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(ASSETS_DIR));
-    foreach ($iterator as $file) {
-        if ($file->isDir()) continue;
-        $files[] = $file->getPathname();
-    }
-    usort($files, function($a, $b) {
-        return filemtime($b) - filemtime($a);
-    });
-    $total = count($files);
-    $pages = ceil($total / $per_page);
-    $offset = ($page - 1) * $per_page;
-    return [
-        'assets' => array_slice($files, $offset, $per_page),
-        'total' => $total,
-        'pages' => $pages,
-        'current_page' => $page
+function admin_image_mime_from_extension(string $ext): string {
+    $map = [
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+        'svg' => 'image/svg+xml',
     ];
+    return $map[$ext] ?? 'image/' . $ext;
+}
+
+function admin_video_mime_from_extension(string $ext): string {
+    $map = [
+        'mp4' => 'video/mp4',
+        'm4v' => 'video/mp4',
+        'mov' => 'video/quicktime',
+        'webm' => 'video/webm',
+        'ogv' => 'video/ogg',
+        'ogg' => 'video/ogg',
+    ];
+    return $map[$ext] ?? 'video/' . $ext;
+}
+
+function nammu_unique_asset_filename(string $filename): string {
+    $dir = ASSETS_DIR;
+    $info = pathinfo($filename);
+    $base = $info['filename'] ?? 'asset';
+    $ext = isset($info['extension']) && $info['extension'] !== '' ? '.' . $info['extension'] : '';
+    $candidate = $base . $ext;
+    $index = 2;
+    while (is_file($dir . '/' . $candidate)) {
+        $candidate = $base . '-' . $index . $ext;
+        $index++;
+    }
+    return $candidate;
+}
+
+function get_assets($page = 1, $per_page = 40) {
+    return get_media_items($page, $per_page);
 }
 
 function get_settings() {
@@ -290,6 +344,24 @@ function get_settings() {
         'username' => $userData['username'] ?? '',
     ];
     $telegram = admin_extract_telegram_settings($config);
+    $whatsapp = admin_extract_social_settings('whatsapp', [
+        'token' => '',
+        'channel' => '',
+        'recipient' => '',
+        'auto_post' => 'off',
+    ], $config);
+    $facebook = admin_extract_social_settings('facebook', [
+        'token' => '',
+        'channel' => '',
+        'recipient' => '',
+        'auto_post' => 'off',
+    ], $config);
+    $twitter = admin_extract_social_settings('twitter', [
+        'token' => '',
+        'channel' => '',
+        'recipient' => '',
+        'auto_post' => 'off',
+    ], $config);
 
     return [
         'sort_order' => $sort_order,
@@ -309,6 +381,9 @@ function get_settings() {
         'social' => $social,
         'account' => $account,
         'telegram' => $telegram,
+        'whatsapp' => $whatsapp,
+        'facebook' => $facebook,
+        'twitter' => $twitter,
     ];
 }
 
@@ -398,31 +473,70 @@ function admin_public_post_url(string $slug): string {
     return $base . $path;
 }
 
-function admin_extract_telegram_settings(?array $config = null): array {
-    $defaults = [
-        'token' => '',
-        'channel' => '',
-        'auto_post' => 'off',
-    ];
+function admin_extract_social_settings(string $key, array $defaults, ?array $config = null): array {
     if ($config === null) {
         $config = load_config_file();
     }
     $stored = [];
-    if (isset($config['telegram']) && is_array($config['telegram'])) {
-        $stored = $config['telegram'];
+    if (isset($config[$key]) && is_array($config[$key])) {
+        $stored = $config[$key];
     }
-    $telegram = array_merge($defaults, $stored);
-    $telegram['token'] = trim((string) $telegram['token']);
-    $telegram['channel'] = trim((string) $telegram['channel']);
+    $values = array_merge($defaults, $stored);
+    $values['token'] = trim((string) ($values['token'] ?? ''));
+    $values['channel'] = trim((string) ($values['channel'] ?? ''));
+    $values['recipient'] = trim((string) ($values['recipient'] ?? ''));
+    $values['auto_post'] = ($values['auto_post'] ?? 'off') === 'on' ? 'on' : 'off';
+    return $values;
+}
+
+function admin_extract_telegram_settings(?array $config = null): array {
+    $defaults = [
+        'token' => '',
+        'channel' => '',
+        'recipient' => '',
+        'auto_post' => 'off',
+    ];
+    $telegram = admin_extract_social_settings('telegram', $defaults, $config);
     if ($telegram['channel'] !== '' && $telegram['channel'][0] !== '@' && !preg_match('/^-?\d+$/', $telegram['channel'])) {
         $telegram['channel'] = '@' . ltrim($telegram['channel'], '@');
     }
-    $telegram['auto_post'] = $telegram['auto_post'] === 'on' ? 'on' : 'off';
     return $telegram;
 }
 
+function admin_cached_social_settings(?string $key = null): array {
+    static $cache = null;
+    if ($cache === null) {
+        $config = load_config_file();
+        $cache = [
+            'telegram' => admin_extract_telegram_settings($config),
+            'whatsapp' => admin_extract_social_settings('whatsapp', [
+                'token' => '',
+                'channel' => '',
+                'recipient' => '',
+                'auto_post' => 'off',
+            ], $config),
+            'facebook' => admin_extract_social_settings('facebook', [
+                'token' => '',
+                'channel' => '',
+                'recipient' => '',
+                'auto_post' => 'off',
+            ], $config),
+            'twitter' => admin_extract_social_settings('twitter', [
+                'token' => '',
+                'channel' => '',
+                'recipient' => '',
+                'auto_post' => 'off',
+            ], $config),
+        ];
+    }
+    if ($key === null) {
+        return $cache;
+    }
+    return $cache[$key] ?? [];
+}
+
 function admin_cached_telegram_settings(): array {
-    return admin_extract_telegram_settings();
+    return admin_cached_social_settings('telegram');
 }
 
 function admin_send_post_to_telegram(string $slug, string $title, string $description, array $telegramSettings): bool {
@@ -431,6 +545,15 @@ function admin_send_post_to_telegram(string $slug, string $title, string $descri
     if ($token === '' || $channel === '') {
         return false;
     }
+    $message = admin_build_telegram_message($slug, $title, $description);
+    return admin_send_telegram_message($token, $channel, $message, 'HTML');
+}
+
+function admin_telegram_escape(string $text): string {
+    return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function admin_build_post_message(string $slug, string $title, string $description): string {
     $parts = [];
     $title = trim($title);
     $description = trim($description);
@@ -445,19 +568,156 @@ function admin_send_post_to_telegram(string $slug, string $title, string $descri
         $parts[] = $url;
     }
     if (empty($parts)) {
-        $parts[] = $url !== '' ? $url : 'Nueva publicación disponible';
+        $parts[] = 'Nueva publicación disponible';
     }
-    $message = implode("\n\n", $parts);
-    return admin_send_telegram_message($token, $channel, $message);
+    return implode("\n\n", $parts);
 }
 
-function admin_send_telegram_message(string $token, string $chatId, string $text): bool {
+function admin_build_telegram_message(string $slug, string $title, string $description): string {
+    $parts = [];
+    $titleTrim = trim($title);
+    if ($titleTrim !== '') {
+        $parts[] = '<b>' . admin_telegram_escape($titleTrim) . '</b>';
+    }
+    $descriptionTrim = trim($description);
+    if ($descriptionTrim !== '') {
+        $parts[] = admin_telegram_escape($descriptionTrim);
+    }
+    $url = admin_public_post_url($slug);
+    if ($url !== '') {
+        $parts[] = admin_telegram_escape($url);
+    }
+    if (empty($parts)) {
+        $parts[] = admin_telegram_escape('Nueva publicación disponible');
+    }
+    return implode("\n\n", $parts);
+}
+
+function admin_send_whatsapp_post(string $slug, string $title, string $description, array $settings): bool {
+    $token = $settings['token'] ?? '';
+    $phoneId = $settings['channel'] ?? '';
+    $recipient = $settings['recipient'] ?? '';
+    if ($token === '' || $phoneId === '' || $recipient === '') {
+        return false;
+    }
+    $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($phoneId) . '/messages';
+    $payload = [
+        'messaging_product' => 'whatsapp',
+        'to' => $recipient,
+        'type' => 'text',
+        'text' => [
+            'body' => admin_build_post_message($slug, $title, $description),
+        ],
+    ];
+    return admin_http_post_json($endpoint, $payload, [
+        'Authorization: Bearer ' . $token,
+        'Content-Type: application/json',
+    ]);
+}
+
+function admin_send_facebook_post(string $slug, string $title, string $description, array $settings): bool {
+    $token = $settings['token'] ?? '';
+    $pageId = $settings['channel'] ?? '';
+    if ($token === '' || $pageId === '') {
+        return false;
+    }
+    $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($pageId) . '/feed';
+    $params = [
+        'message' => admin_build_post_message($slug, $title, $description),
+        'access_token' => $token,
+    ];
+    return admin_http_post_form($endpoint, $params);
+}
+
+function admin_send_twitter_post(string $slug, string $title, string $description, array $settings): bool {
+    $token = $settings['token'] ?? '';
+    if ($token === '') {
+        return false;
+    }
+    $endpoint = 'https://api.twitter.com/2/tweets';
+    $text = admin_build_post_message($slug, $title, $description);
+    if (function_exists('mb_strlen')) {
+        if (mb_strlen($text, 'UTF-8') > 280) {
+            $text = mb_substr($text, 0, 275, 'UTF-8') . '…';
+        }
+    } elseif (strlen($text) > 280) {
+        $text = substr($text, 0, 275) . '…';
+    }
+    $payload = ['text' => $text];
+    return admin_http_post_json($endpoint, $payload, [
+        'Authorization: Bearer ' . $token,
+        'Content-Type: application/json',
+    ]);
+}
+
+function admin_http_post_json(string $url, array $payload, array $headers = []): bool {
+    $body = json_encode($payload);
+    $headers[] = 'Content-Length: ' . strlen((string) $body);
+    return admin_http_post_body($url, $body, $headers);
+}
+
+function admin_http_post_form(string $url, array $params): bool {
+    $body = http_build_query($params);
+    $headers = [
+        'Content-Type: application/x-www-form-urlencoded',
+        'Content-Length: ' . strlen($body),
+    ];
+    return admin_http_post_body($url, $body, $headers);
+}
+
+function admin_http_post_body(string $url, string $body, array $headers): bool {
+    $responseBody = null;
+    $httpCode = null;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $responseBody = curl_exec($ch);
+        if ($responseBody !== false) {
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        }
+        curl_close($ch);
+    } else {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => implode("\r\n", $headers),
+                'content' => $body,
+                'timeout' => 10,
+            ],
+        ]);
+        $responseBody = @file_get_contents($url, false, $context);
+        if (isset($http_response_header) && is_array($http_response_header)) {
+            foreach ($http_response_header as $headerLine) {
+                if (preg_match('#HTTP/\d\.\d\s+(\d+)#', $headerLine, $matches)) {
+                    $httpCode = (int) $matches[1];
+                    break;
+                }
+            }
+        }
+    }
+    if ($responseBody === false || $responseBody === null) {
+        return false;
+    }
+    if ($httpCode !== null) {
+        return $httpCode >= 200 && $httpCode < 300;
+    }
+    return true;
+}
+
+function admin_send_telegram_message(string $token, string $chatId, string $text, ?string $parseMode = null): bool {
     $endpoint = 'https://api.telegram.org/bot' . $token . '/sendMessage';
     $payload = [
         'chat_id' => $chatId,
         'text' => $text,
         'disable_web_page_preview' => false,
     ];
+    if ($parseMode !== null) {
+        $payload['parse_mode'] = $parseMode;
+    }
     $body = http_build_query($payload);
     $responseBody = null;
     $httpCode = null;
@@ -504,12 +764,24 @@ function admin_send_telegram_message(string $token, string $chatId, string $text
     return false;
 }
 
-function admin_maybe_auto_post_to_telegram(string $filename, string $title, string $description): void {
-    $telegram = admin_cached_telegram_settings();
-    if (($telegram['auto_post'] ?? 'off') !== 'on') {
-        return;
+function admin_maybe_auto_post_to_social_networks(string $filename, string $title, string $description): void {
+    $slug = pathinfo($filename, PATHINFO_FILENAME);
+    if ($slug === '') {
+        $slug = $filename;
     }
-    admin_send_post_to_telegram(pathinfo($filename, PATHINFO_FILENAME), $title, $description, $telegram);
+    $settings = admin_cached_social_settings();
+    if (($settings['telegram']['auto_post'] ?? 'off') === 'on') {
+        admin_send_post_to_telegram($slug, $title, $description, $settings['telegram']);
+    }
+    if (($settings['whatsapp']['auto_post'] ?? 'off') === 'on') {
+        admin_send_whatsapp_post($slug, $title, $description, $settings['whatsapp']);
+    }
+    if (($settings['facebook']['auto_post'] ?? 'off') === 'on') {
+        admin_send_facebook_post($slug, $title, $description, $settings['facebook']);
+    }
+    if (($settings['twitter']['auto_post'] ?? 'off') === 'on') {
+        admin_send_twitter_post($slug, $title, $description, $settings['twitter']);
+    }
 }
 
 function get_default_template_settings(): array {
@@ -798,6 +1070,12 @@ if (!is_array($telegramFeedback) || !isset($telegramFeedback['message'], $telegr
 } else {
     unset($_SESSION['telegram_feedback']);
 }
+$assetFeedback = $_SESSION['asset_feedback'] ?? null;
+if (!is_array($assetFeedback) || !isset($assetFeedback['message'], $assetFeedback['type'])) {
+    $assetFeedback = null;
+} else {
+    unset($_SESSION['asset_feedback']);
+}
 
 // Handle POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -893,7 +1171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = 'No se pudo guardar el contenido. Revisa los permisos de la carpeta content/.';
                 } else {
                     if (!$isDraft && $type !== 'Página') {
-                        admin_maybe_auto_post_to_telegram($targetFilename, $title, $description);
+                        admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description);
                     }
                     $redirectTemplate = $isDraft ? 'draft' : ($type === 'Página' ? 'page' : 'single');
                     header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&created=' . urlencode($targetFilename));
@@ -1026,14 +1304,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 if ($writeSucceeded) {
-                    $shouldAutoTelegram = false;
+                    $shouldAutoShare = false;
                     if ($template === 'post' && $status === 'published') {
                         if ($publishDraftAsEntry || $previousStatus === 'draft') {
-                            $shouldAutoTelegram = true;
+                            $shouldAutoShare = true;
                         }
                     }
-                    if ($shouldAutoTelegram) {
-                        admin_maybe_auto_post_to_telegram($targetFilename, $title, $description);
+                    if ($shouldAutoShare) {
+                        admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description);
                     }
                     if ($renameRequested && $normalizedFilename !== '' && $normalizedFilename !== $targetFilename) {
                         $previousPath = CONTENT_DIR . '/' . $normalizedFilename;
@@ -1108,13 +1386,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: admin.php?page=edit&template=' . $templateParam . '&deleted=0');
         exit;
     } elseif (isset($_POST['upload_asset'])) {
-        if (isset($_FILES['asset_file']) && $_FILES['asset_file']['error'] == 0) {
-            $target_dir = ASSETS_DIR . '/';
-            $target_file = $target_dir . basename($_FILES["asset_file"]["name"]);
-            if (move_uploaded_file($_FILES["asset_file"]["tmp_name"], $target_file)) {
-                // file uploaded successfully
+        $feedback = null;
+        if (!isset($_FILES['asset_file']) || $_FILES['asset_file']['error'] === UPLOAD_ERR_NO_FILE) {
+            $feedback = ['type' => 'warning', 'message' => 'No se seleccionó ningún archivo.'];
+        } else {
+            $file = $_FILES['asset_file'];
+            if ($file['error'] === UPLOAD_ERR_INI_SIZE || $file['error'] === UPLOAD_ERR_FORM_SIZE) {
+                $feedback = ['type' => 'danger', 'message' => 'El archivo supera el tamaño máximo permitido por el servidor (upload_max_filesize / post_max_size). Ajusta esos valores para subir vídeos más pesados.'];
+            } elseif ($file['error'] !== UPLOAD_ERR_OK) {
+                $feedback = ['type' => 'danger', 'message' => 'No se pudo subir el archivo (código de error ' . $file['error'] . ').'];
+            } else {
+                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                if (!in_array($ext, nammu_allowed_media_extensions(), true)) {
+                    $feedback = ['type' => 'warning', 'message' => 'Formato no permitido. Usa imágenes o vídeos compatibles (jpg, png, mp4, webm...).'];
+                } else {
+                    $base = nammu_slugify(pathinfo($file['name'], PATHINFO_FILENAME));
+                    if ($base === '') {
+                        $base = 'archivo';
+                    }
+                    $targetName = $base . '.' . $ext;
+                    $targetName = nammu_unique_asset_filename($targetName);
+                    $targetPath = ASSETS_DIR . '/' . $targetName;
+                    if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+                        $feedback = ['type' => 'success', 'message' => 'Archivo subido correctamente.'];
+                    } else {
+                        $feedback = ['type' => 'danger', 'message' => 'No se pudo mover el archivo subido. Revisa los permisos de la carpeta assets/.'];
+                    }
+                }
             }
         }
+        $_SESSION['asset_feedback'] = $feedback;
         header('Location: admin.php?page=resources');
         exit;
     } elseif (isset($_POST['save_edited_image'])) {
@@ -1218,6 +1519,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $telegram_token = trim($_POST['telegram_token'] ?? '');
         $telegram_channel = trim($_POST['telegram_channel'] ?? '');
         $telegram_auto = isset($_POST['telegram_auto']) ? 'on' : 'off';
+        $whatsapp_token = trim($_POST['whatsapp_token'] ?? '');
+        $whatsapp_channel = trim($_POST['whatsapp_channel'] ?? '');
+        $whatsapp_recipient = trim($_POST['whatsapp_recipient'] ?? '');
+        $whatsapp_auto = isset($_POST['whatsapp_auto']) ? 'on' : 'off';
+        $facebook_token = trim($_POST['facebook_token'] ?? '');
+        $facebook_channel = trim($_POST['facebook_channel'] ?? '');
+        $facebook_auto = isset($_POST['facebook_auto']) ? 'on' : 'off';
+        $twitter_token = trim($_POST['twitter_token'] ?? '');
+        $twitter_channel = trim($_POST['twitter_channel'] ?? '');
+        $twitter_auto = isset($_POST['twitter_auto']) ? 'on' : 'off';
 
         try {
             $config = load_config_file();
@@ -1265,6 +1576,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ];
             } else {
                 unset($config['telegram']);
+            }
+            if ($whatsapp_token !== '' || $whatsapp_channel !== '' || $whatsapp_recipient !== '' || $whatsapp_auto === 'on') {
+                $config['whatsapp'] = [
+                    'token' => $whatsapp_token,
+                    'channel' => $whatsapp_channel,
+                    'recipient' => $whatsapp_recipient,
+                    'auto_post' => $whatsapp_auto,
+                ];
+            } else {
+                unset($config['whatsapp']);
+            }
+            if ($facebook_token !== '' || $facebook_channel !== '' || $facebook_auto === 'on') {
+                $config['facebook'] = [
+                    'token' => $facebook_token,
+                    'channel' => $facebook_channel,
+                    'auto_post' => $facebook_auto,
+                ];
+            } else {
+                unset($config['facebook']);
+            }
+            if ($twitter_token !== '' || $twitter_channel !== '' || $twitter_auto === 'on') {
+                $config['twitter'] = [
+                    'token' => $twitter_token,
+                    'channel' => $twitter_channel,
+                    'auto_post' => $twitter_auto,
+                ];
+            } else {
+                unset($config['twitter']);
             }
 
             save_config_file($config);
@@ -2994,7 +3333,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                         <textarea name="content" id="content_publish" class="form-control" rows="15" data-markdown-editor="1"></textarea>
 
-                                        <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor">Insertar imagen</button>
+                                        <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor">Insertar recurso</button>
+                                        <small class="form-text text-muted mt-1">Inserta en la entrada imágenes, vídeos o archivos PDF.</small>
 
                                     </div>
 
@@ -3305,7 +3645,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                         <textarea name="content" id="content_edit" class="form-control" rows="15" data-markdown-editor="1"><?= htmlspecialchars($post_data['content']) ?></textarea>
 
-                                        <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor">Insertar imagen</button>
+                                        <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor">Insertar recurso</button>
+                                        <small class="form-text text-muted mt-1">Inserta en la entrada imágenes, vídeos o archivos PDF.</small>
 
                                     </div>
 
@@ -3344,6 +3685,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             <div class="tab-pane active">
 
                                 <h2>Recursos</h2>
+                                <?php if ($assetFeedback !== null): ?>
+                                    <div class="alert alert-<?= $assetFeedback['type'] === 'success' ? 'success' : 'warning' ?>">
+                                        <?= htmlspecialchars($assetFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                <?php endif; ?>
 
                                 
 
@@ -3375,13 +3721,14 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                     $current_page = $_GET['p'] ?? 1;
 
-                                    $assets_data = get_assets($current_page, 40);
+                                    $media_data = get_media_items($current_page, 40);
 
-                                    foreach ($assets_data['assets'] as $asset):
+                                    foreach ($media_data['items'] as $media):
 
-                                        $relative_path = str_replace(ASSETS_DIR . '/', '', $asset);
-
-                                        $is_image = in_array(strtolower(pathinfo($asset, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'gif']);
+                                        $relative_path = $media['relative'];
+                                        $ext = $media['extension'];
+                                        $is_image = $media['type'] === 'image';
+                                        $is_video = $media['type'] === 'video';
 
                                     ?>
 
@@ -3392,6 +3739,12 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 <?php if ($is_image): ?>
 
                                                     <img src="assets/<?= htmlspecialchars($relative_path) ?>" class="card-img-top" style="height: 150px; object-fit: cover;">
+
+                                                <?php elseif ($is_video): ?>
+
+                                                    <video class="card-img-top" style="height: 150px; object-fit: cover;" muted preload="metadata" controls>
+                                                        <source src="assets/<?= htmlspecialchars($relative_path) ?>" type="<?= htmlspecialchars($media['mime'], ENT_QUOTES, 'UTF-8') ?>">
+                                                    </video>
 
                                                 <?php else: ?>
 
@@ -3439,15 +3792,15 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                         <?php
                                         $pageGroupSize = 16;
-                                        for ($i = 1; $i <= $assets_data['pages']; $i++): ?>
+                                        for ($i = 1; $i <= $media_data['pages']; $i++): ?>
 
-                                            <li class="page-item <?= $i == $assets_data['current_page'] ? 'active' : '' ?>">
+                                            <li class="page-item <?= $i == $media_data['current_page'] ? 'active' : '' ?>">
 
                                                 <a class="page-link" href="?page=resources&p=<?= $i ?>"><?= $i ?></a>
 
                                             </li>
 
-                                            <?php if ($i % $pageGroupSize === 0 && $i < $assets_data['pages']): ?>
+                                            <?php if ($i % $pageGroupSize === 0 && $i < $media_data['pages']): ?>
                                                 <li class="page-break"></li>
                                             <?php endif; ?>
 
@@ -4220,6 +4573,12 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 <?php
                                 $telegramSettings = $settings['telegram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
                                 $telegramAutoEnabled = ($telegramSettings['auto_post'] ?? 'off') === 'on';
+                                $whatsappSettings = $settings['whatsapp'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
+                                $whatsappAutoEnabled = ($whatsappSettings['auto_post'] ?? 'off') === 'on';
+                                $facebookSettings = $settings['facebook'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
+                                $facebookAutoEnabled = ($facebookSettings['auto_post'] ?? 'off') === 'on';
+                                $twitterSettings = $settings['twitter'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
+                                $twitterAutoEnabled = ($twitterSettings['auto_post'] ?? 'off') === 'on';
                                 ?>
 
                                 <form method="post">
@@ -4320,6 +4679,62 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                     <div class="form-check mb-3">
                                         <input type="checkbox" class="form-check-input" name="telegram_auto" id="telegram_auto" value="1" <?= $telegramAutoEnabled ? 'checked' : '' ?>>
                                         <label for="telegram_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
+                                    </div>
+
+                                    <h4 class="mt-4">WhatsApp (opcional)</h4>
+                                    <p class="text-muted">Usa la API de WhatsApp Business Cloud para avisar a tus contactos o grupos.</p>
+                                    <div class="form-group">
+                                        <label for="whatsapp_token">Token del bot o app</label>
+                                        <input type="text" name="whatsapp_token" id="whatsapp_token" class="form-control" value="<?= htmlspecialchars($whatsappSettings['token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Token de acceso">
+                                        <small class="form-text text-muted">Token generado en Meta Developers para tu número de WhatsApp Business.</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="whatsapp_channel">ID del número de WhatsApp Business</label>
+                                        <input type="text" name="whatsapp_channel" id="whatsapp_channel" class="form-control" value="<?= htmlspecialchars($whatsappSettings['channel'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej: 123456789012345">
+                                        <small class="form-text text-muted">Identificador del número conectado en la API de WhatsApp Cloud (phone number ID).</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="whatsapp_recipient">Número destino</label>
+                                        <input type="text" name="whatsapp_recipient" id="whatsapp_recipient" class="form-control" value="<?= htmlspecialchars($whatsappSettings['recipient'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej: 34600111222">
+                                        <small class="form-text text-muted">Número (con prefijo internacional, sin +) al que se enviará el mensaje.</small>
+                                    </div>
+                                    <div class="form-check mb-3">
+                                        <input type="checkbox" class="form-check-input" name="whatsapp_auto" id="whatsapp_auto" value="1" <?= $whatsappAutoEnabled ? 'checked' : '' ?>>
+                                        <label for="whatsapp_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
+                                    </div>
+
+                                    <h4 class="mt-4">Facebook (opcional)</h4>
+                                    <p class="text-muted">Comparte tus entradas en una página o grupo usando la Graph API.</p>
+                                    <div class="form-group">
+                                        <label for="facebook_token">Token de acceso</label>
+                                        <input type="text" name="facebook_token" id="facebook_token" class="form-control" value="<?= htmlspecialchars($facebookSettings['token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="EAABsb...">
+                                        <small class="form-text text-muted">Usa un token con permisos para publicar en la página objetivo.</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="facebook_channel">ID de página o grupo</label>
+                                        <input type="text" name="facebook_channel" id="facebook_channel" class="form-control" value="<?= htmlspecialchars($facebookSettings['channel'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="1234567890">
+                                        <small class="form-text text-muted">Puedes obtenerlo desde la configuración avanzada de la página.</small>
+                                    </div>
+                                    <div class="form-check mb-3">
+                                        <input type="checkbox" class="form-check-input" name="facebook_auto" id="facebook_auto" value="1" <?= $facebookAutoEnabled ? 'checked' : '' ?>>
+                                        <label for="facebook_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
+                                    </div>
+
+                                    <h4 class="mt-4">Twitter / X (opcional)</h4>
+                                    <p class="text-muted">Publica un tweet con el título y enlace de cada entrada.</p>
+                                    <div class="form-group">
+                                        <label for="twitter_token">Token / Bearer</label>
+                                        <input type="text" name="twitter_token" id="twitter_token" class="form-control" value="<?= htmlspecialchars($twitterSettings['token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Bearer ...">
+                                        <small class="form-text text-muted">Generado desde el portal de desarrolladores de Twitter.</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="twitter_channel">Usuario o ID de cuenta</label>
+                                        <input type="text" name="twitter_channel" id="twitter_channel" class="form-control" value="<?= htmlspecialchars($twitterSettings['channel'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="@usuario">
+                                        <small class="form-text text-muted">El bot publicará en esta cuenta.</small>
+                                    </div>
+                                    <div class="form-check mb-3">
+                                        <input type="checkbox" class="form-check-input" name="twitter_auto" id="twitter_auto" value="1" <?= $twitterAutoEnabled ? 'checked' : '' ?>>
+                                        <label for="twitter_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
                                     </div>
 
                                     <button type="submit" name="save_settings" class="btn btn-primary">Guardar</button>
@@ -4492,17 +4907,35 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                             <?php
 
-                            $image_data = get_images(1, 1000); // Load all images for now
+                            $media_data = get_media_items(1, 1000); // Load all media for now
 
-                            foreach ($image_data['images'] as $image):
+                            foreach ($media_data['items'] as $media):
 
-                                $image_name = basename($image);
+                                $media_name = $media['name'];
+                                $media_relative = $media['relative'];
+                                $media_type = $media['type'];
+                                $media_mime = $media['mime'];
+                                $media_src = 'assets/' . $media_relative;
 
                             ?>
 
                                 <div class="col-md-3 mb-3 gallery-item">
 
-                                    <img src="assets/<?= $image_name ?>" class="img-thumbnail" style="width: 100%; height: 150px; object-fit: cover; cursor: pointer;" data-image-name="<?= $image_name ?>">
+                                    <?php if ($media_type === 'image'): ?>
+                                        <img src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" class="img-thumbnail" style="width: 100%; height: 150px; object-fit: cover; cursor: pointer;" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="image" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>">
+                                    <?php elseif ($media_type === 'video'): ?>
+                                        <div class="video-thumb-wrapper" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="video" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" style="cursor: pointer; position: relative;">
+                                            <video class="img-thumbnail" style="width: 100%; height: 150px; object-fit: cover; pointer-events: none;" muted preload="metadata">
+                                                <source src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" type="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>">
+                                            </video>
+                                            <span class="badge badge-dark video-badge" style="position: absolute; bottom: 8px; right: 12px;">Video</span>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="doc-thumb-wrapper" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="pdf" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" style="cursor: pointer; border: 1px dashed rgba(0,0,0,0.2); border-radius: var(--nammu-radius-md, 12px); padding: 2.5rem 1rem; text-align: center;">
+                                            <i class="fas fa-file-pdf" style="font-size: 3rem; color: #c62828;"></i>
+                                            <div class="small mt-2 text-muted">PDF</div>
+                                        </div>
+                                    <?php endif; ?>
 
                                 </div>
 
@@ -5310,22 +5743,34 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
         
 
-            $('.gallery-item img').on('click', function() {
+            $('.image-gallery').on('click', '[data-media-name]', function() {
 
-                var imageName = $(this).data('image-name');
+                var $media = $(this);
+                var mediaName = $media.data('mediaName');
+                var mediaType = $media.data('mediaType') || 'image';
+                var mediaSrc = $media.data('mediaSrc') || '';
+                var mediaMime = $media.data('mediaMime') || '';
+
+                if (!mediaName) {
+                    return;
+                }
 
                 if (imageTargetMode === 'field') {
 
+                    if (mediaType !== 'image') {
+                        alert('Solo puedes seleccionar imágenes para este campo.');
+                        return;
+                    }
                     var targetId = imageTargetInput || 'image';
                     var $input = $('#' + targetId);
                     if ($input.length) {
                         var prefix = imageTargetPrefix || '';
-                        $input.val(prefix + imageName);
+                        $input.val(prefix + mediaName);
                     }
 
                 } else if (imageTargetMode === 'editor') {
 
-                    insertImageInContent(imageName);
+                    insertMediaInContent(mediaType, mediaSrc, mediaMime);
 
                 }
 
@@ -5333,29 +5778,48 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
             });
 
-        
-
-            function insertImageInContent(imageName) {
+            function insertMediaInContent(type, source, mime) {
+                if (!source) {
+                    source = '';
+                }
                 var contentTextArea = document.querySelector('[data-markdown-editor]') || document.getElementById('content');
                 if (!contentTextArea) {
                     return;
                 }
-                var cursorPosition = typeof contentTextArea.selectionStart === 'number' ? contentTextArea.selectionStart : contentTextArea.value.length;
-                var content = contentTextArea.value;
-                var textToInsert = '![](assets/' + imageName + ')';
-                contentTextArea.value = content.substring(0, cursorPosition) + textToInsert + content.substring(cursorPosition);
-                if (typeof contentTextArea.setSelectionRange === 'function') {
-                    var newPos = cursorPosition + textToInsert.length;
-                    contentTextArea.focus();
-                    contentTextArea.setSelectionRange(newPos, newPos);
+                var snippet = '';
+                if (type === 'video') {
+                    var safeSource = source;
+                    var sourceTag = mime ? '        <source src="' + safeSource + '" type="' + mime + '">' : '        <source src="' + safeSource + '">';
+                    snippet = '\n\n<div class="embedded-video">\n    <video controls preload="metadata">\n' + sourceTag + '\n    </video>\n</div>\n\n';
+                } else if (type === 'pdf') {
+                    var pdfSrc = source.indexOf('#') === -1 ? source + '#toolbar=0&view=FitH' : source;
+                    snippet = '\n\n<div class="embedded-pdf">\n    <iframe src="' + pdfSrc + '" title="Documento PDF" loading="lazy" allowfullscreen></iframe>\n</div>\n\n';
+                } else {
+                    snippet = '![](' + source + ')';
+                }
+                insertTextAtCursor(contentTextArea, snippet);
+            }
+
+            function insertTextAtCursor(textarea, text) {
+                if (!textarea) {
+                    return;
+                }
+                var start = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : textarea.value.length;
+                var end = typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : start;
+                var value = textarea.value;
+                textarea.value = value.substring(0, start) + text + value.substring(end);
+                var cursorPosition = start + text.length;
+                if (typeof textarea.setSelectionRange === 'function') {
+                    textarea.focus();
+                    textarea.setSelectionRange(cursorPosition, cursorPosition);
                 }
                 try {
                     var event = new Event('input', { bubbles: true });
-                    contentTextArea.dispatchEvent(event);
+                    textarea.dispatchEvent(event);
                 } catch (evtError) {
                     var legacy = document.createEvent('Event');
                     legacy.initEvent('input', true, true);
-                    contentTextArea.dispatchEvent(legacy);
+                    textarea.dispatchEvent(legacy);
                 }
             }
 

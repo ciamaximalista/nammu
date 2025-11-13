@@ -310,20 +310,28 @@ class MarkdownConverter
 
             $escaped = htmlspecialchars($segment, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
-            $escaped = preg_replace_callback('/!\[([^\]]*)\]\(([^)]+)\)/', function ($matches) {
+            $placeholders = [];
+            $placeholderIndex = 0;
+            $storePlaceholder = function (string $html) use (&$placeholders, &$placeholderIndex): string {
+                $token = '[[NAMMU_PLACEHOLDER_' . $placeholderIndex++ . ']]';
+                $placeholders[$token] = $html;
+                return $token;
+            };
+
+            $escaped = preg_replace_callback('/!\[([^\]]*)\]\(([^)]+)\)/', function ($matches) use ($storePlaceholder) {
                 $alt = $matches[1];
                 $url = htmlspecialchars(trim($matches[2]), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-                return '<img src="' . $url . '" alt="' . $alt . '">';
+                return $storePlaceholder('<img src="' . $url . '" alt="' . $alt . '">');
             }, $escaped);
 
-            $escaped = preg_replace_callback('/\[([^\]]+)\]\(([^)]+)\)/', function ($matches) {
+            $escaped = preg_replace_callback('/\[([^\]]+)\]\(([^)]+)\)/', function ($matches) use ($storePlaceholder) {
                 $text = $matches[1];
                 $url = htmlspecialchars(trim($matches[2]), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-                return '<a href="' . $url . '">' . $text . '</a>';
+                return $storePlaceholder('<a href="' . $url . '">' . $text . '</a>');
             }, $escaped);
 
-            $escaped = preg_replace_callback('/`([^`]+)`/', function ($matches) {
-                return '<code>' . $matches[1] . '</code>';
+            $escaped = preg_replace_callback('/`([^`]+)`/', function ($matches) use ($storePlaceholder) {
+                return $storePlaceholder('<code>' . $matches[1] . '</code>');
             }, $escaped);
 
             $escaped = preg_replace('/\*\*\*(.+?)\*\*\*/s', '<strong><em>$1</em></strong>', $escaped);
@@ -333,6 +341,10 @@ class MarkdownConverter
             $escaped = preg_replace('/\*(.+?)\*/s', '<em>$1</em>', $escaped);
             $escaped = preg_replace('/_(.+?)_/s', '<em>$1</em>', $escaped);
             $escaped = preg_replace('/~~(.+?)~~/s', '<del>$1</del>', $escaped);
+
+            if (!empty($placeholders)) {
+                $escaped = strtr($escaped, $placeholders);
+            }
 
             $escaped = $this->convertSuperscript($escaped);
 

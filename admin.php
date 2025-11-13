@@ -1158,12 +1158,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $filenameInput = trim($_POST['filename'] ?? '');
         $isDraft = isset($_POST['save_draft']);
         $statusValue = $isDraft ? 'draft' : 'published';
+        $slugPattern = '/^[a-z0-9-]+$/i';
+
+        if ($filenameInput !== '' && !preg_match($slugPattern, $filenameInput)) {
+            $error = 'El slug solo puede contener letras, números y guiones medios.';
+        }
 
         if ($filenameInput === '' && $title !== '') {
             $filenameInput = $title;
         }
 
-        $filename = nammu_unique_filename($filenameInput);
+        if ($error === null) {
+            $filename = nammu_unique_filename($filenameInput);
+        } else {
+            $filename = '';
+        }
 
         $all_posts = get_all_posts_metadata();
         $max_ordo = 0;
@@ -1269,7 +1278,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $targetFilename = $normalizedFilename;
         $renameRequested = false;
-        if ($newFilenameInput !== '') {
+        $slugPattern = '/^[a-z0-9-]+$/i';
+        if ($newFilenameInput !== '' && !preg_match($slugPattern, $newFilenameInput)) {
+            $error = 'El nuevo slug solo puede contener letras, números y guiones medios.';
+        }
+        if ($error === null && $newFilenameInput !== '') {
             $desiredSlug = nammu_slugify($newFilenameInput);
             if ($desiredSlug === '' && $title !== '') {
                 $desiredSlug = nammu_slugify($title);
@@ -3425,7 +3438,18 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                         <label for="filename">Slug del post (nombre de archivo sin .md)</label>
 
-                                        <input type="text" name="filename" id="filename" class="form-control" required>
+                                        <input type="text"
+                                               name="filename"
+                                               id="filename"
+                                               class="form-control"
+                                               required
+                                               pattern="[a-z0-9-]+"
+                                               inputmode="text"
+                                               autocomplete="off"
+                                               autocapitalize="none"
+                                               spellcheck="false"
+                                               data-slug-input="1"
+                                               placeholder="mi-slug">
 
                                     </div>
 
@@ -3766,6 +3790,12 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                name="new_filename"
                                                id="new_filename"
                                                class="form-control"
+                                               pattern="[a-z0-9-]+"
+                                               inputmode="text"
+                                               autocomplete="off"
+                                               autocapitalize="none"
+                                               spellcheck="false"
+                                               data-slug-input="1"
                                                value="<?= htmlspecialchars(pathinfo($safeEditFilename, PATHINFO_FILENAME), ENT_QUOTES, 'UTF-8') ?>">
                                         <small class="form-text text-muted">Opcional. Úsalo para cambiar la URL del contenido.</small>
                                     </div>
@@ -6861,6 +6891,31 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
         </script>
 
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var slugInputs = document.querySelectorAll('[data-slug-input]');
+            if (!slugInputs.length) {
+                return;
+            }
+            function sanitizeSlug(value) {
+                var normalized = (value || '').toString().toLowerCase();
+                normalized = normalized.replace(/[^a-z0-9-]+/g, '-');
+                normalized = normalized.replace(/-{2,}/g, '-');
+                normalized = normalized.replace(/^-+/, '').replace(/-+$/, '');
+                return normalized;
+            }
+            slugInputs.forEach(function(input) {
+                var applySanitizedValue = function() {
+                    var sanitized = sanitizeSlug(input.value);
+                    if (input.value !== sanitized) {
+                        input.value = sanitized;
+                    }
+                };
+                input.addEventListener('input', applySanitizedValue);
+                input.addEventListener('blur', applySanitizedValue);
+            });
+        });
+        </script>
         <script>
         document.addEventListener('DOMContentLoaded', function() {
             var deleteModal = $('#deletePostModal');

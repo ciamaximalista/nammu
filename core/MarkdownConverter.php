@@ -313,7 +313,7 @@ class MarkdownConverter
             $placeholders = [];
             $placeholderIndex = 0;
             $storePlaceholder = function (string $html) use (&$placeholders, &$placeholderIndex): string {
-                $token = '[[NAMMU_PLACEHOLDER_' . $placeholderIndex++ . ']]';
+                $token = '[[NAMMU|PLACEHOLDER|' . $placeholderIndex++ . ']]';
                 $placeholders[$token] = $html;
                 return $token;
             };

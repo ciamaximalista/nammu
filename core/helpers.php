@@ -187,6 +187,22 @@ function nammu_template_settings(): array
     if (!in_array($searchConfig['floating'], ['off', 'on'], true)) {
         $searchConfig['floating'] = $searchDefaults['floating'];
     }
+    $entryDefaults = $defaults['entry']['toc'] ?? ['auto' => 'off', 'min_headings' => 3];
+    $entryTemplateConfig = $template['entry']['toc'] ?? [];
+    $entryAuto = $entryTemplateConfig['auto'] ?? $entryDefaults['auto'];
+    if (!in_array($entryAuto, ['on', 'off'], true)) {
+        $entryAuto = $entryDefaults['auto'];
+    }
+    $entryMin = (int) ($entryTemplateConfig['min_headings'] ?? $entryDefaults['min_headings']);
+    if (!in_array($entryMin, [2, 3, 4], true)) {
+        $entryMin = $entryDefaults['min_headings'];
+    }
+    $entryConfig = [
+        'toc' => [
+            'auto' => $entryAuto,
+            'min_headings' => $entryMin,
+        ],
+    ];
 
     return [
         'fonts' => $fonts,
@@ -201,6 +217,7 @@ function nammu_template_settings(): array
         'author' => $author,
         'blog' => $blog,
         'search' => $searchConfig,
+        'entry' => $entryConfig,
     ];
 }
 
@@ -252,6 +269,12 @@ function nammu_default_template_settings(): array
             'mode' => 'single',
             'position' => 'footer',
             'floating' => 'off',
+        ],
+        'entry' => [
+            'toc' => [
+                'auto' => 'off',
+                'min_headings' => 3,
+            ],
         ],
     ];
 }

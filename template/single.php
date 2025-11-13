@@ -21,6 +21,7 @@ $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
+$autoTocHtml = isset($autoTocHtml) ? trim((string) $autoTocHtml) : '';
 $renderSearchBox = static function (string $variant) use ($searchAction, $colorHighlight, $colorAccent, $colorText, $searchActionBase, $letterIndexUrlValue, $showLetterButton): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
@@ -179,6 +180,12 @@ if ($isPageTemplate && $formattedDate !== '') {
         </figure>
     <?php endif; ?>
     <div class="post-body">
+        <?php if ($autoTocHtml !== ''): ?>
+            <section class="post-toc-block" aria-label="Índice de contenidos">
+                <div class="post-toc-heading">Contenido</div>
+                <?= $autoTocHtml ?>
+            </section>
+        <?php endif; ?>
         <?= $htmlContent ?>
     </div>
     <?php if ($bottomMetaText !== ''): ?>
@@ -450,6 +457,45 @@ if ($isPageTemplate && $formattedDate !== '') {
     .embedded-pdf iframe {
         background: #fff;
         height: clamp(480px, 70vh, 900px);
+    }
+    .post-toc-block {
+        margin: 0 auto 2rem;
+        max-width: min(760px, 100%);
+        padding: 1.25rem 1.5rem;
+        border-radius: var(--nammu-radius-md);
+        background: <?= $colorHighlight ?>;
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+    .post-toc-heading {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 600;
+        color: <?= $colorAccent ?>;
+        margin-bottom: 0.65rem;
+    }
+    .nammu-toc {
+        margin: 0;
+        padding-left: 0;
+    }
+    .nammu-toc .toc-level {
+        list-style: none;
+        margin: 0;
+        padding-left: 1.25rem;
+    }
+    .nammu-toc .toc-level-1 {
+        padding-left: 0;
+    }
+    .nammu-toc li {
+        margin: 0.3rem 0;
+        line-height: 1.4;
+    }
+    .nammu-toc a {
+        color: <?= $colorAccent ?>;
+        text-decoration: none;
+    }
+    .nammu-toc a:hover {
+        text-decoration: underline;
     }
     .post-meta-update {
         margin: 2rem auto 0;

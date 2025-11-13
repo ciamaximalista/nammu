@@ -331,6 +331,22 @@ function get_settings() {
     $searchConfig['mode'] = $searchMode;
     $searchConfig['position'] = $searchPosition;
     $searchConfig['floating'] = $searchFloating;
+    $entryTocDefaults = $defaults['entry']['toc'] ?? ['auto' => 'off', 'min_headings' => 3];
+    $entryTemplateToc = $templateConfig['entry']['toc'] ?? [];
+    $entryAuto = $entryTemplateToc['auto'] ?? $entryTocDefaults['auto'];
+    if (!in_array($entryAuto, ['on', 'off'], true)) {
+        $entryAuto = $entryTocDefaults['auto'];
+    }
+    $entryMin = (int) ($entryTemplateToc['min_headings'] ?? $entryTocDefaults['min_headings']);
+    if (!in_array($entryMin, [2, 3, 4], true)) {
+        $entryMin = $entryTocDefaults['min_headings'];
+    }
+    $entry = [
+        'toc' => [
+            'auto' => $entryAuto,
+            'min_headings' => $entryMin,
+        ],
+    ];
 
     $socialDefaults = [
         'default_description' => '',
@@ -377,6 +393,7 @@ function get_settings() {
             'global' => $global,
             'home' => $home,
             'search' => $searchConfig,
+            'entry' => $entry,
         ],
         'social' => $social,
         'account' => $account,
@@ -384,6 +401,7 @@ function get_settings() {
         'whatsapp' => $whatsapp,
         'facebook' => $facebook,
         'twitter' => $twitter,
+        'entry' => $entry,
     ];
 }
 
@@ -846,6 +864,12 @@ function get_default_template_settings(): array {
             'mode' => 'none',
             'position' => 'title',
             'floating' => 'off',
+        ],
+        'entry' => [
+            'toc' => [
+                'auto' => 'off',
+                'min_headings' => 3,
+            ],
         ],
     ];
 }
@@ -1808,6 +1832,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($searchFloatingPosted, ['off', 'on'], true)) {
             $searchFloatingPosted = $searchDefaults['floating'] ?? 'off';
         }
+        $entryTocDefaults = $defaults['entry']['toc'] ?? ['auto' => 'off', 'min_headings' => 3];
+        $entryAutoPosted = $_POST['entry_toc_auto'] ?? ($entryTocDefaults['auto'] ?? 'off');
+        if (!in_array($entryAutoPosted, ['on', 'off'], true)) {
+            $entryAutoPosted = $entryTocDefaults['auto'] ?? 'off';
+        }
+        $entryMinPosted = (int) ($_POST['entry_toc_min'] ?? ($entryTocDefaults['min_headings'] ?? 3));
+        if (!in_array($entryMinPosted, [2, 3, 4], true)) {
+            $entryMinPosted = $entryTocDefaults['min_headings'] ?? 3;
+        }
 
         $config['template'] = [
             'fonts' => $fonts,
@@ -1836,6 +1869,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'mode' => $searchModePosted,
                 'position' => $searchPositionPosted,
                 'floating' => $searchFloatingPosted,
+            ],
+            'entry' => [
+                'toc' => [
+                    'auto' => $entryAutoPosted,
+                    'min_headings' => $entryMinPosted,
+                ],
             ],
         ];
 
@@ -3886,11 +3925,18 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                         <?php elseif ($page === 'template'): ?>
 
                             <?php
-                            $templateSettings = $settings['template'] ?? get_default_template_settings();
+                            $defaults = get_default_template_settings();
+                            $templateSettings = $settings['template'] ?? $defaults;
                             $fontTitle = $templateSettings['fonts']['title'] ?? '';
                             $fontBody = $templateSettings['fonts']['body'] ?? '';
                             $fontCode = $templateSettings['fonts']['code'] ?? '';
                             $fontQuote = $templateSettings['fonts']['quote'] ?? '';
+                            $entryTemplateToc = $templateSettings['entry']['toc'] ?? ($defaults['entry']['toc'] ?? ['auto' => 'off', 'min_headings' => 3]);
+                            $entryTocAutoEnabled = ($entryTemplateToc['auto'] ?? 'off') === 'on';
+                            $entryTocMinHeadings = (int) ($entryTemplateToc['min_headings'] ?? 3);
+                            if (!in_array($entryTocMinHeadings, [2, 3, 4], true)) {
+                                $entryTocMinHeadings = 3;
+                            }
                             $templateColors = $templateSettings['colors'] ?? [];
                             $templateImages = $templateSettings['images'] ?? [];
                             $logoImage = $templateImages['logo'] ?? '';
@@ -3913,7 +3959,6 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 'code_background' => 'Color de fondo de código',
                                 'code_text' => 'Color del código',
                             ];
-                            $defaults = get_default_template_settings();
                             $templateGlobal = $templateSettings['global'] ?? $defaults['global'];
                             $homeColumns = (int)($templateHome['columns'] ?? $defaults['home']['columns']);
                             if ($homeColumns < 1 || $homeColumns > 3) {
@@ -4576,7 +4621,43 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                     </span>
                                                 </label>
                                             <?php endforeach; ?>
+                                    </div>
+
+                                    <h4 class="mt-4">Entrada</h4>
+                                    <p class="text-muted">Configura si las entradas mostrarán un índice de contenidos automáticamente.</p>
+                                    <div class="form-group" data-entry-toc-toggle>
+                                        <label class="d-block">Índice de contenidos por defecto</label>
+                                        <div class="btn-group btn-group-sm btn-group-toggle" role="group" data-toggle="buttons">
+                                            <label class="btn btn-outline-primary <?= $entryTocAutoEnabled ? 'active' : '' ?>">
+                                                <input type="radio"
+                                                    name="entry_toc_auto"
+                                                    value="on"
+                                                    class="sr-only"
+                                                    autocomplete="off"
+                                                    <?= $entryTocAutoEnabled ? 'checked' : '' ?>>
+                                                Sí
+                                            </label>
+                                            <label class="btn btn-outline-primary <?= !$entryTocAutoEnabled ? 'active' : '' ?>">
+                                                <input type="radio"
+                                                    name="entry_toc_auto"
+                                                    value="off"
+                                                    class="sr-only"
+                                                    autocomplete="off"
+                                                    <?= !$entryTocAutoEnabled ? 'checked' : '' ?>>
+                                                No
+                                            </label>
                                         </div>
+                                    </div>
+                                    <div class="form-group" data-entry-toc-options <?= $entryTocAutoEnabled ? '' : 'style="display:none;"' ?>>
+                                        <label for="entry_toc_min">Mostrar a partir de</label>
+                                        <select name="entry_toc_min" id="entry_toc_min" class="form-control" style="max-width: 240px;">
+                                            <option value="2" <?= $entryTocMinHeadings === 2 ? 'selected' : '' ?>>2 encabezados</option>
+                                            <option value="3" <?= $entryTocMinHeadings === 3 ? 'selected' : '' ?>>3 encabezados</option>
+                                            <option value="4" <?= $entryTocMinHeadings === 4 ? 'selected' : '' ?>>4 o más encabezados</option>
+                                        </select>
+                                    </div>
+                                    <small class="form-text text-muted mb-3">Si desactivas el índice automático, puedes insertarlo manualmente dentro de cada entrada usando las etiquetas <code>[toc]</code> o <code>[TOC]</code>.</small>
+
                                     </div>
 
                                     <h4 class="mt-4">Footer</h4>
@@ -5316,6 +5397,20 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
             });
             refreshBlocksSelection();
+
+            var entryTocToggle = form.querySelector('[data-entry-toc-toggle]');
+            var entryTocOptions = form.querySelector('[data-entry-toc-options]');
+            if (entryTocToggle && entryTocOptions) {
+                function refreshEntryTocOptions() {
+                    var checked = entryTocToggle.querySelector('input[name="entry_toc_auto"]:checked');
+                    var shouldShow = checked && checked.value === 'on';
+                    entryTocOptions.style.display = shouldShow ? '' : 'none';
+                }
+                entryTocToggle.querySelectorAll('input[name="entry_toc_auto"]').forEach(function(radio) {
+                    radio.addEventListener('change', refreshEntryTocOptions);
+                });
+                refreshEntryTocOptions();
+            }
 
             var postsInput = document.getElementById('home_per_page');
             var postsAllToggle = document.getElementById('home_per_page_all');

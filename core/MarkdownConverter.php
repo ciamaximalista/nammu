@@ -6,11 +6,25 @@ class MarkdownConverter
 {
     private const TOC_TOKEN = '__NAMMU_TOC_PLACEHOLDER__';
 
-    public function toHtml(string $markdown): string
+    public function toHtml(string $markdown, bool $renderToc = true): string
+    {
+        $document = $this->convertDocument($markdown, $renderToc);
+        return $document['html'];
+    }
+
+    /**
+     * @return array{html: string, headings: array<int, array<string, mixed>>, toc_html: string, has_manual_toc: bool}
+     */
+    public function convertDocument(string $markdown, bool $renderToc = true): array
     {
         $markdown = str_replace(["\r\n", "\r"], "\n", trim($markdown));
         if ($markdown === '') {
-            return '';
+            return [
+                'html' => '',
+                'headings' => [],
+                'toc_html' => '',
+                'has_manual_toc' => false,
+            ];
         }
 
         $lines = explode("\n", $markdown);
@@ -259,12 +273,19 @@ class MarkdownConverter
         $flushCodeBlock();
 
         $document = implode("\n", $html);
+        $tocHtml = '';
         if ($tocRequested) {
             $tocHtml = $this->renderToc($headings);
-            $document = str_replace(self::TOC_TOKEN, $tocHtml, $document);
+            $replacement = $renderToc ? $tocHtml : '';
+            $document = str_replace(self::TOC_TOKEN, $replacement, $document);
         }
 
-        return $document;
+        return [
+            'html' => $document,
+            'headings' => $headings,
+            'toc_html' => $tocHtml,
+            'has_manual_toc' => $tocRequested,
+        ];
     }
 
     private function convertInline(string $text): string
@@ -391,6 +412,11 @@ class MarkdownConverter
         $lower = function_exists('mb_strtolower') ? mb_strtolower($decoded, 'UTF-8') : strtolower($decoded);
         $lower = preg_replace('/[^a-z0-9]+/i', '-', $lower) ?? '';
         return trim($lower, '-');
+    }
+
+    public function buildToc(array $headings): string
+    {
+        return $this->renderToc($headings);
     }
 
     private function renderToc(array $headings): string

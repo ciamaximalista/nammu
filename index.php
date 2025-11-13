@@ -542,12 +542,40 @@ if ($slug !== null && $slug !== '') {
         $renderNotFound('Contenido no encontrado', 'La página solicitada no se encuentra disponible.', $routePath);
     }
 
-    $converted = $markdown->toHtml($post->getContent());
+    $documentData = $markdown->convertDocument($post->getContent());
+    $converted = $documentData['html'];
+    $autoTocHtml = '';
+    $entryTocConfig = $theme['entry']['toc'] ?? ['auto' => 'off', 'min_headings' => 3];
+    $autoTocEnabled = ($entryTocConfig['auto'] ?? 'off') === 'on';
+    $entryMinHeadings = (int) ($entryTocConfig['min_headings'] ?? 3);
+    if (!in_array($entryMinHeadings, [2, 3, 4], true)) {
+        $entryMinHeadings = 3;
+    }
+    $postTemplateName = strtolower($post->getTemplate());
+    $renderableHeadings = array_filter($documentData['headings'], static function (array $heading): bool {
+        return isset($heading['id'], $heading['text'], $heading['level'])
+            && $heading['id'] !== ''
+            && $heading['text'] !== ''
+            && (int) $heading['level'] >= 1
+            && (int) $heading['level'] <= 4;
+    });
+    if (
+        $autoTocEnabled
+        && !$documentData['has_manual_toc']
+        && $postTemplateName !== 'page'
+        && count($renderableHeadings) >= $entryMinHeadings
+    ) {
+        $generatedToc = $markdown->buildToc($documentData['headings']);
+        if ($generatedToc !== '') {
+            $autoTocHtml = $generatedToc;
+        }
+    }
     $content = $renderer->render('single', [
         'pageTitle' => $post->getTitle(),
         'post' => $post,
         'htmlContent' => $converted,
         'postFilePath' => __DIR__ . '/content/' . $post->getSlug() . '.md',
+        'autoTocHtml' => $autoTocHtml,
     ]);
 
     $postImage = nammu_resolve_asset($post->getImage(), $publicBaseUrl);

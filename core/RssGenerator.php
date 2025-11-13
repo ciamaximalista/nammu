@@ -26,7 +26,9 @@ class RssGenerator
             $title = htmlspecialchars($post->getTitle(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             $description = $post->getDescription();
 
-            $contentHtml = $markdownConverter->toHtml($post->getContent());
+            $documentData = $markdownConverter->convertDocument($post->getContent(), false);
+            $contentHtml = $documentData['html'];
+            $contentHtml = $this->replaceEmbeddedMediaWithLinks($contentHtml);
             $contentHtml = $this->absolutizeHtmlLinks($contentHtml);
             $contentForFeed = $contentHtml !== '' ? $contentHtml : htmlspecialchars($post->getContent(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
@@ -182,5 +184,89 @@ XML;
             'svg' => 'image/svg+xml',
             default => 'image/jpeg',
         };
+    }
+
+    private function replaceEmbeddedMediaWithLinks(string $html): string
+    {
+        if (trim($html) === '') {
+            return $html;
+        }
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+        $previous = libxml_use_internal_errors(true);
+        $wrapped = '<div id="rss-media-wrapper">' . $html . '</div>';
+        $flags = LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD;
+        $loaded = @$dom->loadHTML('<?xml encoding="UTF-8"?>' . $wrapped, $flags);
+        if (!$loaded) {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+            return $html;
+        }
+        $xpath = new \DOMXPath($dom);
+        $nodes = $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " embedded-video ") or contains(concat(" ", normalize-space(@class), " "), " embedded-pdf ")]');
+        if ($nodes !== false) {
+            foreach ($nodes as $node) {
+                if (!$node instanceof \DOMElement) {
+                    continue;
+                }
+                $source = $this->extractMediaSource($node);
+                if ($source === null) {
+                    continue;
+                }
+                $classAttr = ' ' . $node->getAttribute('class') . ' ';
+                $mediaType = str_contains($classAttr, ' embedded-pdf ') ? 'pdf' : (str_contains($classAttr, ' embedded-video ') ? 'video' : 'media');
+                $absolute = $this->normalizeUrl($source);
+                $label = match ($mediaType) {
+                    'video' => 'Vídeo',
+                    'pdf' => 'Documento PDF',
+                    default => 'Recurso',
+                };
+                $paragraph = $dom->createElement('p');
+                $paragraph->setAttribute('class', 'rss-media-link');
+                $strong = $dom->createElement('strong', $label . ':');
+                $paragraph->appendChild($strong);
+                $paragraph->appendChild($dom->createTextNode(' '));
+                $anchor = $dom->createElement('a', $absolute);
+                $anchor->setAttribute('href', $absolute);
+                $paragraph->appendChild($anchor);
+                if ($node->parentNode !== null) {
+                    $node->parentNode->replaceChild($paragraph, $node);
+                }
+            }
+        }
+        $wrapper = $dom->getElementById('rss-media-wrapper');
+        $output = '';
+        if ($wrapper !== null) {
+            foreach ($wrapper->childNodes as $child) {
+                $output .= $dom->saveHTML($child);
+            }
+        } else {
+            $output = $html;
+        }
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+        return $output;
+    }
+
+    private function extractMediaSource(\DOMElement $element): ?string
+    {
+        if ($element->hasAttribute('src')) {
+            $src = trim($element->getAttribute('src'));
+            if ($src !== '') {
+                return $src;
+            }
+        }
+        foreach (['video', 'iframe', 'source'] as $tag) {
+            $children = $element->getElementsByTagName($tag);
+            foreach ($children as $child) {
+                if (!$child instanceof \DOMElement) {
+                    continue;
+                }
+                $candidate = trim($child->getAttribute('src'));
+                if ($candidate !== '') {
+                    return $candidate;
+                }
+            }
+        }
+        return null;
     }
 }

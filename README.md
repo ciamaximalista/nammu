@@ -9,7 +9,7 @@ Nammu es un motor ligero para blogs y diccionarios online que reutiliza la estru
 - Panel de administración (`admin.php`) para crear y editar entradas/páginas en Markdown.
 - Gestión directa de recursos multimedia (carpeta `assets/`), con recorte básico, control de intensidad de color, brillo y contraste y filtro de pixelado.
 - Plantillas configurables desde la administración: tipografías Google Fonts, colores, cabeceras, maquetación de portada, footer, meta etiquetas sociales y logotipo flotante.
-- Generación automática de `rss.xml`  (RSS 2.0) con imágenes destacadas y compatibilidad con URLs amigables.
+- Generación automática de `rss.xml`  (RSS 2.0) con imágenes destacadas, limpieza de etiquetas `[toc]/[TOC]` y reemplazo de vídeos/PDF incrustados por enlaces absolutos para máxima compatibilidad con lectores.
 - Generación automática de `sitemap.xml` para facilitar la indexación por Google y otros buscadores.
 - Parseador Markdown extensible con soporte para listas, encabezados, enlaces, imágenes, código en línea, bloques de cita y bloques de código.
 - Buscador avanzado (`buscar.php`) con soporte para frases exactas, exclusiones con `-palabra`, filtros por campos (`title:`, `category:`, `content:`), selector de tipo (entradas/páginas) e integración visual configurable desde la plantilla.
@@ -19,6 +19,7 @@ Nammu es un motor ligero para blogs y diccionarios online que reutiliza la estru
 - Integración opcional con Telegram, WhatsApp Cloud API, Facebook Pages y Twitter/X para enviarlas automáticamente al publicar (también se puede reenviar manualmente desde la tabla de “Editar”).
 - Índice alfabético: al elegir la ordenación alfabética en Configuración, la portada agrupa las entradas por letra (A, B, C…, “Otros”), se activa el índice de letras (`/letras`) y las vistas por letra (`/letra/{slug}`) que reutilizan la maquetación elegida.
 - Parseador Markdown con extras: soporta código en bloque (```` ``` ````), blockquotes, superíndices con `^texto`, tachado con `~~`, negrita/cursiva combinadas y genera automáticamente una **tabla de contenidos** cuando encuentra `[toc]` o `[TOC]`, enlazando con los títulos `h1–h4`.
+- Bloque “Entrada” dentro de la pestaña Plantilla para decidir si las entradas muestran un índice de contenidos por defecto (a partir de 2, 3 o 4 encabezados). El sistema añade el TOC en entradas publicadas y borradores, pero respeta las etiquetas `[toc]/[TOC]` si ya las incluiste manualmente.
 - Tratamiento diferenciado de entradas y páginas: las páginas usan la misma ruta amigable `/slug`, pero muestran cintillas de actualización específicas (con fecha calculada a partir del YAML o, si falta, de los metadatos del archivo) y pueden compartir maquetación con las entradas según la plantilla elegida.
 - Modo borradores: desde “Publicar” puedes guardar contenidos como borrador; la pestaña “Editar” incorpora un filtro “Entradas | Páginas | Borradores” y las entradas en borrador quedan fuera de RSS, sitemap, índices, búsqueda y portada. Si accedes por URL directa, el post muestra un sello rojo “Borrador” en la vista individual.
 - Compatible con la estructura de directorios de PicoCMS (`content/` y `assets/`), lo que simplifica migraciones.

@@ -539,6 +539,21 @@ function admin_cached_telegram_settings(): array {
     return admin_cached_social_settings('telegram');
 }
 
+function admin_is_social_network_configured(string $network, array $settings): bool {
+    switch ($network) {
+        case 'telegram':
+            return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
+        case 'whatsapp':
+            return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '' && ($settings['recipient'] ?? '') !== '';
+        case 'facebook':
+            return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
+        case 'twitter':
+            return ($settings['token'] ?? '') !== '';
+        default:
+            return false;
+    }
+}
+
 function admin_send_post_to_telegram(string $slug, string $title, string $description, array $telegramSettings): bool {
     $token = $telegramSettings['token'] ?? '';
     $channel = $telegramSettings['channel'] ?? '';
@@ -770,16 +785,16 @@ function admin_maybe_auto_post_to_social_networks(string $filename, string $titl
         $slug = $filename;
     }
     $settings = admin_cached_social_settings();
-    if (($settings['telegram']['auto_post'] ?? 'off') === 'on') {
+    if (($settings['telegram']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('telegram', $settings['telegram'])) {
         admin_send_post_to_telegram($slug, $title, $description, $settings['telegram']);
     }
-    if (($settings['whatsapp']['auto_post'] ?? 'off') === 'on') {
+    if (($settings['whatsapp']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('whatsapp', $settings['whatsapp'])) {
         admin_send_whatsapp_post($slug, $title, $description, $settings['whatsapp']);
     }
-    if (($settings['facebook']['auto_post'] ?? 'off') === 'on') {
+    if (($settings['facebook']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('facebook', $settings['facebook'])) {
         admin_send_facebook_post($slug, $title, $description, $settings['facebook']);
     }
-    if (($settings['twitter']['auto_post'] ?? 'off') === 'on') {
+    if (($settings['twitter']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('twitter', $settings['twitter'])) {
         admin_send_twitter_post($slug, $title, $description, $settings['twitter']);
     }
 }
@@ -1064,11 +1079,11 @@ if (!is_array($accountFeedback) || !isset($accountFeedback['message'], $accountF
 } else {
     unset($_SESSION['account_feedback']);
 }
-$telegramFeedback = $_SESSION['telegram_feedback'] ?? null;
-if (!is_array($telegramFeedback) || !isset($telegramFeedback['message'], $telegramFeedback['type'])) {
-    $telegramFeedback = null;
+$socialFeedback = $_SESSION['social_feedback'] ?? null;
+if (!is_array($socialFeedback) || !isset($socialFeedback['message'], $socialFeedback['type'])) {
+    $socialFeedback = null;
 } else {
-    unset($_SESSION['telegram_feedback']);
+    unset($_SESSION['social_feedback']);
 }
 $assetFeedback = $_SESSION['asset_feedback'] ?? null;
 if (!is_array($assetFeedback) || !isset($assetFeedback['message'], $assetFeedback['type'])) {
@@ -1327,12 +1342,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
-    } elseif (isset($_POST['send_telegram_post'])) {
-        $filename = $_POST['telegram_filename'] ?? '';
-        $filename = nammu_normalize_filename($filename);
-        $templateTarget = $_POST['telegram_template'] ?? 'single';
+    } elseif (isset($_POST['send_social_post'])) {
+        $networkKey = $_POST['social_network'] ?? '';
+        $filename = $_POST['social_filename'] ?? '';
+        $templateTarget = $_POST['social_template'] ?? 'single';
         $templateTarget = in_array($templateTarget, ['single', 'page', 'draft'], true) ? $templateTarget : 'single';
         $redirectTemplate = urlencode($templateTarget);
+        $networkLabels = [
+            'telegram' => 'Telegram',
+            'whatsapp' => 'WhatsApp',
+            'facebook' => 'Facebook',
+            'twitter' => 'X',
+        ];
+        if (!isset($networkLabels[$networkKey])) {
+            $_SESSION['social_feedback'] = ['type' => 'danger', 'message' => 'Red social no válida.'];
+            header('Location: admin.php?page=edit&template=' . $redirectTemplate);
+            exit;
+        }
+        $filename = nammu_normalize_filename($filename);
         $feedback = [
             'type' => 'danger',
             'message' => 'No se pudo encontrar la entrada solicitada.',
@@ -1343,28 +1370,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $metadata = $postData['metadata'] ?? [];
                 $template = strtolower($metadata['Template'] ?? 'post');
                 if (in_array($template, ['single', 'post'], true)) {
-                    $telegram = admin_cached_telegram_settings();
-                    if (($telegram['token'] ?? '') === '' || ($telegram['channel'] ?? '') === '') {
-                        $feedback['message'] = 'Configura el token y el canal de Telegram en la pestaña Configuración antes de enviar.';
+                    $slug = pathinfo($filename, PATHINFO_FILENAME);
+                    $slug = $slug !== '' ? $slug : $filename;
+                    $title = $metadata['Title'] ?? $slug;
+                    $description = $metadata['Description'] ?? '';
+                    $allSocialSettings = admin_cached_social_settings();
+                    $networkSettings = $allSocialSettings[$networkKey] ?? [];
+                    if (!admin_is_social_network_configured($networkKey, $networkSettings)) {
+                        $feedback['message'] = 'Configura correctamente ' . $networkLabels[$networkKey] . ' en la pestaña Configuración antes de enviar.';
                     } else {
-                        $slug = pathinfo($filename, PATHINFO_FILENAME);
-                        $title = $metadata['Title'] ?? $slug;
-                        $description = $metadata['Description'] ?? '';
-                        if (admin_send_post_to_telegram($slug, $title, $description, $telegram)) {
+                        $sent = false;
+                        switch ($networkKey) {
+                            case 'telegram':
+                                $sent = admin_send_post_to_telegram($slug, $title, $description, $networkSettings);
+                                break;
+                            case 'whatsapp':
+                                $sent = admin_send_whatsapp_post($slug, $title, $description, $networkSettings);
+                                break;
+                            case 'facebook':
+                                $sent = admin_send_facebook_post($slug, $title, $description, $networkSettings);
+                                break;
+                            case 'twitter':
+                                $sent = admin_send_twitter_post($slug, $title, $description, $networkSettings);
+                                break;
+                        }
+                        if ($sent) {
                             $feedback = [
                                 'type' => 'success',
-                                'message' => 'La publicación se envió correctamente a Telegram.',
+                                'message' => 'La publicación se envió correctamente a ' . $networkLabels[$networkKey] . '.',
                             ];
                         } else {
-                            $feedback['message'] = 'No se pudo enviar el mensaje a Telegram. Comprueba el token y el canal.';
+                            $feedback['message'] = 'No se pudo enviar la publicación a ' . $networkLabels[$networkKey] . '. Comprueba las credenciales.';
                         }
                     }
                 } else {
-                    $feedback['message'] = 'Sólo las entradas pueden enviarse a Telegram.';
+                    $feedback['message'] = 'Sólo las entradas pueden enviarse a redes sociales.';
                 }
             }
         }
-        $_SESSION['telegram_feedback'] = $feedback;
+        $_SESSION['social_feedback'] = $feedback;
         header('Location: admin.php?page=edit&template=' . $redirectTemplate);
         exit;
     } elseif (isset($_POST['delete_post'])) {
@@ -3374,12 +3418,12 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 $searchQueryParam = $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '';
                                 ?>
 
-                                <h2>Editar</h2>
-                                <?php if ($telegramFeedback !== null): ?>
-                                    <div class="alert alert-<?= $telegramFeedback['type'] === 'success' ? 'success' : 'warning' ?>">
-                                        <?= htmlspecialchars($telegramFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
-                                    </div>
-                                <?php endif; ?>
+                <h2>Editar</h2>
+                <?php if ($socialFeedback !== null): ?>
+                    <div class="alert alert-<?= $socialFeedback['type'] === 'success' ? 'success' : 'warning' ?>">
+                        <?= htmlspecialchars($socialFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+                    </div>
+                <?php endif; ?>
 
                                 <form class="form-inline mb-3 edit-search-form" method="get">
                                     <input type="hidden" name="page" value="edit">
@@ -3405,6 +3449,20 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 </div>
 
                                 <p class="text-muted">Mostrando <?= strtolower($currentTypeLabel) ?>.</p>
+                                <?php
+                                $networkConfigs = [
+                                    'telegram' => $settings['telegram'] ?? [],
+                                    'whatsapp' => $settings['whatsapp'] ?? [],
+                                    'facebook' => $settings['facebook'] ?? [],
+                                    'twitter' => $settings['twitter'] ?? [],
+                                ];
+                                $networkLabels = [
+                                    'telegram' => 'Telegram',
+                                    'whatsapp' => 'WhatsApp',
+                                    'facebook' => 'Facebook',
+                                    'twitter' => 'X',
+                                ];
+                                ?>
 
                                 <table class="table table-striped">
 
@@ -3420,7 +3478,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                             <th>Nombre de archivo</th>
 
-                                            <th class="text-center">Telegram</th>
+                                            <th class="text-center">Redes</th>
 
                                             <th></th>
 
@@ -3461,12 +3519,25 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 <td><a href="<?= htmlspecialchars($postLink, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($post['filename']) ?></a></td>
 
                                                 <td class="text-center">
-                                                    <?php if ($templateFilter === 'single'): ?>
-                                                        <form method="post">
-                                                            <input type="hidden" name="telegram_filename" value="<?= htmlspecialchars($post['filename'], ENT_QUOTES, 'UTF-8') ?>">
-                                                            <input type="hidden" name="telegram_template" value="<?= htmlspecialchars($templateFilter, ENT_QUOTES, 'UTF-8') ?>">
-                                                            <button type="submit" name="send_telegram_post" class="btn btn-sm btn-outline-primary">Enviar</button>
-                                                        </form>
+                                                    <?php
+                                                    $availableNetworks = [];
+                                                    foreach ($networkConfigs as $key => $cfg) {
+                                                        if (admin_is_social_network_configured($key, $cfg)) {
+                                                            $availableNetworks[] = $key;
+                                                        }
+                                                    }
+                                                    ?>
+                                                    <?php if (!empty($availableNetworks) && in_array($templateFilter, ['single', 'draft'], true)): ?>
+                                                        <?php foreach ($availableNetworks as $networkKey): ?>
+                                                            <form method="post" class="d-inline-block mb-1">
+                                                                <input type="hidden" name="social_network" value="<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>">
+                                                                <input type="hidden" name="social_filename" value="<?= htmlspecialchars($post['filename'], ENT_QUOTES, 'UTF-8') ?>">
+                                                                <input type="hidden" name="social_template" value="<?= htmlspecialchars($templateFilter, ENT_QUOTES, 'UTF-8') ?>">
+                                                                <button type="submit" name="send_social_post" class="btn btn-sm btn-outline-primary">
+                                                                    <?= htmlspecialchars($networkLabels[$networkKey] ?? ucfirst($networkKey), ENT_QUOTES, 'UTF-8') ?>
+                                                                </button>
+                                                            </form>
+                                                        <?php endforeach; ?>
                                                     <?php else: ?>
                                                         <span class="text-muted">—</span>
                                                     <?php endif; ?>

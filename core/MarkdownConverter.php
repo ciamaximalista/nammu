@@ -325,7 +325,7 @@ class MarkdownConverter
             }, $escaped);
 
             $escaped = preg_replace_callback('/\[([^\]]+)\]\(([^)]+)\)/', function ($matches) use ($storePlaceholder) {
-                $text = $matches[1];
+                $text = $this->applyInlineFormatting($matches[1]);
                 $url = htmlspecialchars(trim($matches[2]), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                 return $storePlaceholder('<a href="' . $url . '">' . $text . '</a>');
             }, $escaped);
@@ -334,13 +334,7 @@ class MarkdownConverter
                 return $storePlaceholder('<code>' . $matches[1] . '</code>');
             }, $escaped);
 
-            $escaped = preg_replace('/\*\*\*(.+?)\*\*\*/s', '<strong><em>$1</em></strong>', $escaped);
-            $escaped = preg_replace('/___(.+?)___/s', '<strong><em>$1</em></strong>', $escaped);
-            $escaped = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $escaped);
-            $escaped = preg_replace('/__(.+?)__/s', '<strong>$1</strong>', $escaped);
-            $escaped = preg_replace('/\*(.+?)\*/s', '<em>$1</em>', $escaped);
-            $escaped = preg_replace('/_(.+?)_/s', '<em>$1</em>', $escaped);
-            $escaped = preg_replace('/~~(.+?)~~/s', '<del>$1</del>', $escaped);
+            $escaped = $this->applyInlineFormatting($escaped);
 
             if (!empty($placeholders)) {
                 $escaped = strtr($escaped, $placeholders);
@@ -352,6 +346,19 @@ class MarkdownConverter
         }
 
         return $result;
+    }
+
+    private function applyInlineFormatting(string $text): string
+    {
+        $text = preg_replace('/\*\*\*(.+?)\*\*\*/s', '<strong><em>$1</em></strong>', $text);
+        $text = preg_replace('/___(.+?)___/s', '<strong><em>$1</em></strong>', $text);
+        $text = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $text);
+        $text = preg_replace('/__(.+?)__/s', '<strong>$1</strong>', $text);
+        $text = preg_replace('/\*(.+?)\*/s', '<em>$1</em>', $text);
+        $text = preg_replace('/_(.+?)_/s', '<em>$1</em>', $text);
+        $text = preg_replace('/~~(.+?)~~/s', '<del>$1</del>', $text);
+
+        return $text;
     }
 
     private function convertSuperscript(string $text): string

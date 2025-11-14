@@ -2,6 +2,7 @@
 session_start();
 
 require_once __DIR__ . '/core/bootstrap.php';
+require_once __DIR__ . '/core/helpers.php';
 
 // Load dependencies (optional)
 $autoload = __DIR__ . '/vendor/autoload.php';
@@ -324,6 +325,10 @@ function admin_recursive_delete_path(string $target): bool {
         return true;
     }
     if (is_file($target) || is_link($target)) {
+        if (@unlink($target)) {
+            return true;
+        }
+        @chmod($target, 0664);
         return @unlink($target);
     }
     $items = scandir($target);
@@ -334,10 +339,19 @@ function admin_recursive_delete_path(string $target): bool {
         if ($item === '.' || $item === '..') {
             continue;
         }
-        if (!admin_recursive_delete_path($target . '/' . $item)) {
+        $child = $target . '/' . $item;
+        if (!admin_recursive_delete_path($child)) {
+            @chmod($child, 0775);
+            if (!admin_recursive_delete_path($child)) {
+                return false;
+            }
             return false;
         }
     }
+    if (@rmdir($target)) {
+        return true;
+    }
+    @chmod($target, 0775);
     return @rmdir($target);
 }
 

@@ -8,13 +8,15 @@ class ItineraryTopic
     private array $metadata;
     private string $content;
     private string $filePath;
+    private array $quiz;
 
-    public function __construct(string $slug, array $metadata, string $content, string $filePath)
+    public function __construct(string $slug, array $metadata, string $content, string $filePath, array $quiz = [])
     {
         $this->slug = $slug;
         $this->metadata = $metadata;
         $this->content = $content;
         $this->filePath = $filePath;
+        $this->quiz = $quiz;
     }
 
     public function getSlug(): string
@@ -53,8 +55,7 @@ class ItineraryTopic
 
     public function hasTest(): bool
     {
-        $testIndicator = $this->metadata['Test'] ?? $this->metadata['test'] ?? null;
-        return is_array($testIndicator) ? !empty($testIndicator) : (trim((string) $testIndicator) !== '');
+        return !empty($this->quiz['questions']);
     }
 
     public function getFilePath(): string
@@ -65,5 +66,27 @@ class ItineraryTopic
     public function getMetadata(): array
     {
         return $this->metadata;
+    }
+
+    public function getQuiz(): array
+    {
+        return $this->quiz;
+    }
+
+    public function getQuizMinimumCorrect(): int
+    {
+        if (!$this->hasTest()) {
+            return 0;
+        }
+        $questions = $this->quiz['questions'] ?? [];
+        $questionCount = max(1, count($questions));
+        $minimum = (int) ($this->quiz['minimum_correct'] ?? $questionCount);
+        if ($minimum < 1) {
+            $minimum = 1;
+        }
+        if ($minimum > $questionCount) {
+            $minimum = $questionCount;
+        }
+        return $minimum;
     }
 }

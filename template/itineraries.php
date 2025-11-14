@@ -83,10 +83,12 @@ if (!in_array($blocksMode, ['boxed', 'flat'], true)) {
                 $thumbClassParts[] = $cardStyle === 'square-right' ? 'thumb-square' : 'thumb-circle';
             }
             $thumbClass = implode(' ', $thumbClassParts);
+            $classLabel = $itinerary->getClassLabel();
             $topicCount = $itinerary->getTopicCount();
-            $metaText = $topicCount === 1
+            $countText = $topicCount === 1
                 ? 'Incluye 1 tema'
                 : 'Incluye ' . $topicCount . ' temas';
+            $metaText = $classLabel . '. ' . $countText;
             ?>
             <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
                 <?php if ($cover): ?>

@@ -736,3 +736,77 @@ function nammu_letter_sort_weight(string $letter): int
     }
     return $ord;
 }
+
+function nammu_itinerary_progress_cookie_name(string $slug): string
+{
+    $normalized = strtolower($slug);
+    $normalized = preg_replace('/[^a-z0-9-]+/i', '-', $normalized);
+    $normalized = trim((string) $normalized, '-');
+    if ($normalized === '') {
+        $normalized = 'general';
+    }
+    return 'nammu_itinerary_progress_' . $normalized;
+}
+
+function nammu_get_itinerary_progress(string $slug): array
+{
+    $cookieName = nammu_itinerary_progress_cookie_name($slug);
+    $raw = $_COOKIE[$cookieName] ?? '';
+    $default = [
+        'visited' => [],
+        'passed' => [],
+    ];
+    if (!is_string($raw) || trim($raw) === '') {
+        return $default;
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return $default;
+    }
+    $visited = [];
+    foreach ($decoded['visited'] ?? [] as $value) {
+        $item = trim((string) $value);
+        if ($item !== '') {
+            $visited[$item] = true;
+        }
+    }
+    $passed = [];
+    foreach ($decoded['passed'] ?? [] as $value) {
+        $item = trim((string) $value);
+        if ($item !== '') {
+            $passed[$item] = true;
+        }
+    }
+    return [
+        'visited' => array_keys($visited),
+        'passed' => array_keys($passed),
+    ];
+}
+
+function nammu_set_itinerary_progress(string $slug, array $progress): void
+{
+    $visited = [];
+    foreach ($progress['visited'] ?? [] as $value) {
+        $item = trim((string) $value);
+        if ($item !== '') {
+            $visited[$item] = true;
+        }
+    }
+    $passed = [];
+    foreach ($progress['passed'] ?? [] as $value) {
+        $item = trim((string) $value);
+        if ($item !== '') {
+            $passed[$item] = true;
+        }
+    }
+    $payload = json_encode([
+        'visited' => array_keys($visited),
+        'passed' => array_keys($passed),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($payload === false) {
+        return;
+    }
+    $cookieName = nammu_itinerary_progress_cookie_name($slug);
+    setcookie($cookieName, $payload, time() + 31536000, '/', '', false, false);
+    $_COOKIE[$cookieName] = $payload;
+}

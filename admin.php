@@ -320,6 +320,174 @@ function admin_load_itinerary_topic(string $itinerarySlug, string $topicSlug): ?
     }
 }
 
+function admin_get_itinerary_stats(Itinerary $itinerary): array {
+    try {
+        return admin_itinerary_repository()->getItineraryStats($itinerary->getSlug());
+    } catch (Throwable $e) {
+        return ['started' => 0, 'topics' => [], 'updated_at' => 0];
+    }
+}
+
+function admin_itinerary_class_options(): array {
+    return [
+        'Libro' => 'Libro',
+        'Curso' => 'Curso',
+        'Colección de materiales' => 'Colección de materiales',
+        'Otros' => 'Otros',
+    ];
+}
+
+function admin_normalize_itinerary_class_label(?string $choice, ?string $custom): string {
+    $choice = trim((string) $choice);
+    $custom = trim((string) $custom);
+    $options = admin_itinerary_class_options();
+    if ($choice !== '' && isset($options[$choice])) {
+        if ($choice === 'Otros') {
+            return $custom !== '' ? $custom : 'Itinerario';
+        }
+        return $options[$choice];
+    }
+    if ($custom !== '') {
+        return $custom;
+    }
+    return 'Itinerario';
+}
+
+function admin_itinerary_class_form_state(string $label): array {
+    $label = trim($label);
+    $options = admin_itinerary_class_options();
+    if ($label === '' || $label === 'Itinerario') {
+        return ['choice' => '', 'custom' => ''];
+    }
+    foreach ($options as $value => $text) {
+        if ($value === 'Otros') {
+            continue;
+        }
+        if ($label === $text) {
+            return ['choice' => $value, 'custom' => ''];
+        }
+    }
+    return ['choice' => 'Otros', 'custom' => $label];
+}
+
+function admin_itinerary_usage_logic_options(): array {
+    return [
+        'free' => 'El lector puede ir libremente al tema que quiera',
+        'sequential' => 'Es necesario haber accedido a un tema para pasar al siguiente',
+        'assessment' => 'Es necesario haber respondido correctamente a las autoevaluaciones para pasar al tema siguiente',
+    ];
+}
+
+function admin_normalize_itinerary_usage_logic(?string $value): string {
+    $value = strtolower(trim((string) $value));
+    $options = admin_itinerary_usage_logic_options();
+    if ($value !== '' && isset($options[$value])) {
+        return $value;
+    }
+    return 'free';
+}
+
+function admin_parse_quiz_payload(string $payload): array {
+    $payload = trim($payload);
+    if ($payload === '') {
+        return ['data' => [], 'error' => null];
+    }
+    $decoded = json_decode($payload, true);
+    if (!is_array($decoded)) {
+        return ['data' => [], 'error' => 'La autoevaluación enviada no es válida.'];
+    }
+    $sanitized = admin_sanitize_quiz_array($decoded);
+    if (!empty($decoded['questions']) && empty($sanitized)) {
+        return ['data' => [], 'error' => 'Revisa la autoevaluación: cada pregunta necesita texto y al menos una respuesta correcta.'];
+    }
+    return ['data' => $sanitized, 'error' => null];
+}
+
+function admin_sanitize_quiz_array(?array $quiz): array {
+    if (!is_array($quiz)) {
+        return [];
+    }
+    $questions = [];
+    foreach ($quiz['questions'] ?? [] as $question) {
+        if (!is_array($question)) {
+            continue;
+        }
+        $text = trim((string) ($question['text'] ?? ''));
+        if ($text === '') {
+            continue;
+        }
+        $answers = [];
+        foreach ($question['answers'] ?? [] as $answer) {
+            if (!is_array($answer)) {
+                continue;
+            }
+            $answerText = trim((string) ($answer['text'] ?? ''));
+            if ($answerText === '') {
+                continue;
+            }
+            $answers[] = [
+                'text' => $answerText,
+                'correct' => !empty($answer['correct']),
+            ];
+        }
+        if (empty($answers)) {
+            continue;
+        }
+        $hasCorrect = false;
+        foreach ($answers as $answer) {
+            if ($answer['correct']) {
+                $hasCorrect = true;
+                break;
+            }
+        }
+        if (!$hasCorrect) {
+            continue;
+        }
+        $questions[] = [
+            'text' => $text,
+            'answers' => $answers,
+        ];
+    }
+    if (empty($questions)) {
+        return [];
+    }
+    $minimum = (int) ($quiz['minimum_correct'] ?? count($questions));
+    if ($minimum < 1) {
+        $minimum = 1;
+    }
+    if ($minimum > count($questions)) {
+        $minimum = count($questions);
+    }
+    return [
+        'minimum_correct' => $minimum,
+        'questions' => array_values($questions),
+    ];
+}
+
+function admin_quiz_summary(array $quiz): string {
+    if (empty($quiz['questions'])) {
+        return '';
+    }
+    $questionCount = count($quiz['questions']);
+    $minimum = (int) ($quiz['minimum_correct'] ?? $questionCount);
+    if ($minimum < 1) {
+        $minimum = 1;
+    }
+    if ($minimum > $questionCount) {
+        $minimum = $questionCount;
+    }
+    $questionLabel = $questionCount === 1 ? 'pregunta' : 'preguntas';
+    return $questionCount . ' ' . $questionLabel . ' · mínimo ' . $minimum . ' correctas';
+}
+
+function admin_quiz_json(array $quiz): string {
+    if (empty($quiz['questions'])) {
+        return '';
+    }
+    $payload = json_encode($quiz, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    return $payload === false ? '' : $payload;
+}
+
 function admin_recursive_delete_path(string $target): bool {
     if (!file_exists($target)) {
         return true;
@@ -1555,6 +1723,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $description = trim($_POST['itinerary_description'] ?? '');
         $image = trim($_POST['itinerary_image'] ?? '');
         $content = $_POST['itinerary_content'] ?? '';
+        $classChoice = $_POST['itinerary_class'] ?? '';
+        $classCustom = $_POST['itinerary_class_custom'] ?? '';
+        $itineraryQuizPayload = $_POST['itinerary_quiz_payload'] ?? '';
+        $usageLogicInput = $_POST['itinerary_usage_logic'] ?? '';
         $slugInput = trim($_POST['itinerary_slug'] ?? '');
         $originalSlugInput = trim($_POST['itinerary_original_slug'] ?? '');
         $mode = $_POST['itinerary_mode'] ?? '';
@@ -1571,6 +1743,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($title === '') {
             $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'El título del itinerario es obligatorio.'];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        $itineraryQuizResult = admin_parse_quiz_payload($itineraryQuizPayload);
+        if ($itineraryQuizResult['error'] !== null) {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => $itineraryQuizResult['error']];
             header('Location: ' . $redirectBase);
             exit;
         }
@@ -1605,11 +1783,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         try {
+            $classLabel = admin_normalize_itinerary_class_label($classChoice, $classCustom);
+            $usageLogic = admin_normalize_itinerary_usage_logic($usageLogicInput);
             $saved = admin_itinerary_repository()->saveItinerary($slug, [
                 'Title' => $title,
                 'Description' => $description,
                 'Image' => $image,
-            ], $content);
+                'ItineraryClass' => $classLabel,
+                'UsageLogic' => $usageLogic,
+            ], $content, !empty($itineraryQuizResult['data']['questions']) ? $itineraryQuizResult['data'] : null);
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario guardado correctamente.'];
             header('Location: admin.php?page=itinerarios&itinerary=' . urlencode($saved->getSlug()));
             exit;
@@ -1629,6 +1811,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $slugInput = trim($_POST['topic_slug'] ?? '');
         $originalSlugInput = trim($_POST['topic_original_slug'] ?? '');
         $mode = $_POST['topic_mode'] ?? '';
+        $quizPayload = $_POST['topic_quiz_payload'] ?? '';
+        $quizResult = admin_parse_quiz_payload($quizPayload);
+        if ($quizResult['error'] !== null) {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => $quizResult['error']];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        $quizData = $quizResult['data'];
         if ($slugInput === '' && $title !== '') {
             $slugInput = $title;
         }
@@ -1702,6 +1892,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (is_file($oldFile)) {
                     @unlink($oldFile);
                 }
+                $oldQuiz = ITINERARIES_DIR . '/' . $itinerarySlug . '/' . $originalSlug . '.quiz.json';
+                if (is_file($oldQuiz)) {
+                    @unlink($oldQuiz);
+                }
             }
             $newSaved = false;
             foreach ($sequence as $index => $entry) {
@@ -1716,14 +1910,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'Number' => $number,
                         'Image' => $image,
                     ];
-                    $repository->saveTopic($itinerarySlug, $topicSlug, $metadata, $content);
+                    $repository->saveTopic($itinerarySlug, $topicSlug, $metadata, $content, !empty($quizData['questions']) ? $quizData : null);
                     $newSaved = true;
                 } else {
                     /** @var ItineraryTopic $existingTopic */
                     $existingTopic = $entry['topic'];
                     $metadata = $existingTopic->getMetadata();
                     $metadata['Number'] = $number;
-                    $repository->saveTopic($itinerarySlug, $existingTopic->getSlug(), $metadata, $existingTopic->getContent());
+                    $repository->saveTopic(
+                        $itinerarySlug,
+                        $existingTopic->getSlug(),
+                        $metadata,
+                        $existingTopic->getContent(),
+                        $existingTopic->getQuiz()
+                    );
                 }
             }
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Tema guardado correctamente.'];
@@ -2254,6 +2454,11 @@ $itineraryFormData = [
     'image' => '',
     'slug' => '',
     'content' => '',
+    'class_choice' => '',
+    'class_custom' => '',
+    'usage_logic' => 'free',
+    'quiz' => '',
+    'quiz_summary' => '',
     'mode' => 'new',
 ];
 $topicFormData = [
@@ -2263,6 +2468,8 @@ $topicFormData = [
     'slug' => '',
     'content' => '',
     'number' => 1,
+    'quiz' => '',
+    'quiz_summary' => '',
     'mode' => 'new',
 ];
 $topicNumberOptions = [1];
@@ -2275,12 +2482,19 @@ if (is_logged_in() && $page === 'itinerarios') {
     }
     $isNewItinerary = isset($_GET['new']) || $selectedItinerary === null;
     if ($selectedItinerary !== null) {
+        $classState = admin_itinerary_class_form_state($selectedItinerary->getClassLabel());
+        $itineraryQuiz = method_exists($selectedItinerary, 'getQuiz') ? $selectedItinerary->getQuiz() : [];
         $itineraryFormData = [
             'title' => $selectedItinerary->getTitle(),
             'description' => $selectedItinerary->getDescription(),
             'image' => $selectedItinerary->getImage() ?? '',
             'slug' => $selectedItinerary->getSlug(),
             'content' => $selectedItinerary->getContent(),
+            'class_choice' => $classState['choice'] ?? '',
+            'class_custom' => $classState['custom'] ?? '',
+            'usage_logic' => method_exists($selectedItinerary, 'getUsageLogic') ? $selectedItinerary->getUsageLogic() : 'free',
+            'quiz' => admin_quiz_json($itineraryQuiz),
+            'quiz_summary' => admin_quiz_summary($itineraryQuiz),
             'mode' => 'existing',
         ];
     } else {
@@ -2294,6 +2508,7 @@ if (is_logged_in() && $page === 'itinerarios') {
         }
     }
     if ($selectedTopic !== null) {
+        $quizData = $selectedTopic->getQuiz();
         $topicFormData = [
             'title' => $selectedTopic->getTitle(),
             'description' => $selectedTopic->getDescription(),
@@ -2301,6 +2516,8 @@ if (is_logged_in() && $page === 'itinerarios') {
             'slug' => $selectedTopic->getSlug(),
             'content' => $selectedTopic->getContent(),
             'number' => max(1, $selectedTopic->getNumber()),
+            'quiz' => admin_quiz_json($quizData),
+            'quiz_summary' => admin_quiz_summary($quizData),
             'mode' => 'existing',
         ];
     } else {
@@ -2324,6 +2541,7 @@ if (is_logged_in() && $page === 'itinerarios') {
     if ($isNewItinerary) {
         $itineraryFormData['slug'] = '';
         $itineraryFormData['content'] = '';
+        $itineraryFormData['usage_logic'] = 'free';
     }
 }
 
@@ -2391,6 +2609,93 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             background: linear-gradient(180deg, rgba(255,255,255,0) 0%, #fff 40%);
             padding-top: 1rem;
             text-align: right;
+        }
+        .topic-quiz-controls {
+            gap: 0.5rem;
+        }
+        .topic-quiz-controls small {
+            white-space: nowrap;
+        }
+        .topic-quiz-modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1040;
+        }
+        .topic-quiz-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1045;
+        }
+        .topic-quiz-modal__dialog {
+            background: #fff;
+            border-radius: 12px;
+            max-width: 720px;
+            width: 90%;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 18px 45px rgba(0,0,0,0.3);
+        }
+        .topic-quiz-modal__header,
+        .topic-quiz-modal__footer {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #f0f2f5;
+        }
+        .topic-quiz-modal__footer {
+            border-bottom: 0;
+            border-top: 1px solid #f0f2f5;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+        .topic-quiz-modal__body {
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+        .topic-quiz-question {
+            border: 1px solid #e3e8ef;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: #fafbfc;
+        }
+        .topic-quiz-question h5 {
+            font-size: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        .topic-quiz-answers .form-group {
+            margin-bottom: 0.5rem;
+        }
+        .topic-quiz-answers small {
+            display: block;
+            color: #6c757d;
+        }
+        .topic-quiz-answer {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .topic-quiz-answer input[type="checkbox"] {
+            margin-top: 0.4rem;
+        }
+        .topic-quiz-question .btn-link {
+            padding-left: 0;
+        }
+        .topic-quiz-modal.d-none,
+        .topic-quiz-modal-backdrop.d-none {
+            display: none;
         }
 
         <style>
@@ -5212,6 +5517,28 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                     </thead>
                                                     <tbody>
                                                         <?php foreach ($itinerariesList as $itineraryItem): ?>
+                                                            <?php
+                                                                $rawStats = admin_get_itinerary_stats($itineraryItem);
+                                                                $topicStatsList = array_values($rawStats['topics'] ?? []);
+                                                                usort($topicStatsList, static function (array $a, array $b): int {
+                                                                    return (int) ($a['number'] ?? 0) <=> (int) ($b['number'] ?? 0);
+                                                                });
+                                                                $statsPayload = [
+                                                                    'started' => (int) ($rawStats['started'] ?? 0),
+                                                                    'topics' => array_map(static function (array $topic): array {
+                                                                        return [
+                                                                            'number' => (int) ($topic['number'] ?? 0),
+                                                                            'title' => $topic['title'] ?? ($topic['slug'] ?? ''),
+                                                                            'count' => (int) ($topic['count'] ?? 0),
+                                                                        ];
+                                                                    }, $topicStatsList),
+                                                                ];
+                                                                $statsJson = htmlspecialchars(
+                                                                    json_encode($statsPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                                                                    ENT_QUOTES,
+                                                                    'UTF-8'
+                                                                );
+                                                            ?>
                                                             <tr>
                                                                 <td><?= htmlspecialchars($itineraryItem->getTitle(), ENT_QUOTES, 'UTF-8') ?></td>
                                                                 <td><?= htmlspecialchars($itineraryItem->getDescription(), ENT_QUOTES, 'UTF-8') ?></td>
@@ -5223,6 +5550,16 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                                 </td>
                                                                 <td class="text-right">
                                                                     <div class="text-right">
+                                                                        <div class="mb-2">
+                                                                            <button
+                                                                                type="button"
+                                                                                class="btn btn-sm btn-outline-info mb-2"
+                                                                                data-toggle="modal"
+                                                                                data-target="#itineraryStatsModal"
+                                                                                data-itinerary-title="<?= htmlspecialchars($itineraryItem->getTitle(), ENT_QUOTES, 'UTF-8') ?>"
+                                                                                data-itinerary-stats="<?= $statsJson ?>"
+                                                                            >Estadísticas</button>
+                                                                        </div>
                                                                         <div class="mb-2">
                                                                             <a class="btn btn-sm btn-outline-primary" href="?page=itinerarios&itinerary=<?= urlencode($itineraryItem->getSlug()) ?>#itinerary-form">Editar</a>
                                                                         </div>
@@ -5259,6 +5596,49 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                     <div class="form-group">
                                                         <label for="itinerary_description">Descripción</label>
                                                         <textarea name="itinerary_description" id="itinerary_description" class="form-control" rows="3"><?= htmlspecialchars($itineraryFormData['description'], ENT_QUOTES, 'UTF-8') ?></textarea>
+                                                    </div>
+                                                    <?php
+                                                        $itineraryUsageLogic = $itineraryFormData['usage_logic'] ?? 'free';
+                                                        $usageOptions = admin_itinerary_usage_logic_options();
+                                                    ?>
+                                                    <div class="form-group">
+                                                        <label class="d-block">Lógica de uso</label>
+                                                        <p class="text-muted small mb-2">Define cómo debe avanzar el lector a través de los temas de este itinerario.</p>
+                                                        <?php foreach ($usageOptions as $value => $label): ?>
+                                                            <?php $usageFieldId = 'itinerary_usage_logic_' . $value; ?>
+                                                            <div class="form-check">
+                                                                <input
+                                                                    class="form-check-input"
+                                                                    type="radio"
+                                                                    name="itinerary_usage_logic"
+                                                                    id="<?= htmlspecialchars($usageFieldId, ENT_QUOTES, 'UTF-8') ?>"
+                                                                    value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>"
+                                                                    <?= $itineraryUsageLogic === $value ? 'checked' : '' ?>
+                                                                >
+                                                                <label class="form-check-label" for="<?= htmlspecialchars($usageFieldId, ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
+                                                                </label>
+                                                            </div>
+                                                        <?php endforeach; ?>
+                                                        <small class="form-text text-muted">Si eliges las dos últimas opciones, informaremos al lector de que se usarán cookies.</small>
+                                                    </div>
+                                                    <?php $itineraryClassChoice = $itineraryFormData['class_choice'] ?? ''; ?>
+                                                    <div class="form-group">
+                                                        <label for="itinerary_class">Clase de itinerario</label>
+                                                        <select name="itinerary_class" id="itinerary_class" class="form-control" data-itinerary-class-select>
+                                                            <option value="" <?= $itineraryClassChoice === '' ? 'selected' : '' ?>>Selecciona una opción</option>
+                                                            <?php foreach (admin_itinerary_class_options() as $value => $label): ?>
+                                                                <option value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>" <?= $itineraryClassChoice === $value ? 'selected' : '' ?>>
+                                                                    <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
+                                                                </option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                        <small class="form-text text-muted">Este texto aparecerá como subtítulo del itinerario.</small>
+                                                    </div>
+                                                    <div class="form-group <?= $itineraryClassChoice === 'Otros' ? '' : 'd-none' ?>" data-itinerary-class-custom-wrapper>
+                                                        <label for="itinerary_class_custom">Especifica la clase</label>
+                                                        <input type="text" name="itinerary_class_custom" id="itinerary_class_custom" class="form-control" value="<?= htmlspecialchars($itineraryFormData['class_custom'], ENT_QUOTES, 'UTF-8') ?>" maxlength="80" placeholder="Ej. Programa especial" <?= $itineraryClassChoice === 'Otros' ? 'required' : '' ?>>
+                                                        <small class="form-text text-muted">Texto corto (máx. 80 caracteres) que sustituye la etiqueta “Itinerario”.</small>
                                                     </div>
                                                     <div class="form-group">
                                                         <label for="itinerary_slug">Slug</label>
@@ -5297,7 +5677,23 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                             </div>
                                                         </div>
                                                         <textarea name="itinerary_content" id="itinerary_content" class="form-control" rows="10" data-markdown-editor="itinerary"><?= htmlspecialchars($itineraryFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>
-                                        <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#itinerary_content">Insertar recurso</button>
+                                                        <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#itinerary_content">Insertar recurso</button>
+                                                        <div class="d-flex flex-wrap align-items-center gap-2 mt-2 topic-quiz-controls">
+                                                            <input type="hidden" name="itinerary_quiz_payload" id="itinerary_quiz_payload" value="<?= htmlspecialchars($itineraryFormData['quiz'], ENT_QUOTES, 'UTF-8') ?>">
+                                                            <button
+                                                                type="button"
+                                                                class="btn btn-outline-secondary"
+                                                                data-quiz-trigger
+                                                                data-quiz-target="#itinerary_quiz_payload"
+                                                                data-quiz-summary="#itinerary_quiz_summary"
+                                                                data-quiz-title="Autoevaluación de la presentación"
+                                                            >
+                                                                <?= ($itineraryFormData['quiz'] ?? '') !== '' ? 'Editar autoevaluación' : 'Añadir autoevaluación' ?>
+                                                            </button>
+                                                            <small class="text-muted mb-0" id="itinerary_quiz_summary" data-quiz-summary="itinerary_quiz_payload">
+                                                                <?= htmlspecialchars($itineraryFormData['quiz_summary'], ENT_QUOTES, 'UTF-8') ?>
+                                                            </small>
+                                                        </div>
                                                     </div>
                                                     <div class="sticky-save">
                                                         <button type="submit" name="save_itinerary" class="btn btn-primary">Guardar itinerario</button>
@@ -5418,9 +5814,21 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                                 </div>
                                                             </div>
                                                             <textarea name="topic_content" id="topic_content" class="form-control" rows="10" data-markdown-editor="itinerary-topic"><?= htmlspecialchars($topicFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>
-                                                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                                            <div class="d-flex flex-wrap align-items-center gap-2 mt-2 topic-quiz-controls">
                                                                 <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#topic_content">Nuevo recurso</button>
-                                                                <button type="button" class="btn btn-outline-secondary" disabled>Añadir test (próximamente)</button>
+                                                                <input type="hidden" name="topic_quiz_payload" id="topic_quiz_payload" value="<?= htmlspecialchars($topicFormData['quiz'], ENT_QUOTES, 'UTF-8') ?>">
+                                                                <?php $quizHasData = $topicFormData['quiz'] !== ''; ?>
+                                                                <button
+                                                                    type="button"
+                                                                    class="btn btn-outline-secondary"
+                                                                    data-quiz-trigger
+                                                                    data-quiz-target="#topic_quiz_payload"
+                                                                    data-quiz-summary="#topic_quiz_summary"
+                                                                    data-quiz-title="Autoevaluación del tema"
+                                                                >
+                                                                    <?= $quizHasData ? 'Editar autoevaluación' : 'Añadir autoevaluación' ?>
+                                                                </button>
+                                                                <small class="text-muted mb-0" id="topic_quiz_summary" data-quiz-summary="topic_quiz_payload"><?= htmlspecialchars($topicFormData['quiz_summary'], ENT_QUOTES, 'UTF-8') ?></small>
                                                             </div>
                                                         </div>
                                                         <div class="mt-3">
@@ -6532,6 +6940,65 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
         });
         </script>
 
+        <div class="topic-quiz-modal-backdrop d-none" data-topic-quiz-backdrop></div>
+        <div class="topic-quiz-modal d-none" data-topic-quiz-modal aria-hidden="true">
+            <div class="topic-quiz-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="topicQuizModalTitle">
+                <div class="topic-quiz-modal__header">
+                    <h4 id="topicQuizModalTitle" class="mb-0">Autoevaluación del tema</h4>
+                    <button type="button" class="close" aria-label="Cerrar" data-topic-quiz-close>&times;</button>
+                </div>
+                <div class="topic-quiz-modal__body">
+                    <div class="form-group">
+                        <label for="topic_quiz_minimum">Preguntas mínimas correctas para aprobar</label>
+                        <input type="number" min="1" value="1" class="form-control" id="topic_quiz_minimum" data-topic-quiz-min>
+                        <small class="form-text text-muted">Debe ser un número entre 1 y el total de preguntas configuradas.</small>
+                    </div>
+                    <div class="topic-quiz-modal__questions" data-topic-quiz-questions></div>
+                    <button type="button" class="btn btn-outline-primary btn-sm mt-2" data-topic-quiz-add-question>Añadir pregunta</button>
+                </div>
+                <div class="topic-quiz-modal__footer">
+                    <button type="button" class="btn btn-link text-danger mr-auto" data-topic-quiz-clear>Eliminar autoevaluación</button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-secondary" data-topic-quiz-close>Cancelar</button>
+                        <button type="button" class="btn btn-primary" data-topic-quiz-save>Guardar autoevaluación</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="itineraryStatsModal" tabindex="-1" role="dialog" aria-labelledby="itineraryStatsModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="itineraryStatsModalLabel">Estadísticas del itinerario</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="font-weight-bold" data-stats-title></p>
+                        <p data-stats-started class="mb-3 text-muted"></p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Tema</th>
+                                        <th>Usuarios</th>
+                                        <th>% sobre quienes iniciaron</th>
+                                    </tr>
+                                </thead>
+                                <tbody data-stats-table-body>
+                                    <tr>
+                                        <td colspan="3" class="text-muted">Cargando...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
 
         <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
@@ -7601,6 +8068,32 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
         <script>
         document.addEventListener('DOMContentLoaded', function() {
+            var classSelect = document.querySelector('[data-itinerary-class-select]');
+            var customWrapper = document.querySelector('[data-itinerary-class-custom-wrapper]');
+            var customInput = document.getElementById('itinerary_class_custom');
+            if (!classSelect || !customWrapper) {
+                return;
+            }
+            var toggleCustomField = function() {
+                if (classSelect.value === 'Otros') {
+                    customWrapper.classList.remove('d-none');
+                    if (customInput) {
+                        customInput.setAttribute('required', 'required');
+                    }
+                } else {
+                    customWrapper.classList.add('d-none');
+                    if (customInput) {
+                        customInput.removeAttribute('required');
+                    }
+                }
+            };
+            classSelect.addEventListener('change', toggleCustomField);
+            toggleCustomField();
+        });
+        </script>
+
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
             var slugInputs = document.querySelectorAll('[data-slug-input]');
             if (!slugInputs.length) {
                 return;
@@ -7631,6 +8124,372 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 };
                 input.addEventListener('input', applySanitizedValue);
                 input.addEventListener('blur', applyTrimmedValue);
+            });
+        });
+        </script>
+
+        <script>
+        $(function() {
+            var statsModal = $('#itineraryStatsModal');
+            if (!statsModal.length) {
+                return;
+            }
+            statsModal.on('show.bs.modal', function (event) {
+                var button = $(event.relatedTarget);
+                var statsRaw = button && button.attr('data-itinerary-stats') ? button.attr('data-itinerary-stats') : '{}';
+                var title = button && button.data('itinerary-title') ? button.data('itinerary-title') : 'Itinerario';
+                var stats;
+                try {
+                    stats = JSON.parse(statsRaw);
+                } catch (err) {
+                    stats = {started: 0, topics: []};
+                }
+                stats = stats || {};
+                var started = parseInt(stats.started, 10);
+                if (isNaN(started) || started < 0) {
+                    started = 0;
+                }
+                statsModal.find('[data-stats-title]').text(title);
+                statsModal.find('[data-stats-started]').text('Empezado por ' + started + ' usuarios reales');
+                var tbody = statsModal.find('[data-stats-table-body]');
+                tbody.empty();
+                var topics = Array.isArray(stats.topics) ? stats.topics : [];
+                if (!topics.length) {
+                    tbody.append('<tr><td colspan="3" class="text-muted">Todavía no hay usuarios con progreso registrado.</td></tr>');
+                    return;
+                }
+                topics.forEach(function(topic) {
+                    var number = parseInt(topic.number, 10);
+                    if (isNaN(number)) {
+                        number = 0;
+                    }
+                    var label = number > 0 ? 'Tema ' + number : 'Tema';
+                    if (topic.title) {
+                        label += ' — ' + topic.title;
+                    }
+                    var count = parseInt(topic.count, 10);
+                    if (isNaN(count) || count < 0) {
+                        count = 0;
+                    }
+                    var percentLabel = started > 0 ? ((count / started) * 100).toFixed(1) + '%' : '—';
+                    var row = $('<tr></tr>');
+                    row.append($('<td></td>').text(label));
+                    row.append($('<td></td>').text(count));
+                    row.append($('<td></td>').text(percentLabel));
+                    tbody.append(row);
+                });
+            });
+        });
+        </script>
+
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var quizModal = document.querySelector('[data-topic-quiz-modal]');
+            var quizBackdrop = document.querySelector('[data-topic-quiz-backdrop]');
+            var triggers = document.querySelectorAll('[data-quiz-trigger]');
+            if (!quizModal || !quizBackdrop || !triggers.length) {
+                return;
+            }
+            var minInput = quizModal.querySelector('[data-topic-quiz-min]');
+            var questionsWrapper = quizModal.querySelector('[data-topic-quiz-questions]');
+            var addQuestionBtn = quizModal.querySelector('[data-topic-quiz-add-question]');
+            var saveBtn = quizModal.querySelector('[data-topic-quiz-save]');
+            var clearBtn = quizModal.querySelector('[data-topic-quiz-clear]');
+            var closeButtons = quizModal.querySelectorAll('[data-topic-quiz-close]');
+            var modalTitle = quizModal.querySelector('#topicQuizModalTitle');
+            var activeContext = {
+                input: null,
+                summary: null,
+                trigger: null
+            };
+
+            function parseQuizValue(value) {
+                var payload = (value || '').trim();
+                if (payload === '') {
+                    return {minimum_correct: 1, questions: []};
+                }
+                try {
+                    var parsed = JSON.parse(payload);
+                    if (parsed && Array.isArray(parsed.questions)) {
+                        var min = parseInt(parsed.minimum_correct, 10);
+                        if (!min || min < 1) {
+                            min = parsed.questions.length || 1;
+                        }
+                        return {
+                            minimum_correct: Math.min(parsed.questions.length || 1, min),
+                            questions: parsed.questions
+                        };
+                    }
+                } catch (err) {
+                    console.warn('No se pudo leer la autoevaluación almacenada', err);
+                }
+                return {minimum_correct: 1, questions: []};
+            }
+
+            function updateSummary(input, summaryEl, trigger) {
+                if (!input) {
+                    return;
+                }
+                var state = parseQuizValue(input.value);
+                if (summaryEl) {
+                    if (!state.questions.length) {
+                        summaryEl.textContent = '';
+                    } else {
+                        var label = state.questions.length === 1 ? 'pregunta' : 'preguntas';
+                        summaryEl.textContent = state.questions.length + ' ' + label + ' · mínimo ' + state.minimum_correct + ' correctas';
+                    }
+                }
+                if (trigger) {
+                    trigger.textContent = state.questions.length ? 'Editar autoevaluación' : 'Añadir autoevaluación';
+                }
+            }
+
+            function toggleModal(show) {
+                if (show) {
+                    quizModal.classList.remove('d-none');
+                    quizBackdrop.classList.remove('d-none');
+                    quizModal.setAttribute('aria-hidden', 'false');
+                } else {
+                    quizModal.classList.add('d-none');
+                    quizBackdrop.classList.add('d-none');
+                    quizModal.setAttribute('aria-hidden', 'true');
+                }
+            }
+
+            function addAnswer(container, answerData) {
+                var row = document.createElement('div');
+                row.className = 'topic-quiz-answer';
+                row.setAttribute('data-quiz-answer', '1');
+
+                var checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'mr-2';
+                checkbox.checked = !!(answerData && answerData.correct);
+
+                var input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'form-control';
+                input.placeholder = 'Respuesta posible';
+                input.value = answerData && answerData.text ? answerData.text : '';
+                input.setAttribute('data-quiz-answer-text', '1');
+
+                var removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'btn btn-link text-danger btn-sm';
+                removeBtn.textContent = 'Quitar';
+                removeBtn.addEventListener('click', function() {
+                    row.remove();
+                });
+
+                row.appendChild(checkbox);
+                row.appendChild(input);
+                row.appendChild(removeBtn);
+                container.appendChild(row);
+            }
+
+            function addQuestion(questionData) {
+                var block = document.createElement('div');
+                block.className = 'topic-quiz-question';
+                block.setAttribute('data-quiz-question', '1');
+
+                var header = document.createElement('div');
+                header.className = 'd-flex justify-content-between align-items-center mb-2';
+
+                var title = document.createElement('h5');
+                title.className = 'mb-0';
+                title.textContent = 'Pregunta';
+                header.appendChild(title);
+
+                var removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'btn btn-link text-danger btn-sm';
+                removeBtn.textContent = 'Quitar';
+                removeBtn.addEventListener('click', function() {
+                    block.remove();
+                });
+                header.appendChild(removeBtn);
+
+                var questionInput = document.createElement('input');
+                questionInput.type = 'text';
+                questionInput.className = 'form-control mb-3';
+                questionInput.placeholder = 'Enunciado de la pregunta';
+                questionInput.value = questionData && questionData.text ? questionData.text : '';
+                questionInput.setAttribute('data-quiz-question-text', '1');
+
+                var answersWrapper = document.createElement('div');
+                answersWrapper.className = 'topic-quiz-answers';
+                answersWrapper.setAttribute('data-quiz-answers', '1');
+
+                var answers = questionData && Array.isArray(questionData.answers) ? questionData.answers : [];
+                if (!answers.length) {
+                    addAnswer(answersWrapper);
+                    addAnswer(answersWrapper);
+                } else {
+                    answers.forEach(function(answer) {
+                        addAnswer(answersWrapper, answer);
+                    });
+                }
+
+                var addAnswerBtn = document.createElement('button');
+                addAnswerBtn.type = 'button';
+                addAnswerBtn.className = 'btn btn-outline-primary btn-sm mt-2';
+                addAnswerBtn.textContent = 'Añadir respuesta';
+                addAnswerBtn.addEventListener('click', function() {
+                    addAnswer(answersWrapper);
+                });
+
+                block.appendChild(header);
+                block.appendChild(questionInput);
+                block.appendChild(answersWrapper);
+                block.appendChild(addAnswerBtn);
+                questionsWrapper.appendChild(block);
+            }
+
+            function loadQuestionsIntoModal(state) {
+                questionsWrapper.innerHTML = '';
+                var quizState = state || {minimum_correct: 1, questions: []};
+                var questions = quizState.questions.length ? quizState.questions : [];
+                minInput.value = quizState.minimum_correct || 1;
+                if (!questions.length) {
+                    addQuestion();
+                    return;
+                }
+                questions.forEach(function(question) {
+                    addQuestion(question);
+                });
+            }
+
+            function collectQuizData() {
+                var questionBlocks = questionsWrapper.querySelectorAll('[data-quiz-question]');
+                var quizQuestions = [];
+                var hasError = false;
+                questionBlocks.forEach(function(block) {
+                    if (hasError) {
+                        return;
+                    }
+                    var textInput = block.querySelector('[data-quiz-question-text]');
+                    var questionText = textInput ? textInput.value.trim() : '';
+                    if (questionText === '') {
+                        hasError = true;
+                        alert('Todas las preguntas necesitan un enunciado.');
+                        return;
+                    }
+                    var answers = [];
+                    var answerNodes = block.querySelectorAll('[data-quiz-answer]');
+                    answerNodes.forEach(function(answerNode) {
+                        var answerTextInput = answerNode.querySelector('[data-quiz-answer-text]');
+                        var answerText = answerTextInput ? answerTextInput.value.trim() : '';
+                        if (answerText === '') {
+                            return;
+                        }
+                        var checkbox = answerNode.querySelector('input[type="checkbox"]');
+                        answers.push({
+                            text: answerText,
+                            correct: checkbox ? checkbox.checked : false
+                        });
+                    });
+                    if (!answers.length) {
+                        hasError = true;
+                        alert('Cada pregunta necesita al menos una respuesta.');
+                        return;
+                    }
+                    var hasCorrect = answers.some(function(answer) { return answer.correct; });
+                    if (!hasCorrect) {
+                        hasError = true;
+                        alert('Cada pregunta necesita al menos una respuesta marcada como correcta.');
+                        return;
+                    }
+                    quizQuestions.push({
+                        text: questionText,
+                        answers: answers
+                    });
+                });
+                if (hasError) {
+                    return null;
+                }
+                if (!quizQuestions.length) {
+                    return {minimum_correct: 0, questions: []};
+                }
+                var minimum = parseInt(minInput.value, 10);
+                if (!minimum || minimum < 1) {
+                    minimum = quizQuestions.length;
+                }
+                if (minimum > quizQuestions.length) {
+                    minimum = quizQuestions.length;
+                }
+                return {
+                    minimum_correct: minimum,
+                    questions: quizQuestions
+                };
+            }
+
+            function saveQuiz() {
+                if (!activeContext.input) {
+                    toggleModal(false);
+                    return;
+                }
+                var data = collectQuizData();
+                if (!data) {
+                    return;
+                }
+                if (!data.questions.length) {
+                    activeContext.input.value = '';
+                } else {
+                    activeContext.input.value = JSON.stringify(data);
+                }
+                updateSummary(activeContext.input, activeContext.summary, activeContext.trigger);
+                toggleModal(false);
+            }
+
+            function clearQuiz() {
+                if (!activeContext.input) {
+                    toggleModal(false);
+                    return;
+                }
+                activeContext.input.value = '';
+                updateSummary(activeContext.input, activeContext.summary, activeContext.trigger);
+                toggleModal(false);
+            }
+
+            if (addQuestionBtn) {
+                addQuestionBtn.addEventListener('click', function() {
+                    addQuestion();
+                });
+            }
+            if (saveBtn) {
+                saveBtn.addEventListener('click', saveQuiz);
+            }
+            if (clearBtn) {
+                clearBtn.addEventListener('click', clearQuiz);
+            }
+            closeButtons.forEach(function(button) {
+                button.addEventListener('click', function() {
+                    toggleModal(false);
+                });
+            });
+            quizBackdrop.addEventListener('click', function() {
+                toggleModal(false);
+            });
+
+            triggers.forEach(function(trigger) {
+                var targetSelector = trigger.getAttribute('data-quiz-target');
+                var summarySelector = trigger.getAttribute('data-quiz-summary');
+                var targetInput = targetSelector ? document.querySelector(targetSelector) : null;
+                var summaryEl = summarySelector ? document.querySelector(summarySelector) : null;
+                if (!targetInput) {
+                    return;
+                }
+                trigger.addEventListener('click', function() {
+                    activeContext.input = targetInput;
+                    activeContext.summary = summaryEl;
+                    activeContext.trigger = trigger;
+                    if (modalTitle) {
+                        modalTitle.textContent = trigger.getAttribute('data-quiz-title') || 'Autoevaluación';
+                    }
+                    loadQuestionsIntoModal(parseQuizValue(targetInput.value));
+                    toggleModal(true);
+                });
+                updateSummary(targetInput, summaryEl, trigger);
             });
         });
         </script>

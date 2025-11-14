@@ -4,23 +4,35 @@ namespace Nammu\Core;
 
 class Itinerary
 {
+    public const USAGE_LOGIC_FREE = 'free';
+    public const USAGE_LOGIC_SEQUENTIAL = 'sequential';
+    public const USAGE_LOGIC_ASSESSMENT = 'assessment';
+
+    private const USAGE_LOGIC_ALLOWED = [
+        self::USAGE_LOGIC_FREE => true,
+        self::USAGE_LOGIC_SEQUENTIAL => true,
+        self::USAGE_LOGIC_ASSESSMENT => true,
+    ];
+
     private string $slug;
     private array $metadata;
     private string $content;
     /** @var ItineraryTopic[] */
     private array $topics;
     private string $directory;
+    private array $quiz;
 
     /**
      * @param ItineraryTopic[] $topics
      */
-    public function __construct(string $slug, array $metadata, string $content, array $topics, string $directory)
+    public function __construct(string $slug, array $metadata, string $content, array $topics, string $directory, array $quiz = [])
     {
         $this->slug = $slug;
         $this->metadata = $metadata;
         $this->content = $content;
         $this->topics = $this->sortTopics($topics);
         $this->directory = $directory;
+        $this->quiz = $quiz;
     }
 
     public function getSlug(): string
@@ -36,6 +48,24 @@ class Itinerary
     public function getDescription(): string
     {
         return $this->metadata['Description'] ?? '';
+    }
+
+    public function getClassLabel(): string
+    {
+        $label = trim((string) ($this->metadata['ItineraryClass'] ?? ''));
+        if ($label === '') {
+            return 'Itinerario';
+        }
+        return $label;
+    }
+
+    public function getUsageLogic(): string
+    {
+        $value = strtolower(trim((string) ($this->metadata['UsageLogic'] ?? '')));
+        if (!isset(self::USAGE_LOGIC_ALLOWED[$value])) {
+            return self::USAGE_LOGIC_FREE;
+        }
+        return $value;
     }
 
     public function getImage(): ?string
@@ -78,6 +108,33 @@ class Itinerary
     public function getFirstTopic(): ?ItineraryTopic
     {
         return $this->topics[0] ?? null;
+    }
+
+    public function getQuiz(): array
+    {
+        return $this->quiz;
+    }
+
+    public function hasQuiz(): bool
+    {
+        return !empty($this->quiz['questions']);
+    }
+
+    public function getQuizMinimumCorrect(): int
+    {
+        if (!$this->hasQuiz()) {
+            return 0;
+        }
+        $questions = $this->quiz['questions'] ?? [];
+        $questionCount = max(1, count($questions));
+        $minimum = (int) ($this->quiz['minimum_correct'] ?? $questionCount);
+        if ($minimum < 1) {
+            $minimum = 1;
+        }
+        if ($minimum > $questionCount) {
+            $minimum = $questionCount;
+        }
+        return $minimum;
     }
 
     private function sortTopics(array $topics): array

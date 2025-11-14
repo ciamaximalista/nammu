@@ -487,6 +487,90 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
         .itinerary-topics__cta .button {
             min-width: 220px;
         }
+        .itinerary-usage-alert {
+            margin-top: 2rem;
+            padding: 1rem 1.25rem;
+            border-radius: var(--nammu-radius-md);
+            background: rgba(234, 47, 40, 0.08);
+            border-left: 4px solid <?= $colorH2 ?>;
+            font-size: 0.95rem;
+            text-align: left;
+            color: <?= $colorText ?>;
+        }
+        .itinerary-quiz {
+            margin: 2.5rem auto;
+            padding: 1.5rem;
+            border-radius: var(--nammu-radius-md);
+            border: 1px solid rgba(0,0,0,0.08);
+            background: #fff;
+            max-width: min(900px, 100%);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+        }
+        .itinerary-quiz__header h2 {
+            margin-bottom: 0.5rem;
+        }
+        .itinerary-quiz__question {
+            border: 1px solid rgba(0,0,0,0.05);
+            border-radius: var(--nammu-radius-md);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: <?= $colorHighlight ?>;
+        }
+        .itinerary-quiz__answers {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .itinerary-quiz__answers li {
+            margin-bottom: 0.5rem;
+        }
+        .itinerary-quiz__answers label {
+            display: flex;
+            gap: 0.6rem;
+            cursor: pointer;
+            align-items: flex-start;
+        }
+        .itinerary-quiz__answers input[type="checkbox"] {
+            margin-top: 0.25rem;
+        }
+        .itinerary-quiz__actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            margin-top: 1rem;
+        }
+        .itinerary-quiz__result {
+            font-weight: 600;
+        }
+        .itinerary-topic-cta__alert {
+            margin-top: 1rem;
+            color: <?= $colorH2 ?>;
+            font-weight: 600;
+        }
+        .button-disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .itinerary-topic-card__lock {
+            display: none;
+            margin-top: 0.5rem;
+            font-size: 0.92rem;
+            color: <?= $colorH2 ?>;
+            font-weight: 600;
+        }
+        .itinerary-topic-card--locked {
+            opacity: 0.85;
+        }
+        .itinerary-topic-card--locked .itinerary-topic-card__lock {
+            display: block;
+        }
+        .itinerary-topic-card--locked [data-topic-link] {
+            cursor: not-allowed;
+        }
+        [data-topic-link].is-disabled {
+            pointer-events: none;
+        }
         @media (max-width: 1024px) {
             .floating-logo {
                 display: none;
@@ -558,5 +642,297 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
             </form>
         </div>
     <?php endif; ?>
+    <script>
+    (function() {
+        function buildCookieName(slug) {
+            var normalized = (slug || '').toString().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+            if (!normalized) {
+                normalized = 'general';
+            }
+            return 'nammu_itinerary_progress_' + normalized;
+        }
+        function readProgress(slug) {
+            var name = buildCookieName(slug) + '=';
+            var decoded = '';
+            document.cookie.split(';').forEach(function(part) {
+                var trimmed = part.trim();
+                if (trimmed.indexOf(name) === 0) {
+                    decoded = decodeURIComponent(trimmed.substring(name.length));
+                }
+            });
+            if (!decoded) {
+                return {visited: [], passed: []};
+            }
+            try {
+                var parsed = JSON.parse(decoded);
+                return {
+                    visited: Array.isArray(parsed.visited) ? parsed.visited : [],
+                    passed: Array.isArray(parsed.passed) ? parsed.passed : []
+                };
+            } catch (e) {
+                return {visited: [], passed: []};
+            }
+        }
+        function writeProgress(slug, data) {
+            var name = buildCookieName(slug);
+            var payload = encodeURIComponent(JSON.stringify(data));
+            document.cookie = name + '=' + payload + ';path=/;max-age=31536000;samesite=lax';
+        }
+        function ensureStructure(slug) {
+            var progress = readProgress(slug);
+            if (!Array.isArray(progress.visited)) {
+                progress.visited = [];
+            }
+            if (!Array.isArray(progress.passed)) {
+                progress.passed = [];
+            }
+            return progress;
+        }
+        function markVisited(slug, topic) {
+            if (!slug || !topic) {
+                return;
+            }
+            var progress = ensureStructure(slug);
+            if (progress.visited.indexOf(topic) === -1) {
+                progress.visited.push(topic);
+                writeProgress(slug, progress);
+            }
+        }
+        function markPassed(slug, topic) {
+            if (!slug || !topic) {
+                return;
+            }
+            var progress = ensureStructure(slug);
+            if (progress.passed.indexOf(topic) === -1) {
+                progress.passed.push(topic);
+                writeProgress(slug, progress);
+            }
+            return progress;
+        }
+
+        function hasVisited(progress, topic) {
+            if (!topic) {
+                return true;
+            }
+            return progress.visited.indexOf(topic) !== -1;
+        }
+
+        function hasPassed(progress, topic) {
+            if (!topic) {
+                return true;
+            }
+            return progress.passed.indexOf(topic) !== -1;
+        }
+
+        function setLinkState(link, unlocked, disabledClass) {
+            if (!link) {
+                return;
+            }
+            if (unlocked) {
+                var original = link.getAttribute('data-original-href');
+                if (original) {
+                    link.setAttribute('href', original);
+                } else if (link.dataset.originalHref) {
+                    link.setAttribute('href', link.dataset.originalHref);
+                }
+                link.classList.remove('is-disabled');
+                if (disabledClass) {
+                    link.classList.remove(disabledClass);
+                }
+                link.removeAttribute('aria-disabled');
+                link.removeAttribute('tabindex');
+            } else {
+                if (!link.getAttribute('data-original-href') && link.getAttribute('href')) {
+                    link.setAttribute('data-original-href', link.getAttribute('href'));
+                }
+                if (link.getAttribute('href')) {
+                    link.removeAttribute('href');
+                }
+                link.classList.add('is-disabled');
+                if (disabledClass) {
+                    link.classList.add(disabledClass);
+                }
+                link.setAttribute('aria-disabled', 'true');
+                link.setAttribute('tabindex', '-1');
+            }
+        }
+
+        function toggleTopicCard(card, unlocked) {
+            var lockMessage = card.querySelector('[data-topic-lock-message]');
+            var links = card.querySelectorAll('[data-topic-link]');
+            if (unlocked) {
+                card.classList.remove('itinerary-topic-card--locked');
+                links.forEach(function(link) {
+                    setLinkState(link, true);
+                });
+                if (lockMessage) {
+                    lockMessage.style.display = 'none';
+                }
+            } else {
+                card.classList.add('itinerary-topic-card--locked');
+                links.forEach(function(link) {
+                    setLinkState(link, false);
+                });
+                if (lockMessage) {
+                    lockMessage.style.display = '';
+                }
+            }
+        }
+
+        function applyTopicLocks(container) {
+            var slug = container.getAttribute('data-itinerary-slug') || '';
+            if (!slug) {
+                return;
+            }
+            var usageLogic = container.getAttribute('data-usage-logic') || 'free';
+            if (usageLogic === 'free') {
+                return;
+            }
+            var progress = ensureStructure(slug);
+            var cards = container.querySelectorAll('[data-itinerary-topic]');
+            var firstLocked = false;
+            cards.forEach(function(card, index) {
+                var requiredSlug = index === 0 ? '__presentation' : (cards[index - 1].getAttribute('data-topic-slug') || '');
+                var unlocked = true;
+                if (usageLogic === 'sequential') {
+                    unlocked = hasVisited(progress, requiredSlug);
+                } else if (usageLogic === 'assessment') {
+                    unlocked = hasPassed(progress, requiredSlug);
+                }
+                toggleTopicCard(card, unlocked);
+                if (index === 0) {
+                    firstLocked = !unlocked;
+                }
+            });
+            var startLink = container.querySelector('[data-first-topic-link]');
+            if (startLink) {
+                setLinkState(startLink, !firstLocked, 'button-disabled');
+            }
+        }
+
+        var quizBlocks = document.querySelectorAll('[data-itinerary-quiz]');
+        quizBlocks.forEach(function(quizBlock) {
+            var slug = quizBlock.getAttribute('data-itinerary-slug');
+            var topic = quizBlock.getAttribute('data-topic-slug');
+            var minCorrect = parseInt(quizBlock.getAttribute('data-min-correct'), 10) || 1;
+            var submitBtn = quizBlock.querySelector('[data-quiz-submit]');
+            var resultBox = quizBlock.querySelector('[data-quiz-result]');
+            if (!slug || !topic || !submitBtn || !resultBox) {
+                return;
+            }
+            submitBtn.addEventListener('click', function() {
+                var questions = quizBlock.querySelectorAll('[data-quiz-question]');
+                if (!questions.length) {
+                    return;
+                }
+                var correctCount = 0;
+                questions.forEach(function(question) {
+                    var answers = question.querySelectorAll('[data-quiz-answer]');
+                    var isCorrect = true;
+                    answers.forEach(function(answer) {
+                        var shouldBeChecked = answer.getAttribute('data-correct') === '1';
+                        var checked = answer.checked;
+                        if (shouldBeChecked !== checked) {
+                            isCorrect = false;
+                        }
+                    });
+                    if (isCorrect) {
+                        correctCount += 1;
+                    }
+                });
+                var totalQuestions = questions.length;
+                var percentage = Math.round((correctCount / totalQuestions) * 100);
+                var passed = correctCount >= minCorrect;
+                var message = 'Has respondido correctamente el ' + percentage + '% (' + correctCount + ' de ' + totalQuestions + ' preguntas). ';
+                message += passed
+                    ? 'Has superado el mínimo establecido.'
+                    : 'No alcanzas el mínimo de ' + minCorrect + ' preguntas.';
+                resultBox.textContent = message;
+                resultBox.classList.toggle('text-success', passed);
+                resultBox.classList.toggle('text-danger', !passed);
+                if (passed) {
+                    markPassed(slug, topic);
+                    document.dispatchEvent(new CustomEvent('itineraryQuizPassed', {
+                        detail: {slug: slug, topic: topic}
+                    }));
+                }
+            });
+        });
+
+        var ctaBlock = document.querySelector('[data-itinerary-topic-cta]');
+        if (ctaBlock) {
+            var slug = ctaBlock.getAttribute('data-itinerary-slug');
+            var topic = ctaBlock.getAttribute('data-topic-slug');
+            var usageLogic = ctaBlock.getAttribute('data-usage-logic') || 'free';
+            var requiresQuiz = ctaBlock.getAttribute('data-requires-quiz') === '1';
+            var initialPassed = ctaBlock.getAttribute('data-initial-passed') === '1';
+            var nextLink = ctaBlock.querySelector('[data-next-link]');
+            var lockedNotice = ctaBlock.querySelector('[data-next-locked]');
+
+            markVisited(slug, topic);
+
+            function setLocked(state) {
+                if (!nextLink) {
+                    return;
+                }
+                if (state) {
+                    nextLink.classList.add('button-disabled');
+                    nextLink.setAttribute('aria-disabled', 'true');
+                    nextLink.setAttribute('tabindex', '-1');
+                    if (lockedNotice) {
+                        lockedNotice.style.display = '';
+                    }
+                } else {
+                    nextLink.classList.remove('button-disabled');
+                    nextLink.removeAttribute('aria-disabled');
+                    nextLink.removeAttribute('tabindex');
+                    if (lockedNotice) {
+                        lockedNotice.style.display = 'none';
+                    }
+                }
+            }
+
+            var locked = requiresQuiz && !initialPassed;
+            setLocked(locked);
+
+            if (nextLink) {
+                nextLink.addEventListener('click', function(event) {
+                    if (requiresQuiz && locked) {
+                        event.preventDefault();
+                    }
+                });
+            }
+
+            document.addEventListener('itineraryQuizPassed', function(event) {
+                if (!event.detail || event.detail.slug !== slug || event.detail.topic !== topic) {
+                    return;
+                }
+                locked = false;
+                setLocked(false);
+            });
+        }
+
+        var topicContainers = document.querySelectorAll('[data-itinerary-topics]');
+        topicContainers.forEach(function(container) {
+            var slug = container.getAttribute('data-itinerary-slug');
+            if (!slug) {
+                return;
+            }
+            var usageLogic = container.getAttribute('data-usage-logic') || 'free';
+            var presentationQuiz = container.getAttribute('data-presentation-quiz') === '1';
+            markVisited(slug, '__presentation');
+            if (usageLogic === 'assessment' && !presentationQuiz) {
+                markPassed(slug, '__presentation');
+            }
+            applyTopicLocks(container);
+            document.addEventListener('itineraryQuizPassed', function(event) {
+                if (!event.detail || event.detail.slug !== slug) {
+                    return;
+                }
+                applyTopicLocks(container);
+            });
+        });
+    })();
+    </script>
 </body>
 </html>

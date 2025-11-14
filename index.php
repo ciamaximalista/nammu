@@ -545,6 +545,22 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
     if ($topic === null) {
         $renderNotFound('Tema no encontrado', 'Este tema no se encuentra disponible dentro del itinerario.', $routePath);
     }
+    $usageLogic = $itinerary->getUsageLogic();
+    $progressData = nammu_get_itinerary_progress($itinerary->getSlug());
+    $hadPresentation = in_array('__presentation', $progressData['visited'], true);
+    $alreadyVisited = in_array($topic->getSlug(), $progressData['visited'], true);
+    if (!$alreadyVisited) {
+        $progressData['visited'][] = $topic->getSlug();
+        nammu_set_itinerary_progress($itinerary->getSlug(), $progressData);
+        if ($hadPresentation) {
+            $incrementStart = $topic->getNumber() === 1;
+            try {
+                $itineraryRepository->recordTopicStat($itinerary->getSlug(), $topic, $incrementStart);
+            } catch (Throwable $e) {
+                // Ignore write failures to keep navigation smooth
+            }
+        }
+    }
     $documentData = $markdown->convertDocument($topic->getContent());
     $topicHtml = $documentData['html'];
     $topicsList = $itinerary->getTopics();
@@ -647,7 +663,9 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
     $topicExtras = $renderer->render('itinerary-topic', [
         'itinerary' => $itinerary,
         'topic' => $topic,
-        'hasTest' => $topic->hasTest(),
+        'quiz' => $topic->getQuiz(),
+        'usageLogic' => $usageLogic,
+        'progress' => $progressData,
         'nextStep' => $nextStep,
     ]);
     $content = $topicMainContent . $topicExtras;
@@ -666,6 +684,11 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
     $itinerary = $itineraryRepository->find($itinerarySlug);
     if ($itinerary === null) {
         $renderNotFound('Itinerario no encontrado', 'El itinerario solicitado no se encuentra disponible.', $routePath);
+    }
+    $itineraryProgress = nammu_get_itinerary_progress($itinerary->getSlug());
+    if (!in_array('__presentation', $itineraryProgress['visited'], true)) {
+        $itineraryProgress['visited'][] = '__presentation';
+        nammu_set_itinerary_progress($itinerary->getSlug(), $itineraryProgress);
     }
     $documentData = $markdown->convertDocument($itinerary->getContent());
     $itineraryHtml = $documentData['html'];
@@ -731,7 +754,7 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
         'postFilePath' => $itinerary->getDirectory() . '/index.md',
         'autoTocHtml' => $autoTocHtml,
         'hideCategory' => true,
-        'customMetaBand' => 'Itinerario',
+        'customMetaBand' => $itinerary->getClassLabel(),
         'suppressSingleSearchTop' => true,
         'suppressSingleSearchBottom' => true,
     ]);
@@ -741,14 +764,90 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
         $itineraryBody
     ) ?? $itineraryBody;
     $itineraryBody = '<div class="itinerary-single-content">' . $itineraryBody . '</div>';
+    $usageLogic = $itinerary->getUsageLogic();
+    $usageNotice = '';
+    if ($usageLogic === Itinerary::USAGE_LOGIC_SEQUENTIAL) {
+        $usageNotice = 'Este itinerario usa cookies para asegurar que sigues el orden de temas creado por su autor. La información guardada en esas cookies se usa exclusivamenente para ese fin. Al iniciar el itinerario aceptas su uso.';
+    } elseif ($usageLogic === Itinerary::USAGE_LOGIC_ASSESSMENT) {
+        $usageNotice = 'Este itinerario usa cookies para asegurar que sigues el orden de temas creado por su autor y que  pasas las autoevaluaciones entre temas. La información guardada en esas cookies se usa exclusivamenente para esos fines. Al iniciar el itinerario aceptas su uso.';
+    }
+    $presentationQuizHtml = '';
+    $presentationQuizData = $itinerary->getQuiz();
+    if ($itinerary->hasQuiz()) {
+        $presentationQuestions = $presentationQuizData['questions'] ?? [];
+        if (!empty($presentationQuestions)) {
+            $presentationQuestionCount = count($presentationQuestions);
+            $presentationMinimum = $itinerary->getQuizMinimumCorrect();
+            $shuffledPresentationQuestions = $presentationQuestions;
+            shuffle($shuffledPresentationQuestions);
+            ob_start(); ?>
+            <section
+                class="itinerary-quiz"
+                data-itinerary-quiz
+                data-itinerary-slug="<?= htmlspecialchars($itinerary->getSlug(), ENT_QUOTES, 'UTF-8') ?>"
+                data-topic-slug="__presentation"
+                data-min-correct="<?= (int) $presentationMinimum ?>"
+                data-usage-logic="<?= htmlspecialchars($usageLogic, ENT_QUOTES, 'UTF-8') ?>"
+            >
+                <div class="itinerary-quiz__header">
+                    <h2>Autoevaluación de la presentación del itinerario</h2>
+                    <p>Debes acertar al menos <?= (int) $presentationMinimum ?> de <?= (int) $presentationQuestionCount ?> preguntas para avanzar.</p>
+                </div>
+                <div class="itinerary-quiz__body">
+                    <?php foreach ($shuffledPresentationQuestions as $index => $question): ?>
+                        <?php
+                        $answers = $question['answers'] ?? [];
+                        shuffle($answers);
+                        ?>
+                        <article class="itinerary-quiz__question" data-quiz-question>
+                            <h3>Pregunta <?= $index + 1 ?></h3>
+                            <p><?= htmlspecialchars($question['text'] ?? '', ENT_QUOTES, 'UTF-8') ?></p>
+                            <ul class="itinerary-quiz__answers">
+                                <?php foreach ($answers as $answer): ?>
+                                    <li>
+                                        <label>
+                                            <input
+                                                type="checkbox"
+                                                data-quiz-answer
+                                                data-correct="<?= !empty($answer['correct']) ? '1' : '0' ?>"
+                                                value="1"
+                                            >
+                                            <span><?= htmlspecialchars($answer['text'] ?? '', ENT_QUOTES, 'UTF-8') ?></span>
+                                        </label>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+                <div class="itinerary-quiz__actions">
+                    <button type="button" class="button button-primary" data-quiz-submit>Comprobar respuestas</button>
+                    <div class="itinerary-quiz__result" data-quiz-result aria-live="polite"></div>
+                </div>
+            </section>
+            <?php
+            $presentationQuizHtml = (string) ob_get_clean();
+        }
+    }
     $topicsHtml = '';
     if (!empty($topicSummaries)) {
         ob_start(); ?>
-        <section class="itinerary-topics">
+        <section
+            class="itinerary-topics"
+            data-itinerary-topics
+            data-itinerary-slug="<?= htmlspecialchars($itinerary->getSlug(), ENT_QUOTES, 'UTF-8') ?>"
+            data-usage-logic="<?= htmlspecialchars($usageLogic, ENT_QUOTES, 'UTF-8') ?>"
+            data-presentation-quiz="<?= $itinerary->hasQuiz() ? '1' : '0' ?>"
+        >
             <h2>Temas del itinerario</h2>
             <div class="itinerary-topics__list">
                 <?php foreach ($topicSummaries as $topic): ?>
-                    <article class="itinerary-topic-card">
+                    <article
+                        class="itinerary-topic-card"
+                        data-itinerary-topic
+                        data-topic-slug="<?= htmlspecialchars($topic['slug'], ENT_QUOTES, 'UTF-8') ?>"
+                        data-topic-number="<?= (int) $topic['number'] ?>"
+                    >
                         <?php
                             $topicImageUrl = null;
                             if (!empty($topic['image'])) {
@@ -757,37 +856,54 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
                                 $topicImageUrl = nammu_resolve_asset($itinerary->getImage(), $publicBaseUrl);
                             }
                         ?>
-                        <?php if ($topicImageUrl): ?>
-                            <figure class="itinerary-topic-card__media">
-                                <img src="<?= htmlspecialchars($topicImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($topic['title'], ENT_QUOTES, 'UTF-8') ?>">
-                            </figure>
-                        <?php endif; ?>
+                <?php if ($topicImageUrl): ?>
+                    <figure class="itinerary-topic-card__media">
+                        <a href="<?= htmlspecialchars($topic['url'], ENT_QUOTES, 'UTF-8') ?>" data-topic-link>
+                            <img src="<?= htmlspecialchars($topicImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($topic['title'], ENT_QUOTES, 'UTF-8') ?>">
+                        </a>
+                    </figure>
+                <?php endif; ?>
                         <div class="itinerary-topic-card__number">
                             Tema <?= (int) $topic['number'] ?>
                         </div>
                         <div class="itinerary-topic-card__body">
                             <h3>
-                                <a href="<?= htmlspecialchars($topic['url'], ENT_QUOTES, 'UTF-8') ?>">
+                                <a href="<?= htmlspecialchars($topic['url'], ENT_QUOTES, 'UTF-8') ?>" data-topic-link>
                                     <?= htmlspecialchars($topic['title'], ENT_QUOTES, 'UTF-8') ?>
                                 </a>
                             </h3>
                             <?php if ($topic['description'] !== ''): ?>
                                 <p class="itinerary-topic-card__description"><?= htmlspecialchars($topic['description'], ENT_QUOTES, 'UTF-8') ?></p>
                             <?php endif; ?>
+                            <p class="itinerary-topic-card__lock" data-topic-lock-message style="display:none;">
+                                Completa el paso anterior para desbloquear este tema.
+                            </p>
                         </div>
                     </article>
                 <?php endforeach; ?>
             </div>
             <?php if ($firstTopicUrl): ?>
                 <div class="itinerary-topics__cta">
-                    <a class="button button-primary" href="<?= htmlspecialchars($firstTopicUrl, ENT_QUOTES, 'UTF-8') ?>">Comenzar itinerario</a>
+                    <a
+                        class="button button-primary"
+                        href="<?= htmlspecialchars($firstTopicUrl, ENT_QUOTES, 'UTF-8') ?>"
+                        data-first-topic-link="1"
+                        data-topic-link
+                        data-topic-slug="<?= htmlspecialchars($firstTopic !== null ? $firstTopic->getSlug() : '', ENT_QUOTES, 'UTF-8') ?>"
+                        data-topic-number="<?= (int) ($firstTopic !== null ? $firstTopic->getNumber() : 1) ?>"
+                    >Comenzar itinerario</a>
+                </div>
+            <?php endif; ?>
+            <?php if ($usageNotice !== ''): ?>
+                <div class="itinerary-usage-alert" role="note">
+                    <?= htmlspecialchars($usageNotice, ENT_QUOTES, 'UTF-8') ?>
                 </div>
             <?php endif; ?>
         </section>
         <?php
         $topicsHtml = (string) ob_get_clean();
     }
-    $content = $itineraryBody . $topicsHtml;
+    $content = $itineraryBody . $presentationQuizHtml . $topicsHtml;
     echo $renderer->render('layout', [
         'pageTitle' => $itinerary->getTitle(),
         'metaDescription' => $itineraryDescription,

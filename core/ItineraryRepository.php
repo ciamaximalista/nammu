@@ -14,8 +14,11 @@ class ItineraryRepository
         if ($this->baseDir === '') {
             throw new RuntimeException('Directorio base para itinerarios no válido');
         }
-        if (!is_dir($this->baseDir) && !mkdir($this->baseDir, 0755, true) && !is_dir($this->baseDir)) {
-            throw new RuntimeException('No se pudo preparar el directorio base de itinerarios');
+        if (!is_dir($this->baseDir) && !\nammu_ensure_directory($this->baseDir)) {
+            throw new RuntimeException(
+                'No se pudo preparar el directorio base de itinerarios. ' .
+                'Crea manualmente la carpeta "' . $this->baseDir . '" y asigna permisos de escritura al usuario del servidor web.'
+            );
         }
     }
 
@@ -91,8 +94,8 @@ class ItineraryRepository
             throw new RuntimeException('El slug del itinerario no es válido');
         }
         $directory = "{$this->baseDir}/{$slug}";
-        if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
-            throw new RuntimeException("No se pudo crear el directorio del itinerario {$slug}");
+        if (!is_dir($directory) && !\nammu_ensure_directory($directory)) {
+            throw new RuntimeException("No se pudo crear el directorio del itinerario {$slug}. Comprueba los permisos de escritura.");
         }
 
         $metadata['Slug'] = $slug;

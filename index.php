@@ -10,6 +10,9 @@ require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
 
 use Nammu\Core\ContentRepository;
+use Nammu\Core\Itinerary;
+use Nammu\Core\ItineraryRepository;
+use Nammu\Core\ItineraryTopic;
 use Nammu\Core\MarkdownConverter;
 use Nammu\Core\Post;
 use Nammu\Core\RssGenerator;
@@ -17,6 +20,7 @@ use Nammu\Core\TemplateRenderer;
 use Nammu\Core\SitemapGenerator;
 
 $contentRepository = new ContentRepository(__DIR__ . '/content');
+$itineraryRepository = new ItineraryRepository(__DIR__ . '/itinerarios');
 $markdown = new MarkdownConverter();
 
 $siteDocument = $contentRepository->getDocument('index');
@@ -88,6 +92,18 @@ $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseU
     return $publicBaseUrl !== '' ? $publicBaseUrl . '/' . $path : '/' . $path;
 });
 
+$buildItineraryUrl = static function (Itinerary|string $itinerary) use ($publicBaseUrl): string {
+    $slug = $itinerary instanceof Itinerary ? $itinerary->getSlug() : (string) $itinerary;
+    $path = '/itinerarios/' . rawurlencode($slug);
+    return $publicBaseUrl !== '' ? $publicBaseUrl . $path : $path;
+};
+$buildItineraryTopicUrl = static function (Itinerary|string $itinerary, ItineraryTopic|string $topic) use ($publicBaseUrl): string {
+    $itinerarySlug = $itinerary instanceof Itinerary ? $itinerary->getSlug() : (string) $itinerary;
+    $topicSlug = $topic instanceof ItineraryTopic ? $topic->getSlug() : (string) $topic;
+    $path = '/itinerarios/' . rawurlencode($itinerarySlug) . '/' . rawurlencode($topicSlug);
+    return $publicBaseUrl !== '' ? $publicBaseUrl . $path : $path;
+};
+
 $renderer->setGlobal('postUrl', function (Post|string $post) use ($publicBaseUrl): string {
     $slug = $post instanceof Post ? $post->getSlug() : (string) $post;
     $path = '/' . rawurlencode($slug);
@@ -97,6 +113,11 @@ $renderer->setGlobal('paginationUrl', function (int $page) use ($publicBaseUrl):
     $target = $page <= 1 ? '/' : '/pagina/' . $page;
     return $publicBaseUrl !== '' ? $publicBaseUrl . $target : $target;
 });
+$renderer->setGlobal('itineraryUrl', $buildItineraryUrl);
+$renderer->setGlobal('itineraryTopicUrl', $buildItineraryTopicUrl);
+$renderer->setGlobal('itinerariesIndexUrl', $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios');
+$itineraryListing = $itineraryRepository->all();
+$renderer->setGlobal('hasItineraries', !empty($itineraryListing));
 
 $renderer->setGlobal('markdownToHtml', function (string $markdownText) use ($markdown): string {
     return $markdown->toHtml($markdownText);
@@ -510,6 +531,296 @@ if ($categorySlugRequest !== null) {
     ]);
     exit;
 }
+
+if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItineraryTopic)) {
+    $itinerarySlug = ItineraryRepository::normalizeSlug(rawurldecode($matchItineraryTopic[1]));
+    $topicSlug = ItineraryRepository::normalizeSlug(rawurldecode($matchItineraryTopic[2]));
+    $itinerary = $itineraryRepository->find($itinerarySlug);
+    if ($itinerary === null) {
+        $renderNotFound('Itinerario no encontrado', 'El itinerario solicitado no se encuentra disponible.', $routePath);
+    }
+    $topic = $itineraryRepository->findTopic($itinerarySlug, $topicSlug);
+    if ($topic === null) {
+        $renderNotFound('Tema no encontrado', 'Este tema no se encuentra disponible dentro del itinerario.', $routePath);
+    }
+    $documentData = $markdown->convertDocument($topic->getContent());
+    $topicHtml = $documentData['html'];
+    $topicsList = $itinerary->getTopics();
+    $nextTopic = null;
+    foreach ($topicsList as $index => $candidate) {
+        if ($candidate->getSlug() === $topic->getSlug()) {
+            $nextTopic = $topicsList[$index + 1] ?? null;
+            break;
+        }
+    }
+    $nextStep = null;
+    if ($nextTopic !== null) {
+        $nextStep = [
+            'url' => $buildItineraryTopicUrl($itinerary, $nextTopic),
+            'label' => 'Pasar al siguiente tema',
+        ];
+    }
+    $topicImage = nammu_resolve_asset($topic->getImage(), $publicBaseUrl);
+    if ($topicImage === null) {
+        $topicImage = nammu_resolve_asset($itinerary->getImage(), $publicBaseUrl);
+    }
+    if ($topicImage === null) {
+        $topicImage = $homeImage;
+    }
+    $topicDescription = $topic->getDescription();
+    if ($topicDescription === '') {
+        $topicDescription = nammu_excerpt_text($topicHtml, 200);
+    }
+    $topicCanonical = $buildItineraryTopicUrl($itinerary, $topic);
+    $entryTocConfig = $theme['entry']['toc'] ?? ['auto' => 'off', 'min_headings' => 3];
+    $autoTocEnabled = ($entryTocConfig['auto'] ?? 'off') === 'on';
+    $entryMinHeadings = (int) ($entryTocConfig['min_headings'] ?? 3);
+    if (!in_array($entryMinHeadings, [2, 3, 4], true)) {
+        $entryMinHeadings = 3;
+    }
+    $renderableHeadings = array_filter($documentData['headings'], static function (array $heading): bool {
+        return isset($heading['id'], $heading['text'], $heading['level'])
+            && $heading['id'] !== ''
+            && $heading['text'] !== ''
+            && (int) $heading['level'] >= 1
+            && (int) $heading['level'] <= 4;
+    });
+    $autoTocHtml = '';
+    if ($autoTocEnabled && !$documentData['has_manual_toc'] && count($renderableHeadings) >= $entryMinHeadings) {
+        $generatedToc = $markdown->buildToc($documentData['headings']);
+        if ($generatedToc !== '') {
+            $autoTocHtml = $generatedToc;
+        }
+    }
+    $topicSocialMeta = nammu_build_social_meta([
+        'type' => 'article',
+        'title' => $topic->getTitle() . ' — ' . $itinerary->getTitle(),
+        'description' => $topicDescription,
+        'url' => $topicCanonical,
+        'image' => $topicImage,
+        'site_name' => $siteNameForMeta,
+    ], $socialConfig);
+    $topicMetadata = $topic->getMetadata();
+    $itineraryMetadata = method_exists($itinerary, 'getMetadata') ? $itinerary->getMetadata() : [];
+    $virtualPostMetadata = [
+        'Title' => $topic->getTitle(),
+        'Description' => $topicDescription,
+        'Image' => $topicMetadata['Image'] ?? ($itinerary->getImage() ?? ''),
+        'Template' => 'post',
+    ];
+    if (!empty($topicMetadata['Date'])) {
+        $virtualPostMetadata['Date'] = $topicMetadata['Date'];
+    } elseif (!empty($itineraryMetadata['Date'])) {
+        $virtualPostMetadata['Date'] = $itineraryMetadata['Date'];
+    }
+    $virtualPost = new Post(
+        'itinerario-' . $itinerary->getSlug() . '-' . $topic->getSlug(),
+        $virtualPostMetadata,
+        $topic->getContent()
+    );
+    $virtualPostMetadata = [
+        'Title' => $topic->getTitle(),
+        'Description' => $topicDescription,
+        'Image' => $topicMetadata['Image'] ?? ($itinerary->getImage() ?? ''),
+        'Template' => 'post',
+        'Category' => 'Tema ' . $topic->getNumber() . ' del itinerario «' . $itinerary->getTitle() . '»',
+    ];
+    $topicMainContent = $renderer->render('single', [
+        'pageTitle' => $topic->getTitle(),
+        'post' => $virtualPost,
+        'htmlContent' => $topicHtml,
+        'postFilePath' => $topic->getFilePath(),
+        'autoTocHtml' => $autoTocHtml,
+        'hideCategory' => true,
+        'customMetaBand' => 'Tema ' . $topic->getNumber() . ' del itinerario «' . $itinerary->getTitle() . '»',
+        'suppressSingleSearchTop' => true,
+        'suppressSingleSearchBottom' => true,
+    ]);
+    $topicMainContent = preg_replace(
+        '#<(?:div|section)\s+class="site-search-block placement-bottom"[^>]*>.*?</(?:div|section)>#si',
+        '',
+        $topicMainContent
+    ) ?? $topicMainContent;
+    $topicMainContent = '<div class="itinerary-single-content">' . $topicMainContent . '</div>';
+    $topicExtras = $renderer->render('itinerary-topic', [
+        'itinerary' => $itinerary,
+        'topic' => $topic,
+        'hasTest' => $topic->hasTest(),
+        'nextStep' => $nextStep,
+    ]);
+    $content = $topicMainContent . $topicExtras;
+    echo $renderer->render('layout', [
+        'pageTitle' => $topic->getTitle() . ' — ' . $itinerary->getTitle(),
+        'metaDescription' => $topicDescription,
+        'content' => $content,
+        'socialMeta' => $topicSocialMeta,
+        'showLogo' => true,
+    ]);
+    exit;
+}
+
+if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
+    $itinerarySlug = ItineraryRepository::normalizeSlug(rawurldecode($matchItinerary[1]));
+    $itinerary = $itineraryRepository->find($itinerarySlug);
+    if ($itinerary === null) {
+        $renderNotFound('Itinerario no encontrado', 'El itinerario solicitado no se encuentra disponible.', $routePath);
+    }
+    $documentData = $markdown->convertDocument($itinerary->getContent());
+    $itineraryHtml = $documentData['html'];
+    $topics = $itinerary->getTopics();
+    $firstTopic = $itinerary->getFirstTopic();
+    $firstTopicUrl = $firstTopic ? $buildItineraryTopicUrl($itinerary, $firstTopic) : null;
+    $topicSummaries = array_map(function (ItineraryTopic $topic) use ($itinerary, $buildItineraryTopicUrl): array {
+        return [
+            'slug' => $topic->getSlug(),
+            'title' => $topic->getTitle(),
+            'description' => $topic->getDescription(),
+            'number' => $topic->getNumber(),
+            'url' => $buildItineraryTopicUrl($itinerary, $topic),
+            'image' => $topic->getImage(),
+            'meta' => 'Tema ' . $topic->getNumber() . ' del itinerario «' . $itinerary->getTitle() . '»',
+        ];
+    }, $topics);
+    $itineraryImage = nammu_resolve_asset($itinerary->getImage(), $publicBaseUrl) ?? $homeImage;
+    $itineraryDescription = $itinerary->getDescription() !== '' ? $itinerary->getDescription() : nammu_excerpt_text($itineraryHtml, 220);
+    $canonical = $buildItineraryUrl($itinerary);
+    $itinerarySocialMeta = nammu_build_social_meta([
+        'type' => 'website',
+        'title' => $itinerary->getTitle(),
+        'description' => $itineraryDescription,
+        'url' => $canonical,
+        'image' => $itineraryImage,
+        'site_name' => $siteNameForMeta,
+    ], $socialConfig);
+    $entryTocConfig = $theme['entry']['toc'] ?? ['auto' => 'off', 'min_headings' => 3];
+    $autoTocEnabled = ($entryTocConfig['auto'] ?? 'off') === 'on';
+    $entryMinHeadings = (int) ($entryTocConfig['min_headings'] ?? 3);
+    if (!in_array($entryMinHeadings, [2, 3, 4], true)) {
+        $entryMinHeadings = 3;
+    }
+    $virtualItineraryPost = new Post(
+        'itinerario-' . $itinerary->getSlug(),
+        [
+            'Title' => $itinerary->getTitle(),
+            'Description' => $itineraryDescription,
+            'Image' => $itinerary->getImage() ?? '',
+            'Template' => 'post',
+        ],
+        $itinerary->getContent()
+    );
+    $autoTocHtml = '';
+    $renderableHeadings = array_filter($documentData['headings'], static function (array $heading): bool {
+        return isset($heading['id'], $heading['text'], $heading['level'])
+            && $heading['id'] !== ''
+            && $heading['text'] !== ''
+            && (int) $heading['level'] >= 1
+            && (int) $heading['level'] <= 4;
+    });
+    if ($autoTocEnabled && !$documentData['has_manual_toc'] && count($renderableHeadings) >= $entryMinHeadings) {
+        $generatedToc = $markdown->buildToc($documentData['headings']);
+        if ($generatedToc !== '') {
+            $autoTocHtml = $generatedToc;
+        }
+    }
+    $itineraryBody = $renderer->render('single', [
+        'pageTitle' => $itinerary->getTitle(),
+        'post' => $virtualItineraryPost,
+        'htmlContent' => $itineraryHtml,
+        'postFilePath' => $itinerary->getDirectory() . '/index.md',
+        'autoTocHtml' => $autoTocHtml,
+        'hideCategory' => true,
+        'customMetaBand' => 'Itinerario',
+        'suppressSingleSearchTop' => true,
+        'suppressSingleSearchBottom' => true,
+    ]);
+    $itineraryBody = preg_replace(
+        '#<(?:div|section)\s+class="site-search-block placement-bottom"[^>]*>.*?</(?:div|section)>#si',
+        '',
+        $itineraryBody
+    ) ?? $itineraryBody;
+    $itineraryBody = '<div class="itinerary-single-content">' . $itineraryBody . '</div>';
+    $topicsHtml = '';
+    if (!empty($topicSummaries)) {
+        ob_start(); ?>
+        <section class="itinerary-topics">
+            <h2>Temas del itinerario</h2>
+            <div class="itinerary-topics__list">
+                <?php foreach ($topicSummaries as $topic): ?>
+                    <article class="itinerary-topic-card">
+                        <?php
+                            $topicImageUrl = null;
+                            if (!empty($topic['image'])) {
+                                $topicImageUrl = nammu_resolve_asset($topic['image'], $publicBaseUrl);
+                            } elseif (!empty($itinerary->getImage())) {
+                                $topicImageUrl = nammu_resolve_asset($itinerary->getImage(), $publicBaseUrl);
+                            }
+                        ?>
+                        <?php if ($topicImageUrl): ?>
+                            <figure class="itinerary-topic-card__media">
+                                <img src="<?= htmlspecialchars($topicImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($topic['title'], ENT_QUOTES, 'UTF-8') ?>">
+                            </figure>
+                        <?php endif; ?>
+                        <div class="itinerary-topic-card__number">
+                            Tema <?= (int) $topic['number'] ?>
+                        </div>
+                        <div class="itinerary-topic-card__body">
+                            <h3>
+                                <a href="<?= htmlspecialchars($topic['url'], ENT_QUOTES, 'UTF-8') ?>">
+                                    <?= htmlspecialchars($topic['title'], ENT_QUOTES, 'UTF-8') ?>
+                                </a>
+                            </h3>
+                            <?php if ($topic['description'] !== ''): ?>
+                                <p class="itinerary-topic-card__description"><?= htmlspecialchars($topic['description'], ENT_QUOTES, 'UTF-8') ?></p>
+                            <?php endif; ?>
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+            </div>
+            <?php if ($firstTopicUrl): ?>
+                <div class="itinerary-topics__cta">
+                    <a class="button button-primary" href="<?= htmlspecialchars($firstTopicUrl, ENT_QUOTES, 'UTF-8') ?>">Comenzar itinerario</a>
+                </div>
+            <?php endif; ?>
+        </section>
+        <?php
+        $topicsHtml = (string) ob_get_clean();
+    }
+    $content = $itineraryBody . $topicsHtml;
+    echo $renderer->render('layout', [
+        'pageTitle' => $itinerary->getTitle(),
+        'metaDescription' => $itineraryDescription,
+        'content' => $content,
+        'socialMeta' => $itinerarySocialMeta,
+        'showLogo' => true,
+    ]);
+    exit;
+}
+
+if (preg_match('#^/itinerarios/?$#i', $routePath)) {
+    $itineraries = $itineraryListing;
+    $content = $renderer->render('itineraries', [
+        'itineraries' => $itineraries,
+    ]);
+    $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios';
+    $description = 'Selección de itinerarios temáticos para seguir paso a paso.';
+    $itineraryIndexMeta = nammu_build_social_meta([
+        'type' => 'website',
+        'title' => 'Itinerarios — ' . $siteNameForMeta,
+        'description' => $description,
+        'url' => $canon,
+        'image' => $homeImage,
+        'site_name' => $siteNameForMeta,
+    ], $socialConfig);
+    echo $renderer->render('layout', [
+        'pageTitle' => 'Itinerarios',
+        'metaDescription' => $description,
+        'content' => $content,
+        'socialMeta' => $itineraryIndexMeta,
+        'showLogo' => true,
+    ]);
+    exit;
+}
+
 if (isset($_GET['post'])) {
     $candidateSlug = trim((string) $_GET['post']);
     if ($candidateSlug !== '') {
@@ -715,6 +1026,62 @@ if ($publicBaseUrl !== '') {
         static fn (Post $post): string => '/' . rawurlencode($post->getSlug()),
         $markdown
     ));
+    $itineraryFeedPosts = [];
+    $itineraryPostUrls = [];
+    foreach ($itineraryListing as $itineraryItem) {
+        $itineraryMetadata = $itineraryItem->getMetadata();
+        $itineraryDescription = $itineraryItem->getDescription();
+        if ($itineraryDescription === '') {
+            $convertedDocument = $markdown->convertDocument($itineraryItem->getContent());
+            $itineraryDescription = nammu_excerpt_text($convertedDocument['html'], 220);
+        }
+        $dateString = $itineraryMetadata['Date'] ?? ($itineraryMetadata['Updated'] ?? '');
+        if (trim((string) $dateString) === '') {
+            $indexPath = $itineraryItem->getDirectory() . '/index.md';
+            $mtime = is_file($indexPath) ? @filemtime($indexPath) : false;
+            if ($mtime !== false) {
+                $dateString = gmdate('Y-m-d', $mtime);
+            } else {
+                $dateString = gmdate('Y-m-d');
+            }
+        }
+        $virtualMeta = [
+            'Title' => $itineraryItem->getTitle(),
+            'Description' => $itineraryDescription,
+            'Image' => $itineraryItem->getImage() ?? '',
+            'Date' => $dateString,
+        ];
+        $virtualSlug = 'itinerary-feed-' . $itineraryItem->getSlug();
+        $virtualPost = new Post($virtualSlug, $virtualMeta, $itineraryItem->getContent());
+        $itineraryFeedPosts[] = $virtualPost;
+        $itineraryPostUrls[$virtualSlug] = $buildItineraryUrl($itineraryItem);
+    }
+    usort($itineraryFeedPosts, static function (Post $a, Post $b): int {
+        $dateA = $a->getDate();
+        $dateB = $b->getDate();
+        if ($dateA && $dateB) {
+            return $dateB <=> $dateA;
+        }
+        if ($dateA) {
+            return -1;
+        }
+        if ($dateB) {
+            return 1;
+        }
+        return strcmp($a->getSlug(), $b->getSlug());
+    });
+    $itineraryFeedContent = (new RssGenerator(
+        $publicBaseUrl,
+        $siteTitle . ' — Itinerarios',
+        'Itinerarios recientes'
+    ))->generate(
+        $itineraryFeedPosts,
+        static function (Post $post) use ($itineraryPostUrls): string {
+            return $itineraryPostUrls[$post->getSlug()] ?? '/';
+        },
+        $markdown
+    );
+    @file_put_contents(__DIR__ . '/itinerarios.xml', $itineraryFeedContent);
 }
 $sitemapGenerator = new SitemapGenerator($publicBaseUrl);
 $sitemapXml = $sitemapGenerator->generate($buildSitemapEntries($posts, $theme, $publicBaseUrl));

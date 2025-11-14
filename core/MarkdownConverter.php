@@ -280,6 +280,8 @@ class MarkdownConverter
             $document = str_replace(self::TOC_TOKEN, $replacement, $document);
         }
 
+        $document = $this->normalizeAssetPaths($document);
+
         return [
             'html' => $document,
             'headings' => $headings,
@@ -346,6 +348,11 @@ class MarkdownConverter
         }
 
         return $result;
+    }
+
+    private function normalizeAssetPaths(string $html): string
+    {
+        return preg_replace('/((?:src|href)=["\'])(?!https?:|\/\/)(assets\/)/i', '$1/$2', $html) ?? $html;
     }
 
     private function applyInlineFormatting(string $text): string

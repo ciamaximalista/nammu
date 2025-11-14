@@ -1,17 +1,23 @@
 <?php
 session_start();
 
+require_once __DIR__ . '/core/bootstrap.php';
+
 // Load dependencies (optional)
 $autoload = __DIR__ . '/vendor/autoload.php';
 if (is_file($autoload)) {
     require_once $autoload;
 }
+use Nammu\Core\Itinerary;
+use Nammu\Core\ItineraryRepository;
+use Nammu\Core\ItineraryTopic;
 use Symfony\Component\Yaml\Yaml;
 
 // --- User Configuration ---
 define('USER_FILE', __DIR__ . '/config/user.php');
 define('CONTENT_DIR', __DIR__ . '/content');
 define('ASSETS_DIR', __DIR__ . '/assets');
+define('ITINERARIES_DIR', __DIR__ . '/itinerarios');
 
 // --- Helper Functions ---
 
@@ -265,6 +271,75 @@ function get_assets($page = 1, $per_page = 40) {
     return get_media_items($page, $per_page);
 }
 
+function admin_itinerary_repository(): ItineraryRepository {
+    static $repository = null;
+    if ($repository === null) {
+        if (!is_dir(ITINERARIES_DIR)) {
+            @mkdir(ITINERARIES_DIR, 0755, true);
+        }
+        $repository = new ItineraryRepository(ITINERARIES_DIR);
+    }
+    return $repository;
+}
+
+/**
+ * @return Itinerary[]
+ */
+function admin_list_itineraries(): array {
+    try {
+        return admin_itinerary_repository()->all();
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+function admin_load_itinerary(string $slug): ?Itinerary {
+    $normalized = ItineraryRepository::normalizeSlug($slug);
+    if ($normalized === '') {
+        return null;
+    }
+    try {
+        return admin_itinerary_repository()->find($normalized);
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+function admin_load_itinerary_topic(string $itinerarySlug, string $topicSlug): ?ItineraryTopic {
+    $itineraryNormalized = ItineraryRepository::normalizeSlug($itinerarySlug);
+    $topicNormalized = ItineraryRepository::normalizeSlug($topicSlug);
+    if ($itineraryNormalized === '' || $topicNormalized === '') {
+        return null;
+    }
+    try {
+        return admin_itinerary_repository()->findTopic($itineraryNormalized, $topicNormalized);
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+function admin_recursive_delete_path(string $target): bool {
+    if (!file_exists($target)) {
+        return true;
+    }
+    if (is_file($target) || is_link($target)) {
+        return @unlink($target);
+    }
+    $items = scandir($target);
+    if ($items === false) {
+        return false;
+    }
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+        if (!admin_recursive_delete_path($target . '/' . $item)) {
+            return false;
+        }
+    }
+    return @rmdir($target);
+}
+
 function get_settings() {
     $config = load_config_file();
 
@@ -489,6 +564,12 @@ function admin_public_post_url(string $slug): string {
         return $path;
     }
     return $base . $path;
+}
+
+function admin_public_itinerary_url(string $slug): string {
+    $base = admin_base_url();
+    $path = '/itinerarios/' . rawurlencode($slug);
+    return $base === '' ? $path : $base . $path;
 }
 
 function admin_extract_social_settings(string $key, array $defaults, ?array $config = null): array {
@@ -1115,6 +1196,12 @@ if (!is_array($assetFeedback) || !isset($assetFeedback['message'], $assetFeedbac
 } else {
     unset($_SESSION['asset_feedback']);
 }
+$itineraryFeedback = $_SESSION['itinerary_feedback'] ?? null;
+if (!is_array($itineraryFeedback) || !isset($itineraryFeedback['message'], $itineraryFeedback['type'])) {
+    $itineraryFeedback = null;
+} else {
+    unset($_SESSION['itinerary_feedback']);
+}
 
 // Handle POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -1447,6 +1534,240 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $_SESSION['social_feedback'] = $feedback;
         header('Location: admin.php?page=edit&template=' . $redirectTemplate);
+        exit;
+    } elseif (isset($_POST['save_itinerary'])) {
+        $title = trim($_POST['itinerary_title'] ?? '');
+        $description = trim($_POST['itinerary_description'] ?? '');
+        $image = trim($_POST['itinerary_image'] ?? '');
+        $content = $_POST['itinerary_content'] ?? '';
+        $slugInput = trim($_POST['itinerary_slug'] ?? '');
+        $originalSlugInput = trim($_POST['itinerary_original_slug'] ?? '');
+        $mode = $_POST['itinerary_mode'] ?? '';
+        if ($slugInput === '' && $title !== '') {
+            $slugInput = $title;
+        }
+        $slug = ItineraryRepository::normalizeSlug($slugInput);
+        $originalSlug = ItineraryRepository::normalizeSlug($originalSlugInput);
+        $redirectBase = 'admin.php?page=itinerarios';
+        if ($originalSlug !== '') {
+            $redirectBase .= '&itinerary=' . urlencode($originalSlug);
+        } elseif ($mode === 'new') {
+            $redirectBase .= '&new=1';
+        }
+        if ($title === '') {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'El título del itinerario es obligatorio.'];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        if ($slug === '') {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'El slug del itinerario no es válido.'];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        $targetDir = ITINERARIES_DIR . '/' . $slug;
+        if ($originalSlug === '' && is_dir($targetDir)) {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'Ya existe un itinerario con ese slug.'];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        if ($originalSlug !== '' && $originalSlug !== $slug) {
+            $originalDir = ITINERARIES_DIR . '/' . $originalSlug;
+            if (is_dir($targetDir)) {
+                $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'Ya existe un itinerario con el slug solicitado.'];
+                header('Location: ' . $redirectBase);
+                exit;
+            }
+            if (is_dir($originalDir)) {
+                if (!@rename($originalDir, $targetDir)) {
+                    $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudo renombrar la carpeta del itinerario.'];
+                    header('Location: ' . $redirectBase);
+                    exit;
+                }
+            } else {
+                if (!is_dir($targetDir)) {
+                    @mkdir($targetDir, 0755, true);
+                }
+            }
+        }
+        try {
+            $saved = admin_itinerary_repository()->saveItinerary($slug, [
+                'Title' => $title,
+                'Description' => $description,
+                'Image' => $image,
+            ], $content);
+            $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario guardado correctamente.'];
+            header('Location: admin.php?page=itinerarios&itinerary=' . urlencode($saved->getSlug()));
+            exit;
+        } catch (Throwable $e) {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudo guardar el itinerario: ' . $e->getMessage()];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+    } elseif (isset($_POST['save_itinerary_topic']) || isset($_POST['save_itinerary_topic_add'])) {
+        $redirectToNewForm = isset($_POST['save_itinerary_topic_add']);
+        $itinerarySlug = ItineraryRepository::normalizeSlug($_POST['topic_itinerary_slug'] ?? '');
+        $title = trim($_POST['topic_title'] ?? '');
+        $description = trim($_POST['topic_description'] ?? '');
+        $image = trim($_POST['topic_image'] ?? '');
+        $content = $_POST['topic_content'] ?? '';
+        $numberRequested = (int) ($_POST['topic_number'] ?? 1);
+        $slugInput = trim($_POST['topic_slug'] ?? '');
+        $originalSlugInput = trim($_POST['topic_original_slug'] ?? '');
+        $mode = $_POST['topic_mode'] ?? '';
+        if ($slugInput === '' && $title !== '') {
+            $slugInput = $title;
+        }
+        $topicSlug = ItineraryRepository::normalizeSlug($slugInput);
+        $originalSlug = ItineraryRepository::normalizeSlug($originalSlugInput);
+        $redirectBase = 'admin.php?page=itinerarios';
+        if ($itinerarySlug !== '') {
+            $redirectBase .= '&itinerary=' . urlencode($itinerarySlug);
+        }
+        if ($redirectToNewForm) {
+            $redirectBase .= '&topic=new';
+        } elseif ($mode === 'new') {
+            $redirectBase .= '&topic=new';
+        } elseif ($originalSlug !== '') {
+            $redirectBase .= '&topic=' . urlencode($originalSlug);
+        }
+        if ($itinerarySlug === '') {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'Selecciona un itinerario antes de añadir un tema.'];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        if ($title === '') {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'El título del tema es obligatorio.'];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        if ($topicSlug === '') {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'El slug del tema no es válido.'];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        try {
+            $repository = admin_itinerary_repository();
+            $itinerary = $repository->find($itinerarySlug);
+            if ($itinerary === null) {
+                $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'El itinerario seleccionado no existe.'];
+                header('Location: ' . $redirectBase);
+                exit;
+            }
+            $topics = $itinerary->getTopics();
+            $filteredTopics = [];
+            foreach ($topics as $topic) {
+                if ($topic->getSlug() === $topicSlug && $topicSlug !== $originalSlug) {
+                    $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'Ya existe un tema con ese slug en el itinerario.'];
+                    header('Location: ' . $redirectBase);
+                    exit;
+                }
+                if ($topic->getSlug() !== $originalSlug) {
+                    $filteredTopics[] = $topic;
+                }
+            }
+            $position = max(1, $numberRequested);
+            $maxPosition = count($filteredTopics) + 1;
+            if ($position > $maxPosition) {
+                $position = $maxPosition;
+            }
+            $sequence = [];
+            $inserted = false;
+            foreach ($filteredTopics as $existingTopic) {
+                if (!$inserted && count($sequence) === $position - 1) {
+                    $sequence[] = ['type' => 'new'];
+                    $inserted = true;
+                }
+                $sequence[] = ['type' => 'existing', 'topic' => $existingTopic];
+            }
+            if (!$inserted) {
+                $sequence[] = ['type' => 'new'];
+            }
+            if ($originalSlug !== '' && $originalSlug !== $topicSlug) {
+                $oldFile = ITINERARIES_DIR . '/' . $itinerarySlug . '/' . $originalSlug . '.md';
+                if (is_file($oldFile)) {
+                    @unlink($oldFile);
+                }
+            }
+            $newSaved = false;
+            foreach ($sequence as $index => $entry) {
+                $number = $index + 1;
+                if ($entry['type'] === 'new') {
+                    if ($newSaved) {
+                        continue;
+                    }
+                    $metadata = [
+                        'Title' => $title,
+                        'Description' => $description,
+                        'Number' => $number,
+                        'Image' => $image,
+                    ];
+                    $repository->saveTopic($itinerarySlug, $topicSlug, $metadata, $content);
+                    $newSaved = true;
+                } else {
+                    /** @var ItineraryTopic $existingTopic */
+                    $existingTopic = $entry['topic'];
+                    $metadata = $existingTopic->getMetadata();
+                    $metadata['Number'] = $number;
+                    $repository->saveTopic($itinerarySlug, $existingTopic->getSlug(), $metadata, $existingTopic->getContent());
+                }
+            }
+            $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Tema guardado correctamente.'];
+            if ($redirectToNewForm) {
+                header('Location: admin.php?page=itinerarios&itinerary=' . urlencode($itinerarySlug) . '&topic=new');
+            } else {
+                header('Location: admin.php?page=itinerarios&itinerary=' . urlencode($itinerarySlug) . '&topic=' . urlencode($topicSlug));
+            }
+            exit;
+        } catch (Throwable $e) {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudo guardar el tema: ' . $e->getMessage()];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+    } elseif (isset($_POST['delete_itinerary'])) {
+        $slug = ItineraryRepository::normalizeSlug($_POST['delete_itinerary_slug'] ?? '');
+        $redirectBase = 'admin.php?page=itinerarios';
+        if ($slug === '') {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudo borrar el itinerario seleccionado.'];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        $targetDir = ITINERARIES_DIR . '/' . $slug;
+        if (!is_dir($targetDir)) {
+            $_SESSION['itinerary_feedback'] = ['type' => 'warning', 'message' => 'El itinerario ya no existe.'];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        if (admin_recursive_delete_path($targetDir)) {
+            $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario borrado correctamente.'];
+        } else {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudo borrar la carpeta del itinerario. Revisa los permisos.'];
+        }
+        header('Location: ' . $redirectBase);
+        exit;
+    } elseif (isset($_POST['delete_itinerary_topic'])) {
+        $itinerarySlug = ItineraryRepository::normalizeSlug($_POST['delete_topic_itinerary_slug'] ?? '');
+        $topicSlug = ItineraryRepository::normalizeSlug($_POST['delete_topic_slug'] ?? '');
+        $redirectBase = 'admin.php?page=itinerarios';
+        if ($itinerarySlug !== '') {
+            $redirectBase .= '&itinerary=' . urlencode($itinerarySlug);
+        }
+        if ($itinerarySlug === '' || $topicSlug === '') {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudo borrar el tema seleccionado.'];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        $filePath = ITINERARIES_DIR . '/' . $itinerarySlug . '/' . $topicSlug . '.md';
+        if (!is_file($filePath)) {
+            $_SESSION['itinerary_feedback'] = ['type' => 'warning', 'message' => 'El tema ya no existe en el itinerario.'];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        if (@unlink($filePath)) {
+            $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Tema borrado correctamente.'];
+        } else {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudo borrar el archivo del tema. Revisa los permisos.'];
+        }
+        header('Location: ' . $redirectBase);
         exit;
     } elseif (isset($_POST['delete_post'])) {
         $filename = $_POST['delete_filename'] ?? '';
@@ -1909,6 +2230,88 @@ if (is_logged_in()) {
     $page = $user_exists ? 'login' : 'register';
 }
 
+$itinerariesList = [];
+$selectedItinerary = null;
+$selectedTopic = null;
+$itineraryFormData = [
+    'title' => '',
+    'description' => '',
+    'image' => '',
+    'slug' => '',
+    'content' => '',
+    'mode' => 'new',
+];
+$topicFormData = [
+    'title' => '',
+    'description' => '',
+    'image' => '',
+    'slug' => '',
+    'content' => '',
+    'number' => 1,
+    'mode' => 'new',
+];
+$topicNumberOptions = [1];
+
+if (is_logged_in() && $page === 'itinerarios') {
+    $itinerariesList = admin_list_itineraries();
+    $requestedSlug = isset($_GET['itinerary']) ? ItineraryRepository::normalizeSlug((string) $_GET['itinerary']) : '';
+    if ($requestedSlug !== '') {
+        $selectedItinerary = admin_load_itinerary($requestedSlug);
+    }
+    $isNewItinerary = isset($_GET['new']) || $selectedItinerary === null;
+    if ($selectedItinerary !== null) {
+        $itineraryFormData = [
+            'title' => $selectedItinerary->getTitle(),
+            'description' => $selectedItinerary->getDescription(),
+            'image' => $selectedItinerary->getImage() ?? '',
+            'slug' => $selectedItinerary->getSlug(),
+            'content' => $selectedItinerary->getContent(),
+            'mode' => 'existing',
+        ];
+    } else {
+        $itineraryFormData['mode'] = 'new';
+    }
+    $topicParam = $_GET['topic'] ?? '';
+    if ($selectedItinerary !== null && $topicParam !== '' && $topicParam !== 'new') {
+        $normalizedTopic = ItineraryRepository::normalizeSlug($topicParam);
+        if ($normalizedTopic !== '') {
+            $selectedTopic = admin_load_itinerary_topic($selectedItinerary->getSlug(), $normalizedTopic);
+        }
+    }
+    if ($selectedTopic !== null) {
+        $topicFormData = [
+            'title' => $selectedTopic->getTitle(),
+            'description' => $selectedTopic->getDescription(),
+            'image' => $selectedTopic->getImage() ?? '',
+            'slug' => $selectedTopic->getSlug(),
+            'content' => $selectedTopic->getContent(),
+            'number' => max(1, $selectedTopic->getNumber()),
+            'mode' => 'existing',
+        ];
+    } else {
+        $topicFormData['mode'] = 'new';
+        if ($selectedItinerary !== null) {
+            $topicFormData['number'] = max(1, $selectedItinerary->getTopicCount() + 1);
+        }
+    }
+    if ($selectedItinerary !== null) {
+        $topicCount = $selectedItinerary->getTopicCount();
+        $maxOptions = $topicCount + ($selectedTopic === null ? 1 : 0);
+        $maxOptions = max(1, $maxOptions);
+        $topicNumberOptions = range(1, $maxOptions);
+        if ($topicFormData['number'] > $maxOptions) {
+            $topicFormData['number'] = $maxOptions;
+        }
+    } else {
+        $topicNumberOptions = [1];
+        $topicFormData['number'] = 1;
+    }
+    if ($isNewItinerary) {
+        $itineraryFormData['slug'] = '';
+        $itineraryFormData['content'] = '';
+    }
+}
+
 $settings = get_settings();
 $socialDefaults = [
     'default_description' => '',
@@ -1962,6 +2365,17 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             display: block;
             margin: 0 auto 20px;
             max-width: 150px;
+        }
+        .itinerary-form-card {
+            position: relative;
+        }
+        .itinerary-form-card .sticky-save,
+        .itinerary-topics-card .sticky-save {
+            position: sticky;
+            bottom: 0;
+            background: linear-gradient(180deg, rgba(255,255,255,0) 0%, #fff 40%);
+            padding-top: 1rem;
+            text-align: right;
         }
 
         <style>
@@ -3305,6 +3719,12 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 </li>
 
+                                <li class="nav-item <?= $page === 'itinerarios' ? 'active' : '' ?>">
+
+                                    <a class="nav-link" href="?page=itinerarios"><h1>Itinerarios</h1></a>
+
+                                </li>
+
                                 <li class="nav-item <?= $page === 'configuracion' ? 'active' : '' ?>">
 
                                     <a class="nav-link" href="?page=configuracion"><h1>Configuración</h1></a>
@@ -3429,7 +3849,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                         <textarea name="content" id="content_publish" class="form-control" rows="15" data-markdown-editor="1"></textarea>
 
-                                        <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor">Insertar recurso</button>
+                                        <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#content_publish">Insertar recurso</button>
                                         <small class="form-text text-muted mt-1">Inserta en la entrada imágenes, vídeos o archivos PDF.</small>
 
                                     </div>
@@ -3779,7 +4199,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                         <textarea name="content" id="content_edit" class="form-control" rows="15" data-markdown-editor="1"><?= htmlspecialchars($post_data['content']) ?></textarea>
 
-                                        <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor">Insertar recurso</button>
+                                        <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#content_edit">Insertar recurso</button>
                                         <small class="form-text text-muted mt-1">Inserta en la entrada imágenes, vídeos o archivos PDF.</small>
 
                                     </div>
@@ -4741,8 +5161,266 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                             </div>
 
-                        <?php elseif ($page === 'configuracion'): ?>
+                        <?php elseif ($page === 'itinerarios'): ?>
 
+                            <div class="tab-pane active">
+                                <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+                                    <h2 class="mb-0">Itinerarios</h2>
+                                    <div class="btn-group">
+                                        <a class="btn btn-outline-secondary" href="?page=itinerarios">Refrescar</a>
+                                        <a class="btn btn-primary" href="?page=itinerarios&new=1">Nuevo itinerario</a>
+                                    </div>
+                                </div>
+
+                                <?php if ($itineraryFeedback): ?>
+                                    <div class="alert alert-<?= htmlspecialchars($itineraryFeedback['type'], ENT_QUOTES, 'UTF-8') ?>">
+                                        <?= htmlspecialchars($itineraryFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                <?php endif; ?>
+
+                                <div class="card mb-4">
+                                    <div class="card-body">
+                                        <h3 class="h5 mb-3">Listado de itinerarios</h3>
+                                        <?php if (empty($itinerariesList)): ?>
+                                            <p class="text-muted mb-0">Todavía no hay itinerarios registrados.</p>
+                                        <?php else: ?>
+                                            <div class="table-responsive">
+                                                <table class="table table-striped table-hover">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Título</th>
+                                                            <th>Descripción</th>
+                                                            <th>Temas</th>
+                                                            <th>Slug público</th>
+                                                            <th class="text-right">Acciones</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php foreach ($itinerariesList as $itineraryItem): ?>
+                                                            <tr>
+                                                                <td><?= htmlspecialchars($itineraryItem->getTitle(), ENT_QUOTES, 'UTF-8') ?></td>
+                                                                <td><?= htmlspecialchars($itineraryItem->getDescription(), ENT_QUOTES, 'UTF-8') ?></td>
+                                                                <td><?= $itineraryItem->getTopicCount() ?></td>
+                                                                <td>
+                                                                    <a href="<?= htmlspecialchars(admin_public_itinerary_url($itineraryItem->getSlug()), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                                        /itinerarios/<?= htmlspecialchars($itineraryItem->getSlug(), ENT_QUOTES, 'UTF-8') ?>
+                                                                    </a>
+                                                                </td>
+                                                                <td class="text-right">
+                                                                    <div class="text-right">
+                                                                        <div class="mb-2">
+                                                                            <a class="btn btn-sm btn-outline-primary" href="?page=itinerarios&itinerary=<?= urlencode($itineraryItem->getSlug()) ?>#itinerary-form">Editar</a>
+                                                                        </div>
+                                                                        <form method="post" class="d-inline-block" onsubmit="return confirm('¿Seguro que deseas borrar este itinerario? Esta acción eliminará todos sus temas.');">
+                                                                            <input type="hidden" name="delete_itinerary_slug" value="<?= htmlspecialchars($itineraryItem->getSlug(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <button type="submit" name="delete_itinerary" class="btn btn-sm btn-outline-danger mt-1">Borrar</button>
+                                                                        </form>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        <?php endforeach; ?>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div id="itinerary-form" class="card mb-4">
+                                            <div class="card-body itinerary-form-card">
+                                                <form method="post">
+                                                    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+                                                        <h3 class="h5 mb-0"><?= $itineraryFormData['mode'] === 'existing' ? 'Editar itinerario' : 'Nuevo itinerario' ?></h3>
+                                                        <button type="submit" name="save_itinerary" class="btn btn-primary">Guardar itinerario</button>
+                                                    </div>
+                                                    <input type="hidden" name="itinerary_original_slug" value="<?= htmlspecialchars($itineraryFormData['slug'], ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="itinerary_mode" value="<?= htmlspecialchars($itineraryFormData['mode'], ENT_QUOTES, 'UTF-8') ?>">
+                                                    <div class="form-group">
+                                                        <label for="itinerary_title">Título</label>
+                                                        <input type="text" name="itinerary_title" id="itinerary_title" class="form-control" value="<?= htmlspecialchars($itineraryFormData['title'], ENT_QUOTES, 'UTF-8') ?>" required>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="itinerary_description">Descripción</label>
+                                                        <textarea name="itinerary_description" id="itinerary_description" class="form-control" rows="3"><?= htmlspecialchars($itineraryFormData['description'], ENT_QUOTES, 'UTF-8') ?></textarea>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="itinerary_slug">Slug</label>
+                                                        <input type="text" name="itinerary_slug" id="itinerary_slug" class="form-control" data-slug-input="1" pattern="[a-z0-9-]+" title="Usa solo letras minúsculas, números y guiones (-)" value="<?= htmlspecialchars($itineraryFormData['slug'], ENT_QUOTES, 'UTF-8') ?>" placeholder="mi-itinerario">
+                                                        <small class="form-text text-muted">Usaremos este valor para la carpeta y la URL pública.</small>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="itinerary_image">Imagen destacada</label>
+                                                        <div class="input-group">
+                                                            <input type="text" name="itinerary_image" id="itinerary_image" class="form-control" readonly value="<?= htmlspecialchars($itineraryFormData['image'], ENT_QUOTES, 'UTF-8') ?>">
+                                                            <div class="input-group-append">
+                                                                <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="itinerary_image" data-target-prefix="">Seleccionar imagen</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="itinerary_content">Presentación del itinerario</label>
+                                                        <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#itinerary_content">
+                                                            <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="bold"><strong>B</strong></button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="italic"><em>I</em></button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="strike">S̶</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="code">&lt;/&gt;</button>
+                                                            </div>
+                                                            <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="link">Link</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="quote">&gt;</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="sup">x<sup>2</sup></button>
+                                                            </div>
+                                                            <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="ul">•</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="ol">1.</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="heading">H2</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="code-block">{ }</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="hr">—</button>
+                                                            </div>
+                                                        </div>
+                                                        <textarea name="itinerary_content" id="itinerary_content" class="form-control" rows="10" data-markdown-editor="itinerary"><?= htmlspecialchars($itineraryFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>
+                                        <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#itinerary_content">Insertar recurso</button>
+                                                    </div>
+                                                    <div class="sticky-save">
+                                                        <button type="submit" name="save_itinerary" class="btn btn-primary">Guardar itinerario</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 mt-4 mt-lg-0">
+                                        <div class="card mb-4">
+                                            <div class="card-body itinerary-topics-card">
+                                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                                    <h3 class="h5 mb-0">
+                                                        <?php if ($selectedItinerary): ?>
+                                                            Temas de <?= htmlspecialchars($selectedItinerary->getTitle(), ENT_QUOTES, 'UTF-8') ?>
+                                                        <?php else: ?>
+                                                            Temas del itinerario
+                                                        <?php endif; ?>
+                                                    </h3>
+                                                    <?php if ($selectedItinerary): ?>
+                                                        <a class="btn btn-outline-primary" href="?page=itinerarios&itinerary=<?= urlencode($selectedItinerary->getSlug()) ?>&topic=new#topic-form">Nuevo tema</a>
+                                                    <?php else: ?>
+                                                        <button type="button" class="btn btn-outline-primary disabled" disabled title="Guarda el itinerario para poder añadir temas">Nuevo tema</button>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <?php if (!$selectedItinerary): ?>
+                                                    <p class="text-muted mb-0">Selecciona o crea un itinerario para gestionar sus temas.</p>
+                                                <?php elseif (empty($selectedItinerary->getTopics())): ?>
+                                                    <p class="text-muted mb-0">Añade tu primer tema para comenzar el itinerario.</p>
+                                                <?php else: ?>
+                                                    <?php foreach ($selectedItinerary->getTopics() as $topicItem): ?>
+                                                        <div class="card mb-3">
+                                                            <div class="card-body">
+                                                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                                                    <div>
+                                                                        <span class="badge badge-secondary mb-2">Tema <?= (int) $topicItem->getNumber() ?></span>
+                                                                        <h4 class="h6 mb-1"><?= htmlspecialchars($topicItem->getTitle(), ENT_QUOTES, 'UTF-8') ?></h4>
+                                                                        <?php if ($topicItem->getDescription() !== ''): ?>
+                                                                            <p class="mb-2 text-muted"><?= htmlspecialchars($topicItem->getDescription(), ENT_QUOTES, 'UTF-8') ?></p>
+                                                                        <?php endif; ?>
+                                                                        <a href="<?= htmlspecialchars(admin_public_itinerary_url($selectedItinerary->getSlug()) . '/' . rawurlencode($topicItem->getSlug()), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Ver tema</a>
+                                                                    </div>
+                                                                    <div class="text-right">
+                                                                        <div class="mb-2">
+                                                                            <a class="btn btn-sm btn-outline-primary" href="?page=itinerarios&itinerary=<?= urlencode($selectedItinerary->getSlug()) ?>&topic=<?= urlencode($topicItem->getSlug()) ?>#topic-form">Editar</a>
+                                                                        </div>
+                                                                        <form method="post" class="d-inline-block" onsubmit="return confirm('¿Seguro que deseas borrar este tema del itinerario?');">
+                                                                            <input type="hidden" name="delete_topic_itinerary_slug" value="<?= htmlspecialchars($selectedItinerary->getSlug(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="delete_topic_slug" value="<?= htmlspecialchars($topicItem->getSlug(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <button type="submit" name="delete_itinerary_topic" class="btn btn-sm btn-outline-danger mt-1">Borrar</button>
+                                                                        </form>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+
+                                        <?php if ($selectedItinerary): ?>
+                                            <div id="topic-form" class="card mb-4">
+                                                <div class="card-body itinerary-topics-card">
+                                                    <h3 class="h5 mb-3"><?= $topicFormData['mode'] === 'existing' ? 'Editar tema' : 'Nuevo tema' ?></h3>
+                                                    <form method="post">
+                                                        <input type="hidden" name="topic_itinerary_slug" value="<?= htmlspecialchars($selectedItinerary->getSlug(), ENT_QUOTES, 'UTF-8') ?>">
+                                                        <input type="hidden" name="topic_original_slug" value="<?= htmlspecialchars($topicFormData['slug'], ENT_QUOTES, 'UTF-8') ?>">
+                                                        <input type="hidden" name="topic_mode" value="<?= htmlspecialchars($topicFormData['mode'], ENT_QUOTES, 'UTF-8') ?>">
+                                                        <div class="form-group">
+                                                            <label for="topic_title">Título del tema</label>
+                                                            <input type="text" name="topic_title" id="topic_title" class="form-control" value="<?= htmlspecialchars($topicFormData['title'], ENT_QUOTES, 'UTF-8') ?>" required>
+                                                        </div>
+                                                        <div class="form-group">
+                                                            <label for="topic_description">Descripción</label>
+                                                            <textarea name="topic_description" id="topic_description" class="form-control" rows="3"><?= htmlspecialchars($topicFormData['description'], ENT_QUOTES, 'UTF-8') ?></textarea>
+                                                        </div>
+                                                        <div class="form-group">
+                                                            <label for="topic_slug">Slug</label>
+                                                            <input type="text" name="topic_slug" id="topic_slug" class="form-control" data-slug-input="1" pattern="[a-z0-9-]+" title="Usa solo letras minúsculas, números y guiones (-)" value="<?= htmlspecialchars($topicFormData['slug'], ENT_QUOTES, 'UTF-8') ?>" placeholder="tema-1">
+                                                        </div>
+                                                        <div class="form-group">
+                                                            <label for="topic_number">Tema nº</label>
+                                                            <select name="topic_number" id="topic_number" class="form-control">
+                                                                <?php foreach ($topicNumberOptions as $option): ?>
+                                                                    <option value="<?= $option ?>" <?= $option == $topicFormData['number'] ? 'selected' : '' ?>><?= $option ?></option>
+                                                                <?php endforeach; ?>
+                                                            </select>
+                                                        </div>
+                                                        <div class="form-group">
+                                                            <label for="topic_image">Imagen asociada</label>
+                                                            <div class="input-group">
+                                                                <input type="text" name="topic_image" id="topic_image" class="form-control" readonly value="<?= htmlspecialchars($topicFormData['image'], ENT_QUOTES, 'UTF-8') ?>">
+                                                                <div class="input-group-append">
+                                                                    <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="topic_image" data-target-prefix="">Seleccionar imagen</button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="form-group">
+                                                            <label for="topic_content">Presentación del tema</label>
+                                                            <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#topic_content">
+                                                                <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="bold"><strong>B</strong></button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="italic"><em>I</em></button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="strike">S̶</button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="code">&lt;/&gt;</button>
+                                                                </div>
+                                                                <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="link">Link</button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="quote">&gt;</button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="sup">x<sup>2</sup></button>
+                                                                </div>
+                                                                <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="ul">•</button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="ol">1.</button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="heading">H2</button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="code-block">{ }</button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="hr">—</button>
+                                                                </div>
+                                                            </div>
+                                                            <textarea name="topic_content" id="topic_content" class="form-control" rows="10" data-markdown-editor="itinerary-topic"><?= htmlspecialchars($topicFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>
+                                                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                                                <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#topic_content">Nuevo recurso</button>
+                                                                <button type="button" class="btn btn-outline-secondary" disabled>Añadir test (próximamente)</button>
+                                                            </div>
+                                                        </div>
+                                                        <div class="mt-3">
+                                                            <button type="submit" name="save_itinerary_topic" class="btn btn-primary">Guardar tema</button>
+                                                            <button type="submit" name="save_itinerary_topic_add" class="btn btn-secondary ml-2">Añadir nuevo tema</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+
+                        <?php elseif ($page === 'configuracion'): ?>
                             <div class="tab-pane active">
 
                                 <h2>Configuración</h2>
@@ -5852,6 +6530,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var imageTargetMode = '';
             var imageTargetInput = '';
             var imageTargetPrefix = '';
+            var imageTargetEditor = '';
 
         
 
@@ -5862,6 +6541,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 imageTargetMode = button.data('target-type') || '';
                 imageTargetInput = button.data('target-input') || '';
                 imageTargetPrefix = button.data('target-prefix') || '';
+                imageTargetEditor = button.data('target-editor') || '';
 
             });
 
@@ -5978,7 +6658,20 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 if (!source) {
                     source = '';
                 }
-                var contentTextArea = document.querySelector('[data-markdown-editor]') || document.getElementById('content');
+                var contentTextArea = null;
+                if (imageTargetEditor) {
+                    try {
+                        contentTextArea = document.querySelector(imageTargetEditor);
+                    } catch (selectorError) {
+                        contentTextArea = null;
+                    }
+                }
+                if (!contentTextArea && document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
+                    contentTextArea = document.activeElement;
+                }
+                if (!contentTextArea) {
+                    contentTextArea = document.querySelector('[data-markdown-editor]') || document.getElementById('content');
+                }
                 if (!contentTextArea) {
                     return;
                 }
@@ -6897,22 +7590,32 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             if (!slugInputs.length) {
                 return;
             }
-            function sanitizeSlug(value) {
+            function sanitizeSlug(value, trimEdges) {
                 var normalized = (value || '').toString().toLowerCase();
                 normalized = normalized.replace(/[^a-z0-9-]+/g, '-');
                 normalized = normalized.replace(/-{2,}/g, '-');
-                normalized = normalized.replace(/^-+/, '').replace(/-+$/, '');
+                if (trimEdges) {
+                    normalized = normalized.replace(/^-+/, '').replace(/-+$/, '');
+                } else {
+                    normalized = normalized.replace(/^-+/, '');
+                }
                 return normalized;
             }
             slugInputs.forEach(function(input) {
                 var applySanitizedValue = function() {
-                    var sanitized = sanitizeSlug(input.value);
+                    var sanitized = sanitizeSlug(input.value, false);
+                    if (input.value !== sanitized) {
+                        input.value = sanitized;
+                    }
+                };
+                var applyTrimmedValue = function() {
+                    var sanitized = sanitizeSlug(input.value, true);
                     if (input.value !== sanitized) {
                         input.value = sanitized;
                     }
                 };
                 input.addEventListener('input', applySanitizedValue);
-                input.addEventListener('blur', applySanitizedValue);
+                input.addEventListener('blur', applyTrimmedValue);
             });
         });
         </script>

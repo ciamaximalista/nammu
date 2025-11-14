@@ -121,8 +121,8 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
         .embedded-pdf {
             margin: 2rem auto;
             text-align: center;
-            width: min(100%, 1200px);
-            min-width: min(800px, 100%);
+            width: 100%;
+            max-width: min(760px, 100%);
         }
         .embedded-video video,
         .embedded-video iframe,
@@ -130,17 +130,19 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
             display: block;
             width: 100%;
             max-width: 100%;
-            min-width: min(800px, 100%);
-            aspect-ratio: 16 / 9;
             border: none;
             border-radius: var(--nammu-radius-md);
             background: #000;
             margin: 0 auto;
         }
+        .embedded-video video,
+        .embedded-video iframe {
+            aspect-ratio: 16 / 9;
+        }
         .embedded-pdf iframe {
-            aspect-ratio: auto;
-            height: clamp(480px, 70vh, 900px);
             background: #fff;
+            height: clamp(480px, 70vh, 900px);
+            aspect-ratio: auto;
         }
         h1, h2, h3, h4, h5, h6 {
             font-family: "<?= $titleFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -359,6 +361,131 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
         .floating-search-categories:hover {
             background: rgba(0,0,0,0.08);
             border-color: rgba(0,0,0,0.12);
+        }
+        .itinerary-single-content .post {
+            gap: 1.5rem;
+        }
+        .itinerary-single-content .post-header {
+            text-align: center;
+        }
+        .itinerary-single-content .post-brand {
+            align-items: center;
+            text-align: center;
+        }
+        .itinerary-single-content .post-intro,
+        .itinerary-single-content .post-body {
+            max-width: 100%;
+            margin-left: 0;
+            margin-right: 0;
+        }
+        .itinerary-single-content .post-body {
+            margin: 0 0 1.5rem 0;
+        }
+        .itinerary-single-content .post-meta-band {
+            margin: 0 auto 1rem;
+        }
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.85rem 1.75rem;
+            border-radius: var(--nammu-radius-pill);
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-decoration: none;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+            border: 1px solid transparent;
+        }
+        .button-primary {
+            background: <?= $colorAccent ?>;
+            color: #ffffff;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+        }
+        .button-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+            text-decoration: none;
+        }
+        .button-secondary {
+            background: transparent;
+            color: <?= $colorAccent ?>;
+            border-color: rgba(0,0,0,0.15);
+        }
+        .button-secondary:hover {
+            background: <?= $colorHighlight ?>;
+            text-decoration: none;
+        }
+        .itinerary-single-content .post-intro {
+            margin: 1.5rem 0;
+        }
+        .itinerary-topics {
+            margin: 3.5rem auto;
+            max-width: min(960px, 100%);
+        }
+        .itinerary-topics__list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        .itinerary-topic-card {
+            background: <?= $colorHighlight ?>;
+            border-radius: var(--nammu-radius-md);
+            padding: 1.25rem;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .itinerary-topic-card__media {
+            margin: -1.25rem -1.25rem 0.85rem;
+            border-top-left-radius: var(--nammu-radius-md);
+            border-top-right-radius: var(--nammu-radius-md);
+            overflow: hidden;
+        }
+        .itinerary-topic-card__media img {
+            width: 100%;
+            height: 190px;
+            object-fit: cover;
+            display: block;
+        }
+        .itinerary-topic-card__number {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: <?= $colorBackground ?>;
+            background: <?= $colorH1 ?>;
+            display: block;
+            padding: 0.35rem 1rem;
+            margin: -2rem -1.25rem 0.65rem;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.18);
+            border-radius: 0;
+        }
+        .itinerary-topic-card .post-meta-band {
+            margin: 0 0 0.65rem 0;
+        }
+        .itinerary-topic-card__body h3 {
+            margin: 0 0 0.65rem 0;
+            font-size: 1.05rem;
+        }
+        .itinerary-topic-card__body p {
+            margin: 0;
+            color: <?= $colorText ?>;
+        }
+        .itinerary-topic-card__description {
+            margin: 0;
+            font-size: 0.95rem;
+            color: <?= $colorText ?>;
+        }
+        .itinerary-topics__cta {
+            margin-top: 4rem;
+            text-align: center;
+        }
+        .itinerary-topics__cta .button {
+            min-width: 220px;
         }
         @media (max-width: 1024px) {
             .floating-logo {

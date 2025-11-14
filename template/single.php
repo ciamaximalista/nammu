@@ -17,12 +17,23 @@ $searchPositionSetting = in_array($searchSettings['position'] ?? 'title', ['titl
 $showSingleSearch = in_array($searchMode, ['single', 'both'], true);
 $singleSearchTop = $showSingleSearch && $searchPositionSetting === 'title';
 $singleSearchBottom = $showSingleSearch && $searchPositionSetting === 'footer';
+$suppressSingleSearchTop = !empty($suppressSingleSearchTop);
+$suppressSingleSearchBottom = !empty($suppressSingleSearchBottom);
+if ($suppressSingleSearchTop) {
+    $singleSearchTop = false;
+}
+if ($suppressSingleSearchBottom) {
+    $singleSearchBottom = false;
+}
 $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
+$itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/itinerarios' : '/itinerarios');
+$hasItineraries = !empty($hasItineraries);
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
 $autoTocHtml = isset($autoTocHtml) ? trim((string) $autoTocHtml) : '';
-$renderSearchBox = static function (string $variant) use ($searchAction, $colorHighlight, $colorAccent, $colorText, $searchActionBase, $letterIndexUrlValue, $showLetterButton): string {
+$customMetaBand = isset($customMetaBand) ? trim((string) $customMetaBand) : '';
+$renderSearchBox = static function (string $variant) use ($searchAction, $colorHighlight, $colorAccent, $colorText, $searchActionBase, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
         <form class="site-search-form" method="get" action="<?= htmlspecialchars($searchAction, ENT_QUOTES, 'UTF-8') ?>">
@@ -51,6 +62,14 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $colorH
                         <path d="M5 18L9 6L13 18" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         <line x1="6.5" y1="13" x2="11.5" y2="13" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
                         <path d="M15 6H20L15 18H20" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </a>
+            <?php endif; ?>
+            <?php if (!empty($hasItineraries) && !empty($itinerariesIndexUrl)): ?>
+                <a class="search-itineraries-link" href="<?= htmlspecialchars($itinerariesIndexUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Itinerarios">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 10L12 6L20 10L12 14L4 10Z" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linejoin="round" fill="none"/>
+                        <path d="M6 12V16C6 17.6569 9.58172 19 12 19C14.4183 19 18 17.6569 18 16V12" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                 </a>
             <?php endif; ?>
@@ -162,9 +181,12 @@ if ($isPageTemplate && $formattedDate !== '') {
             <?php endif; ?>
         </div>
         <h1><?= htmlspecialchars($post->getTitle(), ENT_QUOTES, 'UTF-8') ?></h1>
-        <?php if (!$isPageTemplate && $topMetaText !== ''): ?>
-            <div class="post-meta-band"><?= $topMetaText ?></div>
-        <?php endif; ?>
+<?php if (!$isPageTemplate && $topMetaText !== '' && empty($hideCategory)): ?>
+    <div class="post-meta-band"><?= $topMetaText ?></div>
+<?php endif; ?>
+<?php if ($customMetaBand !== ''): ?>
+    <div class="post-meta-band post-meta-band--custom"><?= htmlspecialchars($customMetaBand, ENT_QUOTES, 'UTF-8') ?></div>
+<?php endif; ?>
         <?php if ($post->getDescription() !== ''): ?>
             <div class="post-intro">
                 <p><?= htmlspecialchars($post->getDescription(), ENT_QUOTES, 'UTF-8') ?></p>
@@ -191,7 +213,7 @@ if ($isPageTemplate && $formattedDate !== '') {
     <?php if ($bottomMetaText !== ''): ?>
         <div class="post-meta-update"><?= $bottomMetaText ?></div>
     <?php endif; ?>
-    <?php if ($singleSearchBottom): ?>
+    <?php if ($singleSearchBottom && empty($suppressSingleSearchBottom)): ?>
         <div class="site-search-block placement-bottom">
             <?= $renderSearchBox('variant-panel') ?>
         </div>
@@ -282,7 +304,8 @@ if ($isPageTemplate && $formattedDate !== '') {
         justify-content: center;
     }
     .search-categories-link,
-    .search-letters-link {
+    .search-letters-link,
+    .search-itineraries-link {
         width: 44px;
         height: 44px;
         border-radius: 12px;
@@ -294,7 +317,8 @@ if ($isPageTemplate && $formattedDate !== '') {
         transition: background 0.2s ease;
     }
     .search-categories-link:hover,
-    .search-letters-link:hover {
+    .search-letters-link:hover,
+    .search-itineraries-link:hover {
         background: rgba(0,0,0,0.1);
     }
     .post {
@@ -330,17 +354,20 @@ if ($isPageTemplate && $formattedDate !== '') {
         color: <?= htmlspecialchars($colors['h1'] ?? '#1b8eed', ENT_QUOTES, 'UTF-8') ?>;
     }
     .post-meta-band {
-        display: inline-block;
+        display: inline-flex;
         margin: 0 auto;
-        padding: 0.5rem 1rem;
+        padding: 0.35rem 1rem;
         border-radius: var(--nammu-radius-pill);
         background: <?= $colorHighlight ?>;
         color: <?= $colorAccent ?>;
-        font-size: 0.9rem;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 600;
     }
     .post-intro {
         max-width: min(760px, 100%);
-        margin: 0 auto;
+        margin: 0 auto 1.5rem;
         padding: 1.25rem 1.5rem;
         border-radius: var(--nammu-radius-md);
         background: <?= $colorIntroBg ?>;
@@ -362,7 +389,7 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .post-body {
         max-width: min(760px, 100%);
-        margin: 0 auto;
+        margin: 0 auto 1.5rem;
         color: <?= $colorText ?>;
     }
     .post-body p {

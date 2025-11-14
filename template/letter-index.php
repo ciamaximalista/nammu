@@ -18,8 +18,10 @@ $searchBottom = $shouldShowSearch && $searchPositionSetting === 'footer';
 $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
+$itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/itinerarios' : '/itinerarios');
+$hasItineraries = !empty($hasItineraries);
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
-$renderSearchBox = static function (string $variant) use ($searchAction, $searchActionBase, $accentColor, $letterIndexUrlValue, $showLetterButton): string {
+$renderSearchBox = static function (string $variant) use ($searchAction, $searchActionBase, $accentColor, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
         <form class="site-search-form" method="get" action="<?= htmlspecialchars($searchAction, ENT_QUOTES, 'UTF-8') ?>">
@@ -48,6 +50,14 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
                         <path d="M5 18L9 6L13 18" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         <line x1="6.5" y1="13" x2="11.5" y2="13" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
                         <path d="M15 6H20L15 18H20" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </a>
+            <?php endif; ?>
+            <?php if (!empty($hasItineraries) && !empty($itinerariesIndexUrl)): ?>
+                <a class="search-itineraries-link" href="<?= htmlspecialchars($itinerariesIndexUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Itinerarios">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 10L12 6L20 10L12 14L4 10Z" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linejoin="round" fill="none"/>
+                        <path d="M6 12V16C6 17.6569 9.58172 19 12 19C14.4183 19 18 17.6569 18 16V12" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                 </a>
             <?php endif; ?>
@@ -206,7 +216,8 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         justify-content: center;
     }
     .search-categories-link,
-    .search-letters-link {
+    .search-letters-link,
+    .search-itineraries-link {
         width: 44px;
         height: 44px;
         border-radius: 12px;
@@ -218,7 +229,8 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         transition: background 0.2s ease;
     }
     .search-categories-link:hover,
-    .search-letters-link:hover {
+    .search-letters-link:hover,
+    .search-itineraries-link:hover {
         background: rgba(0,0,0,0.12);
     }
     @media (max-width: 640px) {
@@ -228,7 +240,8 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         .site-search-form input[type="text"],
         .site-search-form button,
         .search-categories-link,
-        .search-letters-link {
+        .search-letters-link,
+        .search-itineraries-link {
             width: 100%;
         }
     }

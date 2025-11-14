@@ -23,7 +23,40 @@ Nammu es un motor ligero para blogs y diccionarios online que reutiliza la estru
 - TOC automático opcional: si activas el bloque anterior, cada post mostrará el índice al inicio del contenido siempre que alcance el mínimo de encabezados definido; las páginas quedan excluidas por diseño y puedes desactivar la función post a post insertando tu propio `[toc]`.
 - Tratamiento diferenciado de entradas y páginas: las páginas usan la misma ruta amigable `/slug`, pero muestran cintillas de actualización específicas (con fecha calculada a partir del YAML o, si falta, de los metadatos del archivo) y pueden compartir maquetación con las entradas según la plantilla elegida.
 - Modo borradores: desde “Publicar” puedes guardar contenidos como borrador; la pestaña “Editar” incorpora un filtro “Entradas | Páginas | Borradores” y las entradas en borrador quedan fuera de RSS, sitemap, índices, búsqueda y portada. Si accedes por URL directa, el post muestra un sello rojo “Borrador” en la vista individual.
+- **Itinerarios temáticos**: agrupa múltiples archivos Markdown bajo `/itinerarios/{slug}` con portada, índice visual, contenidos renderizados como entradas y compatibilidad con recursos (vídeos, PDF, etc.). Incluye formulario completo en la administración, botón “Comenzar itinerario”, pases por temas, y genera un feed específico `itinerarios.xml` además de añadir un acceso directo en todas las cajas de búsqueda del sitio.
 - Compatible con la estructura de directorios de PicoCMS (`content/` y `assets/`), lo que simplifica migraciones.
+
+## Itinerarios: guía rápida
+
+Los itinerarios añaden una capa narrativa encima de los posts tradicionales para organizar contenidos extensos o cursos modulares. Funcionan como “colecciones” dentro del motor y heredan el look & feel definido en la plantilla.
+
+### Estructura y almacenamiento
+
+- Cada itinerario vive en `itinerarios/{slug}/index.md`. El front matter del `index.md` admite al menos `Title`, `Description`, `Image`, `Date/Updated` y cualquier campo personalizado que necesites.
+- Los temas se guardan como ficheros Markdown hermanos (`itinerarios/{slug}/{tema}.md`). El YAML de cada tema debe incluir `Title`, `Description`, `Number`, `Image` opcional y se completará con el contenido Markdown de la presentación del tema.
+- Los slugs se normalizan automáticamente (permitiendo `-`) tanto para itinerarios como para temas. Internamente se usa `ItineraryRepository` para cargar/guardar las entradas y se reordenan los números de tema al insertar en posiciones intermedias.
+
+### Creación y edición en el panel
+
+- La pestaña **Itinerarios** del admin ofrece:
+  - Tabla con todos los itinerarios (título, descripción, nº de temas, slug público) con acciones **Editar** y **Borrar**.
+  - Formulario “Nuevo/Editar itinerario” en una sola columna: título, descripción corta, imagen de portada, slug editable, área Markdown con los mismos atajos que los posts y botón para insertar recursos.
+  - Bloque “Temas del itinerario” con botón “Nuevo tema” y tarjetas individuales que incluyen los botones **Editar**/**Borrar** más un enlace “Ver tema”.
+  - Formulario de tema con título, descripción, número (permite reorganizar arrastrando posiciones al guardar), slug, imagen y editor Markdown. También dispone de botón “Nuevo recurso” y un placeholder “Añadir test” (la lógica de tests se activará más adelante).
+- Los itinerarios se almacenan en disco inmediatamente; al borrar un itinerario se elimina la carpeta completa y todos sus temas. Al borrar un tema sólo se borra su fichero `.md`.
+
+### Experiencia de navegación
+
+- `/itinerarios`: listado maquetado como una página de categoría (respeta columnas, estilo de tarjetas y colores definidos en Plantilla). Muestra hero con el nombre del propietario del blog y tarjetas con imagen, título y descripción.
+- `/itinerarios/{slug}`: renderiza el `index.md` como si fuese un post (sin etiqueta de categoría) y añade un índice visual de temas (tarjetas en rejilla con cintilla “Tema N”, imagen recortada, descripción y enlace). Al final aparece el botón **Comenzar Itinerario** que lleva al primer tema.
+- `/itinerarios/{slug}/{tema}`: cada tema se muestra con la maquetación de post individual (imagen, descripción, recursos incrustados, etc.) seguida de una caja de llamada a la acción que permite avanzar al siguiente tema, volver al índice o (próximamente) superar un test. Cuando no hay test se ofrece un botón “Pasar al siguiente tema”.
+- Los posts virtuales creados para cada itinerario/tema actualizan los metadatos sociales (Open Graph / Twitter), añaden cintillas informativas (“Itinerario”, “Tema N del itinerario «…»”) y eliminan el buscador incrustado para evitar duplicados en esta vista.
+
+### Búsqueda, RSS y otros extras
+
+- Todas las cajas de búsqueda (portada, posts, categorías, índice alfabético y buscador avanzado) muestran un tercer botón con icono educativo que enlaza a `/itinerarios` siempre que exista al menos un itinerario.
+- Además del `rss.xml` general, Nammu genera `itinerarios.xml` con los itinerarios ordenados por fecha (metadatos `Date`/`Updated` o `filemtime`). El feed incluye portada, descripción y el contenido completo del `index.md` en `content:encoded`.
+- Los PDFs, vídeos y recursos insertados desde el editor se procesan igual que en los posts estándar, garantizando rutas absolutas (`/assets/...`) y estilos adaptados (iframes a ancho completo, vídeo responsivo, etc.).
 
 ## Requisitos
 
@@ -51,8 +84,7 @@ Nammu es un motor ligero para blogs y diccionarios online que reutiliza la estru
    sudo chown -R www-data:www-data /var/www/html/<carpeta-publica-de-tu-sitio>
    sudo find /var/www/html/<carpeta-publica-de-tu-sitio> -type d -exec chmod 755 {} \;
    sudo find /var/www/html/<carpeta-publica-de-tu-sitio> -type f -exec chmod 644 {} \;
-   sudo chmod 775 /var/www/html/<carpeta-publica-de-tu-sitio>/config
-   sudo chmod 775 /var/www/html/<carpeta-publica-de-tu-sitio>/content /var/www/html/<carpeta-publica-de-tu-sitio>/assets
+   sudo chmod 775 /var/www/html/<carpeta-publica-de-tu-sitio>/config /var/www/html/<carpeta-publica-de-tu-sitio>/content /var/www/html/<carpeta-publica-de-tu-sitio>/assets /var/www/html/<carpeta-publica-de-tu-sitio>/itinerarios
    ```
    Ajusta el usuario/grupo (`www-data`) según tu servidor.
 4. Configura el host virtual y asegúrate de que `AllowOverride All` esté habilitado si deseas utilizar el `.htaccess`.

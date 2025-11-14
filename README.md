@@ -79,12 +79,13 @@ Los itinerarios añaden una capa narrativa encima de los posts tradicionales par
     git pull origin main
     ```
 2. Coloca los archivos en el directorio público en la carpeta que tengas asociada a tu dominio (`/var/www/html/<carpeta-publica-de-tu-sitio>`).
-3. Asegura los permisos:
+3. Crea las carpetas que Nammu necesita escribir y ajusta permisos:
    ```bash
+   sudo mkdir -p /var/www/html/<carpeta-publica-de-tu-sitio>/{config,content,assets,itinerarios}
    sudo chown -R www-data:www-data /var/www/html/<carpeta-publica-de-tu-sitio>
    sudo find /var/www/html/<carpeta-publica-de-tu-sitio> -type d -exec chmod 755 {} \;
    sudo find /var/www/html/<carpeta-publica-de-tu-sitio> -type f -exec chmod 644 {} \;
-   sudo chmod 775 /var/www/html/<carpeta-publica-de-tu-sitio>/config /var/www/html/<carpeta-publica-de-tu-sitio>/content /var/www/html/<carpeta-publica-de-tu-sitio>/assets /var/www/html/<carpeta-publica-de-tu-sitio>/itinerarios
+   sudo chmod 775 /var/www/html/<carpeta-publica-de-tu-sitio>/{config,content,assets,itinerarios}
    ```
    Ajusta el usuario/grupo (`www-data`) según tu servidor.
 4. Configura el host virtual y asegúrate de que `AllowOverride All` esté habilitado si deseas utilizar el `.htaccess`.

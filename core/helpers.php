@@ -3,6 +3,28 @@
 declare(strict_types=1);
 
 use Nammu\Core\Post;
+
+function nammu_ensure_directory(string $directory, int $permissions = 0775): bool
+{
+    $directory = rtrim($directory, '/');
+    if ($directory === '') {
+        return false;
+    }
+
+    clearstatcache(true, $directory);
+    if (is_dir($directory)) {
+        @chmod($directory, $permissions);
+        return true;
+    }
+
+    if (@mkdir($directory, $permissions, true) || is_dir($directory)) {
+        @chmod($directory, $permissions);
+        return true;
+    }
+
+    return false;
+}
+
 function nammu_base_url(): string
 {
     $explicit = getenv('NAMMU_BASE_URL');

@@ -20,7 +20,9 @@ use Nammu\Core\TemplateRenderer;
 use Nammu\Core\SitemapGenerator;
 
 $contentRepository = new ContentRepository(__DIR__ . '/content');
-$itineraryRepository = new ItineraryRepository(__DIR__ . '/itinerarios');
+$itinerariesBaseDir = __DIR__ . '/itinerarios';
+nammu_ensure_directory($itinerariesBaseDir);
+$itineraryRepository = new ItineraryRepository($itinerariesBaseDir);
 $markdown = new MarkdownConverter();
 
 $siteDocument = $contentRepository->getDocument('index');

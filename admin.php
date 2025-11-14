@@ -18,6 +18,7 @@ define('USER_FILE', __DIR__ . '/config/user.php');
 define('CONTENT_DIR', __DIR__ . '/content');
 define('ASSETS_DIR', __DIR__ . '/assets');
 define('ITINERARIES_DIR', __DIR__ . '/itinerarios');
+nammu_ensure_directory(ITINERARIES_DIR);
 
 // --- Helper Functions ---
 

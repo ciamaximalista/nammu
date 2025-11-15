@@ -2003,33 +2003,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: admin.php?page=edit&template=' . $templateParam . '&deleted=0');
         exit;
     } elseif (isset($_POST['upload_asset'])) {
-        $feedback = null;
-        if (!isset($_FILES['asset_file']) || $_FILES['asset_file']['error'] === UPLOAD_ERR_NO_FILE) {
+        $filesField = $_FILES['asset_files'] ?? ($_FILES['asset_file'] ?? null);
+        $normalizedFiles = [];
+        if ($filesField !== null) {
+            if (is_array($filesField['name'])) {
+                $count = count($filesField['name']);
+                for ($i = 0; $i < $count; $i++) {
+                    $normalizedFiles[] = [
+                        'name' => $filesField['name'][$i] ?? '',
+                        'type' => $filesField['type'][$i] ?? '',
+                        'tmp_name' => $filesField['tmp_name'][$i] ?? '',
+                        'error' => $filesField['error'][$i] ?? UPLOAD_ERR_NO_FILE,
+                        'size' => $filesField['size'][$i] ?? 0,
+                    ];
+                }
+            } else {
+                $normalizedFiles[] = [
+                    'name' => $filesField['name'] ?? '',
+                    'type' => $filesField['type'] ?? '',
+                    'tmp_name' => $filesField['tmp_name'] ?? '',
+                    'error' => $filesField['error'] ?? UPLOAD_ERR_NO_FILE,
+                    'size' => $filesField['size'] ?? 0,
+                ];
+            }
+        }
+        $uploads = [];
+        foreach ($normalizedFiles as $file) {
+            $name = trim((string) ($file['name'] ?? ''));
+            $error = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+            if ($name === '' && $error === UPLOAD_ERR_NO_FILE) {
+                continue;
+            }
+            $uploads[] = $file;
+        }
+        if (empty($uploads)) {
             $feedback = ['type' => 'warning', 'message' => 'No se seleccionó ningún archivo.'];
         } else {
-            $file = $_FILES['asset_file'];
-            if ($file['error'] === UPLOAD_ERR_INI_SIZE || $file['error'] === UPLOAD_ERR_FORM_SIZE) {
-                $feedback = ['type' => 'danger', 'message' => 'El archivo supera el tamaño máximo permitido por el servidor (upload_max_filesize / post_max_size). Ajusta esos valores para subir vídeos más pesados.'];
-            } elseif ($file['error'] !== UPLOAD_ERR_OK) {
-                $feedback = ['type' => 'danger', 'message' => 'No se pudo subir el archivo (código de error ' . $file['error'] . ').'];
-            } else {
-                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-                if (!in_array($ext, nammu_allowed_media_extensions(), true)) {
-                    $feedback = ['type' => 'warning', 'message' => 'Formato no permitido. Usa imágenes o vídeos compatibles (jpg, png, mp4, webm...).'];
-                } else {
-                    $base = nammu_slugify(pathinfo($file['name'], PATHINFO_FILENAME));
-                    if ($base === '') {
-                        $base = 'archivo';
-                    }
-                    $targetName = $base . '.' . $ext;
-                    $targetName = nammu_unique_asset_filename($targetName);
-                    $targetPath = ASSETS_DIR . '/' . $targetName;
-                    if (move_uploaded_file($file['tmp_name'], $targetPath)) {
-                        $feedback = ['type' => 'success', 'message' => 'Archivo subido correctamente.'];
-                    } else {
-                        $feedback = ['type' => 'danger', 'message' => 'No se pudo mover el archivo subido. Revisa los permisos de la carpeta assets/.'];
-                    }
+            $allowedExtensions = nammu_allowed_media_extensions();
+            $successCount = 0;
+            $errorMessages = [];
+            foreach ($uploads as $file) {
+                $originalName = $file['name'] ?? 'archivo';
+                $errorCode = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+                if ($errorCode === UPLOAD_ERR_INI_SIZE || $errorCode === UPLOAD_ERR_FORM_SIZE) {
+                    $errorMessages[] = $originalName . ': supera el tamaño máximo permitido por el servidor.';
+                    continue;
                 }
+                if ($errorCode === UPLOAD_ERR_NO_FILE) {
+                    $errorMessages[] = $originalName . ': no se seleccionó correctamente en el formulario.';
+                    continue;
+                }
+                if ($errorCode !== UPLOAD_ERR_OK) {
+                    $errorMessages[] = $originalName . ': error al subir (código ' . $errorCode . ').';
+                    continue;
+                }
+                $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+                if (!in_array($ext, $allowedExtensions, true)) {
+                    $errorMessages[] = $originalName . ': formato no permitido. Usa imágenes o vídeos compatibles (jpg, png, mp4, webm...).';
+                    continue;
+                }
+                $base = nammu_slugify(pathinfo($originalName, PATHINFO_FILENAME));
+                if ($base === '') {
+                    $base = 'archivo';
+                }
+                $targetName = $base . '.' . $ext;
+                $targetName = nammu_unique_asset_filename($targetName);
+                $targetPath = ASSETS_DIR . '/' . $targetName;
+                if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+                    $successCount++;
+                } else {
+                    $errorMessages[] = $originalName . ': no se pudo mover el archivo. Revisa los permisos de la carpeta assets/.';
+                }
+            }
+            if ($successCount > 0 && empty($errorMessages)) {
+                $feedback = [
+                    'type' => 'success',
+                    'message' => $successCount === 1 ? 'Archivo subido correctamente.' : $successCount . ' archivos subidos correctamente.',
+                ];
+            } elseif ($successCount > 0) {
+                $feedback = [
+                    'type' => 'warning',
+                    'message' => ($successCount === 1 ? '1 archivo subido correctamente. ' : $successCount . ' archivos subidos correctamente. ') . 'Errores: ' . implode(' ', $errorMessages),
+                ];
+            } else {
+                $feedback = [
+                    'type' => 'danger',
+                    'message' => 'No se pudieron subir los archivos. Detalles: ' . implode(' ', $errorMessages),
+                ];
             }
         }
         $_SESSION['asset_feedback'] = $feedback;
@@ -4579,7 +4639,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                     <div class="form-group">
 
-                                        <input type="file" name="asset_file" id="asset_file" class="form-control-file">
+                                        <input type="file" name="asset_files[]" id="asset_file" class="form-control-file" multiple>
 
                                     </div>
 
@@ -5523,8 +5583,21 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                                 usort($topicStatsList, static function (array $a, array $b): int {
                                                                     return (int) ($a['number'] ?? 0) <=> (int) ($b['number'] ?? 0);
                                                                 });
+                                                                $presentationReaders = (int) ($rawStats['started'] ?? 0);
+                                                                $topicOneStarters = 0;
+                                                                foreach ($topicStatsList as $topicStat) {
+                                                                    $topicNumber = (int) ($topicStat['number'] ?? 0);
+                                                                    if ($topicNumber === 1) {
+                                                                        $topicOneStarters = (int) ($topicStat['count'] ?? 0);
+                                                                        break;
+                                                                    }
+                                                                }
+                                                                if ($topicOneStarters === 0 && !empty($topicStatsList)) {
+                                                                    $topicOneStarters = (int) ($topicStatsList[0]['count'] ?? 0);
+                                                                }
                                                                 $statsPayload = [
-                                                                    'started' => (int) ($rawStats['started'] ?? 0),
+                                                                    'started' => $topicOneStarters,
+                                                                    'presentation_readers' => $presentationReaders,
                                                                     'topics' => array_map(static function (array $topic): array {
                                                                         return [
                                                                             'number' => (int) ($topic['number'] ?? 0),
@@ -8150,7 +8223,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     started = 0;
                 }
                 statsModal.find('[data-stats-title]').text(title);
-                statsModal.find('[data-stats-started]').text('Empezado por ' + started + ' usuarios reales');
+                var presentationReaders = parseInt(stats.presentation_readers, 10);
+                if (isNaN(presentationReaders) || presentationReaders < 0) {
+                    presentationReaders = started;
+                }
+                statsModal.find('[data-stats-started]').text('Leyeron la presentación del itinerario ' + presentationReaders + ' usuarios reales');
                 var tbody = statsModal.find('[data-stats-table-body]');
                 tbody.empty();
                 var topics = Array.isArray(stats.topics) ? stats.topics : [];

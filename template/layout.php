@@ -426,7 +426,8 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
         .itinerary-topics__list {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 1.5rem;
+            column-gap: 1.5rem;
+            row-gap: 3.5rem;
             margin: 0;
             padding: 0;
             list-style: none;
@@ -790,23 +791,35 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
             }
             var progress = ensureStructure(slug);
             var cards = container.querySelectorAll('[data-itinerary-topic]');
-            var firstLocked = false;
+            if (!cards.length) {
+                return;
+            }
+            var usesAssessment = usageLogic === 'assessment';
+            var baseUnlocked = usesAssessment ? hasPassed(progress, '__presentation') : hasVisited(progress, '__presentation');
+            var highestCompletedIndex = -1;
+            var cardStates = [];
             cards.forEach(function(card, index) {
-                var requiredSlug = index === 0 ? '__presentation' : (cards[index - 1].getAttribute('data-topic-slug') || '');
-                var unlocked = true;
-                if (usageLogic === 'sequential') {
-                    unlocked = hasVisited(progress, requiredSlug);
-                } else if (usageLogic === 'assessment') {
-                    unlocked = hasPassed(progress, requiredSlug);
+                var topicSlug = card.getAttribute('data-topic-slug') || '';
+                var completed = usesAssessment ? hasPassed(progress, topicSlug) : hasVisited(progress, topicSlug);
+                if (completed && index > highestCompletedIndex) {
+                    highestCompletedIndex = index;
                 }
-                toggleTopicCard(card, unlocked);
-                if (index === 0) {
-                    firstLocked = !unlocked;
+                cardStates.push({element: card, completed: completed});
+            });
+            var maxUnlockedIndex = baseUnlocked ? Math.min(cards.length - 1, highestCompletedIndex + 1) : -1;
+            cardStates.forEach(function(entry, index) {
+                var unlocked = false;
+                if (entry.completed) {
+                    unlocked = true;
+                } else if (baseUnlocked && index === (highestCompletedIndex + 1) && index <= maxUnlockedIndex) {
+                    unlocked = true;
                 }
+                toggleTopicCard(entry.element, unlocked);
             });
             var startLink = container.querySelector('[data-first-topic-link]');
             if (startLink) {
-                setLinkState(startLink, !firstLocked, 'button-disabled');
+                var firstUnlocked = baseUnlocked && maxUnlockedIndex >= 0;
+                setLinkState(startLink, firstUnlocked, 'button-disabled');
             }
         }
 

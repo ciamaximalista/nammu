@@ -806,6 +806,9 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
                 }
                 cardStates.push({element: card, completed: completed});
             });
+            if (!baseUnlocked && highestCompletedIndex >= 0) {
+                baseUnlocked = true;
+            }
             var maxUnlockedIndex = baseUnlocked ? Math.min(cards.length - 1, highestCompletedIndex + 1) : -1;
             cardStates.forEach(function(entry, index) {
                 var unlocked = false;

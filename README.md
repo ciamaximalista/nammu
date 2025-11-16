@@ -1,172 +1,152 @@
 ![Nammu Logo](nammu-banner.png)
 
-# Nammu — CMS ligero basado en PHP y MarkDown
+# Nammu — CMS ligero para periodistas, editoriales y escuelas
 
-Nammu es un motor ligero para **blogs, diccionarios, cursos, libros y más** basado en PHP 8 y MarkDown con todo tipo de recursos: herramientas de edición, plantillas personalizables, generación de RSS, administración de recursos, sistemas de autoevaluación, integración con redes sociales, etc. 
+Nammu condensa todo lo que esperas de un gestor contemporáneo —edición Markdown, plantillas vivas, itinerarios interactivos y automatización social— en un paquete PHP 8 sin dependencias caprichosas. Es ligero, portable y lo bastante flexible como para lanzar un blog personal, un diccionario multimedia o un curso con estadísticas por tema.
 
-El proyecto se distribuye bajo licencia **EUPL** y puede ejecutarse en cualquier alojamiento que soporte PHP 8+.
+La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting que ofrezca PHP 8+ y escritura en disco.
 
-## Características principales
+## Qué puedes construir con Nammu
 
-- Panel de administración para crear y editar entradas/páginas en Markdown.
-- Gestión directa de recursos multimedia, con recorte básico, control de intensidad de color, brillo y contraste y filtro de pixelado.
-- Plantillas configurables desde la administración: tipografías Google Fonts, colores, cabeceras, maquetación de portada, footer, meta etiquetas sociales y logotipo flotante.
-- Generación automática de `rss.xml`  (RSS 2.0) con imágenes destacadas, limpieza de etiquetas `[toc]/[TOC]` y reemplazo de vídeos/PDF incrustados por enlaces absolutos para máxima compatibilidad con lectores.
-- Generación automática de `sitemap.xml` para facilitar la indexación por Google y otros buscadores.
-- Parseador Markdown con soporte para listas, encabezados, enlaces, imágenes, código en línea, bloques de cita, código en bloque (```` ``` ````), blockquotes, superíndices con `^texto`, tachado con `~~`, negrita/cursiva combinadas y genera automáticamente una **tabla de contenidos** cuando encuentra `[toc]` o `[TOC]`, enlazando con los títulos `h1–h4`.
-- Buscador avanzado (`buscar.php`) con soporte para frases exactas, exclusiones con `-palabra`, filtros por campos (`title:`, `category:`, `content:`), selector de tipo (entradas/páginas) e integración visual configurable desde la plantilla.
-- Botón extra en las cajas de búsqueda (portada, categorías, post individual, etc.) que enlaza al índice de categorías (modo blog) o al alfabético cuando se usa la ordenación por título (modo diccionario) y, si existe, al índice de itinerarios (cursos, libros, etc.).
-- Índice de categorías (`/categorias`) y páginas de cada categoría (`/categoria/{slug}`) que reutilizan la maquetación elegida para la portada e incluyen miniaturas automáticas basadas en la última entrada de cada categoría.
-- Selector de recursos multimedia compatible con imágenes, vídeos (MP4, WebM, MOV…) y documentos PDF. Al insertar desde el modal, los vídeos se convierten en bloques `<video>` centrados, los PDF se incrustan como `<iframe>` a ancho completo y las URLs directas de YouTube se transforman automáticamente en iframes responsivos.
-- Integración opcional con Telegram, WhatsApp Cloud API, Facebook Pages y Twitter/X para enviar las entradas automáticamente al publicar (también se puede reenviar manualmente desde la tabla de “Editar”).
-- Índice alfabético: al elegir el modo diccionario en Configuración, la portada agrupa las entradas por letra (A, B, C…, “Otros”), se activa el índice de letras (`/letras`) y las vistas por letra (`/letra/{slug}`) que reutilizan la maquetación elegida.
-- Bloque “Entrada” dentro de la pestaña Plantilla para decidir si las entradas muestran un índice de contenidos por defecto (a partir de 2, 3 o 4 encabezados). El sistema añade el TOC en entradas publicadas y borradores, pero respeta las etiquetas `[toc]/[TOC]` si ya las incluiste manualmente.
-- TOC automático opcional: si activas el bloque anterior, cada post mostrará el índice al inicio del contenido siempre que alcance el mínimo de encabezados definido; las páginas quedan excluidas por diseño y puedes desactivar la función post a post insertando tu propio `[toc]`.
-- Tratamiento diferenciado de entradas y páginas: las páginas usan la misma ruta amigable `/slug`, pero muestran cintillas de actualización específicas (con fecha calculada a partir del YAML o, si falta, de los metadatos del archivo) y pueden compartir maquetación con las entradas según la plantilla elegida.
-- Modo borradores: desde “Publicar” puedes guardar contenidos como borrador; la pestaña “Editar” incorpora un filtro “Entradas | Páginas | Borradores” y las entradas en borrador quedan fuera de RSS, sitemap, índices, búsqueda y portada. Si accedes por URL directa, el post muestra un sello rojo “Borrador” en la vista individual.
-- **Itinerarios temáticos**: agrupa múltiples archivos Markdown bajo `/itinerarios/{slug}` con portada, índice visual, contenidos renderizados como entradas, autoevaluaciones (para la presentación del curso/libro y para cada tema), lógica de progreso basada en cookies (modo libre, secuencial o condicionado a aprobar los tests) y compatibilidad con recursos (vídeos, PDF, etc.). Incluye estadísticas de inicio/avance por tema, y genera un feed específico `itinerarios.xml` además de añadir un acceso directo al índice de itinerarios en todas las cajas de búsqueda del sitio.
-- Compatible con la estructura de directorios de PicoCMS (`content/` y `assets/`), lo que simplifica migraciones.
+### Publicaciones en Markdown con control editorial
 
-## Orden alfabético, índices y buscador
+- Panel `admin.php` con sesión propia y creación del primer usuario en el onboarding.
+- Entradas y páginas Markdown con front matter YAML, soporte para `[toc]`, tablas, superíndices, bloques de código y TOC automático configurable por plantilla.
+- Sistema de borradores con filtros “Entradas / Páginas / Borradores”, publicación directa desde el formulario y sello rojo en la vista pública cuando está sin publicar.
+- Buscador interno dentro de la pestaña “Editar” que filtra por título, descripción, categoría o archivo para localizar contenidos en segundos.
 
-- En **Configuración → Ordenar posts por** puedes elegir *“Orden alfabético (A-Z)”*. Cuando está activo:
-  - La portada agrupa automáticamente las entradas por letra inicial mostrando bloques `A`, `B`, `C`, … (también un bloque “Otros” para títulos que no empiezan por letra).
-  - Se habilita un botón adicional en todas las cajas de búsqueda que enlaza al nuevo índice alfabético.
-  - Puedes acceder al listado completo de letras en `/letras` y a las páginas individuales `/letra/{slug}` (por ejemplo `/letra/a` o `/letra/otros`). Ambas reutilizan la maquetación seleccionada en Plantilla (columnas, tarjetas, etc.).
-- Si vuelves a la ordenación cronológica, la portada y las rutas alfabéticas regresan a su comportamiento habitual y el botón del buscador desaparece automáticamente.
+### Biblioteca multimedia integrada
 
-## Itinerarios: guía rápida
+- Subida múltiple de imágenes, vídeos (MP4, WebM, MOV), GIF y PDF con renombrado seguro (`nammu_unique_asset_filename`) y validación de extensión.
+- Editor web con recorte, brillo, contraste, saturación y pixelado antes de sobrescribir el archivo en `assets/`.
+- Selector de medios reutilizable que inserta imágenes, vídeos locales (`<video>`), PDF (`<iframe>`) o enlaces de YouTube convertidos a iframes responsive.
 
-Los itinerarios añaden una capa narrativa encima de los posts tradicionales para organizar contenidos extensos o cursos modulares. Funcionan como “colecciones” dentro del motor y heredan el *look & feel* definido en la plantilla.
+### Plantillas vivas y SEO al día
 
-### Estructura y almacenamiento
+- Página “Plantilla” para elegir tipografías Google Fonts, colores, estilo de tarjetas, cabeceras de portada (texto, gráfico, mixtas) y comportamiento del TOC.
+- Footer editable con HTML libre, logotipos posicionables (arriba, abajo o ninguno) y radio global de esquinas.
+- `rss.xml` y `sitemap.xml` regenerados automáticamente desde `index.php`, con limpieza de `[toc]`, conversión de embeds a enlaces y `<enclosure>` para imágenes.
+- Botones contextuales en todas las cajas de búsqueda: índice de categorías, índice alfabético (modo diccionario) y, si hay cursos, acceso directo a `/itinerarios` con un icono de libro.
 
-- Cada itinerario vive en `itinerarios/{slug}/index.md`. El front matter del `index.md` admite al menos `Title`, `Description`, `Image`, `Date/Updated` y cualquier campo personalizado que necesites.
-- Los temas se guardan como ficheros Markdown hermanos (`itinerarios/{slug}/{tema}.md`). El YAML de cada tema debe incluir `Title`, `Description`, `Number`, `Image` opcional y se completará con el contenido Markdown de la presentación del tema.
-- Los slugs se normalizan automáticamente (permitiendo `-`) tanto para itinerarios como para temas. Internamente se usa `ItineraryRepository` para cargar/guardar las entradas y se reordenan los números de tema al insertar en posiciones intermedias.
+### Buscador avanzado e índices
 
-### Creación y edición en el panel
+- Buscador público (`buscar.php`) con `"-frase exacta"`, exclusiones `-palabra`, filtros `title:`, `category:`, `content:` y selector Entradas/Páginas.
+- Índice de categorías (`/categorias`) y vistas por categoría o letra (`/categoria/{slug}`, `/letra/{slug}`) que heredan la maquetación elegida.
+- Modo diccionario: agrupa la portada por letras, muestra `/letras`, añade accesos directos por letra y mantiene la navegación cuando vuelves a modo blog.
 
-- La pestaña **Itinerarios** del admin ofrece:
-  - Tabla con todos los itinerarios (título, descripción, nº de temas, slug público) con acciones **Editar** y **Borrar**.
-  - Cada fila incluye un botón **Estadísticas** que abre una ventana con el número de usuarios reales que comenzaron el itinerario (“pasaron de la portada al Tema 1”) y el desglose por tema (usuarios y porcentaje respecto a los que iniciaron el recorrido).
-  - Formulario “Nuevo/Editar itinerario” en una sola columna: título, descripción corta, imagen de portada, slug editable, área Markdown con los mismos atajos que los posts, botón para insertar recursos y un editor visual de autoevaluaciones para la presentación.
-  - Bloque “Temas del itinerario” con botón “Nuevo tema” y tarjetas individuales que incluyen los botones **Editar**/**Borrar** más un enlace “Ver tema”.
-  - Formulario de tema con título, descripción, número (permite reorganizar arrastrando posiciones al guardar), slug, imagen, editor Markdown y el mismo modal de autoevaluación (preguntas/respuestas ilimitadas, selección de correctas y mínimo de aciertos).
-- Los itinerarios se almacenan en disco inmediatamente; al borrar un itinerario se elimina la carpeta completa y todos sus temas. Al borrar un tema sólo se borra su fichero `.md`.
+### Itinerarios, cursos y libros interactivos
 
-### Experiencia de navegación
+- Cada itinerario vive en `/itinerarios/{slug}` con portada Markdown, imagen, descripción y autoevaluación opcional.
+- Temas independientes con imagen, descripción, contenido y quiz propio. Tres lógicas de uso: libre, secuencial y assessment (exige aprobar).
+- Progreso almacenado en cookies: desbloquea automáticamente los temas ya superados y el siguiente en línea, mostrando un aviso cuando todavía no puedes avanzar.
+- Estadísticas por itinerario: lectores de la presentación, usuarios que completaron el tema 1 (iniciados) y porcentaje por tema. Incluye botón **Poner estadísticas a cero** para reiniciar los contadores.
+- Feed dedicado `itinerarios.xml` y botones en los buscadores que llevan directo al índice de cursos.
 
-- `/itinerarios`: listado maquetado como una página de categoría (respeta columnas, estilo de tarjetas y colores definidos en Plantilla). Muestra hero con el nombre del propietario del blog y tarjetas con imagen, título y descripción.
-- `/itinerarios/{slug}`: renderiza el `index.md` como si fuese un post (sin etiqueta de categoría) y añade un índice visual de temas (tarjetas en rejilla con cintilla “Tema N”, imagen recortada, descripción y enlace). Al final aparece el botón **Comenzar Itinerario** que lleva al primer tema.
-- `/itinerarios/{slug}/{tema}`: cada tema se muestra con la maquetación de post individual (imagen, descripción, recursos incrustados, etc.) seguida de una caja de llamada a la acción que permite avanzar al siguiente tema, volver al índice o superar la autoevaluación (si existe). Cuando no hay test se ofrece un botón “Pasar al siguiente tema”.
-- Los posts virtuales creados para cada itinerario/tema actualizan los metadatos sociales (Open Graph / Twitter), añaden cintillas informativas (“Itinerario”, “Tema N del itinerario «…»”) y eliminan el buscador incrustado para evitar duplicados en esta vista.
+### Automatización y redes sociales
 
-### Autoevaluaciones y lógica de avance
+- Integración opcional con Telegram, WhatsApp Cloud API, Facebook Pages y Twitter/X: auto-posting al publicar o envío manual desde la tabla de “Editar”.
+- Plantillas de mensaje consistentes (título, descripción y URL pública) con escape apropiado para HTML o texto plano.
+- Feedback inmediato en la UI usando `$_SESSION['social_feedback']`.
 
-- Cada itinerario puede declararse como:
-  1. **Libre**: el lector puede abrir cualquier tema desde el índice.
-  2. **Secuencial**: se exige visitar la portada y los temas en orden; los enlaces quedan bloqueados hasta haber pasado por el anterior.
-  3. **Autoevaluaciones**: además de la navegación secuencial, cada paso exige aprobar la autoevaluación previa (presentación incluida si tiene test). El botón “Comenzar itinerario” también queda bloqueado hasta superar este test inicial.
-- Las autoevaluaciones se editan desde el mismo modal (preguntas ilimitadas, respuestas múltiples con marca de correctas y mínimo de aciertos). El front baraja preguntas y respuestas, muestra el porcentaje de aciertos y desbloquea el siguiente paso sólo si se alcanza el mínimo configurado.
-- El progreso se almacena en cookies propias por itinerario (`visited` y `passed`). Al detectar que alguien pasa de la portada al Tema 1 o abre un tema por primera vez, el sistema incrementa estadísticas agregadas en `stats.json` y las expone en el modal de **Estadísticas** del admin.
+### Recursos técnicos clave
 
-### Búsqueda, RSS y otros extras
+- Compatible con la estructura `content/` y `assets/` de PicoCMS, lo que simplifica migraciones.
+- Si está disponible Symfony Yaml, se usa para parsear `config/config.yml`; si no, existe un parser propio robusto.
+- Markdown enriquecido en el panel gracias a una barra de botones que aplica negrita, listas, enlaces, código, citas y atajos para imágenes/vídeos.
 
-- Todas las cajas de búsqueda (portada, posts, categorías, índice alfabético y buscador avanzado) muestran un tercer botón con icono educativo que enlaza a `/itinerarios` siempre que exista al menos un itinerario.
-- Además del `rss.xml` general, Nammu genera `itinerarios.xml` con los itinerarios ordenados por fecha (metadatos `Date`/`Updated` o `filemtime`). El feed incluye portada, descripción y el contenido completo del `index.md` en `content:encoded`.
-- Los PDFs, vídeos y recursos insertados desde el editor se procesan igual que en los posts estándar, garantizando rutas absolutas (`/assets/...`) y estilos adaptados (iframes a ancho completo, vídeo responsivo, etc.).
+## Requisitos mínimos
 
-## Requisitos
+- PHP 8.0 o superior con extensiones estándar (`json`, `mbstring`, `iconv`, `curl` recomendado).
+- Servidor web capaz de ejecutar PHP y escribir en `content/`, `assets/` e `itinerarios/`.
+- Composer opcional para aprovechar Symfony Yaml (el núcleo funciona sin él).
 
-- PHP 8.0 o superior con extensiones estándar (no requiere Composer en producción).
-- Servidor web (Apache, Nginx, Caddy…) con permisos de escritura en `content/`, `assets/` y `config/`.
-- Acceso SSH/SFTP para aplicar permisos y desplegar actualizaciones.
+## Instalación
 
-## Instalación limpia
+### Paso a paso
 
-1. Clona o descarga el repositorio:
-   ```bash
-   git clone https://github.com/<tu-organizacion>/nammu.git memoria
-   ```
-   Alternativamente si quieres instalarlo directamente en en una carpeta pública determinada:
-   
-    ```bash
-    git init
-    git config --global --add safe.directory /var/www/html/<carpeta-publica-de-tu-sitio>
-    git remote add origin https://github.com/ciamaximalista/nammu.git
-    git pull origin main
-    ```
-2. Coloca los archivos en el directorio público en la carpeta que tengas asociada a tu dominio (`/var/www/html/<carpeta-publica-de-tu-sitio>`).
-3. Crea las carpetas que Nammu necesita escribir y ajusta permisos (repite para cada instancia que tengas en `blogs/`):
-   ```bash
-   sudo mkdir -p /var/www/html/<carpeta-publica-de-tu-sitio>/{config,content,assets,itinerarios}
-   sudo chown -R www-data:www-data /var/www/html/<carpeta-publica-de-tu-sitio>
-   sudo find /var/www/html/<carpeta-publica-de-tu-sitio> -type d -exec chmod 755 {} \;
-   sudo find /var/www/html/<carpeta-publica-de-tu-sitio> -type f -exec chmod 644 {} \;
-   sudo find /var/www/html/<carpeta-publica-de-tu-sitio>/{config,content,assets,itinerarios} -type d -exec chmod 775 {} \;
-   sudo find /var/www/html/<carpeta-publica-de-tu-sitio>/{config,content,assets,itinerarios} -type f -exec chmod 664 {} \;
-   sudo chmod 664 /var/www/html/<carpeta-publica-de-tu-sitio>/config/config.yml
-   ```
-   Ajusta el usuario/grupo (`www-data`) según tu servidor.
-4. Configura el host virtual y asegúrate de que `AllowOverride All` esté habilitado si deseas utilizar el `.htaccess`.
-5. Visita `https://tu-dominio/admin.php`, crea el usuario inicial y empieza a publicar.
-6. Si vas a subir vídeos medianos o grandes, recuerda aumentar `upload_max_filesize` y `post_max_size` en tu `php.ini` (o `.user.ini`) a un valor superior al del archivo más pesado que quieras aceptar y reinicia PHP/FPM.
+1. Clona el repositorio o descarga el ZIP y descomprímelo en tu raíz web (ej. `/var/www/html/blogs/memoria`).
+2. Crea los directorios `config/`, `content/`, `assets/` e `itinerarios/` si no existen.
+3. Ajusta los permisos (ver siguiente bloque).
+4. Configura tu host virtual apuntando a la carpeta pública y habilita PHP 8.
+5. Accede a `https://tusitio/admin.php`, crea el usuario inicial y empieza a publicar.
 
-## Migración desde PicoCMS
-
-Nammu está pensado para reemplazar una instalación de PicoCMS reutilizando los mismos contenidos:
-
-1. **Haz copia de seguridad** de tu sitio actual.
-2. Dentro del directorio de PicoCMS, **elimina todo** excepto las carpetas `content/` y `assets/`.
-
-Ahora ya está todo listo para descargar y poner permisos:
-
-    git init
-    git config --global --add safe.directory /var/www/html/<carpeta-publica-de-tu-sitio>
-    git remote add origin https://github.com/ciamaximalista/nammu.git
-    git pull origin main
-    
-    sudo chown -R <tu-usuario>:www-data /var/www/html/<carpeta-publica-de-tu-sitio>
-    sudo find /var/www/html/<carpeta-publica-de-tu-sitio> -type d -exec chmod 755 {} \;
-    sudo find /var/www/html/<carpeta-publica-de-tu-sitio> -type f -exec chmod 644 {} \;
-    sudo chmod 775 /var/www/html/<carpeta-publica-de-tu-sitio>/config
-    sudo chmod 775 /var/www/html/<carpeta-publica-de-tu-sitio>/content /var/www/html/<carpeta-publica-de-tu-sitio>/assets
-    ```
-
-> Consejo: si usabas plugins de PicoCMS, evalúa si aún los necesitas. El núcleo de Nammu ya integra RSS, cabecera personalizable y otras funciones habituales. Pronto añadiremos más.
-
-## Administración y permisos
-
-- `admin.php` exige autenticación. El primer acceso genera un usuario administrador.
-- `content/` y `assets/` deben ser **escribibles** por el proceso web para guardar posts e imágenes.
-- `config/config.yml` almacena la configuración general y se actualiza desde el panel (plantilla, redes sociales, etc.). Si la edición falla, revisa que el archivo tenga permisos 664 y pertenezca al usuario/grupo del servidor.
-- En la pestaña **Editar** ahora tienes un buscador interno minimalista que filtra por título, descripción, categoría o nombre de archivo. El filtro se mantiene al cambiar entre “Entradas” y “Páginas”, lo que facilita localizar rápidamente el contenido que quieres modificar o borrar.
-- Los borradores se gestionan desde la misma pestaña: el nuevo botón “Guardar como borrador” en **Publicar** crea contenidos que no se publican hasta que los promociones con “Publicar como entrada” o “Publicar como página” dentro del formulario de edición.
-- El modal de recursos permite insertar vídeos (locales o de YouTube) y documentos PDF en el cuerpo del post; los vídeos locales se incrustan como `<video>` HTML5, las URLs de YouTube pegadas en una línea se transforman automáticamente en un iframe responsive y los PDF se muestran como un `<iframe>` a ancho completo.
-- Cada entrada puede anunciarse en Telegram, WhatsApp Cloud, Facebook Pages o Twitter/X si configuras los tokens desde **Configuración → Redes sociales**. Puedes activar el envío automático o dispararlo manualmente con el botón “Enviar” de la tabla de “Editar”.
-
-## Actualizaciones
-
-Cuando apliques nuevas versiones desde GitHub, asegúrate de que los permisos no impidan la escritura en el repositorio. Si delegaste la propiedad en el usuario del servidor web, puedes recuperar el control con tu usuario SSH:
+### Permisos recomendados
 
 ```bash
-sudo chown -R <tu-usuario>:www-data /var/www/html/blogs/memoria
-find /var/www/html/<carpeta-publica-de-tu-sitio> -type d -exec chmod 775 {} \;
-find /var/www/html/<carpeta-publica-de-tu-sitio> -type f -exec chmod 664 {} \;
-
-sudo chown -R www-data:www-data /var/www/html/<carpeta-publica-de-tu-sitio>/{content,assets,config}
-sudo chmod 775 /var/www/html/<carpeta-publica-de-tu-sitio>{content,assets,config}
+sudo chown -R <tu-usuario>:www-data /var/www/html/<carpeta-publica>
+sudo find /var/www/html/<carpeta-publica> -type d -exec chmod 755 {} \;
+sudo find /var/www/html/<carpeta-publica> -type f -exec chmod 644 {} \;
+sudo chmod 775 /var/www/html/<carpeta-publica>/{config,content,assets,itinerarios}
 ```
 
-Reemplaza <tu-usuario> por tu usuario SSH. Con esta secuencia podrás ejecutar `git pull` normalmente y mantener el servidor con permisos de escritura en las rutas necesarias.
+Sustituye `<tu-usuario>` y `<carpeta-publica>` según tu entorno. Usa el grupo del proceso web (www-data, apache, nginx…).
 
-## Licencia
+## Actualización
 
-Este proyecto se distribuye bajo **European Union Public Licence (EUPL)**. Consulta el texto completo de la licencia para conocer los términos de uso, distribución y modificación.
+### Desde Git
+
+```bash
+cd /var/www/html/<carpeta-publica>
+git pull origin main
+sudo chown -R www-data:www-data content assets itinerarios config
+sudo chmod 775 content assets itinerarios config
+```
+
+Si cediste propiedad al usuario del servidor para que pueda escribir, ejecuta `sudo chown -R <tu-usuario>:www-data .` antes de `git pull` y deshaz el cambio después.
+
+### Migración desde PicoCMS
+
+1. Copia tus carpetas `content/` y `assets/` dentro de la instalación de Nammu.
+2. Revisa el front matter y asegúrate de usar las claves que Nammu reconoce (`Title`, `Template`, `Date`, `Category`, `Image`, `Description`, `Status`, `Ordo`).
+3. Ve a **Configuración** y define el modo (blog/diccionario), nombre del sitio, autor y redes sociales.
+4. Replica tus estilos en **Plantilla** para ajustar fuentes, colores y portadas.
+5. Regenera `rss.xml`, `sitemap.xml` e `itinerarios.xml` cargando la portada; el sistema los crea automáticamente.
+
+## Administración diaria
+
+### Panel de control
+
+- **Publicar**: formularios para entradas/páginas con fecha amigable, selección de tipo, slug, imagen destacada y modales para insertar medios.
+- **Editar**: tabla con paginación, buscador, estados, acciones rápidas (editar, borrar) y botones para disparar envíos sociales.
+- **Recursos**: biblioteca con tarjetas, filtros por imagen/vídeo/documento, botón “Editar” para abrir el mini editor y subida múltiple con feedback.
+- **Plantilla**: controla tipografías, colores, cabeceras, comportamiento del buscador (posición y modo flotante), TOC por defecto y número de entradas por home.
+- **Itinerarios**: crea portadas, define clase (Libro, Curso, Colección, Otros), lógica de uso, quizzes y estadísticas. Cada tema puede añadirse, duplicarse o borrarse desde la misma pestaña.
+- **Configuración**: modo blog/diccionario, búsqueda avanzada, nombre del sitio, autor, redes sociales, API de Google Fonts y cambio de contraseña.
+
+### Recursos avanzados
+
+- Botón “Recalcular Ordo” para reordenar automáticamente el campo `Ordo` según la fecha de publicación.
+- Restablecimiento de estadísticas de itinerario desde el modal correspondiente.
+- Alertas discretas tras cada acción (`$_SESSION['asset_feedback']`, `$_SESSION['itinerary_feedback']`, etc.).
+
+## Itinerarios en profundidad
+
+### Crear y editar
+
+1. En **Itinerarios**, pulsa “Nuevo itinerario”.
+2. Completa título, descripción, imagen, contenido y, si quieres, autoevaluación de presentación (JSON generado desde el modal).
+3. Elige la lógica (`free`, `sequential`, `assessment`) y guarda.
+4. Añade temas: cada uno tiene número, título, descripción, imagen, contenido Markdown y quiz opcional.
+
+### Progreso y estadísticas
+
+- El navegador marca los temas visitados/aprobados y desbloquea el siguiente automáticamente.
+- El botón “Comenzar itinerario” respeta el último progreso, mostrando sólo los temas permitidos.
+- El modal de estadísticas muestra lectores de la presentación, iniciados (quienes superaron el tema 1) y porcentaje por tema respecto a esos iniciados.
+- Puedes pulsar **Poner estadísticas a cero** para limpiar `stats.json` del itinerario.
+
+## SEO, feeds y archivos auxiliares
+
+- `rss.xml`: feed RSS 2.0 con títulos, descripciones higienizadas, enlaces absolutos e imágenes destacadas.
+- `sitemap.xml`: inventario de entradas, páginas e itinerarios para buscadores.
+- `itinerarios.xml`: feed específico de cursos/libros para reutilizar el contenido en otras plataformas.
+
+## Licencia y soporte
+
+Nammu está licenciado bajo **EUPL**. Puedes usarlo en proyectos comerciales u open source siempre que mantengas la atribución y compartas las modificaciones bajo la misma licencia cuando corresponda.
+
+¿Dudas, bugs o ideas? Abre un issue en el repositorio o contacta con quienes mantienen el proyecto.
 
 ---
 
-¿Preguntas o incidencias? Abre un _issue_ en GitHub o contacta con el equipo de desarrollo. 
-
-**¡Bienvenido a Nammu!** 
+**Nammu** convierte la edición diaria en un sprint veloz y medible. Publica, enseña, analiza y comparte desde un mismo panel, sin sacrificar velocidad ni control.

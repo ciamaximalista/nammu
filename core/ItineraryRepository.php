@@ -299,6 +299,23 @@ class ItineraryRepository
         return $this->readItineraryStats($directory);
     }
 
+    public function resetItineraryStats(string $slug): void
+    {
+        $slug = $this->sanitizeSlug($slug);
+        if ($slug === '') {
+            return;
+        }
+        $directory = "{$this->baseDir}/{$slug}";
+        if (!is_dir($directory)) {
+            return;
+        }
+        $this->writeItineraryStats($directory, [
+            'started' => 0,
+            'topics' => [],
+            'updated_at' => time(),
+        ]);
+    }
+
     public function recordTopicStat(string $itinerarySlug, ItineraryTopic $topic, bool $incrementStart): void
     {
         $itinerarySlug = $this->sanitizeSlug($itinerarySlug);

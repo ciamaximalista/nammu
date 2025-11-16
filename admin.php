@@ -1984,6 +1984,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         header('Location: ' . $redirectBase);
         exit;
+    } elseif (isset($_POST['reset_itinerary_stats'])) {
+        $slug = ItineraryRepository::normalizeSlug($_POST['reset_stats_slug'] ?? '');
+        $redirectBase = 'admin.php?page=itinerarios';
+        if ($slug === '') {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudo identificar el itinerario para reiniciar estadísticas.'];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        $itinerary = admin_load_itinerary($slug);
+        if ($itinerary === null) {
+            $_SESSION['itinerary_feedback'] = ['type' => 'warning', 'message' => 'El itinerario solicitado ya no existe.'];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        try {
+            admin_itinerary_repository()->resetItineraryStats($slug);
+            $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Las estadísticas del itinerario se pusieron a cero.'];
+        } catch (Throwable $e) {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudieron reiniciar las estadísticas: ' . $e->getMessage()];
+        }
+        header('Location: ' . $redirectBase);
+        exit;
     } elseif (isset($_POST['delete_post'])) {
         $filename = $_POST['delete_filename'] ?? '';
         $filename = trim($filename);
@@ -5630,6 +5652,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                                                 data-toggle="modal"
                                                                                 data-target="#itineraryStatsModal"
                                                                                 data-itinerary-title="<?= htmlspecialchars($itineraryItem->getTitle(), ENT_QUOTES, 'UTF-8') ?>"
+                                                                                data-itinerary-slug="<?= htmlspecialchars($itineraryItem->getSlug(), ENT_QUOTES, 'UTF-8') ?>"
                                                                                 data-itinerary-stats="<?= $statsJson ?>"
                                                                             >Estadísticas</button>
                                                                         </div>
@@ -7068,6 +7091,15 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             </table>
                         </div>
                     </div>
+                    <div class="modal-footer flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center">
+                        <small class="text-muted mb-2 mb-sm-0" data-stats-note></small>
+                        <form method="post" class="mb-0" data-reset-stats-form>
+                            <input type="hidden" name="reset_stats_slug" value="" data-reset-stats-slug>
+                            <button type="submit" name="reset_itinerary_stats" class="btn btn-sm btn-outline-danger" data-reset-stats-button>
+                                Poner estadísticas a cero
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -8211,6 +8243,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 var button = $(event.relatedTarget);
                 var statsRaw = button && button.attr('data-itinerary-stats') ? button.attr('data-itinerary-stats') : '{}';
                 var title = button && button.data('itinerary-title') ? button.data('itinerary-title') : 'Itinerario';
+                var slug = button && button.data('itinerary-slug') ? button.data('itinerary-slug') : '';
                 var stats;
                 try {
                     stats = JSON.parse(statsRaw);
@@ -8228,6 +8261,19 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     presentationReaders = started;
                 }
                 statsModal.find('[data-stats-started]').text('Leyeron la presentación del itinerario ' + presentationReaders + ' usuarios reales');
+                var note = statsModal.find('[data-stats-note]');
+                if (note.length) {
+                    note.text('Puedes poner a cero todas las métricas de "' + title + '". Esta acción no se puede deshacer.');
+                }
+                var resetForm = statsModal.find('[data-reset-stats-form]');
+                var resetSlugInput = statsModal.find('[data-reset-stats-slug]');
+                var resetBtn = statsModal.find('[data-reset-stats-button]');
+                if (resetSlugInput.length) {
+                    resetSlugInput.val(slug || '');
+                }
+                if (resetBtn.length) {
+                    resetBtn.prop('disabled', !slug);
+                }
                 var tbody = statsModal.find('[data-stats-table-body]');
                 tbody.empty();
                 var topics = Array.isArray(stats.topics) ? stats.topics : [];
@@ -8252,10 +8298,13 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     var row = $('<tr></tr>');
                     row.append($('<td></td>').text(label));
                     row.append($('<td></td>').text(count));
-                    row.append($('<td></td>').text(percentLabel));
-                    tbody.append(row);
-                });
+                row.append($('<td></td>').text(percentLabel));
+                tbody.append(row);
             });
+            statsModal.find('[data-reset-stats-form]').on('submit', function() {
+                return window.confirm('¿Seguro que quieres poner a cero las estadísticas de este itinerario? Esta acción eliminará todos los conteos registrados.');
+            });
+        });
         });
         </script>
 

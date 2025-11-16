@@ -103,9 +103,9 @@ if ($quizAvailable) {
                 &rsaquo; Tema <?= (int) $topic->getNumber() ?>
             </p>
             <h2>¿Listo para continuar?</h2>
-            <?php if ($nextStep !== null): ?>
+            <?php if ($nextStep !== null && $ctaLocked): ?>
                 <p>Cuando completes <strong><?= htmlspecialchars($topic->getTitle(), ENT_QUOTES, 'UTF-8') ?></strong> podrás avanzar al siguiente tema.</p>
-            <?php else: ?>
+            <?php elseif ($nextStep === null): ?>
                 <p>Has llegado al final del itinerario. Puedes volver al listado de itinerarios o repasar los temas anteriores.</p>
             <?php endif; ?>
         </div>

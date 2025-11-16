@@ -6,10 +6,14 @@ require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
 
 use Nammu\Core\ContentRepository;
+use Nammu\Core\Itinerary;
+use Nammu\Core\ItineraryRepository;
 use Nammu\Core\MarkdownConverter;
 use Nammu\Core\TemplateRenderer;
+use Throwable;
 
 $contentDir = __DIR__ . '/content';
+$itinerariesDir = __DIR__ . '/itinerarios';
 $contentRepository = new ContentRepository($contentDir);
 $markdown = new MarkdownConverter();
 
@@ -89,6 +93,17 @@ $renderer->setGlobal('markdownToHtml', function (string $markdownText) use ($mar
 });
 $renderer->setGlobal('baseUrl', $publicBaseUrl !== '' ? $publicBaseUrl : '/');
 $renderer->setGlobal('socialConfig', $socialConfig);
+$renderer->setGlobal('itinerariesIndexUrl', $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios');
+
+$loadedItineraries = [];
+try {
+    $itineraryRepository = new ItineraryRepository($itinerariesDir);
+    $loadedItineraries = $itineraryRepository->all();
+} catch (Throwable $e) {
+    $itineraryRepository = null;
+    $loadedItineraries = [];
+}
+$renderer->setGlobal('hasItineraries', !empty($loadedItineraries));
 
 $queryRaw = trim($_GET['q'] ?? '');
 $typeFilterRaw = trim($_GET['tipo'] ?? 'todo');
@@ -111,6 +126,9 @@ $conditions = ['conditions' => [], 'tokens' => []];
 if ($performSearch) {
     $searchSummary['didSearch'] = true;
     $documents = nammu_collect_documents($contentDir, $markdown);
+    if (!empty($loadedItineraries)) {
+        $documents = array_merge($documents, nammu_collect_itinerary_documents($loadedItineraries, $markdown));
+    }
     $conditions = nammu_parse_search_query($queryRaw);
     if (!empty($conditions['type']) && $conditions['type'] !== 'todo') {
         $typeFilter = $conditions['type'];
@@ -129,9 +147,11 @@ if ($performSearch) {
 $highlightTerms = array_column(array_filter($conditions['conditions'] ?? [], static fn ($c) => empty($c['negate'])), 'value');
 $resultsForView = [];
 foreach ($results as $item) {
+    $relativeUrl = $item['relative_url'] ?? '/' . rawurlencode($item['slug']);
+    $baseForUrl = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '';
     $resultsForView[] = [
         'slug' => $item['slug'],
-        'url' => ($publicBaseUrl !== '' ? $publicBaseUrl : '') . '/' . rawurlencode($item['slug']),
+        'url' => $baseForUrl . $relativeUrl,
         'title' => nammu_highlight_terms($item['title'], $item['highlight_terms']),
         'description' => $item['description'] !== '' ? nammu_highlight_terms($item['description'], $item['highlight_terms']) : '',
         'snippet' => $item['snippet'],
@@ -152,13 +172,16 @@ $content = $renderer->render('search', [
         'todo' => 'Todo el sitio',
         'post' => 'Sólo entradas',
         'page' => 'Sólo páginas',
+        'itinerary' => 'Sólo itinerarios',
     ],
     'tips' => [
         'Usa comillas para buscar frases exactas, por ejemplo "bosque mediterráneo".',
         'Filtra por campos: title:"Plantación", category:educación, content:escuela.',
         'Excluye términos con el prefijo -, por ejemplo bosque -urbano.',
-        'Limita por tipo con tipo:entrada o tipo:página.',
+        'Limita por tipo con tipo:entrada, tipo:página o tipo:itinerario.',
     ],
+    'hasItineraries' => !empty($loadedItineraries),
+    'itinerariesIndexUrl' => $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios',
 ]);
 
 $queryForTitle = $queryRaw !== '' ? '“' . $queryRaw . '”' : '';
@@ -260,6 +283,7 @@ function nammu_collect_documents(string $contentDir, MarkdownConverter $markdown
             'date_display' => $dateDisplay,
             'body_html' => $bodyHtml,
             'body_text' => $bodyText,
+            'relative_url' => '/' . rawurlencode($slug),
             'fields' => [
                 'title' => $title,
                 'description' => $description,
@@ -425,6 +449,7 @@ function nammu_normalize_search_type(string $type): string
     return match ($type) {
         'post', 'posts', 'entrada', 'entradas', 'blog' => 'post',
         'page', 'pages', 'pagina', 'página', 'paginas', 'páginas' => 'page',
+        'itinerario', 'itinerarios', 'curso', 'cursos', 'libro', 'libros' => 'itinerary',
         default => 'todo',
     };
 }
@@ -499,7 +524,7 @@ function nammu_execute_search(array $documents, array $conditions, string $typeF
             'title' => $doc['title'],
             'description' => $doc['description'],
             'category' => $doc['category'],
-            'type_label' => match ($doc['type']) {
+            'type_label' => $doc['type_label_override'] ?? match ($doc['type']) {
                 'page' => 'Página',
                 'post' => 'Entrada',
                 default => 'Documento',
@@ -507,6 +532,7 @@ function nammu_execute_search(array $documents, array $conditions, string $typeF
             'date_display' => $doc['date_display'],
             'score' => $score,
             'snippet' => $snippet,
+            'relative_url' => $doc['relative_url'] ?? '/' . rawurlencode($doc['slug']),
             'highlight_terms' => $highlightTerms,
         ];
     }
@@ -566,4 +592,101 @@ function nammu_highlight_terms(string $text, array $terms): string
         $text = preg_replace('/(' . $escaped . ')/iu', '<mark>$1</mark>', $text);
     }
     return $text;
+}
+
+/**
+ * @param Itinerary[] $itineraries
+ * @return array<int, array<string, mixed>>
+ */
+function nammu_collect_itinerary_documents(array $itineraries, MarkdownConverter $markdown): array
+{
+    $documents = [];
+    foreach ($itineraries as $itinerary) {
+        if (!$itinerary instanceof Itinerary) {
+            continue;
+        }
+        $slug = $itinerary->getSlug();
+        $itineraryTitle = trim($itinerary->getTitle()) !== '' ? trim($itinerary->getTitle()) : $slug;
+        $description = trim($itinerary->getDescription());
+        $classLabel = trim($itinerary->getClassLabel());
+        $typeLabel = $classLabel !== '' ? nammu_uppercase_label($classLabel) : 'ITINERARIO';
+        $bodyHtml = $markdown->toHtml($itinerary->getContent());
+        $bodyText = trim(preg_replace('/\s+/u', ' ', strip_tags($bodyHtml)));
+        $relativeUrl = nammu_build_itinerary_relative_url($slug);
+
+        $documents[] = [
+            'slug' => 'itinerarios/' . $slug,
+            'relative_url' => $relativeUrl,
+            'title' => $itineraryTitle,
+            'description' => $description,
+            'category' => $itineraryTitle,
+            'template' => 'itinerary',
+            'type' => 'itinerary',
+            'date_raw' => '',
+            'date_iso' => '',
+            'date_display' => '',
+            'body_html' => $bodyHtml,
+            'body_text' => $bodyText,
+            'fields' => [
+                'title' => $itineraryTitle,
+                'description' => $description,
+                'category' => $itineraryTitle,
+                'content' => $bodyText,
+                'slug' => 'itinerarios/' . $slug,
+            ],
+            'type_label_override' => $typeLabel,
+        ];
+
+        foreach ($itinerary->getTopics() as $topic) {
+            $topicSlug = $topic->getSlug();
+            $topicTitle = trim($topic->getTitle()) !== '' ? trim($topic->getTitle()) : $topicSlug;
+            $topicDescription = trim($topic->getDescription());
+            $topicHtml = $markdown->toHtml($topic->getContent());
+            $topicText = trim(preg_replace('/\s+/u', ' ', strip_tags($topicHtml)));
+            $topicUrl = nammu_build_itinerary_relative_url($slug, $topicSlug);
+
+            $documents[] = [
+                'slug' => 'itinerarios/' . $slug . '/' . $topicSlug,
+                'relative_url' => $topicUrl,
+                'title' => $topicTitle,
+                'description' => $topicDescription,
+                'category' => $itineraryTitle,
+                'template' => 'itinerary_topic',
+                'type' => 'itinerary',
+                'date_raw' => '',
+                'date_iso' => '',
+                'date_display' => '',
+                'body_html' => $topicHtml,
+                'body_text' => $topicText,
+                'fields' => [
+                    'title' => $topicTitle,
+                    'description' => $topicDescription,
+                    'category' => $itineraryTitle,
+                    'content' => $topicText,
+                    'slug' => 'itinerarios/' . $slug . '/' . $topicSlug,
+                ],
+                'type_label_override' => $typeLabel,
+            ];
+        }
+    }
+
+    return $documents;
+}
+
+function nammu_build_itinerary_relative_url(string $itinerarySlug, ?string $topicSlug = null): string
+{
+    $segments = [rawurlencode($itinerarySlug)];
+    if ($topicSlug !== null && $topicSlug !== '') {
+        $segments[] = rawurlencode($topicSlug);
+    }
+    return '/itinerarios/' . implode('/', $segments);
+}
+
+function nammu_uppercase_label(string $text): string
+{
+    $text = trim($text);
+    if ($text === '') {
+        return '';
+    }
+    return function_exists('mb_strtoupper') ? mb_strtoupper($text, 'UTF-8') : strtoupper($text);
 }

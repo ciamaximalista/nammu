@@ -121,8 +121,23 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
         .embedded-pdf {
             margin: 2rem auto;
             text-align: center;
-            width: 100%;
-            max-width: min(760px, 100%);
+            width: min(100%, 1200px);
+            min-width: min(800px, 100%);
+        }
+        .embedded-pdf__actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+        .embedded-pdf__action {
+            color: <?= $colorAccent ?>;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .embedded-pdf__action:hover {
+            text-decoration: underline;
         }
         .embedded-video video,
         .embedded-video iframe,
@@ -130,6 +145,7 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
             display: block;
             width: 100%;
             max-width: 100%;
+            min-width: min(800px, 100%);
             border: none;
             border-radius: var(--nammu-radius-md);
             background: #000;
@@ -947,6 +963,45 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
                 }
                 applyTopicLocks(container);
             });
+        });
+    })();
+    </script>
+    <script>
+    (function() {
+        var pdfBlocks = document.querySelectorAll('.embedded-pdf');
+        if (!pdfBlocks.length) {
+            return;
+        }
+        pdfBlocks.forEach(function(block) {
+            if (block.querySelector('.embedded-pdf__actions')) {
+                return;
+            }
+            var iframe = block.querySelector('iframe');
+            if (!iframe) {
+                return;
+            }
+            var srcValue = iframe.getAttribute('src') || '';
+            var baseHref = srcValue.split('#')[0] || srcValue;
+            var actions = document.createElement('div');
+            actions.className = 'embedded-pdf__actions';
+            actions.setAttribute('aria-label', 'Acciones del PDF');
+
+            var downloadLink = document.createElement('a');
+            downloadLink.className = 'embedded-pdf__action';
+            downloadLink.href = baseHref;
+            downloadLink.setAttribute('download', '');
+            downloadLink.textContent = 'Descargar PDF';
+
+            var fullscreenLink = document.createElement('a');
+            fullscreenLink.className = 'embedded-pdf__action';
+            fullscreenLink.href = baseHref;
+            fullscreenLink.target = '_blank';
+            fullscreenLink.rel = 'noopener';
+            fullscreenLink.textContent = 'Ver a pantalla completa';
+
+            actions.appendChild(downloadLink);
+            actions.appendChild(fullscreenLink);
+            block.insertBefore(actions, iframe);
         });
     })();
     </script>

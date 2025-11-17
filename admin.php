@@ -6912,19 +6912,22 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             }
 
             function replaceSelection(textarea, replacement, selectionStartOffset, selectionEndOffset) {
+                var previousScrollTop = textarea.scrollTop;
                 var value = textarea.value;
                 var range = getRange(textarea);
                 textarea.value = value.slice(0, range.start) + replacement + value.slice(range.end);
                 var selStart = range.start + (typeof selectionStartOffset === 'number' ? selectionStartOffset : replacement.length);
                 var selEnd = range.start + (typeof selectionEndOffset === 'number' ? selectionEndOffset : replacement.length);
-                setSelection(textarea, selStart, selEnd);
+                setSelection(textarea, selStart, selEnd, previousScrollTop);
             }
 
-            function setSelection(textarea, start, end) {
+            function setSelection(textarea, start, end, previousScrollTop) {
+                var scrollTop = typeof previousScrollTop === 'number' ? previousScrollTop : textarea.scrollTop;
                 textarea.focus();
                 if (typeof textarea.setSelectionRange === 'function') {
                     textarea.setSelectionRange(start, end);
                 }
+                textarea.scrollTop = scrollTop;
                 triggerInput(textarea);
             }
 
@@ -7268,8 +7271,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     var sourceTag = mime ? '        <source src="' + safeSource + '" type="' + mime + '">' : '        <source src="' + safeSource + '">';
                     snippet = '\n\n<div class="embedded-video">\n    <video controls preload="metadata">\n' + sourceTag + '\n    </video>\n</div>\n\n';
                 } else if (type === 'pdf') {
-                    var pdfSrc = source.indexOf('#') === -1 ? source + '#toolbar=0&view=FitH' : source;
-                    snippet = '\n\n<div class="embedded-pdf">\n    <iframe src="' + pdfSrc + '" title="Documento PDF" loading="lazy" allowfullscreen></iframe>\n</div>\n\n';
+                    var hasHash = source.indexOf('#') !== -1;
+                    var pdfSrc = hasHash ? source : source + '#toolbar=0&view=FitH';
+                    var pdfHref = source;
+                    snippet = '\n\n<div class="embedded-pdf">\n    <div class="embedded-pdf__actions" aria-label="Acciones del PDF">\n        <a class="embedded-pdf__action" href="' + pdfHref + '" download>Descargar PDF</a>\n        <a class="embedded-pdf__action" href="' + pdfHref + '" target="_blank" rel="noopener">Ver a pantalla completa</a>\n    </div>\n    <iframe src="' + pdfSrc + '" title="Documento PDF" loading="lazy" allowfullscreen></iframe>\n</div>\n\n';
                 } else {
                     snippet = '![](' + source + ')';
                 }

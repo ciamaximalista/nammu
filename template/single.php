@@ -467,6 +467,21 @@ if ($isPageTemplate && $formattedDate !== '') {
         width: min(100%, 1200px);
         min-width: min(800px, 100%);
     }
+    .embedded-pdf__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+    .embedded-pdf__action {
+        color: <?= $colorAccent ?>;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .embedded-pdf__action:hover {
+        text-decoration: underline;
+    }
     .embedded-video video,
     .embedded-video iframe,
     .embedded-pdf iframe {

@@ -603,7 +603,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     .home-hero-tagline {
         margin: 0;
         font-size: 1.05rem;
-        color: <?= $textColor ?>;
+        color: <?= $headingColor ?>;
         max-width: 720px;
         margin-left: auto;
         margin-right: auto;

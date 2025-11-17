@@ -464,7 +464,8 @@ if ($isPageTemplate && $formattedDate !== '') {
     .embedded-pdf {
         margin: 2rem auto;
         text-align: center;
-        width: min(100%, 1200px);
+        width: 100%;
+        max-width: 1200px;
         position: relative;
         --pdf-aspect: 1.414;
         overflow: hidden;

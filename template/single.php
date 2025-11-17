@@ -149,7 +149,8 @@ if (!$isPageTemplate) {
         if ($formattedDate !== '') {
             $topMetaText = 'Publicado el ' . htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8');
             if ($categoryLinkHtml !== '') {
-                $topMetaText .= ' en ' . $categoryLinkHtml;
+                // Non-breaking space ensures the category label doesn't stick to "en"
+                $topMetaText .= ' en&nbsp;' . $categoryLinkHtml;
             }
         } elseif ($categoryLinkHtml !== '') {
             $topMetaText = $categoryLinkHtml;

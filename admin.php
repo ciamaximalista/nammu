@@ -4807,7 +4807,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 'background' => 'Color de Fondo',
                                 'highlight' => 'Color de Cajas Destacadas',
                                 'accent' => 'Color Destacado',
-                                'brand' => 'Color de Cabecera (.post-brand)',
+                                'brand' => 'Color de Cabecera',
                                 'code_background' => 'Color de fondo de código',
                                 'code_text' => 'Color del código',
                             ];

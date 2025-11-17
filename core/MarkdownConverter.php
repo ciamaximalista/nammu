@@ -193,6 +193,14 @@ class MarkdownConverter
                 continue;
             }
 
+            if (preg_match('/^(-{3,}|\*{3,}|_{3,})$/', $trimmed)) {
+                $flushParagraph();
+                $closeAllLists();
+                $flushBlockquote();
+                $html[] = '<hr />';
+                continue;
+            }
+
             $youtubeId = $this->extractYoutubeId($trimmed);
             if ($youtubeId !== null) {
                 $flushParagraph();
@@ -337,6 +345,18 @@ class MarkdownConverter
             }, $escaped);
 
             $escaped = $this->applyInlineFormatting($escaped);
+
+            // Auto-link plain URLs and emails
+            $escaped = preg_replace_callback('/\bhttps?:\/\/[^\s<>"\']+/i', function ($matches) use ($storePlaceholder) {
+                $url = $matches[0];
+                return $storePlaceholder('<a href="' . $url . '">' . $url . '</a>');
+            }, $escaped);
+
+            $escaped = preg_replace_callback('/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i', function ($matches) use ($storePlaceholder) {
+                $email = $matches[0];
+                $mailto = 'mailto:' . $email;
+                return $storePlaceholder('<a href="' . $mailto . '">' . $email . '</a>');
+            }, $escaped);
 
             if (!empty($placeholders)) {
                 $escaped = strtr($escaped, $placeholders);

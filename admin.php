@@ -7272,9 +7272,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     snippet = '\n\n<div class="embedded-video">\n    <video controls preload="metadata">\n' + sourceTag + '\n    </video>\n</div>\n\n';
                 } else if (type === 'pdf') {
                     var hasHash = source.indexOf('#') !== -1;
-                    var pdfSrc = hasHash ? source : source + '#toolbar=0&view=FitH';
-                    var pdfHref = source;
-                    snippet = '\n\n<div class="embedded-pdf">\n    <div class="embedded-pdf__actions" aria-label="Acciones del PDF">\n        <a class="embedded-pdf__action" href="' + pdfHref + '" download>Descargar PDF</a>\n        <a class="embedded-pdf__action" href="' + pdfHref + '" target="_blank" rel="noopener">Ver a pantalla completa</a>\n    </div>\n    <iframe src="' + pdfSrc + '" title="Documento PDF" loading="lazy" allowfullscreen></iframe>\n</div>\n\n';
+                    var pdfBase = source.split('#')[0];
+                    var defaultParams = 'page=1&zoom=page-fit&spread=0&toolbar=0&navpanes=0&scrollbar=0&statusbar=0&pagemode=none';
+                    var pdfSrc = hasHash ? source : pdfBase + '#' + defaultParams;
+                    var pdfHref = pdfBase;
+                    snippet = '\n\n<div class="embedded-pdf">\n    <iframe src="' + pdfSrc + '" title="Documento PDF" loading="lazy" allowfullscreen></iframe>\n    <div class="embedded-pdf__actions" aria-label="Acciones del PDF">\n        <a class="embedded-pdf__action" href="' + pdfHref + '" download>Descargar PDF</a>\n        <a class="embedded-pdf__action" href="' + pdfHref + '" target="_blank" rel="noopener">Ver a pantalla completa</a>\n    </div>\n</div>\n\n';
                 } else {
                     snippet = '![](' + source + ')';
                 }

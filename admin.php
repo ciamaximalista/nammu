@@ -6826,6 +6826,26 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     });
                     return;
                 }
+
+                textarea.addEventListener('keydown', function(event) {
+                    if (!(event.ctrlKey || event.metaKey)) {
+                        return;
+                    }
+                    var key = event.key ? event.key.toLowerCase() : '';
+                    var action = null;
+                    if (key === 'b') {
+                        action = 'bold';
+                    } else if (key === 'i') {
+                        action = 'italic';
+                    } else if (key === 'k') {
+                        action = 'link';
+                    }
+                    if (action) {
+                        event.preventDefault();
+                        applyMarkdownAction(textarea, action);
+                    }
+                });
+
                 toolbar.addEventListener('click', function(event) {
                     var button = findActionButton(event.target, toolbar);
                     if (!button) {

@@ -335,6 +335,68 @@ if ($routePath === '/sitemap.xml') {
     exit;
 }
 
+if ($routePath === '/itinerarios.xml') {
+    $itineraryFeedPosts = [];
+    $itineraryPostUrls = [];
+    foreach ($itineraryListing as $itineraryItem) {
+        $itineraryMetadata = $itineraryItem->getMetadata();
+        $itineraryDescription = $itineraryItem->getDescription();
+        if ($itineraryDescription === '') {
+            $convertedDocument = $markdown->convertDocument($itineraryItem->getContent());
+            $itineraryDescription = nammu_excerpt_text($convertedDocument['html'], 220);
+        }
+        $dateString = $itineraryMetadata['Date'] ?? ($itineraryMetadata['Updated'] ?? '');
+        if (trim((string) $dateString) === '') {
+            $indexPath = $itineraryItem->getDirectory() . '/index.md';
+            $mtime = is_file($indexPath) ? @filemtime($indexPath) : false;
+            if ($mtime !== false) {
+                $dateString = gmdate('Y-m-d', $mtime);
+            } else {
+                $dateString = gmdate('Y-m-d');
+            }
+        }
+        $virtualMeta = [
+            'Title' => $itineraryItem->getTitle(),
+            'Description' => $itineraryDescription,
+            'Image' => $itineraryItem->getImage() ?? '',
+            'Date' => $dateString,
+        ];
+        $virtualSlug = 'itinerary-feed-' . $itineraryItem->getSlug();
+        $virtualPost = new Post($virtualSlug, $virtualMeta, $itineraryItem->getContent());
+        $itineraryFeedPosts[] = $virtualPost;
+        $itineraryPostUrls[$virtualSlug] = $buildItineraryUrl($itineraryItem);
+    }
+    usort($itineraryFeedPosts, static function (Post $a, Post $b): int {
+        $dateA = $a->getDate();
+        $dateB = $b->getDate();
+        if ($dateA && $dateB) {
+            return $dateB <=> $dateA;
+        }
+        if ($dateA) {
+            return -1;
+        }
+        if ($dateB) {
+            return 1;
+        }
+        return strcmp($a->getSlug(), $b->getSlug());
+    });
+    $itineraryFeedContent = (new RssGenerator(
+        $publicBaseUrl,
+        $siteTitle . ' — Itinerarios',
+        'Itinerarios recientes'
+    ))->generate(
+        $itineraryFeedPosts,
+        static function (Post $post) use ($itineraryPostUrls): string {
+            return $itineraryPostUrls[$post->getSlug()] ?? '/';
+        },
+        $markdown
+    );
+    header('Content-Type: application/rss+xml; charset=UTF-8');
+    echo $itineraryFeedContent;
+    @file_put_contents(__DIR__ . '/itinerarios.xml', $itineraryFeedContent);
+    exit;
+}
+
 if ($isLettersIndex) {
     if (!$isAlphabeticalOrder) {
         $renderNotFound('Índice alfabético no disponible', 'Activa la ordenación alfabética para acceder a esta vista.', $routePath);

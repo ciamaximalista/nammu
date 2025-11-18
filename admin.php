@@ -12,6 +12,9 @@ if (is_file($autoload)) {
 use Nammu\Core\Itinerary;
 use Nammu\Core\ItineraryRepository;
 use Nammu\Core\ItineraryTopic;
+use Nammu\Core\MarkdownConverter;
+use Nammu\Core\Post;
+use Nammu\Core\RssGenerator;
 use Symfony\Component\Yaml\Yaml;
 
 // --- User Configuration ---
@@ -282,6 +285,81 @@ function admin_itinerary_repository(): ItineraryRepository {
         $repository = new ItineraryRepository(ITINERARIES_DIR);
     }
     return $repository;
+}
+
+function admin_regenerate_itinerary_feed(): void {
+    try {
+        $repository = admin_itinerary_repository();
+        $itineraries = $repository->all();
+        $baseUrl = nammu_base_url();
+
+        $config = load_config_file();
+        $siteTitle = trim((string) ($config['site_name'] ?? 'Nammu Blog'));
+        $siteDescription = trim((string) ($config['social']['default_description'] ?? ''));
+
+        $markdown = new MarkdownConverter();
+        $posts = [];
+        $urls = [];
+
+        foreach ($itineraries as $itinerary) {
+            if (!$itinerary instanceof Itinerary) {
+                continue;
+            }
+            $metadata = $itinerary->getMetadata();
+            $description = $itinerary->getDescription();
+            if ($description === '') {
+                $convertedDocument = $markdown->convertDocument($itinerary->getContent());
+                $description = nammu_excerpt_text($convertedDocument['html'], 220);
+            }
+            $dateString = $metadata['Date'] ?? ($metadata['Updated'] ?? '');
+            if (trim((string) $dateString) === '') {
+                $indexPath = $itinerary->getDirectory() . '/index.md';
+                $mtime = is_file($indexPath) ? @filemtime($indexPath) : false;
+                $dateString = $mtime !== false ? gmdate('Y-m-d', $mtime) : gmdate('Y-m-d');
+            }
+            $virtualMeta = [
+                'Title' => $itinerary->getTitle(),
+                'Description' => $description,
+                'Image' => $itinerary->getImage() ?? '',
+                'Date' => $dateString,
+            ];
+            $virtualSlug = 'itinerary-feed-' . $itinerary->getSlug();
+            $posts[] = new Post($virtualSlug, $virtualMeta, $itinerary->getContent());
+            $path = '/itinerarios/' . rawurlencode($itinerary->getSlug());
+            $urls[$virtualSlug] = $baseUrl !== '' ? $baseUrl . $path : $path;
+        }
+
+        usort($posts, static function (Post $a, Post $b): int {
+            $dateA = $a->getDate();
+            $dateB = $b->getDate();
+            if ($dateA && $dateB) {
+                return $dateB <=> $dateA;
+            }
+            if ($dateA) {
+                return -1;
+            }
+            if ($dateB) {
+                return 1;
+            }
+            return strcmp($a->getSlug(), $b->getSlug());
+        });
+
+        $feedContent = (new RssGenerator(
+            $baseUrl,
+            $siteTitle . ' — Itinerarios',
+            'Itinerarios recientes'
+        ))->generate(
+            $posts,
+            static function (Post $post) use ($urls): string {
+                return $urls[$post->getSlug()] ?? '/';
+            },
+            $markdown
+        );
+
+        @file_put_contents(__DIR__ . '/itinerarios.xml', $feedContent);
+    } catch (Throwable $e) {
+        error_log('No se pudo regenerar itinerarios.xml: ' . $e->getMessage());
+    }
 }
 
 /**
@@ -1792,6 +1870,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'ItineraryClass' => $classLabel,
                 'UsageLogic' => $usageLogic,
             ], $content, !empty($itineraryQuizResult['data']['questions']) ? $itineraryQuizResult['data'] : null);
+            admin_regenerate_itinerary_feed();
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario guardado correctamente.'];
             header('Location: admin.php?page=itinerarios&itinerary=' . urlencode($saved->getSlug()));
             exit;
@@ -1954,6 +2033,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (admin_recursive_delete_path($targetDir)) {
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario borrado correctamente.'];
+            admin_regenerate_itinerary_feed();
         } else {
             $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudo borrar la carpeta del itinerario. Revisa los permisos.'];
         }

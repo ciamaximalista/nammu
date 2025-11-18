@@ -389,7 +389,8 @@ if ($routePath === '/itinerarios.xml') {
         static function (Post $post) use ($itineraryPostUrls): string {
             return $itineraryPostUrls[$post->getSlug()] ?? '/';
         },
-        $markdown
+        $markdown,
+        false
     );
     header('Content-Type: application/rss+xml; charset=UTF-8');
     echo $itineraryFeedContent;
@@ -1259,7 +1260,8 @@ if ($publicBaseUrl !== '') {
         static function (Post $post) use ($itineraryPostUrls): string {
             return $itineraryPostUrls[$post->getSlug()] ?? '/';
         },
-        $markdown
+        $markdown,
+        false
     );
     @file_put_contents(__DIR__ . '/itinerarios.xml', $itineraryFeedContent);
 }

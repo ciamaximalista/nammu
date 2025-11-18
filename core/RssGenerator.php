@@ -18,7 +18,12 @@ class RssGenerator
     /**
      * @param Post[] $posts
      */
-    public function generate(array $posts, callable $urlResolver, MarkdownConverter $markdownConverter): string
+    public function generate(
+        array $posts,
+        callable $urlResolver,
+        MarkdownConverter $markdownConverter,
+        bool $includeImageInContent = true
+    ): string
     {
         $items = [];
         foreach ($posts as $post) {
@@ -41,7 +46,9 @@ class RssGenerator
             $imageUrl = $this->resolveImageUrl($post->getImage());
             $enclosureXml = '';
             if ($imageUrl !== null) {
-                $contentForFeed = '<p><img src="' . $imageUrl . '" alt="' . $title . '"></p>' . $contentForFeed;
+                if ($includeImageInContent) {
+                    $contentForFeed = '<p><img src="' . $imageUrl . '" alt="' . $title . '"></p>' . $contentForFeed;
+                }
                 $mimeType = $this->guessImageMimeType($imageUrl);
                 $enclosureXml = "\n        <enclosure url=\"{$imageUrl}\" type=\"{$mimeType}\" />";
             }

@@ -353,7 +353,8 @@ function admin_regenerate_itinerary_feed(): void {
             static function (Post $post) use ($urls): string {
                 return $urls[$post->getSlug()] ?? '/';
             },
-            $markdown
+            $markdown,
+            false
         );
 
         @file_put_contents(__DIR__ . '/itinerarios.xml', $feedContent);

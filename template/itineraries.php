@@ -42,7 +42,7 @@ if ($columns < 1 || $columns > 3) {
     $columns = 2;
 }
 $cardStyle = $homeSettings['card_style'] ?? 'full';
-$cardStyle = in_array($cardStyle, ['full', 'square-right', 'circle-right'], true) ? $cardStyle : 'full';
+$cardStyle = in_array($cardStyle, ['full', 'square-right', 'square-tall-right', 'circle-right'], true) ? $cardStyle : 'full';
 $fullImageMode = $homeSettings['full_image_mode'] ?? 'natural';
 if (!in_array($fullImageMode, ['natural', 'crop'], true)) {
     $fullImageMode = 'natural';
@@ -80,7 +80,13 @@ if (!in_array($blocksMode, ['boxed', 'flat'], true)) {
                 $thumbClassParts[] = 'thumb-wide';
             } else {
                 $thumbClassParts[] = 'thumb-right';
-                $thumbClassParts[] = $cardStyle === 'square-right' ? 'thumb-square' : 'thumb-circle';
+                if ($cardStyle === 'square-right') {
+                    $thumbClassParts[] = 'thumb-square';
+                } elseif ($cardStyle === 'square-tall-right') {
+                    $thumbClassParts[] = 'thumb-vertical';
+                } else {
+                    $thumbClassParts[] = 'thumb-circle';
+                }
             }
             $thumbClass = implode(' ', $thumbClassParts);
             $classLabel = $itinerary->getClassLabel();
@@ -167,6 +173,7 @@ if (!in_array($blocksMode, ['boxed', 'flat'], true)) {
         color: <?= $textColor ?>;
         position: relative;
         overflow: hidden;
+        box-sizing: border-box;
     }
     .itinerary-card::after {
         content: '';
@@ -206,6 +213,40 @@ if (!in_array($blocksMode, ['boxed', 'flat'], true)) {
         display: block;
         border-radius: inherit;
     }
+    .itinerary-card.style-square-tall-right {
+        display: grid;
+        grid-template-columns: 1fr clamp(110px, 34%, 170px);
+        grid-template-rows: 1fr;
+        gap: 1rem;
+        align-items: stretch;
+        min-height: 220px;
+    }
+    .itinerary-card.style-square-tall-right .itinerary-thumb {
+        grid-column: 2;
+        grid-row: 1;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        border-radius: var(--nammu-radius-lg);
+        align-self: stretch;
+        justify-self: center;
+    }
+    .itinerary-card.style-square-tall-right .itinerary-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        border-radius: inherit;
+    }
+    .itinerary-card.style-square-tall-right .itinerary-card__body {
+        grid-column: 1;
+        grid-row: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.6rem;
+    }
     .itinerary-card.style-circle-right .itinerary-thumb {
         border-radius: 50%;
         shape-outside: circle();
@@ -230,6 +271,19 @@ if (!in_array($blocksMode, ['boxed', 'flat'], true)) {
         }
         .itinerary-card.style-media-right .itinerary-thumb img {
             border-radius: var(--nammu-radius-md);
+        }
+        .itinerary-card.style-square-tall-right {
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr;
+            min-height: 220px;
+        }
+        .itinerary-card.style-square-tall-right .itinerary-thumb {
+            grid-column: 1;
+            width: 100%;
+            height: 100%;
+        }
+        .itinerary-card.style-square-tall-right .itinerary-thumb img {
+            height: 100%;
         }
         .itinerary-card.style-circle-right .itinerary-thumb {
             width: min(200px, 60vw);
@@ -294,6 +348,9 @@ if (!in_array($blocksMode, ['boxed', 'flat'], true)) {
         margin: 0;
         font-size: 1.6rem;
         color: <?= $headingSecondaryColor ?>;
+        word-break: break-word;
+        hyphens: auto;
+        overflow-wrap: anywhere;
     }
     .itinerary-card h2 a {
         color: inherit;

@@ -37,7 +37,7 @@ if ($columns < 1 || $columns > 3) {
     $columns = 2;
 }
 $cardStyle = $homeSettings['card_style'] ?? 'full';
-$cardStyle = in_array($cardStyle, ['full', 'square-right', 'circle-right'], true) ? $cardStyle : 'full';
+$cardStyle = in_array($cardStyle, ['full', 'square-right', 'square-tall-right', 'circle-right'], true) ? $cardStyle : 'full';
 $fullImageMode = $homeSettings['full_image_mode'] ?? 'natural';
 if (!in_array($fullImageMode, ['natural', 'crop'], true)) {
     $fullImageMode = 'natural';
@@ -140,7 +140,13 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
                 $thumbClassParts[] = 'thumb-wide';
             } else {
                 $thumbClassParts[] = 'thumb-right';
-                $thumbClassParts[] = $cardStyle === 'square-right' ? 'thumb-square' : 'thumb-circle';
+                if ($cardStyle === 'square-right') {
+                    $thumbClassParts[] = 'thumb-square';
+                } elseif ($cardStyle === 'square-tall-right') {
+                    $thumbClassParts[] = 'thumb-vertical';
+                } else {
+                    $thumbClassParts[] = 'thumb-circle';
+                }
             }
             $thumbClass = implode(' ', $thumbClassParts);
             $metaPieces = [];
@@ -324,6 +330,7 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         color: <?= $textColor ?>;
         position: relative;
         overflow: hidden;
+        box-sizing: border-box;
     }
     .post-card::after {
         content: '';
@@ -363,6 +370,40 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         display: block;
         border-radius: inherit;
     }
+    .post-card.style-square-tall-right {
+        display: grid;
+        grid-template-columns: 1fr clamp(110px, 34%, 170px);
+        grid-template-rows: 1fr;
+        gap: 1rem;
+        align-items: stretch;
+        min-height: 220px;
+    }
+    .post-card.style-square-tall-right .post-thumb {
+        grid-column: 2;
+        grid-row: 1;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        border-radius: var(--nammu-radius-lg);
+        align-self: stretch;
+        justify-self: center;
+    }
+    .post-card.style-square-tall-right .post-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        border-radius: inherit;
+    }
+    .post-card.style-square-tall-right .post-body {
+        grid-column: 1;
+        grid-row: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.6rem;
+    }
     .post-card.style-circle-right .post-thumb {
         border-radius: 50%;
         shape-outside: circle();
@@ -387,6 +428,19 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         }
         .post-card.style-media-right .post-thumb img {
             border-radius: var(--nammu-radius-md);
+        }
+        .post-card.style-square-tall-right {
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr;
+            min-height: 220px;
+        }
+        .post-card.style-square-tall-right .post-thumb {
+            grid-column: 1;
+            width: 100%;
+            height: 100%;
+        }
+        .post-card.style-square-tall-right .post-thumb img {
+            height: 100%;
         }
         .post-card.style-circle-right .post-thumb {
             width: min(200px, 60vw);
@@ -451,6 +505,9 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
         margin: 0;
         font-size: 1.6rem;
         color: <?= $headingSecondaryColor ?>;
+        word-break: break-word;
+        hyphens: auto;
+        overflow-wrap: anywhere;
     }
     .post-card h2 a {
         color: inherit;

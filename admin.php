@@ -2477,7 +2477,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         $homeCardStylePosted = $_POST['home_card_style'] ?? $defaults['home']['card_style'];
-        $homeCardStylePosted = in_array($homeCardStylePosted, ['full', 'square-right', 'circle-right'], true)
+        $homeCardStylePosted = in_array($homeCardStylePosted, ['full', 'square-right', 'square-tall-right', 'circle-right'], true)
             ? $homeCardStylePosted
             : $defaults['home']['card_style'];
         $homeFullImageModePosted = $_POST['home_card_full_mode'] ?? $defaults['home']['full_image_mode'];
@@ -3997,6 +3997,50 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                 }
 
+                .card-style-square-tall-right {
+
+                    grid-template-columns: 1fr 0.85fr;
+
+                }
+
+                .card-style-square-tall-right .card-thumb {
+
+                    grid-column: 2;
+
+                    grid-row: 1 / -1;
+
+                    width: 34px;
+
+                    height: calc(100% - 10px);
+
+                    display: block;
+
+                    background: rgba(27, 142, 237, 0.35);
+
+                    border: 1px solid rgba(27, 142, 237, 0.5);
+
+                    justify-self: center;
+
+                    align-self: center;
+
+                    border-radius: 10px;
+
+                }
+
+                .card-style-square-tall-right .card-lines {
+
+                    grid-column: 1;
+
+                    grid-row: 1 / -1;
+
+                    display: flex;
+
+                    flex-direction: column;
+
+                    justify-content: space-between;
+
+                }
+
                 .card-style-circle-right .card-thumb {
 
                     grid-column: 2;
@@ -4904,7 +4948,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             if (!in_array($homeBlocksMode, ['boxed', 'flat'], true)) {
                                 $homeBlocksMode = $defaults['home']['blocks'];
                             }
-                            $cardStylesAllowed = ['full', 'square-right', 'circle-right'];
+                            $cardStylesAllowed = ['full', 'square-right', 'square-tall-right', 'circle-right'];
                             $homeCardStyle = $templateHome['card_style'] ?? $defaults['home']['card_style'];
                             if (!in_array($homeCardStyle, $cardStylesAllowed, true)) {
                                 $homeCardStyle = $defaults['home']['card_style'];
@@ -5087,6 +5131,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 'square-right' => [
                                                     'label' => 'Cuadrada a la derecha',
                                                     'caption' => 'Miniatura cuadrada flotante',
+                                                ],
+                                                'square-tall-right' => [
+                                                    'label' => 'Vertical a la derecha',
+                                                    'caption' => 'Mismo ancho que la cuadrada, ocupa toda la altura',
                                                 ],
                                                 'circle-right' => [
                                                     'label' => 'Circular a la derecha',

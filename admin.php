@@ -5030,7 +5030,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                     <p class="card-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><?= htmlspecialchars($relative_path) ?></p>
 
                                                     <?php if ($tags_text !== ''): ?>
-                                                        <small class="d-block text-muted mb-2">Etiquetas: <?= htmlspecialchars($tags_text, ENT_QUOTES, 'UTF-8') ?></small>
+                                                        <div class="mb-2">
+                                                            <?php foreach ($item_tags as $tag): ?>
+                                                                <a href="#" class="badge badge-primary badge-pill mr-1 mb-1" data-tag-filter="<?= htmlspecialchars($tag, ENT_QUOTES, 'UTF-8') ?>" data-tag-scope="resources" style="font-size: 0.75rem;">&num;<?= htmlspecialchars($tag, ENT_QUOTES, 'UTF-8') ?></a>
+                                                            <?php endforeach; ?>
+                                                        </div>
                                                     <?php else: ?>
                                                         <small class="d-block text-muted mb-2">Sin etiquetas</small>
                                                     <?php endif; ?>
@@ -5049,6 +5053,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                                     <?php endif; ?>
 
+                                                    <button type="button" class="btn btn-sm btn-outline-primary edit-tags-btn" data-tag-target="<?= htmlspecialchars($relative_path, ENT_QUOTES, 'UTF-8') ?>" data-tag-list="<?= htmlspecialchars($tags_text, ENT_QUOTES, 'UTF-8') ?>">Etiquetas</button>
+
                                                 </div>
 
                                             </div>
@@ -5058,6 +5064,47 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                     <?php endforeach; ?>
 
                                 </div>
+
+                                <?php
+                                $tagCloud = [];
+                                foreach ($media_tags_map as $tags) {
+                                    if (!is_array($tags)) {
+                                        continue;
+                                    }
+                                    foreach ($tags as $tag) {
+                                        $tag = trim((string) $tag);
+                                        if ($tag === '') {
+                                            continue;
+                                        }
+                                        if (!isset($tagCloud[$tag])) {
+                                            $tagCloud[$tag] = 0;
+                                        }
+                                        $tagCloud[$tag]++;
+                                    }
+                                }
+                                ksort($tagCloud, SORT_NATURAL | SORT_FLAG_CASE);
+                                ?>
+
+                                <?php if (!empty($tagCloud)): ?>
+                                    <div class="mt-3 mb-4">
+                                        <h5>Nube de etiquetas</h5>
+                                        <div>
+                                            <?php
+                                            $minCount = min($tagCloud);
+                                            $maxCount = max($tagCloud);
+                                            $minSize = 0.75; // rem
+                                            $maxSize = 1.5; // rem
+                                            $range = max(1, $maxCount - $minCount);
+                                            foreach ($tagCloud as $tag => $count):
+                                                $size = $minSize + (($count - $minCount) / $range) * ($maxSize - $minSize);
+                                            ?>
+                                                <a href="#" class="badge badge-secondary mr-2 mb-2" data-tag-filter="<?= htmlspecialchars($tag, ENT_QUOTES, 'UTF-8') ?>" data-tag-scope="resources" style="font-size: <?= htmlspecialchars(number_format($size, 2, '.', ''), ENT_QUOTES, 'UTF-8') ?>rem;">
+                                                    <?= htmlspecialchars($tag, ENT_QUOTES, 'UTF-8') ?>
+                                                </a>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
 
         
 
@@ -6660,7 +6707,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                     <?php endif; ?>
 
                                     <?php if ($media_tags_text !== ''): ?>
-                                        <small class="d-block text-muted text-truncate mt-1">Etiquetas: <?= htmlspecialchars($media_tags_text, ENT_QUOTES, 'UTF-8') ?></small>
+                                        <div class="mt-1">
+                                            <?php foreach ($media_tags_list as $tag): ?>
+                                                <a href="#" class="badge badge-primary badge-pill mr-1 mb-1" data-tag-filter="<?= htmlspecialchars($tag, ENT_QUOTES, 'UTF-8') ?>" data-tag-scope="modal" style="font-size: 0.7rem;">&num;<?= htmlspecialchars($tag, ENT_QUOTES, 'UTF-8') ?></a>
+                                            <?php endforeach; ?>
+                                        </div>
                                     <?php else: ?>
                                         <small class="d-block text-muted text-truncate mt-1">Sin etiquetas</small>
                                     <?php endif; ?>
@@ -6689,6 +6740,34 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
             </div>
 
+        </div>
+
+        <div class="modal fade" id="tagsModal" tabindex="-1" role="dialog" aria-labelledby="tagsModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="tagsModalLabel">Editar etiquetas</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="tagsModalForm" method="post">
+                            <input type="hidden" name="update_image_tags" value="1">
+                            <input type="hidden" name="original_image" id="tagsModalTarget" value="">
+                            <div class="form-group">
+                                <label for="tagsModalInput">Etiquetas</label>
+                                <input type="text" class="form-control" name="image_tags" id="tagsModalInput" placeholder="Ej. portada, dossier, pdf">
+                                <small class="form-text text-muted">Separa las etiquetas con comas.</small>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="tagsModalSave">Guardar</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         
@@ -7493,6 +7572,9 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var modalSearchInput = $('#modal-image-search');
             var tagsInput = $('#image_tags');
             var tagsTargetInput = $('#image-tags-target');
+            var tagsModal = $('#tagsModal');
+            var tagsModalInput = $('#tagsModalInput');
+            var tagsModalTarget = $('#tagsModalTarget');
 
         
 
@@ -7655,6 +7737,42 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 });
 
             }
+
+            $(document).on('click', '[data-tag-filter]', function(e) {
+                e.preventDefault();
+                var tag = ($(this).data('tag-filter') || '').toString();
+                var scope = ($(this).data('tag-scope') || '').toString();
+                if (!tag.length) {
+                    return;
+                }
+                if (scope === 'modal') {
+                    if (modalSearchInput.length) {
+                        modalSearchInput.val(tag);
+                        applyModalFilter(tag);
+                    }
+                } else {
+                    if (resourceSearchInput.length) {
+                        resourceSearchInput.val(tag);
+                        resourceSearchInput.trigger('input');
+                    }
+                }
+            });
+
+            $('.edit-tags-btn').on('click', function() {
+                var currentTags = $(this).data('tag-list') || '';
+                var target = $(this).data('tag-target') || '';
+                tagsModalInput.val(currentTags);
+                tagsModalTarget.val(target);
+                tagsModal.modal('show');
+            });
+
+            $('#tagsModalSave').on('click', function() {
+                if (!tagsModalTarget.val()) {
+                    tagsModal.modal('hide');
+                    return;
+                }
+                $('#tagsModalForm').trigger('submit');
+            });
 
         
 

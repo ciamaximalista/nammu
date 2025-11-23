@@ -5053,7 +5053,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                                     <?php endif; ?>
 
-                                                    <button type="button" class="btn btn-sm btn-outline-primary edit-tags-btn" data-tag-target="<?= htmlspecialchars($relative_path, ENT_QUOTES, 'UTF-8') ?>" data-tag-list="<?= htmlspecialchars($tags_text, ENT_QUOTES, 'UTF-8') ?>">Etiquetas</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary edit-tags-btn mt-1" data-tag-target="<?= htmlspecialchars($relative_path, ENT_QUOTES, 'UTF-8') ?>" data-tag-list="<?= htmlspecialchars($tags_text, ENT_QUOTES, 'UTF-8') ?>">Etiquetas</button>
 
                                                 </div>
 

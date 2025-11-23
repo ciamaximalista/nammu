@@ -277,7 +277,7 @@ function load_media_tags(bool $forceReload = false): array {
                 if (!is_string($tag)) {
                     continue;
                 }
-                $tag = trim($tag);
+                $tag = nammu_normalize_tag($tag);
                 if ($tag === '') {
                     continue;
                 }
@@ -309,7 +309,7 @@ function save_media_tags(array $tags): void {
             if (!is_string($tag)) {
                 continue;
             }
-            $tag = trim($tag);
+            $tag = nammu_normalize_tag($tag);
             if ($tag === '') {
                 continue;
             }
@@ -336,13 +336,26 @@ function parse_media_tags_input(?string $input): array {
     $parts = preg_split('/[,\n]/', $input) ?: [];
     $tags = [];
     foreach ($parts as $part) {
-        $clean = trim($part);
-        if ($clean === '' || in_array($clean, $tags, true)) {
+        $normalized = nammu_normalize_tag($part);
+        if ($normalized === '' || in_array($normalized, $tags, true)) {
             continue;
         }
-        $tags[] = $clean;
+        $tags[] = $normalized;
     }
     return $tags;
+}
+
+function nammu_normalize_tag(string $tag): string {
+    $clean = trim($tag);
+    if ($clean === '') {
+        return '';
+    }
+    if (function_exists('mb_strtolower')) {
+        $clean = mb_strtolower($clean, 'UTF-8');
+    } else {
+        $clean = strtolower($clean);
+    }
+    return $clean;
 }
 
 function update_media_tags_entry(string $relative, array $tags): void {
@@ -353,7 +366,7 @@ function update_media_tags_entry(string $relative, array $tags): void {
     $current = load_media_tags();
     $clean = [];
     foreach ($tags as $tag) {
-        $tag = trim((string) $tag);
+        $tag = nammu_normalize_tag((string) $tag);
         if ($tag === '' || in_array($tag, $clean, true)) {
             continue;
         }

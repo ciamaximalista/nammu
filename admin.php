@@ -22,6 +22,7 @@ define('USER_FILE', __DIR__ . '/config/user.php');
 define('CONTENT_DIR', __DIR__ . '/content');
 define('ASSETS_DIR', __DIR__ . '/assets');
 define('ITINERARIES_DIR', __DIR__ . '/itinerarios');
+define('MEDIA_TAGS_FILE', __DIR__ . '/config/media-tags.json');
 nammu_ensure_directory(ITINERARIES_DIR);
 
 // --- Helper Functions ---
@@ -232,6 +233,153 @@ function get_media_items($page = 1, $per_page = 24) {
         'pages' => $pages,
         'current_page' => $page,
     ];
+}
+
+function normalize_media_tag_key(string $relative): string {
+    $normalized = trim((string) $relative);
+    $normalized = str_replace(['\\', '\r', '\n'], ['/', '', ''], $normalized);
+    $normalized = str_replace(['../', '..\\'], '', $normalized);
+    $normalized = ltrim($normalized, '/');
+    if (substr($normalized, 0, 7) === 'assets/') {
+        $normalized = substr($normalized, 7);
+    }
+    return trim($normalized);
+}
+
+function load_media_tags(bool $forceReload = false): array {
+    static $cache = null;
+    if ($cache !== null && !$forceReload) {
+        return $cache;
+    }
+    if (!is_file(MEDIA_TAGS_FILE)) {
+        $cache = [];
+        return $cache;
+    }
+    $raw = @file_get_contents(MEDIA_TAGS_FILE);
+    if ($raw === false) {
+        $cache = [];
+        return $cache;
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        $cache = [];
+        return $cache;
+    }
+    $clean = [];
+    foreach ($decoded as $key => $list) {
+        $normalizedKey = normalize_media_tag_key((string) $key);
+        if ($normalizedKey === '') {
+            continue;
+        }
+        $cleanList = [];
+        if (is_array($list)) {
+            foreach ($list as $tag) {
+                if (!is_string($tag)) {
+                    continue;
+                }
+                $tag = trim($tag);
+                if ($tag === '') {
+                    continue;
+                }
+                if (!in_array($tag, $cleanList, true)) {
+                    $cleanList[] = $tag;
+                }
+            }
+        }
+        if (!empty($cleanList)) {
+            $clean[$normalizedKey] = array_values($cleanList);
+        }
+    }
+    $cache = $clean;
+    return $cache;
+}
+
+function save_media_tags(array $tags): void {
+    $normalized = [];
+    foreach ($tags as $key => $list) {
+        $normalizedKey = normalize_media_tag_key((string) $key);
+        if ($normalizedKey === '') {
+            continue;
+        }
+        if (!is_array($list)) {
+            continue;
+        }
+        $cleanList = [];
+        foreach ($list as $tag) {
+            if (!is_string($tag)) {
+                continue;
+            }
+            $tag = trim($tag);
+            if ($tag === '') {
+                continue;
+            }
+            if (!in_array($tag, $cleanList, true)) {
+                $cleanList[] = $tag;
+            }
+        }
+        if (!empty($cleanList)) {
+            $normalized[$normalizedKey] = array_values($cleanList);
+        }
+    }
+    $json = json_encode($normalized, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    if ($json === false) {
+        $json = '{}';
+    }
+    @file_put_contents(MEDIA_TAGS_FILE, $json);
+    load_media_tags(true);
+}
+
+function parse_media_tags_input(?string $input): array {
+    if ($input === null) {
+        return [];
+    }
+    $parts = preg_split('/[,\n]/', $input) ?: [];
+    $tags = [];
+    foreach ($parts as $part) {
+        $clean = trim($part);
+        if ($clean === '' || in_array($clean, $tags, true)) {
+            continue;
+        }
+        $tags[] = $clean;
+    }
+    return $tags;
+}
+
+function update_media_tags_entry(string $relative, array $tags): void {
+    $key = normalize_media_tag_key($relative);
+    if ($key === '') {
+        return;
+    }
+    $current = load_media_tags();
+    $clean = [];
+    foreach ($tags as $tag) {
+        $tag = trim((string) $tag);
+        if ($tag === '' || in_array($tag, $clean, true)) {
+            continue;
+        }
+        $clean[] = $tag;
+    }
+    if (empty($clean)) {
+        if (isset($current[$key])) {
+            unset($current[$key]);
+            save_media_tags($current);
+        }
+        return;
+    }
+    $current[$key] = $clean;
+    save_media_tags($current);
+}
+
+function delete_media_tags_entry(string $relative): void {
+    $key = normalize_media_tag_key($relative);
+    if ($key === '') {
+        return;
+    }
+    $current = load_media_tags();
+    if (isset($current[$key])) {
+        unset($current[$key]);
+        save_media_tags($current);
+    }
 }
 
 function admin_image_mime_from_extension(string $ext): string {
@@ -2201,6 +2349,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['save_edited_image'])) {
         $image_data = $_POST['image_data'] ?? '';
         $image_name = $_POST['image_name'] ?? '';
+        $tagsInput = $_POST['image_tags'] ?? '';
 
         if ($image_data && $image_name) {
             $image_name = preg_replace('/[^A-Za-z0-9\._-]/ ', '', basename($image_name));
@@ -2212,8 +2361,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $target_path = ASSETS_DIR . '/' . $image_name;
 
             file_put_contents($target_path, $image_data);
+            update_media_tags_entry($image_name, parse_media_tags_input($tagsInput));
+            $_SESSION['asset_feedback'] = [
+                'type' => 'success',
+                'message' => 'Imagen guardada y etiquetas actualizadas.',
+            ];
         }
 
+        header('Location: admin.php?page=resources');
+        exit;
+    } elseif (isset($_POST['update_image_tags'])) {
+        $targetRelative = $_POST['original_image'] ?? '';
+        $normalizedTarget = normalize_media_tag_key($targetRelative);
+        if ($normalizedTarget !== '') {
+            update_media_tags_entry($normalizedTarget, parse_media_tags_input($_POST['image_tags'] ?? ''));
+            $_SESSION['asset_feedback'] = [
+                'type' => 'success',
+                'message' => 'Etiquetas guardadas correctamente.',
+            ];
+        } else {
+            $_SESSION['asset_feedback'] = [
+                'type' => 'warning',
+                'message' => 'No se pudo actualizar las etiquetas del recurso seleccionado.',
+            ];
+        }
         header('Location: admin.php?page=resources');
         exit;
     } elseif (isset($_POST['delete_asset'])) {
@@ -2223,6 +2394,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (file_exists($filepath)) {
                 unlink($filepath);
             }
+            delete_media_tags_entry($file_to_delete);
         }
         header('Location: admin.php?page=resources');
         exit;
@@ -4802,13 +4974,20 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 <h4>Archivos existentes</h4>
 
-                                <div class="row">
+                                <div class="form-group" data-resource-search>
+                                    <label for="resource-search-input">Buscar recursos</label>
+                                    <input type="search" class="form-control" id="resource-search-input" placeholder="Filtra por nombre o etiqueta">
+                                    <small class="form-text text-muted">El listado se actualizará según el término introducido.</small>
+                                </div>
+
+                                <div class="row" id="resource-gallery">
 
                                     <?php
 
                                     $current_page = $_GET['p'] ?? 1;
 
                                     $media_data = get_media_items($current_page, 40);
+                                    $media_tags_map = load_media_tags();
 
                                     foreach ($media_data['items'] as $media):
 
@@ -4816,10 +4995,13 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                         $ext = $media['extension'];
                                         $is_image = $media['type'] === 'image';
                                         $is_video = $media['type'] === 'video';
+                                        $item_tags = $media_tags_map[$relative_path] ?? [];
+                                        $tags_text = implode(', ', $item_tags);
+                                        $search_data = trim($relative_path . ' ' . $tags_text);
 
                                     ?>
 
-                                        <div class="col-md-3 mb-3">
+                                        <div class="col-md-3 mb-3 resource-item" data-resource-search-value="<?= htmlspecialchars($search_data, ENT_QUOTES, 'UTF-8') ?>">
 
                                             <div class="card">
 
@@ -4847,6 +5029,12 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                                     <p class="card-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><?= htmlspecialchars($relative_path) ?></p>
 
+                                                    <?php if ($tags_text !== ''): ?>
+                                                        <small class="d-block text-muted mb-2">Etiquetas: <?= htmlspecialchars($tags_text, ENT_QUOTES, 'UTF-8') ?></small>
+                                                    <?php else: ?>
+                                                        <small class="d-block text-muted mb-2">Sin etiquetas</small>
+                                                    <?php endif; ?>
+
                                                     <form method="post" onsubmit="return confirm('¿Estás seguro de que quieres borrar este archivo?');" style="display: inline-block;">
 
                                                         <input type="hidden" name="file_to_delete" value="<?= htmlspecialchars($relative_path) ?>">
@@ -4857,7 +5045,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                                     <?php if ($is_image): ?>
 
-                                                        <button type="button" class="btn btn-sm btn-primary edit-image-btn" data-image-path="assets/<?= htmlspecialchars($relative_path) ?>" data-image-name="<?= htmlspecialchars(pathinfo($relative_path, PATHINFO_FILENAME)) ?>">Editar</button>
+                                                        <button type="button" class="btn btn-sm btn-primary edit-image-btn" data-image-path="assets/<?= htmlspecialchars($relative_path) ?>" data-image-name="<?= htmlspecialchars(pathinfo($relative_path, PATHINFO_FILENAME)) ?>" data-image-relative="<?= htmlspecialchars($relative_path, ENT_QUOTES, 'UTF-8') ?>" data-image-tags="<?= htmlspecialchars($tags_text, ENT_QUOTES, 'UTF-8') ?>">Editar</button>
 
                                                     <?php endif; ?>
 
@@ -6363,6 +6551,22 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 <button id="resetFiltersBtn" class="btn btn-info btn-block">Reiniciar filtros</button>
 
+                                <hr>
+
+                                <div class="form-group">
+
+                                    <label for="image_tags">Etiquetas</label>
+
+                                    <input type="text" class="form-control" id="image_tags" placeholder="Ej. portada, equipo">
+
+                                    <small class="form-text text-muted">Escribe etiquetas separadas por comas.</small>
+
+                                </div>
+
+                                <button type="button" class="btn btn-outline-primary btn-block mb-2" id="save-tags-only">Guardar etiquetas</button>
+
+                                <input type="hidden" id="image-tags-target" value="">
+
                             </div>
 
                         </div>
@@ -6411,11 +6615,18 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                     <div class="modal-body">
 
+                        <div class="form-group">
+                            <label for="modal-image-search">Buscar recursos</label>
+                            <input type="search" class="form-control" id="modal-image-search" placeholder="Filtra por nombre o etiqueta">
+                            <small class="form-text text-muted">La galería mostrará solo los elementos que coincidan con tu búsqueda.</small>
+                        </div>
+
                         <div class="row image-gallery">
 
                             <?php
 
                             $media_data = get_media_items(1, 1000); // Load all media for now
+                            $modal_media_tags = load_media_tags();
 
                             foreach ($media_data['items'] as $media):
 
@@ -6424,25 +6635,34 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 $media_type = $media['type'];
                                 $media_mime = $media['mime'];
                                 $media_src = 'assets/' . $media_relative;
+                                $media_tags_list = $modal_media_tags[$media_relative] ?? [];
+                                $media_tags_text = implode(', ', $media_tags_list);
+                                $media_search = trim($media_name . ' ' . $media_relative . ' ' . $media_tags_text);
 
                             ?>
 
-                                <div class="col-md-3 mb-3 gallery-item">
+                                <div class="col-md-3 mb-3 gallery-item" data-media-search="<?= htmlspecialchars($media_search, ENT_QUOTES, 'UTF-8') ?>">
 
                                     <?php if ($media_type === 'image'): ?>
-                                        <img src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" class="img-thumbnail" style="width: 100%; height: 150px; object-fit: cover; cursor: pointer;" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="image" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>">
+                                        <img src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" class="img-thumbnail" style="width: 100%; height: 150px; object-fit: cover; cursor: pointer;" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="image" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" data-media-tags="<?= htmlspecialchars($media_tags_text, ENT_QUOTES, 'UTF-8') ?>">
                                     <?php elseif ($media_type === 'video'): ?>
-                                        <div class="video-thumb-wrapper" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="video" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" style="cursor: pointer; position: relative;">
+                                        <div class="video-thumb-wrapper" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="video" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" data-media-tags="<?= htmlspecialchars($media_tags_text, ENT_QUOTES, 'UTF-8') ?>" style="cursor: pointer; position: relative;">
                                             <video class="img-thumbnail" style="width: 100%; height: 150px; object-fit: cover; pointer-events: none;" muted preload="metadata">
                                                 <source src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" type="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>">
                                             </video>
                                             <span class="badge badge-dark video-badge" style="position: absolute; bottom: 8px; right: 12px;">Video</span>
                                         </div>
                                     <?php else: ?>
-                                        <div class="doc-thumb-wrapper" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="pdf" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" style="cursor: pointer; border: 1px dashed rgba(0,0,0,0.2); border-radius: var(--nammu-radius-md, 12px); padding: 2.5rem 1rem; text-align: center;">
+                                        <div class="doc-thumb-wrapper" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="pdf" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" data-media-tags="<?= htmlspecialchars($media_tags_text, ENT_QUOTES, 'UTF-8') ?>" style="cursor: pointer; border: 1px dashed rgba(0,0,0,0.2); border-radius: var(--nammu-radius-md, 12px); padding: 2.5rem 1rem; text-align: center;">
                                             <i class="fas fa-file-pdf" style="font-size: 3rem; color: #c62828;"></i>
                                             <div class="small mt-2 text-muted">PDF</div>
                                         </div>
+                                    <?php endif; ?>
+
+                                    <?php if ($media_tags_text !== ''): ?>
+                                        <small class="d-block text-muted text-truncate mt-1">Etiquetas: <?= htmlspecialchars($media_tags_text, ENT_QUOTES, 'UTF-8') ?></small>
+                                    <?php else: ?>
+                                        <small class="d-block text-muted text-truncate mt-1">Sin etiquetas</small>
                                     <?php endif; ?>
 
                                 </div>
@@ -7270,6 +7490,9 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var imageTargetInput = '';
             var imageTargetPrefix = '';
             var imageTargetEditor = '';
+            var modalSearchInput = $('#modal-image-search');
+            var tagsInput = $('#image_tags');
+            var tagsTargetInput = $('#image-tags-target');
 
         
 
@@ -7281,6 +7504,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 imageTargetInput = button.data('target-input') || '';
                 imageTargetPrefix = button.data('target-prefix') || '';
                 imageTargetEditor = button.data('target-editor') || '';
+                if (modalSearchInput.length) {
+                    modalSearchInput.val('');
+                    applyModalFilter('');
+                }
 
             });
 
@@ -7292,9 +7519,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
             var galleryItems = $('.image-gallery .gallery-item');
 
-            var totalItems = galleryItems.length;
+            var filteredGalleryItems = galleryItems;
 
-            var totalPages = Math.ceil(totalItems / itemsPerPage);
+            var totalItems = filteredGalleryItems.length;
+
+            var totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
 
         
 
@@ -7302,7 +7531,14 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                 galleryItems.hide();
 
-                galleryItems.slice((page - 1) * itemsPerPage, page * itemsPerPage).show();
+                if (!filteredGalleryItems.length) {
+                    currentPage = 1;
+                    return;
+                }
+
+                filteredGalleryItems.slice((page - 1) * itemsPerPage, page * itemsPerPage).show();
+
+                currentPage = page;
 
             }
 
@@ -7315,6 +7551,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 pagination.empty();
 
                 var groupSize = 16;
+
+                if (!filteredGalleryItems.length) {
+                    return;
+                }
 
                 for (var i = 1; i <= totalPages; i++) {
 
@@ -7330,7 +7570,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                         e.preventDefault();
 
-                        currentPage = parseInt($(this).text());
+                        currentPage = parseInt($(this).text(), 10) || 1;
 
                         showPage(currentPage);
 
@@ -7347,6 +7587,72 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     }
 
                 }
+
+            }
+
+            function applyModalFilter(term) {
+
+                var normalized = (term || '').toString().toLowerCase().trim();
+
+                if (!normalized.length) {
+
+                    filteredGalleryItems = galleryItems;
+
+                } else {
+
+                    filteredGalleryItems = galleryItems.filter(function() {
+
+                        var haystack = ($(this).data('media-search') || '').toString().toLowerCase();
+
+                        return haystack.indexOf(normalized) !== -1;
+
+                    });
+
+                }
+
+                totalItems = filteredGalleryItems.length;
+
+                totalPages = Math.max(1, Math.ceil(Math.max(totalItems, 1) / itemsPerPage));
+
+                showPage(1);
+
+                setupPagination();
+
+            }
+
+            if (modalSearchInput.length) {
+
+                modalSearchInput.on('input', function() {
+
+                    applyModalFilter($(this).val());
+
+                });
+
+            }
+
+            applyModalFilter('');
+
+            var resourceSearchInput = $('#resource-search-input');
+
+            var resourceItems = $('[data-resource-search-value]');
+
+            if (resourceSearchInput.length && resourceItems.length) {
+
+                resourceSearchInput.on('input', function() {
+
+                    var normalized = ($(this).val() || '').toString().toLowerCase().trim();
+
+                    resourceItems.each(function() {
+
+                        var haystack = ($(this).attr('data-resource-search-value') || '').toString().toLowerCase();
+
+                        var matches = !normalized.length || haystack.indexOf(normalized) !== -1;
+
+                        $(this).toggle(matches);
+
+                    });
+
+                });
 
             }
 
@@ -8177,11 +8483,23 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
         
 
+                    var imageRelative = $(this).data('image-relative') || '';
+
+        
+
+                    var imageTags = $(this).data('image-tags') || '';
+
+        
+
                     $('#new-image-name').val(imageName + '-edited.png');
 
         
 
-                    
+                    tagsInput.val(imageTags);
+
+        
+
+                    tagsTargetInput.val(imageRelative);
 
         
 
@@ -8289,7 +8607,63 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
         
 
+                    form.append($('<input type="hidden" name="image_tags">').val(tagsInput.val()));
+
+        
+
                     
+
+        
+
+                    $('body').append(form);
+
+        
+
+                    form.submit();
+
+        
+
+                });
+
+        
+
+                $('#save-tags-only').on('click', function() {
+
+        
+
+                    var target = tagsTargetInput.val();
+
+        
+
+                    if (!target) {
+
+        
+
+                        alert('Selecciona una imagen para poder guardar sus etiquetas.');
+
+        
+
+                        return;
+
+        
+
+                    }
+
+        
+
+                    var form = $('<form action="admin.php?page=resources" method="post"></form>');
+
+        
+
+                    form.append('<input type="hidden" name="update_image_tags" value="1">');
+
+        
+
+                    form.append($('<input type="hidden" name="original_image">').val(target));
+
+        
+
+                    form.append($('<input type="hidden" name="image_tags">').val(tagsInput.val()));
 
         
 

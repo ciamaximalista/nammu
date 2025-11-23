@@ -108,10 +108,12 @@ Si cediste propiedad al usuario del servidor para que pueda escribir, ejecuta `s
 
 - **Publicar**: formularios para entradas/páginas con fecha amigable, selección de tipo, slug, imagen destacada y modales para insertar medios.
 - **Editar**: tabla con paginación, buscador, estados, acciones rápidas (editar, borrar) y botones para disparar envíos sociales.
-- **Recursos**: biblioteca con tarjetas, filtros por imagen/vídeo/documento, botón “Editar” para abrir el mini editor y subida múltiple con feedback.
+- **Recursos**: biblioteca con tarjetas, filtros por imagen/vídeo/documento, botón “Editar” para abrir el mini editor, subida múltiple con feedback, etiquetado de imágenes y buscador instantáneo por nombre o etiquetas.
 - **Plantilla**: controla tipografías, colores, cabeceras, comportamiento del buscador (posición y modo flotante), TOC por defecto y número de entradas por home.
 - **Itinerarios**: crea portadas, define clase (Libro, Curso, Colección, Otros), lógica de uso, quizzes y estadísticas. Cada tema puede añadirse, duplicarse o borrarse desde la misma pestaña.
 - **Configuración**: modo blog/diccionario, búsqueda avanzada, nombre del sitio, autor, redes sociales, API de Google Fonts y cambio de contraseña.
+
+El modal “Insertar recurso” que aparece en Publicar, Editar e Itinerarios comparte el mismo buscador, así que puedes localizar imágenes etiquetadas sin salir del formulario.
 
 ### Recursos avanzados
 

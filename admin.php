@@ -7730,10 +7730,18 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var tagsModalRedirect = $('#tagsModalRedirect');
             var insertActions = $('#image-insert-actions');
             var pendingInsert = null;
+            function getQueryParam(name) {
+                var params = new URLSearchParams(window.location.search);
+                return params.get(name);
+            }
+
             var isResourcesPage = window.location.search.indexOf('page=resources') !== -1 || window.location.href.indexOf('admin.php') !== -1 && !window.location.search;
             var resourceScrollKey = 'nammuResourceScroll';
-            var currentResourcesPage = (parseInt($('#resource-gallery').data('resources-page'), 10) || 1);
-            var currentResourcesSearch = ($('#resource-gallery').data('resources-search') || '').toString();
+            var resourcesPageFromUrl = parseInt(getQueryParam('p'), 10);
+            resourcesPageFromUrl = isNaN(resourcesPageFromUrl) ? null : resourcesPageFromUrl;
+            var currentResourcesPage = resourcesPageFromUrl || (parseInt($('#resource-gallery').data('resources-page'), 10) || 1);
+            var resourcesSearchFromUrl = getQueryParam('search') || '';
+            var currentResourcesSearch = resourcesSearchFromUrl !== '' ? resourcesSearchFromUrl : (($('#resource-gallery').data('resources-search') || '').toString());
 
         
 

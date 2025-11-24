@@ -6794,14 +6794,19 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     </div>
 
                     <div class="modal-footer">
+                        <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between w-100">
+                            <div id="image-insert-actions" class="d-none mb-3 mb-md-0">
+                                <div class="d-flex align-items-center flex-wrap">
+                                    <span class="mr-2">Insertar como:</span>
+                                    <button type="button" class="btn btn-sm btn-primary mr-2 mb-2" data-insert-mode="full">Imagen completa</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary mb-2" data-insert-mode="vignette">Viñeta</button>
+                                </div>
+                            </div>
 
-                        <nav aria-label="Page navigation">
-
-                            <ul class="pagination pagination-break" id="image-pagination">
-
-                            </ul>
-
-                        </nav>
+                            <nav aria-label="Page navigation" class="ml-md-auto">
+                                <ul class="pagination pagination-break" id="image-pagination"></ul>
+                            </nav>
+                        </div>
 
                     </div>
 
@@ -7644,6 +7649,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var tagsModal = $('#tagsModal');
             var tagsModalInput = $('#tagsModalInput');
             var tagsModalTarget = $('#tagsModalTarget');
+            var insertActions = $('#image-insert-actions');
+            var pendingInsert = null;
 
         
 
@@ -7658,6 +7665,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 if (modalSearchInput.length) {
                     modalSearchInput.val('');
                     applyModalFilter('');
+                }
+                pendingInsert = null;
+                if (insertActions.length) {
+                    insertActions.addClass('d-none');
                 }
 
             });
@@ -7827,6 +7838,19 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
             });
 
+            function showInsertActions(mediaName, mediaType, mediaSrc, mediaMime) {
+                if (!insertActions.length) {
+                    return;
+                }
+                pendingInsert = {
+                    name: mediaName,
+                    type: mediaType,
+                    src: mediaSrc,
+                    mime: mediaMime
+                };
+                insertActions.removeClass('d-none');
+            }
+
             $('.edit-tags-btn').on('click', function() {
                 var currentTags = $(this).data('tag-list') || '';
                 var target = $(this).data('tag-target') || '';
@@ -7878,7 +7902,13 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                 } else if (imageTargetMode === 'editor') {
 
-                    insertMediaInContent(mediaType, mediaSrc, mediaMime);
+                    if (mediaType === 'image') {
+                        showInsertActions(mediaName, mediaType, mediaSrc, mediaMime);
+                        return;
+                    }
+
+                    insertMediaInContent(mediaType, mediaSrc, mediaMime, 'full');
+                    $('#imageModal').modal('hide');
 
                 }
 
@@ -7886,7 +7916,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
             });
 
-            function insertMediaInContent(type, source, mime) {
+            function insertMediaInContent(type, source, mime, mode) {
                 if (!source) {
                     source = '';
                 }
@@ -7919,8 +7949,14 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     var pdfSrc = hasHash ? source : pdfBase + '#' + defaultParams;
                     var pdfHref = pdfBase;
                     snippet = '\n\n<div class="embedded-pdf">\n    <iframe src="' + pdfSrc + '" title="Documento PDF" loading="lazy" allowfullscreen></iframe>\n    <div class="embedded-pdf__actions" aria-label="Acciones del PDF">\n        <a class="embedded-pdf__action" href="' + pdfHref + '" download>Descargar PDF</a>\n        <a class="embedded-pdf__action" href="' + pdfHref + '" target="_blank" rel="noopener">Ver a pantalla completa</a>\n    </div>\n</div>\n\n';
+                } else if (type === 'document') {
+                    snippet = '[' + (source.split('/').pop() || 'Documento') + '](' + source + ')';
                 } else {
-                    snippet = '![](' + source + ')';
+                    if (mode === 'vignette') {
+                        snippet = '\n\n<img src="' + source + '" alt="" style="float:right; max-width:33%; margin:0 0 1rem 1rem;" />\n\n';
+                    } else {
+                        snippet = '![](' + source + ')';
+                    }
                 }
                 insertTextAtCursor(contentTextArea, snippet);
             }
@@ -7947,6 +7983,17 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     textarea.dispatchEvent(legacy);
                 }
             }
+
+            insertActions.on('click', '[data-insert-mode]', function() {
+                if (!pendingInsert) {
+                    return;
+                }
+                var mode = $(this).data('insert-mode') || 'full';
+                insertMediaInContent(pendingInsert.type, pendingInsert.src, pendingInsert.mime, mode);
+                $('#imageModal').modal('hide');
+                pendingInsert = null;
+                insertActions.addClass('d-none');
+            });
 
         
 

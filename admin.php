@@ -5037,9 +5037,16 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 <h4>Archivos existentes</h4>
 
+                                <?php
+                                $resourceSearchTerm = isset($_GET['search']) ? trim((string) $_GET['search']) : '';
+                                if ($resourceSearchTerm === '' && isset($_GET['tag'])) {
+                                    $resourceSearchTerm = trim((string) $_GET['tag']);
+                                }
+                                ?>
+
                                 <div class="form-group" data-resource-search>
                                     <label for="resource-search-input">Buscar recursos</label>
-                                    <input type="search" class="form-control" id="resource-search-input" placeholder="Filtra por nombre o etiqueta">
+                                    <input type="search" class="form-control" id="resource-search-input" placeholder="Filtra por nombre o etiqueta" value="<?= htmlspecialchars($resourceSearchTerm, ENT_QUOTES, 'UTF-8') ?>">
                                     <small class="form-text text-muted">El listado se actualizará según el término introducido.</small>
                                 </div>
 
@@ -5047,10 +5054,40 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                     <?php
 
-                                    $current_page = $_GET['p'] ?? 1;
+                                $current_page = $_GET['p'] ?? 1;
 
-                                    $media_data = get_media_items($current_page, 40);
                                     $media_tags_map = load_media_tags();
+                                    $all_media = get_media_items(1, 0);
+                                    $resourceSearchNormalized = $resourceSearchTerm !== '' ? (function_exists('mb_strtolower') ? mb_strtolower($resourceSearchTerm, 'UTF-8') : strtolower($resourceSearchTerm)) : '';
+                                    $filteredItems = [];
+                                    foreach ($all_media['items'] as $media) {
+                                        $relative_path = $media['relative'];
+                                        $tags_for_item = $media_tags_map[$relative_path] ?? [];
+                                        if ($resourceSearchNormalized !== '') {
+                                            $haystackParts = [
+                                                $media['name'] ?? '',
+                                                $relative_path,
+                                                implode(' ', $tags_for_item),
+                                            ];
+                                            $haystack = function_exists('mb_strtolower') ? mb_strtolower(implode(' ', $haystackParts), 'UTF-8') : strtolower(implode(' ', $haystackParts));
+                                            if (strpos($haystack, $resourceSearchNormalized) === false) {
+                                                continue;
+                                            }
+                                        }
+                                        $filteredItems[] = $media;
+                                    }
+                                    $perPage = 40;
+                                    $totalItems = count($filteredItems);
+                                    $pages = max(1, (int) ceil($totalItems / $perPage));
+                                    $current_page = max(1, min((int) $current_page, $pages));
+                                    $offset = ($current_page - 1) * $perPage;
+                                    $pageItems = array_slice($filteredItems, $offset, $perPage);
+                                    $media_data = [
+                                        'items' => $pageItems,
+                                        'total' => $totalItems,
+                                        'pages' => $pages,
+                                        'current_page' => $current_page,
+                                    ];
 
                                     foreach ($media_data['items'] as $media):
 
@@ -5191,7 +5228,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                             <li class="page-item <?= $i == $media_data['current_page'] ? 'active' : '' ?>">
 
-                                                <a class="page-link" href="?page=resources&p=<?= $i ?>"><?= $i ?></a>
+                                                <a class="page-link" href="?page=resources&p=<?= $i ?><?= $resourceSearchTerm !== '' ? '&search=' . urlencode($resourceSearchTerm) : '' ?>"><?= $i ?></a>
 
                                             </li>
 
@@ -7659,10 +7696,12 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var tagsModal = $('#tagsModal');
             var tagsModalInput = $('#tagsModalInput');
             var tagsModalTarget = $('#tagsModalTarget');
+            var tagsModalRedirect = $('#tagsModalRedirect');
             var insertActions = $('#image-insert-actions');
             var pendingInsert = null;
             var isResourcesPage = window.location.search.indexOf('page=resources') !== -1 || window.location.href.indexOf('admin.php') !== -1 && !window.location.search;
             var resourceScrollKey = 'nammuResourceScroll';
+            var currentResourcesPage = (parseInt($('#resource-gallery').data('resources-page'), 10) || 1);
 
         
 
@@ -7843,10 +7882,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                         applyModalFilter(tag);
                     }
                 } else {
-                    if (resourceSearchInput.length) {
-                        resourceSearchInput.val(tag);
-                        resourceSearchInput.trigger('input');
-                    }
+                    var url = 'admin.php?page=resources&search=' + encodeURIComponent(tag);
+                    window.location = url;
                 }
             });
 
@@ -7856,7 +7893,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
                 try {
                     var scroll = window.pageYOffset || document.documentElement.scrollTop || 0;
-                    localStorage.setItem(resourceScrollKey, JSON.stringify({ scroll: scroll }));
+                    localStorage.setItem(resourceScrollKey, JSON.stringify({ scroll: scroll, page: currentResourcesPage }));
                 } catch (err) {
                     // ignore
                 }
@@ -7868,6 +7905,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     if (storedScroll) {
                         var parsed = JSON.parse(storedScroll);
                         var value = parsed && typeof parsed.scroll === 'number' ? parsed.scroll : 0;
+                        var storedPage = parsed && typeof parsed.page === 'number' ? parsed.page : null;
+                        if (storedPage && storedPage !== currentResourcesPage) {
+                            // Do not restore scroll if landing on a different page
+                            value = 0;
+                        }
                         setTimeout(function() {
                             window.scrollTo(0, value);
                         }, 50);
@@ -7906,6 +7948,13 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
                 saveResourceScroll();
                 $('#tagsModalForm').trigger('submit');
+            });
+
+            $('#tagsModalForm').on('submit', function() {
+                saveResourceScroll();
+                if (tagsModalRedirect.length) {
+                    tagsModalRedirect.val(currentResourcesPage);
+                }
             });
 
         
@@ -8886,6 +8935,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
         
 
+                    form.append($('<input type="hidden" name="redirect_p">').val(currentResourcesPage));
+
+        
+
                     
 
         
@@ -8943,6 +8996,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
         
 
                     form.append($('<input type="hidden" name="image_tags">').val(tagsInput.val()));
+
+        
+
+                    form.append($('<input type="hidden" name="redirect_p">').val(currentResourcesPage));
 
         
 

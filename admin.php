@@ -7651,6 +7651,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var tagsModalTarget = $('#tagsModalTarget');
             var insertActions = $('#image-insert-actions');
             var pendingInsert = null;
+            var isResourcesPage = window.location.search.indexOf('page=resources') !== -1 || window.location.href.indexOf('admin.php') !== -1 && !window.location.search;
+            var resourceScrollKey = 'nammuResourceScroll';
 
         
 
@@ -7838,6 +7840,34 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
             });
 
+            function saveResourceScroll() {
+                if (!isResourcesPage) {
+                    return;
+                }
+                try {
+                    var scroll = window.pageYOffset || document.documentElement.scrollTop || 0;
+                    localStorage.setItem(resourceScrollKey, JSON.stringify({ scroll: scroll }));
+                } catch (err) {
+                    // ignore
+                }
+            }
+
+            if (isResourcesPage) {
+                try {
+                    var storedScroll = localStorage.getItem(resourceScrollKey);
+                    if (storedScroll) {
+                        var parsed = JSON.parse(storedScroll);
+                        var value = parsed && typeof parsed.scroll === 'number' ? parsed.scroll : 0;
+                        setTimeout(function() {
+                            window.scrollTo(0, value);
+                        }, 50);
+                    }
+                    localStorage.removeItem(resourceScrollKey);
+                } catch (err) {
+                    // ignore
+                }
+            }
+
             function showInsertActions(mediaName, mediaType, mediaSrc, mediaMime) {
                 if (!insertActions.length) {
                     return;
@@ -7864,6 +7894,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     tagsModal.modal('hide');
                     return;
                 }
+                saveResourceScroll();
                 $('#tagsModalForm').trigger('submit');
             });
 
@@ -8853,6 +8884,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
         
 
+                    saveResourceScroll();
+
+        
+
                     form.submit();
 
         
@@ -8902,6 +8937,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
         
 
                     $('body').append(form);
+
+        
+
+                    saveResourceScroll();
 
         
 

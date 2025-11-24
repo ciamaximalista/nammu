@@ -5085,7 +5085,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                         continue;
                                     }
                                     foreach ($tags as $tag) {
-                                        $tag = trim((string) $tag);
+                                        $tag = nammu_normalize_tag((string) $tag);
                                         if ($tag === '') {
                                             continue;
                                         }

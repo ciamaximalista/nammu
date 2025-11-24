@@ -187,7 +187,12 @@ function get_post_content($filename) {
 }
 
 function nammu_allowed_media_extensions(): array {
-    return ['jpg','jpeg','png','gif','webp','svg','mp4','webm','mov','m4v','ogv','ogg','pdf'];
+    return [
+        'jpg','jpeg','png','gif','webp','svg',
+        'mp4','webm','mov','m4v','ogv','ogg',
+        'mp3','wav','flac','m4a','aac','oga',
+        'pdf','doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp','md','txt','rtf'
+    ];
 }
 
 function get_media_items($page = 1, $per_page = 24) {
@@ -199,15 +204,20 @@ function get_media_items($page = 1, $per_page = 24) {
     foreach ($files as $file) {
         $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
         $type = 'image';
+        $documentExts = ['pdf','doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp','md','txt','rtf'];
         if (in_array($ext, ['mp4','webm','mov','m4v','ogv','ogg'], true)) {
             $type = 'video';
-        } elseif ($ext === 'pdf') {
+        } elseif (in_array($ext, ['mp3','wav','flac','m4a','aac','oga'], true)) {
+            $type = 'audio';
+        } elseif (in_array($ext, $documentExts, true)) {
             $type = 'document';
         }
         if ($type === 'video') {
             $mime = admin_video_mime_from_extension($ext);
+        } elseif ($type === 'audio') {
+            $mime = admin_audio_mime_from_extension($ext);
         } elseif ($type === 'document') {
-            $mime = 'application/pdf';
+            $mime = admin_document_mime_from_extension($ext);
         } else {
             $mime = admin_image_mime_from_extension($ext);
         }
@@ -417,6 +427,38 @@ function admin_video_mime_from_extension(string $ext): string {
         'ogg' => 'video/ogg',
     ];
     return $map[$ext] ?? 'video/' . $ext;
+}
+
+function admin_audio_mime_from_extension(string $ext): string {
+    $map = [
+        'mp3' => 'audio/mpeg',
+        'wav' => 'audio/wav',
+        'flac' => 'audio/flac',
+        'm4a' => 'audio/mp4',
+        'aac' => 'audio/aac',
+        'oga' => 'audio/ogg',
+        'ogg' => 'audio/ogg',
+    ];
+    return $map[$ext] ?? 'audio/' . $ext;
+}
+
+function admin_document_mime_from_extension(string $ext): string {
+    $map = [
+        'pdf' => 'application/pdf',
+        'doc' => 'application/msword',
+        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls' => 'application/vnd.ms-excel',
+        'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'ppt' => 'application/vnd.ms-powerpoint',
+        'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'odt' => 'application/vnd.oasis.opendocument.text',
+        'ods' => 'application/vnd.oasis.opendocument.spreadsheet',
+        'odp' => 'application/vnd.oasis.opendocument.presentation',
+        'md' => 'text/markdown',
+        'rtf' => 'application/rtf',
+        'txt' => 'text/plain',
+    ];
+    return $map[$ext] ?? 'application/octet-stream';
 }
 
 function nammu_unique_asset_filename(string $filename): string {
@@ -5008,6 +5050,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                         $ext = $media['extension'];
                                         $is_image = $media['type'] === 'image';
                                         $is_video = $media['type'] === 'video';
+                                        $is_audio = $media['type'] === 'audio';
                                         $item_tags = $media_tags_map[$relative_path] ?? [];
                                         $tags_text = implode(', ', $item_tags);
                                         $search_data = trim($relative_path . ' ' . $tags_text);
@@ -5028,11 +5071,19 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                         <source src="assets/<?= htmlspecialchars($relative_path) ?>" type="<?= htmlspecialchars($media['mime'], ENT_QUOTES, 'UTF-8') ?>">
                                                     </video>
 
+                                                <?php elseif ($is_audio): ?>
+
+                                                    <div class="card-body text-center">
+                                                        <i class="fas fa-music" style="font-size: 3rem;"></i>
+                                                        <div class="small text-muted mt-2">Audio</div>
+                                                    </div>
+
                                                 <?php else: ?>
 
                                                     <div class="card-body text-center">
 
                                                         <i class="fas fa-file" style="font-size: 4rem;"></i>
+                                                        <div class="small text-muted mt-2">Documento</div>
 
                                                     </div>
 
@@ -6692,10 +6743,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 $media_name = $media['name'];
                                 $media_relative = $media['relative'];
-                                $media_type = $media['type'];
-                                $media_mime = $media['mime'];
-                                $media_src = 'assets/' . $media_relative;
-                                $media_tags_list = $modal_media_tags[$media_relative] ?? [];
+                                        $media_type = $media['type'];
+                                        $media_mime = $media['mime'];
+                                        $media_src = 'assets/' . $media_relative;
+                                        $media_tags_list = $modal_media_tags[$media_relative] ?? [];
                                 $media_tags_text = implode(', ', $media_tags_list);
                                 $media_search = trim($media_name . ' ' . $media_relative . ' ' . $media_tags_text);
 
@@ -6712,10 +6763,15 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                             </video>
                                             <span class="badge badge-dark video-badge" style="position: absolute; bottom: 8px; right: 12px;">Video</span>
                                         </div>
+                                    <?php elseif ($media_type === 'audio'): ?>
+                                        <div class="doc-thumb-wrapper" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="audio" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" data-media-tags="<?= htmlspecialchars($media_tags_text, ENT_QUOTES, 'UTF-8') ?>" style="cursor: pointer; border: 1px dashed rgba(0,0,0,0.2); border-radius: var(--nammu-radius-md, 12px); padding: 2.5rem 1rem; text-align: center;">
+                                            <i class="fas fa-music" style="font-size: 3rem; color: #1e88e5;"></i>
+                                            <div class="small mt-2 text-muted">Audio</div>
+                                        </div>
                                     <?php else: ?>
-                                        <div class="doc-thumb-wrapper" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="pdf" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" data-media-tags="<?= htmlspecialchars($media_tags_text, ENT_QUOTES, 'UTF-8') ?>" style="cursor: pointer; border: 1px dashed rgba(0,0,0,0.2); border-radius: var(--nammu-radius-md, 12px); padding: 2.5rem 1rem; text-align: center;">
-                                            <i class="fas fa-file-pdf" style="font-size: 3rem; color: #c62828;"></i>
-                                            <div class="small mt-2 text-muted">PDF</div>
+                                        <div class="doc-thumb-wrapper" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="document" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" data-media-tags="<?= htmlspecialchars($media_tags_text, ENT_QUOTES, 'UTF-8') ?>" style="cursor: pointer; border: 1px dashed rgba(0,0,0,0.2); border-radius: var(--nammu-radius-md, 12px); padding: 2.5rem 1rem; text-align: center;">
+                                            <i class="fas fa-file-alt" style="font-size: 3rem; color: #5f6368;"></i>
+                                            <div class="small mt-2 text-muted">Documento</div>
                                         </div>
                                     <?php endif; ?>
 

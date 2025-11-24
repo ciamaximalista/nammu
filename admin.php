@@ -2400,15 +2400,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $_SESSION['asset_feedback'] = $feedback;
         $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
-        $redirectSuffix = $redirectPage > 1 ? '&p=' . $redirectPage : '';
-        header('Location: admin.php?page=resources' . $redirectSuffix);
+        $redirectSearch = isset($_POST['redirect_search']) ? trim((string) $_POST['redirect_search']) : '';
+        $redirectParams = 'page=resources';
+        if ($redirectPage > 1) {
+            $redirectParams .= '&p=' . $redirectPage;
+        }
+        if ($redirectSearch !== '') {
+            $redirectParams .= '&search=' . urlencode($redirectSearch);
+        }
+        header('Location: admin.php?' . $redirectParams);
         exit;
     } elseif (isset($_POST['save_edited_image'])) {
         $image_data = $_POST['image_data'] ?? '';
         $image_name = $_POST['image_name'] ?? '';
         $tagsInput = $_POST['image_tags'] ?? '';
         $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
-        $redirectSuffix = $redirectPage > 1 ? '&p=' . $redirectPage : '';
+        $redirectSearch = isset($_POST['redirect_search']) ? trim((string) $_POST['redirect_search']) : '';
 
         if ($image_data && $image_name) {
             $image_name = preg_replace('/[^A-Za-z0-9\._-]/ ', '', basename($image_name));
@@ -2427,13 +2434,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
         }
 
-        header('Location: admin.php?page=resources' . $redirectSuffix);
+        $redirectParams = 'page=resources';
+        if ($redirectPage > 1) {
+            $redirectParams .= '&p=' . $redirectPage;
+        }
+        if ($redirectSearch !== '') {
+            $redirectParams .= '&search=' . urlencode($redirectSearch);
+        }
+
+        header('Location: admin.php?' . $redirectParams);
         exit;
     } elseif (isset($_POST['update_image_tags'])) {
         $targetRelative = $_POST['original_image'] ?? '';
         $normalizedTarget = normalize_media_tag_key($targetRelative);
         $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
-        $redirectSuffix = $redirectPage > 1 ? '&p=' . $redirectPage : '';
+        $redirectSearch = isset($_POST['redirect_search']) ? trim((string) $_POST['redirect_search']) : '';
         if ($normalizedTarget !== '') {
             update_media_tags_entry($normalizedTarget, parse_media_tags_input($_POST['image_tags'] ?? ''));
             $_SESSION['asset_feedback'] = [
@@ -2446,12 +2461,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'message' => 'No se pudo actualizar las etiquetas del recurso seleccionado.',
             ];
         }
-        header('Location: admin.php?page=resources' . $redirectSuffix);
+        $redirectParams = 'page=resources';
+        if ($redirectPage > 1) {
+            $redirectParams .= '&p=' . $redirectPage;
+        }
+        if ($redirectSearch !== '') {
+            $redirectParams .= '&search=' . urlencode($redirectSearch);
+        }
+        header('Location: admin.php?' . $redirectParams);
         exit;
     } elseif (isset($_POST['delete_asset'])) {
         $file_to_delete = $_POST['file_to_delete'] ?? '';
         $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
-        $redirectSuffix = $redirectPage > 1 ? '&p=' . $redirectPage : '';
+        $redirectSearch = isset($_POST['redirect_search']) ? trim((string) $_POST['redirect_search']) : '';
         if ($file_to_delete) {
             $filepath = ASSETS_DIR . '/' . $file_to_delete;
             if (file_exists($filepath)) {
@@ -2459,7 +2481,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             delete_media_tags_entry($file_to_delete);
         }
-        header('Location: admin.php?page=resources' . $redirectSuffix);
+        $redirectParams = 'page=resources';
+        if ($redirectPage > 1) {
+            $redirectParams .= '&p=' . $redirectPage;
+        }
+        if ($redirectSearch !== '') {
+            $redirectParams .= '&search=' . urlencode($redirectSearch);
+        }
+        header('Location: admin.php?' . $redirectParams);
         exit;
     } elseif (isset($_POST['recalculate_ordo'])) {
         $all_posts = get_all_posts_metadata();
@@ -5050,7 +5079,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                     <small class="form-text text-muted">El listado se actualizará según el término introducido.</small>
                                 </div>
 
-                                <div class="row" id="resource-gallery" data-resources-page="<?= (int) $current_page ?>">
+                                <div class="row" id="resource-gallery" data-resources-page="<?= (int) $current_page ?>" data-resources-search="<?= htmlspecialchars($resourceSearchTerm, ENT_QUOTES, 'UTF-8') ?>">
 
                                     <?php
 
@@ -5152,6 +5181,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                                         <input type="hidden" name="file_to_delete" value="<?= htmlspecialchars($relative_path) ?>">
                                                         <input type="hidden" name="redirect_p" value="<?= (int) $current_page ?>">
+                                                        <input type="hidden" name="redirect_search" value="<?= htmlspecialchars($resourceSearchTerm, ENT_QUOTES, 'UTF-8') ?>">
 
                                                         <button type="submit" name="delete_asset" class="btn btn-sm btn-danger">Borrar</button>
 
@@ -6876,6 +6906,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             <input type="hidden" name="update_image_tags" value="1">
                             <input type="hidden" name="original_image" id="tagsModalTarget" value="">
                             <input type="hidden" name="redirect_p" id="tagsModalRedirect" value="<?= isset($current_page) ? (int) $current_page : 1 ?>">
+                            <input type="hidden" name="redirect_search" id="tagsModalRedirectSearch" value="<?= htmlspecialchars($resourceSearchTerm, ENT_QUOTES, 'UTF-8') ?>">
                             <div class="form-group">
                                 <label for="tagsModalInput">Etiquetas</label>
                                 <input type="text" class="form-control" name="image_tags" id="tagsModalInput" placeholder="Ej. portada, dossier, pdf">
@@ -7702,6 +7733,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var isResourcesPage = window.location.search.indexOf('page=resources') !== -1 || window.location.href.indexOf('admin.php') !== -1 && !window.location.search;
             var resourceScrollKey = 'nammuResourceScroll';
             var currentResourcesPage = (parseInt($('#resource-gallery').data('resources-page'), 10) || 1);
+            var currentResourcesSearch = ($('#resource-gallery').data('resources-search') || '').toString();
 
         
 
@@ -7855,6 +7887,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                     var normalized = ($(this).val() || '').toString().toLowerCase().trim();
 
+                    currentResourcesSearch = ($(this).val() || '').toString();
+
                     resourceItems.each(function() {
 
                         var haystack = ($(this).attr('data-resource-search-value') || '').toString().toLowerCase();
@@ -7893,7 +7927,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
                 try {
                     var scroll = window.pageYOffset || document.documentElement.scrollTop || 0;
-                    localStorage.setItem(resourceScrollKey, JSON.stringify({ scroll: scroll, page: currentResourcesPage }));
+                    localStorage.setItem(resourceScrollKey, JSON.stringify({ scroll: scroll, page: currentResourcesPage, search: currentResourcesSearch }));
                 } catch (err) {
                     // ignore
                 }
@@ -7906,8 +7940,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                         var parsed = JSON.parse(storedScroll);
                         var value = parsed && typeof parsed.scroll === 'number' ? parsed.scroll : 0;
                         var storedPage = parsed && typeof parsed.page === 'number' ? parsed.page : null;
-                        if (storedPage && storedPage !== currentResourcesPage) {
-                            // Do not restore scroll if landing on a different page
+                        if ((storedPage && storedPage !== currentResourcesPage) || (parsed && parsed.search !== undefined && parsed.search !== currentResourcesSearch)) {
+                            // Do not restore scroll if landing on a different page or search
                             value = 0;
                         }
                         setTimeout(function() {
@@ -7954,6 +7988,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 saveResourceScroll();
                 if (tagsModalRedirect.length) {
                     tagsModalRedirect.val(currentResourcesPage);
+                }
+                var redirectSearchInput = document.getElementById('tagsModalRedirectSearch');
+                if (redirectSearchInput) {
+                    redirectSearchInput.value = currentResourcesSearch;
                 }
             });
 
@@ -8939,6 +8977,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
         
 
+                    form.append($('<input type="hidden" name="redirect_search">').val(currentResourcesSearch));
+
+        
+
                     
 
         
@@ -9000,6 +9042,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
         
 
                     form.append($('<input type="hidden" name="redirect_p">').val(currentResourcesPage));
+
+        
+
+                    form.append($('<input type="hidden" name="redirect_search">').val(currentResourcesSearch));
 
         
 

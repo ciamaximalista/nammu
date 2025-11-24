@@ -2470,6 +2470,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         header('Location: admin.php?' . $redirectParams);
         exit;
+    } elseif (isset($_POST['delete_tag_global'])) {
+        $tagToDelete = nammu_normalize_tag($_POST['delete_tag_choice'] ?? '');
+        $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
+        $redirectSearch = isset($_POST['redirect_search']) ? trim((string) $_POST['redirect_search']) : '';
+        if ($tagToDelete === '') {
+            $_SESSION['asset_feedback'] = [
+                'type' => 'warning',
+                'message' => 'Selecciona una etiqueta para borrar.',
+            ];
+        } else {
+            $map = load_media_tags();
+            $changed = false;
+            foreach ($map as $key => $tags) {
+                if (!is_array($tags)) {
+                    continue;
+                }
+                $filtered = [];
+                foreach ($tags as $tag) {
+                    $normalized = nammu_normalize_tag((string) $tag);
+                    if ($normalized === '' || $normalized === $tagToDelete) {
+                        $changed = $changed || $normalized === $tagToDelete;
+                        continue;
+                    }
+                    $filtered[] = $normalized;
+                }
+                if (empty($filtered)) {
+                    unset($map[$key]);
+                    $changed = true;
+                } elseif (count($filtered) !== count($tags)) {
+                    $map[$key] = array_values(array_unique($filtered));
+                    $changed = true;
+                }
+            }
+            if ($changed) {
+                save_media_tags($map);
+                $_SESSION['asset_feedback'] = [
+                    'type' => 'success',
+                    'message' => 'Etiqueta borrada de todos los recursos.',
+                ];
+            } else {
+                $_SESSION['asset_feedback'] = [
+                    'type' => 'warning',
+                    'message' => 'La etiqueta no estaba asignada a ningún recurso.',
+                ];
+            }
+        }
+        $redirectParams = 'page=resources';
+        if ($redirectPage > 1) {
+            $redirectParams .= '&p=' . $redirectPage;
+        }
+        if ($redirectSearch !== '') {
+            $redirectParams .= '&search=' . urlencode($redirectSearch);
+        }
+        header('Location: admin.php?' . $redirectParams);
+        exit;
     } elseif (isset($_POST['delete_asset'])) {
         $file_to_delete = $_POST['file_to_delete'] ?? '';
         $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
@@ -5243,6 +5298,19 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 </a>
                                             <?php endforeach; ?>
                                         </div>
+                                        <form method="post" class="form-inline mt-3" data-delete-tag-form>
+                                            <input type="hidden" name="delete_tag_global" value="1">
+                                            <input type="hidden" name="redirect_p" value="<?= (int) $current_page ?>">
+                                            <input type="hidden" name="redirect_search" value="<?= htmlspecialchars($resourceSearchTerm, ENT_QUOTES, 'UTF-8') ?>">
+                                            <label class="mr-2" for="delete_tag_choice">Borrar etiqueta</label>
+                                            <select name="delete_tag_choice" id="delete_tag_choice" class="form-control mr-2">
+                                                <option value="">Selecciona etiqueta</option>
+                                                <?php foreach (array_keys($tagCloud) as $tagOption): ?>
+                                                    <option value="<?= htmlspecialchars($tagOption, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($tagOption, ENT_QUOTES, 'UTF-8') ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <button type="submit" class="btn btn-outline-danger">Borrar</button>
+                                        </form>
                                     </div>
                                 <?php endif; ?>
 
@@ -8129,6 +8197,12 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 $('#imageModal').modal('hide');
                 pendingInsert = null;
                 insertActions.addClass('d-none');
+            });
+
+            $('[data-delete-tag-form]').on('submit', function() {
+                saveResourceScroll();
+                $(this).find('[name="redirect_p"]').val(currentResourcesPage);
+                $(this).find('[name="redirect_search"]').val(currentResourcesSearch);
             });
 
         

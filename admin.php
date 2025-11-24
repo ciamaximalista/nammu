@@ -2399,12 +2399,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         $_SESSION['asset_feedback'] = $feedback;
-        header('Location: admin.php?page=resources');
+        $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
+        $redirectSuffix = $redirectPage > 1 ? '&p=' . $redirectPage : '';
+        header('Location: admin.php?page=resources' . $redirectSuffix);
         exit;
     } elseif (isset($_POST['save_edited_image'])) {
         $image_data = $_POST['image_data'] ?? '';
         $image_name = $_POST['image_name'] ?? '';
         $tagsInput = $_POST['image_tags'] ?? '';
+        $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
+        $redirectSuffix = $redirectPage > 1 ? '&p=' . $redirectPage : '';
 
         if ($image_data && $image_name) {
             $image_name = preg_replace('/[^A-Za-z0-9\._-]/ ', '', basename($image_name));
@@ -2423,11 +2427,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
         }
 
-        header('Location: admin.php?page=resources');
+        header('Location: admin.php?page=resources' . $redirectSuffix);
         exit;
     } elseif (isset($_POST['update_image_tags'])) {
         $targetRelative = $_POST['original_image'] ?? '';
         $normalizedTarget = normalize_media_tag_key($targetRelative);
+        $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
+        $redirectSuffix = $redirectPage > 1 ? '&p=' . $redirectPage : '';
         if ($normalizedTarget !== '') {
             update_media_tags_entry($normalizedTarget, parse_media_tags_input($_POST['image_tags'] ?? ''));
             $_SESSION['asset_feedback'] = [
@@ -2440,10 +2446,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'message' => 'No se pudo actualizar las etiquetas del recurso seleccionado.',
             ];
         }
-        header('Location: admin.php?page=resources');
+        header('Location: admin.php?page=resources' . $redirectSuffix);
         exit;
     } elseif (isset($_POST['delete_asset'])) {
         $file_to_delete = $_POST['file_to_delete'] ?? '';
+        $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
+        $redirectSuffix = $redirectPage > 1 ? '&p=' . $redirectPage : '';
         if ($file_to_delete) {
             $filepath = ASSETS_DIR . '/' . $file_to_delete;
             if (file_exists($filepath)) {
@@ -2451,7 +2459,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             delete_media_tags_entry($file_to_delete);
         }
-        header('Location: admin.php?page=resources');
+        header('Location: admin.php?page=resources' . $redirectSuffix);
         exit;
     } elseif (isset($_POST['recalculate_ordo'])) {
         $all_posts = get_all_posts_metadata();
@@ -5035,7 +5043,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                     <small class="form-text text-muted">El listado se actualizará según el término introducido.</small>
                                 </div>
 
-                                <div class="row" id="resource-gallery">
+                                <div class="row" id="resource-gallery" data-resources-page="<?= (int) $current_page ?>">
 
                                     <?php
 
@@ -5106,6 +5114,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                     <form method="post" onsubmit="return confirm('¿Estás seguro de que quieres borrar este archivo?');" style="display: inline-block;">
 
                                                         <input type="hidden" name="file_to_delete" value="<?= htmlspecialchars($relative_path) ?>">
+                                                        <input type="hidden" name="redirect_p" value="<?= (int) $current_page ?>">
 
                                                         <button type="submit" name="delete_asset" class="btn btn-sm btn-danger">Borrar</button>
 
@@ -6829,6 +6838,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                         <form id="tagsModalForm" method="post">
                             <input type="hidden" name="update_image_tags" value="1">
                             <input type="hidden" name="original_image" id="tagsModalTarget" value="">
+                            <input type="hidden" name="redirect_p" id="tagsModalRedirect" value="<?= isset($current_page) ? (int) $current_page : 1 ?>">
                             <div class="form-group">
                                 <label for="tagsModalInput">Etiquetas</label>
                                 <input type="text" class="form-control" name="image_tags" id="tagsModalInput" placeholder="Ej. portada, dossier, pdf">

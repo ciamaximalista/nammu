@@ -89,7 +89,7 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
             --nammu-radius-pill: 0;
         }
         body {
-            margin: 0;
+            margin: 8px 0;
             padding: 0;
             background-color: <?= $colorBackground ?>;
             color: <?= $colorText ?>;

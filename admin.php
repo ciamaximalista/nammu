@@ -7019,6 +7019,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
         </div>
 
 <?php if ($page === 'template'): ?>
+        <style>
+        body { margin-top: 8px; margin-bottom: 8px; }
+        </style>
+
         <script>
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('template-settings');

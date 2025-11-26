@@ -2310,6 +2310,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     } elseif (isset($_POST['upload_asset'])) {
         $filesField = $_FILES['asset_files'] ?? ($_FILES['asset_file'] ?? null);
+        $redirectTarget = 'admin.php?page=resources';
+        $redirectUrlRaw = trim((string) ($_POST['redirect_url'] ?? ''));
+        $redirectPageRaw = trim((string) ($_POST['redirect_page'] ?? ''));
+        $pattern = '/^page=[a-z0-9_-]+(?:&[a-z0-9_-]+=[a-zA-Z0-9._\-\/]+)*$/i';
+        if ($redirectUrlRaw !== '' && preg_match($pattern, $redirectUrlRaw)) {
+            $redirectTarget = 'admin.php?' . $redirectUrlRaw;
+        } else {
+            $allowedPages = ['resources','publish','edit','edit-post','template','itinerarios','configuracion'];
+            if (in_array($redirectPageRaw, $allowedPages, true)) {
+                $redirectTarget = 'admin.php?page=' . $redirectPageRaw;
+                if ($redirectPageRaw === 'edit-post') {
+                    $redirectFileRaw = trim((string) ($_POST['redirect_file'] ?? ''));
+                    $safeRedirectFile = nammu_normalize_filename($redirectFileRaw);
+                    if ($safeRedirectFile !== '') {
+                        $redirectTarget .= '&file=' . urlencode($safeRedirectFile);
+                    }
+                }
+            }
+        }
         $normalizedFiles = [];
         if ($filesField !== null) {
             if (is_array($filesField['name'])) {
@@ -2399,16 +2418,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         $_SESSION['asset_feedback'] = $feedback;
-        $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
-        $redirectSearch = isset($_POST['redirect_search']) ? trim((string) $_POST['redirect_search']) : '';
-        $redirectParams = 'page=resources';
-        if ($redirectPage > 1) {
-            $redirectParams .= '&p=' . $redirectPage;
+        if (!empty($redirectTarget)) {
+            header('Location: ' . $redirectTarget);
+        } else {
+            $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
+            $redirectSearch = isset($_POST['redirect_search']) ? trim((string) $_POST['redirect_search']) : '';
+            $redirectParams = 'page=resources';
+            if ($redirectPage > 1) {
+                $redirectParams .= '&p=' . $redirectPage;
+            }
+            if ($redirectSearch !== '') {
+                $redirectParams .= '&search=' . urlencode($redirectSearch);
+            }
+            header('Location: admin.php?' . $redirectParams);
         }
-        if ($redirectSearch !== '') {
-            $redirectParams .= '&search=' . urlencode($redirectSearch);
-        }
-        header('Location: admin.php?' . $redirectParams);
         exit;
     } elseif (isset($_POST['save_edited_image'])) {
         $image_data = $_POST['image_data'] ?? '';
@@ -6869,6 +6892,21 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     </div>
 
                     <div class="modal-body">
+
+                        <form action="admin.php" method="post" enctype="multipart/form-data" class="mb-3">
+                            <input type="hidden" name="upload_asset" value="1">
+                            <input type="hidden" name="redirect_page" value="<?= htmlspecialchars($page, ENT_QUOTES, 'UTF-8') ?>">
+                            <input type="hidden" name="redirect_p" value="<?= isset($_GET['p']) ? (int) $_GET['p'] : 1 ?>">
+                            <input type="hidden" name="redirect_search" value="<?= htmlspecialchars($_GET['search'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                            <input type="hidden" name="redirect_file" value="<?= ($page === 'edit-post' && isset($safeEditFilename)) ? htmlspecialchars($safeEditFilename, ENT_QUOTES, 'UTF-8') : '' ?>">
+                            <input type="hidden" name="redirect_url" value="<?= htmlspecialchars($_SERVER['QUERY_STRING'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                            <div class="form-group mb-2">
+                                <label class="d-block">Subir nuevo archivo</label>
+                                <input type="file" name="asset_files[]" class="form-control-file" multiple>
+                                <small class="form-text text-muted">Formatos permitidos: imágenes, audio, vídeo, documentos y Markdown.</small>
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-primary">Subir</button>
+                        </form>
 
                         <div class="form-group">
                             <label for="modal-image-search">Buscar recursos</label>

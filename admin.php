@@ -4711,11 +4711,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="ul" title="Lista" aria-label="Lista">•</button>
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="ol" title="Lista numerada" aria-label="Lista numerada">1.</button>
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="heading" title="Encabezado" aria-label="Encabezado">H2</button>
-                                            <button type="button" class="btn btn-outline-secondary" data-md-action="code-block" title="Bloque de código" aria-label="Bloque de código">{ }</button>
-                                            <button type="button" class="btn btn-outline-secondary" data-md-action="hr" title="Separador" aria-label="Separador">—</button>
-                                            <button type="button" class="btn btn-outline-secondary" data-md-action="table" title="Tabla" aria-label="Tabla">Tbl</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="code-block" title="Bloque de código" aria-label="Bloque de código">{ }</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="hr" title="Separador" aria-label="Separador">—</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="table" title="Tabla" aria-label="Tabla">Tbl</button>
+                                            </div>
                                         </div>
-                                    </div>
 
                                         <textarea name="content" id="content_publish" class="form-control" rows="15" data-markdown-editor="1"></textarea>
 
@@ -5064,6 +5064,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="heading" title="Encabezado" aria-label="Encabezado">H2</button>
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="code-block" title="Bloque de código" aria-label="Bloque de código">{ }</button>
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="hr" title="Separador" aria-label="Separador">—</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="table" title="Tabla" aria-label="Tabla">Tbl</button>
                                             </div>
                                         </div>
 
@@ -6366,6 +6367,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="heading">H2</button>
                                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="code-block">{ }</button>
                                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="hr">—</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="table">Tbl</button>
                                                             </div>
                                                         </div>
                                                         <textarea name="itinerary_content" id="itinerary_content" class="form-control" rows="10" data-markdown-editor="itinerary"><?= htmlspecialchars($itineraryFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>

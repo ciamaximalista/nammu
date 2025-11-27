@@ -4711,10 +4711,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="ul" title="Lista" aria-label="Lista">•</button>
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="ol" title="Lista numerada" aria-label="Lista numerada">1.</button>
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="heading" title="Encabezado" aria-label="Encabezado">H2</button>
-                                                <button type="button" class="btn btn-outline-secondary" data-md-action="code-block" title="Bloque de código" aria-label="Bloque de código">{ }</button>
-                                                <button type="button" class="btn btn-outline-secondary" data-md-action="hr" title="Separador" aria-label="Separador">—</button>
-                                            </div>
+                                            <button type="button" class="btn btn-outline-secondary" data-md-action="code-block" title="Bloque de código" aria-label="Bloque de código">{ }</button>
+                                            <button type="button" class="btn btn-outline-secondary" data-md-action="hr" title="Separador" aria-label="Separador">—</button>
+                                            <button type="button" class="btn btn-outline-secondary" data-md-action="table" title="Tabla" aria-label="Tabla">Tbl</button>
                                         </div>
+                                    </div>
 
                                         <textarea name="content" id="content_publish" class="form-control" rows="15" data-markdown-editor="1"></textarea>
 
@@ -7606,6 +7607,9 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     case 'hr':
                         insertHorizontalRule(textarea);
                         break;
+                    case 'table':
+                        insertTable(textarea);
+                        break;
                     default:
                         break;
                 }
@@ -7730,6 +7734,32 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             function insertHorizontalRule(textarea) {
                 var insertText = '\n\n---\n\n';
                 replaceSelection(textarea, insertText, insertText.length, insertText.length);
+            }
+
+            function insertTable(textarea) {
+                var rowsInput = window.prompt('Número de filas (sin contar cabecera):', '3');
+                var colsInput = window.prompt('Número de columnas:', '3');
+                var rows = parseInt(rowsInput, 10);
+                var cols = parseInt(colsInput, 10);
+                if (!rows || rows < 1 || !cols || cols < 1) {
+                    return;
+                }
+                var headerCells = [];
+                for (var c = 1; c <= cols; c++) {
+                    headerCells.push('Columna ' + c);
+                }
+                var header = '| ' + headerCells.join(' | ') + ' |\n';
+                var separator = '| ' + headerCells.map(function() { return '---'; }).join(' | ') + ' |\n';
+                var body = '';
+                for (var r = 1; r <= rows; r++) {
+                    var rowCells = [];
+                    for (var cc = 1; cc <= cols; cc++) {
+                        rowCells.push('Dato ' + r + '.' + cc);
+                    }
+                    body += '| ' + rowCells.join(' | ') + ' |\n';
+                }
+                var tableMarkdown = '\n' + header + separator + body + '\n';
+                replaceSelection(textarea, tableMarkdown, tableMarkdown.length, tableMarkdown.length);
             }
 
             function insertLink(textarea) {

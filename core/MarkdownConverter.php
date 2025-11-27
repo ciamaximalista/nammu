@@ -161,8 +161,23 @@ class MarkdownConverter
             $inCodeBlock = false;
         };
 
-        foreach ($lines as $line) {
+        $totalLines = count($lines);
+        for ($index = 0; $index < $totalLines; $index++) {
+            $line = $lines[$index];
             $trimmed = trim($line);
+
+            if (!$inCodeBlock && !$inBlockquote) {
+                $tableEndIndex = $index;
+                $tableHtml = $this->tryParseTable($lines, $index, $tableEndIndex);
+                if ($tableHtml !== null) {
+                    $flushParagraph();
+                    $closeAllLists();
+                    $flushBlockquote();
+                    $html[] = $tableHtml;
+                    $index = $tableEndIndex;
+                    continue;
+                }
+            }
 
             if (preg_match('/^```(?:(.+))?$/', $trimmed, $matches)) {
                 if ($inCodeBlock) {
@@ -557,6 +572,125 @@ class MarkdownConverter
     {
         $types = ['1', 'a', 'i', 'A', 'I'];
         return $types[$level % count($types)];
+    }
+
+    private function tryParseTable(array $lines, int $startIndex, int &$endIndex): ?string
+    {
+        $line = $lines[$startIndex] ?? '';
+        $next = $lines[$startIndex + 1] ?? '';
+        if ($line === '' || $next === '') {
+            return null;
+        }
+
+        $headerCells = $this->splitTableRow($line);
+        if ($headerCells === null || count($headerCells) < 1) {
+            return null;
+        }
+
+        $alignInfo = $this->parseTableSeparator($next, count($headerCells));
+        if ($alignInfo === null) {
+            return null;
+        }
+
+        $rows = [];
+        $totalLines = count($lines);
+        $endIndex = $startIndex + 1;
+
+        for ($i = $startIndex + 2; $i < $totalLines; $i++) {
+            $rowLine = $lines[$i];
+            if (trim($rowLine) === '') {
+                break;
+            }
+            $cells = $this->splitTableRow($rowLine);
+            if ($cells === null) {
+                break;
+            }
+            $rows[] = $cells;
+            $endIndex = $i;
+        }
+
+        $endIndex = max($endIndex, $startIndex + 1);
+        $alignStyles = array_map(function ($align) {
+            if ($align === 'left') {
+                return ' style="text-align:left"';
+            }
+            if ($align === 'right') {
+                return ' style="text-align:right"';
+            }
+            if ($align === 'center') {
+                return ' style="text-align:center"';
+            }
+            return '';
+        }, $alignInfo);
+
+        $html = '<table>';
+        $html .= '<thead><tr>';
+        foreach ($headerCells as $idx => $cell) {
+            $style = $alignStyles[$idx] ?? '';
+            $html .= '<th' . $style . '>' . $this->convertInline($cell) . '</th>';
+        }
+        $html .= '</tr></thead>';
+
+        if (!empty($rows)) {
+            $html .= '<tbody>';
+            foreach ($rows as $row) {
+                $html .= '<tr>';
+                foreach ($headerCells as $idx => $header) {
+                    $cell = $row[$idx] ?? '';
+                    $style = $alignStyles[$idx] ?? '';
+                    $html .= '<td' . $style . '>' . $this->convertInline($cell) . '</td>';
+                }
+                $html .= '</tr>';
+            }
+            $html .= '</tbody>';
+        }
+
+        $html .= '</table>';
+        return $html;
+    }
+
+    private function splitTableRow(string $line): ?array
+    {
+        if (strpos($line, '|') === false) {
+            return null;
+        }
+        $trimmed = trim($line);
+        $trimmed = trim($trimmed, '|');
+        $parts = array_map('trim', explode('|', $trimmed));
+        if (count($parts) === 0) {
+            return null;
+        }
+        return $parts;
+    }
+
+    private function parseTableSeparator(string $line, int $expectedColumns): ?array
+    {
+        $cells = $this->splitTableRow($line);
+        if ($cells === null || count($cells) < $expectedColumns) {
+            return null;
+        }
+        $alignments = [];
+        foreach ($cells as $cell) {
+            $cell = trim($cell);
+            if ($cell === '' || !preg_match('/^:?-{3,}:?$/', $cell)) {
+                return null;
+            }
+            $left = $cell[0] === ':';
+            $right = substr($cell, -1) === ':';
+            if ($left && $right) {
+                $alignments[] = 'center';
+            } elseif ($right) {
+                $alignments[] = 'right';
+            } elseif ($left) {
+                $alignments[] = 'left';
+            } else {
+                $alignments[] = '';
+            }
+        }
+        while (count($alignments) < $expectedColumns) {
+            $alignments[] = '';
+        }
+        return array_slice($alignments, 0, $expectedColumns);
     }
 
     private function calculateIndentLevel(string $whitespace): int

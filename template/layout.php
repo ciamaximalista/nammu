@@ -117,6 +117,32 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
             text-decoration: underline;
             color: <?= $colorAccent ?>;
         }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            overflow: hidden;
+            border-radius: var(--nammu-radius-md);
+        }
+        table thead th {
+            background: <?= $colorAccent ?>;
+            color: #fff;
+            font-weight: 600;
+        }
+        table th,
+        table td {
+            padding: 0.75rem 0.85rem;
+            border: 1px solid <?= $colorHighlight ?>;
+        }
+        table tbody tr:nth-child(odd) {
+            background: <?= $colorBackground ?>;
+        }
+        table tbody tr:nth-child(even) {
+            background: <?= $colorHighlight ?>;
+        }
+        table tbody tr:hover {
+            background: <?= $colorHighlight ?>;
+        }
         .embedded-video,
         .embedded-pdf {
             margin: 2rem auto;

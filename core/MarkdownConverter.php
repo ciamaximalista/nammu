@@ -34,7 +34,7 @@ class MarkdownConverter
         $inBlockquote = false;
         $codeBuffer = [];
         $codeLanguage = '';
-        $blockquoteBuffer = [];
+        $blockquoteLines = [];
         $headings = [];
         $headingSlugCounts = [];
         $tocRequested = false;
@@ -51,31 +51,48 @@ class MarkdownConverter
             $paragraphBuffer = [];
         };
 
-        $flushBlockquote = function () use (&$blockquoteBuffer, &$html, &$inBlockquote) {
+        $flushBlockquote = function () use (&$blockquoteLines, &$html, &$inBlockquote) {
             if (!$inBlockquote) {
                 return;
             }
-            $content = implode("\n", $blockquoteBuffer);
-            $content = trim($content);
-            if ($content === '') {
-                $blockquoteBuffer = [];
+            if (empty($blockquoteLines)) {
                 $inBlockquote = false;
                 return;
             }
-            $segments = preg_split("/\n{2,}/", $content);
-            $parts = [];
-            foreach ($segments as $segment) {
-                $segment = trim($segment);
-                if ($segment === '') {
-                    continue;
+
+            $stack = [];
+            $parts = '';
+            foreach ($blockquoteLines as $entry) {
+                $level = max(1, (int) ($entry['level'] ?? 1));
+                $text = (string) ($entry['text'] ?? '');
+
+                while (count($stack) < $level) {
+                    $parts .= '<blockquote>';
+                    $stack[] = '>';
                 }
-                $parts[] = '<p>' . $this->convertInline($segment) . '</p>';
+                while (count($stack) > $level) {
+                    array_pop($stack);
+                    $parts .= '</blockquote>';
+                }
+
+                $content = trim($text);
+                if ($content === '') {
+                    $parts .= '<br />';
+                } else {
+                    $parts .= '<p>' . $this->convertInline($content) . '</p>';
+                }
             }
-            if (empty($parts)) {
-                $parts[] = '<p>' . $this->convertInline($content) . '</p>';
+
+            while (!empty($stack)) {
+                array_pop($stack);
+                $parts .= '</blockquote>';
             }
-            $html[] = '<blockquote>' . implode("\n", $parts) . '</blockquote>';
-            $blockquoteBuffer = [];
+
+            if ($parts !== '') {
+                $html[] = $parts;
+            }
+
+            $blockquoteLines = [];
             $inBlockquote = false;
         };
 
@@ -200,7 +217,8 @@ class MarkdownConverter
 
             if ($trimmed === '') {
                 if ($inBlockquote) {
-                    $blockquoteBuffer[] = '';
+                    $lastLevel = !empty($blockquoteLines) ? ($blockquoteLines[array_key_last($blockquoteLines)]['level'] ?? 1) : 1;
+                    $blockquoteLines[] = ['level' => $lastLevel, 'text' => ''];
                     continue;
                 }
                 $flushParagraph();
@@ -264,14 +282,15 @@ class MarkdownConverter
                 continue;
             }
 
-            if (preg_match('/^>\s?(.*)$/', $trimmed, $matches)) {
+            if (preg_match('/^(>+)\s?(.*)$/', $trimmed, $matches)) {
                 $flushParagraph();
                 $closeAllLists();
+                $level = strlen($matches[1]);
                 if (!$inBlockquote) {
                     $inBlockquote = true;
-                    $blockquoteBuffer = [];
+                    $blockquoteLines = [];
                 }
-                $blockquoteBuffer[] = $matches[1];
+                $blockquoteLines[] = ['level' => $level, 'text' => $matches[2]];
                 continue;
             }
 

@@ -2313,7 +2313,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $redirectTarget = 'admin.php?page=resources';
         $redirectUrlRaw = trim((string) ($_POST['redirect_url'] ?? ''));
         $redirectPageRaw = trim((string) ($_POST['redirect_page'] ?? ''));
-        $pattern = '/^page=[a-z0-9_-]+(?:&[a-z0-9_-]+=[a-zA-Z0-9._\-\/]+)*$/i';
+        $pattern = '/^page=[a-z0-9._%\-\/&=]+$/i';
         if ($redirectUrlRaw !== '' && preg_match($pattern, $redirectUrlRaw)) {
             $redirectTarget = 'admin.php?' . $redirectUrlRaw;
         } else {

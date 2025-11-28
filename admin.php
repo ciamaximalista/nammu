@@ -2075,6 +2075,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'Image' => $image,
                 'ItineraryClass' => $classLabel,
                 'UsageLogic' => $usageLogic,
+                'Status' => $statusValue,
             ], $content, !empty($itineraryQuizResult['data']['questions']) ? $itineraryQuizResult['data'] : null);
             admin_regenerate_itinerary_feed();
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario guardado correctamente.'];

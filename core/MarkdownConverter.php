@@ -77,7 +77,7 @@ class MarkdownConverter
 
                 $content = trim($text);
                 if ($content === '') {
-                    $parts .= '<br />';
+                    $parts .= '<p></p>';
                 } else {
                     $parts .= '<p>' . $this->convertInline($content) . '</p>';
                 }

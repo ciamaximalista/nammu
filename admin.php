@@ -2009,6 +2009,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $classCustom = $_POST['itinerary_class_custom'] ?? '';
         $itineraryQuizPayload = $_POST['itinerary_quiz_payload'] ?? '';
         $usageLogicInput = $_POST['itinerary_usage_logic'] ?? '';
+        $statusInput = $_POST['itinerary_status'] ?? '';
         $slugInput = trim($_POST['itinerary_slug'] ?? '');
         $originalSlugInput = trim($_POST['itinerary_original_slug'] ?? '');
         $mode = $_POST['itinerary_mode'] ?? '';
@@ -2067,6 +2068,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $classLabel = admin_normalize_itinerary_class_label($classChoice, $classCustom);
             $usageLogic = admin_normalize_itinerary_usage_logic($usageLogicInput);
+            $statusValue = strtolower(trim((string) $statusInput)) === 'draft' ? 'draft' : 'published';
             $saved = admin_itinerary_repository()->saveItinerary($slug, [
                 'Title' => $title,
                 'Description' => $description,
@@ -2962,6 +2964,7 @@ $itineraryFormData = [
     'class_choice' => '',
     'class_custom' => '',
     'usage_logic' => 'free',
+    'status' => 'draft',
     'quiz' => '',
     'quiz_summary' => '',
     'mode' => 'new',
@@ -2998,6 +3001,7 @@ if (is_logged_in() && $page === 'itinerarios') {
             'class_choice' => $classState['choice'] ?? '',
             'class_custom' => $classState['custom'] ?? '',
             'usage_logic' => method_exists($selectedItinerary, 'getUsageLogic') ? $selectedItinerary->getUsageLogic() : 'free',
+            'status' => method_exists($selectedItinerary, 'getStatus') ? $selectedItinerary->getStatus() : 'published',
             'quiz' => admin_quiz_json($itineraryQuiz),
             'quiz_summary' => admin_quiz_summary($itineraryQuiz),
             'mode' => 'existing',
@@ -3047,6 +3051,7 @@ if (is_logged_in() && $page === 'itinerarios') {
         $itineraryFormData['slug'] = '';
         $itineraryFormData['content'] = '';
         $itineraryFormData['usage_logic'] = 'free';
+        $itineraryFormData['status'] = 'draft';
     }
 }
 
@@ -6192,6 +6197,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                             <th>Título</th>
                                                             <th>Descripción</th>
                                                             <th>Temas</th>
+                                                            <th>Estado</th>
                                                             <th>Slug público</th>
                                                             <th class="text-right">Acciones</th>
                                                         </tr>
@@ -6233,10 +6239,18 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                                     'UTF-8'
                                                                 );
                                                             ?>
+                                                            <?php $itineraryStatus = method_exists($itineraryItem, 'getStatus') ? $itineraryItem->getStatus() : 'published'; ?>
                                                             <tr>
                                                                 <td><?= htmlspecialchars($itineraryItem->getTitle(), ENT_QUOTES, 'UTF-8') ?></td>
                                                                 <td><?= htmlspecialchars($itineraryItem->getDescription(), ENT_QUOTES, 'UTF-8') ?></td>
                                                                 <td><?= $itineraryItem->getTopicCount() ?></td>
+                                                                <td>
+                                                                    <?php if ($itineraryStatus === 'draft'): ?>
+                                                                        <span class="badge badge-secondary">Borrador</span>
+                                                                    <?php else: ?>
+                                                                        <span class="badge badge-success">Publicado</span>
+                                                                    <?php endif; ?>
+                                                                </td>
                                                                 <td>
                                                                     <a href="<?= htmlspecialchars(admin_public_itinerary_url($itineraryItem->getSlug()), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
                                                                         /itinerarios/<?= htmlspecialchars($itineraryItem->getSlug(), ENT_QUOTES, 'UTF-8') ?>
@@ -6291,6 +6305,15 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                     <div class="form-group">
                                                         <label for="itinerary_description">Descripción</label>
                                                         <textarea name="itinerary_description" id="itinerary_description" class="form-control" rows="3"><?= htmlspecialchars($itineraryFormData['description'], ENT_QUOTES, 'UTF-8') ?></textarea>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="itinerary_status">Estado</label>
+                                                        <?php $itineraryStatus = $itineraryFormData['status'] ?? 'draft'; ?>
+                                                        <select name="itinerary_status" id="itinerary_status" class="form-control">
+                                                            <option value="published" <?= $itineraryStatus === 'published' ? 'selected' : '' ?>>Publicado</option>
+                                                            <option value="draft" <?= $itineraryStatus === 'draft' ? 'selected' : '' ?>>Borrador</option>
+                                                        </select>
+                                                        <small class="form-text text-muted">Los borradores no aparecerán en la portada pública de itinerarios ni en sus feeds.</small>
                                                     </div>
                                                     <?php
                                                         $itineraryUsageLogic = $itineraryFormData['usage_logic'] ?? 'free';

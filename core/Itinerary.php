@@ -50,6 +50,22 @@ class Itinerary
         return $this->metadata['Description'] ?? '';
     }
 
+    public function getStatus(): string
+    {
+        $value = strtolower(trim((string) ($this->metadata['Status'] ?? 'published')));
+        return $value === 'draft' ? 'draft' : 'published';
+    }
+
+    public function isDraft(): bool
+    {
+        return $this->getStatus() === 'draft';
+    }
+
+    public function isPublished(): bool
+    {
+        return $this->getStatus() === 'published';
+    }
+
     public function getClassLabel(): string
     {
         $label = trim((string) ($this->metadata['ItineraryClass'] ?? ''));

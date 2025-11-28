@@ -282,10 +282,14 @@ class MarkdownConverter
                 continue;
             }
 
-            if (preg_match('/^(>+)\s?(.*)$/', $trimmed, $matches)) {
+            $lineForQuote = ltrim($line);
+            if (preg_match('/^((?:>\s*)+)(.*)$/', $lineForQuote, $matches)) {
                 $flushParagraph();
                 $closeAllLists();
-                $level = strlen($matches[1]);
+                $level = substr_count(str_replace(' ', '', $matches[1]), '>');
+                if ($level < 1) {
+                    $level = 1;
+                }
                 if (!$inBlockquote) {
                     $inBlockquote = true;
                     $blockquoteLines = [];

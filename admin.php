@@ -4714,6 +4714,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="code-block" title="Bloque de código" aria-label="Bloque de código">{ }</button>
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="hr" title="Separador" aria-label="Separador">—</button>
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="table" title="Tabla" aria-label="Tabla">Tbl</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="callout" title="Caja destacada" aria-label="Caja destacada">Aviso</button>
                                             </div>
                                         </div>
 
@@ -5065,6 +5066,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="code-block" title="Bloque de código" aria-label="Bloque de código">{ }</button>
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="hr" title="Separador" aria-label="Separador">—</button>
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="table" title="Tabla" aria-label="Tabla">Tbl</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="callout" title="Caja destacada" aria-label="Caja destacada">Aviso</button>
                                             </div>
                                         </div>
 
@@ -6368,6 +6370,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="code-block">{ }</button>
                                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="hr">—</button>
                                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="table">Tbl</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="callout">Aviso</button>
                                                             </div>
                                                         </div>
                                                         <textarea name="itinerary_content" id="itinerary_content" class="form-control" rows="10" data-markdown-editor="itinerary"><?= htmlspecialchars($itineraryFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>
@@ -6500,13 +6503,15 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                                     <button type="button" class="btn btn-outline-secondary" data-md-action="sup">x<sup>2</sup></button>
                                                                 </div>
                                                                 <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
-                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="ul">•</button>
-                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="ol">1.</button>
-                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="heading">H2</button>
-                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="code-block">{ }</button>
-                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="hr">—</button>
-                                                                </div>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="ul">•</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="ol">1.</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="heading">H2</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="code-block">{ }</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="hr">—</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="table">Tbl</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="callout">Aviso</button>
                                                             </div>
+                                                        </div>
                                                             <textarea name="topic_content" id="topic_content" class="form-control" rows="10" data-markdown-editor="itinerary-topic"><?= htmlspecialchars($topicFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>
                                                             <div class="d-flex flex-wrap align-items-center gap-2 mt-2 topic-quiz-controls">
                                                                 <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#topic_content">Nuevo recurso</button>
@@ -7612,6 +7617,9 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     case 'table':
                         insertTable(textarea);
                         break;
+                    case 'callout':
+                        insertCallout(textarea);
+                        break;
                     default:
                         break;
                 }
@@ -7762,6 +7770,20 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
                 var tableMarkdown = '\n' + header + separator + body + '\n';
                 replaceSelection(textarea, tableMarkdown, tableMarkdown.length, tableMarkdown.length);
+            }
+
+            function insertCallout(textarea) {
+                var title = window.prompt('Título del aviso/caja', 'Aviso');
+                if (title === null) {
+                    return;
+                }
+                title = title.trim() === '' ? 'Aviso' : title.trim();
+                var body = window.prompt('Contenido del aviso (texto o enlaces)', 'Añade aquí bibliografía o enlaces recomendados.');
+                if (body === null) {
+                    return;
+                }
+                var callout = '\n\n<div class="callout-box">\n  <h4>' + title + '</h4>\n  <p>' + (body.trim() === '' ? 'Contenido del aviso.' : body.trim()) + '</p>\n</div>\n\n';
+                replaceSelection(textarea, callout, callout.length, callout.length);
             }
 
             function insertLink(textarea) {

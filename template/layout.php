@@ -143,6 +143,24 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
         table tbody tr:hover {
             background: <?= $colorHighlight ?>;
         }
+        .callout-box {
+            background: <?= $colorHighlight ?>;
+            border: 1px solid <?= $colorAccent ?>33;
+            border-left: 6px solid <?= $colorAccent ?>;
+            padding: 1rem 1.25rem;
+            border-radius: var(--nammu-radius-md);
+            margin: 1.5rem auto;
+            max-width: 820px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+        }
+        .callout-box h4 {
+            margin: 0 0 0.35rem;
+            color: <?= $colorAccent ?>;
+            font-weight: 700;
+        }
+        .callout-box p:last-child {
+            margin-bottom: 0;
+        }
         .embedded-video,
         .embedded-pdf {
             margin: 2rem auto;

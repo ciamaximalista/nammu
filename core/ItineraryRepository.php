@@ -100,8 +100,14 @@ class ItineraryRepository
             throw new RuntimeException("No se pudo crear el directorio del itinerario {$slug}. Comprueba los permisos de escritura.");
         }
 
+        $existingMeta = [];
+        if (is_file("{$directory}/index.md")) {
+            [$existingMeta] = $this->readFrontMatter("{$directory}/index.md");
+        }
+
         $metadata['Slug'] = $slug;
-        $this->writeFrontMatter("{$directory}/index.md", $metadata, $content);
+        $mergedMeta = array_merge($existingMeta, $metadata);
+        $this->writeFrontMatter("{$directory}/index.md", $mergedMeta, $content);
 
         $quizFile = $this->itineraryQuizFile($directory);
         if ($quiz === null || empty($quiz['questions'])) {

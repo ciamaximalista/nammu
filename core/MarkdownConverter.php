@@ -782,8 +782,10 @@ class MarkdownConverter
             return 0;
         }
 
-        // Hacemos más permisiva la anidación: 1-2 espacios ya cuentan como nivel 1
-        $indent = (int) ceil($totalSpaces / 2);
+        // Consideramos un nivel por cada 4 espacios (tab = 4 espacios), pero
+        // mantenemos tolerancia para sangrías cortas: cualquier sangría > 0 se
+        // interpreta como al menos nivel 1.
+        $indent = (int) floor($totalSpaces / 4);
         if ($indent < 1) {
             $indent = 1;
         }

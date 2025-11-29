@@ -7802,11 +7802,16 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     return;
                 }
                 title = title.trim() === '' ? 'Aviso' : title.trim();
-                var body = window.prompt('Contenido del aviso (texto o enlaces)', 'Añade aquí bibliografía o enlaces recomendados.');
+                var body = window.prompt('Contenido del aviso (texto o enlaces). Usa “\\n” para saltos de línea.', 'Añade aquí bibliografía o enlaces recomendados.');
                 if (body === null) {
                     return;
                 }
-                var callout = '\n\n<div class="callout-box">\n  <h4>' + title + '</h4>\n  <p>' + (body.trim() === '' ? 'Contenido del aviso.' : body.trim()) + '</p>\n</div>\n\n';
+                var bodyLines = body.split('\\n').map(function(line) { return line.trim(); }).filter(function(line) { return line !== ''; });
+                var paragraphs = bodyLines.length ? bodyLines : ['Contenido del aviso.'];
+                var bodyHtml = paragraphs.map(function(line) {
+                    return '  <p>' + line + '</p>';
+                }).join('\\n');
+                var callout = '\n\n<div class="callout-box">\n  <h4>' + title + '</h4>\n' + bodyHtml + '\n</div>\n\n';
                 replaceSelection(textarea, callout, callout.length, callout.length);
             }
 

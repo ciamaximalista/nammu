@@ -144,19 +144,33 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
             background: <?= $colorHighlight ?>;
         }
         .callout-box {
-            background: <?= $colorHighlight ?>;
+            background: linear-gradient(135deg, <?= $colorHighlight ?> 0%, <?= $colorBackground ?> 100%);
             border: 1px solid <?= $colorAccent ?>33;
-            border-left: 6px solid <?= $colorAccent ?>;
-            padding: 1rem 1.25rem;
-            border-radius: var(--nammu-radius-md);
-            margin: 1.5rem auto;
-            max-width: 820px;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+            border-radius: var(--nammu-radius-lg);
+            padding: 1.4rem 1.6rem;
+            margin: 1.75rem auto;
+            max-width: 860px;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.07);
+            position: relative;
+            overflow: hidden;
+        }
+        .callout-box::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 2px solid <?= $colorAccent ?>33;
+            border-radius: var(--nammu-radius-lg);
+            pointer-events: none;
         }
         .callout-box h4 {
-            margin: 0 0 0.35rem;
+            margin: 0 0 0.5rem;
             color: <?= $colorAccent ?>;
-            font-weight: 700;
+            font-weight: 800;
+            letter-spacing: 0.01em;
+        }
+        .callout-box p {
+            margin: 0 0 0.4rem;
+            color: <?= $colorText ?>;
         }
         .callout-box p:last-child {
             margin-bottom: 0;

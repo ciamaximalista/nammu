@@ -918,6 +918,11 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
             data-usage-logic="<?= htmlspecialchars($usageLogic, ENT_QUOTES, 'UTF-8') ?>"
             data-presentation-quiz="<?= $itinerary->hasQuiz() ? '1' : '0' ?>"
         >
+            <?php if (!empty($itinerariesIndexUrlLocal)): ?>
+                <div class="itinerary-topics__back mb-3">
+                    <a class="button button-secondary" href="<?= htmlspecialchars($itinerariesIndexUrlLocal, ENT_QUOTES, 'UTF-8') ?>">Todos los itinerarios</a>
+                </div>
+            <?php endif; ?>
             <h2>Temas del itinerario</h2>
             <div class="itinerary-topics__list">
                 <?php foreach ($topicSummaries as $topic): ?>

@@ -123,13 +123,14 @@ class MarkdownConverter
         $openList = function (string $type, int $indentLevel, ?int $startNumber = null) use (&$listStack, &$html) {
             $attributes = '';
             if ($type === 'ol') {
+                $listType = $this->orderedListTypeForLevel($indentLevel);
                 if ($startNumber !== null && $startNumber !== 1) {
                     $attributes .= ' start="' . $startNumber . '"';
                 }
-                $typeAttr = $this->orderedListTypeForLevel($indentLevel);
-                if ($typeAttr !== '1') {
-                    $attributes .= ' type="' . $typeAttr . '"';
+                if ($listType !== '1' && $listType !== 'greek') {
+                    $attributes .= ' type="' . $listType . '"';
                 }
+                $attributes .= $this->orderedListStyleForType($listType);
             }
             $html[] = '<' . $type . $attributes . '>';
             $listStack[] = [
@@ -264,11 +265,13 @@ class MarkdownConverter
                 continue;
             }
 
-            if (preg_match('/^(\s*)(\d+)[\.\)]\s+(.+)$/', $line, $matches)) {
+            if (preg_match('/^(\s*)([0-9]+|[A-Za-z]|[Α-Ωα-ωά-ώ])[\.\)]\s+(.+)$/u', $line, $matches)) {
                 $flushParagraph();
                 $flushBlockquote();
                 $indentLevel = $this->calculateIndentLevel($matches[1]);
-                $indentLevel = $ensureList('ol', $indentLevel, (int) $matches[2]);
+                $listType = $this->orderedListTypeForLevel($indentLevel);
+                $startNumber = $this->orderedListStartFromMarker($matches[2], $listType);
+                $indentLevel = $ensureList('ol', $indentLevel, $startNumber);
                 $html[] = '<li>' . $this->convertInline($matches[3]) . '</li>';
                 continue;
             }
@@ -593,8 +596,52 @@ class MarkdownConverter
 
     private function orderedListTypeForLevel(int $level): string
     {
+        if ($level <= 0) {
+            return '1';
+        }
+        if ($level === 1) {
+            return 'a';
+        }
+        if ($level === 2) {
+            return 'greek';
+        }
         $types = ['1', 'a', 'i', 'A', 'I'];
         return $types[$level % count($types)];
+    }
+
+    private function orderedListStyleForType(string $type): string
+    {
+        if ($type === 'greek') {
+            return ' style="list-style-type: lower-greek;"';
+        }
+        return '';
+    }
+
+    private function orderedListStartFromMarker(string $marker, string $listType): int
+    {
+        $marker = trim($marker);
+        if ($marker === '') {
+            return 1;
+        }
+        if (ctype_digit($marker)) {
+            return max(1, (int) $marker);
+        }
+        if ($listType === 'a' || $listType === 'A') {
+            $lower = function_exists('mb_strtolower') ? mb_strtolower($marker, 'UTF-8') : strtolower($marker);
+            $pos = ord($lower[0]) - ord('a') + 1;
+            return $pos > 0 ? $pos : 1;
+        }
+        if ($listType === 'greek') {
+            $lower = function_exists('mb_strtolower') ? mb_strtolower($marker, 'UTF-8') : strtolower($marker);
+            $greek = ['α','β','γ','δ','ε','ζ','η','θ','ι','κ','λ','μ','ν','ξ','ο','π','ρ','σ','τ','υ','φ','χ','ψ','ω'];
+            $index = array_search($lower, $greek, true);
+            if ($index === false) {
+                return 1;
+            }
+            return $index + 1;
+        }
+
+        return 1;
     }
 
     private function tryParseTable(array $lines, int $startIndex, int &$endIndex): ?string

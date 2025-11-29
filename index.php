@@ -787,6 +787,7 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
     $itineraryImage = nammu_resolve_asset($itinerary->getImage(), $publicBaseUrl) ?? $homeImage;
     $itineraryDescription = $itinerary->getDescription() !== '' ? $itinerary->getDescription() : nammu_excerpt_text($itineraryHtml, 220);
     $canonical = $buildItineraryUrl($itinerary);
+    $itinerariesIndexUrlLocal = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios';
     $itinerarySocialMeta = nammu_build_social_meta([
         'type' => 'website',
         'title' => $itinerary->getTitle(),
@@ -971,17 +972,21 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
                         data-topic-number="<?= (int) ($firstTopic !== null ? $firstTopic->getNumber() : 1) ?>"
                     >Comenzar itinerario</a>
                 </div>
-            <?php endif; ?>
-            <?php if ($usageNotice !== ''): ?>
-                <div class="itinerary-usage-alert" role="note">
-                    <?= htmlspecialchars($usageNotice, ENT_QUOTES, 'UTF-8') ?>
-                </div>
+        <?php endif; ?>
+        <?php if ($usageNotice !== ''): ?>
+            <div class="itinerary-usage-alert" role="note">
+                <?= htmlspecialchars($usageNotice, ENT_QUOTES, 'UTF-8') ?>
+            </div>
             <?php endif; ?>
         </section>
         <?php
         $topicsHtml = (string) ob_get_clean();
     }
-    $content = $itineraryBody . $presentationQuizHtml . $topicsHtml;
+    $backButtonHtml = '';
+    if (!empty($itinerariesIndexUrlLocal)) {
+        $backButtonHtml = '<div class="itinerary-topics__back mb-3"><a class="button button-secondary" href="' . htmlspecialchars($itinerariesIndexUrlLocal, ENT_QUOTES, 'UTF-8') . '">Todos los itinerarios</a></div>';
+    }
+    $content = $backButtonHtml . $itineraryBody . $presentationQuizHtml . $topicsHtml;
     echo $renderer->render('layout', [
         'pageTitle' => $itinerary->getTitle(),
         'metaDescription' => $itineraryDescription,

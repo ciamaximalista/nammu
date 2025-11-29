@@ -718,23 +718,27 @@ class MarkdownConverter
 
     private function calculateIndentLevel(string $whitespace): int
     {
-        $indent = 0;
-        $spaceCount = 0;
+        $totalSpaces = 0;
         $length = strlen($whitespace);
         for ($i = 0; $i < $length; $i++) {
             $char = $whitespace[$i];
             if ($char === "\t") {
-                $indent++;
-                $spaceCount = 0;
+                $totalSpaces += 4;
             } elseif ($char === ' ') {
-                $spaceCount++;
-                if ($spaceCount === 4) {
-                    $indent++;
-                    $spaceCount = 0;
-                }
+                $totalSpaces++;
             } else {
                 break;
             }
+        }
+
+        if ($totalSpaces === 0) {
+            return 0;
+        }
+
+        // Hacemos más permisiva la anidación: 1-2 espacios ya cuentan como nivel 1
+        $indent = (int) ceil($totalSpaces / 2);
+        if ($indent < 1) {
+            $indent = 1;
         }
 
         return $indent;

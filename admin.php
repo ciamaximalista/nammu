@@ -7830,21 +7830,31 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 if (!target || target.tagName !== 'TEXTAREA') {
                     if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
                         target = document.activeElement;
+                    } else if (lastFocusedTextarea && lastFocusedTextarea.tagName === 'TEXTAREA') {
+                        target = lastFocusedTextarea;
                     } else {
                         target = document.querySelector('[data-markdown-editor]') || document.querySelector('textarea');
                     }
                 }
-                calloutTarget = target;
+                if (target && target.id === 'calloutBody') {
+                    target = null;
+                }
+                calloutTarget = target || fallbackTextarea();
                 if (calloutTitleInput.length) {
                     calloutTitleInput.val(calloutTitleInput.val() || 'Aviso');
                 }
                 if (calloutBodyInput.length) {
                     calloutBodyInput.val(calloutBodyInput.val() || '');
                 }
-                if (calloutModal.length && typeof calloutModal.modal === 'function') {
-                    calloutModal.modal('show');
-                } else if (calloutModal.length) {
-                    calloutModal.addClass('show').css('display', 'block').attr('aria-hidden', 'false');
+                var showModal = function() {
+                    if (calloutModal.length && typeof calloutModal.modal === 'function') {
+                        calloutModal.modal('show');
+                    } else if (calloutModal.length) {
+                        calloutModal.addClass('show').css('display', 'block').attr('aria-hidden', 'false');
+                    }
+                };
+                if (calloutModal.length) {
+                    showModal();
                 } else {
                     // Fallback a prompts si el modal no está disponible
                     var title = window.prompt('Título del aviso/caja', 'Aviso') || 'Aviso';
@@ -7857,6 +7867,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     var callout = '\n\n<div class="callout-box">\n  <h4>' + title + '</h4>\n' + bodyHtml + '\n</div>\n\n';
                     replaceSelection(calloutTarget, callout, callout.length, callout.length);
                     calloutTarget = null;
+                    calloutTargetSelector = '';
                 }
             }
 
@@ -7985,6 +7996,29 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var calloutBodyInput = $('#calloutBody');
             var calloutInsertBtn = $('#calloutInsert');
             var calloutTarget = null;
+            var calloutTargetSelector = '';
+            var lastFocusedTextarea = null;
+            var calloutModalEl = document.getElementById('calloutModal');
+
+            $(document).on('focusin', 'textarea', function() {
+                lastFocusedTextarea = this;
+            });
+
+            function fallbackTextarea() {
+                var active = document.activeElement;
+                if (active && active.tagName === 'TEXTAREA' && active.id !== 'calloutBody') {
+                    return active;
+                }
+                if (lastFocusedTextarea && lastFocusedTextarea.tagName === 'TEXTAREA' && lastFocusedTextarea.id !== 'calloutBody') {
+                    return lastFocusedTextarea;
+                }
+                var editorTextarea = document.querySelector('[data-markdown-editor]');
+                if (editorTextarea && editorTextarea.tagName === 'TEXTAREA') {
+                    return editorTextarea;
+                }
+                var anyTextarea = document.querySelector('textarea');
+                return anyTextarea || null;
+            }
 
             $(document).on('click', '[data-md-action="callout"]', function(evt) {
                 // Garantiza que el modal se abra aunque falle el toolbar handler
@@ -8444,12 +8478,30 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 $(this).find('[name="redirect_search"]').val(currentResourcesSearch);
             });
 
-            $(document).on('click', '#calloutInsert', function() {
+            function resolveCalloutTarget() {
+                if (calloutTarget && calloutTarget.tagName === 'TEXTAREA' && calloutTarget.id !== 'calloutBody') {
+                    return calloutTarget;
+                }
+                var fb = fallbackTextarea();
+                if (fb && fb.id === 'calloutBody') {
+                    return null;
+                }
+                return fb;
+            }
+
+            function handleCalloutInsert() {
                 ensureCalloutModal();
-                if (!calloutTarget || calloutTarget.tagName !== 'TEXTAREA') {
-                    calloutTarget = document.activeElement && document.activeElement.tagName === 'TEXTAREA'
-                        ? document.activeElement
-                        : (document.querySelector('[data-markdown-editor]') || document.querySelector('textarea'));
+                calloutTarget = resolveCalloutTarget();
+                if (!calloutTarget || calloutTarget.id === 'calloutBody') {
+                    calloutTarget = fallbackTextarea();
+                }
+                if (!calloutTarget || calloutTarget.id === 'calloutBody') {
+                    var allTextareas = document.querySelectorAll('textarea[data-markdown-editor], textarea');
+                    allTextareas.forEach(function(el) {
+                        if (!calloutTarget && el.id !== 'calloutBody' && el.tagName === 'TEXTAREA') {
+                            calloutTarget = el;
+                        }
+                    });
                 }
                 if (!calloutTarget) {
                     if (calloutModal.length && typeof calloutModal.modal === 'function') {
@@ -8472,13 +8524,32 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     return '  <p>' + line + '</p>';
                 }).join('\n');
                 var callout = '\n\n<div class="callout-box">\n  <h4>' + title + '</h4>\n' + bodyHtml + '\n</div>\n\n';
-                replaceSelection(calloutTarget, callout, callout.length, callout.length);
+                if (calloutTarget && typeof calloutTarget.value === 'string') {
+                    try {
+                        replaceSelection(calloutTarget, callout, callout.length, callout.length);
+                    } catch (errInsert) {
+                        try {
+                            insertTextAtCursor(calloutTarget, callout);
+                        } catch (errFallback) {
+                            // ignore
+                        }
+                    }
+                }
+                if (typeof calloutTarget.focus === 'function') {
+                    calloutTarget.focus();
+                }
                 calloutTarget = null;
+                calloutTargetSelector = '';
                 if (calloutModal.length && typeof calloutModal.modal === 'function') {
                     calloutModal.modal('hide');
                 } else if (calloutModal.length) {
                     calloutModal.removeClass('show').css('display', 'none').attr('aria-hidden', 'true');
                 }
+            }
+
+            $(document).on('click', '#calloutInsert', function(e) {
+                e.preventDefault();
+                handleCalloutInsert();
             });
 
         

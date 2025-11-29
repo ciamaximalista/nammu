@@ -138,7 +138,7 @@ if ($quizAvailable) {
 
             <?php if (!empty($itinerariesIndexUrl)): ?>
                 <a class="button button-secondary" href="<?= htmlspecialchars($itinerariesIndexUrl, ENT_QUOTES, 'UTF-8') ?>">
-                    Volver a los itinerarios
+                    Todos los itinerarios
                 </a>
             <?php endif; ?>
         </div>

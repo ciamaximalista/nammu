@@ -10,6 +10,16 @@
 /** @var string $itineraryMeta */
 /** @var string $itinerariesIndexUrl */
 ?>
+<?php
+    $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/itinerarios' : '/itinerarios');
+?>
+
+<?php if (!empty($itinerariesIndexUrl)): ?>
+    <div class="itinerary-topics__back mb-3">
+        <a class="button button-secondary" href="<?= htmlspecialchars($itinerariesIndexUrl, ENT_QUOTES, 'UTF-8') ?>">Todos los itinerarios</a>
+    </div>
+<?php endif; ?>
+
 <div class="itinerary-single-content">
     <?= $itineraryBody ?>
 </div>

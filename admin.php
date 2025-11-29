@@ -4720,7 +4720,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="code-block" title="Bloque de código" aria-label="Bloque de código">{ }</button>
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="hr" title="Separador" aria-label="Separador">—</button>
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="table" title="Tabla" aria-label="Tabla">Tbl</button>
-                                                <button type="button" class="btn btn-outline-secondary" data-md-action="callout" title="Caja destacada" aria-label="Caja destacada">Aviso</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="callout" data-toggle="modal" data-target="#calloutModal" title="Caja destacada" aria-label="Caja destacada">Aviso</button>
                                             </div>
                                         </div>
 
@@ -5072,7 +5072,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="code-block" title="Bloque de código" aria-label="Bloque de código">{ }</button>
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="hr" title="Separador" aria-label="Separador">—</button>
                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="table" title="Tabla" aria-label="Tabla">Tbl</button>
-                                                <button type="button" class="btn btn-outline-secondary" data-md-action="callout" title="Caja destacada" aria-label="Caja destacada">Aviso</button>
+                                                <button type="button" class="btn btn-outline-secondary" data-md-action="callout" data-toggle="modal" data-target="#calloutModal" title="Caja destacada" aria-label="Caja destacada">Aviso</button>
                                             </div>
                                         </div>
 
@@ -6394,7 +6394,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="code-block">{ }</button>
                                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="hr">—</button>
                                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="table">Tbl</button>
-                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="callout">Aviso</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="callout" data-toggle="modal" data-target="#calloutModal">Aviso</button>
                                                             </div>
                                                         </div>
                                                         <textarea name="itinerary_content" id="itinerary_content" class="form-control" rows="10" data-markdown-editor="itinerary"><?= htmlspecialchars($itineraryFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>
@@ -6533,7 +6533,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="code-block">{ }</button>
                                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="hr">—</button>
                                                                 <button type="button" class="btn btn-outline-secondary" data-md-action="table">Tbl</button>
-                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="callout">Aviso</button>
+                                                                <button type="button" class="btn btn-outline-secondary" data-md-action="callout" data-toggle="modal" data-target="#calloutModal">Aviso</button>
                                                             </div>
                                                         </div>
                                                             <textarea name="topic_content" id="topic_content" class="form-control" rows="10" data-markdown-editor="itinerary-topic"><?= htmlspecialchars($topicFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>
@@ -7824,7 +7824,16 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             }
 
             function openCalloutModal(textarea) {
-                calloutTarget = textarea;
+                ensureCalloutModal();
+                var target = textarea;
+                if (!target || target.tagName !== 'TEXTAREA') {
+                    if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
+                        target = document.activeElement;
+                    } else {
+                        target = document.querySelector('[data-markdown-editor]') || document.querySelector('textarea');
+                    }
+                }
+                calloutTarget = target;
                 if (calloutTitleInput.length) {
                     calloutTitleInput.val(calloutTitleInput.val() || 'Aviso');
                 }
@@ -7833,6 +7842,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
                 if (calloutModal.length && typeof calloutModal.modal === 'function') {
                     calloutModal.modal('show');
+                } else if (calloutModal.length) {
+                    calloutModal.addClass('show').css('display', 'block').attr('aria-hidden', 'false');
                 } else {
                     // Fallback a prompts si el modal no está disponible
                     var title = window.prompt('Título del aviso/caja', 'Aviso') || 'Aviso';
@@ -7973,6 +7984,70 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var calloutBodyInput = $('#calloutBody');
             var calloutInsertBtn = $('#calloutInsert');
             var calloutTarget = null;
+
+            $(document).on('click', '[data-md-action="callout"]', function(evt) {
+                // Garantiza que el modal se abra aunque falle el toolbar handler
+                var toolbar = this.closest('[data-markdown-toolbar]');
+                var target = null;
+                if (toolbar) {
+                    var selector = toolbar.getAttribute('data-target');
+                    if (selector) {
+                        try {
+                            target = document.querySelector(selector);
+                        } catch (e) {
+                            target = null;
+                        }
+                    }
+                    if (!target) {
+                        var sib = toolbar.nextElementSibling;
+                        if (sib && sib.tagName === 'TEXTAREA') {
+                            target = sib;
+                        }
+                    }
+                }
+                openCalloutModal(target);
+            });
+            function ensureCalloutModal() {
+                calloutModal = $('#calloutModal');
+                calloutTitleInput = $('#calloutTitle');
+                calloutBodyInput = $('#calloutBody');
+                calloutInsertBtn = $('#calloutInsert');
+                if (!calloutModal.length) {
+                    var html = [
+                        '<div class="modal fade" id="calloutModal" tabindex="-1" role="dialog" aria-labelledby="calloutModalLabel" aria-hidden="true">',
+                        '  <div class="modal-dialog" role="document">',
+                        '    <div class="modal-content">',
+                        '      <div class="modal-header">',
+                        '        <h5 class="modal-title" id="calloutModalLabel">Caja destacada</h5>',
+                        '        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">',
+                        '          <span aria-hidden="true">&times;</span>',
+                        '        </button>',
+                        '      </div>',
+                        '      <div class="modal-body">',
+                        '        <div class="form-group">',
+                        '          <label for="calloutTitle">Título</label>',
+                        '          <input type="text" id="calloutTitle" class="form-control" value="Aviso">',
+                        '        </div>',
+                        '        <div class="form-group">',
+                        '          <label for="calloutBody">Contenido del aviso</label>',
+                        '          <textarea id="calloutBody" class="form-control" rows="4" placeholder="Añade aquí bibliografía, enlaces o notas."></textarea>',
+                        '        </div>',
+                        '      </div>',
+                        '      <div class="modal-footer">',
+                        '        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>',
+                        '        <button type="button" class="btn btn-primary" id="calloutInsert">Insertar</button>',
+                        '      </div>',
+                        '    </div>',
+                        '  </div>',
+                        '</div>'
+                    ].join('');
+                    $('body').append(html);
+                    calloutModal = $('#calloutModal');
+                    calloutTitleInput = $('#calloutTitle');
+                    calloutBodyInput = $('#calloutBody');
+                    calloutInsertBtn = $('#calloutInsert');
+                }
+            }
 
         
 
@@ -8368,30 +8443,42 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 $(this).find('[name="redirect_search"]').val(currentResourcesSearch);
             });
 
-            if (calloutInsertBtn.length) {
-                calloutInsertBtn.on('click', function() {
-                    if (!calloutTarget) {
+            $(document).on('click', '#calloutInsert', function() {
+                ensureCalloutModal();
+                if (!calloutTarget || calloutTarget.tagName !== 'TEXTAREA') {
+                    calloutTarget = document.activeElement && document.activeElement.tagName === 'TEXTAREA'
+                        ? document.activeElement
+                        : (document.querySelector('[data-markdown-editor]') || document.querySelector('textarea'));
+                }
+                if (!calloutTarget) {
+                    if (calloutModal.length && typeof calloutModal.modal === 'function') {
                         calloutModal.modal('hide');
-                        return;
+                    } else if (calloutModal.length) {
+                        calloutModal.removeClass('show').css('display', 'none').attr('aria-hidden', 'true');
                     }
-                    var title = (calloutTitleInput.val() || 'Aviso').toString().trim();
-                    if (title === '') {
-                        title = 'Aviso';
-                    }
-                    var bodyRaw = (calloutBodyInput.val() || '').toString();
-                    var lines = bodyRaw.split(/\n+/).map(function(line) { return line.trim(); }).filter(function(line) { return line !== ''; });
-                    if (!lines.length) {
-                        lines = ['Contenido del aviso.'];
-                    }
-                    var bodyHtml = lines.map(function(line) {
-                        return '  <p>' + line + '</p>';
-                    }).join('\n');
-                    var callout = '\n\n<div class="callout-box">\n  <h4>' + title + '</h4>\n' + bodyHtml + '\n</div>\n\n';
-                    replaceSelection(calloutTarget, callout, callout.length, callout.length);
-                    calloutTarget = null;
+                    return;
+                }
+                var title = (calloutTitleInput.val() || 'Aviso').toString().trim();
+                if (title === '') {
+                    title = 'Aviso';
+                }
+                var bodyRaw = (calloutBodyInput.val() || '').toString();
+                var lines = bodyRaw.split(/\n+/).map(function(line) { return line.trim(); }).filter(function(line) { return line !== ''; });
+                if (!lines.length) {
+                    lines = ['Contenido del aviso.'];
+                }
+                var bodyHtml = lines.map(function(line) {
+                    return '  <p>' + line + '</p>';
+                }).join('\n');
+                var callout = '\n\n<div class="callout-box">\n  <h4>' + title + '</h4>\n' + bodyHtml + '\n</div>\n\n';
+                replaceSelection(calloutTarget, callout, callout.length, callout.length);
+                calloutTarget = null;
+                if (calloutModal.length && typeof calloutModal.modal === 'function') {
                     calloutModal.modal('hide');
-                });
-            }
+                } else if (calloutModal.length) {
+                    calloutModal.removeClass('show').css('display', 'none').attr('aria-hidden', 'true');
+                }
+            });
 
         
 

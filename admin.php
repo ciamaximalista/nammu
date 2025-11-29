@@ -7831,8 +7831,20 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 if (calloutBodyInput.length) {
                     calloutBodyInput.val(calloutBodyInput.val() || '');
                 }
-                if (calloutModal.length) {
+                if (calloutModal.length && typeof calloutModal.modal === 'function') {
                     calloutModal.modal('show');
+                } else {
+                    // Fallback a prompts si el modal no está disponible
+                    var title = window.prompt('Título del aviso/caja', 'Aviso') || 'Aviso';
+                    var bodyRaw = window.prompt('Contenido del aviso (texto o enlaces)', '') || '';
+                    var lines = bodyRaw.split(/\n+/).map(function(line) { return line.trim(); }).filter(function(line) { return line !== ''; });
+                    if (!lines.length) {
+                        lines = ['Contenido del aviso.'];
+                    }
+                    var bodyHtml = lines.map(function(line) { return '  <p>' + line + '</p>'; }).join('\n');
+                    var callout = '\n\n<div class="callout-box">\n  <h4>' + title + '</h4>\n' + bodyHtml + '\n</div>\n\n';
+                    replaceSelection(calloutTarget, callout, callout.length, callout.length);
+                    calloutTarget = null;
                 }
             }
 

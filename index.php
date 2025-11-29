@@ -633,8 +633,10 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
     $topicHtml = $documentData['html'];
     $topicsList = $itinerary->getTopics();
     $nextTopic = null;
+    $previousTopic = null;
     foreach ($topicsList as $index => $candidate) {
         if ($candidate->getSlug() === $topic->getSlug()) {
+            $previousTopic = $topicsList[$index - 1] ?? null;
             $nextTopic = $topicsList[$index + 1] ?? null;
             break;
         }
@@ -644,6 +646,13 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
         $nextStep = [
             'url' => $buildItineraryTopicUrl($itinerary, $nextTopic),
             'label' => 'Pasar al siguiente tema',
+        ];
+    }
+    $previousStep = null;
+    if ($previousTopic !== null) {
+        $previousStep = [
+            'url' => $buildItineraryTopicUrl($itinerary, $previousTopic),
+            'label' => 'Volver al tema anterior',
         ];
     }
     $topicImage = nammu_resolve_asset($topic->getImage(), $publicBaseUrl);
@@ -735,6 +744,7 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
         'usageLogic' => $usageLogic,
         'progress' => $progressData,
         'nextStep' => $nextStep,
+        'previousStep' => $previousStep,
     ]);
     $content = $topicMainContent . $topicExtras;
     echo $renderer->render('layout', [

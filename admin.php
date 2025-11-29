@@ -4609,9 +4609,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             </ul>
 
                             <form method="post" class="form-inline my-2 my-lg-0 ml-lg-3">
-
-                                <button type="submit" name="logout" class="btn btn-outline-danger my-2 my-sm-0">Cerrar sesión</button>
-
+                                <div class="d-flex flex-column align-items-stretch">
+                                    <button type="submit" name="logout" class="btn btn-outline-danger my-2 my-sm-0">Cerrar sesión</button>
+                                    <a href="index.php" class="btn btn-outline-secondary btn-sm mt-2">Ir al blog</a>
+                                </div>
                             </form>
 
                         </div>

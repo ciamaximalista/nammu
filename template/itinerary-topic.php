@@ -2,6 +2,7 @@
 /** @var \Nammu\Core\Itinerary $itinerary */
 /** @var \Nammu\Core\ItineraryTopic $topic */
 /** @var array|null $nextStep */
+/** @var array|null $previousStep */
 /** @var callable $itineraryUrl */
 /** @var string $itinerariesIndexUrl */
 /** @var array $quiz */
@@ -124,7 +125,18 @@ if ($quizAvailable) {
                         Completa y aprueba la autoevaluación para desbloquear el siguiente tema.
                     </p>
                 <?php endif; ?>
-            <?php else: ?>
+            <?php endif; ?>
+
+            <?php if (!empty($previousStep)): ?>
+                <a
+                    class="button button-secondary"
+                    href="<?= htmlspecialchars($previousStep['url'], ENT_QUOTES, 'UTF-8') ?>"
+                >
+                    <?= htmlspecialchars($previousStep['label'], ENT_QUOTES, 'UTF-8') ?>
+                </a>
+            <?php endif; ?>
+
+            <?php if (!empty($itinerariesIndexUrl)): ?>
                 <a class="button button-secondary" href="<?= htmlspecialchars($itinerariesIndexUrl, ENT_QUOTES, 'UTF-8') ?>">
                     Volver a los itinerarios
                 </a>

@@ -8,6 +8,7 @@
 /** @var string $itineraryTitle */
 /** @var string $itineraryBody */
 /** @var string $itineraryMeta */
+/** @var string $itinerariesIndexUrl */
 ?>
 <div class="itinerary-single-content">
     <?= $itineraryBody ?>
@@ -25,6 +26,11 @@
 <?php if (!empty($topicSummaries)): ?>
     <section class="itinerary-topics">
         <h2>Temas del itinerario</h2>
+        <?php if (!empty($itinerariesIndexUrl)): ?>
+            <div class="itinerary-topics__back mb-3">
+                <a class="button button-secondary" href="<?= htmlspecialchars($itinerariesIndexUrl, ENT_QUOTES, 'UTF-8') ?>">Volver a los itinerarios</a>
+            </div>
+        <?php endif; ?>
         <div class="itinerary-topics__list">
             <?php foreach ($topicSummaries as $topic): ?>
                 <?php

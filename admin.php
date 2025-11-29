@@ -7060,6 +7060,33 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             </div>
         </div>
 
+        <div class="modal fade" id="calloutModal" tabindex="-1" role="dialog" aria-labelledby="calloutModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="calloutModalLabel">Caja destacada</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="calloutTitle">Título</label>
+                            <input type="text" id="calloutTitle" class="form-control" value="Aviso">
+                        </div>
+                        <div class="form-group">
+                            <label for="calloutBody">Contenido del aviso (texto o enlaces)</label>
+                            <textarea id="calloutBody" class="form-control" rows="4" placeholder="Añade aquí bibliografía, enlaces o notas. Usa Enter para nueva línea."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="calloutInsert">Insertar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         
 
         <div class="modal fade" id="deletePostModal" tabindex="-1" role="dialog" aria-labelledby="deletePostModalLabel" aria-hidden="true">
@@ -7642,7 +7669,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                         insertTable(textarea);
                         break;
                     case 'callout':
-                        insertCallout(textarea);
+                        openCalloutModal(textarea);
                         break;
                     default:
                         break;
@@ -7796,23 +7823,17 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 replaceSelection(textarea, tableMarkdown, tableMarkdown.length, tableMarkdown.length);
             }
 
-            function insertCallout(textarea) {
-                var title = window.prompt('Título del aviso/caja', 'Aviso');
-                if (title === null) {
-                    return;
+            function openCalloutModal(textarea) {
+                calloutTarget = textarea;
+                if (calloutTitleInput.length) {
+                    calloutTitleInput.val(calloutTitleInput.val() || 'Aviso');
                 }
-                title = title.trim() === '' ? 'Aviso' : title.trim();
-                var body = window.prompt('Contenido del aviso (texto o enlaces). Usa “\\n” para saltos de línea.', 'Añade aquí bibliografía o enlaces recomendados.');
-                if (body === null) {
-                    return;
+                if (calloutBodyInput.length) {
+                    calloutBodyInput.val(calloutBodyInput.val() || '');
                 }
-                var bodyLines = body.split('\\n').map(function(line) { return line.trim(); }).filter(function(line) { return line !== ''; });
-                var paragraphs = bodyLines.length ? bodyLines : ['Contenido del aviso.'];
-                var bodyHtml = paragraphs.map(function(line) {
-                    return '  <p>' + line + '</p>';
-                }).join('\\n');
-                var callout = '\n\n<div class="callout-box">\n  <h4>' + title + '</h4>\n' + bodyHtml + '\n</div>\n\n';
-                replaceSelection(textarea, callout, callout.length, callout.length);
+                if (calloutModal.length) {
+                    calloutModal.modal('show');
+                }
             }
 
             function insertLink(textarea) {
@@ -7935,6 +7956,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var currentResourcesPage = resourcesPageFromUrl || (parseInt($('#resource-gallery').data('resources-page'), 10) || 1);
             var resourcesSearchFromUrl = getQueryParam('search') || '';
             var currentResourcesSearch = resourcesSearchFromUrl !== '' ? resourcesSearchFromUrl : (($('#resource-gallery').data('resources-search') || '').toString());
+            var calloutModal = $('#calloutModal');
+            var calloutTitleInput = $('#calloutTitle');
+            var calloutBodyInput = $('#calloutBody');
+            var calloutInsertBtn = $('#calloutInsert');
+            var calloutTarget = null;
 
         
 
@@ -8329,6 +8355,31 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 $(this).find('[name="redirect_p"]').val(currentResourcesPage);
                 $(this).find('[name="redirect_search"]').val(currentResourcesSearch);
             });
+
+            if (calloutInsertBtn.length) {
+                calloutInsertBtn.on('click', function() {
+                    if (!calloutTarget) {
+                        calloutModal.modal('hide');
+                        return;
+                    }
+                    var title = (calloutTitleInput.val() || 'Aviso').toString().trim();
+                    if (title === '') {
+                        title = 'Aviso';
+                    }
+                    var bodyRaw = (calloutBodyInput.val() || '').toString();
+                    var lines = bodyRaw.split(/\n+/).map(function(line) { return line.trim(); }).filter(function(line) { return line !== ''; });
+                    if (!lines.length) {
+                        lines = ['Contenido del aviso.'];
+                    }
+                    var bodyHtml = lines.map(function(line) {
+                        return '  <p>' + line + '</p>';
+                    }).join('\n');
+                    var callout = '\n\n<div class="callout-box">\n  <h4>' + title + '</h4>\n' + bodyHtml + '\n</div>\n\n';
+                    replaceSelection(calloutTarget, callout, callout.length, callout.length);
+                    calloutTarget = null;
+                    calloutModal.modal('hide');
+                });
+            }
 
         
 

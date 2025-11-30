@@ -921,27 +921,27 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
             <h2>Temas del itinerario</h2>
             <div class="itinerary-topics__list">
                 <?php foreach ($topicSummaries as $topic): ?>
+                    <?php
+                        $topicImageUrl = null;
+                        if (!empty($topic['image'])) {
+                            $topicImageUrl = nammu_resolve_asset($topic['image'], $publicBaseUrl);
+                        } elseif (!empty($itinerary->getImage())) {
+                            $topicImageUrl = nammu_resolve_asset($itinerary->getImage(), $publicBaseUrl);
+                        }
+                    ?>
                     <article
                         class="itinerary-topic-card"
                         data-itinerary-topic
                         data-topic-slug="<?= htmlspecialchars($topic['slug'], ENT_QUOTES, 'UTF-8') ?>"
                         data-topic-number="<?= (int) $topic['number'] ?>"
                     >
-                        <?php
-                            $topicImageUrl = null;
-                            if (!empty($topic['image'])) {
-                                $topicImageUrl = nammu_resolve_asset($topic['image'], $publicBaseUrl);
-                            } elseif (!empty($itinerary->getImage())) {
-                                $topicImageUrl = nammu_resolve_asset($itinerary->getImage(), $publicBaseUrl);
-                            }
-                        ?>
-                <?php if ($topicImageUrl): ?>
-                    <figure class="itinerary-topic-card__media">
-                        <a href="<?= htmlspecialchars($topic['url'], ENT_QUOTES, 'UTF-8') ?>" data-topic-link>
-                            <img src="<?= htmlspecialchars($topicImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($topic['title'], ENT_QUOTES, 'UTF-8') ?>">
-                        </a>
-                    </figure>
-                <?php endif; ?>
+                        <?php if ($topicImageUrl): ?>
+                            <figure class="itinerary-topic-card__media">
+                                <a href="<?= htmlspecialchars($topic['url'], ENT_QUOTES, 'UTF-8') ?>" data-topic-link>
+                                    <img src="<?= htmlspecialchars($topicImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($topic['title'], ENT_QUOTES, 'UTF-8') ?>">
+                                </a>
+                            </figure>
+                        <?php endif; ?>
                         <div class="itinerary-topic-card__number">
                             Tema <?= (int) $topic['number'] ?>
                         </div>

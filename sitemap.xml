@@ -1,536 +1,620 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>/</loc>
-    <lastmod>2025-11-03T00:00:00+00:00</lastmod>
+    <loc>https://memoria.repoblacion.ong/</loc>
+    <lastmod>2025-11-20T00:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>/fregenal-plantfortheplanet</loc>
+    <loc>https://memoria.repoblacion.ong/10-programas-rne</loc>
+    <lastmod>2025-11-20T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/conferencia-rural-pact-2025</loc>
+    <lastmod>2025-11-19T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/nammu</loc>
+    <lastmod>2025-11-17T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/empieza-atlas</loc>
+    <lastmod>2025-11-17T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/biggood-2025</loc>
+    <lastmod>2025-11-13T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/delegacion-geografia-ucm</loc>
+    <lastmod>2025-11-11T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/fregenal-plantfortheplanet</loc>
     <lastmod>2025-11-03T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/jornada-coade</loc>
+    <loc>https://memoria.repoblacion.ong/jornada-coade</loc>
     <lastmod>2025-10-30T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/facturaflow</loc>
+    <loc>https://memoria.repoblacion.ong/video-castillo-burguillos</loc>
+    <lastmod>2025-10-20T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/convenio-ucm</loc>
+    <lastmod>2025-10-09T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/facturaflow</loc>
     <lastmod>2025-09-25T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/crisis-sucesion-y-wbo</loc>
+    <loc>https://memoria.repoblacion.ong/crisis-sucesion-y-wbo</loc>
     <lastmod>2025-09-15T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/campus-rural-castillo</loc>
+    <loc>https://memoria.repoblacion.ong/campus-rural-castillo</loc>
     <lastmod>2025-08-26T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/notas-de-analisis</loc>
+    <loc>https://memoria.repoblacion.ong/notas-de-analisis</loc>
     <lastmod>2025-07-16T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/convenio-cscae</loc>
+    <loc>https://memoria.repoblacion.ong/convenio-cscae</loc>
     <lastmod>2025-06-25T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/festival-repoblacion-2025-prensa</loc>
+    <loc>https://memoria.repoblacion.ong/festival-repoblacion-2025-prensa</loc>
     <lastmod>2025-06-24T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/festival-repoblacion-2025-imagenes</loc>
+    <loc>https://memoria.repoblacion.ong/festival-repoblacion-2025-imagenes</loc>
     <lastmod>2025-06-23T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/manifiesto-dddd</loc>
+    <loc>https://memoria.repoblacion.ong/manifiesto-dddd</loc>
     <lastmod>2025-06-21T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/espectrometro</loc>
+    <loc>https://memoria.repoblacion.ong/espectrometro</loc>
     <lastmod>2025-06-09T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/recta-final-festival-2025</loc>
+    <loc>https://memoria.repoblacion.ong/recta-final-festival-2025</loc>
     <lastmod>2025-05-22T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/festival-otono</loc>
+    <loc>https://memoria.repoblacion.ong/festival-otono</loc>
     <lastmod>2025-05-05T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/atlas-sudoe</loc>
+    <loc>https://memoria.repoblacion.ong/atlas-sudoe</loc>
     <lastmod>2025-05-04T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/comunicado-apagon</loc>
+    <loc>https://memoria.repoblacion.ong/comunicado-apagon</loc>
     <lastmod>2025-04-29T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/la-candela</loc>
+    <loc>https://memoria.repoblacion.ong/la-candela</loc>
     <lastmod>2025-04-25T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/inauguracion-ruralnext</loc>
+    <loc>https://memoria.repoblacion.ong/inauguracion-ruralnext</loc>
     <lastmod>2025-03-28T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/sostenibilidad-5g-dehesa</loc>
+    <loc>https://memoria.repoblacion.ong/sostenibilidad-5g-dehesa</loc>
     <lastmod>2025-03-18T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/cerv-pueblos</loc>
+    <loc>https://memoria.repoblacion.ong/cerv-pueblos</loc>
     <lastmod>2025-03-15T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/coopnext</loc>
+    <loc>https://memoria.repoblacion.ong/coopnext</loc>
     <lastmod>2025-03-12T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/manifiesto-arquitectura-neb-fest-2025</loc>
+    <loc>https://memoria.repoblacion.ong/manifiesto-arquitectura-neb-fest-2025</loc>
     <lastmod>2025-03-10T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/asoc-fomento-1</loc>
+    <loc>https://memoria.repoblacion.ong/asoc-fomento-1</loc>
     <lastmod>2025-02-04T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/rural-next</loc>
+    <loc>https://memoria.repoblacion.ong/rural-next</loc>
     <lastmod>2025-01-14T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/burguillos-curso-finanzas</loc>
+    <loc>https://memoria.repoblacion.ong/burguillos-curso-finanzas</loc>
     <lastmod>2025-01-12T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/premios-arquitectura-extremadura-2024</loc>
+    <loc>https://memoria.repoblacion.ong/premios-arquitectura-extremadura-2024</loc>
     <lastmod>2024-12-18T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/stage</loc>
+    <loc>https://memoria.repoblacion.ong/stage</loc>
     <lastmod>2024-12-17T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/llucanes-curso-finanzas</loc>
+    <loc>https://memoria.repoblacion.ong/venta-directa-germinal</loc>
+    <lastmod>2024-12-02T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/llucanes-curso-finanzas</loc>
     <lastmod>2024-11-19T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/convenio-caixabank</loc>
+    <loc>https://memoria.repoblacion.ong/finazas-sencillas-germinal</loc>
+    <lastmod>2024-11-19T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/convenio-caixabank</loc>
     <lastmod>2024-11-05T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/convenio-maximalista</loc>
+    <loc>https://memoria.repoblacion.ong/convenio-maximalista</loc>
     <lastmod>2024-10-31T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/atlas-derechos-digitales</loc>
+    <loc>https://memoria.repoblacion.ong/atlas-derechos-digitales</loc>
     <lastmod>2024-10-24T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/feria-zafra</loc>
+    <loc>https://memoria.repoblacion.ong/primera-reunion-informativa-empresas-valverde</loc>
+    <lastmod>2024-10-21T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/feria-zafra</loc>
     <lastmod>2024-10-02T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/comuneras-coopnext</loc>
+    <loc>https://memoria.repoblacion.ong/comuneras-coopnext</loc>
     <lastmod>2024-09-16T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/bodion</loc>
+    <loc>https://memoria.repoblacion.ong/bodion</loc>
     <lastmod>2024-09-11T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/alma-valverde-comienza</loc>
+    <loc>https://memoria.repoblacion.ong/alma-valverde-comienza</loc>
     <lastmod>2024-09-08T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/colaboracion-canal-extremadura</loc>
+    <loc>https://memoria.repoblacion.ong/colaboracion-canal-extremadura</loc>
     <lastmod>2024-08-22T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/bodion-informa</loc>
+    <loc>https://memoria.repoblacion.ong/bodion-informa</loc>
     <lastmod>2024-08-02T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/alma-tragsa</loc>
+    <loc>https://memoria.repoblacion.ong/alma-tragsa</loc>
     <lastmod>2024-07-29T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/primera-reunion-red</loc>
+    <loc>https://memoria.repoblacion.ong/primera-reunion-red</loc>
     <lastmod>2024-07-25T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/segundo-encuentro-bodion</loc>
+    <loc>https://memoria.repoblacion.ong/segundo-encuentro-bodion</loc>
     <lastmod>2024-06-15T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/campus-rural</loc>
+    <loc>https://memoria.repoblacion.ong/campus-rural</loc>
     <lastmod>2024-05-17T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/convenio-derechos-digitales</loc>
+    <loc>https://memoria.repoblacion.ong/convenio-derechos-digitales</loc>
     <lastmod>2024-05-16T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/la-florida</loc>
+    <loc>https://memoria.repoblacion.ong/la-florida</loc>
     <lastmod>2024-05-15T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/zaya</loc>
+    <loc>https://memoria.repoblacion.ong/zaya</loc>
     <lastmod>2024-05-14T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/alma-valverde</loc>
+    <loc>https://memoria.repoblacion.ong/alma-valverde</loc>
     <lastmod>2024-05-10T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/reactivacion-economica-valverde-2024</loc>
+    <loc>https://memoria.repoblacion.ong/reactivacion-economica-valverde-2024</loc>
     <lastmod>2024-05-03T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/red-pueblos-repoblacion</loc>
+    <loc>https://memoria.repoblacion.ong/red-pueblos-repoblacion</loc>
     <lastmod>2024-05-02T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/resumen-prensa-nebfest</loc>
+    <loc>https://memoria.repoblacion.ong/resumen-prensa-nebfest</loc>
     <lastmod>2024-04-15T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/summaries-day-12</loc>
+    <loc>https://memoria.repoblacion.ong/summaries-day-12</loc>
     <lastmod>2024-04-12T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/summaries-day-11</loc>
+    <loc>https://memoria.repoblacion.ong/summaries-day-11</loc>
     <lastmod>2024-04-11T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/nota-prensa-1-nebfest-2024</loc>
+    <loc>https://memoria.repoblacion.ong/nota-prensa-1-nebfest-2024</loc>
     <lastmod>2024-03-25T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/diputacion-nebfest2024</loc>
+    <loc>https://memoria.repoblacion.ong/diputacion-nebfest2024</loc>
     <lastmod>2024-03-19T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/tema-nebfest</loc>
+    <loc>https://memoria.repoblacion.ong/tema-nebfest</loc>
     <lastmod>2024-03-15T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/delegacion-bilbao</loc>
+    <loc>https://memoria.repoblacion.ong/delegacion-bilbao</loc>
     <lastmod>2024-03-10T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/asociaciones-bodion</loc>
+    <loc>https://memoria.repoblacion.ong/asociaciones-bodion</loc>
     <lastmod>2024-03-02T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/delegacion-tedua</loc>
+    <loc>https://memoria.repoblacion.ong/delegacion-tedua</loc>
     <lastmod>2024-02-23T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/sensibilizacion-venta-directa</loc>
+    <loc>https://memoria.repoblacion.ong/sensibilizacion-venta-directa</loc>
     <lastmod>2024-02-05T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/capacidades-pac</loc>
+    <loc>https://memoria.repoblacion.ong/capacidades-pac</loc>
     <lastmod>2024-01-16T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/encargo-nebfest</loc>
+    <loc>https://memoria.repoblacion.ong/encargo-nebfest</loc>
     <lastmod>2024-01-14T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/consejo-social</loc>
+    <loc>https://memoria.repoblacion.ong/consejo-social</loc>
     <lastmod>2024-01-12T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/fundacion-repoblacion</loc>
+    <loc>https://memoria.repoblacion.ong/fundacion-repoblacion</loc>
     <lastmod>2023-11-29T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/categoria/sostenibilidad</loc>
+    <loc>https://memoria.repoblacion.ong/categoria/comunicacion</loc>
+    <lastmod>2025-11-20T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/categoria/cooperacion-internacional</loc>
+    <lastmod>2025-11-19T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/categoria/herramientas-libres</loc>
+    <lastmod>2025-11-17T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/categoria/agricultura</loc>
+    <lastmod>2025-11-17T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/categoria/premios-y-reconocimientos</loc>
+    <lastmod>2025-11-13T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/categoria/delegaciones</loc>
+    <lastmod>2025-11-11T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/categoria/sostenibilidad</loc>
     <lastmod>2025-11-03T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categoria/cursos</loc>
+    <loc>https://memoria.repoblacion.ong/categoria/cursos</loc>
     <lastmod>2025-10-30T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categoria/herramientas-libres</loc>
-    <lastmod>2025-09-25T00:00:00+00:00</lastmod>
+    <loc>https://memoria.repoblacion.ong/categoria/asistencia-a-ayuntamientos</loc>
+    <lastmod>2025-10-20T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categoria/prospectiva</loc>
+    <loc>https://memoria.repoblacion.ong/categoria/convenios</loc>
+    <lastmod>2025-10-09T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/categoria/prospectiva</loc>
     <lastmod>2025-09-15T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categoria/convenios</loc>
-    <lastmod>2025-08-26T00:00:00+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>/categoria/festival-repoblacion</loc>
+    <loc>https://memoria.repoblacion.ong/categoria/festival-repoblacion</loc>
     <lastmod>2025-06-24T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categoria/digitalizacion</loc>
+    <loc>https://memoria.repoblacion.ong/categoria/digitalizacion</loc>
     <lastmod>2025-06-21T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categoria/cultura</loc>
+    <loc>https://memoria.repoblacion.ong/categoria/cultura</loc>
     <lastmod>2025-05-05T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categoria/agricultura</loc>
-    <lastmod>2025-05-04T00:00:00+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>/categoria/comunicados</loc>
+    <loc>https://memoria.repoblacion.ong/categoria/comunicados</loc>
     <lastmod>2025-04-29T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categoria/desarrollo-local</loc>
+    <loc>https://memoria.repoblacion.ong/categoria/desarrollo-local</loc>
     <lastmod>2025-03-28T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categoria/cooperacion-internacional</loc>
-    <lastmod>2025-03-18T00:00:00+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>/categoria/cooperativismo</loc>
+    <loc>https://memoria.repoblacion.ong/categoria/cooperativismo</loc>
     <lastmod>2025-03-12T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categoria/tejido-social</loc>
+    <loc>https://memoria.repoblacion.ong/categoria/tejido-social</loc>
     <lastmod>2025-02-04T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categoria/asistencia-a-ayuntamientos</loc>
-    <lastmod>2024-12-18T00:00:00+00:00</lastmod>
+    <loc>https://memoria.repoblacion.ong/categoria/formacion</loc>
+    <lastmod>2024-11-19T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categoria/comunicacion</loc>
-    <lastmod>2024-10-02T00:00:00+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>/categoria/asistencia-a-asociaciones</loc>
+    <loc>https://memoria.repoblacion.ong/categoria/asistencia-a-asociaciones</loc>
     <lastmod>2024-09-16T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categoria/asistencia-a-emprendedores</loc>
+    <loc>https://memoria.repoblacion.ong/categoria/asistencia-a-emprendedores</loc>
     <lastmod>2024-05-15T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categoria/delegaciones</loc>
-    <lastmod>2024-03-10T00:00:00+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>/categoria/organizacion</loc>
+    <loc>https://memoria.repoblacion.ong/categoria/organizacion</loc>
     <lastmod>2024-01-12T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/categorias</loc>
-    <lastmod>2025-11-03T00:00:00+00:00</lastmod>
+    <loc>https://memoria.repoblacion.ong/categorias</loc>
+    <lastmod>2025-11-20T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/pagina/2</loc>
-    <lastmod>2025-11-03T00:00:00+00:00</lastmod>
+    <loc>https://memoria.repoblacion.ong/pagina/2</loc>
+    <lastmod>2025-11-20T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>/pagina/3</loc>
-    <lastmod>2025-11-03T00:00:00+00:00</lastmod>
+    <loc>https://memoria.repoblacion.ong/pagina/3</loc>
+    <lastmod>2025-11-20T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>/pagina/4</loc>
-    <lastmod>2025-11-03T00:00:00+00:00</lastmod>
+    <loc>https://memoria.repoblacion.ong/pagina/4</loc>
+    <lastmod>2025-11-20T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>/pagina/5</loc>
-    <lastmod>2025-11-03T00:00:00+00:00</lastmod>
+    <loc>https://memoria.repoblacion.ong/pagina/5</loc>
+    <lastmod>2025-11-20T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>/pagina/6</loc>
-    <lastmod>2025-11-03T00:00:00+00:00</lastmod>
+    <loc>https://memoria.repoblacion.ong/pagina/6</loc>
+    <lastmod>2025-11-20T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>/pagina/7</loc>
-    <lastmod>2025-11-03T00:00:00+00:00</lastmod>
+    <loc>https://memoria.repoblacion.ong/pagina/7</loc>
+    <lastmod>2025-11-20T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>/pagina/8</loc>
-    <lastmod>2025-11-03T00:00:00+00:00</lastmod>
+    <loc>https://memoria.repoblacion.ong/pagina/8</loc>
+    <lastmod>2025-11-20T00:00:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://memoria.repoblacion.ong/pagina/9</loc>
+    <lastmod>2025-11-20T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>

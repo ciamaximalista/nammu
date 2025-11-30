@@ -74,9 +74,8 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 
 ```bash
 sudo chown -R <tu-usuario>:www-data /var/www/html/<carpeta-publica>
-sudo find /var/www/html/<carpeta-publica> -type d -exec chmod 755 {} \;
-sudo find /var/www/html/<carpeta-publica> -type f -exec chmod 644 {} \;
-sudo chmod 775 /var/www/html/<carpeta-publica>/{config,content,assets,itinerarios}
+sudo find /var/www/html/<carpeta-publica> -type d -exec chmod 2775 {} \;
+sudo find /var/www/html/<carpeta-publica> -type f -exec chmod 664 {} \;
 ```
 
 Sustituye `<tu-usuario>` y `<carpeta-publica>` según tu entorno. Usa el grupo del proceso web (www-data, apache, nginx…).
@@ -88,8 +87,9 @@ Sustituye `<tu-usuario>` y `<carpeta-publica>` según tu entorno. Usa el grupo d
 ```bash
 cd /var/www/html/<carpeta-publica>
 git pull origin main
-sudo chown -R www-data:www-data content assets itinerarios config
-sudo chmod 775 content assets itinerarios config
+sudo chown -R <tu-usuario>:www-data .
+sudo find . -type d -exec chmod 2775 {} \;
+sudo find . -type f -exec chmod 664 {} \;
 ```
 
 Si cediste propiedad al usuario del servidor para que pueda escribir, ejecuta `sudo chown -R <tu-usuario>:www-data .` antes de `git pull` y deshaz el cambio después.

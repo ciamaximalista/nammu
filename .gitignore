@@ -1,9 +1,9 @@
-assets/
-content/
-itinerarios/
 rss.xml
 itinerarios.xml
 sitemap.xml
+assets/
+content/
+itinerarios/
 config/user.php
 config/config.yml
 config/media-tags.json

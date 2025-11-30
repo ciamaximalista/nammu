@@ -2956,11 +2956,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // If logged in, show admin panel
-if (is_logged_in()) {
+$isLoggedIn = is_logged_in();
+if ($isLoggedIn) {
     $page = $_GET['page'] ?? 'publish';
 } else {
     $page = $user_exists ? 'login' : 'register';
 }
+$isItineraryAdminPage = in_array($page, ['itinerarios', 'itinerario', 'itinerario-tema'], true);
 
 $itinerariesList = [];
 $selectedItinerary = null;

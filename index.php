@@ -973,11 +973,6 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
                     >Comenzar itinerario</a>
                 </div>
             <?php endif; ?>
-            <?php if (!empty($itinerariesIndexUrlLocal)): ?>
-                <div class="itinerary-topics__back mt-2">
-                    <a class="button button-secondary" href="<?= htmlspecialchars($itinerariesIndexUrlLocal, ENT_QUOTES, 'UTF-8') ?>">Todos los itinerarios</a>
-                </div>
-            <?php endif; ?>
             <?php if ($usageNotice !== ''): ?>
                 <div class="itinerary-usage-alert" role="note">
                     <?= htmlspecialchars($usageNotice, ENT_QUOTES, 'UTF-8') ?>
@@ -987,11 +982,7 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
         <?php
         $topicsHtml = (string) ob_get_clean();
     }
-    $backButtonHtml = '';
-    if (!empty($itinerariesIndexUrlLocal)) {
-        $backButtonHtml = '<div class="itinerary-topics__back mb-3"><a class="button button-secondary" href="' . htmlspecialchars($itinerariesIndexUrlLocal, ENT_QUOTES, 'UTF-8') . '">Todos los itinerarios</a></div>';
-    }
-    $content = $backButtonHtml . $itineraryBody . $presentationQuizHtml . $topicsHtml;
+    $content = $itineraryBody . $presentationQuizHtml . $topicsHtml;
     echo $renderer->render('layout', [
         'pageTitle' => $itinerary->getTitle(),
         'metaDescription' => $itineraryDescription,

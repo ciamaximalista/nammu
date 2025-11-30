@@ -53,7 +53,10 @@ class Itinerary
     public function getStatus(): string
     {
         $value = strtolower(trim((string) ($this->metadata['Status'] ?? 'published')));
-        return $value === 'draft' ? 'draft' : 'published';
+        if (in_array($value, ['draft', 'borrador'], true)) {
+            return 'draft';
+        }
+        return 'published';
     }
 
     public function isDraft(): bool

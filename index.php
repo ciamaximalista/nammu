@@ -355,6 +355,9 @@ if ($routePath === '/itinerarios.xml') {
     $itineraryFeedPosts = [];
     $itineraryPostUrls = [];
     foreach ($itineraryListing as $itineraryItem) {
+        if (method_exists($itineraryItem, 'isDraft') && $itineraryItem->isDraft()) {
+            continue;
+        }
         $itineraryMetadata = $itineraryItem->getMetadata();
         $itineraryDescription = $itineraryItem->getDescription();
         if ($itineraryDescription === '') {
@@ -378,7 +381,8 @@ if ($routePath === '/itinerarios.xml') {
             'Date' => $dateString,
         ];
         $virtualSlug = 'itinerary-feed-' . $itineraryItem->getSlug();
-        $virtualPost = new Post($virtualSlug, $virtualMeta, $itineraryItem->getContent());
+        $status = method_exists($itineraryItem, 'isDraft') && $itineraryItem->isDraft() ? 'draft' : 'published';
+        $virtualPost = new Post($virtualSlug, $virtualMeta, $itineraryItem->getContent(), $status);
         $itineraryFeedPosts[] = $virtualPost;
         $itineraryPostUrls[$virtualSlug] = $buildItineraryUrl($itineraryItem);
     }
@@ -620,6 +624,7 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
     if ($itinerary === null) {
         $renderNotFound('Itinerario no encontrado', 'El itinerario solicitado no se encuentra disponible.', $routePath);
     }
+    $itineraryStatus = method_exists($itinerary, 'isDraft') && $itinerary->isDraft() ? 'draft' : 'published';
     $topic = $itineraryRepository->findTopic($itinerarySlug, $topicSlug);
     if ($topic === null) {
         $renderNotFound('Tema no encontrado', 'Este tema no se encuentra disponible dentro del itinerario.', $routePath);
@@ -719,10 +724,12 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
     } elseif (!empty($itineraryMetadata['Date'])) {
         $virtualPostMetadata['Date'] = $itineraryMetadata['Date'];
     }
+    $topicStatus = method_exists($itinerary, 'isDraft') && $itinerary->isDraft() ? 'draft' : 'published';
     $virtualPost = new Post(
         'itinerario-' . $itinerary->getSlug() . '-' . $topic->getSlug(),
         $virtualPostMetadata,
-        $topic->getContent()
+        $topic->getContent(),
+        $topicStatus
     );
     $virtualPostMetadata = [
         'Title' => $topic->getTitle(),
@@ -774,6 +781,7 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
     if ($itinerary === null) {
         $renderNotFound('Itinerario no encontrado', 'El itinerario solicitado no se encuentra disponible.', $routePath);
     }
+    $itineraryStatus = method_exists($itinerary, 'isDraft') && $itinerary->isDraft() ? 'draft' : 'published';
     $itineraryProgress = nammu_get_itinerary_progress($itinerary->getSlug());
     if (!in_array('__presentation', $itineraryProgress['visited'], true)) {
         $itineraryProgress['visited'][] = '__presentation';
@@ -821,7 +829,8 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
             'Image' => $itinerary->getImage() ?? '',
             'Template' => 'post',
         ],
-        $itinerary->getContent()
+        $itinerary->getContent(),
+        $itineraryStatus
     );
     $autoTocHtml = '';
     $renderableHeadings = array_filter($documentData['headings'], static function (array $heading): bool {

@@ -165,4 +165,10 @@ class Itinerary
         });
         return $topics;
     }
+
+    public function getOrder(): int
+    {
+        $value = (int) ($this->metadata['Order'] ?? 0);
+        return $value > 0 ? $value : PHP_INT_MAX;
+    }
 }

@@ -619,6 +619,24 @@ function admin_itinerary_class_options(): array {
     ];
 }
 
+function admin_next_itinerary_order(): int {
+    $list = admin_list_itineraries();
+    $max = 0;
+    foreach ($list as $index => $item) {
+        if ($item instanceof Itinerary) {
+            $meta = $item->getMetadata();
+            $value = (int) ($meta['Order'] ?? 0);
+            if ($value <= 0) {
+                $value = $index + 1;
+            }
+            if ($value > $max) {
+                $max = $value;
+            }
+        }
+    }
+    return $max + 1;
+}
+
 function admin_normalize_itinerary_class_label(?string $choice, ?string $custom): string {
     $choice = trim((string) $choice);
     $custom = trim((string) $custom);
@@ -2014,6 +2032,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $slugInput = trim($_POST['itinerary_slug'] ?? '');
         $originalSlugInput = trim($_POST['itinerary_original_slug'] ?? '');
         $mode = $_POST['itinerary_mode'] ?? '';
+        $orderInput = (int) ($_POST['itinerary_order'] ?? 0);
         if ($slugInput === '' && $title !== '') {
             $slugInput = $title;
         }
@@ -2066,6 +2085,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
+        if ($orderInput <= 0) {
+            $orderInput = admin_next_itinerary_order();
+        }
         try {
             $classLabel = admin_normalize_itinerary_class_label($classChoice, $classCustom);
             $usageLogic = admin_normalize_itinerary_usage_logic($usageLogicInput);
@@ -2077,6 +2099,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'ItineraryClass' => $classLabel,
                 'UsageLogic' => $usageLogic,
                 'Status' => $statusValue,
+                'Order' => $orderInput,
             ], $content, !empty($itineraryQuizResult['data']['questions']) ? $itineraryQuizResult['data'] : null);
             admin_regenerate_itinerary_feed();
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario guardado correctamente.'];
@@ -2311,6 +2334,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         header('Location: admin.php?page=edit&template=' . $templateParam . '&deleted=0');
+        exit;
+    } elseif (isset($_POST['reorder_itinerary'])) {
+        $slug = ItineraryRepository::normalizeSlug($_POST['itinerary_slug'] ?? '');
+        $direction = $_POST['direction'] ?? '';
+        $redirectBase = 'admin.php?page=itinerarios';
+        if ($slug === '' || ($direction !== 'up' && $direction !== 'down')) {
+            $_SESSION['itinerary_feedback'] = ['type' => 'warning', 'message' => 'No se pudo reordenar el itinerario.'];
+            header('Location: ' . $redirectBase);
+            exit;
+        }
+        try {
+            $repo = admin_itinerary_repository();
+            $list = $repo->all();
+            $count = count($list);
+            $index = null;
+            foreach ($list as $i => $item) {
+                if ($item->getSlug() === $slug) {
+                    $index = $i;
+                    break;
+                }
+            }
+            if ($index === null) {
+                $_SESSION['itinerary_feedback'] = ['type' => 'warning', 'message' => 'Itinerario no encontrado para reordenar.'];
+                header('Location: ' . $redirectBase);
+                exit;
+            }
+            $swapWith = null;
+            if ($direction === 'up' && $index > 0) {
+                $swapWith = $index - 1;
+            } elseif ($direction === 'down' && $index < $count - 1) {
+                $swapWith = $index + 1;
+            }
+            if ($swapWith === null) {
+                header('Location: ' . $redirectBase);
+                exit;
+            }
+            $current = $list[$index];
+            $other = $list[$swapWith];
+            $orderCurrent = (int) ($current->getMetadata()['Order'] ?? ($index + 1));
+            $orderOther = (int) ($other->getMetadata()['Order'] ?? ($swapWith + 1));
+            $metaCurrent = $current->getMetadata();
+            $metaOther = $other->getMetadata();
+            $metaCurrent['Order'] = $orderOther;
+            $metaOther['Order'] = $orderCurrent;
+            $repo->saveItinerary($current->getSlug(), $metaCurrent, $current->getContent(), $current->getQuiz());
+            $repo->saveItinerary($other->getSlug(), $metaOther, $other->getContent(), $other->getQuiz());
+            admin_regenerate_itinerary_feed();
+            $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Orden actualizado.'];
+        } catch (Throwable $e) {
+            $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudo reordenar: ' . $e->getMessage()];
+        }
+        header('Location: ' . $redirectBase);
         exit;
     } elseif (isset($_POST['upload_asset'])) {
         $filesField = $_FILES['asset_files'] ?? ($_FILES['asset_file'] ?? null);
@@ -2962,7 +3037,7 @@ if ($isLoggedIn) {
 } else {
     $page = $user_exists ? 'login' : 'register';
 }
-$isItineraryAdminPage = in_array($page, ['itinerarios', 'itinerario', 'itinerario-tema'], true);
+$isItineraryAdminPage = in_array($page, ['itinerarios', 'itinerario'], true);
 
 $itinerariesList = [];
 $selectedItinerary = null;
@@ -3016,10 +3091,12 @@ if (is_logged_in() && $isItineraryAdminPage) {
             'status' => method_exists($selectedItinerary, 'getStatus') ? $selectedItinerary->getStatus() : 'published',
             'quiz' => admin_quiz_json($itineraryQuiz),
             'quiz_summary' => admin_quiz_summary($itineraryQuiz),
+            'order' => method_exists($selectedItinerary, 'getOrder') ? (int) $selectedItinerary->getOrder() : 0,
             'mode' => 'existing',
         ];
     } else {
         $itineraryFormData['mode'] = 'new';
+        $itineraryFormData['order'] = admin_next_itinerary_order();
     }
     $topicParam = $_GET['topic'] ?? '';
     if ($selectedItinerary !== null && $topicParam !== '' && $topicParam !== 'new') {
@@ -6207,6 +6284,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                 <table class="table table-striped table-hover">
                                                     <thead>
                                                         <tr>
+                                                            <th style="width:80px;">Orden</th>
                                                             <th>Título</th>
                                                             <th>Descripción</th>
                                                             <th>Temas</th>
@@ -6254,6 +6332,22 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                             ?>
                                                             <?php $itineraryStatus = method_exists($itineraryItem, 'getStatus') ? $itineraryItem->getStatus() : 'published'; ?>
                                                             <tr>
+                                                                <td class="text-nowrap">
+                                                                    <div class="btn-group-vertical btn-group-sm" role="group" aria-label="Mover itinerario">
+                                                                        <form method="post" class="d-inline">
+                                                                            <input type="hidden" name="reorder_itinerary" value="1">
+                                                                            <input type="hidden" name="itinerary_slug" value="<?= htmlspecialchars($itineraryItem->getSlug(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="direction" value="up">
+                                                                            <button type="submit" class="btn btn-outline-secondary" <?= $itinerariesList[0]->getSlug() === $itineraryItem->getSlug() ? 'disabled' : '' ?> title="Subir">▲</button>
+                                                                        </form>
+                                                                        <form method="post" class="d-inline">
+                                                                            <input type="hidden" name="reorder_itinerary" value="1">
+                                                                            <input type="hidden" name="itinerary_slug" value="<?= htmlspecialchars($itineraryItem->getSlug(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="direction" value="down">
+                                                                            <button type="submit" class="btn btn-outline-secondary" <?= $itinerariesList[array_key_last($itinerariesList)]->getSlug() === $itineraryItem->getSlug() ? 'disabled' : '' ?> title="Bajar">▼</button>
+                                                                        </form>
+                                                                    </div>
+                                                                </td>
                                                                 <td><?= htmlspecialchars($itineraryItem->getTitle(), ENT_QUOTES, 'UTF-8') ?></td>
                                                                 <td><?= htmlspecialchars($itineraryItem->getDescription(), ENT_QUOTES, 'UTF-8') ?></td>
                                                                 <td><?= $itineraryItem->getTopicCount() ?></td>
@@ -6304,6 +6398,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                         <?php elseif ($page === 'itinerario'): ?>
 
                             <div class="tab-pane active">
+                                <?php
+                                    $topicParamRaw = $_GET['topic'] ?? '';
+                                    $isTopicStandalone = $selectedItinerary && ($topicParamRaw === 'new' || $selectedTopic !== null);
+                                ?>
                                 <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
                                     <div>
                                         <h2 class="mb-1"><?= $isNewItinerary ? 'Nuevo itinerario' : 'Editar itinerario' ?></h2>
@@ -6311,9 +6409,6 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                     </div>
                                     <div class="btn-group">
                                         <a class="btn btn-outline-secondary" href="?page=itinerarios">Volver al listado</a>
-                                        <?php if ($selectedItinerary): ?>
-                                            <a class="btn btn-outline-secondary" href="?page=itinerario-tema&itinerary=<?= urlencode($selectedItinerary->getSlug()) ?>#topic-form">Gestionar temas</a>
-                                        <?php endif; ?>
                                         <a class="btn btn-primary" href="?page=itinerario&new=1">Nuevo itinerario</a>
                                     </div>
                                 </div>
@@ -6339,6 +6434,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                     </div>
                                                     <input type="hidden" name="itinerary_original_slug" value="<?= htmlspecialchars($itineraryFormData['slug'], ENT_QUOTES, 'UTF-8') ?>">
                                                     <input type="hidden" name="itinerary_mode" value="<?= htmlspecialchars($itineraryFormData['mode'], ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="itinerary_order" value="<?= (int) ($itineraryFormData['order'] ?? 0) ?>">
                                                     <div class="form-group">
                                                         <label for="itinerary_title">Título</label>
                                                         <input type="text" name="itinerary_title" id="itinerary_title" class="form-control" value="<?= htmlspecialchars($itineraryFormData['title'], ENT_QUOTES, 'UTF-8') ?>" required>
@@ -6506,10 +6602,245 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                                             <input type="hidden" name="delete_topic_slug" value="<?= htmlspecialchars($topicItem->getSlug(), ENT_QUOTES, 'UTF-8') ?>">
                                                                             <button type="submit" name="delete_itinerary_topic" class="btn btn-sm btn-outline-danger mt-1">Borrar</button>
                                                                         </form>
+                                        </div>
+                                    </div>
+                                    <?php if (!$isNewItinerary): ?>
+                                        <?php if (!$isTopicStandalone): ?>
+                                            <div class="col-12 mt-4 mt-lg-0">
+                                                <div class="card mb-4">
+                                                    <div class="card-body itinerary-topics-card">
+                                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                                            <h3 class="h5 mb-0">
+                                                                <?php if ($selectedItinerary): ?>
+                                                                    Temas de <?= htmlspecialchars($selectedItinerary->getTitle(), ENT_QUOTES, 'UTF-8') ?>
+                                                                <?php else: ?>
+                                                                    Temas del itinerario
+                                                                <?php endif; ?>
+                                                            </h3>
+                                                            <?php if ($selectedItinerary): ?>
+                                                                <a class="btn btn-outline-primary" href="?page=itinerario&itinerary=<?= urlencode($selectedItinerary->getSlug()) ?>&topic=new#topic-form">Nuevo tema</a>
+                                                            <?php else: ?>
+                                                                <button type="button" class="btn btn-outline-primary disabled" disabled title="Guarda el itinerario para poder añadir temas">Nuevo tema</button>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                        <?php if (!$selectedItinerary): ?>
+                                                            <p class="text-muted mb-0">Selecciona o crea un itinerario para gestionar sus temas.</p>
+                                                        <?php elseif (empty($selectedItinerary->getTopics())): ?>
+                                                            <p class="text-muted mb-0">Añade tu primer tema para comenzar el itinerario.</p>
+                                                        <?php else: ?>
+                                                            <?php foreach ($selectedItinerary->getTopics() as $topicItem): ?>
+                                                                <div class="card mb-3">
+                                                                    <div class="card-body">
+                                                                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                                                            <div>
+                                                                                <span class="badge badge-secondary mb-2">Tema <?= (int) $topicItem->getNumber() ?></span>
+                                                                                <h4 class="h6 mb-1"><?= htmlspecialchars($topicItem->getTitle(), ENT_QUOTES, 'UTF-8') ?></h4>
+                                                                                <?php if ($topicItem->getDescription() !== ''): ?>
+                                                                                    <p class="mb-2 text-muted"><?= htmlspecialchars($topicItem->getDescription(), ENT_QUOTES, 'UTF-8') ?></p>
+                                                                                <?php endif; ?>
+                                                                                <a href="<?= htmlspecialchars(admin_public_itinerary_url($selectedItinerary->getSlug()) . '/' . rawurlencode($topicItem->getSlug()), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Ver tema</a>
+                                                                            </div>
+                                                                            <div class="text-right">
+                                                                                <div class="mb-2">
+                                                                                    <a class="btn btn-sm btn-outline-primary" href="?page=itinerario&itinerary=<?= urlencode($selectedItinerary->getSlug()) ?>&topic=<?= urlencode($topicItem->getSlug()) ?>#topic-form">Editar</a>
+                                                                                </div>
+                                                                                <form method="post" class="d-inline-block" onsubmit="return confirm('¿Seguro que deseas borrar este tema del itinerario?');">
+                                                                                    <input type="hidden" name="delete_topic_itinerary_slug" value="<?= htmlspecialchars($selectedItinerary->getSlug(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                                    <input type="hidden" name="delete_topic_slug" value="<?= htmlspecialchars($topicItem->getSlug(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                                    <button type="submit" name="delete_itinerary_topic" class="btn btn-sm btn-outline-danger mt-1">Borrar</button>
+                                                                                </form>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            <?php endforeach; ?>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+
+                                                <?php if ($selectedItinerary): ?>
+                                                    <div id="topic-form" class="card mb-4">
+                                                        <div class="card-body itinerary-topics-card">
+                                                            <h3 class="h5 mb-3"><?= $topicFormData['mode'] === 'existing' ? 'Editar tema' : 'Nuevo tema' ?></h3>
+                                                            <form method="post">
+                                                                <input type="hidden" name="topic_itinerary_slug" value="<?= htmlspecialchars($selectedItinerary->getSlug(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                <input type="hidden" name="topic_original_slug" value="<?= htmlspecialchars($topicFormData['slug'], ENT_QUOTES, 'UTF-8') ?>">
+                                                                <input type="hidden" name="topic_mode" value="<?= htmlspecialchars($topicFormData['mode'], ENT_QUOTES, 'UTF-8') ?>">
+                                                                <div class="form-group">
+                                                                    <label for="topic_title">Título del tema</label>
+                                                                    <input type="text" name="topic_title" id="topic_title" class="form-control" value="<?= htmlspecialchars($topicFormData['title'], ENT_QUOTES, 'UTF-8') ?>" required>
+                                                                </div>
+                                                                <div class="form-group">
+                                                                    <label for="topic_description">Descripción</label>
+                                                                    <textarea name="topic_description" id="topic_description" class="form-control" rows="3"><?= htmlspecialchars($topicFormData['description'], ENT_QUOTES, 'UTF-8') ?></textarea>
+                                                                </div>
+                                                                <div class="form-group">
+                                                                    <label for="topic_slug">Slug</label>
+                                                                    <input type="text" name="topic_slug" id="topic_slug" class="form-control" data-slug-input="1" pattern="[a-z0-9-]+" title="Usa solo letras minúsculas, números y guiones (-)" value="<?= htmlspecialchars($topicFormData['slug'], ENT_QUOTES, 'UTF-8') ?>" placeholder="tema-1">
+                                                                </div>
+                                                                <div class="form-group">
+                                                                    <label for="topic_number">Tema nº</label>
+                                                                    <select name="topic_number" id="topic_number" class="form-control">
+                                                                        <?php foreach ($topicNumberOptions as $option): ?>
+                                                                            <option value="<?= $option ?>" <?= $option == $topicFormData['number'] ? 'selected' : '' ?>><?= $option ?></option>
+                                                                        <?php endforeach; ?>
+                                                                    </select>
+                                                                </div>
+                                                                <div class="form-group">
+                                                                    <label for="topic_image">Imagen asociada</label>
+                                                                    <div class="input-group">
+                                                                        <input type="text" name="topic_image" id="topic_image" class="form-control" readonly value="<?= htmlspecialchars($topicFormData['image'], ENT_QUOTES, 'UTF-8') ?>">
+                                                                        <div class="input-group-append">
+                                                                            <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="topic_image" data-target-prefix="" data-redirect-anchor="topic-form">Seleccionar imagen</button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="form-group">
+                                                                    <label for="topic_content">Presentación del tema</label>
+                                                                    <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#topic_content">
+                                                                        <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                                            <button type="button" class="btn btn-outline-secondary" data-md-action="bold"><strong>B</strong></button>
+                                                                            <button type="button" class="btn btn-outline-secondary" data-md-action="italic"><em>I</em></button>
+                                                                            <button type="button" class="btn btn-outline-secondary" data-md-action="strike">S̶</button>
+                                                                            <button type="button" class="btn btn-outline-secondary" data-md-action="code">&lt;/&gt;</button>
+                                                                        </div>
+                                                                        <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                                            <button type="button" class="btn btn-outline-secondary" data-md-action="link">Link</button>
+                                                                            <button type="button" class="btn btn-outline-secondary" data-md-action="quote">&gt;</button>
+                                                                            <button type="button" class="btn btn-outline-secondary" data-md-action="sup">x<sup>2</sup></button>
+                                                                        </div>
+                                                                        <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                                        <button type="button" class="btn btn-outline-secondary" data-md-action="ul">•</button>
+                                                                        <button type="button" class="btn btn-outline-secondary" data-md-action="ol">1.</button>
+                                                                        <button type="button" class="btn btn-outline-secondary" data-md-action="heading">H2</button>
+                                                                        <button type="button" class="btn btn-outline-secondary" data-md-action="code-block">{ }</button>
+                                                                        <button type="button" class="btn btn-outline-secondary" data-md-action="hr">—</button>
+                                                                        <button type="button" class="btn btn-outline-secondary" data-md-action="table">Tbl</button>
+                                                                        <button type="button" class="btn btn-outline-secondary" data-md-action="callout" data-toggle="modal" data-target="#calloutModal">Aviso</button>
+                                                                    </div>
+                                                                </div>
+                                                                    <textarea name="topic_content" id="topic_content" class="form-control" rows="10" data-markdown-editor="itinerary-topic"><?= htmlspecialchars($topicFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>
+                                                                    <div class="d-flex flex-wrap align-items-center gap-2 mt-2 topic-quiz-controls">
+                                                                        <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#topic_content" data-redirect-anchor="topic-form">Nuevo recurso</button>
+                                                                        <input type="hidden" name="topic_quiz_payload" id="topic_quiz_payload" value="<?= htmlspecialchars($topicFormData['quiz'], ENT_QUOTES, 'UTF-8') ?>">
+                                                                        <?php $quizHasData = $topicFormData['quiz'] !== ''; ?>
+                                                                        <button
+                                                                            type="button"
+                                                                            class="btn btn-outline-secondary"
+                                                                            data-quiz-trigger
+                                                                            data-quiz-target="#topic_quiz_payload"
+                                                                            data-quiz-summary="#topic_quiz_summary"
+                                                                            data-quiz-title="Autoevaluación del tema"
+                                                                        >
+                                                                            <?= $quizHasData ? 'Editar autoevaluación' : 'Añadir autoevaluación' ?>
+                                                                        </button>
+                                                                        <small class="text-muted mb-0" id="topic_quiz_summary" data-quiz-summary="topic_quiz_payload"><?= htmlspecialchars($topicFormData['quiz_summary'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="mt-3">
+                                                                    <button type="submit" name="save_itinerary_topic" class="btn btn-primary">Guardar tema</button>
+                                                                    <button type="submit" name="save_itinerary_topic_add" class="btn btn-secondary ml-2">Añadir nuevo tema</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="col-12">
+                                                <div id="topic-form" class="card mb-4">
+                                                    <div class="card-body itinerary-topics-card">
+                                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                                            <h3 class="h5 mb-0"><?= $topicFormData['mode'] === 'existing' ? 'Editar tema' : 'Nuevo tema' ?></h3>
+                                                            <a class="btn btn-outline-secondary" href="?page=itinerario&itinerary=<?= urlencode($selectedItinerary->getSlug()) ?>">Volver al itinerario</a>
+                                                        </div>
+                                                        <form method="post">
+                                                            <input type="hidden" name="topic_itinerary_slug" value="<?= htmlspecialchars($selectedItinerary->getSlug(), ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="topic_original_slug" value="<?= htmlspecialchars($topicFormData['slug'], ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="topic_mode" value="<?= htmlspecialchars($topicFormData['mode'], ENT_QUOTES, 'UTF-8') ?>">
+                                                            <div class="form-group">
+                                                                <label for="topic_title">Título del tema</label>
+                                                                <input type="text" name="topic_title" id="topic_title" class="form-control" value="<?= htmlspecialchars($topicFormData['title'], ENT_QUOTES, 'UTF-8') ?>" required>
+                                                            </div>
+                                                            <div class="form-group">
+                                                                <label for="topic_description">Descripción</label>
+                                                                <textarea name="topic_description" id="topic_description" class="form-control" rows="3"><?= htmlspecialchars($topicFormData['description'], ENT_QUOTES, 'UTF-8') ?></textarea>
+                                                            </div>
+                                                            <div class="form-group">
+                                                                <label for="topic_slug">Slug</label>
+                                                                <input type="text" name="topic_slug" id="topic_slug" class="form-control" data-slug-input="1" pattern="[a-z0-9-]+" title="Usa solo letras minúsculas, números y guiones (-)" value="<?= htmlspecialchars($topicFormData['slug'], ENT_QUOTES, 'UTF-8') ?>" placeholder="tema-1">
+                                                            </div>
+                                                            <div class="form-group">
+                                                                <label for="topic_number">Tema nº</label>
+                                                                <select name="topic_number" id="topic_number" class="form-control">
+                                                                    <?php foreach ($topicNumberOptions as $option): ?>
+                                                                        <option value="<?= $option ?>" <?= $option == $topicFormData['number'] ? 'selected' : '' ?>><?= $option ?></option>
+                                                                    <?php endforeach; ?>
+                                                                </select>
+                                                            </div>
+                                                            <div class="form-group">
+                                                                <label for="topic_image">Imagen asociada</label>
+                                                                <div class="input-group">
+                                                                    <input type="text" name="topic_image" id="topic_image" class="form-control" readonly value="<?= htmlspecialchars($topicFormData['image'], ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <div class="input-group-append">
+                                                                        <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="topic_image" data-target-prefix="" data-redirect-anchor="topic-form">Seleccionar imagen</button>
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
+                                                            <div class="form-group">
+                                                                <label for="topic_content">Presentación del tema</label>
+                                                                <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#topic_content">
+                                                                    <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                                        <button type="button" class="btn btn-outline-secondary" data-md-action="bold"><strong>B</strong></button>
+                                                                        <button type="button" class="btn btn-outline-secondary" data-md-action="italic"><em>I</em></button>
+                                                                        <button type="button" class="btn btn-outline-secondary" data-md-action="strike">S̶</button>
+                                                                        <button type="button" class="btn btn-outline-secondary" data-md-action="code">&lt;/&gt;</button>
+                                                                    </div>
+                                                                    <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                                        <button type="button" class="btn btn-outline-secondary" data-md-action="link">Link</button>
+                                                                        <button type="button" class="btn btn-outline-secondary" data-md-action="quote">&gt;</button>
+                                                                        <button type="button" class="btn btn-outline-secondary" data-md-action="sup">x<sup>2</sup></button>
+                                                                    </div>
+                                                                    <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="ul">•</button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="ol">1.</button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="heading">H2</button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="code-block">{ }</button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="hr">—</button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="table">Tbl</button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-md-action="callout" data-toggle="modal" data-target="#calloutModal">Aviso</button>
+                                                                </div>
+                                                            </div>
+                                                                <textarea name="topic_content" id="topic_content" class="form-control" rows="10" data-markdown-editor="itinerary-topic"><?= htmlspecialchars($topicFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>
+                                                                <div class="d-flex flex-wrap align-items-center gap-2 mt-2 topic-quiz-controls">
+                                                                    <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#topic_content" data-redirect-anchor="topic-form">Nuevo recurso</button>
+                                                                    <input type="hidden" name="topic_quiz_payload" id="topic_quiz_payload" value="<?= htmlspecialchars($topicFormData['quiz'], ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <?php $quizHasData = $topicFormData['quiz'] !== ''; ?>
+                                                                    <button
+                                                                        type="button"
+                                                                        class="btn btn-outline-secondary"
+                                                                        data-quiz-trigger
+                                                                        data-quiz-target="#topic_quiz_payload"
+                                                                        data-quiz-summary="#topic_quiz_summary"
+                                                                        data-quiz-title="Autoevaluación del tema"
+                                                                    >
+                                                                        <?= $quizHasData ? 'Editar autoevaluación' : 'Añadir autoevaluación' ?>
+                                                                    </button>
+                                                                    <small class="text-muted mb-0" id="topic_quiz_summary" data-quiz-summary="topic_quiz_payload"><?= htmlspecialchars($topicFormData['quiz_summary'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                                </div>
+                                                            </div>
+                                                            <div class="mt-3">
+                                                                <button type="submit" name="save_itinerary_topic" class="btn btn-primary">Guardar tema</button>
+                                                                <button type="submit" name="save_itinerary_topic_add" class="btn btn-secondary ml-2">Añadir nuevo tema</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
                                                     <?php endforeach; ?>
                                                 <?php endif; ?>
                                             </div>

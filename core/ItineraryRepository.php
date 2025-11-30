@@ -42,6 +42,10 @@ class ItineraryRepository
         }
 
         usort($itineraries, static function (Itinerary $a, Itinerary $b): int {
+            $orderComparison = $a->getOrder() <=> $b->getOrder();
+            if ($orderComparison !== 0) {
+                return $orderComparison;
+            }
             return strcasecmp($a->getTitle(), $b->getTitle());
         });
 

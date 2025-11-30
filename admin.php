@@ -6307,32 +6307,6 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
                                     <div>
                                         <h2 class="mb-1"><?= $isNewItinerary ? 'Nuevo itinerario' : 'Editar itinerario' ?></h2>
-                                        <p class="text-muted mb-0"><?= $selectedItinerary ? htmlspecialchars($selectedItinerary->getTitle(), ENT_QUOTES, 'UTF-8') : 'Define aquí la presentación y los temas.' ?></p>
-                                    </div>
-                                    <div class="btn-group">
-                                        <a class="btn btn-outline-secondary" href="?page=itinerarios">Volver al listado</a>
-                                        <a class="btn btn-primary" href="?page=itinerario&new=1">Nuevo itinerario</a>
-                                    </div>
-                                </div>
-
-                                <?php if ($itineraryFeedback): ?>
-                                    <div class="alert alert-<?= htmlspecialchars($itineraryFeedback['type'], ENT_QUOTES, 'UTF-8') ?>">
-                                        <?= htmlspecialchars($itineraryFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
-                                    </div>
-                                <?php endif; ?>
-
-                                <?php if (!$selectedItinerary && !$isNewItinerary): ?>
-                                    <div class="alert alert-info">Selecciona un itinerario desde el listado para editarlo o crea uno nuevo.</div>
-                                <?php endif; ?>
-
-                            </div>
-
-                        <?php elseif ($page === 'itinerario'): ?>
-
-                            <div class="tab-pane active">
-                                <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
-                                    <div>
-                                        <h2 class="mb-1"><?= $isNewItinerary ? 'Nuevo itinerario' : 'Editar itinerario' ?></h2>
                                         <p class="text-muted mb-0"><?= $selectedItinerary ? htmlspecialchars($selectedItinerary->getTitle(), ENT_QUOTES, 'UTF-8') : 'Define aquí la presentación del itinerario.' ?></p>
                                     </div>
                                     <div class="btn-group">

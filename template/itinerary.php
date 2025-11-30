@@ -14,33 +14,33 @@
     $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/itinerarios' : '/itinerarios');
 ?>
 
-<?php if (!empty($itinerariesIndexUrl)): ?>
-    <div class="itinerary-topics__back mb-3">
-        <a class="button button-secondary" href="<?= htmlspecialchars($itinerariesIndexUrl, ENT_QUOTES, 'UTF-8') ?>">Todos los itinerarios</a>
-    </div>
-<?php endif; ?>
-
 <div class="itinerary-single-content">
     <?= $itineraryBody ?>
 </div>
 
 <?php
     $usageLogic = method_exists($itinerary, 'getUsageLogic') ? $itinerary->getUsageLogic() : 'free';
+    $usageReasons = [
+        'Hacer estadísticas para mejorar los itinerarios y reforzar o ajustar los temas con más abandonos.',
+    ];
+    if ($usageLogic === \Nammu\Core\Itinerary::USAGE_LOGIC_SEQUENTIAL || $usageLogic === \Nammu\Core\Itinerary::USAGE_LOGIC_ASSESSMENT) {
+        $usageReasons[] = 'Asegurarnos de que no se lea un tema sin haber leído el anterior cuando el itinerario requiere avanzar en orden.';
+    }
+    if ($usageLogic === \Nammu\Core\Itinerary::USAGE_LOGIC_ASSESSMENT) {
+        $usageReasons[] = 'Comprobar que se han superado las autoevaluaciones cuando el autor lo ha configurado así.';
+    }
     $usageNotice = '';
-    if ($usageLogic === \Nammu\Core\Itinerary::USAGE_LOGIC_SEQUENTIAL) {
-        $usageNotice = 'Este itinerario usa cookies para asegurar que sigues el orden de temas creado por su autor. La información guardada en esas cookies se usa exclusivamenente para ese fin. Al iniciar el itinerario aceptas su uso.';
-    } elseif ($usageLogic === \Nammu\Core\Itinerary::USAGE_LOGIC_ASSESSMENT) {
-        $usageNotice = 'Este itinerario usa cookies para asegurar que sigues el orden de temas creado por su autor y que  pasas las autoevaluaciones entre temas. La información guardada en esas cookies se usa exclusivamenente para esos fines. Al iniciar el itinerario aceptas su uso.';
+    if (!empty($usageReasons)) {
+        $usageNotice = '<strong>Uso de cookies en este itinerario:</strong><ul class="mb-0">';
+        foreach ($usageReasons as $reason) {
+            $usageNotice .= '<li>' . htmlspecialchars($reason, ENT_QUOTES, 'UTF-8') . '</li>';
+        }
+        $usageNotice .= '</ul>';
     }
 ?>
 <?php if (!empty($topicSummaries)): ?>
     <section class="itinerary-topics">
         <h2>Temas del itinerario</h2>
-        <?php if (!empty($itinerariesIndexUrl)): ?>
-            <div class="itinerary-topics__back mb-3">
-                <a class="button button-secondary" href="<?= htmlspecialchars($itinerariesIndexUrl, ENT_QUOTES, 'UTF-8') ?>">Volver a los itinerarios</a>
-            </div>
-        <?php endif; ?>
         <div class="itinerary-topics__list">
             <?php foreach ($topicSummaries as $topic): ?>
                 <?php
@@ -78,6 +78,11 @@
         <?php if ($firstTopicUrl): ?>
             <div class="itinerary-topics__cta">
                 <a class="button button-primary" href="<?= htmlspecialchars($firstTopicUrl, ENT_QUOTES, 'UTF-8') ?>">Comenzar itinerario</a>
+            </div>
+        <?php endif; ?>
+        <?php if (!empty($itinerariesIndexUrl)): ?>
+            <div class="itinerary-topics__back mt-3">
+                <a class="button button-secondary" href="<?= htmlspecialchars($itinerariesIndexUrl, ENT_QUOTES, 'UTF-8') ?>">Todos los itinerarios</a>
             </div>
         <?php endif; ?>
         <?php if ($usageNotice !== ''): ?>

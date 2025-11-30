@@ -1641,6 +1641,7 @@ function nammu_normalize_filename(string $filename, bool $ensureExtension = true
 // --- Routing and Logic ---
 
 $page = $_GET['page'] ?? 'login';
+$isItineraryAdminPage = in_array($page, ['itinerarios', 'itinerario'], true);
 $error = null;
 $user_exists = file_exists(USER_FILE);
 $accountFeedback = $_SESSION['account_feedback'] ?? null;
@@ -2018,7 +2019,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $slug = ItineraryRepository::normalizeSlug($slugInput);
         $originalSlug = ItineraryRepository::normalizeSlug($originalSlugInput);
-        $redirectBase = 'admin.php?page=itinerarios';
+        $redirectBase = 'admin.php?page=itinerario';
         if ($originalSlug !== '') {
             $redirectBase .= '&itinerary=' . urlencode($originalSlug);
         } elseif ($mode === 'new') {
@@ -2079,7 +2080,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ], $content, !empty($itineraryQuizResult['data']['questions']) ? $itineraryQuizResult['data'] : null);
             admin_regenerate_itinerary_feed();
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario guardado correctamente.'];
-            header('Location: admin.php?page=itinerarios&itinerary=' . urlencode($saved->getSlug()));
+            header('Location: admin.php?page=itinerario&itinerary=' . urlencode($saved->getSlug()));
             exit;
         } catch (Throwable $e) {
             $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudo guardar el itinerario: ' . $e->getMessage()];
@@ -2110,7 +2111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $topicSlug = ItineraryRepository::normalizeSlug($slugInput);
         $originalSlug = ItineraryRepository::normalizeSlug($originalSlugInput);
-        $redirectBase = 'admin.php?page=itinerarios';
+        $redirectBase = 'admin.php?page=itinerario';
         if ($itinerarySlug !== '') {
             $redirectBase .= '&itinerary=' . urlencode($itinerarySlug);
         }
@@ -2214,9 +2215,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Tema guardado correctamente.'];
             if ($redirectToNewForm) {
-                header('Location: admin.php?page=itinerarios&itinerary=' . urlencode($itinerarySlug) . '&topic=new');
+                header('Location: admin.php?page=itinerario&itinerary=' . urlencode($itinerarySlug) . '&topic=new');
             } else {
-                header('Location: admin.php?page=itinerarios&itinerary=' . urlencode($itinerarySlug) . '&topic=' . urlencode($topicSlug));
+                header('Location: admin.php?page=itinerario&itinerary=' . urlencode($itinerarySlug) . '&topic=' . urlencode($topicSlug));
             }
             exit;
         } catch (Throwable $e) {
@@ -2249,7 +2250,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['delete_itinerary_topic'])) {
         $itinerarySlug = ItineraryRepository::normalizeSlug($_POST['delete_topic_itinerary_slug'] ?? '');
         $topicSlug = ItineraryRepository::normalizeSlug($_POST['delete_topic_slug'] ?? '');
-        $redirectBase = 'admin.php?page=itinerarios';
+        $redirectBase = 'admin.php?page=itinerario';
         if ($itinerarySlug !== '') {
             $redirectBase .= '&itinerary=' . urlencode($itinerarySlug);
         }
@@ -2316,11 +2317,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $redirectTarget = 'admin.php?page=resources';
         $redirectUrlRaw = trim((string) ($_POST['redirect_url'] ?? ''));
         $redirectPageRaw = trim((string) ($_POST['redirect_page'] ?? ''));
+        $redirectAnchorRaw = trim((string) ($_POST['redirect_anchor'] ?? ''));
+        $redirectAnchor = '';
+        if ($redirectAnchorRaw !== '' && preg_match('/^[A-Za-z0-9_-]+$/', $redirectAnchorRaw)) {
+            $redirectAnchor = '#' . $redirectAnchorRaw;
+        }
         $pattern = '/^page=[a-z0-9._%\-\/&=]+$/i';
         if ($redirectUrlRaw !== '' && preg_match($pattern, $redirectUrlRaw)) {
             $redirectTarget = 'admin.php?' . $redirectUrlRaw;
         } else {
-            $allowedPages = ['resources','publish','edit','edit-post','template','itinerarios','configuracion'];
+            $allowedPages = ['resources','publish','edit','edit-post','template','itinerarios','itinerario','configuracion'];
             if (in_array($redirectPageRaw, $allowedPages, true)) {
                 $redirectTarget = 'admin.php?page=' . $redirectPageRaw;
                 if ($redirectPageRaw === 'edit-post') {
@@ -2331,6 +2337,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
             }
+        }
+        if ($redirectAnchor !== '') {
+            $redirectTarget .= $redirectAnchor;
         }
         $normalizedFiles = [];
         if ($filesField !== null) {
@@ -2983,7 +2992,7 @@ $topicFormData = [
 ];
 $topicNumberOptions = [1];
 
-if (is_logged_in() && $page === 'itinerarios') {
+if (is_logged_in() && $isItineraryAdminPage) {
     $itinerariesList = admin_list_itineraries();
     $requestedSlug = isset($_GET['itinerary']) ? ItineraryRepository::normalizeSlug((string) $_GET['itinerary']) : '';
     if ($requestedSlug !== '') {
@@ -4594,7 +4603,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 </li>
 
-                                <li class="nav-item <?= $page === 'itinerarios' ? 'active' : '' ?>">
+                                <li class="nav-item <?= ($page === 'itinerarios' || $page === 'itinerario') ? 'active' : '' ?>">
 
                                     <a class="nav-link" href="?page=itinerarios"><h1>Itinerarios</h1></a>
 
@@ -6176,7 +6185,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                     <h2 class="mb-0">Itinerarios</h2>
                                     <div class="btn-group">
                                         <a class="btn btn-outline-secondary" href="?page=itinerarios">Refrescar</a>
-                                        <a class="btn btn-primary" href="?page=itinerarios&new=1">Nuevo itinerario</a>
+                                        <a class="btn btn-primary" href="?page=itinerario&new=1">Nuevo itinerario</a>
                                     </div>
                                 </div>
 
@@ -6272,7 +6281,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                                             >Estadísticas</button>
                                                                         </div>
                                                                         <div class="mb-2">
-                                                                            <a class="btn btn-sm btn-outline-primary" href="?page=itinerarios&itinerary=<?= urlencode($itineraryItem->getSlug()) ?>#itinerary-form">Editar</a>
+                                                                            <a class="btn btn-sm btn-outline-primary" href="?page=itinerario&itinerary=<?= urlencode($itineraryItem->getSlug()) ?>#itinerary-form">Editar</a>
                                                                         </div>
                                                                         <form method="post" class="d-inline-block" onsubmit="return confirm('¿Seguro que deseas borrar este itinerario? Esta acción eliminará todos sus temas.');">
                                                                             <input type="hidden" name="delete_itinerary_slug" value="<?= htmlspecialchars($itineraryItem->getSlug(), ENT_QUOTES, 'UTF-8') ?>">
@@ -6288,6 +6297,31 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                         <?php endif; ?>
                                     </div>
                                 </div>
+                            </div>
+
+                        <?php elseif ($page === 'itinerario'): ?>
+
+                            <div class="tab-pane active">
+                                <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+                                    <div>
+                                        <h2 class="mb-1"><?= $isNewItinerary ? 'Nuevo itinerario' : 'Editar itinerario' ?></h2>
+                                        <p class="text-muted mb-0"><?= $selectedItinerary ? htmlspecialchars($selectedItinerary->getTitle(), ENT_QUOTES, 'UTF-8') : 'Define aquí la presentación y los temas.' ?></p>
+                                    </div>
+                                    <div class="btn-group">
+                                        <a class="btn btn-outline-secondary" href="?page=itinerarios">Volver al listado</a>
+                                        <a class="btn btn-primary" href="?page=itinerario&new=1">Nuevo itinerario</a>
+                                    </div>
+                                </div>
+
+                                <?php if ($itineraryFeedback): ?>
+                                    <div class="alert alert-<?= htmlspecialchars($itineraryFeedback['type'], ENT_QUOTES, 'UTF-8') ?>">
+                                        <?= htmlspecialchars($itineraryFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                <?php endif; ?>
+
+                                <?php if (!$selectedItinerary && !$isNewItinerary): ?>
+                                    <div class="alert alert-info">Selecciona un itinerario desde el listado para editarlo o crea uno nuevo.</div>
+                                <?php endif; ?>
 
                                 <div class="row">
                                     <div class="col-12">
@@ -6436,7 +6470,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                         <?php endif; ?>
                                                     </h3>
                                                     <?php if ($selectedItinerary): ?>
-                                                        <a class="btn btn-outline-primary" href="?page=itinerarios&itinerary=<?= urlencode($selectedItinerary->getSlug()) ?>&topic=new#topic-form">Nuevo tema</a>
+                                                        <a class="btn btn-outline-primary" href="?page=itinerario&itinerary=<?= urlencode($selectedItinerary->getSlug()) ?>&topic=new#topic-form">Nuevo tema</a>
                                                     <?php else: ?>
                                                         <button type="button" class="btn btn-outline-primary disabled" disabled title="Guarda el itinerario para poder añadir temas">Nuevo tema</button>
                                                     <?php endif; ?>
@@ -6460,7 +6494,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                                     </div>
                                                                     <div class="text-right">
                                                                         <div class="mb-2">
-                                                                            <a class="btn btn-sm btn-outline-primary" href="?page=itinerarios&itinerary=<?= urlencode($selectedItinerary->getSlug()) ?>&topic=<?= urlencode($topicItem->getSlug()) ?>#topic-form">Editar</a>
+                                                                            <a class="btn btn-sm btn-outline-primary" href="?page=itinerario&itinerary=<?= urlencode($selectedItinerary->getSlug()) ?>&topic=<?= urlencode($topicItem->getSlug()) ?>#topic-form">Editar</a>
                                                                         </div>
                                                                         <form method="post" class="d-inline-block" onsubmit="return confirm('¿Seguro que deseas borrar este tema del itinerario?');">
                                                                             <input type="hidden" name="delete_topic_itinerary_slug" value="<?= htmlspecialchars($selectedItinerary->getSlug(), ENT_QUOTES, 'UTF-8') ?>">
@@ -6509,7 +6543,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                             <div class="input-group">
                                                                 <input type="text" name="topic_image" id="topic_image" class="form-control" readonly value="<?= htmlspecialchars($topicFormData['image'], ENT_QUOTES, 'UTF-8') ?>">
                                                                 <div class="input-group-append">
-                                                                    <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="topic_image" data-target-prefix="">Seleccionar imagen</button>
+                                                                    <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="topic_image" data-target-prefix="" data-redirect-anchor="topic-form">Seleccionar imagen</button>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -6539,7 +6573,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                                         </div>
                                                             <textarea name="topic_content" id="topic_content" class="form-control" rows="10" data-markdown-editor="itinerary-topic"><?= htmlspecialchars($topicFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>
                                                             <div class="d-flex flex-wrap align-items-center gap-2 mt-2 topic-quiz-controls">
-                                                                <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#topic_content">Nuevo recurso</button>
+                                                                <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#topic_content" data-redirect-anchor="topic-form">Nuevo recurso</button>
                                                                 <input type="hidden" name="topic_quiz_payload" id="topic_quiz_payload" value="<?= htmlspecialchars($topicFormData['quiz'], ENT_QUOTES, 'UTF-8') ?>">
                                                                 <?php $quizHasData = $topicFormData['quiz'] !== ''; ?>
                                                                 <button
@@ -6933,6 +6967,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             <input type="hidden" name="redirect_search" value="<?= htmlspecialchars($_GET['search'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                             <input type="hidden" name="redirect_file" value="<?= ($page === 'edit-post' && isset($safeEditFilename)) ? htmlspecialchars($safeEditFilename, ENT_QUOTES, 'UTF-8') : '' ?>">
                             <input type="hidden" name="redirect_url" value="<?= htmlspecialchars($_SERVER['QUERY_STRING'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                            <input type="hidden" name="redirect_anchor" id="imageUploadRedirectAnchor" value="">
                             <div class="form-group mb-2">
                                 <label class="d-block">Subir nuevo archivo</label>
                                 <input type="file" name="asset_files[]" class="form-control-file" multiple>
@@ -8094,6 +8129,14 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 imageTargetInput = button.data('target-input') || '';
                 imageTargetPrefix = button.data('target-prefix') || '';
                 imageTargetEditor = button.data('target-editor') || '';
+                var anchorInput = document.getElementById('imageUploadRedirectAnchor');
+                if (anchorInput) {
+                    var anchorVal = '';
+                    if (button && button.length) {
+                        anchorVal = button.data('redirect-anchor') || '';
+                    }
+                    anchorInput.value = anchorVal || '';
+                }
                 if (modalSearchInput.length) {
                     modalSearchInput.val('');
                     applyModalFilter('');

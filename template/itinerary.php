@@ -81,7 +81,7 @@
             </div>
         <?php endif; ?>
         <?php if (!empty($itinerariesIndexUrl)): ?>
-            <div class="itinerary-topics__back mt-3">
+            <div class="itinerary-topics__back mt-3" style="text-align: center;">
                 <a class="button button-secondary" href="<?= htmlspecialchars($itinerariesIndexUrl, ENT_QUOTES, 'UTF-8') ?>">Todos los itinerarios</a>
             </div>
         <?php endif; ?>

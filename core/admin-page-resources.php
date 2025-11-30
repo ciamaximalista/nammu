@@ -109,7 +109,7 @@
                     $isImage = in_array($ext, ['jpg','jpeg','png','gif','webp','svg'], true);
                     $relativePath = $resource['relative'] ?? $resource['name'];
                     $resourceUrl = 'assets/' . rawurlencode($relativePath);
-                    $resourceTags = $resource['tags'] ?? [];
+                    $resourceTags = $media_tags_map[$relativePath] ?? [];
                     ?>
                     <div class="col-sm-6 col-md-4 col-lg-3 mb-4">
                         <div class="card h-100 resource-card" data-resource-name="<?= htmlspecialchars($resource['name'], ENT_QUOTES, 'UTF-8') ?>">
@@ -120,37 +120,53 @@
                                     <?= htmlspecialchars(strtoupper($ext), ENT_QUOTES, 'UTF-8') ?>
                                 </div>
                             <?php endif; ?>
+                            <div class="px-3 pt-2">
+                                <?php if (!empty($resourceTags)): ?>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        <?php foreach ($resourceTags as $tag): ?>
+                                            <a class="badge badge-pill badge-info mb-1" href="?page=resources&search=<?= urlencode($tag) ?>" style="font-size: 0.75rem;">
+                                                <?= htmlspecialchars($tag, ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php else: ?>
+                                    <small class="text-muted d-block mb-1">Sin etiquetas</small>
+                                <?php endif; ?>
+                            </div>
                             <div class="card-body">
                                 <small class="text-muted d-block mb-2"><?= htmlspecialchars($relativePath, ENT_QUOTES, 'UTF-8') ?></small>
                                 <?php if (!empty($resource['size_readable'])): ?>
                                     <p class="card-text text-muted small mb-2"><?= htmlspecialchars($resource['size_readable'], ENT_QUOTES, 'UTF-8') ?></p>
                                 <?php endif; ?>
-                                <?php if (!empty($resourceTags)): ?>
-                                    <div class="d-flex flex-wrap gap-1">
-                                        <?php foreach ($resourceTags as $tag): ?>
-                                            <a class="badge badge-pill badge-info" href="?page=resources&search=<?= urlencode($tag) ?>"><?= htmlspecialchars($tag, ENT_QUOTES, 'UTF-8') ?></a>
-                                        <?php endforeach; ?>
-                                    </div>
-                                <?php endif; ?>
                             </div>
-                            <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($resourceUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Ver</a>
-                                <div class="btn-group btn-group-sm">
+                            <div class="card-footer d-flex align-items-center flex-wrap" style="gap: 0.4rem 0.6rem;">
+                                <?php if ($isImage): ?>
                                     <button
                                         type="button"
-                                        class="btn btn-outline-primary"
-                                        data-toggle="modal"
-                                        data-target="#editResourceModal"
-                                        data-resource="<?= htmlspecialchars($resource['name'], ENT_QUOTES, 'UTF-8') ?>"
-                                        data-tags="<?= htmlspecialchars(implode(', ', $resourceTags), ENT_QUOTES, 'UTF-8') ?>"
+                                        class="btn btn-sm btn-outline-primary edit-image-btn"
+                                        data-image-path="assets/<?= htmlspecialchars($relativePath, ENT_QUOTES, 'UTF-8') ?>"
+                                        data-image-name="<?= htmlspecialchars(pathinfo($resource['name'], PATHINFO_FILENAME), ENT_QUOTES, 'UTF-8') ?>"
+                                        data-image-relative="<?= htmlspecialchars($relativePath, ENT_QUOTES, 'UTF-8') ?>"
+                                        data-image-tags="<?= htmlspecialchars(implode(', ', $resourceTags), ENT_QUOTES, 'UTF-8') ?>"
+                                        style="margin-right: 4px;"
                                     >
                                         Editar
                                     </button>
-                                    <form method="post" class="d-inline" onsubmit="return confirm('¿Seguro que deseas borrar este recurso?');">
-                                        <input type="hidden" name="delete_resource" value="<?= htmlspecialchars($resource['name'], ENT_QUOTES, 'UTF-8') ?>">
-                                        <button type="submit" class="btn btn-outline-danger">Borrar</button>
-                                    </form>
-                                </div>
+                                <?php endif; ?>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-info edit-tags-btn"
+                                    data-tag-list="<?= htmlspecialchars(implode(', ', $resourceTags), ENT_QUOTES, 'UTF-8') ?>"
+                                    data-tag-target="<?= htmlspecialchars($relativePath, ENT_QUOTES, 'UTF-8') ?>"
+                                    style="margin-right: 4px;"
+                                >
+                                    Etiquetas
+                                </button>
+                                <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($resourceUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" style="margin-right: 4px;">Ver</a>
+                                <form method="post" class="mb-0" onsubmit="return confirm('¿Seguro que deseas borrar este recurso?');">
+                                    <input type="hidden" name="delete_resource" value="<?= htmlspecialchars($resource['name'], ENT_QUOTES, 'UTF-8') ?>">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Borrar</button>
+                                </form>
                             </div>
                         </div>
                     </div>

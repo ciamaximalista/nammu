@@ -2718,27 +2718,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $site_author = trim($_POST['site_author'] ?? '');
         $site_name = trim($_POST['site_name'] ?? '');
 
-        $social_default_description = trim($_POST['social_default_description'] ?? '');
-        $social_home_image = trim($_POST['social_home_image'] ?? '');
-        $social_twitter = trim($_POST['social_twitter'] ?? '');
-        if ($social_twitter !== '' && $social_twitter[0] === '@') {
-            $social_twitter = substr($social_twitter, 1);
-        }
-        $social_facebook_app_id = trim($_POST['social_facebook_app_id'] ?? '');
-        $telegram_token = trim($_POST['telegram_token'] ?? '');
-        $telegram_channel = trim($_POST['telegram_channel'] ?? '');
-        $telegram_auto = isset($_POST['telegram_auto']) ? 'on' : 'off';
-        $whatsapp_token = trim($_POST['whatsapp_token'] ?? '');
-        $whatsapp_channel = trim($_POST['whatsapp_channel'] ?? '');
-        $whatsapp_recipient = trim($_POST['whatsapp_recipient'] ?? '');
-        $whatsapp_auto = isset($_POST['whatsapp_auto']) ? 'on' : 'off';
-        $facebook_token = trim($_POST['facebook_token'] ?? '');
-        $facebook_channel = trim($_POST['facebook_channel'] ?? '');
-        $facebook_auto = isset($_POST['facebook_auto']) ? 'on' : 'off';
-        $twitter_token = trim($_POST['twitter_token'] ?? '');
-        $twitter_channel = trim($_POST['twitter_channel'] ?? '');
-        $twitter_auto = isset($_POST['twitter_auto']) ? 'on' : 'off';
-
         try {
             $config = load_config_file();
 
@@ -2762,6 +2741,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 unset($config['site_name']);
             }
+
+            save_config_file($config);
+
+        } catch (Throwable $e) {
+            $error = "Error guardando la configuración: " . $e->getMessage();
+        }
+
+        header('Location: admin.php?page=configuracion');
+        exit;
+    } elseif (isset($_POST['save_social'])) {
+        $social_default_description = trim($_POST['social_default_description'] ?? '');
+        $social_home_image = trim($_POST['social_home_image'] ?? '');
+        $social_twitter = trim($_POST['social_twitter'] ?? '');
+        if ($social_twitter !== '' && $social_twitter[0] === '@') {
+            $social_twitter = substr($social_twitter, 1);
+        }
+        $social_facebook_app_id = trim($_POST['social_facebook_app_id'] ?? '');
+        $telegram_token = trim($_POST['telegram_token'] ?? '');
+        $telegram_channel = trim($_POST['telegram_channel'] ?? '');
+        $telegram_auto = isset($_POST['telegram_auto']) ? 'on' : 'off';
+        $whatsapp_token = trim($_POST['whatsapp_token'] ?? '');
+        $whatsapp_channel = trim($_POST['whatsapp_channel'] ?? '');
+        $whatsapp_recipient = trim($_POST['whatsapp_recipient'] ?? '');
+        $whatsapp_auto = isset($_POST['whatsapp_auto']) ? 'on' : 'off';
+        $facebook_token = trim($_POST['facebook_token'] ?? '');
+        $facebook_channel = trim($_POST['facebook_channel'] ?? '');
+        $facebook_auto = isset($_POST['facebook_auto']) ? 'on' : 'off';
+        $twitter_token = trim($_POST['twitter_token'] ?? '');
+        $twitter_channel = trim($_POST['twitter_channel'] ?? '');
+        $twitter_auto = isset($_POST['twitter_auto']) ? 'on' : 'off';
+
+        try {
+            $config = load_config_file();
 
             $social = [
                 'default_description' => $social_default_description,
@@ -2816,7 +2828,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             save_config_file($config);
-
         } catch (Throwable $e) {
             $error = "Error guardando la configuración: " . $e->getMessage();
         }

@@ -135,7 +135,18 @@ $renderer->setGlobal('isAlphabeticalOrder', $isAlphabeticalOrder);
 
 $routePath = nammu_route_path();
 $alphabeticalSorter = static function (Post $a, Post $b): int {
-    return strcasecmp($a->getTitle(), $b->getTitle());
+    $letterA = nammu_letter_key_from_title($a->getTitle());
+    $letterB = nammu_letter_key_from_title($b->getTitle());
+    $weightA = nammu_letter_sort_weight($letterA);
+    $weightB = nammu_letter_sort_weight($letterB);
+    if ($weightA !== $weightB) {
+        return $weightA <=> $weightB;
+    }
+    $cmp = strcasecmp($a->getTitle(), $b->getTitle());
+    if ($cmp !== 0) {
+        return $cmp;
+    }
+    return strcmp($a->getSlug(), $b->getSlug());
 };
 $postToViewArray = static function (Post $post): array {
     $date = $post->getDate();

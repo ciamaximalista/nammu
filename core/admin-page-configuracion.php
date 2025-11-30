@@ -72,6 +72,14 @@
 
             </div>
 
+            <div class="text-right mb-4">
+                <button type="submit" name="save_settings" class="btn btn-primary">Guardar configuración general</button>
+            </div>
+
+        </form>
+
+        <form method="post">
+
             <h4 class="mt-4">Integración con Redes Sociales</h4>
 
             <div class="form-group">
@@ -175,6 +183,12 @@
                 <input type="checkbox" class="form-check-input" name="twitter_auto" id="twitter_auto" value="1" <?= $twitterAutoEnabled ? 'checked' : '' ?>>
                 <label for="twitter_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
             </div>
+
+            <div class="text-right mb-4">
+                <button type="submit" name="save_social" class="btn btn-outline-primary">Guardar redes sociales</button>
+            </div>
+
+        </form>
 
             <hr class="my-5">
             <h3>Cuenta de acceso</h3>

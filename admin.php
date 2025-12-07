@@ -833,6 +833,7 @@ function get_settings() {
     $googleFontsApi = $config['google_fonts_api'] ?? '';
     $authorName = $config['site_author'] ?? '';
     $blogName = $config['site_name'] ?? '';
+    $siteUrl = $config['site_url'] ?? '';
 
     $fonts = array_merge($defaults['fonts'], $templateConfig['fonts'] ?? []);
     $colors = array_merge($defaults['colors'], $templateConfig['colors'] ?? []);
@@ -942,6 +943,7 @@ function get_settings() {
         'google_fonts_api' => $googleFontsApi,
         'site_author' => $authorName,
         'site_name' => $blogName,
+        'site_url' => $siteUrl,
         'template' => [
             'fonts' => $fonts,
             'colors' => $colors,

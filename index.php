@@ -1140,6 +1140,16 @@ if ($isAlphabeticalOrder) {
 }
 
 $homeSettings = $theme['home'] ?? [];
+$homeColumns = (int) ($homeSettings['columns'] ?? 2);
+if ($homeColumns < 1 || $homeColumns > 3) {
+    $homeColumns = 2;
+}
+$homeFirstRowEnabled = (($homeSettings['first_row_enabled'] ?? 'off') === 'on');
+$homeFirstRowColumns = (int) ($homeSettings['first_row_columns'] ?? $homeColumns);
+if ($homeFirstRowColumns < 1 || $homeFirstRowColumns > 3) {
+    $homeFirstRowColumns = $homeColumns;
+}
+$homeFirstRowFill = (($homeSettings['first_row_fill'] ?? 'off') === 'on');
 $perPageSetting = $homeSettings['per_page'] ?? 'all';
 $perPage = null;
 if (is_string($perPageSetting) && strtolower($perPageSetting) === 'all') {
@@ -1162,12 +1172,28 @@ $totalPosts = count($posts);
 $totalPages = 1;
 $paginatedPosts = $posts;
 if ($perPage !== null) {
-    $totalPages = max(1, (int) ceil($totalPosts / $perPage));
+    $firstPageExtra = 0;
+    if ($homeFirstRowEnabled && $homeFirstRowFill && $totalPosts > $perPage) {
+        $remainder = max(0, $perPage - $homeFirstRowColumns);
+        if ($homeColumns > 0) {
+            $mod = $remainder % $homeColumns;
+            if ($mod !== 0) {
+                $firstPageExtra = min($homeColumns - $mod, max(0, $totalPosts - $perPage));
+            }
+        }
+    }
+    $firstPageTake = $perPage + $firstPageExtra;
+    $remainingAfterFirst = max(0, $totalPosts - $firstPageTake);
+    $totalPages = 1 + ($remainingAfterFirst > 0 ? (int) ceil($remainingAfterFirst / $perPage) : 0);
     if ($currentPage > $totalPages) {
         $currentPage = $totalPages;
     }
-    $offset = max(0, ($currentPage - 1) * $perPage);
-    $paginatedPosts = array_slice($posts, $offset, $perPage);
+    if ($currentPage === 1) {
+        $paginatedPosts = array_slice($posts, 0, $firstPageTake);
+    } else {
+        $offset = $firstPageTake + ($currentPage - 2) * $perPage;
+        $paginatedPosts = array_slice($posts, $offset, $perPage);
+    }
 } else {
     $currentPage = 1;
 }

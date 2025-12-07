@@ -45,6 +45,7 @@
                             if ($homeFirstRowColumns < 1 || $homeFirstRowColumns > 3) {
                                 $homeFirstRowColumns = $homeColumns;
                             }
+                            $homeFirstRowFill = (($templateHome['first_row_fill'] ?? $defaults['home']['first_row_fill'] ?? 'off') === 'on');
                             $homePerPageValue = $templateHome['per_page'] ?? $defaults['home']['per_page'];
                             $homePerPageNumeric = is_numeric($homePerPageValue) ? (int) $homePerPageValue : '';
                             $homePerPageAll = !is_numeric($homePerPageValue) || $homePerPageValue === 'all';
@@ -251,6 +252,19 @@
                                             <?php endforeach; ?>
                                         </div>
                                         <small class="form-text text-muted">Si lo desactivas, la portada usará el número de columnas general en todas las filas.</small>
+                                    </div>
+
+                                    <div class="form-group" data-first-row-fill <?= $homeFirstRowEnabled ? '' : 'style="display:none;"' ?>>
+                                        <label>¿Cuadrar la última fila de la portada para que no queden huecos?</label>
+                                        <div class="custom-control custom-radio">
+                                            <input type="radio" id="home_first_row_fill_on" name="home_first_row_fill" value="on" class="custom-control-input" <?= $homeFirstRowFill ? 'checked' : '' ?>>
+                                            <label class="custom-control-label" for="home_first_row_fill_on">Sí, completar la última fila</label>
+                                        </div>
+                                        <div class="custom-control custom-radio">
+                                            <input type="radio" id="home_first_row_fill_off" name="home_first_row_fill" value="off" class="custom-control-input" <?= !$homeFirstRowFill ? 'checked' : '' ?>>
+                                            <label class="custom-control-label" for="home_first_row_fill_off">No, mantener la cuadrícula tal cual</label>
+                                        </div>
+                                        <small class="form-text text-muted">Al activarlo, añadiremos entradas en la última fila para evitar huecos cuando la primera fila tenga un ancho distinto.</small>
                                     </div>
 
                                     <div class="form-group">

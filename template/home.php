@@ -48,6 +48,7 @@ $homeFirstRowColumns = (int) ($homeSettings['first_row_columns'] ?? $columns);
 if ($homeFirstRowColumns < 1 || $homeFirstRowColumns > 3) {
     $homeFirstRowColumns = $columns;
 }
+$homeFirstRowFill = (($homeSettings['first_row_fill'] ?? 'off') === 'on');
 $pagination = $pagination ?? null;
 $hasPagination = is_array($pagination) && ($pagination['total'] ?? 1) > 1;
 $currentPage = 1;
@@ -379,6 +380,17 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         if ($allowFirstRow && !empty($posts)) {
             $firstRowPosts = array_slice($posts, 0, $homeFirstRowColumns);
             $remainingPosts = array_slice($posts, $homeFirstRowColumns);
+            if ($homeFirstRowFill && !empty($remainingPosts)) {
+                $mod = count($remainingPosts) % $columns;
+                if ($columns > 0 && $mod !== 0) {
+                    $needed = $columns - $mod;
+                    $cycleSource = $remainingPosts;
+                    $sourceCount = count($cycleSource);
+                    for ($i = 0; $i < $needed && $sourceCount > 0; $i++) {
+                        $remainingPosts[] = $cycleSource[$i % $sourceCount];
+                    }
+                }
+            }
         }
     ?>
     <?php if (!empty($firstRowPosts)): ?>
@@ -669,6 +681,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     .post-grid {
         display: grid;
         gap: 1.5rem;
+        margin-bottom: 1.2rem;
     }
     .post-grid.columns-1 {
         grid-template-columns: minmax(0, 1fr);

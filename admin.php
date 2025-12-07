@@ -1414,6 +1414,7 @@ function get_default_template_settings(): array {
             'columns' => 2,
             'first_row_enabled' => 'off',
             'first_row_columns' => 2,
+            'first_row_fill' => 'off',
             'per_page' => 'all',
             'card_style' => 'full',
             'blocks' => 'boxed',
@@ -2917,6 +2918,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($homeFirstRowColumns, [1, 2, 3], true)) {
             $homeFirstRowColumns = $homeColumnsPosted;
         }
+        $homeFirstRowFill = $_POST['home_first_row_fill'] ?? ($defaults['home']['first_row_fill'] ?? 'off');
+        $homeFirstRowFill = $homeFirstRowFill === 'on' ? 'on' : 'off';
         $homeAllToggle = isset($_POST['home_per_page_all']) && $_POST['home_per_page_all'] === '1';
         $homePerPageRaw = trim($_POST['home_per_page'] ?? '');
         if ($homeAllToggle || $homePerPageRaw === '') {
@@ -3020,6 +3023,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'columns' => $homeColumnsPosted,
                 'first_row_enabled' => $homeFirstRowEnabled ? 'on' : 'off',
                 'first_row_columns' => $homeFirstRowColumns,
+                'first_row_fill' => $homeFirstRowFill,
                 'per_page' => $homePerPageValue,
                 'card_style' => $homeCardStylePosted,
                 'full_image_mode' => $homeFullImageModePosted,
@@ -5408,11 +5412,53 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     var checked = entryTocToggle.querySelector('input[name="entry_toc_auto"]:checked');
                     var shouldShow = checked && checked.value === 'on';
                     entryTocOptions.style.display = shouldShow ? '' : 'none';
+            }
+            entryTocToggle.querySelectorAll('input[name="entry_toc_auto"]').forEach(function(radio) {
+                radio.addEventListener('change', refreshEntryTocOptions);
+            });
+            refreshEntryTocOptions();
+
+            var firstRowToggle = form.querySelector('#home_first_row_enabled');
+            var firstRowOptions = form.querySelector('[data-first-row-options]');
+            var firstRowFill = form.querySelector('[data-first-row-fill]');
+            function toggleFirstRowOptions() {
+                var show = firstRowToggle && firstRowToggle.checked;
+                if (firstRowOptions) {
+                    firstRowOptions.style.display = show ? '' : 'none';
                 }
-                entryTocToggle.querySelectorAll('input[name="entry_toc_auto"]').forEach(function(radio) {
-                    radio.addEventListener('change', refreshEntryTocOptions);
+                if (firstRowFill) {
+                    firstRowFill.style.display = show ? '' : 'none';
+                }
+                if (!show && firstRowOptions) {
+                    var mainChecked = form.querySelector('input[name=\"home_columns\"]:checked');
+                    var firstRowRadios = firstRowOptions.querySelectorAll('input[name=\"home_first_row_columns\"]');
+                    if (mainChecked) {
+                        firstRowRadios.forEach(function(radio) {
+                            var isActive = radio.value === mainChecked.value;
+                            radio.checked = isActive;
+                            var label = radio.closest('.home-layout-option');
+                            if (label) {
+                                label.classList.toggle('active', isActive);
+                            }
+                        });
+                    }
+                }
+            }
+            if (firstRowToggle) {
+                firstRowToggle.addEventListener('change', toggleFirstRowOptions);
+            }
+            if (firstRowOptions) {
+                var firstRowRadios = firstRowOptions.querySelectorAll('input[name=\"home_first_row_columns\"]');
+                firstRowRadios.forEach(function(radio) {
+                    radio.addEventListener('change', function() {
+                        firstRowOptions.querySelectorAll('.home-layout-option').forEach(function(opt) {
+                            var r = opt.querySelector('input[type=\"radio\"]');
+                            opt.classList.toggle('active', r && r.checked);
+                        });
+                    });
                 });
-                refreshEntryTocOptions();
+            }
+            toggleFirstRowOptions();
             }
 
             var postsInput = document.getElementById('home_per_page');

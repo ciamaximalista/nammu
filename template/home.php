@@ -680,8 +680,8 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     }
     .post-grid {
         display: grid;
-        gap: 1.5rem;
-        margin-bottom: 1.2rem;
+        gap: 1.6rem;
+        margin-bottom: 1.6rem;
     }
     .post-grid.columns-1 {
         grid-template-columns: minmax(0, 1fr);

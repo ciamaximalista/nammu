@@ -699,6 +699,9 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         margin-left: auto;
         margin-right: auto;
     }
+    .post-grid.first-row-center.columns-1 .post-card h2 {
+        font-size: clamp(1.8rem, 3.6vw, 2.4rem);
+    }
     .post-grid.columns-1 {
         grid-template-columns: minmax(0, 1fr);
     }

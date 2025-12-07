@@ -43,8 +43,17 @@ $columns = (int) ($homeSettings['columns'] ?? 2);
 if ($columns < 1 || $columns > 3) {
     $columns = 2;
 }
+$homeFirstRowEnabled = (($homeSettings['first_row_enabled'] ?? 'off') === 'on');
+$homeFirstRowColumns = (int) ($homeSettings['first_row_columns'] ?? $columns);
+if ($homeFirstRowColumns < 1 || $homeFirstRowColumns > 3) {
+    $homeFirstRowColumns = $columns;
+}
 $pagination = $pagination ?? null;
 $hasPagination = is_array($pagination) && ($pagination['total'] ?? 1) > 1;
+$currentPage = 1;
+if (is_array($pagination) && isset($pagination['current']) && (int) $pagination['current'] > 0) {
+    $currentPage = (int) $pagination['current'];
+}
 $baseHref = $baseUrl ?? '/';
 $cardStyle = $homeSettings['card_style'] ?? 'full';
 $cardStyle = in_array($cardStyle, ['full', 'square-right', 'square-tall-right', 'circle-right'], true) ? $cardStyle : 'full';
@@ -363,16 +372,34 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         </section>
     <?php endforeach; ?>
 <?php elseif (!empty($posts)): ?>
-    <section class="post-grid columns-<?= $columns ?> blocks-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?>">
-        <?= $renderPostCards($posts, false) ?>
-    </section>
+    <?php
+        $firstRowPosts = [];
+        $remainingPosts = $posts;
+        $allowFirstRow = $homeFirstRowEnabled && $currentPage === 1;
+        if ($allowFirstRow && !empty($posts)) {
+            $firstRowPosts = array_slice($posts, 0, $homeFirstRowColumns);
+            $remainingPosts = array_slice($posts, $homeFirstRowColumns);
+        }
+    ?>
+    <?php if (!empty($firstRowPosts)): ?>
+        <section class="post-grid columns-<?= $homeFirstRowColumns ?> blocks-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?>">
+            <?= $renderPostCards($firstRowPosts, false) ?>
+        </section>
+    <?php endif; ?>
+    <?php if (!empty($remainingPosts)): ?>
+        <section class="post-grid columns-<?= $columns ?> blocks-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?>">
+            <?= $renderPostCards($remainingPosts, false) ?>
+        </section>
+    <?php endif; ?>
+    <?php if (empty($firstRowPosts) && empty($remainingPosts)): ?>
+        <p>No hay publicaciones disponibles todavía.</p>
+    <?php endif; ?>
 <?php else: ?>
     <p>No hay publicaciones disponibles todavía.</p>
 <?php endif; ?>
 
 <?php if ($hasPagination): ?>
     <?php
-    $currentPage = (int) ($pagination['current'] ?? 1);
     $totalPages = (int) ($pagination['total'] ?? 1);
     $hasPrev = !empty($pagination['has_prev']) && $currentPage > 1;
     $hasNext = !empty($pagination['has_next']) && $currentPage < $totalPages;

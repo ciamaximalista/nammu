@@ -40,6 +40,11 @@
                             if ($homeColumns < 1 || $homeColumns > 3) {
                                 $homeColumns = $defaults['home']['columns'];
                             }
+                            $homeFirstRowEnabled = (($templateHome['first_row_enabled'] ?? $defaults['home']['first_row_enabled'] ?? 'off') === 'on');
+                            $homeFirstRowColumns = (int)($templateHome['first_row_columns'] ?? $defaults['home']['first_row_columns'] ?? $homeColumns);
+                            if ($homeFirstRowColumns < 1 || $homeFirstRowColumns > 3) {
+                                $homeFirstRowColumns = $homeColumns;
+                            }
                             $homePerPageValue = $templateHome['per_page'] ?? $defaults['home']['per_page'];
                             $homePerPageNumeric = is_numeric($homePerPageValue) ? (int) $homePerPageValue : '';
                             $homePerPageAll = !is_numeric($homePerPageValue) || $homePerPageValue === 'all';

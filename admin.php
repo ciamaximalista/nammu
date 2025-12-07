@@ -1412,6 +1412,8 @@ function get_default_template_settings(): array {
         ],
         'home' => [
             'columns' => 2,
+            'first_row_enabled' => 'off',
+            'first_row_columns' => 2,
             'per_page' => 'all',
             'card_style' => 'full',
             'blocks' => 'boxed',
@@ -5359,6 +5361,45 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
             });
             refreshBlocksSelection();
+
+            var firstRowToggle = document.getElementById('home_first_row_enabled');
+            var firstRowOptions = document.querySelector('[data-first-row-options]');
+            function toggleFirstRowOptions() {
+                if (!firstRowOptions) {
+                    return;
+                }
+                var show = firstRowToggle && firstRowToggle.checked;
+                firstRowOptions.style.display = show ? '' : 'none';
+                if (!show) {
+                    var mainChecked = form.querySelector('input[name="home_columns"]:checked');
+                    var firstRowRadios = firstRowOptions.querySelectorAll('input[name="home_first_row_columns"]');
+                    if (mainChecked) {
+                        firstRowRadios.forEach(function(radio) {
+                            var isActive = radio.value === mainChecked.value;
+                            radio.checked = isActive;
+                            var label = radio.closest('.home-layout-option');
+                            if (label) {
+                                label.classList.toggle('active', isActive);
+                            }
+                        });
+                    }
+                }
+            }
+            if (firstRowToggle) {
+                firstRowToggle.addEventListener('change', toggleFirstRowOptions);
+            }
+            if (firstRowOptions) {
+                var firstRowRadios = firstRowOptions.querySelectorAll('input[name="home_first_row_columns"]');
+                firstRowRadios.forEach(function(radio) {
+                    radio.addEventListener('change', function() {
+                        firstRowOptions.querySelectorAll('.home-layout-option').forEach(function(opt) {
+                            var r = opt.querySelector('input[type="radio"]');
+                            opt.classList.toggle('active', r && r.checked);
+                        });
+                    });
+                });
+            }
+            toggleFirstRowOptions();
 
             var entryTocToggle = form.querySelector('[data-entry-toc-toggle]');
             var entryTocOptions = form.querySelector('[data-entry-toc-options]');

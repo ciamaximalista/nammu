@@ -50,6 +50,7 @@
                         <div class="form-group">
                             <label for="topic_slug">Slug</label>
                             <input type="text" name="topic_slug" id="topic_slug" class="form-control" data-slug-input="1" pattern="[a-z0-9-]+" title="Usa solo letras minúsculas, números y guiones (-)" value="<?= htmlspecialchars($topicFormData['slug'], ENT_QUOTES, 'UTF-8') ?>" placeholder="tema-1">
+                            <small class="form-text text-muted">Si lo dejas vacío se generará automáticamente a partir del título.</small>
                         </div>
                         <div class="form-group">
                             <label for="topic_number">Tema nº</label>

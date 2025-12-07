@@ -114,7 +114,6 @@
                    name="filename"
                    id="filename"
                    class="form-control"
-                   required
                    pattern="[a-z0-9-]+"
                    inputmode="text"
                    autocomplete="off"
@@ -122,6 +121,7 @@
                    spellcheck="false"
                    data-slug-input="1"
                    placeholder="mi-slug">
+            <small class="form-text text-muted">Si lo dejas vacío se generará automáticamente a partir del título.</small>
 
         </div>
 

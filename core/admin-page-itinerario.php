@@ -97,7 +97,7 @@
                             <div class="form-group">
                                 <label for="itinerary_slug">Slug</label>
                                 <input type="text" name="itinerary_slug" id="itinerary_slug" class="form-control" data-slug-input="1" pattern="[a-z0-9-]+" title="Usa solo letras minúsculas, números y guiones (-)" value="<?= htmlspecialchars($itineraryFormData['slug'], ENT_QUOTES, 'UTF-8') ?>" placeholder="mi-itinerario">
-                                <small class="form-text text-muted">Usaremos este valor para la carpeta y la URL pública.</small>
+                                <small class="form-text text-muted">Si lo dejas vacío lo generaremos automáticamente a partir del título.</small>
                             </div>
                             <div class="form-group">
                                 <label for="itinerary_image">Imagen destacada</label>

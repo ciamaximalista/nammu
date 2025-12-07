@@ -1736,7 +1736,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($filenameInput === '' && $title !== '') {
-            $filenameInput = $title;
+            $filenameInput = nammu_slugify($title);
         }
 
         if ($error === null) {
@@ -1877,6 +1877,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $renameRequested = $targetFilename !== $normalizedFilename;
                 }
             }
+        } elseif ($error === null && $newFilenameInput === '' && $normalizedFilename === '' && $title !== '') {
+            $autoSlug = nammu_slugify($title);
+            if ($autoSlug === '') {
+                $autoSlug = 'entrada';
+            }
+            $targetFilename = nammu_unique_filename($autoSlug);
         }
 
         if ($targetFilename === '') {

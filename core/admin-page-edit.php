@@ -334,7 +334,7 @@
                        spellcheck="false"
                        data-slug-input="1"
                        value="<?= htmlspecialchars(pathinfo($safeEditFilename, PATHINFO_FILENAME), ENT_QUOTES, 'UTF-8') ?>">
-                <small class="form-text text-muted">Opcional. Úsalo para cambiar la URL del contenido.</small>
+                <small class="form-text text-muted">Opcional. Déjalo vacío para recalcular el slug a partir del título.</small>
             </div>
 
             <div class="mt-3">

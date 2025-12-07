@@ -30,7 +30,11 @@ $siteTitle = $siteDocument['metadata']['Title'] ?? 'Nammu Blog';
 $siteDescription = $siteDocument['metadata']['Description'] ?? '';
 $siteBio = $siteDocument['content'] ?? '';
 
-$baseUrl = nammu_base_url();
+$configBaseUrl = $config['site_url'] ?? '';
+if (is_string($configBaseUrl)) {
+    $configBaseUrl = rtrim(trim($configBaseUrl), '/');
+}
+$baseUrl = $configBaseUrl !== '' ? $configBaseUrl : nammu_base_url();
 $publicBaseUrl = $baseUrl;
 $homeUrl = $publicBaseUrl !== '' ? $publicBaseUrl : '/';
 $rssUrl = ($publicBaseUrl !== '' ? $publicBaseUrl : '') . '/rss.xml';

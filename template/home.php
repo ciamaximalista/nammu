@@ -384,10 +384,11 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
                 $mod = count($remainingPosts) % $columns;
                 if ($columns > 0 && $mod !== 0) {
                     $needed = $columns - $mod;
-                    $cycleSource = $remainingPosts;
-                    $sourceCount = count($cycleSource);
+                    $sourceCount = count($remainingPosts);
                     for ($i = 0; $i < $needed && $sourceCount > 0; $i++) {
-                        $remainingPosts[] = $cycleSource[$i % $sourceCount];
+                        // Usa los más antiguos de la página para completar sin alterar el orden cronológico
+                        $index = $sourceCount - 1 - ($i % $sourceCount);
+                        $remainingPosts[] = $remainingPosts[$index];
                     }
                 }
             }

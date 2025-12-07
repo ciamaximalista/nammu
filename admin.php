@@ -1418,6 +1418,7 @@ function get_default_template_settings(): array {
             'first_row_columns' => 2,
             'first_row_fill' => 'off',
             'first_row_align' => 'left',
+            'first_row_style' => 'inherit',
             'per_page' => 'all',
             'card_style' => 'full',
             'blocks' => 'boxed',
@@ -2933,6 +2934,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($homeFirstRowAlign, ['left', 'center'], true)) {
             $homeFirstRowAlign = 'left';
         }
+        $homeFirstRowStyle = $_POST['home_first_row_style'] ?? ($defaults['home']['first_row_style'] ?? 'inherit');
+        if (!in_array($homeFirstRowStyle, ['inherit', 'boxed', 'flat'], true)) {
+            $homeFirstRowStyle = 'inherit';
+        }
         $homeAllToggle = isset($_POST['home_per_page_all']) && $_POST['home_per_page_all'] === '1';
         $homePerPageRaw = trim($_POST['home_per_page'] ?? '');
         if ($homeAllToggle || $homePerPageRaw === '') {
@@ -3038,6 +3043,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'first_row_columns' => $homeFirstRowColumns,
                 'first_row_fill' => $homeFirstRowFill,
                 'first_row_align' => $homeFirstRowAlign,
+                'first_row_style' => $homeFirstRowStyle,
                 'per_page' => $homePerPageValue,
                 'card_style' => $homeCardStylePosted,
                 'full_image_mode' => $homeFullImageModePosted,
@@ -5384,6 +5390,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var firstRowOptions = document.querySelector('[data-first-row-options]');
             var firstRowFill = document.querySelector('[data-first-row-fill]');
             var firstRowAlign = document.querySelector('[data-first-row-align]');
+            var firstRowStyle = document.querySelector('[data-first-row-style]');
             function toggleFirstRowOptions() {
                 var show = firstRowToggle && firstRowToggle.checked;
                 if (firstRowOptions) {
@@ -5396,6 +5403,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     var colsRadio = firstRowOptions ? firstRowOptions.querySelector('input[name="home_first_row_columns"]:checked') : null;
                     var showAlign = show && colsRadio && parseInt(colsRadio.value, 10) === 1;
                     firstRowAlign.style.display = showAlign ? '' : 'none';
+                }
+                if (firstRowStyle) {
+                    var colsRadioStyle = firstRowOptions ? firstRowOptions.querySelector('input[name="home_first_row_columns"]:checked') : null;
+                    var showStyle = show && colsRadioStyle && parseInt(colsRadioStyle.value, 10) === 1;
+                    firstRowStyle.style.display = showStyle ? '' : 'none';
                 }
                 if (!show && firstRowOptions) {
                     var mainChecked = form.querySelector('input[name="home_columns"]:checked');

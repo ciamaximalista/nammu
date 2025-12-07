@@ -50,6 +50,10 @@
                             if (!in_array($homeFirstRowAlign, ['left', 'center'], true)) {
                                 $homeFirstRowAlign = 'left';
                             }
+                            $homeFirstRowStyle = $templateHome['first_row_style'] ?? ($defaults['home']['first_row_style'] ?? 'inherit');
+                            if (!in_array($homeFirstRowStyle, ['inherit', 'boxed', 'flat'], true)) {
+                                $homeFirstRowStyle = 'inherit';
+                            }
                             $homePerPageValue = $templateHome['per_page'] ?? $defaults['home']['per_page'];
                             $homePerPageNumeric = is_numeric($homePerPageValue) ? (int) $homePerPageValue : '';
                             $homePerPageAll = !is_numeric($homePerPageValue) || $homePerPageValue === 'all';
@@ -280,6 +284,22 @@
                                         <div class="custom-control custom-radio">
                                             <input type="radio" id="home_first_row_align_center" name="home_first_row_align" value="center" class="custom-control-input" <?= $homeFirstRowAlign === 'center' ? 'checked' : '' ?>>
                                             <label class="custom-control-label" for="home_first_row_align_center">Centrado</label>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group" data-first-row-style <?= ($homeFirstRowEnabled && $homeFirstRowColumns === 1) ? '' : 'style="display:none;"' ?>>
+                                        <label>Estilo de la tarjeta de la primera fila</label>
+                                        <div class="custom-control custom-radio">
+                                            <input type="radio" id="home_first_row_style_inherit" name="home_first_row_style" value="inherit" class="custom-control-input" <?= $homeFirstRowStyle === 'inherit' ? 'checked' : '' ?>>
+                                            <label class="custom-control-label" for="home_first_row_style_inherit">Usar el estilo general</label>
+                                        </div>
+                                        <div class="custom-control custom-radio">
+                                            <input type="radio" id="home_first_row_style_boxed" name="home_first_row_style" value="boxed" class="custom-control-input" <?= $homeFirstRowStyle === 'boxed' ? 'checked' : '' ?>>
+                                            <label class="custom-control-label" for="home_first_row_style_boxed">En caja</label>
+                                        </div>
+                                        <div class="custom-control custom-radio">
+                                            <input type="radio" id="home_first_row_style_flat" name="home_first_row_style" value="flat" class="custom-control-input" <?= $homeFirstRowStyle === 'flat' ? 'checked' : '' ?>>
+                                            <label class="custom-control-label" for="home_first_row_style_flat">Sin caja (flat)</label>
                                         </div>
                                     </div>
 

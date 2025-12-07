@@ -53,6 +53,10 @@ $homeFirstRowAlign = $homeSettings['first_row_align'] ?? 'left';
 if (!in_array($homeFirstRowAlign, ['left', 'center'], true)) {
     $homeFirstRowAlign = 'left';
 }
+$homeFirstRowStyle = $homeSettings['first_row_style'] ?? 'inherit';
+if (!in_array($homeFirstRowStyle, ['inherit', 'boxed', 'flat'], true)) {
+    $homeFirstRowStyle = 'inherit';
+}
 $pagination = $pagination ?? null;
 $hasPagination = is_array($pagination) && ($pagination['total'] ?? 1) > 1;
 $currentPage = 1;
@@ -399,8 +403,20 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         }
     ?>
     <?php if (!empty($firstRowPosts)): ?>
-        <?php $firstRowClass = ($homeFirstRowColumns === 1 && $homeFirstRowAlign === 'center') ? ' first-row-center' : ''; ?>
-        <section class="post-grid columns-<?= $homeFirstRowColumns ?> blocks-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?><?= htmlspecialchars($firstRowClass, ENT_QUOTES, 'UTF-8') ?>">
+        <?php
+            $firstRowClasses = [];
+            if ($homeFirstRowColumns === 1 && $homeFirstRowAlign === 'center') {
+                $firstRowClasses[] = 'first-row-center';
+            }
+            if ($homeFirstRowStyle === 'flat') {
+                $firstRowClasses[] = 'first-row-flat';
+            } elseif ($homeFirstRowStyle === 'boxed') {
+                $firstRowClasses[] = 'first-row-boxed';
+            }
+            $firstRowClassAttr = count($firstRowClasses) ? ' ' . htmlspecialchars(implode(' ', $firstRowClasses), ENT_QUOTES, 'UTF-8') : '';
+            $firstRowBlocksMode = $homeFirstRowStyle === 'inherit' ? $blocksMode : ($homeFirstRowStyle === 'flat' ? 'flat' : 'boxed');
+        ?>
+        <section class="post-grid columns-<?= $homeFirstRowColumns ?> blocks-<?= htmlspecialchars($firstRowBlocksMode, ENT_QUOTES, 'UTF-8') ?><?= $firstRowClassAttr ?>">
             <?= $renderPostCards($firstRowPosts, false) ?>
         </section>
     <?php endif; ?>

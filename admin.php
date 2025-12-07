@@ -1417,6 +1417,7 @@ function get_default_template_settings(): array {
             'first_row_enabled' => 'off',
             'first_row_columns' => 2,
             'first_row_fill' => 'off',
+            'first_row_align' => 'left',
             'per_page' => 'all',
             'card_style' => 'full',
             'blocks' => 'boxed',
@@ -2928,6 +2929,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $homeFirstRowFill = $_POST['home_first_row_fill'] ?? ($defaults['home']['first_row_fill'] ?? 'off');
         $homeFirstRowFill = $homeFirstRowFill === 'on' ? 'on' : 'off';
+        $homeFirstRowAlign = $_POST['home_first_row_align'] ?? ($defaults['home']['first_row_align'] ?? 'left');
+        if (!in_array($homeFirstRowAlign, ['left', 'center'], true)) {
+            $homeFirstRowAlign = 'left';
+        }
         $homeAllToggle = isset($_POST['home_per_page_all']) && $_POST['home_per_page_all'] === '1';
         $homePerPageRaw = trim($_POST['home_per_page'] ?? '');
         if ($homeAllToggle || $homePerPageRaw === '') {
@@ -3032,6 +3037,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'first_row_enabled' => $homeFirstRowEnabled ? 'on' : 'off',
                 'first_row_columns' => $homeFirstRowColumns,
                 'first_row_fill' => $homeFirstRowFill,
+                'first_row_align' => $homeFirstRowAlign,
                 'per_page' => $homePerPageValue,
                 'card_style' => $homeCardStylePosted,
                 'full_image_mode' => $homeFullImageModePosted,
@@ -5376,13 +5382,22 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
             var firstRowToggle = document.getElementById('home_first_row_enabled');
             var firstRowOptions = document.querySelector('[data-first-row-options]');
+            var firstRowFill = document.querySelector('[data-first-row-fill]');
+            var firstRowAlign = document.querySelector('[data-first-row-align]');
             function toggleFirstRowOptions() {
-                if (!firstRowOptions) {
-                    return;
-                }
                 var show = firstRowToggle && firstRowToggle.checked;
-                firstRowOptions.style.display = show ? '' : 'none';
-                if (!show) {
+                if (firstRowOptions) {
+                    firstRowOptions.style.display = show ? '' : 'none';
+                }
+                if (firstRowFill) {
+                    firstRowFill.style.display = show ? '' : 'none';
+                }
+                if (firstRowAlign) {
+                    var colsRadio = firstRowOptions ? firstRowOptions.querySelector('input[name="home_first_row_columns"]:checked') : null;
+                    var showAlign = show && colsRadio && parseInt(colsRadio.value, 10) === 1;
+                    firstRowAlign.style.display = showAlign ? '' : 'none';
+                }
+                if (!show && firstRowOptions) {
                     var mainChecked = form.querySelector('input[name="home_columns"]:checked');
                     var firstRowRadios = firstRowOptions.querySelectorAll('input[name="home_first_row_columns"]');
                     if (mainChecked) {
@@ -5408,6 +5423,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             var r = opt.querySelector('input[type="radio"]');
                             opt.classList.toggle('active', r && r.checked);
                         });
+                        toggleFirstRowOptions();
                     });
                 });
             }

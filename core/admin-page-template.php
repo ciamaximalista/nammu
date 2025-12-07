@@ -46,6 +46,10 @@
                                 $homeFirstRowColumns = $homeColumns;
                             }
                             $homeFirstRowFill = (($templateHome['first_row_fill'] ?? $defaults['home']['first_row_fill'] ?? 'off') === 'on');
+                            $homeFirstRowAlign = $templateHome['first_row_align'] ?? ($defaults['home']['first_row_align'] ?? 'left');
+                            if (!in_array($homeFirstRowAlign, ['left', 'center'], true)) {
+                                $homeFirstRowAlign = 'left';
+                            }
                             $homePerPageValue = $templateHome['per_page'] ?? $defaults['home']['per_page'];
                             $homePerPageNumeric = is_numeric($homePerPageValue) ? (int) $homePerPageValue : '';
                             $homePerPageAll = !is_numeric($homePerPageValue) || $homePerPageValue === 'all';
@@ -265,6 +269,18 @@
                                             <label class="custom-control-label" for="home_first_row_fill_off">No, mantener la cuadrícula tal cual</label>
                                         </div>
                                         <small class="form-text text-muted">Al activarlo, añadiremos entradas en la última fila para evitar huecos cuando la primera fila tenga un ancho distinto.</small>
+                                    </div>
+
+                                    <div class="form-group" data-first-row-align <?= ($homeFirstRowEnabled && $homeFirstRowColumns === 1) ? '' : 'style="display:none;"' ?>>
+                                        <label>Alineación del titular y texto de la primera fila</label>
+                                        <div class="custom-control custom-radio">
+                                            <input type="radio" id="home_first_row_align_left" name="home_first_row_align" value="left" class="custom-control-input" <?= $homeFirstRowAlign === 'left' ? 'checked' : '' ?>>
+                                            <label class="custom-control-label" for="home_first_row_align_left">Izquierda (por defecto)</label>
+                                        </div>
+                                        <div class="custom-control custom-radio">
+                                            <input type="radio" id="home_first_row_align_center" name="home_first_row_align" value="center" class="custom-control-input" <?= $homeFirstRowAlign === 'center' ? 'checked' : '' ?>>
+                                            <label class="custom-control-label" for="home_first_row_align_center">Centrado</label>
+                                        </div>
                                     </div>
 
                                     <div class="form-group">

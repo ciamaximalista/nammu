@@ -49,6 +49,10 @@ if ($homeFirstRowColumns < 1 || $homeFirstRowColumns > 3) {
     $homeFirstRowColumns = $columns;
 }
 $homeFirstRowFill = (($homeSettings['first_row_fill'] ?? 'off') === 'on');
+$homeFirstRowAlign = $homeSettings['first_row_align'] ?? 'left';
+if (!in_array($homeFirstRowAlign, ['left', 'center'], true)) {
+    $homeFirstRowAlign = 'left';
+}
 $pagination = $pagination ?? null;
 $hasPagination = is_array($pagination) && ($pagination['total'] ?? 1) > 1;
 $currentPage = 1;
@@ -395,7 +399,8 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         }
     ?>
     <?php if (!empty($firstRowPosts)): ?>
-        <section class="post-grid columns-<?= $homeFirstRowColumns ?> blocks-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?>">
+        <?php $firstRowClass = ($homeFirstRowColumns === 1 && $homeFirstRowAlign === 'center') ? ' first-row-center' : ''; ?>
+        <section class="post-grid columns-<?= $homeFirstRowColumns ?> blocks-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?><?= htmlspecialchars($firstRowClass, ENT_QUOTES, 'UTF-8') ?>">
             <?= $renderPostCards($firstRowPosts, false) ?>
         </section>
     <?php endif; ?>
@@ -683,6 +688,16 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         display: grid;
         gap: 1.6rem;
         margin-bottom: 1.6rem;
+    }
+    .post-grid.first-row-center .post-card,
+    .post-grid.first-row-center .post-card h2,
+    .post-grid.first-row-center .post-meta,
+    .post-grid.first-row-center .post-description {
+        text-align: center;
+    }
+    .post-grid.first-row-center .post-card .post-thumb {
+        margin-left: auto;
+        margin-right: auto;
     }
     .post-grid.columns-1 {
         grid-template-columns: minmax(0, 1fr);

@@ -63,6 +63,12 @@
             </div>
 
             <div class="form-group">
+                <label for="site_url">URL pública (opcional)</label>
+                <input type="url" name="site_url" id="site_url" class="form-control" value="<?= htmlspecialchars($settings['site_url'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="https://tusitio.com">
+                <small class="form-text text-muted">Úsala para fijar la URL del sitio en los feeds RSS y enlaces absolutos. Déjala vacía para usar automáticamente el host de la petición.</small>
+            </div>
+
+            <div class="form-group">
 
                 <label for="google_fonts_api">API Key de Google Fonts</label>
 

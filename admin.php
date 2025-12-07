@@ -2726,6 +2726,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $google_fonts_api = trim($_POST['google_fonts_api'] ?? '');
         $site_author = trim($_POST['site_author'] ?? '');
         $site_name = trim($_POST['site_name'] ?? '');
+        $site_url = trim($_POST['site_url'] ?? '');
 
         try {
             $config = load_config_file();
@@ -2749,6 +2750,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $config['site_name'] = $site_name;
             } else {
                 unset($config['site_name']);
+            }
+            if ($site_url !== '') {
+                $config['site_url'] = $site_url;
+            } else {
+                unset($config['site_url']);
             }
 
             save_config_file($config);

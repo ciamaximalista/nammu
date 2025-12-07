@@ -80,11 +80,6 @@ sudo find /var/www/html/<carpeta-publica> -type f -exec chmod 664 {} \;
 
 Sustituye `<tu-usuario>` y `<carpeta-publica>` según tu entorno. Usa el grupo del proceso web (www-data, apache, nginx…).
 
-Si quieres fijar la URL pública (por ejemplo, sin `www`), añade en `config/config.yml`:
-```yaml
-site_url: "https://tusitio.com"
-```
-De lo contrario, Nammu usará automáticamente el host de la petición para generar `rss.xml`, `itinerarios.xml` y enlaces absolutos.
 
 ## Actualización
 

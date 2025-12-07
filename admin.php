@@ -2910,6 +2910,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($homeColumnsPosted, [1, 2, 3], true)) {
             $homeColumnsPosted = $defaults['home']['columns'];
         }
+        $homeFirstRowEnabled = isset($_POST['home_first_row_enabled']) && $_POST['home_first_row_enabled'] === '1';
+        $homeFirstRowColumns = isset($_POST['home_first_row_columns']) ? (int) $_POST['home_first_row_columns'] : ($defaults['home']['first_row_columns'] ?? $homeColumnsPosted);
+        if (!in_array($homeFirstRowColumns, [1, 2, 3], true)) {
+            $homeFirstRowColumns = $homeColumnsPosted;
+        }
         $homeAllToggle = isset($_POST['home_per_page_all']) && $_POST['home_per_page_all'] === '1';
         $homePerPageRaw = trim($_POST['home_per_page'] ?? '');
         if ($homeAllToggle || $homePerPageRaw === '') {
@@ -3011,6 +3016,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ],
             'home' => [
                 'columns' => $homeColumnsPosted,
+                'first_row_enabled' => $homeFirstRowEnabled ? 'on' : 'off',
+                'first_row_columns' => $homeFirstRowColumns,
                 'per_page' => $homePerPageValue,
                 'card_style' => $homeCardStylePosted,
                 'full_image_mode' => $homeFullImageModePosted,

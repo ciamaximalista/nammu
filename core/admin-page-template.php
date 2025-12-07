@@ -219,6 +219,36 @@
                                     </div>
 
                                     <div class="form-group">
+                                        <label for="home_first_row_enabled">¿La primera fila de entradas debe ser diferente?</label>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="home_first_row_enabled" id="home_first_row_enabled" value="1" <?= $homeFirstRowEnabled ? 'checked' : '' ?>>
+                                            <label class="form-check-label" for="home_first_row_enabled">Sí, quiero personalizar la primera fila</label>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group" data-first-row-options <?= $homeFirstRowEnabled ? '' : 'style="display:none;"' ?>>
+                                        <label>Entradas en la primera fila</label>
+                                        <div class="home-layout-options">
+                                            <?php foreach ([1, 2, 3] as $cols): ?>
+                                                <?php $isActive = ($homeFirstRowColumns === $cols); ?>
+                                                <label class="home-layout-option <?= $isActive ? 'active' : '' ?>">
+                                                    <input type="radio"
+                                                        name="home_first_row_columns"
+                                                        value="<?= $cols ?>"
+                                                        <?= $isActive ? 'checked' : '' ?>>
+                                                    <span class="layout-figure columns-<?= $cols ?>">
+                                                        <?php for ($i = 0; $i < $cols; $i++): ?>
+                                                            <span class="layout-cell"></span>
+                                                        <?php endfor; ?>
+                                                    </span>
+                                                    <span class="layout-caption"><?= $cols ?> <?= $cols === 1 ? 'entrada' : 'entradas' ?></span>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        </div>
+                                        <small class="form-text text-muted">Si lo desactivas, la portada usará el número de columnas general en todas las filas.</small>
+                                    </div>
+
+                                    <div class="form-group">
                                         <label>Estilo de las tarjetas</label>
                                         <div class="home-card-style-options">
                                             <?php

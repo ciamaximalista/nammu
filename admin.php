@@ -2652,13 +2652,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $file_to_delete = $_POST['file_to_delete'] ?? '';
         $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
         $redirectSearch = isset($_POST['redirect_search']) ? trim((string) $_POST['redirect_search']) : '';
-        if ($file_to_delete) {
+        $file_to_delete = ltrim((string) $file_to_delete, '/');
+        $feedback = null;
+        if ($file_to_delete !== '' && strpos($file_to_delete, '..') === false) {
             $filepath = ASSETS_DIR . '/' . $file_to_delete;
             if (file_exists($filepath)) {
-                unlink($filepath);
+                if (@unlink($filepath)) {
+                    delete_media_tags_entry($file_to_delete);
+                    $feedback = ['type' => 'success', 'message' => 'Recurso borrado correctamente.'];
+                } else {
+                    $feedback = ['type' => 'warning', 'message' => 'No se pudo borrar el archivo. Revisa permisos.'];
+                }
+            } else {
+                $feedback = ['type' => 'warning', 'message' => 'El recurso ya no existe.'];
             }
-            delete_media_tags_entry($file_to_delete);
+        } else {
+            $feedback = ['type' => 'warning', 'message' => 'Recurso no válido para borrar.'];
         }
+        $_SESSION['asset_feedback'] = $feedback;
         $redirectParams = 'page=resources';
         if ($redirectPage > 1) {
             $redirectParams .= '&p=' . $redirectPage;

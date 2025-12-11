@@ -164,7 +164,9 @@
                                 </button>
                                 <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($resourceUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" style="margin-right: 4px;">Ver</a>
                                 <form method="post" class="mb-0" onsubmit="return confirm('¿Seguro que deseas borrar este recurso?');">
-                                    <input type="hidden" name="delete_resource" value="<?= htmlspecialchars($resource['name'], ENT_QUOTES, 'UTF-8') ?>">
+                                    <input type="hidden" name="delete_asset" value="<?= htmlspecialchars($relativePath, ENT_QUOTES, 'UTF-8') ?>">
+                                    <input type="hidden" name="redirect_p" value="<?= (int) $current_page ?>">
+                                    <input type="hidden" name="redirect_search" value="<?= htmlspecialchars($resourceSearchTerm, ENT_QUOTES, 'UTF-8') ?>">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">Borrar</button>
                                 </form>
                             </div>

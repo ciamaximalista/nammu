@@ -6229,6 +6229,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 if (insertActions.length) {
                     insertActions.addClass('d-none');
                 }
+                if (imageTargetMode === 'uploader') {
+                    // Nada especial, solo aseguramos que la búsqueda queda limpia
+                    return;
+                }
 
             });
 

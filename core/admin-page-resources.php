@@ -89,7 +89,7 @@
                     <?php endif; ?>
                 </form>
             </div>
-            <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#uploadModal">Subir nuevo recurso</button>
+            <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#imageModal" data-target-type="uploader">Subir nuevo recurso</button>
         </div>
 
         <?php if (!empty($resourceSearchTerm)): ?>

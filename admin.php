@@ -2649,7 +2649,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: admin.php?' . $redirectParams);
         exit;
     } elseif (isset($_POST['delete_asset'])) {
-        $file_to_delete = $_POST['file_to_delete'] ?? '';
+        $file_to_delete = $_POST['delete_asset'] ?? ($_POST['file_to_delete'] ?? '');
         $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
         $redirectSearch = isset($_POST['redirect_search']) ? trim((string) $_POST['redirect_search']) : '';
         $file_to_delete = ltrim((string) $file_to_delete, '/');

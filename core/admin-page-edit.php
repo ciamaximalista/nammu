@@ -1,3 +1,10 @@
+<?php
+$editFeedback = $_SESSION['edit_feedback'] ?? null;
+if ($editFeedback !== null) {
+    unset($_SESSION['edit_feedback']);
+}
+?>
+
 <?php if ($page === 'edit'): ?>
 
     <div class="tab-pane active">
@@ -216,6 +223,12 @@
             }
             $isDraftEditing = $currentStatusValue === 'draft';
         ?>
+
+        <?php if ($editFeedback !== null): ?>
+            <div class="alert alert-<?= $editFeedback['type'] === 'success' ? 'success' : 'warning' ?>">
+                <?= htmlspecialchars($editFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
 
         <h2><?= $editHeading ?></h2>
 

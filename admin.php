@@ -1956,7 +1956,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                     $redirectTemplate = $status === 'draft' ? 'draft' : ($template === 'page' ? 'page' : 'single');
-                    header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&updated=' . urlencode($targetFilename));
+                    $feedbackMessage = 'Contenido actualizado correctamente.';
+                    if ($publishDraftAsEntry) {
+                        $feedbackMessage = 'Borrador publicado como entrada.';
+                    } elseif ($publishDraftAsPage) {
+                        $feedbackMessage = 'Borrador publicado como página.';
+                    } elseif ($convertToDraft) {
+                        $feedbackMessage = 'Contenido pasado a borrador.';
+                    }
+                    $_SESSION['edit_feedback'] = [
+                        'type' => 'success',
+                        'message' => $feedbackMessage,
+                    ];
+                    header('Location: admin.php?page=edit-post&file=' . urlencode($targetFilename));
                     exit;
                 } else {
                     $error = 'No se pudo guardar el contenido actualizado. Revisa los permisos de la carpeta content/.';

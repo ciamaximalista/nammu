@@ -394,6 +394,10 @@ if ($isPageTemplate && $formattedDate !== '') {
         margin: 0 auto 1.5rem;
         color: <?= $colorText ?>;
     }
+    .post-body h1 {
+        margin: 2.8rem 0 1.35rem;
+        line-height: 1.15;
+    }
     .post-body p {
         margin-top: 0;
     }

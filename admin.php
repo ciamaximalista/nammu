@@ -1663,6 +1663,146 @@ function nammu_normalize_filename(string $filename, bool $ensureExtension = true
     return $basename;
 }
 
+/**
+ * Guarda automáticamente el contenido del editor (publicar/editar) cuando una acción va a recargar la página.
+ */
+function admin_autosave_from_payload($jsonPayload): array {
+    $result = ['saved' => false, 'filename' => '', 'message' => ''];
+    if (!is_string($jsonPayload) || trim($jsonPayload) === '') {
+        return $result;
+    }
+
+    $decoded = json_decode($jsonPayload, true);
+    if (!is_array($decoded)) {
+        return $result;
+    }
+    $context = $decoded['context'] ?? '';
+    if ($context !== '' && !in_array($context, ['edit', 'publish'], true)) {
+        // Solo autosalvamos posts y páginas; otros contextos se restauran en cliente
+        return $result;
+    }
+    $fields = $decoded['fields'] ?? null;
+    if (!is_array($fields)) {
+        return $result;
+    }
+
+    $title = trim((string) ($fields['title'] ?? ''));
+    $description = trim((string) ($fields['description'] ?? ''));
+    $content = (string) ($fields['content'] ?? '');
+    if ($title === '' && $description === '' && trim($content) === '') {
+        $result['message'] = 'No se guardó ningún borrador porque el editor está vacío.';
+        return $result;
+    }
+
+    $category = trim((string) ($fields['category'] ?? ''));
+    $dateInput = (string) ($fields['date'] ?? '');
+    $timestamp = $dateInput !== '' ? strtotime($dateInput) : time();
+    if ($timestamp === false) {
+        $timestamp = time();
+    }
+    $date = date('Y-m-d', $timestamp);
+    $image = trim((string) ($fields['image'] ?? ''));
+    $type = ($fields['type'] ?? '') === 'Página' ? 'Página' : 'Entrada';
+    $template = $type === 'Página' ? 'page' : 'post';
+    $statusInput = strtolower(trim((string) ($fields['status'] ?? '')));
+    $status = in_array($statusInput, ['draft', 'published'], true) ? $statusInput : 'draft';
+
+    $existingFilename = nammu_normalize_filename((string) ($fields['filename'] ?? ''));
+    $isExistingFile = $existingFilename !== '' && is_file(CONTENT_DIR . '/' . $existingFilename);
+    $targetFilename = $existingFilename;
+    $ordo = 0;
+
+    if ($isExistingFile) {
+        $existing = get_post_content($existingFilename);
+        $existingMeta = $existing['metadata'] ?? [];
+        $ordo = (int) ($existingMeta['Ordo'] ?? 0);
+        if (!in_array($status, ['draft', 'published'], true)) {
+            $status = strtolower($existingMeta['Status'] ?? 'draft');
+            if ($status !== 'draft' && $status !== 'published') {
+                $status = 'draft';
+            }
+        }
+        $template = $type === 'Página' ? 'page' : ($template === 'page' ? 'page' : 'post');
+    } else {
+        $status = 'draft';
+        $slugPattern = '/^[a-z0-9-]+$/i';
+        $slugCandidate = trim((string) ($fields['filename'] ?? ''));
+        $slug = '';
+        if ($slugCandidate !== '' && preg_match($slugPattern, $slugCandidate)) {
+            $slug = nammu_slugify($slugCandidate);
+        }
+        if ($slug === '' && $title !== '') {
+            $slug = nammu_slugify($title);
+        }
+        if ($slug === '') {
+            $slug = 'borrador';
+        }
+        $uniqueSlug = nammu_unique_filename($slug);
+        $targetFilename = nammu_normalize_filename($uniqueSlug . '.md');
+
+        $allPosts = get_all_posts_metadata();
+        $maxOrdo = 0;
+        foreach ($allPosts as $post) {
+            $metaOrdo = isset($post['metadata']['Ordo']) ? (int) $post['metadata']['Ordo'] : 0;
+            if ($metaOrdo > $maxOrdo) {
+                $maxOrdo = $metaOrdo;
+            }
+        }
+        $ordo = $maxOrdo + 1;
+    }
+
+    if ($targetFilename === '') {
+        $result['message'] = 'No se pudo determinar el archivo para guardar el borrador.';
+        return $result;
+    }
+
+    $file_content = "---\n";
+    $file_content .= "Title: " . $title . "\n";
+    $file_content .= "Template: " . $template . "\n";
+    $file_content .= "Category: " . $category . "\n";
+    $file_content .= "Date: " . $date . "\n";
+    $file_content .= "Image: " . $image . "\n";
+    $file_content .= "Description: " . $description . "\n";
+    $file_content .= "Status: " . $status . "\n";
+    $file_content .= "Ordo: " . $ordo . "\n";
+    $file_content .= "---\n\n";
+    $file_content .= $content;
+
+    $finalPath = CONTENT_DIR . '/' . $targetFilename;
+    $tempPath = tempnam(CONTENT_DIR, 'autosave_');
+    if ($tempPath === false) {
+        $result['message'] = 'No se pudo crear el archivo temporal para el borrador.';
+        return $result;
+    }
+    if (file_put_contents($tempPath, $file_content) === false) {
+        @unlink($tempPath);
+        $result['message'] = 'No se pudieron guardar los cambios antes de recargar la página.';
+        return $result;
+    }
+
+    $writeSucceeded = false;
+    if (@rename($tempPath, $finalPath)) {
+        $writeSucceeded = true;
+    } else {
+        @unlink($tempPath);
+        if (file_put_contents($finalPath, $file_content) !== false) {
+            $writeSucceeded = true;
+        }
+    }
+
+    if ($writeSucceeded) {
+        $result['saved'] = true;
+        $result['filename'] = $targetFilename;
+        $result['message'] = $isExistingFile
+            ? 'Cambios guardados automáticamente antes de recargar la página.'
+            : 'Borrador guardado automáticamente antes de recargar la página.';
+    } else {
+        $result['message'] = 'No se pudieron guardar los cambios antes de recargar la página.';
+    }
+
+    return $result;
+}
+
 // --- Routing and Logic ---
 
 $page = $_GET['page'] ?? 'login';
@@ -1686,6 +1826,12 @@ if (!is_array($assetFeedback) || !isset($assetFeedback['message'], $assetFeedbac
     $assetFeedback = null;
 } else {
     unset($_SESSION['asset_feedback']);
+}
+$assetApply = $_SESSION['asset_apply'] ?? null;
+if (!is_array($assetApply)) {
+    $assetApply = null;
+} else {
+    unset($_SESSION['asset_apply']);
 }
 $itineraryFeedback = $_SESSION['itinerary_feedback'] ?? null;
 if (!is_array($itineraryFeedback) || !isset($itineraryFeedback['message'], $itineraryFeedback['type'])) {
@@ -2441,6 +2587,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($redirectAnchor !== '') {
             $redirectTarget .= $redirectAnchor;
         }
+        $autosavePayloadRaw = $_POST['autosave_payload'] ?? '';
+        $autosaveResult = ['saved' => false, 'filename' => '', 'message' => ''];
+        if (is_string($autosavePayloadRaw) && trim($autosavePayloadRaw) !== '') {
+            $autosaveResult = admin_autosave_from_payload($autosavePayloadRaw);
+            if ($autosaveResult['saved'] && $autosaveResult['filename'] !== '') {
+                $redirectTarget = 'admin.php?page=edit-post&file=' . urlencode($autosaveResult['filename']) . $redirectAnchor;
+            }
+            if ($autosaveResult['message'] !== '') {
+                $_SESSION['edit_feedback'] = [
+                    'type' => $autosaveResult['saved'] ? 'success' : 'warning',
+                    'message' => $autosaveResult['message'],
+                ];
+            }
+        }
+        $targetTypeRaw = $_POST['target_type'] ?? '';
+        $targetInputRaw = $_POST['target_input'] ?? '';
+        $targetEditorRaw = $_POST['target_editor'] ?? '';
+        $targetPrefixRaw = $_POST['target_prefix'] ?? '';
+        $targetType = in_array($targetTypeRaw, ['field', 'editor'], true) ? $targetTypeRaw : '';
+        $targetInput = preg_match('/^[A-Za-z0-9_-]+$/', $targetInputRaw) ? $targetInputRaw : '';
+        $targetEditor = '';
+        if (is_string($targetEditorRaw) && trim($targetEditorRaw) !== '') {
+            $targetEditor = substr($targetEditorRaw, 0, 200);
+        }
+        $targetPrefix = '';
+        if (is_string($targetPrefixRaw)) {
+            $targetPrefix = substr($targetPrefixRaw, 0, 100);
+        }
         $normalizedFiles = [];
         if ($filesField !== null) {
             if (is_array($filesField['name'])) {
@@ -2473,6 +2647,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $uploads[] = $file;
         }
+        $savedAssets = [];
         if (empty($uploads)) {
             $feedback = ['type' => 'warning', 'message' => 'No se seleccionó ningún archivo.'];
         } else {
@@ -2508,6 +2683,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $targetPath = ASSETS_DIR . '/' . $targetName;
                 if (move_uploaded_file($file['tmp_name'], $targetPath)) {
                     $successCount++;
+                    $savedAssets[] = [
+                        'name' => $targetName,
+                        'src' => 'assets/' . $targetName,
+                    ];
                 } else {
                     $errorMessages[] = $originalName . ': no se pudo mover el archivo. Revisa los permisos de la carpeta assets/.';
                 }
@@ -2528,6 +2707,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'message' => 'No se pudieron subir los archivos. Detalles: ' . implode(' ', $errorMessages),
                 ];
             }
+        }
+        if (!empty($savedAssets) || (is_string($autosavePayloadRaw) && trim($autosavePayloadRaw) !== '')) {
+            $_SESSION['asset_apply'] = [
+                'mode' => $targetType,
+                'input' => $targetInput,
+                'editor' => $targetEditor,
+                'prefix' => $targetPrefix,
+                'anchor' => $redirectAnchor,
+                'files' => $savedAssets,
+                'restore_payload' => is_string($autosavePayloadRaw) ? $autosavePayloadRaw : '',
+            ];
         }
         $_SESSION['asset_feedback'] = $feedback;
         if (!empty($redirectTarget)) {
@@ -4967,6 +5157,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             <input type="hidden" name="redirect_file" value="<?= ($page === 'edit-post' && isset($safeEditFilename)) ? htmlspecialchars($safeEditFilename, ENT_QUOTES, 'UTF-8') : '' ?>">
                             <input type="hidden" name="redirect_url" value="<?= htmlspecialchars($_SERVER['QUERY_STRING'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                             <input type="hidden" name="redirect_anchor" id="imageUploadRedirectAnchor" value="">
+                            <input type="hidden" name="autosave_payload" id="imageUploadAutosavePayload" value="">
+                            <input type="hidden" name="target_type" id="imageUploadTargetType" value="">
+                            <input type="hidden" name="target_input" id="imageUploadTargetInput" value="">
+                            <input type="hidden" name="target_editor" id="imageUploadTargetEditor" value="">
+                            <input type="hidden" name="target_prefix" id="imageUploadTargetPrefix" value="">
                             <div class="form-group mb-2">
                                 <label class="d-block">Subir nuevo archivo</label>
                                 <input type="file" name="asset_files[]" class="form-control-file" multiple>
@@ -6094,6 +6289,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
         <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 
         <script>
+        window.nammuAssetApply = <?= json_encode($assetApply, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 
         $(document).ready(function() {
 
@@ -6101,6 +6297,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var imageTargetInput = '';
             var imageTargetPrefix = '';
             var imageTargetEditor = '';
+            var lastImageTrigger = null;
             var modalSearchInput = $('#modal-image-search');
             var tagsInput = $('#image_tags');
             var tagsTargetInput = $('#image-tags-target');
@@ -6130,6 +6327,126 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var calloutTargetSelector = '';
             var lastFocusedTextarea = null;
             var calloutModalEl = document.getElementById('calloutModal');
+            var autosavePayloadInput = document.getElementById('imageUploadAutosavePayload');
+            var imageUploadForm = document.querySelector('#imageModal form');
+            var uploadTargetTypeInput = document.getElementById('imageUploadTargetType');
+            var uploadTargetInputInput = document.getElementById('imageUploadTargetInput');
+            var uploadTargetEditorInput = document.getElementById('imageUploadTargetEditor');
+            var uploadTargetPrefixInput = document.getElementById('imageUploadTargetPrefix');
+            var assetApply = window.nammuAssetApply || null;
+
+            function collectEditorForm() {
+                if (lastImageTrigger) {
+                    var triggerForm = $(lastImageTrigger).closest('form');
+                    if (triggerForm.length) {
+                        return { context: detectContext(triggerForm), form: triggerForm };
+                    }
+                }
+                var editForm = $('#content_edit').closest('form');
+                if (editForm.length) {
+                    return { context: 'edit', form: editForm };
+                }
+                var publishForm = $('#content_publish').closest('form');
+                if (publishForm.length) {
+                    return { context: 'publish', form: publishForm };
+                }
+                var itineraryForm = $('#itinerary-form form');
+                if (itineraryForm.length) {
+                    return { context: 'itinerary', form: itineraryForm };
+                }
+                var topicForm = $('#topic-form form');
+                if (topicForm.length) {
+                    return { context: 'topic', form: topicForm };
+                }
+                return null;
+            }
+
+            function detectContext($form) {
+                if ($form.find('#content_edit').length) {
+                    return 'edit';
+                }
+                if ($form.find('#content_publish').length) {
+                    return 'publish';
+                }
+                if ($form.find('#itinerary_content').length) {
+                    return 'itinerary';
+                }
+                if ($form.find('#topic_content').length) {
+                    return 'topic';
+                }
+                return 'generic';
+            }
+
+            function buildAutosavePayload() {
+                var ctx = collectEditorForm();
+                if (!ctx) {
+                    return '';
+                }
+                var form = ctx.form;
+                var fields = {};
+                if (ctx.context === 'itinerary') {
+                    fields = {
+                        itinerary_title: form.find('[name="itinerary_title"]').val() || '',
+                        itinerary_description: form.find('[name="itinerary_description"]').val() || '',
+                        itinerary_content: form.find('[name="itinerary_content"]').val() || '',
+                        itinerary_image: form.find('[name="itinerary_image"]').val() || '',
+                        itinerary_status: form.find('[name="itinerary_status"]').val() || '',
+                        itinerary_slug: form.find('[name="itinerary_slug"]').val() || '',
+                        itinerary_class: form.find('[name="itinerary_class"]').val() || '',
+                        itinerary_class_custom: form.find('[name="itinerary_class_custom"]').val() || '',
+                        itinerary_usage_logic: form.find('[name="itinerary_usage_logic"]:checked').val() || '',
+                        itinerary_quiz_payload: form.find('[name="itinerary_quiz_payload"]').val() || ''
+                    };
+                } else if (ctx.context === 'topic') {
+                    fields = {
+                        topic_title: form.find('[name="topic_title"]').val() || '',
+                        topic_description: form.find('[name="topic_description"]').val() || '',
+                        topic_content: form.find('[name="topic_content"]').val() || '',
+                        topic_image: form.find('[name="topic_image"]').val() || '',
+                        topic_slug: form.find('[name="topic_slug"]').val() || '',
+                        topic_number: form.find('[name="topic_number"]').val() || '',
+                        topic_quiz_payload: form.find('[name="topic_quiz_payload"]').val() || '',
+                        topic_itinerary_slug: form.find('[name="topic_itinerary_slug"]').val() || ''
+                    };
+                } else {
+                    fields = {
+                        title: form.find('[name="title"]').val() || '',
+                        category: form.find('[name="category"]').val() || '',
+                        date: form.find('[name="date"]').val() || '',
+                        image: form.find('[name="image"]').val() || '',
+                        description: form.find('[name="description"]').val() || '',
+                        content: form.find('[name="content"]').val() || '',
+                        type: form.find('[name="type"]').val() || '',
+                        status: form.find('[name="status"]').val() || '',
+                        filename: form.find('[name="filename"]').val() || '',
+                        new_filename: form.find('[name="new_filename"]').val() || ''
+                    };
+                }
+                var hasContent = Object.keys(fields).some(function(key) {
+                    var value = fields[key];
+                    return value && value.toString().trim() !== '';
+                });
+                if (!hasContent) {
+                    return '';
+                }
+                return JSON.stringify({
+                    context: ctx.context,
+                    fields: fields
+                });
+            }
+
+            if (imageUploadForm) {
+                imageUploadForm.addEventListener('submit', function() {
+                    if (!autosavePayloadInput) {
+                        return;
+                    }
+                    autosavePayloadInput.value = buildAutosavePayload();
+                    if (uploadTargetTypeInput) uploadTargetTypeInput.value = imageTargetMode || '';
+                    if (uploadTargetInputInput) uploadTargetInputInput.value = imageTargetInput || '';
+                    if (uploadTargetEditorInput) uploadTargetEditorInput.value = imageTargetEditor || '';
+                    if (uploadTargetPrefixInput) uploadTargetPrefixInput.value = imageTargetPrefix || '';
+                });
+            }
 
             $(document).on('focusin', 'textarea', function() {
                 lastFocusedTextarea = this;
@@ -6220,6 +6537,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             $('#imageModal').on('show.bs.modal', function (event) {
 
                 var button = $(event.relatedTarget);
+                lastImageTrigger = button && button.length ? button[0] : null;
 
                 imageTargetMode = button.data('target-type') || '';
                 imageTargetInput = button.data('target-input') || '';
@@ -6581,6 +6899,59 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 insertTextAtCursor(contentTextArea, snippet);
             }
 
+            function applyUploadedMediaIfNeeded() {
+                if (!assetApply) {
+                    return;
+                }
+                if (assetApply.restore_payload) {
+                    try {
+                        var restoreData = JSON.parse(assetApply.restore_payload);
+                        restoreFormFields(restoreData);
+                    } catch (err) {
+                        // ignore restore errors
+                    }
+                }
+                if (!assetApply.files || !assetApply.files.length) {
+                    return;
+                }
+                var firstFile = assetApply.files[0];
+                var targetValue = (assetApply.prefix || '') + (firstFile.name || '');
+                var targetSrc = firstFile.src || targetValue;
+                if (assetApply.mode === 'field' && targetValue) {
+                    if (assetApply.input) {
+                        var $fieldInput = $('#' + assetApply.input);
+                        if ($fieldInput.length) {
+                            $fieldInput.val(targetValue);
+                        }
+                    }
+                } else if (assetApply.mode === 'editor' && targetSrc) {
+                    insertMediaInContent('image', targetSrc, firstFile.mime || '', 'full');
+                }
+                if (assetApply.anchor) {
+                    window.location.hash = assetApply.anchor.replace('#', '');
+                }
+                window.nammuAssetApply = null;
+            }
+
+            function restoreFormFields(payload) {
+                if (!payload || typeof payload !== 'object' || !payload.fields) {
+                    return;
+                }
+                var fields = payload.fields;
+                Object.keys(fields).forEach(function(key) {
+                    var value = fields[key];
+                    var $input = $('[name="' + key + '"]');
+                    if (!$input.length) {
+                        return;
+                    }
+                    if ($input.is(':radio')) {
+                        $input.filter('[value="' + value + '"]').prop('checked', true);
+                    } else {
+                        $input.val(value);
+                    }
+                });
+            }
+
             function insertTextAtCursor(textarea, text) {
                 if (!textarea) {
                     return;
@@ -6614,6 +6985,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 pendingInsert = null;
                 insertActions.addClass('d-none');
             });
+
+            applyUploadedMediaIfNeeded();
 
             $('[data-delete-tag-form]').on('submit', function() {
                 saveResourceScroll();

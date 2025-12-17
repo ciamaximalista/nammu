@@ -5187,10 +5187,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 $media_name = $media['name'];
                                 $media_relative = $media['relative'];
-                                        $media_type = $media['type'];
-                                        $media_mime = $media['mime'];
-                                        $media_src = 'assets/' . $media_relative;
-                                        $media_tags_list = $modal_media_tags[$media_relative] ?? [];
+                                $media_type = $media['type'];
+                                $media_extension = $media['extension'] ?? '';
+                                $media_mime = $media['mime'];
+                                $media_src = 'assets/' . $media_relative;
+                                $media_tags_list = $modal_media_tags[$media_relative] ?? [];
                                 $media_tags_text = implode(', ', $media_tags_list);
                                 $media_search = trim($media_name . ' ' . $media_relative . ' ' . $media_tags_text);
 
@@ -5213,9 +5214,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                             <div class="small mt-2 text-muted">Audio</div>
                                         </div>
                                     <?php else: ?>
-                                        <div class="doc-thumb-wrapper" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="document" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" data-media-tags="<?= htmlspecialchars($media_tags_text, ENT_QUOTES, 'UTF-8') ?>" style="cursor: pointer; border: 1px dashed rgba(0,0,0,0.2); border-radius: var(--nammu-radius-md, 12px); padding: 2.5rem 1rem; text-align: center;">
+                                        <?php $isPdf = strtolower($media_extension) === 'pdf'; ?>
+                                        <div class="doc-thumb-wrapper" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="<?= $isPdf ? 'pdf' : 'document' ?>" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" data-media-tags="<?= htmlspecialchars($media_tags_text, ENT_QUOTES, 'UTF-8') ?>" style="cursor: pointer; border: 1px dashed rgba(0,0,0,0.2); border-radius: var(--nammu-radius-md, 12px); padding: 2.5rem 1rem; text-align: center;">
                                             <i class="fas fa-file-alt" style="font-size: 3rem; color: #5f6368;"></i>
-                                            <div class="small mt-2 text-muted">Documento</div>
+                                            <div class="small mt-2 text-muted"><?= $isPdf ? 'PDF' : 'Documento' ?></div>
                                         </div>
                                     <?php endif; ?>
 
@@ -5242,8 +5244,14 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             <div id="image-insert-actions" class="d-none mb-3 mb-md-0">
                                 <div class="d-flex align-items-center flex-wrap">
                                     <span class="mr-2">Insertar como:</span>
-                                    <button type="button" class="btn btn-sm btn-primary mr-2 mb-2" data-insert-mode="full">Imagen completa</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary mb-2" data-insert-mode="vignette">Viñeta</button>
+                                    <div class="d-flex align-items-center flex-wrap" data-insert-group="image">
+                                        <button type="button" class="btn btn-sm btn-primary mr-2 mb-2" data-insert-mode="full">Imagen completa</button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary mb-2" data-insert-mode="vignette">Viñeta</button>
+                                    </div>
+                                    <div class="d-flex align-items-center flex-wrap d-none" data-insert-group="pdf">
+                                        <button type="button" class="btn btn-sm btn-primary mr-2 mb-2" data-insert-mode="embed">PDF incrustado</button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary mb-2" data-insert-mode="link">Enlace</button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -6306,6 +6314,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var tagsModalTarget = $('#tagsModalTarget');
             var tagsModalRedirect = $('#tagsModalRedirect');
             var insertActions = $('#image-insert-actions');
+            var insertActionGroups = insertActions.find('[data-insert-group]');
             var pendingInsert = null;
             function getQueryParam(name) {
                 var params = new URLSearchParams(window.location.search);
@@ -6774,6 +6783,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     src: mediaSrc,
                     mime: mediaMime
                 };
+                if (insertActionGroups.length) {
+                    var groupKey = mediaType === 'pdf' ? 'pdf' : 'image';
+                    insertActionGroups.addClass('d-none');
+                    insertActionGroups.filter('[data-insert-group="' + groupKey + '"]').removeClass('d-none');
+                }
                 insertActions.removeClass('d-none');
             }
 
@@ -6840,7 +6854,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                 } else if (imageTargetMode === 'editor') {
 
-                    if (mediaType === 'image') {
+                    if (mediaType === 'image' || mediaType === 'pdf') {
                         showInsertActions(mediaName, mediaType, mediaSrc, mediaMime);
                         return;
                     }
@@ -6881,12 +6895,16 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     var sourceTag = mime ? '        <source src="' + safeSource + '" type="' + mime + '">' : '        <source src="' + safeSource + '">';
                     snippet = '\n\n<div class="embedded-video">\n    <video controls preload="metadata">\n' + sourceTag + '\n    </video>\n</div>\n\n';
                 } else if (type === 'pdf') {
-                    var hasHash = source.indexOf('#') !== -1;
-                    var pdfBase = source.split('#')[0];
-                    var defaultParams = 'page=1&zoom=page-fit&spread=0&toolbar=0&navpanes=0&scrollbar=0&statusbar=0&pagemode=none';
-                    var pdfSrc = hasHash ? source : pdfBase + '#' + defaultParams;
-                    var pdfHref = pdfBase;
-                    snippet = '\n\n<div class="embedded-pdf">\n    <iframe src="' + pdfSrc + '" title="Documento PDF" loading="lazy" allowfullscreen></iframe>\n    <div class="embedded-pdf__actions" aria-label="Acciones del PDF">\n        <a class="embedded-pdf__action" href="' + pdfHref + '" download>Descargar PDF</a>\n        <a class="embedded-pdf__action" href="' + pdfHref + '" target="_blank" rel="noopener">Ver a pantalla completa</a>\n    </div>\n</div>\n\n';
+                    if (mode === 'link') {
+                        snippet = '[' + (source.split('/').pop() || 'Documento') + '](' + source + ')';
+                    } else {
+                        var hasHash = source.indexOf('#') !== -1;
+                        var pdfBase = source.split('#')[0];
+                        var defaultParams = 'page=1&zoom=page-fit&spread=0&toolbar=0&navpanes=0&scrollbar=0&statusbar=0&pagemode=none';
+                        var pdfSrc = hasHash ? source : pdfBase + '#' + defaultParams;
+                        var pdfHref = pdfBase;
+                        snippet = '\n\n<div class="embedded-pdf">\n    <iframe src="' + pdfSrc + '" title="Documento PDF" loading="lazy" allowfullscreen></iframe>\n    <div class="embedded-pdf__actions" aria-label="Acciones del PDF">\n        <a class="embedded-pdf__action" href="' + pdfHref + '" download>Descargar PDF</a>\n        <a class="embedded-pdf__action" href="' + pdfHref + '" target="_blank" rel="noopener">Ver a pantalla completa</a>\n    </div>\n</div>\n\n';
+                    }
                 } else if (type === 'document') {
                     snippet = '[' + (source.split('/').pop() || 'Documento') + '](' + source + ')';
                 } else {

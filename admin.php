@@ -5252,6 +5252,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                         <button type="button" class="btn btn-sm btn-primary mr-2 mb-2" data-insert-mode="embed">PDF incrustado</button>
                                         <button type="button" class="btn btn-sm btn-outline-primary mb-2" data-insert-mode="link">Enlace</button>
                                     </div>
+                                    <div class="d-flex align-items-center flex-wrap d-none" data-insert-group="video">
+                                        <button type="button" class="btn btn-sm btn-primary mr-2 mb-2" data-insert-mode="embed">Vídeo incrustado</button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary mb-2" data-insert-mode="link">Enlace</button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -6784,7 +6788,12 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     mime: mediaMime
                 };
                 if (insertActionGroups.length) {
-                    var groupKey = mediaType === 'pdf' ? 'pdf' : 'image';
+                    var groupKey = 'image';
+                    if (mediaType === 'pdf') {
+                        groupKey = 'pdf';
+                    } else if (mediaType === 'video') {
+                        groupKey = 'video';
+                    }
                     insertActionGroups.addClass('d-none');
                     insertActionGroups.filter('[data-insert-group="' + groupKey + '"]').removeClass('d-none');
                 }
@@ -6854,7 +6863,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                 } else if (imageTargetMode === 'editor') {
 
-                    if (mediaType === 'image' || mediaType === 'pdf') {
+                    if (mediaType === 'image' || mediaType === 'pdf' || mediaType === 'video') {
                         showInsertActions(mediaName, mediaType, mediaSrc, mediaMime);
                         return;
                     }
@@ -6891,9 +6900,13 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
                 var snippet = '';
                 if (type === 'video') {
-                    var safeSource = source;
-                    var sourceTag = mime ? '        <source src="' + safeSource + '" type="' + mime + '">' : '        <source src="' + safeSource + '">';
-                    snippet = '\n\n<div class="embedded-video">\n    <video controls preload="metadata">\n' + sourceTag + '\n    </video>\n</div>\n\n';
+                    if (mode === 'link') {
+                        snippet = '[' + (source.split('/').pop() || 'Video') + '](' + source + ')';
+                    } else {
+                        var safeSource = source;
+                        var sourceTag = mime ? '        <source src="' + safeSource + '" type="' + mime + '">' : '        <source src="' + safeSource + '">';
+                        snippet = '\n\n<div class="embedded-video">\n    <video controls preload="metadata">\n' + sourceTag + '\n    </video>\n</div>\n\n';
+                    }
                 } else if (type === 'pdf') {
                     if (mode === 'link') {
                         snippet = '[' + (source.split('/').pop() || 'Documento') + '](' + source + ')';

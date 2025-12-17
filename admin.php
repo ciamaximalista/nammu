@@ -5242,19 +5242,19 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     <div class="modal-footer">
                         <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between w-100">
                             <div id="image-insert-actions" class="d-none mb-3 mb-md-0">
-                                <div class="d-flex align-items-center flex-wrap">
-                                    <span class="mr-2">Insertar como:</span>
-                                    <div class="d-flex align-items-center flex-wrap" data-insert-group="image">
-                                        <button type="button" class="btn btn-sm btn-primary mr-2 mb-2" data-insert-mode="full">Imagen completa</button>
-                                        <button type="button" class="btn btn-sm btn-outline-primary mb-2" data-insert-mode="vignette">Viñeta</button>
+                                <div class="d-flex flex-column align-items-start">
+                                    <span class="mb-1">Insertar como:</span>
+                                    <div class="btn-group mb-2" role="group" data-insert-group="image">
+                                        <button type="button" class="btn btn-sm btn-primary" data-insert-mode="full">Imagen completa</button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-insert-mode="vignette">Viñeta</button>
                                     </div>
-                                    <div class="d-flex align-items-center flex-wrap d-none" data-insert-group="pdf">
-                                        <button type="button" class="btn btn-sm btn-primary mr-2 mb-2" data-insert-mode="embed">PDF incrustado</button>
-                                        <button type="button" class="btn btn-sm btn-outline-primary mb-2" data-insert-mode="link">Enlace</button>
+                                    <div class="btn-group mb-2 d-none" role="group" data-insert-group="pdf">
+                                        <button type="button" class="btn btn-sm btn-primary" data-insert-mode="embed">PDF incrustado</button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-insert-mode="link">Enlace</button>
                                     </div>
-                                    <div class="d-flex align-items-center flex-wrap d-none" data-insert-group="video">
-                                        <button type="button" class="btn btn-sm btn-primary mr-2 mb-2" data-insert-mode="embed">Vídeo incrustado</button>
-                                        <button type="button" class="btn btn-sm btn-outline-primary mb-2" data-insert-mode="link">Enlace</button>
+                                    <div class="btn-group mb-2 d-none" role="group" data-insert-group="video">
+                                        <button type="button" class="btn btn-sm btn-primary" data-insert-mode="embed">Vídeo incrustado</button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-insert-mode="link">Enlace</button>
                                     </div>
                                 </div>
                             </div>

@@ -1933,14 +1933,17 @@ function admin_gmail_update_display_name(string $sendAsEmail, string $displayNam
     if ($sendAsEmail === '' || $displayName === '') {
         return;
     }
-    $payload = json_encode(['displayName' => $displayName]);
+    $payload = json_encode([
+        'displayName' => $displayName,
+        'replyToAddress' => $sendAsEmail,
+    ]);
     if ($payload === false) {
         return;
     }
     $url = 'https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs/' . rawurlencode($sendAsEmail);
     $opts = [
         'http' => [
-            'method' => 'PATCH',
+            'method' => 'PUT',
             'header' => "Authorization: Bearer {$accessToken}\r\nContent-Type: application/json\r\n",
             'content' => $payload,
             'timeout' => 10,
@@ -3708,12 +3711,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $html[] = '      <div style="font-size:20px; font-weight:700;">' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '</div>';
             $html[] = '    </div>';
             $html[] = '    <div style="padding:22px;">';
-            $html[] = '      <h2 style="margin:0 0 18px 0; font-size:36px; line-height:1.18; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . '; font-family:' . $titleFontCss . ', Arial, sans-serif;">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
+            $html[] = '      <h2 style="margin:0 0 20px 0; font-size:38px; line-height:1.15; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . '; font-family:' . $titleFontCss . ', Arial, sans-serif;">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
             if ($imageUrl !== '') {
                 $html[] = '      <div style="margin:0 0 14px 0;"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-radius:12px; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . ';"></div>';
             }
             if ($description !== '') {
-                $html[] = '      <p style="margin:0 0 18px 0; line-height:1.7; font-size:19px; font-family:' . $bodyFontCss . ', Arial, sans-serif;">' . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')) . '</p>';
+                $html[] = '      <p style="margin:0 0 20px 0; line-height:1.75; font-size:20px; font-family:' . $bodyFontCss . ', Arial, sans-serif;">' . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')) . '</p>';
             }
             $html[] = '      <p style="margin:0 0 16px 0;">';
             $html[] = '        <a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block; background:' . htmlspecialchars($primary, ENT_QUOTES, 'UTF-8') . '; color:#fff; padding:14px 18px; border-radius:10px; text-decoration:none; font-weight:600;">' . htmlspecialchars($ctaLabel, ENT_QUOTES, 'UTF-8') . '</a>';

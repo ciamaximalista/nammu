@@ -99,10 +99,13 @@ $isAlphabetical = !empty($isAlphabetical);
 $letterGroups = $letterGroups ?? [];
 $letterGroupUrls = $letterGroupUrls ?? [];
 $subscriptionSuccess = isset($_GET['subscribed']) && $_GET['subscribed'] === '1';
+$subscriptionSent = isset($_GET['sub_sent']) && $_GET['sub_sent'] === '1';
 $subscriptionError = isset($_GET['sub_error']) && $_GET['sub_error'] === '1';
 $subscriptionMessage = '';
 if ($subscriptionSuccess) {
-    $subscriptionMessage = 'Te has suscrito correctamente.';
+    $subscriptionMessage = 'Suscripción confirmada. ¡Gracias!';
+} elseif ($subscriptionSent) {
+    $subscriptionMessage = 'Hemos enviado un email de confirmación. Revisa tu correo.';
 } elseif ($subscriptionError) {
     $subscriptionMessage = 'No pudimos procesar ese correo. Revisa la dirección e inténtalo de nuevo.';
 }

@@ -1766,12 +1766,19 @@ function admin_google_refresh_access_token(string $clientId, string $clientSecre
 }
 
 function admin_gmail_send_message(string $from, string $to, string $subject, string $textBody, string $htmlBody, string $accessToken, ?string $fromName = null): array {
+    $encodeHeader = function (string $value): string {
+        if (function_exists('mb_encode_mimeheader')) {
+            return mb_encode_mimeheader($value, 'UTF-8', 'B', "\r\n");
+        }
+        return '=?UTF-8?B?' . base64_encode($value) . '?=';
+    };
     $boundary = '=_NammuMailer_' . bin2hex(random_bytes(8));
-    $fromHeader = $fromName && trim($fromName) !== '' ? sprintf('"%s" <%s>', addslashes($fromName), $from) : $from;
+    $fromHeader = $fromName && trim($fromName) !== '' ? sprintf('%s <%s>', $encodeHeader($fromName), $from) : $from;
+    $subjectHeader = $encodeHeader($subject);
     $headers = [
         'From: ' . $fromHeader,
         'To: ' . $to,
-        'Subject: ' . $subject,
+        'Subject: ' . $subjectHeader,
         'MIME-Version: 1.0',
         'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
     ];
@@ -3612,11 +3619,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $html[] = '      <img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:48px; height:48px; object-fit:cover; border-radius:50%; position:absolute; right:18px; top:18px; box-shadow:0 4px 12px rgba(0,0,0,0.15); background:#fff;">';
             }
             $html[] = '    </div>';
-            if ($imageUrl !== '') {
-                $html[] = '    <img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-bottom:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . ';">';
-            }
             $html[] = '    <div style="padding:22px;">';
             $html[] = '      <h2 style="margin:0 0 12px 0; font-size:22px; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . ';">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
+            if ($imageUrl !== '') {
+                $html[] = '      <img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-radius:12px; margin:0 0 14px 0;">';
+            }
             if ($description !== '') {
                 $html[] = '      <p style="margin:0 0 14px 0; line-height:1.5;">' . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')) . '</p>';
             }

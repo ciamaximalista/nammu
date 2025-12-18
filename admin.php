@@ -1769,25 +1769,22 @@ function admin_gmail_send_message(string $from, string $to, string $subject, str
     $boundary = '=_NammuMailer_' . bin2hex(random_bytes(8));
     $displayName = $fromName && trim($fromName) !== '' ? trim($fromName) : '';
     $displayName = str_replace(['"', "\r", "\n"], '', $displayName);
-    if ($displayName !== '') {
-        if (function_exists('mb_encode_mimeheader')) {
-            $encodedName = mb_encode_mimeheader($displayName, 'UTF-8', 'Q', '');
-        } else {
-            $encodedName = '=?UTF-8?B?' . base64_encode($displayName) . '?=';
-        }
-        $fromHeader = $encodedName . ' <' . $from . '>';
-    } else {
-        $fromHeader = $from;
-    }
+    $encodedName = $displayName !== '' && function_exists('mb_encode_mimeheader')
+        ? mb_encode_mimeheader($displayName, 'UTF-8', 'Q', "\r\n")
+        : ($displayName !== '' ? '=?UTF-8?B?' . base64_encode($displayName) . '?=' : '');
+    $fromHeader = $encodedName !== '' ? $encodedName . ' <' . $from . '>' : $from;
     $subjectHeader = function_exists('mb_encode_mimeheader')
         ? mb_encode_mimeheader($subject, 'UTF-8', 'Q', "\r\n")
         : '=?UTF-8?B?' . base64_encode($subject) . '?=';
+    $unsubscribe = admin_mailing_unsubscribe_link($to);
     $headers = [
         'From: ' . $fromHeader,
         'Reply-To: ' . $fromHeader,
         'To: ' . $to,
         'Subject: ' . $subjectHeader,
         'MIME-Version: 1.0',
+        'List-Unsubscribe: <' . $unsubscribe . '>',
+        'List-Unsubscribe-Post: List-Unsubscribe=One-Click',
         'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
     ];
     $body = [];
@@ -1936,22 +1933,29 @@ function admin_gmail_update_display_name(string $sendAsEmail, string $displayNam
     $payload = json_encode([
         'displayName' => $displayName,
         'replyToAddress' => $sendAsEmail,
+        'treatAsAlias' => false,
     ]);
     if ($payload === false) {
         return;
     }
-    $url = 'https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs/' . rawurlencode($sendAsEmail);
-    $opts = [
-        'http' => [
-            'method' => 'PUT',
-            'header' => "Authorization: Bearer {$accessToken}\r\nContent-Type: application/json\r\n",
-            'content' => $payload,
-            'timeout' => 10,
-            'ignore_errors' => true,
-        ],
-    ];
-    $context = stream_context_create($opts);
-    @file_get_contents($url, false, $context);
+    $targets = [$sendAsEmail, 'me'];
+    foreach ($targets as $target) {
+        $url = 'https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs/' . rawurlencode($target);
+        $opts = [
+            'http' => [
+                'method' => 'PATCH',
+                'header' => "Authorization: Bearer {$accessToken}\r\nContent-Type: application/json\r\n",
+                'content' => $payload,
+                'timeout' => 10,
+                'ignore_errors' => true,
+            ],
+        ];
+        $context = stream_context_create($opts);
+        $result = @file_get_contents($url, false, $context);
+        if ($result !== false && isset($http_response_header[0]) && str_contains($http_response_header[0], '200')) {
+            break;
+        }
+    }
 }
 
 function color_picker_value(string $value, string $fallback): string {

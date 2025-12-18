@@ -1765,10 +1765,11 @@ function admin_google_refresh_access_token(string $clientId, string $clientSecre
     return $decoded;
 }
 
-function admin_gmail_send_message(string $from, string $to, string $subject, string $textBody, string $htmlBody, string $accessToken): array {
+function admin_gmail_send_message(string $from, string $to, string $subject, string $textBody, string $htmlBody, string $accessToken, ?string $fromName = null): array {
     $boundary = '=_NammuMailer_' . bin2hex(random_bytes(8));
+    $fromHeader = $fromName && trim($fromName) !== '' ? sprintf('"%s" <%s>', addslashes($fromName), $from) : $from;
     $headers = [
-        'From: ' . $from,
+        'From: ' . $fromHeader,
         'To: ' . $to,
         'Subject: ' . $subject,
         'MIME-Version: 1.0',
@@ -1825,7 +1826,7 @@ function admin_is_mailing_ready(array $settings): bool {
     return $gmail !== '' && $clientId !== '' && $clientSecret !== '' && !empty($tokens['refresh_token']);
 }
 
-function admin_send_mailing_broadcast(string $subject, string $textBody, string $htmlBody, array $subscribers, array $mailingConfig, ?callable $bodyBuilder = null): array {
+function admin_send_mailing_broadcast(string $subject, string $textBody, string $htmlBody, array $subscribers, array $mailingConfig, ?callable $bodyBuilder = null, ?string $fromName = null): array {
     $gmail = $mailingConfig['gmail_address'] ?? '';
     $clientId = $mailingConfig['client_id'] ?? '';
     $clientSecret = $mailingConfig['client_secret'] ?? '';
@@ -1853,7 +1854,7 @@ function admin_send_mailing_broadcast(string $subject, string $textBody, string 
         if ($bodyBuilder !== null) {
             [$textToSend, $htmlToSend] = $bodyBuilder($to);
         }
-        [$sent, $err] = admin_gmail_send_message($gmail, $to, $subject, $textToSend, $htmlToSend, $accessToken);
+        [$sent, $err] = admin_gmail_send_message($gmail, $to, $subject, $textToSend, $htmlToSend, $accessToken, $fromName);
         if ($sent) {
             $ok++;
         } else {
@@ -3565,18 +3566,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($template === 'itinerario') {
             $subjectPrefix = 'Nuevo itinerario';
         }
-        $subject = $subjectPrefix . ': ' . $title;
+        $subject = $title;
         $blogName = $settings['site_name'] ?? 'Tu blog';
         $authorName = $settings['site_author'] ?? 'Autor';
         $imagePath = $metadata['Image'] ?? '';
         $imageUrl = $imagePath !== '' ? rtrim(admin_base_url(), '/') . '/' . ltrim($imagePath, '/') : '';
+        $logoPath = $settings['template']['images']['logo'] ?? '';
+        $logoUrl = $logoPath !== '' ? rtrim(admin_base_url(), '/') . '/' . ltrim($logoPath, '/') : '';
         $colors = $settings['template']['colors'] ?? [];
         $primary = $colors['primary'] ?? '#1b8eed';
         $bg = $colors['body_bg'] ?? '#f5f7fb';
         $textColor = $colors['body_text'] ?? '#1f2933';
         $footerBg = '#f9fafb';
         $border = '#e5e7eb';
-        $ctaLabel = $template === 'itinerario' ? 'Comienza este itinerario' : ($template === 'page' ? 'Ver esta página' : 'Sigue leyendo esta entrada');
+        $ctaLabel = $template === 'itinerario' ? 'Comienza este itinerario' : ($template === 'page' ? 'Ver esta página' : 'Sigue leyendo');
+        $fromName = $authorName !== '' ? $authorName : $blogName;
 
         $buildText = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link) {
             $lines = [];
@@ -3596,14 +3600,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             return implode("\n", $lines);
         };
 
-        $buildHtml = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link, $imageUrl, $primary, $bg, $textColor, $footerBg, $border, $ctaLabel) {
+        $buildHtml = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link, $imageUrl, $logoUrl, $primary, $bg, $textColor, $footerBg, $border, $ctaLabel) {
             $safeUnsub = htmlspecialchars(admin_mailing_unsubscribe_link($recipientEmail), ENT_QUOTES, 'UTF-8');
             $html = [];
             $html[] = '<div style="font-family: Arial, sans-serif; background:' . htmlspecialchars($bg, ENT_QUOTES, 'UTF-8') . '; padding:24px; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . ';">';
             $html[] = '  <div style="max-width:720px; margin:0 auto; background:#ffffff; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '; border-radius:12px; overflow:hidden;">';
-            $html[] = '    <div style="background:' . htmlspecialchars($primary, ENT_QUOTES, 'UTF-8') . '; color:#fff; padding:18px 22px;">';
+            $html[] = '    <div style="background:' . htmlspecialchars($primary, ENT_QUOTES, 'UTF-8') . '; color:#fff; padding:18px 22px; position:relative;">';
             $html[] = '      <div style="font-size:14px; opacity:0.9;">' . htmlspecialchars($authorName, ENT_QUOTES, 'UTF-8') . '</div>';
             $html[] = '      <div style="font-size:20px; font-weight:700;">' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '</div>';
+            if ($logoUrl !== '') {
+                $html[] = '      <img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:48px; height:48px; object-fit:cover; border-radius:50%; position:absolute; right:18px; top:18px; box-shadow:0 4px 12px rgba(0,0,0,0.15); background:#fff;">';
+            }
             $html[] = '    </div>';
             if ($imageUrl !== '') {
                 $html[] = '    <img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-bottom:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . ';">';
@@ -3637,7 +3644,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             return [$text, $html];
         };
         try {
-            $result = admin_send_mailing_broadcast($subject, '', '', $subscribers, $mailingConfig, $bodyBuilder);
+            $result = admin_send_mailing_broadcast($subject, '', '', $subscribers, $mailingConfig, $bodyBuilder, $fromName);
             $message = 'Aviso enviado. OK: ' . $result['sent'] . ' / Fallos: ' . $result['failed'];
             if (!empty($result['error'])) {
                 $message .= ' (' . $result['error'] . ')';

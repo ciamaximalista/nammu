@@ -209,6 +209,21 @@ function nammu_template_settings(): array
     if (!in_array($searchConfig['floating'], ['off', 'on'], true)) {
         $searchConfig['floating'] = $searchDefaults['floating'];
     }
+    $subscriptionDefaults = $defaults['subscription'] ?? [
+        'mode' => 'none',
+        'position' => 'footer',
+        'floating' => 'off',
+    ];
+    $subscriptionConfig = array_merge($subscriptionDefaults, $template['subscription'] ?? []);
+    if (!in_array($subscriptionConfig['mode'], ['none', 'home', 'single', 'both'], true)) {
+        $subscriptionConfig['mode'] = $subscriptionDefaults['mode'];
+    }
+    if (!in_array($subscriptionConfig['position'], ['title', 'footer'], true)) {
+        $subscriptionConfig['position'] = $subscriptionDefaults['position'];
+    }
+    if (!in_array($subscriptionConfig['floating'], ['off', 'on'], true)) {
+        $subscriptionConfig['floating'] = $subscriptionDefaults['floating'];
+    }
     $entryDefaults = $defaults['entry']['toc'] ?? ['auto' => 'off', 'min_headings' => 3];
     $entryTemplateConfig = $template['entry']['toc'] ?? [];
     $entryAuto = $entryTemplateConfig['auto'] ?? $entryDefaults['auto'];
@@ -239,6 +254,7 @@ function nammu_template_settings(): array
         'author' => $author,
         'blog' => $blog,
         'search' => $searchConfig,
+        'subscription' => $subscriptionConfig,
         'entry' => $entryConfig,
     ];
 }
@@ -289,6 +305,11 @@ function nammu_default_template_settings(): array
         ],
         'search' => [
             'mode' => 'single',
+            'position' => 'footer',
+            'floating' => 'off',
+        ],
+        'subscription' => [
+            'mode' => 'none',
             'position' => 'footer',
             'floating' => 'off',
         ],

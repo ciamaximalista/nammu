@@ -230,11 +230,6 @@ if ($isPageTemplate && $formattedDate !== '') {
                     <?= $renderSearchBox('variant-inline minimal') ?>
                 </div>
             <?php endif; ?>
-            <?php if ($singleSubscriptionTop): ?>
-                <div class="site-search-block placement-top within-brand site-subscription-block">
-                    <?= $renderSubscriptionBox('variant-inline minimal') ?>
-                </div>
-            <?php endif; ?>
         </div>
         <h1><?= htmlspecialchars($post->getTitle(), ENT_QUOTES, 'UTF-8') ?></h1>
 <?php if (!$isPageTemplate && $topMetaText !== '' && empty($hideCategory)): ?>
@@ -258,6 +253,11 @@ if ($isPageTemplate && $formattedDate !== '') {
         </figure>
     <?php endif; ?>
     <div class="post-body">
+        <?php if ($singleSubscriptionTop): ?>
+            <div class="site-search-block placement-top site-subscription-block">
+                <?= $renderSubscriptionBox('variant-panel') ?>
+            </div>
+        <?php endif; ?>
         <?php if ($autoTocHtml !== ''): ?>
             <section class="post-toc-block" aria-label="Índice de contenidos">
                 <div class="post-toc-heading">Contenido</div>
@@ -269,14 +269,14 @@ if ($isPageTemplate && $formattedDate !== '') {
     <?php if ($bottomMetaText !== ''): ?>
         <div class="post-meta-update"><?= $bottomMetaText ?></div>
     <?php endif; ?>
-    <?php if ($singleSearchBottom && empty($suppressSingleSearchBottom)): ?>
-        <div class="site-search-block placement-bottom">
-            <?= $renderSearchBox('variant-panel') ?>
-        </div>
-    <?php endif; ?>
     <?php if ($singleSubscriptionBottom): ?>
         <div class="site-search-block placement-bottom site-subscription-block">
             <?= $renderSubscriptionBox('variant-panel') ?>
+        </div>
+    <?php endif; ?>
+    <?php if ($singleSearchBottom && empty($suppressSingleSearchBottom)): ?>
+        <div class="site-search-block placement-bottom">
+            <?= $renderSearchBox('variant-panel') ?>
         </div>
     <?php endif; ?>
 </article>

@@ -852,8 +852,8 @@
                                             <?php
                                             $subscriptionPositionOptions = [
                                                 'title' => [
-                                                    'label' => 'Bajo el título',
-                                                    'caption' => 'Caja alineada con el encabezado principal',
+                                                    'label' => 'Sobre el índice',
+                                                    'caption' => 'Encima del índice (en posts) o sobre la primera fila (portada)',
                                                     'figure' => 'search-pos-title',
                                                 ],
                                                 'footer' => [

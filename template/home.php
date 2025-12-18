@@ -397,14 +397,14 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     </section>
 <?php endif; ?>
 
-<?php if ($homeSearchTop): ?>
-    <section class="site-search-block placement-top">
-        <?= $renderSearchBox('variant-inline minimal') ?>
-    </section>
-<?php endif; ?>
 <?php if ($homeSubscriptionTop): ?>
     <section class="site-search-block placement-top site-subscription-block">
         <?= $renderSubscriptionBox('variant-inline minimal') ?>
+    </section>
+<?php endif; ?>
+<?php if ($homeSearchTop): ?>
+    <section class="site-search-block placement-top">
+        <?= $renderSearchBox('variant-inline minimal') ?>
     </section>
 <?php endif; ?>
 
@@ -509,14 +509,14 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     </nav>
 <?php endif; ?>
 
-<?php if ($homeSearchBottom): ?>
-    <section class="site-search-block placement-bottom">
-        <?= $renderSearchBox('variant-panel') ?>
-    </section>
-<?php endif; ?>
 <?php if ($homeSubscriptionBottom): ?>
     <section class="site-search-block placement-bottom site-subscription-block">
         <?= $renderSubscriptionBox('variant-panel') ?>
+    </section>
+<?php endif; ?>
+<?php if ($homeSearchBottom): ?>
+    <section class="site-search-block placement-bottom">
+        <?= $renderSearchBox('variant-panel') ?>
     </section>
 <?php endif; ?>
 

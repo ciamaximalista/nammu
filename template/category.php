@@ -163,14 +163,14 @@ $renderSubscriptionBox = static function (string $variant) use ($subscriptionAct
     </div>
 </section>
 
-<?php if ($searchTop): ?>
-    <section class="site-search-block placement-top">
-        <?= $renderSearchBox('variant-inline minimal') ?>
-    </section>
-<?php endif; ?>
 <?php if ($subscriptionTop): ?>
     <section class="site-search-block placement-top site-subscription-block">
         <?= $renderSubscriptionBox('variant-inline minimal') ?>
+    </section>
+<?php endif; ?>
+<?php if ($searchTop): ?>
+    <section class="site-search-block placement-top">
+        <?= $renderSearchBox('variant-inline minimal') ?>
     </section>
 <?php endif; ?>
 
@@ -234,14 +234,14 @@ $renderSubscriptionBox = static function (string $variant) use ($subscriptionAct
     </section>
 <?php endif; ?>
 
-<?php if ($searchBottom): ?>
-    <section class="site-search-block placement-bottom">
-        <?= $renderSearchBox('variant-panel') ?>
-    </section>
-<?php endif; ?>
 <?php if ($subscriptionBottom): ?>
     <section class="site-search-block placement-bottom site-subscription-block">
         <?= $renderSubscriptionBox('variant-panel') ?>
+    </section>
+<?php endif; ?>
+<?php if ($searchBottom): ?>
+    <section class="site-search-block placement-bottom">
+        <?= $renderSearchBox('variant-panel') ?>
     </section>
 <?php endif; ?>
 

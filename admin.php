@@ -23,6 +23,7 @@ define('CONTENT_DIR', __DIR__ . '/content');
 define('ASSETS_DIR', __DIR__ . '/assets');
 define('ITINERARIES_DIR', __DIR__ . '/itinerarios');
 define('MEDIA_TAGS_FILE', __DIR__ . '/config/media-tags.json');
+define('MAILING_SUBSCRIBERS_FILE', __DIR__ . '/config/mailing-subscribers.json');
 nammu_ensure_directory(ITINERARIES_DIR);
 
 // --- Helper Functions ---
@@ -937,6 +938,16 @@ function get_settings() {
         'recipient' => '',
         'auto_post' => 'off',
     ], $config);
+    $mailingDefaults = [
+        'provider' => 'gmail',
+        'gmail_address' => '',
+        'smtp_host' => 'smtp.gmail.com',
+        'smtp_port' => 465,
+        'auth_method' => 'oauth2',
+        'security' => 'ssl',
+        'status' => 'disconnected',
+    ];
+    $mailing = array_merge($mailingDefaults, $config['mailing'] ?? []);
 
     return [
         'sort_order' => $sort_order,
@@ -961,6 +972,7 @@ function get_settings() {
         'whatsapp' => $whatsapp,
         'facebook' => $facebook,
         'twitter' => $twitter,
+        'mailing' => $mailing,
         'entry' => $entry,
     ];
 }
@@ -1585,6 +1597,58 @@ function save_config_file(array $config): void {
     }
 }
 
+function admin_normalize_email(string $email): string {
+    $email = strtolower(trim($email));
+    return $email;
+}
+
+function admin_load_mailing_subscribers(): array {
+    $file = MAILING_SUBSCRIBERS_FILE;
+    if (!is_file($file)) {
+        return [];
+    }
+    $raw = file_get_contents($file);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return [];
+    }
+    $unique = [];
+    foreach ($decoded as $email) {
+        $normalized = admin_normalize_email((string) $email);
+        if ($normalized === '' || !filter_var($normalized, FILTER_VALIDATE_EMAIL)) {
+            continue;
+        }
+        $unique[$normalized] = true;
+    }
+    return array_keys($unique);
+}
+
+function admin_save_mailing_subscribers(array $subscribers): void {
+    $file = MAILING_SUBSCRIBERS_FILE;
+    $dir = dirname($file);
+    if (!nammu_ensure_directory($dir)) {
+        throw new RuntimeException('No se pudo crear el directorio de configuración para la lista de correo');
+    }
+    $unique = [];
+    foreach ($subscribers as $email) {
+        $normalized = admin_normalize_email((string) $email);
+        if ($normalized === '' || !filter_var($normalized, FILTER_VALIDATE_EMAIL)) {
+            continue;
+        }
+        $unique[$normalized] = true;
+    }
+    $payload = json_encode(array_keys($unique), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($payload === false) {
+        throw new RuntimeException('No se pudo serializar la lista de suscriptores');
+    }
+    if (file_put_contents($file, $payload) === false) {
+        throw new RuntimeException('No se pudo escribir el archivo de suscriptores');
+    }
+}
+
 function color_picker_value(string $value, string $fallback): string {
     if (preg_match('/^#([0-9a-f]{3}|[0-9a-f]{6})$/i', $value)) {
         return strtoupper($value);
@@ -1826,6 +1890,12 @@ if (!is_array($assetFeedback) || !isset($assetFeedback['message'], $assetFeedbac
     $assetFeedback = null;
 } else {
     unset($_SESSION['asset_feedback']);
+}
+$mailingFeedback = $_SESSION['mailing_feedback'] ?? null;
+if (!is_array($mailingFeedback) || !isset($mailingFeedback['message'], $mailingFeedback['type'])) {
+    $mailingFeedback = null;
+} else {
+    unset($_SESSION['mailing_feedback']);
 }
 $assetApply = $_SESSION['asset_apply'] ?? null;
 if (!is_array($assetApply)) {
@@ -3065,6 +3135,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         header('Location: admin.php?page=configuracion');
+        exit;
+    } elseif (isset($_POST['save_mailing'])) {
+        $mailingGmail = trim($_POST['mailing_gmail'] ?? '');
+        try {
+            $config = load_config_file();
+            if ($mailingGmail !== '') {
+                $config['mailing'] = [
+                    'provider' => 'gmail',
+                    'gmail_address' => $mailingGmail,
+                    'smtp_host' => 'smtp.gmail.com',
+                    'smtp_port' => 465,
+                    'auth_method' => 'oauth2',
+                    'security' => 'ssl',
+                    'status' => 'pending',
+                ];
+            } else {
+                unset($config['mailing']);
+            }
+            save_config_file($config);
+        } catch (Throwable $e) {
+            $error = "Error guardando la configuración de correo: " . $e->getMessage();
+        }
+        header('Location: admin.php?page=configuracion#mailing');
+        exit;
+    } elseif (isset($_POST['add_subscriber'])) {
+        $email = admin_normalize_email($_POST['subscriber_email'] ?? '');
+        $redirect = 'admin.php?page=lista-correo#suscriptores';
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Introduce un correo válido para suscribir.',
+            ];
+            header('Location: ' . $redirect);
+            exit;
+        }
+        try {
+            $subscribers = admin_load_mailing_subscribers();
+            if (in_array($email, $subscribers, true)) {
+                $_SESSION['mailing_feedback'] = [
+                    'type' => 'info',
+                    'message' => 'Esa dirección ya está en la lista.',
+                ];
+            } else {
+                $subscribers[] = $email;
+                admin_save_mailing_subscribers($subscribers);
+                $_SESSION['mailing_feedback'] = [
+                    'type' => 'success',
+                    'message' => 'Suscriptor añadido correctamente.',
+                ];
+            }
+        } catch (Throwable $e) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudo guardar la lista: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: ' . $redirect);
+        exit;
+    } elseif (isset($_POST['remove_subscriber'])) {
+        $email = admin_normalize_email($_POST['subscriber_email'] ?? '');
+        $redirect = 'admin.php?page=lista-correo#suscriptores';
+        if ($email === '') {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'warning',
+                'message' => 'No se recibió el correo a eliminar.',
+            ];
+            header('Location: ' . $redirect);
+            exit;
+        }
+        try {
+            $subscribers = admin_load_mailing_subscribers();
+            $filtered = array_values(array_filter($subscribers, static function ($item) use ($email) {
+                return admin_normalize_email((string) $item) !== $email;
+            }));
+            admin_save_mailing_subscribers($filtered);
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'success',
+                'message' => 'Suscriptor eliminado.',
+            ];
+        } catch (Throwable $e) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudo actualizar la lista: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: ' . $redirect);
         exit;
     } elseif (isset($_POST['update_account'])) {
         $currentPassword = $_POST['current_password'] ?? '';
@@ -4945,6 +5101,12 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 </li>
 
+                                <li class="nav-item <?= $page === 'lista-correo' ? 'active' : '' ?>">
+
+                                    <a class="nav-link" href="?page=lista-correo"><h1>Lista de Correo</h1></a>
+
+                                </li>
+
                                 <li class="nav-item <?= ($page === 'itinerarios' || $page === 'itinerario' || $page === 'itinerario-tema') ? 'active' : '' ?>">
 
                                     <a class="nav-link" href="?page=itinerarios"><h1>Itinerarios</h1></a>
@@ -4989,6 +5151,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 <?php elseif ($page === 'template'): ?>
 
     <?php include __DIR__ . '/core/admin-page-template.php'; ?>
+
+<?php elseif ($page === 'lista-correo'): ?>
+
+    <?php include __DIR__ . '/core/admin-page-lista-correo.php'; ?>
 
 <?php elseif ($page === 'itinerarios'): ?>
 

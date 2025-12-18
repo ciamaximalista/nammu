@@ -18,6 +18,8 @@
         $facebookAutoEnabled = ($facebookSettings['auto_post'] ?? 'off') === 'on';
         $twitterSettings = $settings['twitter'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
         $twitterAutoEnabled = ($twitterSettings['auto_post'] ?? 'off') === 'on';
+        $mailingSettings = $settings['mailing'] ?? [];
+        $mailingGmail = $mailingSettings['gmail_address'] ?? '';
         ?>
 
         <form method="post">
@@ -82,6 +84,27 @@
                 <button type="submit" name="save_settings" class="btn btn-primary">Guardar configuración general</button>
             </div>
 
+        </form>
+
+        <form method="post" class="mt-4" id="mailing">
+            <h4 class="mt-2">Correo de la lista (Gmail)</h4>
+            <p class="text-muted mb-3">Indica la dirección de Gmail que se usará para enviar correos a la lista. El envío utiliza el servidor de Gmail con autenticación OAuth2.</p>
+            <div class="form-group">
+                <label for="mailing_gmail">Dirección de Gmail</label>
+                <input type="email" name="mailing_gmail" id="mailing_gmail" class="form-control" value="<?= htmlspecialchars($mailingGmail, ENT_QUOTES, 'UTF-8') ?>" placeholder="tunombre@gmail.com">
+                <small class="form-text text-muted">Servidor: smtp.gmail.com · Puerto: 465 · Seguridad: SSL/TLS · Método: OAuth2.</small>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                <button type="submit" name="save_mailing" class="btn btn-outline-primary mr-2 mb-2">Guardar correo de la lista</button>
+                <button type="button" class="btn btn-outline-secondary mb-2" disabled title="La autenticación con Google se habilitará en el siguiente paso">Conectar con Google (próximamente)</button>
+            </div>
+            <?php if (!empty($mailingGmail)): ?>
+                <div class="alert alert-info mb-0">
+                    <?= htmlspecialchars($mailingGmail, ENT_QUOTES, 'UTF-8') ?> está guardado. Cuando activemos OAuth2, se solicitarán permisos de envío para esta cuenta.
+                </div>
+            <?php else: ?>
+                <div class="alert alert-warning mb-0">Aún no hay dirección configurada. Guárdala para habilitar la autenticación con Google.</div>
+            <?php endif; ?>
         </form>
 
         <form method="post">

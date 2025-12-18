@@ -50,6 +50,7 @@ $floatingSubscriptionAction = $searchBaseNormalized === '' ? '/subscribe.php' : 
 $showFloatingSubscription = $subscriptionFloatingEnabled && !empty($showLogo) && !empty($logoUrl);
 $hasFooterLogo = $footerLogoPosition !== 'none' && !empty($logoUrl);
 $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
+$currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
 ?><!DOCTYPE html>
 <html lang="es">
 <head>
@@ -469,6 +470,15 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
             outline: none;
             border-color: <?= $colorAccent ?>;
         }
+        .floating-subscription .subscription-feedback {
+            margin-top: 0.4rem;
+            font-size: 0.85rem;
+            background: <?= $colorHighlight ?>;
+            color: <?= $colorText ?>;
+            border: 1px solid rgba(0,0,0,0.05);
+            border-radius: var(--nammu-radius-md);
+            padding: 0.5rem 0.65rem;
+        }
         .itinerary-single-content .post {
             gap: 1.5rem;
         }
@@ -751,8 +761,9 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
         </div>
     <?php endif; ?>
     <?php if ($showFloatingSubscription): ?>
-        <div class="floating-search floating-subscription">
+        <div class="floating-search floating-subscription" data-floating-subscription>
             <form class="floating-search-form subscription-form" method="post" action="<?= htmlspecialchars($floatingSubscriptionAction, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="back" value="<?= htmlspecialchars($currentUrl, ENT_QUOTES, 'UTF-8') ?>">
                 <span class="floating-search-icon" aria-hidden="true">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <rect x="3" y="5" width="18" height="14" rx="2" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
@@ -1177,6 +1188,34 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
 
             block.dataset.pdfEnhanced = '1';
         });
+    })();
+    </script>
+    <script>
+    (function() {
+        var params = new URLSearchParams(window.location.search || '');
+        var messages = {
+            subscribed: 'Suscripción confirmada. ¡Gracias!',
+            sub_sent: 'Hemos enviado un email de confirmación. Revisa tu correo.',
+            sub_error: 'No pudimos procesar ese correo. Revisa la dirección e inténtalo de nuevo.'
+        };
+        var target = document.querySelector('[data-floating-subscription]');
+        if (!target) {
+            return;
+        }
+        var msg = '';
+        if (params.get('subscribed') === '1') {
+            msg = messages.subscribed;
+        } else if (params.get('sub_sent') === '1') {
+            msg = messages.sub_sent;
+        } else if (params.get('sub_error') === '1') {
+            msg = messages.sub_error;
+        }
+        if (msg) {
+            var box = document.createElement('div');
+            box.className = 'subscription-feedback';
+            box.textContent = msg;
+            target.appendChild(box);
+        }
     })();
     </script>
 </body>

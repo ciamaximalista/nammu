@@ -95,7 +95,15 @@ function subscription_redirect(string $to, array $params = []): void {
 }
 
 $referer = $_SERVER['HTTP_REFERER'] ?? '/';
-$back = filter_var($referer, FILTER_VALIDATE_URL) ? $referer : '/';
+$postedBack = $_POST['back'] ?? '';
+$backRaw = $postedBack !== '' ? $postedBack : $referer;
+$back = filter_var($backRaw, FILTER_VALIDATE_URL) ? $backRaw : '/';
+// Evita redirecciones externas
+$currentHost = $_SERVER['HTTP_HOST'] ?? '';
+$parsedBack = parse_url($back);
+if (!empty($parsedBack['host']) && $currentHost !== '' && $parsedBack['host'] !== $currentHost) {
+    $back = '/';
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     subscription_redirect($back, ['sub_error' => 1]);

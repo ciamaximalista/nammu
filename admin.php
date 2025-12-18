@@ -1769,7 +1769,16 @@ function admin_gmail_send_message(string $from, string $to, string $subject, str
     $boundary = '=_NammuMailer_' . bin2hex(random_bytes(8));
     $displayName = $fromName && trim($fromName) !== '' ? trim($fromName) : '';
     $displayName = str_replace(['"', "\r", "\n"], '', $displayName);
-    $fromHeader = $displayName !== '' ? '"' . $displayName . '" <' . $from . '>' : $from;
+    if ($displayName !== '') {
+        if (function_exists('mb_encode_mimeheader')) {
+            $encodedName = mb_encode_mimeheader($displayName, 'UTF-8', 'Q', '');
+        } else {
+            $encodedName = '=?UTF-8?B?' . base64_encode($displayName) . '?=';
+        }
+        $fromHeader = $encodedName . ' <' . $from . '>';
+    } else {
+        $fromHeader = $from;
+    }
     $subjectHeader = function_exists('mb_encode_mimeheader')
         ? mb_encode_mimeheader($subject, 'UTF-8', 'Q', "\r\n")
         : '=?UTF-8?B?' . base64_encode($subject) . '?=';
@@ -3646,6 +3655,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $textColor = $colors['body_text'] ?? '#1f2933';
         $footerBg = '#f9fafb';
         $border = '#e5e7eb';
+        $titleFont = $settings['template']['fonts']['title'] ?? 'Arial';
+        $bodyFont = $settings['template']['fonts']['body'] ?? 'Arial';
+        $fontsUrl = '';
+        $fontFamilies = [];
+        foreach ([$titleFont, $bodyFont] as $fontCandidate) {
+            $clean = trim((string) $fontCandidate);
+            if ($clean !== '') {
+                $fontFamilies[] = str_replace(' ', '+', $clean) . ':wght@400;600;700';
+            }
+        }
+        if (!empty($fontFamilies)) {
+            $fontsUrl = 'https://fonts.googleapis.com/css2?family=' . implode('&family=', array_unique($fontFamilies)) . '&display=swap';
+        }
+        $titleFontCss = htmlspecialchars($titleFont, ENT_QUOTES, 'UTF-8');
+        $bodyFontCss = htmlspecialchars($bodyFont, ENT_QUOTES, 'UTF-8');
         $ctaLabel = $template === 'itinerario' ? 'Comienza este itinerario' : ($template === 'page' ? 'Ver esta página' : 'Sigue leyendo');
         $fromName = $authorName !== '' ? $authorName : $blogName;
 
@@ -3667,10 +3691,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             return implode("\n", $lines);
         };
 
-        $buildHtml = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link, $imageUrl, $logoUrl, $primary, $bg, $textColor, $footerBg, $border, $ctaLabel) {
+        $buildHtml = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link, $imageUrl, $logoUrl, $primary, $bg, $textColor, $footerBg, $border, $ctaLabel, $fontsUrl, $titleFontCss, $bodyFontCss) {
             $safeUnsub = htmlspecialchars(admin_mailing_unsubscribe_link($recipientEmail), ENT_QUOTES, 'UTF-8');
             $html = [];
-            $html[] = '<div style="font-family: Arial, sans-serif; background:' . htmlspecialchars($bg, ENT_QUOTES, 'UTF-8') . '; padding:24px; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . ';">';
+            if ($fontsUrl !== '') {
+                $html[] = '<link rel="stylesheet" href="' . htmlspecialchars($fontsUrl, ENT_QUOTES, 'UTF-8') . '">';
+            }
+            $html[] = '<style>h1,h2,h3,h4,h5,h6{font-family:' . $titleFontCss . ', Arial, sans-serif;} body,p,a,div,span{font-family:' . $bodyFontCss . ', Arial, sans-serif;}</style>';
+            $html[] = '<div style="font-family:' . $bodyFontCss . ', Arial, sans-serif; background:' . htmlspecialchars($bg, ENT_QUOTES, 'UTF-8') . '; padding:24px; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . ';">';
             $html[] = '  <div style="max-width:720px; margin:0 auto; background:#ffffff; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '; border-radius:12px; overflow:hidden;">';
             $html[] = '    <div style="background:' . htmlspecialchars($primary, ENT_QUOTES, 'UTF-8') . '; color:#fff; padding:18px 22px; text-align:center;">';
             if ($logoUrl !== '') {
@@ -3680,12 +3708,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $html[] = '      <div style="font-size:20px; font-weight:700;">' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '</div>';
             $html[] = '    </div>';
             $html[] = '    <div style="padding:22px;">';
-            $html[] = '      <h2 style="margin:0 0 16px 0; font-size:34px; line-height:1.2; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . ';">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
+            $html[] = '      <h2 style="margin:0 0 18px 0; font-size:36px; line-height:1.18; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . '; font-family:' . $titleFontCss . ', Arial, sans-serif;">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
             if ($imageUrl !== '') {
                 $html[] = '      <div style="margin:0 0 14px 0;"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-radius:12px; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . ';"></div>';
             }
             if ($description !== '') {
-                $html[] = '      <p style="margin:0 0 16px 0; line-height:1.65; font-size:18px;">' . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')) . '</p>';
+                $html[] = '      <p style="margin:0 0 18px 0; line-height:1.7; font-size:19px; font-family:' . $bodyFontCss . ', Arial, sans-serif;">' . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')) . '</p>';
             }
             $html[] = '      <p style="margin:0 0 16px 0;">';
             $html[] = '        <a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block; background:' . htmlspecialchars($primary, ENT_QUOTES, 'UTF-8') . '; color:#fff; padding:14px 18px; border-radius:10px; text-decoration:none; font-weight:600;">' . htmlspecialchars($ctaLabel, ENT_QUOTES, 'UTF-8') . '</a>';

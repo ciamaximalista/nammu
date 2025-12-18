@@ -6340,8 +6340,12 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var searchModeOptions = form.querySelectorAll('.home-card-style-option[data-search-mode-option]');
             var searchPositionOptions = form.querySelectorAll('.home-card-style-option[data-search-position-option]');
             var searchFloatingOptions = form.querySelectorAll('.home-card-style-option[data-search-floating-option]');
+            var subscriptionModeOptions = form.querySelectorAll('.home-card-style-option[data-subscription-mode-option]');
+            var subscriptionPositionOptions = form.querySelectorAll('.home-card-style-option[data-subscription-position-option]');
+            var subscriptionFloatingOptions = form.querySelectorAll('.home-card-style-option[data-subscription-floating-option]');
             var footerLogoOptions = form.querySelectorAll('.home-card-style-option[data-footer-logo-option]');
             var searchPositionContainer = form.querySelector('[data-search-position]');
+            var subscriptionPositionContainer = form.querySelector('[data-subscription-position]');
             function refreshCardStyleSelection() {
                 var activeStyle = '';
                 cardStyleOptions.forEach(function(option) {
@@ -6432,6 +6436,58 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
             });
             refreshSearchFloatingSelection();
+
+            function refreshSubscriptionModeSelection() {
+                var activeMode = 'none';
+                subscriptionModeOptions.forEach(function(option) {
+                    var radio = option.querySelector('input[type="radio"]');
+                    var checked = radio && radio.checked;
+                    if (checked && radio) {
+                        activeMode = radio.value;
+                    }
+                    option.classList.toggle('active', checked);
+                });
+                if (subscriptionPositionContainer) {
+                    subscriptionPositionContainer.style.display = activeMode === 'none' ? 'none' : '';
+                }
+            }
+            function refreshSubscriptionPositionSelection() {
+                subscriptionPositionOptions.forEach(function(option) {
+                    var radio = option.querySelector('input[type="radio"]');
+                    option.classList.toggle('active', radio && radio.checked);
+                });
+            }
+            function refreshSubscriptionFloatingSelection() {
+                subscriptionFloatingOptions.forEach(function(option) {
+                    var radio = option.querySelector('input[type="radio"]');
+                    option.classList.toggle('active', radio && radio.checked);
+                });
+            }
+            subscriptionModeOptions.forEach(function(option) {
+                var radio = option.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.addEventListener('change', function() {
+                        refreshSubscriptionModeSelection();
+                        refreshSubscriptionPositionSelection();
+                    });
+                }
+            });
+            subscriptionPositionOptions.forEach(function(option) {
+                var radio = option.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.addEventListener('change', refreshSubscriptionPositionSelection);
+                }
+            });
+            subscriptionFloatingOptions.forEach(function(option) {
+                var radio = option.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.addEventListener('change', refreshSubscriptionFloatingSelection);
+                }
+            });
+            refreshSubscriptionModeSelection();
+            refreshSubscriptionPositionSelection();
+            refreshSubscriptionFloatingSelection();
+
             footerLogoOptions.forEach(function(option) {
                 var radio = option.querySelector('input[type="radio"]');
                 if (radio) {

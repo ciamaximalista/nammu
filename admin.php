@@ -1767,12 +1767,22 @@ function admin_google_refresh_access_token(string $clientId, string $clientSecre
 
 function admin_gmail_send_message(string $from, string $to, string $subject, string $textBody, string $htmlBody, string $accessToken, ?string $fromName = null): array {
     $boundary = '=_NammuMailer_' . bin2hex(random_bytes(8));
-    $fromHeader = $fromName && trim($fromName) !== '' ? '"' . addslashes($fromName) . '" <' . $from . '>' : $from;
+    $displayName = $fromName && trim($fromName) !== '' ? trim($fromName) : '';
+    if ($displayName !== '') {
+        if (function_exists('mb_encode_mimeheader')) {
+            $displayName = mb_encode_mimeheader($displayName, 'UTF-8', 'Q', "\r\n");
+        } else {
+            $displayName = '=?UTF-8?B?' . base64_encode($displayName) . '?=';
+        }
+    }
+    $fromHeader = $displayName !== '' ? $displayName . ' <' . $from . '>' : $from;
     $subjectHeader = function_exists('mb_encode_mimeheader')
-        ? mb_encode_mimeheader($subject, 'UTF-8', 'B', "\r\n")
+        ? mb_encode_mimeheader($subject, 'UTF-8', 'Q', "\r\n")
         : '=?UTF-8?B?' . base64_encode($subject) . '?=';
     $headers = [
         'From: ' . $fromHeader,
+        'Sender: ' . $fromHeader,
+        'Reply-To: ' . $fromHeader,
         'To: ' . $to,
         'Subject: ' . $subjectHeader,
         'MIME-Version: 1.0',

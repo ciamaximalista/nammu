@@ -402,7 +402,8 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
         .floating-search-icon svg {
             display: block;
         }
-        .floating-search-form input[type="text"] {
+        .floating-search-form input[type="text"],
+        .floating-search-form input[type="email"] {
             flex: 1 1 auto;
             border: none;
             border-bottom: 1px solid rgba(0,0,0,0.12);
@@ -411,10 +412,12 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
             background: transparent;
             color: <?= $colorText ?>;
         }
-        .floating-search-form input[type="text"]::placeholder {
+        .floating-search-form input[type="text"]::placeholder,
+        .floating-search-form input[type="email"]::placeholder {
             color: rgba(0,0,0,0.5);
         }
-        .floating-search-form input[type="text"]:focus {
+        .floating-search-form input[type="text"]:focus,
+        .floating-search-form input[type="email"]:focus {
             outline: none;
             border-color: <?= $colorAccent ?>;
         }
@@ -449,6 +452,22 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
         .floating-search-categories:hover {
             background: rgba(0,0,0,0.08);
             border-color: rgba(0,0,0,0.12);
+        }
+        .floating-subscription input[type="email"] {
+            flex: 1 1 auto;
+            border: none;
+            border-bottom: 1px solid rgba(0,0,0,0.12);
+            padding: 0.35rem 0.25rem;
+            font-size: 0.95rem;
+            background: transparent;
+            color: <?= $colorText ?>;
+        }
+        .floating-subscription input[type="email"]::placeholder {
+            color: rgba(0,0,0,0.45);
+        }
+        .floating-subscription input[type="email"]:focus {
+            outline: none;
+            border-color: <?= $colorAccent ?>;
         }
         .itinerary-single-content .post {
             gap: 1.5rem;
@@ -728,6 +747,25 @@ $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
                         <line x1="8" y1="13" x2="16" y2="13" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
                     </svg>
                 </a>
+            </form>
+        </div>
+    <?php endif; ?>
+    <?php if ($showFloatingSubscription): ?>
+        <div class="floating-search floating-subscription">
+            <form class="floating-search-form subscription-form" method="post" action="<?= htmlspecialchars($floatingSubscriptionAction, ENT_QUOTES, 'UTF-8') ?>">
+                <span class="floating-search-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="3" y="5" width="18" height="14" rx="2" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                        <polyline points="3,7 12,13 21,7" fill="none" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </span>
+                <input type="email" name="subscriber_email" placeholder="email@dominio.com" required>
+                <button type="submit" aria-label="Suscribirme">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="white" stroke-width="2"/>
+                        <polyline points="4,8 12,14 20,8" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
             </form>
         </div>
     <?php endif; ?>

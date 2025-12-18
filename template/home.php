@@ -162,8 +162,13 @@ $renderSubscriptionBox = static function (string $variant) use ($subscriptionAct
                     <polyline points="3,7 12,13 21,7" fill="none" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </span>
-            <input type="email" name="subscriber_email" placeholder="Tu correo" required>
-            <button type="submit" aria-label="Suscribirme" style="background: <?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>; color:#fff;">Suscribirme</button>
+            <input type="email" name="subscriber_email" placeholder="email@dominio.com" required>
+            <button type="submit" aria-label="Suscribirme" title="Suscribirme" style="background: <?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>; color:#fff;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="white" stroke-width="2"/>
+                    <polyline points="4,8 12,14 20,8" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
         </form>
         <?php if ($subscriptionMessage !== ''): ?>
             <div class="subscription-feedback" style="color: <?= htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') ?>; background: <?= htmlspecialchars($highlight, ENT_QUOTES, 'UTF-8') ?>; border-radius: 10px; padding:10px; margin-top:10px; font-size:14px;">
@@ -541,7 +546,8 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         align-items: center;
         gap: 0.75rem;
     }
-    .site-search-form input[type="text"] {
+    .site-search-form input[type="text"],
+    .site-search-form input[type="email"] {
         flex: 1;
         padding: 0.75rem 1rem;
         border-radius: var(--nammu-radius-md);
@@ -1069,6 +1075,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
             flex-direction: column;
         }
         .site-search-form input[type="text"],
+        .site-search-form input[type="email"],
         .site-search-form button,
         .search-categories-link,
         .search-letters-link {

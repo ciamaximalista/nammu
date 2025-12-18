@@ -80,9 +80,11 @@ $searchPositionSetting = in_array($searchSettings['position'] ?? 'title', ['titl
 $showHomeSearch = in_array($searchMode, ['home', 'both'], true);
 $homeSearchTop = $showHomeSearch && $searchPositionSetting === 'title';
 $homeSearchBottom = $showHomeSearch && $searchPositionSetting === 'footer';
-$subscriptionSettings = $theme['subscription'] ?? [];
-$subscriptionMode = in_array($subscriptionSettings['mode'] ?? 'none', ['none', 'home', 'single', 'both'], true) ? $subscriptionSettings['mode'] : 'none';
-$subscriptionPositionSetting = in_array($subscriptionSettings['position'] ?? 'footer', ['title', 'footer'], true) ? $subscriptionSettings['position'] : 'footer';
+$subscriptionSettings = is_array($theme['subscription'] ?? null) ? $theme['subscription'] : [];
+$subscriptionModeValue = $subscriptionSettings['mode'] ?? 'none';
+$subscriptionPositionValue = $subscriptionSettings['position'] ?? 'footer';
+$subscriptionMode = in_array($subscriptionModeValue, ['none', 'home', 'single', 'both'], true) ? $subscriptionModeValue : 'none';
+$subscriptionPositionSetting = in_array($subscriptionPositionValue, ['title', 'footer'], true) ? $subscriptionPositionValue : 'footer';
 $showHomeSubscription = in_array($subscriptionMode, ['home', 'both'], true);
 $homeSubscriptionTop = $showHomeSubscription && $subscriptionPositionSetting === 'title';
 $homeSubscriptionBottom = $showHomeSubscription && $subscriptionPositionSetting === 'footer';

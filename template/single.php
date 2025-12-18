@@ -17,9 +17,11 @@ $searchPositionSetting = in_array($searchSettings['position'] ?? 'title', ['titl
 $showSingleSearch = in_array($searchMode, ['single', 'both'], true);
 $singleSearchTop = $showSingleSearch && $searchPositionSetting === 'title';
 $singleSearchBottom = $showSingleSearch && $searchPositionSetting === 'footer';
-$subscriptionSettings = $theme['subscription'] ?? [];
-$subscriptionMode = in_array($subscriptionSettings['mode'] ?? 'none', ['none', 'home', 'single', 'both'], true) ? $subscriptionSettings['mode'] : 'none';
-$subscriptionPositionSetting = in_array($subscriptionSettings['position'] ?? 'footer', ['title', 'footer'], true) ? $subscriptionSettings['position'] : 'footer';
+$subscriptionSettings = is_array($theme['subscription'] ?? null) ? $theme['subscription'] : [];
+$subscriptionModeValue = $subscriptionSettings['mode'] ?? 'none';
+$subscriptionPositionValue = $subscriptionSettings['position'] ?? 'footer';
+$subscriptionMode = in_array($subscriptionModeValue, ['none', 'home', 'single', 'both'], true) ? $subscriptionModeValue : 'none';
+$subscriptionPositionSetting = in_array($subscriptionPositionValue, ['title', 'footer'], true) ? $subscriptionPositionValue : 'footer';
 $showSingleSubscription = in_array($subscriptionMode, ['single', 'both'], true);
 $singleSubscriptionTop = $showSingleSubscription && $subscriptionPositionSetting === 'title';
 $singleSubscriptionBottom = $showSingleSubscription && $subscriptionPositionSetting === 'footer';

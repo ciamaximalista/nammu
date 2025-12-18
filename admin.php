@@ -1737,6 +1737,7 @@ function admin_google_refresh_access_token(string $clientId, string $clientSecre
             'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
             'content' => $postData,
             'timeout' => 12,
+            'ignore_errors' => true,
         ],
     ];
     $context = stream_context_create($opts);
@@ -1796,6 +1797,7 @@ function admin_gmail_send_message(string $from, string $to, string $subject, str
             'header' => "Authorization: Bearer {$accessToken}\r\nContent-Type: application/json\r\n",
             'content' => $payload,
             'timeout' => 12,
+            'ignore_errors' => true,
         ],
     ];
     $context = stream_context_create($opts);

@@ -3577,9 +3577,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $blogName = $settings['site_name'] ?? 'Tu blog';
         $authorName = $settings['site_author'] ?? 'Autor';
         $imagePath = $metadata['Image'] ?? '';
-        $imageUrl = $imagePath !== '' ? rtrim(admin_base_url(), '/') . '/' . ltrim($imagePath, '/') : '';
+        $imageUrl = '';
+        if ($imagePath !== '') {
+            $normalizedImage = ltrim($imagePath, '/');
+            $imageUrl = rtrim(admin_base_url(), '/') . '/' . $normalizedImage;
+        }
         $logoPath = $settings['template']['images']['logo'] ?? '';
-        $logoUrl = $logoPath !== '' ? rtrim(admin_base_url(), '/') . '/' . ltrim($logoPath, '/') : '';
+        $logoUrl = '';
+        if ($logoPath !== '') {
+            $normalizedLogo = ltrim($logoPath, '/');
+            $logoUrl = rtrim(admin_base_url(), '/') . '/' . $normalizedLogo;
+        }
         $colors = $settings['template']['colors'] ?? [];
         $primary = $colors['primary'] ?? '#1b8eed';
         $bg = $colors['body_bg'] ?? '#f5f7fb';

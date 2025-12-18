@@ -941,6 +941,8 @@ function get_settings() {
     $mailingDefaults = [
         'provider' => 'gmail',
         'gmail_address' => '',
+        'client_id' => '',
+        'client_secret' => '',
         'smtp_host' => 'smtp.gmail.com',
         'smtp_port' => 465,
         'auth_method' => 'oauth2',
@@ -1652,6 +1654,85 @@ function admin_save_mailing_subscribers(array $subscribers): void {
         throw new RuntimeException('No se pudo escribir el archivo de suscriptores');
     }
     @chmod($file, 0664);
+}
+
+function admin_load_mailing_tokens(): array {
+    $file = __DIR__ . '/config/mailing-tokens.json';
+    if (!is_file($file)) {
+        return [];
+    }
+    $raw = file_get_contents($file);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function admin_save_mailing_tokens(array $tokens): void {
+    $file = __DIR__ . '/config/mailing-tokens.json';
+    $dir = dirname($file);
+    if (!nammu_ensure_directory($dir)) {
+        throw new RuntimeException('No se pudo crear el directorio de configuración para tokens de correo');
+    }
+    $payload = json_encode($tokens, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($payload === false) {
+        throw new RuntimeException('No se pudo serializar los tokens de correo');
+    }
+    if (file_put_contents($file, $payload, LOCK_EX) === false) {
+        throw new RuntimeException('No se pudo escribir el archivo de tokens de correo');
+    }
+    @chmod($file, 0660);
+}
+
+function admin_delete_mailing_tokens(): void {
+    $file = __DIR__ . '/config/mailing-tokens.json';
+    if (is_file($file)) {
+        @unlink($file);
+    }
+}
+
+function admin_google_exchange_code(string $code, string $clientId, string $clientSecret, string $redirectUri): array {
+    $postData = http_build_query([
+        'code' => $code,
+        'client_id' => $clientId,
+        'client_secret' => $clientSecret,
+        'redirect_uri' => $redirectUri,
+        'grant_type' => 'authorization_code',
+        'access_type' => 'offline',
+        'prompt' => 'consent',
+    ]);
+    $opts = [
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
+            'content' => $postData,
+            'timeout' => 12,
+        ],
+    ];
+    $context = stream_context_create($opts);
+    $raw = @file_get_contents('https://oauth2.googleapis.com/token', false, $context);
+    if ($raw === false) {
+        throw new RuntimeException('No se pudo contactar con Google OAuth.');
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        throw new RuntimeException('Respuesta inesperada al intercambiar el código de Google.');
+    }
+    if (isset($decoded['error'])) {
+        $message = is_string($decoded['error']) ? $decoded['error'] : 'Error de OAuth';
+        $desc = isset($decoded['error_description']) ? ' (' . $decoded['error_description'] . ')' : '';
+        throw new RuntimeException($message . $desc);
+    }
+    if (empty($decoded['refresh_token'])) {
+        throw new RuntimeException('Google no devolvió refresh_token. Vuelve a intentar con “Forzar consentimiento”.');
+    }
+    $now = time();
+    $decoded['received_at'] = $now;
+    if (isset($decoded['expires_in'])) {
+        $decoded['expires_at'] = $now + (int) $decoded['expires_in'];
+    }
+    return $decoded;
 }
 
 function color_picker_value(string $value, string $fallback): string {
@@ -3143,12 +3224,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     } elseif (isset($_POST['save_mailing'])) {
         $mailingGmail = trim($_POST['mailing_gmail'] ?? '');
+        $mailingClientId = trim($_POST['mailing_client_id'] ?? '');
+        $mailingClientSecret = trim($_POST['mailing_client_secret'] ?? '');
         try {
             $config = load_config_file();
             if ($mailingGmail !== '') {
                 $config['mailing'] = [
                     'provider' => 'gmail',
                     'gmail_address' => $mailingGmail,
+                    'client_id' => $mailingClientId,
+                    'client_secret' => $mailingClientSecret,
                     'smtp_host' => 'smtp.gmail.com',
                     'smtp_port' => 465,
                     'auth_method' => 'oauth2',
@@ -3157,6 +3242,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ];
             } else {
                 unset($config['mailing']);
+                admin_delete_mailing_tokens();
             }
             save_config_file($config);
         } catch (Throwable $e) {
@@ -3226,6 +3312,106 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
         }
         header('Location: ' . $redirect);
+        exit;
+    } elseif (isset($_GET['gmail_auth']) && $_GET['gmail_auth'] === '1') {
+        $config = get_settings();
+        $mailing = $config['mailing'] ?? [];
+        $gmailAddress = $mailing['gmail_address'] ?? '';
+        $clientId = $mailing['client_id'] ?? '';
+        $clientSecret = $mailing['client_secret'] ?? '';
+        if ($gmailAddress === '' || $clientId === '' || $clientSecret === '') {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Configura Gmail, Client ID y Client Secret antes de conectar.',
+            ];
+            header('Location: admin.php?page=configuracion#mailing');
+            exit;
+        }
+        $redirectUri = admin_base_url() . '/admin.php?page=lista-correo&gmail_callback=1';
+        $state = bin2hex(random_bytes(16));
+        $_SESSION['gmail_oauth_state'] = $state;
+        $scope = urlencode('https://mail.google.com/');
+        $authUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
+            . '?response_type=code'
+            . '&client_id=' . urlencode($clientId)
+            . '&redirect_uri=' . urlencode($redirectUri)
+            . '&scope=' . $scope
+            . '&access_type=offline'
+            . '&prompt=consent'
+            . '&state=' . urlencode($state)
+            . '&login_hint=' . urlencode($gmailAddress);
+        header('Location: ' . $authUrl);
+        exit;
+    } elseif (isset($_GET['gmail_callback']) && $_GET['gmail_callback'] === '1') {
+        $expectedState = $_SESSION['gmail_oauth_state'] ?? '';
+        $receivedState = $_GET['state'] ?? '';
+        unset($_SESSION['gmail_oauth_state']);
+        if ($expectedState === '' || $receivedState !== $expectedState) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Estado de OAuth inválido o caducado. Vuelve a iniciar la conexión.',
+            ];
+            header('Location: admin.php?page=lista-correo');
+            exit;
+        }
+        if (isset($_GET['error'])) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Google canceló la conexión: ' . htmlspecialchars((string) $_GET['error']),
+            ];
+            header('Location: admin.php?page=lista-correo');
+            exit;
+        }
+        $code = $_GET['code'] ?? '';
+        if ($code === '') {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se recibió el código de Google.',
+            ];
+            header('Location: admin.php?page=lista-correo');
+            exit;
+        }
+        $configRaw = load_config_file();
+        $mailing = $configRaw['mailing'] ?? [];
+        $clientId = $mailing['client_id'] ?? '';
+        $clientSecret = $mailing['client_secret'] ?? '';
+        $redirectUri = admin_base_url() . '/admin.php?page=lista-correo&gmail_callback=1';
+        try {
+            $tokens = admin_google_exchange_code($code, $clientId, $clientSecret, $redirectUri);
+            admin_save_mailing_tokens($tokens);
+            $configRaw['mailing']['status'] = 'connected';
+            save_config_file($configRaw);
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'success',
+                'message' => 'Cuenta conectada con Google. Tokens guardados.',
+            ];
+        } catch (Throwable $e) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudo completar la conexión: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: admin.php?page=lista-correo');
+        exit;
+    } elseif (isset($_GET['gmail_disconnect']) && $_GET['gmail_disconnect'] === '1') {
+        try {
+            admin_delete_mailing_tokens();
+            $config = load_config_file();
+            if (isset($config['mailing'])) {
+                $config['mailing']['status'] = 'pending';
+                save_config_file($config);
+            }
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'success',
+                'message' => 'Desconectado de Google. Se revocarán los envíos hasta volver a conectar.',
+            ];
+        } catch (Throwable $e) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudo desconectar: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: admin.php?page=lista-correo');
         exit;
     } elseif (isset($_POST['update_account'])) {
         $currentPassword = $_POST['current_password'] ?? '';

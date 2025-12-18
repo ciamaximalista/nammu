@@ -10,6 +10,8 @@
         $mailingStatus = $mailingSettings['status'] ?? 'disconnected';
         $mailingSubscribers = admin_load_mailing_subscribers();
         $mailingCount = count($mailingSubscribers);
+        $mailingTokens = admin_load_mailing_tokens();
+        $isConnected = !empty($mailingTokens['refresh_token']);
         ?>
 
         <p class="text-muted">Configura y consulta aquí la futura lista de correo. Usaremos tu cuenta de Gmail (SMTP con OAuth2 sobre SSL/TLS, puerto 465) para enviar mensajes cuando el módulo esté activo.</p>
@@ -30,14 +32,28 @@
                     <p class="mb-2"><strong>Servidor:</strong> smtp.gmail.com · Puerto 465 · SSL/TLS · OAuth2</p>
                     <p class="mb-0">
                         <strong>Estado:</strong>
-                        <?php if ($mailingStatus === 'pending'): ?>
-                            <span class="badge badge-warning">Pendiente de conectar con Google</span>
-                        <?php elseif ($mailingStatus === 'connected'): ?>
+                        <?php if ($isConnected): ?>
                             <span class="badge badge-success">Conectado</span>
+                        <?php elseif ($mailingStatus === 'pending'): ?>
+                            <span class="badge badge-warning">Pendiente de conectar con Google</span>
                         <?php else: ?>
                             <span class="badge badge-secondary">Desconectado</span>
                         <?php endif; ?>
                     </p>
+                    <div class="mt-3 d-flex flex-wrap" style="gap: 0.5rem;">
+                        <a class="btn btn-sm btn-primary <?= $mailingGmail === '' ? 'disabled' : '' ?>" href="admin.php?page=lista-correo&amp;gmail_auth=1">Conectar con Google</a>
+                        <a class="btn btn-sm btn-outline-danger <?= !$isConnected ? 'disabled' : '' ?>" href="admin.php?page=lista-correo&amp;gmail_disconnect=1" onclick="return confirm('¿Desconectar y borrar tokens?');">Desconectar</a>
+                        <a class="btn btn-sm btn-outline-secondary" href="?page=configuracion#mailing">Editar configuración</a>
+                    </div>
+                    <?php if ($isConnected): ?>
+                        <div class="alert alert-success mt-3 mb-0">
+                            Tokens guardados. Usa esta cuenta para enviar cuando activemos el envío de campañas.
+                        </div>
+                    <?php else: ?>
+                        <div class="alert alert-warning mt-3 mb-0">
+                            Autoriza con Google para obtener el refresh token y habilitar envíos.
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         <?php endif; ?>

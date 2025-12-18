@@ -20,6 +20,9 @@
         $twitterAutoEnabled = ($twitterSettings['auto_post'] ?? 'off') === 'on';
         $mailingSettings = $settings['mailing'] ?? [];
         $mailingGmail = $mailingSettings['gmail_address'] ?? '';
+        $mailingClientId = $mailingSettings['client_id'] ?? '';
+        $mailingClientSecret = $mailingSettings['client_secret'] ?? '';
+        $mailingStatus = $mailingSettings['status'] ?? 'disconnected';
         ?>
 
         <form method="post">
@@ -94,9 +97,31 @@
                 <input type="email" name="mailing_gmail" id="mailing_gmail" class="form-control" value="<?= htmlspecialchars($mailingGmail, ENT_QUOTES, 'UTF-8') ?>" placeholder="tunombre@gmail.com">
                 <small class="form-text text-muted">Servidor: smtp.gmail.com · Puerto: 465 · Seguridad: SSL/TLS · Método: OAuth2.</small>
             </div>
+            <div class="form-group">
+                <label for="mailing_client_id">Google Client ID</label>
+                <input type="text" name="mailing_client_id" id="mailing_client_id" class="form-control" value="<?= htmlspecialchars($mailingClientId, ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxx.apps.googleusercontent.com">
+                <small class="form-text text-muted">Credenciales OAuth 2.0 (tipo aplicación web) desde Google Cloud Console.</small>
+            </div>
+            <div class="form-group">
+                <label for="mailing_client_secret">Google Client Secret</label>
+                <input type="text" name="mailing_client_secret" id="mailing_client_secret" class="form-control" value="<?= htmlspecialchars($mailingClientSecret, ENT_QUOTES, 'UTF-8') ?>" placeholder="********">
+            </div>
+            <div class="form-group">
+                <label>Estado</label>
+                <div>
+                    <?php if ($mailingStatus === 'connected'): ?>
+                        <span class="badge badge-success">Conectado</span>
+                    <?php elseif ($mailingStatus === 'pending' && $mailingGmail !== ''): ?>
+                        <span class="badge badge-warning">Pendiente de conectar</span>
+                    <?php else: ?>
+                        <span class="badge badge-secondary">Sin configurar</span>
+                    <?php endif; ?>
+                </div>
+                <small class="form-text text-muted">Necesitarás autorizar con Google desde la pestaña “Lista”.</small>
+            </div>
             <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
                 <button type="submit" name="save_mailing" class="btn btn-outline-primary mr-2 mb-2">Guardar correo de la lista</button>
-                <button type="button" class="btn btn-outline-secondary mb-2" disabled title="La autenticación con Google se habilitará en el siguiente paso">Conectar con Google (próximamente)</button>
+                <a class="btn btn-outline-secondary mb-2 <?= $mailingGmail === '' || $mailingClientId === '' || $mailingClientSecret === '' ? 'disabled' : '' ?>" href="<?= $mailingGmail !== '' && $mailingClientId !== '' && $mailingClientSecret !== '' ? 'admin.php?page=lista-correo&gmail_auth=1' : '#' ?>">Conectar con Google</a>
             </div>
             <?php if (!empty($mailingGmail)): ?>
                 <div class="alert alert-info mb-0">

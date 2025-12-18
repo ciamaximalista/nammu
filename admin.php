@@ -948,6 +948,9 @@ function get_settings() {
         'auth_method' => 'oauth2',
         'security' => 'ssl',
         'status' => 'disconnected',
+        'auto_posts' => 'off',
+        'auto_itineraries' => 'off',
+        'format' => 'html',
     ];
     $mailing = array_merge($mailingDefaults, $config['mailing'] ?? []);
 
@@ -1692,6 +1695,125 @@ function admin_delete_mailing_tokens(): void {
     }
 }
 
+function admin_google_refresh_access_token(string $clientId, string $clientSecret, string $refreshToken): array {
+    $postData = http_build_query([
+        'client_id' => $clientId,
+        'client_secret' => $clientSecret,
+        'refresh_token' => $refreshToken,
+        'grant_type' => 'refresh_token',
+    ]);
+    $opts = [
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
+            'content' => $postData,
+            'timeout' => 12,
+        ],
+    ];
+    $context = stream_context_create($opts);
+    $raw = @file_get_contents('https://oauth2.googleapis.com/token', false, $context);
+    if ($raw === false) {
+        throw new RuntimeException('No se pudo refrescar el token con Google.');
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        throw new RuntimeException('Respuesta inesperada al refrescar token.');
+    }
+    if (isset($decoded['error'])) {
+        $message = is_string($decoded['error']) ? $decoded['error'] : 'Error de OAuth';
+        $desc = isset($decoded['error_description']) ? ' (' . $decoded['error_description'] . ')' : '';
+        throw new RuntimeException($message . $desc);
+    }
+    $now = time();
+    if (isset($decoded['expires_in'])) {
+        $decoded['expires_at'] = $now + (int) $decoded['expires_in'];
+    }
+    return $decoded;
+}
+
+function admin_gmail_send_message(string $from, string $to, string $subject, string $textBody, string $htmlBody, string $accessToken): bool {
+    $boundary = '=_NammuMailer_' . bin2hex(random_bytes(8));
+    $headers = [
+        'From: ' . $from,
+        'To: ' . $to,
+        'Subject: ' . $subject,
+        'MIME-Version: 1.0',
+        'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
+    ];
+    $body = [];
+    $body[] = '--' . $boundary;
+    $body[] = 'Content-Type: text/plain; charset=UTF-8';
+    $body[] = 'Content-Transfer-Encoding: 7bit';
+    $body[] = '';
+    $body[] = $textBody;
+    $body[] = '--' . $boundary;
+    $body[] = 'Content-Type: text/html; charset=UTF-8';
+    $body[] = 'Content-Transfer-Encoding: 7bit';
+    $body[] = '';
+    $body[] = $htmlBody;
+    $body[] = '--' . $boundary . '--';
+    $rawMessage = implode("\r\n", array_merge($headers, [''], $body));
+    $payload = json_encode(['raw' => rtrim(strtr(base64_encode($rawMessage), '+/', '-_'), '=')]);
+    if ($payload === false) {
+        throw new RuntimeException('No se pudo preparar el mensaje.');
+    }
+    $opts = [
+        'http' => [
+            'method' => 'POST',
+            'header' => "Authorization: Bearer {$accessToken}\r\nContent-Type: application/json\r\n",
+            'content' => $payload,
+            'timeout' => 12,
+        ],
+    ];
+    $context = stream_context_create($opts);
+    $response = @file_get_contents('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', false, $context);
+    if ($response === false) {
+        return false;
+    }
+    $decoded = json_decode($response, true);
+    return is_array($decoded) && isset($decoded['id']);
+}
+
+function admin_is_mailing_ready(array $settings): bool {
+    $mailing = $settings['mailing'] ?? [];
+    $gmail = $mailing['gmail_address'] ?? '';
+    $clientId = $mailing['client_id'] ?? '';
+    $clientSecret = $mailing['client_secret'] ?? '';
+    $tokens = admin_load_mailing_tokens();
+    return $gmail !== '' && $clientId !== '' && $clientSecret !== '' && !empty($tokens['refresh_token']);
+}
+
+function admin_send_mailing_broadcast(string $subject, string $textBody, string $htmlBody, array $subscribers, array $mailingConfig): array {
+    $gmail = $mailingConfig['gmail_address'] ?? '';
+    $clientId = $mailingConfig['client_id'] ?? '';
+    $clientSecret = $mailingConfig['client_secret'] ?? '';
+    $tokens = admin_load_mailing_tokens();
+    $refresh = $tokens['refresh_token'] ?? '';
+    if ($gmail === '' || $clientId === '' || $clientSecret === '' || $refresh === '') {
+        throw new RuntimeException('Falta configuración o tokens de Gmail.');
+    }
+    $refreshed = admin_google_refresh_access_token($clientId, $clientSecret, $refresh);
+    $accessToken = $refreshed['access_token'] ?? '';
+    if ($accessToken === '') {
+        throw new RuntimeException('No se obtuvo access_token al refrescar.');
+    }
+    $tokens['access_token'] = $accessToken;
+    if (isset($refreshed['expires_at'])) {
+        $tokens['expires_at'] = $refreshed['expires_at'];
+    }
+    admin_save_mailing_tokens($tokens);
+    $ok = 0;
+    $fail = 0;
+    foreach ($subscribers as $to) {
+        $sent = admin_gmail_send_message($gmail, $to, $subject, $textBody, $htmlBody, $accessToken);
+        if ($sent) {
+            $ok++;
+        } else {
+            $fail++;
+        }
+    }
+    return ['sent' => $ok, 'failed' => $fail];
+}
 function admin_google_exchange_code(string $code, string $clientId, string $clientSecret, string $redirectUri): array {
     $postData = http_build_query([
         'code' => $code,
@@ -3309,6 +3431,118 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['mailing_feedback'] = [
                 'type' => 'danger',
                 'message' => 'No se pudo actualizar la lista: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: ' . $redirect);
+        exit;
+    } elseif (isset($_POST['save_mailing_flags'])) {
+        $autoPosts = isset($_POST['mailing_auto_posts']) ? 'on' : 'off';
+        $autoItineraries = isset($_POST['mailing_auto_itineraries']) ? 'on' : 'off';
+        $format = $_POST['mailing_format'] ?? 'html';
+        $format = $format === 'text' ? 'text' : 'html';
+        try {
+            $config = load_config_file();
+            if (!isset($config['mailing'])) {
+                $config['mailing'] = [];
+            }
+            $config['mailing']['auto_posts'] = $autoPosts;
+            $config['mailing']['auto_itineraries'] = $autoItineraries;
+            $config['mailing']['format'] = $format;
+            save_config_file($config);
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'success',
+                'message' => 'Preferencias de lista guardadas.',
+            ];
+        } catch (Throwable $e) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudieron guardar las preferencias: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: admin.php?page=lista-correo');
+        exit;
+    } elseif (isset($_POST['send_mailing_post'])) {
+        $filename = nammu_normalize_filename($_POST['mailing_filename'] ?? '');
+        $template = $_POST['mailing_template'] ?? 'single';
+        $redirect = 'admin.php?page=edit&template=' . urlencode($template);
+        $settings = get_settings();
+        if (!admin_is_mailing_ready($settings)) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Configura Gmail y conecta con Google antes de enviar a la lista.',
+            ];
+            header('Location: ' . $redirect);
+            exit;
+        }
+        $subscribers = admin_load_mailing_subscribers();
+        if (empty($subscribers)) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'warning',
+                'message' => 'No hay suscriptores en la lista.',
+            ];
+            header('Location: ' . $redirect);
+            exit;
+        }
+        if ($filename === '') {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se encontró la publicación a enviar.',
+            ];
+            header('Location: ' . $redirect);
+            exit;
+        }
+        $postData = get_post_content($filename);
+        if ($postData === null) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudo cargar la publicación seleccionada.',
+            ];
+            header('Location: ' . $redirect);
+            exit;
+        }
+        $metadata = $postData['metadata'] ?? [];
+        $title = $metadata['Title'] ?? pathinfo($filename, PATHINFO_FILENAME);
+        $description = $metadata['Description'] ?? '';
+        $slug = pathinfo($filename, PATHINFO_FILENAME);
+        $link = admin_public_post_url($slug);
+        $mailingConfig = $settings['mailing'] ?? [];
+        $format = $mailingConfig['format'] ?? 'html';
+        $isHtml = $format !== 'text';
+        $subjectPrefix = 'Nueva entrada';
+        if ($template === 'page') {
+            $subjectPrefix = 'Nueva página';
+        } elseif ($template === 'itinerario') {
+            $subjectPrefix = 'Nuevo itinerario';
+        }
+        $subject = $subjectPrefix . ': ' . $title;
+        $textBody = $subjectPrefix . " publicada:\n\n" . $title . "\n";
+        if ($description !== '') {
+            $textBody .= $description . "\n";
+        }
+        $textBody .= "\nLéelo aquí: " . $link . "\n";
+        $htmlBody = nl2br(htmlspecialchars($textBody, ENT_QUOTES, 'UTF-8'));
+        if ($isHtml) {
+            $htmlBody = '<p><strong>' . htmlspecialchars($subjectPrefix, ENT_QUOTES, 'UTF-8') . '</strong></p>'
+                . '<p style="margin:0 0 12px 0;">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</p>';
+            if ($description !== '') {
+                $htmlBody .= '<p style="margin:0 0 12px 0;">' . htmlspecialchars($description, ENT_QUOTES, 'UTF-8') . '</p>';
+            }
+            $htmlBody .= '<p style="margin:0 0 16px 0;"><a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" style="background:#1b8eed;color:#fff;padding:10px 14px;text-decoration:none;border-radius:4px;display:inline-block;">Leer</a></p>';
+            $htmlBody .= '<p style="color:#666;font-size:12px;margin:0;">Enviado desde Nammu</p>';
+            $textBody = html_entity_decode(strip_tags($htmlBody));
+        }
+        try {
+            $result = admin_send_mailing_broadcast($subject, $textBody, $htmlBody, $subscribers, $mailingConfig);
+            $message = 'Aviso enviado. OK: ' . $result['sent'] . ' / Fallos: ' . $result['failed'];
+            $type = $result['failed'] > 0 ? 'warning' : 'success';
+            $_SESSION['mailing_feedback'] = [
+                'type' => $type,
+                'message' => $message,
+            ];
+        } catch (Throwable $e) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Error enviando a la lista: ' . $e->getMessage(),
             ];
         }
         header('Location: ' . $redirect);

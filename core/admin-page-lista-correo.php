@@ -10,6 +10,9 @@
         $mailingStatus = $mailingSettings['status'] ?? 'disconnected';
         $mailingClientId = $mailingSettings['client_id'] ?? '';
         $mailingClientSecret = $mailingSettings['client_secret'] ?? '';
+        $mailingAutoPosts = ($mailingSettings['auto_posts'] ?? 'off') === 'on';
+        $mailingAutoItineraries = ($mailingSettings['auto_itineraries'] ?? 'off') === 'on';
+        $mailingFormat = $mailingSettings['format'] ?? 'html';
         $mailingSubscribers = admin_load_mailing_subscribers();
         $mailingCount = count($mailingSubscribers);
         $mailingTokens = admin_load_mailing_tokens();
@@ -96,6 +99,30 @@
                             <?php endforeach; ?>
                         </ul>
                     <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="card mb-4" id="preferencias">
+                <div class="card-body">
+                    <h5 class="mb-3">Preferencias de envío</h5>
+                    <form method="post">
+                        <div class="form-check mb-2">
+                            <input type="checkbox" class="form-check-input" name="mailing_auto_posts" id="mailing_auto_posts" value="1" <?= $mailingAutoPosts ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="mailing_auto_posts">Enviar aviso de cada nueva entrada publicada</label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" name="mailing_auto_itineraries" id="mailing_auto_itineraries" value="1" <?= $mailingAutoItineraries ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="mailing_auto_itineraries">Enviar aviso de cada nuevo itinerario publicado</label>
+                        </div>
+                        <div class="form-group">
+                            <label for="mailing_format">Enviar aviso en formato</label>
+                            <select name="mailing_format" id="mailing_format" class="form-control">
+                                <option value="html" <?= $mailingFormat === 'html' ? 'selected' : '' ?>>HTML</option>
+                                <option value="text" <?= $mailingFormat === 'text' ? 'selected' : '' ?>>Texto</option>
+                            </select>
+                        </div>
+                        <button type="submit" name="save_mailing_flags" class="btn btn-outline-primary">Guardar preferencias</button>
+                    </form>
                 </div>
             </div>
         <?php endif; ?>

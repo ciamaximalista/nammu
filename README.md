@@ -47,6 +47,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 - Integración opcional con Telegram, WhatsApp Cloud API, Facebook Pages y Twitter/X: auto-posting al publicar o envío manual desde la tabla de “Editar”.
 - Plantillas de mensaje consistentes (título, descripción y URL pública) con escape apropiado para HTML o texto plano.
 - Feedback inmediato en la UI usando `$_SESSION['social_feedback']`.
+- Lista de correo con suscriptores guardados en `config/`, uso de Gmail vía SMTP con OAuth2 y gestión básica de altas/bajas desde el panel.
 
 ### Recursos técnicos clave
 
@@ -112,9 +113,19 @@ Si cediste propiedad al usuario del servidor para que pueda escribir, ejecuta `s
 - **Recursos**: biblioteca con tarjetas, filtros por imagen/vídeo/documento, botón “Editar” para abrir el mini editor, subida múltiple con feedback, etiquetado de imágenes, audio, vídeo y documentos (pdf, docx, xlsx, pptx, odt, md, etc., con nube de tags) y buscador instantáneo por nombre o etiquetas.
 - **Plantilla**: controla tipografías, colores, cabeceras, comportamiento del buscador (posición y modo flotante), TOC por defecto y número de entradas por home.
 - **Itinerarios**: crea portadas, define clase (Libro, Curso, Colección, Otros), lógica de uso, quizzes y estadísticas. Cada tema puede añadirse, duplicarse o borrarse desde la misma pestaña.
-- **Configuración**: modo blog/diccionario, búsqueda avanzada, nombre del sitio, autor, redes sociales, API de Google Fonts y cambio de contraseña.
+- **Configuración**: modo blog/diccionario, búsqueda avanzada, nombre del sitio, autor, redes sociales, API de Google Fonts, correo de lista (Gmail + OAuth) y cambio de contraseña.
 
 El modal “Insertar recurso” que aparece en Publicar, Editar e Itinerarios comparte el mismo buscador, así que puedes localizar imágenes etiquetadas sin salir del formulario.
+
+### Lista de correo con Gmail (OAuth2)
+
+1. En **Configuración**, introduce:
+   - Dirección Gmail que se usará para enviar.
+   - Client ID y Client Secret de una credencial OAuth 2.0 (tipo “Aplicación web”) creada en Google Cloud Console.
+2. En la credencial, añade como URI de redirección autorizada: `https://tu-dominio/admin.php?page=lista-correo&gmail_callback=1` (ajusta protocolo/host).
+3. Guarda y ve a la pestaña **Lista**. Pulsa “Conectar con Google” para abrir el consentimiento y obtener el `refresh_token`. El estado cambiará a “Conectado”.
+4. Desde **Lista** podrás añadir/eliminar correos; la lista vive en `config/mailing-subscribers.json` y los tokens en `config/mailing-tokens.json`.
+5. Si cambias de cuenta o credenciales, desconecta y vuelve a conectar para regenerar tokens.
 
 ### Recursos avanzados
 

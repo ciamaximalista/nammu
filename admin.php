@@ -1605,7 +1605,11 @@ function admin_normalize_email(string $email): string {
 function admin_load_mailing_subscribers(): array {
     $file = MAILING_SUBSCRIBERS_FILE;
     if (!is_file($file)) {
-        return [];
+        try {
+            admin_save_mailing_subscribers([]);
+        } catch (Throwable $e) {
+            return [];
+        }
     }
     $raw = file_get_contents($file);
     if ($raw === false || $raw === '') {
@@ -1644,9 +1648,10 @@ function admin_save_mailing_subscribers(array $subscribers): void {
     if ($payload === false) {
         throw new RuntimeException('No se pudo serializar la lista de suscriptores');
     }
-    if (file_put_contents($file, $payload) === false) {
+    if (file_put_contents($file, $payload, LOCK_EX) === false) {
         throw new RuntimeException('No se pudo escribir el archivo de suscriptores');
     }
+    @chmod($file, 0664);
 }
 
 function color_picker_value(string $value, string $fallback): string {
@@ -5101,15 +5106,15 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                                 </li>
 
-                                <li class="nav-item <?= $page === 'lista-correo' ? 'active' : '' ?>">
-
-                                    <a class="nav-link" href="?page=lista-correo"><h1>Lista de Correo</h1></a>
-
-                                </li>
-
                                 <li class="nav-item <?= ($page === 'itinerarios' || $page === 'itinerario' || $page === 'itinerario-tema') ? 'active' : '' ?>">
 
                                     <a class="nav-link" href="?page=itinerarios"><h1>Itinerarios</h1></a>
+
+                                </li>
+
+                                <li class="nav-item <?= $page === 'lista-correo' ? 'active' : '' ?>">
+
+                                    <a class="nav-link" href="?page=lista-correo"><h1>Lista</h1></a>
 
                                 </li>
 
@@ -5152,10 +5157,6 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
     <?php include __DIR__ . '/core/admin-page-template.php'; ?>
 
-<?php elseif ($page === 'lista-correo'): ?>
-
-    <?php include __DIR__ . '/core/admin-page-lista-correo.php'; ?>
-
 <?php elseif ($page === 'itinerarios'): ?>
 
     <?php include __DIR__ . '/core/admin-page-itinerarios.php'; ?>
@@ -5168,6 +5169,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 <?php elseif ($page === 'itinerario-tema'): ?>
 
     <?php include __DIR__ . '/core/admin-page-itinerario-tema.php'; ?>
+
+<?php elseif ($page === 'lista-correo'): ?>
+
+    <?php include __DIR__ . '/core/admin-page-lista-correo.php'; ?>
 
 <?php elseif ($page === 'configuracion'): ?>
 

@@ -330,7 +330,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         border-color: <?= $colorAccent ?>;
     }
     .site-subscription-box .site-search-form {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
     }
     .site-subscription-box .site-search-form input[type="email"] {
         flex: 1 1 240px;
@@ -340,9 +340,9 @@ if ($isPageTemplate && $formattedDate !== '') {
         font-size: 1rem;
     }
     .site-subscription-box .site-search-form button {
-        padding: 0 1rem;
+        padding: 0;
         height: 42px;
-        min-width: 120px;
+        width: 42px;
     }
     .site-subscription-box .subscription-feedback {
         border: 1px solid rgba(0,0,0,0.05);

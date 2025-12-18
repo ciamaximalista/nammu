@@ -599,7 +599,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         border-color: <?= $accentColor ?>;
     }
     .site-subscription-box .site-search-form {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
     }
     .site-subscription-box .site-search-form input[type="email"] {
         flex: 1 1 240px;
@@ -609,9 +609,9 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         font-size: 1rem;
     }
     .site-subscription-box .site-search-form button {
-        padding: 0 1rem;
+        padding: 0;
         height: 44px;
-        min-width: 130px;
+        width: 44px;
     }
     .site-subscription-box .subscription-feedback {
         border: 1px solid rgba(0,0,0,0.05);

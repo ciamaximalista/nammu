@@ -167,7 +167,7 @@ function subscription_gmail_send(string $fromEmail, string $fromName, string $to
 function subscription_send_confirmation(string $email, string $token, string $siteTitle): void {
     $base = subscription_base_url();
     $link = rtrim($base, '/') . '/subscribe_confirm.php?email=' . urlencode($email) . '&token=' . urlencode($token);
-    $siteLabel = $siteTitle !== '' ? $siteTitle : 'nuestro sitio';
+    $siteLabel = $siteTitle !== '' ? $siteTitle : 'tu sitio';
     $subject = 'Confirma tu suscripción a ' . $siteLabel;
     $bodyLines = [
         "Hola,",
@@ -251,21 +251,8 @@ if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
 $pending = subscription_load_pending();
 $token = bin2hex(random_bytes(16));
-$siteTitle = '';
-$configFile = __DIR__ . '/config/config.yml';
-if (is_file($configFile)) {
-    $yaml = file_get_contents($configFile);
-    if ($yaml !== false && $yaml !== '') {
-        if (function_exists('yaml_parse')) {
-            $parsed = @yaml_parse($yaml);
-        } else {
-            $parsed = null;
-        }
-        if (is_array($parsed) && isset($parsed['site_name']) && is_string($parsed['site_name'])) {
-            $siteTitle = trim($parsed['site_name']);
-        }
-    }
-}
+$configData = nammu_load_config();
+$siteTitle = isset($configData['site_name']) && is_string($configData['site_name']) ? trim($configData['site_name']) : '';
 $pendingEntry = [
     'email' => $email,
     'token' => $token,

@@ -167,11 +167,12 @@ function subscription_gmail_send(string $fromEmail, string $fromName, string $to
 function subscription_send_confirmation(string $email, string $token, string $siteTitle): void {
     $base = subscription_base_url();
     $link = rtrim($base, '/') . '/subscribe_confirm.php?email=' . urlencode($email) . '&token=' . urlencode($token);
-    $subject = 'Confirma tu suscripción a ' . ($siteTitle !== '' ? $siteTitle : 'nuestro sitio');
+    $siteLabel = $siteTitle !== '' ? $siteTitle : 'nuestro sitio';
+    $subject = 'Confirma tu suscripción a ' . $siteLabel;
     $bodyLines = [
         "Hola,",
         "",
-        "Confirma tu suscripción haciendo clic en el enlace:",
+        "Confirma tu suscripción a {$siteLabel} haciendo clic en el enlace:",
         $link,
         "",
         "Si no solicitaste esta suscripción, ignora este mensaje.",

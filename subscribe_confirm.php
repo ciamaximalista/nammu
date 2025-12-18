@@ -84,4 +84,73 @@ try {
     subscription_redirect($back, ['sub_error' => 1]);
 }
 
-subscription_redirect($back, ['subscribed' => 1]);
+// Página de éxito con cabecera sencilla usando datos del blog
+$config = nammu_load_config();
+$siteTitle = isset($config['site_name']) && is_string($config['site_name']) ? trim($config['site_name']) : 'el blog';
+$siteAuthor = isset($config['site_author']) && is_string($config['site_author']) ? trim($config['site_author']) : '';
+$siteUrl = isset($config['site_url']) && is_string($config['site_url']) ? trim($config['site_url']) : '';
+if ($siteUrl === '') {
+    $siteUrl = nammu_base_url();
+}
+
+?><!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Suscripción realizada con éxito</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f7fb;
+            color: #1f2933;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+        }
+        .confirm-card {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 28px 32px;
+            max-width: 620px;
+            width: 100%;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+        }
+        .confirm-title {
+            margin: 0 0 12px 0;
+            font-size: 22px;
+            color: #111827;
+        }
+        .confirm-text {
+            margin: 0 0 8px 0;
+            line-height: 1.6;
+        }
+        .confirm-link {
+            display: inline-block;
+            margin-top: 14px;
+            color: #1b8eed;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .confirm-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="confirm-card">
+        <h1 class="confirm-title">Suscripción realizada con éxito</h1>
+        <p class="confirm-text">A partir de ahora recibirás los avisos de publicación de <?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?>.</p>
+        <?php if ($siteAuthor !== ''): ?>
+            <p class="confirm-text">Enviado por: <?= htmlspecialchars($siteAuthor, ENT_QUOTES, 'UTF-8') ?></p>
+        <?php endif; ?>
+        <?php if ($siteUrl !== ''): ?>
+            <a class="confirm-link" href="<?= htmlspecialchars($siteUrl, ENT_QUOTES, 'UTF-8') ?>">Volver al sitio</a>
+        <?php endif; ?>
+    </div>
+</body>
+</html>

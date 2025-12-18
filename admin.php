@@ -892,6 +892,23 @@ function get_settings() {
     $searchConfig['mode'] = $searchMode;
     $searchConfig['position'] = $searchPosition;
     $searchConfig['floating'] = $searchFloating;
+    $subscriptionDefaults = $defaults['subscription'] ?? ['mode' => 'none', 'position' => 'footer', 'floating' => 'off'];
+    $subscriptionConfig = array_merge($subscriptionDefaults, $templateConfig['subscription'] ?? []);
+    $subscriptionMode = $subscriptionConfig['mode'] ?? 'none';
+    if (!in_array($subscriptionMode, ['none', 'home', 'single', 'both'], true)) {
+        $subscriptionMode = $subscriptionDefaults['mode'];
+    }
+    $subscriptionPosition = $subscriptionConfig['position'] ?? 'footer';
+    if (!in_array($subscriptionPosition, ['title', 'footer'], true)) {
+        $subscriptionPosition = $subscriptionDefaults['position'];
+    }
+    $subscriptionFloating = $subscriptionConfig['floating'] ?? ($subscriptionDefaults['floating'] ?? 'off');
+    if (!in_array($subscriptionFloating, ['off', 'on'], true)) {
+        $subscriptionFloating = $subscriptionDefaults['floating'] ?? 'off';
+    }
+    $subscriptionConfig['mode'] = $subscriptionMode;
+    $subscriptionConfig['position'] = $subscriptionPosition;
+    $subscriptionConfig['floating'] = $subscriptionFloating;
     $entryTocDefaults = $defaults['entry']['toc'] ?? ['auto' => 'off', 'min_headings' => 3];
     $entryTemplateToc = $templateConfig['entry']['toc'] ?? [];
     $entryAuto = $entryTemplateToc['auto'] ?? $entryTocDefaults['auto'];
@@ -970,6 +987,7 @@ function get_settings() {
             'global' => $global,
             'home' => $home,
             'search' => $searchConfig,
+            'subscription' => $subscriptionConfig,
             'entry' => $entry,
         ],
         'social' => $social,

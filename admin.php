@@ -1773,7 +1773,7 @@ function admin_gmail_send_message(string $from, string $to, string $subject, str
         return '=?UTF-8?B?' . base64_encode($value) . '?=';
     };
     $boundary = '=_NammuMailer_' . bin2hex(random_bytes(8));
-    $fromHeader = $fromName && trim($fromName) !== '' ? sprintf('%s <%s>', $encodeHeader($fromName), $from) : $from;
+    $fromHeader = $fromName && trim($fromName) !== '' ? sprintf('"%s" <%s>', $encodeHeader($fromName), $from) : $from;
     $subjectHeader = $encodeHeader($subject);
     $headers = [
         'From: ' . $fromHeader,
@@ -3576,17 +3576,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $subject = $title;
         $blogName = $settings['site_name'] ?? 'Tu blog';
         $authorName = $settings['site_author'] ?? 'Autor';
+        $siteBase = rtrim($settings['site_url'] ?? '', '/');
+        $baseForAssets = $siteBase !== '' ? $siteBase : rtrim(admin_base_url(), '/');
         $imagePath = $metadata['Image'] ?? ($metadata['image'] ?? '');
         $imageUrl = '';
         if ($imagePath !== '') {
-            $normalizedImage = ltrim($imagePath, '/');
-            $imageUrl = rtrim(admin_base_url(), '/') . '/' . $normalizedImage;
+            if (preg_match('#^https?://#i', $imagePath)) {
+                $imageUrl = $imagePath;
+            } else {
+                $normalizedImage = ltrim($imagePath, '/');
+                $imageUrl = $baseForAssets . '/' . $normalizedImage;
+            }
         }
         $logoPath = $settings['template']['images']['logo'] ?? '';
         $logoUrl = '';
         if ($logoPath !== '') {
-            $normalizedLogo = ltrim($logoPath, '/');
-            $logoUrl = rtrim(admin_base_url(), '/') . '/' . $normalizedLogo;
+            if (preg_match('#^https?://#i', $logoPath)) {
+                $logoUrl = $logoPath;
+            } else {
+                $normalizedLogo = ltrim($logoPath, '/');
+                $logoUrl = $baseForAssets . '/' . $normalizedLogo;
+            }
         }
         $colors = $settings['template']['colors'] ?? [];
         $primary = $colors['primary'] ?? '#1b8eed';

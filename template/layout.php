@@ -454,6 +454,23 @@ $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
             background: rgba(0,0,0,0.08);
             border-color: rgba(0,0,0,0.12);
         }
+        @media (max-width: 720px) {
+            .floating-search {
+                top: auto;
+                bottom: 1.2rem;
+                right: 1rem;
+                left: 1rem;
+                width: auto;
+                max-width: none;
+                box-shadow: 0 10px 24px rgba(0,0,0,0.14);
+                display: flex;
+                flex-direction: column;
+                gap: 0.55rem;
+            }
+            .floating-logo {
+                display: none;
+            }
+        }
         .floating-subscription input[type="email"] {
             flex: 1 1 auto;
             border: none;

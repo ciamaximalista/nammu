@@ -30,6 +30,11 @@ if ($editFeedback !== null) {
                 <?= htmlspecialchars($socialFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
             </div>
         <?php endif; ?>
+        <?php if ($mailingFeedback !== null): ?>
+            <div class="alert alert-<?= $mailingFeedback['type'] === 'success' ? 'success' : ($mailingFeedback['type'] === 'warning' ? 'warning' : 'danger') ?>">
+                <?= htmlspecialchars($mailingFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
 
         <form class="form-inline mb-3 edit-search-form" method="get">
             <input type="hidden" name="page" value="edit">

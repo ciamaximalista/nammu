@@ -1846,6 +1846,9 @@ function admin_send_mailing_broadcast(string $subject, string $textBody, string 
     if ($accessToken === '') {
         throw new RuntimeException('No se obtuvo access_token al refrescar.');
     }
+    if ($fromName && $gmail) {
+        admin_gmail_update_display_name($gmail, $fromName, $accessToken);
+    }
     $tokens['access_token'] = $accessToken;
     if (isset($refreshed['expires_at'])) {
         $tokens['expires_at'] = $refreshed['expires_at'];
@@ -1913,6 +1916,30 @@ function admin_google_exchange_code(string $code, string $clientId, string $clie
         $decoded['expires_at'] = $now + (int) $decoded['expires_in'];
     }
     return $decoded;
+}
+
+function admin_gmail_update_display_name(string $sendAsEmail, string $displayName, string $accessToken): void {
+    $sendAsEmail = trim($sendAsEmail);
+    $displayName = trim($displayName);
+    if ($sendAsEmail === '' || $displayName === '') {
+        return;
+    }
+    $payload = json_encode(['displayName' => $displayName]);
+    if ($payload === false) {
+        return;
+    }
+    $url = 'https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs/' . rawurlencode($sendAsEmail);
+    $opts = [
+        'http' => [
+            'method' => 'PATCH',
+            'header' => "Authorization: Bearer {$accessToken}\r\nContent-Type: application/json\r\n",
+            'content' => $payload,
+            'timeout' => 10,
+            'ignore_errors' => true,
+        ],
+    ];
+    $context = stream_context_create($opts);
+    @file_get_contents($url, false, $context);
 }
 
 function color_picker_value(string $value, string $fallback): string {
@@ -3653,12 +3680,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $html[] = '      <div style="font-size:20px; font-weight:700;">' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '</div>';
             $html[] = '    </div>';
             $html[] = '    <div style="padding:22px;">';
-            $html[] = '      <h2 style="margin:0 0 16px 0; font-size:30px; line-height:1.25; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . ';">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
+            $html[] = '      <h2 style="margin:0 0 16px 0; font-size:34px; line-height:1.2; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . ';">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
             if ($imageUrl !== '') {
                 $html[] = '      <div style="margin:0 0 14px 0;"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-radius:12px; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . ';"></div>';
             }
             if ($description !== '') {
-                $html[] = '      <p style="margin:0 0 14px 0; line-height:1.5;">' . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')) . '</p>';
+                $html[] = '      <p style="margin:0 0 16px 0; line-height:1.65; font-size:18px;">' . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')) . '</p>';
             }
             $html[] = '      <p style="margin:0 0 16px 0;">';
             $html[] = '        <a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block; background:' . htmlspecialchars($primary, ENT_QUOTES, 'UTF-8') . '; color:#fff; padding:14px 18px; border-radius:10px; text-decoration:none; font-weight:600;">' . htmlspecialchars($ctaLabel, ENT_QUOTES, 'UTF-8') . '</a>';

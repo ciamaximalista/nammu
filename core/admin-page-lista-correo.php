@@ -127,13 +127,6 @@
             </div>
         <?php endif; ?>
 
-        <h5>Próximos pasos</h5>
-        <ul>
-            <li>Autenticar con Google la cuenta guardada para obtener permisos de envío SMTP.</li>
-            <li>Configurar la captación y gestión de usuarios de la lista.</li>
-            <li>Habilitar creación de campañas y envíos desde el panel.</li>
-        </ul>
-
         <a class="btn btn-outline-primary" href="?page=configuracion#mailing">Editar correo de la lista</a>
 
     </div>

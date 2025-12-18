@@ -371,19 +371,26 @@ $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
             object-fit: cover;
             display: block;
         }
-        .floating-search {
+        .floating-stack {
             position: fixed;
             top: calc(2.5rem + 48px + 0.9rem);
             right: clamp(1.5rem, 5vw, 2.5rem);
-            width: clamp(210px, 24vw, 250px);
+            width: clamp(220px, 24vw, 260px);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            pointer-events: auto;
+        }
+        .floating-search {
+            position: static;
+            width: 100%;
             background: rgba(255, 255, 255, 0.96);
             border-radius: var(--nammu-radius-md);
             border: 1px solid rgba(0,0,0,0.08);
             box-shadow: 0 18px 32px rgba(0,0,0,0.12);
             padding: 0.6rem 0.75rem;
-            z-index: 2000;
             backdrop-filter: blur(6px);
-            pointer-events: auto;
         }
         .floating-search-form {
             display: flex;
@@ -456,17 +463,13 @@ $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
             border-color: rgba(0,0,0,0.12);
         }
         @media (max-width: 720px) {
-            .floating-search {
+            .floating-stack {
                 top: auto;
                 bottom: 1.2rem;
                 right: 1rem;
                 left: 1rem;
                 width: auto;
                 max-width: none;
-                box-shadow: 0 10px 24px rgba(0,0,0,0.14);
-                display: flex;
-                flex-direction: column;
-                gap: 0.55rem;
             }
             .floating-logo {
                 display: none;
@@ -753,49 +756,53 @@ $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
             <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
         </a>
     <?php endif; ?>
-    <?php if ($showFloatingSearch): ?>
-        <div class="floating-search">
-            <form class="floating-search-form" method="get" action="<?= htmlspecialchars($floatingSearchAction, ENT_QUOTES, 'UTF-8') ?>">
-                <span class="floating-search-icon" aria-hidden="true">
-                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="8" cy="8" r="6" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
-                        <line x1="12.5" y1="12.5" x2="17" y2="17" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                </span>
-                <input type="text" name="q" placeholder="Buscar en el sitio..." required>
-                <button type="submit" aria-label="Buscar">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M21 4L9 16L4 11" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-                <a class="floating-search-categories" href="<?= htmlspecialchars($floatingCategoriesUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Índice de categorías">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
-                        <line x1="8" y1="9" x2="16" y2="9" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
-                        <line x1="8" y1="13" x2="16" y2="13" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
-                    </svg>
-                </a>
-            </form>
-        </div>
-    <?php endif; ?>
-    <?php if ($showFloatingSubscription): ?>
-        <div class="floating-search floating-subscription" data-floating-subscription>
-            <form class="floating-search-form subscription-form" method="post" action="<?= htmlspecialchars($floatingSubscriptionAction, ENT_QUOTES, 'UTF-8') ?>">
-                <input type="hidden" name="back" value="<?= htmlspecialchars($currentUrl, ENT_QUOTES, 'UTF-8') ?>">
-                <span class="floating-search-icon" aria-hidden="true">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="3" y="5" width="18" height="14" rx="2" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
-                        <polyline points="3,7 12,13 21,7" fill="none" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </span>
-                <input type="email" name="subscriber_email" placeholder="email@dominio.com" required>
-                <button type="submit" aria-label="Suscribirme">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="white" stroke-width="2"/>
-                        <polyline points="4,8 12,14 20,8" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-            </form>
+    <?php if ($showFloatingSearch || $showFloatingSubscription): ?>
+        <div class="floating-stack">
+            <?php if ($showFloatingSubscription): ?>
+                <div class="floating-search floating-subscription" data-floating-subscription>
+                    <form class="floating-search-form subscription-form" method="post" action="<?= htmlspecialchars($floatingSubscriptionAction, ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="back" value="<?= htmlspecialchars($currentUrl, ENT_QUOTES, 'UTF-8') ?>">
+                        <span class="floating-search-icon" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="3" y="5" width="18" height="14" rx="2" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                                <polyline points="3,7 12,13 21,7" fill="none" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </span>
+                        <input type="email" name="subscriber_email" placeholder="email@dominio.com" required>
+                        <button type="submit" aria-label="Suscribirme">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="white" stroke-width="2"/>
+                                <polyline points="4,8 12,14 20,8" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+            <?php endif; ?>
+            <?php if ($showFloatingSearch): ?>
+                <div class="floating-search">
+                    <form class="floating-search-form" method="get" action="<?= htmlspecialchars($floatingSearchAction, ENT_QUOTES, 'UTF-8') ?>">
+                        <span class="floating-search-icon" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="8" cy="8" r="6" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                                <line x1="12.5" y1="12.5" x2="17" y2="17" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </span>
+                        <input type="text" name="q" placeholder="Buscar en el sitio..." required>
+                        <button type="submit" aria-label="Buscar">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M21 4L9 16L4 11" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <a class="floating-search-categories" href="<?= htmlspecialchars($floatingCategoriesUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Índice de categorías">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                                <line x1="8" y1="9" x2="16" y2="9" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                                <line x1="8" y1="13" x2="16" y2="13" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                            </svg>
+                        </a>
+                    </form>
+                </div>
+            <?php endif; ?>
         </div>
     <?php endif; ?>
     <script>

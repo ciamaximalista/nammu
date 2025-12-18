@@ -24,6 +24,7 @@ define('ASSETS_DIR', __DIR__ . '/assets');
 define('ITINERARIES_DIR', __DIR__ . '/itinerarios');
 define('MEDIA_TAGS_FILE', __DIR__ . '/config/media-tags.json');
 define('MAILING_SUBSCRIBERS_FILE', __DIR__ . '/config/mailing-subscribers.json');
+define('MAILING_SECRET_FILE', __DIR__ . '/config/mailing-secret.key');
 nammu_ensure_directory(ITINERARIES_DIR);
 
 // --- Helper Functions ---
@@ -1695,6 +1696,34 @@ function admin_delete_mailing_tokens(): void {
     }
 }
 
+function admin_mailing_secret(): string {
+    $file = MAILING_SECRET_FILE;
+    if (!is_file($file)) {
+        $dir = dirname($file);
+        nammu_ensure_directory($dir);
+        $secret = bin2hex(random_bytes(32));
+        file_put_contents($file, $secret);
+        @chmod($file, 0640);
+        return $secret;
+    }
+    $secret = trim((string) file_get_contents($file));
+    if ($secret === '') {
+        $secret = bin2hex(random_bytes(32));
+        file_put_contents($file, $secret);
+    }
+    return $secret;
+}
+
+function admin_mailing_unsubscribe_token(string $email): string {
+    $secret = admin_mailing_secret();
+    return hash_hmac('sha256', strtolower(trim($email)), $secret);
+}
+
+function admin_mailing_unsubscribe_link(string $email): string {
+    $token = admin_mailing_unsubscribe_token($email);
+    return admin_base_url() . '/unsubscribe.php?email=' . urlencode($email) . '&token=' . urlencode($token);
+}
+
 function admin_google_refresh_access_token(string $clientId, string $clientSecret, string $refreshToken): array {
     $postData = http_build_query([
         'client_id' => $clientId,
@@ -1783,7 +1812,7 @@ function admin_is_mailing_ready(array $settings): bool {
     return $gmail !== '' && $clientId !== '' && $clientSecret !== '' && !empty($tokens['refresh_token']);
 }
 
-function admin_send_mailing_broadcast(string $subject, string $textBody, string $htmlBody, array $subscribers, array $mailingConfig): array {
+function admin_send_mailing_broadcast(string $subject, string $textBody, string $htmlBody, array $subscribers, array $mailingConfig, ?callable $bodyBuilder = null): array {
     $gmail = $mailingConfig['gmail_address'] ?? '';
     $clientId = $mailingConfig['client_id'] ?? '';
     $clientSecret = $mailingConfig['client_secret'] ?? '';
@@ -1805,7 +1834,12 @@ function admin_send_mailing_broadcast(string $subject, string $textBody, string 
     $ok = 0;
     $fail = 0;
     foreach ($subscribers as $to) {
-        $sent = admin_gmail_send_message($gmail, $to, $subject, $textBody, $htmlBody, $accessToken);
+        $textToSend = $textBody;
+        $htmlToSend = $htmlBody;
+        if ($bodyBuilder !== null) {
+            [$textToSend, $htmlToSend] = $bodyBuilder($to);
+        }
+        $sent = admin_gmail_send_message($gmail, $to, $subject, $textToSend, $htmlToSend, $accessToken);
         if ($sent) {
             $ok++;
         } else {
@@ -3515,24 +3549,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $subjectPrefix = 'Nuevo itinerario';
         }
         $subject = $subjectPrefix . ': ' . $title;
-        $textBody = $subjectPrefix . " publicada:\n\n" . $title . "\n";
-        if ($description !== '') {
-            $textBody .= $description . "\n";
-        }
-        $textBody .= "\nLéelo aquí: " . $link . "\n";
-        $htmlBody = nl2br(htmlspecialchars($textBody, ENT_QUOTES, 'UTF-8'));
-        if ($isHtml) {
-            $htmlBody = '<p><strong>' . htmlspecialchars($subjectPrefix, ENT_QUOTES, 'UTF-8') . '</strong></p>'
-                . '<p style="margin:0 0 12px 0;">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</p>';
+        $blogName = $settings['site_name'] ?? 'Tu blog';
+        $authorName = $settings['site_author'] ?? 'Autor';
+        $imagePath = $metadata['Image'] ?? '';
+        $imageUrl = $imagePath !== '' ? rtrim(admin_base_url(), '/') . '/' . ltrim($imagePath, '/') : '';
+        $colors = $settings['template']['colors'] ?? [];
+        $primary = $colors['primary'] ?? '#1b8eed';
+        $bg = $colors['body_bg'] ?? '#f5f7fb';
+        $textColor = $colors['body_text'] ?? '#1f2933';
+        $footerBg = '#f9fafb';
+        $border = '#e5e7eb';
+        $ctaLabel = $template === 'itinerario' ? 'Comienza este itinerario' : ($template === 'page' ? 'Ver esta página' : 'Sigue leyendo esta entrada');
+
+        $buildText = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link) {
+            $lines = [];
+            $lines[] = '**** ' . $authorName . ' ****';
+            $lines[] = '**** ' . $blogName . ' ****';
+            $lines[] = '';
+            $lines[] = '== ' . $title . ' ==';
+            $lines[] = '';
             if ($description !== '') {
-                $htmlBody .= '<p style="margin:0 0 12px 0;">' . htmlspecialchars($description, ENT_QUOTES, 'UTF-8') . '</p>';
+                $lines[] = $description;
+                $lines[] = '';
             }
-            $htmlBody .= '<p style="margin:0 0 16px 0;"><a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" style="background:#1b8eed;color:#fff;padding:10px 14px;text-decoration:none;border-radius:4px;display:inline-block;">Leer</a></p>';
-            $htmlBody .= '<p style="color:#666;font-size:12px;margin:0;">Enviado desde Nammu</p>';
-            $textBody = html_entity_decode(strip_tags($htmlBody));
-        }
+            $lines[] = 'Sigue leyendo: ' . $link;
+            $lines[] = '';
+            $lines[] = '-----------';
+            $lines[] = 'Recibes este email porque estás suscrito a los avisos de ' . $blogName . '. Puedes darte de baja pulsando aquí: ' . admin_mailing_unsubscribe_link($recipientEmail);
+            return implode("\n", $lines);
+        };
+
+        $buildHtml = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link, $imageUrl, $primary, $bg, $textColor, $footerBg, $border, $ctaLabel) {
+            $safeUnsub = htmlspecialchars(admin_mailing_unsubscribe_link($recipientEmail), ENT_QUOTES, 'UTF-8');
+            $html = [];
+            $html[] = '<div style="font-family: Arial, sans-serif; background:' . htmlspecialchars($bg, ENT_QUOTES, 'UTF-8') . '; padding:24px; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . ';">';
+            $html[] = '  <div style="max-width:720px; margin:0 auto; background:#ffffff; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '; border-radius:12px; overflow:hidden;">';
+            $html[] = '    <div style="background:' . htmlspecialchars($primary, ENT_QUOTES, 'UTF-8') . '; color:#fff; padding:18px 22px;">';
+            $html[] = '      <div style="font-size:14px; opacity:0.9;">' . htmlspecialchars($authorName, ENT_QUOTES, 'UTF-8') . '</div>';
+            $html[] = '      <div style="font-size:20px; font-weight:700;">' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '</div>';
+            $html[] = '    </div>';
+            if ($imageUrl !== '') {
+                $html[] = '    <img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-bottom:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . ';">';
+            }
+            $html[] = '    <div style="padding:22px;">';
+            $html[] = '      <h2 style="margin:0 0 12px 0; font-size:22px; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . ';">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
+            if ($description !== '') {
+                $html[] = '      <p style="margin:0 0 14px 0; line-height:1.5;">' . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')) . '</p>';
+            }
+            $html[] = '      <p style="margin:0 0 16px 0;">';
+            $html[] = '        <a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block; background:' . htmlspecialchars($primary, ENT_QUOTES, 'UTF-8') . '; color:#fff; padding:14px 18px; border-radius:10px; text-decoration:none; font-weight:600;">' . htmlspecialchars($ctaLabel, ENT_QUOTES, 'UTF-8') . '</a>';
+            $html[] = '      </p>';
+            $html[] = '    </div>';
+            $html[] = '    <div style="padding:16px 22px; background:' . htmlspecialchars($footerBg, ENT_QUOTES, 'UTF-8') . '; border-top:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '; font-size:13px; color:#4b5563;">';
+            $html[] = '      <p style="margin:0 0 6px 0;">Recibes este email porque estás suscrito a los avisos de ' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '.</p>';
+            $html[] = '      <p style="margin:0;"><a href="' . $safeUnsub . '" style="color:' . htmlspecialchars($primary, ENT_QUOTES, 'UTF-8') . ';">Puedes darte de baja pulsando aquí</a>.</p>';
+            $html[] = '    </div>';
+            $html[] = '  </div>';
+            $html[] = '</div>';
+            return implode('', $html);
+        };
+
+        $bodyBuilder = function (string $recipientEmail) use ($isHtml, $buildText, $buildHtml) {
+            if ($isHtml) {
+                $text = $buildText($recipientEmail);
+                $html = $buildHtml($recipientEmail);
+                return [$text, $html];
+            }
+            $text = $buildText($recipientEmail);
+            $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
+            return [$text, $html];
+        };
         try {
-            $result = admin_send_mailing_broadcast($subject, $textBody, $htmlBody, $subscribers, $mailingConfig);
+            $result = admin_send_mailing_broadcast($subject, '', '', $subscribers, $mailingConfig, $bodyBuilder);
             $message = 'Aviso enviado. OK: ' . $result['sent'] . ' / Fallos: ' . $result['failed'];
             $type = $result['failed'] > 0 ? 'warning' : 'success';
             $_SESSION['mailing_feedback'] = [

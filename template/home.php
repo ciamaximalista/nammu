@@ -80,8 +80,15 @@ $searchPositionSetting = in_array($searchSettings['position'] ?? 'title', ['titl
 $showHomeSearch = in_array($searchMode, ['home', 'both'], true);
 $homeSearchTop = $showHomeSearch && $searchPositionSetting === 'title';
 $homeSearchBottom = $showHomeSearch && $searchPositionSetting === 'footer';
+$subscriptionSettings = $theme['subscription'] ?? [];
+$subscriptionMode = in_array($subscriptionSettings['mode'] ?? 'none', ['none', 'home', 'single', 'both'], true) ? $subscriptionSettings['mode'] : 'none';
+$subscriptionPositionSetting = in_array($subscriptionSettings['position'] ?? 'footer', ['title', 'footer'], true) ? $subscriptionSettings['position'] : 'footer';
+$showHomeSubscription = in_array($subscriptionMode, ['home', 'both'], true);
+$homeSubscriptionTop = $showHomeSubscription && $subscriptionPositionSetting === 'title';
+$homeSubscriptionBottom = $showHomeSubscription && $subscriptionPositionSetting === 'footer';
 $searchActionBase = $baseHref ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
+$subscriptionAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/subscribe.php';
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseHref ?? '/') !== '' ? rtrim($baseHref ?? '/', '/') . '/itinerarios' : '/itinerarios');
 $hasItineraries = !empty($hasItineraries);
@@ -89,6 +96,14 @@ $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValu
 $isAlphabetical = !empty($isAlphabetical);
 $letterGroups = $letterGroups ?? [];
 $letterGroupUrls = $letterGroupUrls ?? [];
+$subscriptionSuccess = isset($_GET['subscribed']) && $_GET['subscribed'] === '1';
+$subscriptionError = isset($_GET['sub_error']) && $_GET['sub_error'] === '1';
+$subscriptionMessage = '';
+if ($subscriptionSuccess) {
+    $subscriptionMessage = 'Te has suscrito correctamente.';
+} elseif ($subscriptionError) {
+    $subscriptionMessage = 'No pudimos procesar ese correo. Revisa la dirección e inténtalo de nuevo.';
+}
 $renderSearchBox = static function (string $variant) use ($searchAction, $accentColor, $highlight, $textColor, $searchActionBase, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
@@ -131,6 +146,28 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $accent
                 </a>
             <?php endif; ?>
         </form>
+    </div>
+    <?php
+    return (string) ob_get_clean();
+};
+$renderSubscriptionBox = static function (string $variant) use ($subscriptionAction, $accentColor, $highlight, $textColor, $subscriptionMessage): string {
+    ob_start(); ?>
+    <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?> site-subscription-box">
+        <form class="site-search-form subscription-form" method="post" action="<?= htmlspecialchars($subscriptionAction, ENT_QUOTES, 'UTF-8') ?>">
+            <span class="search-icon subscription-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="3" y="5" width="18" height="14" rx="2" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                    <polyline points="3,7 12,13 21,7" fill="none" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </span>
+            <input type="email" name="subscriber_email" placeholder="Tu correo" required>
+            <button type="submit" aria-label="Suscribirme" style="background: <?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>; color:#fff;">Suscribirme</button>
+        </form>
+        <?php if ($subscriptionMessage !== ''): ?>
+            <div class="subscription-feedback" style="color: <?= htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') ?>; background: <?= htmlspecialchars($highlight, ENT_QUOTES, 'UTF-8') ?>; border-radius: 10px; padding:10px; margin-top:10px; font-size:14px;">
+                <?= htmlspecialchars($subscriptionMessage, ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
     </div>
     <?php
     return (string) ob_get_clean();
@@ -353,6 +390,11 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         <?= $renderSearchBox('variant-inline minimal') ?>
     </section>
 <?php endif; ?>
+<?php if ($homeSubscriptionTop): ?>
+    <section class="site-search-block placement-top site-subscription-block">
+        <?= $renderSubscriptionBox('variant-inline minimal') ?>
+    </section>
+<?php endif; ?>
 
 <?php if ($bioHtml !== ''): ?>
     <section class="site-bio">
@@ -460,6 +502,11 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         <?= $renderSearchBox('variant-panel') ?>
     </section>
 <?php endif; ?>
+<?php if ($homeSubscriptionBottom): ?>
+    <section class="site-search-block placement-bottom site-subscription-block">
+        <?= $renderSubscriptionBox('variant-panel') ?>
+    </section>
+<?php endif; ?>
 
 <style>
     .home-hero {
@@ -542,6 +589,24 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     .site-search-form input:focus {
         outline: 2px solid <?= $accentColor ?>;
         border-color: <?= $accentColor ?>;
+    }
+    .site-subscription-box .site-search-form {
+        flex-wrap: wrap;
+    }
+    .site-subscription-box .site-search-form input[type="email"] {
+        flex: 1 1 240px;
+        padding: 0.75rem 1rem;
+        border-radius: var(--nammu-radius-md);
+        border: 1px solid rgba(0,0,0,0.1);
+        font-size: 1rem;
+    }
+    .site-subscription-box .site-search-form button {
+        padding: 0 1rem;
+        height: 44px;
+        min-width: 130px;
+    }
+    .site-subscription-box .subscription-feedback {
+        border: 1px solid rgba(0,0,0,0.05);
     }
     .search-categories-link,
     .search-letters-link {

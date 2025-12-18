@@ -39,11 +39,15 @@ $cornerStyle = $theme['corners'] ?? ($themeGlobal['corners'] ?? 'rounded');
 $cornerClass = $cornerStyle === 'square' ? 'corners-square' : 'corners-rounded';
 $searchSettings = $theme['search'] ?? [];
 $searchFloatingEnabled = ($searchSettings['floating'] ?? 'off') === 'on';
+$subscriptionSettings = $theme['subscription'] ?? [];
+$subscriptionFloatingEnabled = ($subscriptionSettings['floating'] ?? 'off') === 'on';
 $baseHref = $baseUrl ?? '/';
 $searchBaseNormalized = rtrim($baseHref === '' ? '/' : $baseHref, '/');
 $floatingSearchAction = $searchBaseNormalized === '' ? '/buscar.php' : $searchBaseNormalized . '/buscar.php';
 $floatingCategoriesUrl = $searchBaseNormalized === '' ? '/categorias' : $searchBaseNormalized . '/categorias';
 $showFloatingSearch = $searchFloatingEnabled && !empty($showLogo) && !empty($logoUrl);
+$floatingSubscriptionAction = $searchBaseNormalized === '' ? '/subscribe.php' : $searchBaseNormalized . '/subscribe.php';
+$showFloatingSubscription = $subscriptionFloatingEnabled && !empty($showLogo) && !empty($logoUrl);
 $hasFooterLogo = $footerLogoPosition !== 'none' && !empty($logoUrl);
 $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
 ?><!DOCTYPE html>

@@ -17,6 +17,12 @@ $searchPositionSetting = in_array($searchSettings['position'] ?? 'title', ['titl
 $showSingleSearch = in_array($searchMode, ['single', 'both'], true);
 $singleSearchTop = $showSingleSearch && $searchPositionSetting === 'title';
 $singleSearchBottom = $showSingleSearch && $searchPositionSetting === 'footer';
+$subscriptionSettings = $theme['subscription'] ?? [];
+$subscriptionMode = in_array($subscriptionSettings['mode'] ?? 'none', ['none', 'home', 'single', 'both'], true) ? $subscriptionSettings['mode'] : 'none';
+$subscriptionPositionSetting = in_array($subscriptionSettings['position'] ?? 'footer', ['title', 'footer'], true) ? $subscriptionSettings['position'] : 'footer';
+$showSingleSubscription = in_array($subscriptionMode, ['single', 'both'], true);
+$singleSubscriptionTop = $showSingleSubscription && $subscriptionPositionSetting === 'title';
+$singleSubscriptionBottom = $showSingleSubscription && $subscriptionPositionSetting === 'footer';
 $suppressSingleSearchTop = !empty($suppressSingleSearchTop);
 $suppressSingleSearchBottom = !empty($suppressSingleSearchBottom);
 if ($suppressSingleSearchTop) {
@@ -27,10 +33,19 @@ if ($suppressSingleSearchBottom) {
 }
 $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
+$subscriptionAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/subscribe.php';
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/itinerarios' : '/itinerarios');
 $hasItineraries = !empty($hasItineraries);
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
+$subscriptionSuccess = isset($_GET['subscribed']) && $_GET['subscribed'] === '1';
+$subscriptionError = isset($_GET['sub_error']) && $_GET['sub_error'] === '1';
+$subscriptionMessage = '';
+if ($subscriptionSuccess) {
+    $subscriptionMessage = 'Te has suscrito correctamente.';
+} elseif ($subscriptionError) {
+    $subscriptionMessage = 'No pudimos procesar ese correo. Revisa la dirección e inténtalo de nuevo.';
+}
 $autoTocHtml = isset($autoTocHtml) ? trim((string) $autoTocHtml) : '';
 $customMetaBand = isset($customMetaBand) ? trim((string) $customMetaBand) : '';
 $renderSearchBox = static function (string $variant) use ($searchAction, $colorHighlight, $colorAccent, $colorText, $searchActionBase, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl): string {
@@ -75,6 +90,28 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $colorH
                 </a>
             <?php endif; ?>
         </form>
+    </div>
+    <?php
+    return (string) ob_get_clean();
+};
+$renderSubscriptionBox = static function (string $variant) use ($subscriptionAction, $colorAccent, $colorHighlight, $colorText, $subscriptionMessage): string {
+    ob_start(); ?>
+    <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?> site-subscription-box">
+        <form class="site-search-form subscription-form" method="post" action="<?= htmlspecialchars($subscriptionAction, ENT_QUOTES, 'UTF-8') ?>">
+            <span class="search-icon subscription-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="3" y="5" width="18" height="14" rx="2" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                    <polyline points="3,7 12,13 21,7" fill="none" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </span>
+            <input type="email" name="subscriber_email" placeholder="Tu correo" required>
+            <button type="submit" aria-label="Suscribirme" style="background: <?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>; color:#fff;">Suscribirme</button>
+        </form>
+        <?php if ($subscriptionMessage !== ''): ?>
+            <div class="subscription-feedback" style="color: <?= htmlspecialchars($colorText, ENT_QUOTES, 'UTF-8') ?>; background: <?= htmlspecialchars($colorHighlight, ENT_QUOTES, 'UTF-8') ?>; border-radius: 10px; padding:10px; margin-top:10px; font-size:14px;">
+                <?= htmlspecialchars($subscriptionMessage, ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
     </div>
     <?php
     return (string) ob_get_clean();
@@ -181,6 +218,11 @@ if ($isPageTemplate && $formattedDate !== '') {
                     <?= $renderSearchBox('variant-inline minimal') ?>
                 </div>
             <?php endif; ?>
+            <?php if ($singleSubscriptionTop): ?>
+                <div class="site-search-block placement-top within-brand site-subscription-block">
+                    <?= $renderSubscriptionBox('variant-inline minimal') ?>
+                </div>
+            <?php endif; ?>
         </div>
         <h1><?= htmlspecialchars($post->getTitle(), ENT_QUOTES, 'UTF-8') ?></h1>
 <?php if (!$isPageTemplate && $topMetaText !== '' && empty($hideCategory)): ?>
@@ -218,6 +260,11 @@ if ($isPageTemplate && $formattedDate !== '') {
     <?php if ($singleSearchBottom && empty($suppressSingleSearchBottom)): ?>
         <div class="site-search-block placement-bottom">
             <?= $renderSearchBox('variant-panel') ?>
+        </div>
+    <?php endif; ?>
+    <?php if ($singleSubscriptionBottom): ?>
+        <div class="site-search-block placement-bottom site-subscription-block">
+            <?= $renderSubscriptionBox('variant-panel') ?>
         </div>
     <?php endif; ?>
 </article>
@@ -273,6 +320,24 @@ if ($isPageTemplate && $formattedDate !== '') {
     .site-search-form input:focus {
         outline: 2px solid <?= $colorAccent ?>;
         border-color: <?= $colorAccent ?>;
+    }
+    .site-subscription-box .site-search-form {
+        flex-wrap: wrap;
+    }
+    .site-subscription-box .site-search-form input[type="email"] {
+        flex: 1 1 240px;
+        padding: 0.7rem 0.9rem;
+        border-radius: 12px;
+        border: 1px solid rgba(0,0,0,0.1);
+        font-size: 1rem;
+    }
+    .site-subscription-box .site-search-form button {
+        padding: 0 1rem;
+        height: 42px;
+        min-width: 120px;
+    }
+    .site-subscription-box .subscription-feedback {
+        border: 1px solid rgba(0,0,0,0.05);
     }
     @media (max-width: 640px) {
         .site-search-form {

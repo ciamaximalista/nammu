@@ -1766,18 +1766,13 @@ function admin_google_refresh_access_token(string $clientId, string $clientSecre
 }
 
 function admin_gmail_send_message(string $from, string $to, string $subject, string $textBody, string $htmlBody, string $accessToken, ?string $fromName = null): array {
-    $encodeHeader = function (string $value): string {
-        if (function_exists('mb_encode_mimeheader')) {
-            return mb_encode_mimeheader($value, 'UTF-8', 'B', "\r\n");
-        }
-        return '=?UTF-8?B?' . base64_encode($value) . '?=';
-    };
     $boundary = '=_NammuMailer_' . bin2hex(random_bytes(8));
-    $fromHeader = $fromName && trim($fromName) !== '' ? $encodeHeader($fromName) . ' <' . $from . '>' : $from;
-    $subjectHeader = $encodeHeader($subject);
+    $fromHeader = $fromName && trim($fromName) !== '' ? '"' . addslashes($fromName) . '" <' . $from . '>' : $from;
+    $subjectHeader = function_exists('mb_encode_mimeheader')
+        ? mb_encode_mimeheader($subject, 'UTF-8', 'B', "\r\n")
+        : '=?UTF-8?B?' . base64_encode($subject) . '?=';
     $headers = [
         'From: ' . $fromHeader,
-        'Reply-To: ' . $fromHeader,
         'To: ' . $to,
         'Subject: ' . $subjectHeader,
         'MIME-Version: 1.0',

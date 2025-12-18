@@ -1742,7 +1742,11 @@ function admin_google_refresh_access_token(string $clientId, string $clientSecre
     $context = stream_context_create($opts);
     $raw = @file_get_contents('https://oauth2.googleapis.com/token', false, $context);
     if ($raw === false) {
-        throw new RuntimeException('No se pudo refrescar el token con Google.');
+        $status = '';
+        if (isset($http_response_header[0])) {
+            $status = ' (' . $http_response_header[0] . ')';
+        }
+        throw new RuntimeException('No se pudo refrescar el token con Google' . $status);
     }
     $decoded = json_decode($raw, true);
     if (!is_array($decoded)) {
@@ -1760,7 +1764,7 @@ function admin_google_refresh_access_token(string $clientId, string $clientSecre
     return $decoded;
 }
 
-function admin_gmail_send_message(string $from, string $to, string $subject, string $textBody, string $htmlBody, string $accessToken): bool {
+function admin_gmail_send_message(string $from, string $to, string $subject, string $textBody, string $htmlBody, string $accessToken): array {
     $boundary = '=_NammuMailer_' . bin2hex(random_bytes(8));
     $headers = [
         'From: ' . $from,
@@ -1797,10 +1801,17 @@ function admin_gmail_send_message(string $from, string $to, string $subject, str
     $context = stream_context_create($opts);
     $response = @file_get_contents('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', false, $context);
     if ($response === false) {
-        return false;
+        $status = isset($http_response_header[0]) ? $http_response_header[0] : 'sin respuesta';
+        return [false, 'HTTP ' . $status];
     }
     $decoded = json_decode($response, true);
-    return is_array($decoded) && isset($decoded['id']);
+    if (!is_array($decoded) || !isset($decoded['id'])) {
+        if (isset($decoded['error']['message'])) {
+            return [false, 'Error Gmail: ' . $decoded['error']['message']];
+        }
+        return [false, 'Respuesta inesperada al enviar correo'];
+    }
+    return [true, null];
 }
 
 function admin_is_mailing_ready(array $settings): bool {
@@ -1833,20 +1844,24 @@ function admin_send_mailing_broadcast(string $subject, string $textBody, string 
     admin_save_mailing_tokens($tokens);
     $ok = 0;
     $fail = 0;
+    $lastError = null;
     foreach ($subscribers as $to) {
         $textToSend = $textBody;
         $htmlToSend = $htmlBody;
         if ($bodyBuilder !== null) {
             [$textToSend, $htmlToSend] = $bodyBuilder($to);
         }
-        $sent = admin_gmail_send_message($gmail, $to, $subject, $textToSend, $htmlToSend, $accessToken);
+        [$sent, $err] = admin_gmail_send_message($gmail, $to, $subject, $textToSend, $htmlToSend, $accessToken);
         if ($sent) {
             $ok++;
         } else {
             $fail++;
+            if ($err !== null) {
+                $lastError = $err;
+            }
         }
     }
-    return ['sent' => $ok, 'failed' => $fail];
+    return ['sent' => $ok, 'failed' => $fail, 'error' => $lastError];
 }
 function admin_google_exchange_code(string $code, string $clientId, string $clientSecret, string $redirectUri): array {
     $postData = http_build_query([
@@ -3622,6 +3637,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $result = admin_send_mailing_broadcast($subject, '', '', $subscribers, $mailingConfig, $bodyBuilder);
             $message = 'Aviso enviado. OK: ' . $result['sent'] . ' / Fallos: ' . $result['failed'];
+            if (!empty($result['error'])) {
+                $message .= ' (' . $result['error'] . ')';
+            }
             $type = $result['failed'] > 0 ? 'warning' : 'success';
             $_SESSION['mailing_feedback'] = [
                 'type' => $type,

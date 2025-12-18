@@ -8,10 +8,13 @@
         $mailingSettings = $settings['mailing'] ?? [];
         $mailingGmail = $mailingSettings['gmail_address'] ?? '';
         $mailingStatus = $mailingSettings['status'] ?? 'disconnected';
+        $mailingClientId = $mailingSettings['client_id'] ?? '';
+        $mailingClientSecret = $mailingSettings['client_secret'] ?? '';
         $mailingSubscribers = admin_load_mailing_subscribers();
         $mailingCount = count($mailingSubscribers);
         $mailingTokens = admin_load_mailing_tokens();
         $isConnected = !empty($mailingTokens['refresh_token']);
+        $canConnect = $mailingGmail !== '' && $mailingClientId !== '' && $mailingClientSecret !== '';
         ?>
 
         <p class="text-muted">Configura y consulta aquí la futura lista de correo. Usaremos tu cuenta de Gmail (SMTP con OAuth2 sobre SSL/TLS, puerto 465) para enviar mensajes cuando el módulo esté activo.</p>
@@ -41,7 +44,7 @@
                         <?php endif; ?>
                     </p>
                     <div class="mt-3 d-flex flex-wrap" style="gap: 0.5rem;">
-                        <a class="btn btn-sm btn-primary <?= $mailingGmail === '' ? 'disabled' : '' ?>" href="admin.php?page=lista-correo&amp;gmail_auth=1">Conectar con Google</a>
+                        <a class="btn btn-sm btn-primary <?= $canConnect ? '' : 'disabled' ?>" href="<?= $canConnect ? 'admin.php?page=lista-correo&amp;gmail_auth=1' : '#'; ?>">Conectar con Google</a>
                         <a class="btn btn-sm btn-outline-danger <?= !$isConnected ? 'disabled' : '' ?>" href="admin.php?page=lista-correo&amp;gmail_disconnect=1" onclick="return confirm('¿Desconectar y borrar tokens?');">Desconectar</a>
                         <a class="btn btn-sm btn-outline-secondary" href="?page=configuracion#mailing">Editar configuración</a>
                     </div>
@@ -51,7 +54,11 @@
                         </div>
                     <?php else: ?>
                         <div class="alert alert-warning mt-3 mb-0">
-                            Autoriza con Google para obtener el refresh token y habilitar envíos.
+                            <?php if (!$canConnect): ?>
+                                Completa el correo, Client ID y Client Secret en Configuración y vuelve a conectar.
+                            <?php else: ?>
+                                Autoriza con Google para obtener el refresh token y habilitar envíos.
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
                 </div>

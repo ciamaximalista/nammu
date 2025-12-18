@@ -125,7 +125,7 @@
             </div>
             <?php if (!empty($mailingGmail)): ?>
                 <div class="alert alert-info mb-0">
-                    <?= htmlspecialchars($mailingGmail, ENT_QUOTES, 'UTF-8') ?> está guardado. Cuando activemos OAuth2, se solicitarán permisos de envío para esta cuenta.
+                    <?= htmlspecialchars($mailingGmail, ENT_QUOTES, 'UTF-8') ?> está guardado. Conecta en la pestaña “Lista” para autorizar envíos con OAuth2.
                 </div>
             <?php else: ?>
                 <div class="alert alert-warning mb-0">Aún no hay dirección configurada. Guárdala para habilitar la autenticación con Google.</div>

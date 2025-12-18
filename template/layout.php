@@ -1199,9 +1199,7 @@ $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
             sub_error: 'No pudimos procesar ese correo. Revisa la dirección e inténtalo de nuevo.'
         };
         var target = document.querySelector('[data-floating-subscription]');
-        if (!target) {
-            return;
-        }
+        if (!target) return;
         var msg = '';
         if (params.get('subscribed') === '1') {
             msg = messages.subscribed;
@@ -1210,12 +1208,11 @@ $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
         } else if (params.get('sub_error') === '1') {
             msg = messages.sub_error;
         }
-        if (msg) {
-            var box = document.createElement('div');
-            box.className = 'subscription-feedback';
-            box.textContent = msg;
-            target.appendChild(box);
-        }
+        if (!msg) return;
+        var box = document.createElement('div');
+        box.className = 'subscription-feedback';
+        box.textContent = msg;
+        target.appendChild(box);
     })();
     </script>
 </body>

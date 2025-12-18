@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/core/helpers.php';
+
 define('MAILING_SUBSCRIBERS_FILE', __DIR__ . '/config/mailing-subscribers.json');
 define('MAILING_PENDING_FILE', __DIR__ . '/config/mailing-pending.json');
 
@@ -34,54 +36,49 @@ function subscription_save(string $file, array $data): void {
     @chmod($file, 0664);
 }
 
-function subscription_redirect(string $to, array $params = []): void {
-    $separator = str_contains($to, '?') ? '&' : '?';
-    if (!empty($params)) {
-        $to .= $separator . http_build_query($params);
-    }
-    header('Location: ' . $to);
-    exit;
-}
-
-$referer = $_SERVER['HTTP_REFERER'] ?? '/';
-$back = filter_var($referer, FILTER_VALIDATE_URL) ? $referer : '/';
-
 $email = subscription_normalize_email($_GET['email'] ?? '');
 $token = trim($_GET['token'] ?? '');
 
+// Estado de error o éxito
+$showError = false;
+$errorMessage = '';
+
 if ($email === '' || $token === '') {
-    subscription_redirect($back, ['sub_error' => 1]);
-}
-
-$pending = subscription_load([MAILING_PENDING_FILE, []]);
-$matchIndex = null;
-foreach ($pending as $idx => $entry) {
-    if (!is_array($entry)) {
-        continue;
+    $showError = true;
+    $errorMessage = 'Solicitud inválida. Falta email o token.';
+} else {
+    $pending = subscription_load([MAILING_PENDING_FILE, []]);
+    $matchIndex = null;
+    foreach ($pending as $idx => $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        if (($entry['email'] ?? '') === $email && ($entry['token'] ?? '') === $token) {
+            $matchIndex = $idx;
+            break;
+        }
     }
-    if (($entry['email'] ?? '') === $email && ($entry['token'] ?? '') === $token) {
-        $matchIndex = $idx;
-        break;
+
+    if ($matchIndex === null) {
+        $showError = true;
+        $errorMessage = 'Este enlace de confirmación no es válido o ya se utilizó.';
+    } else {
+        unset($pending[$matchIndex]);
+        $pending = array_values($pending);
+
+        $subscribers = subscription_load([MAILING_SUBSCRIBERS_FILE, []]);
+        if (!in_array($email, $subscribers, true)) {
+            $subscribers[] = $email;
+        }
+
+        try {
+            subscription_save(MAILING_PENDING_FILE, $pending);
+            subscription_save(MAILING_SUBSCRIBERS_FILE, $subscribers);
+        } catch (Throwable $e) {
+            $showError = true;
+            $errorMessage = 'No pudimos confirmar tu suscripción. Inténtalo de nuevo.';
+        }
     }
-}
-
-if ($matchIndex === null) {
-    subscription_redirect($back, ['sub_error' => 1]);
-}
-
-unset($pending[$matchIndex]);
-$pending = array_values($pending);
-
-$subscribers = subscription_load([MAILING_SUBSCRIBERS_FILE, []]);
-if (!in_array($email, $subscribers, true)) {
-    $subscribers[] = $email;
-}
-
-try {
-    subscription_save(MAILING_PENDING_FILE, $pending);
-    subscription_save(MAILING_SUBSCRIBERS_FILE, $subscribers);
-} catch (Throwable $e) {
-    subscription_redirect($back, ['sub_error' => 1]);
 }
 
 // Página de éxito con cabecera sencilla usando datos del blog
@@ -143,13 +140,21 @@ if ($siteUrl === '') {
 </head>
 <body>
     <div class="confirm-card">
-        <h1 class="confirm-title">Suscripción realizada con éxito</h1>
-        <p class="confirm-text">A partir de ahora recibirás los avisos de publicación de <?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?>.</p>
-        <?php if ($siteAuthor !== ''): ?>
-            <p class="confirm-text">Enviado por: <?= htmlspecialchars($siteAuthor, ENT_QUOTES, 'UTF-8') ?></p>
-        <?php endif; ?>
-        <?php if ($siteUrl !== ''): ?>
-            <a class="confirm-link" href="<?= htmlspecialchars($siteUrl, ENT_QUOTES, 'UTF-8') ?>">Volver al sitio</a>
+        <?php if ($showError): ?>
+            <h1 class="confirm-title">No pudimos confirmar</h1>
+            <p class="confirm-text"><?= htmlspecialchars($errorMessage, ENT_QUOTES, 'UTF-8') ?></p>
+            <?php if ($siteUrl !== ''): ?>
+                <a class="confirm-link" href="<?= htmlspecialchars($siteUrl, ENT_QUOTES, 'UTF-8') ?>">Volver al sitio</a>
+            <?php endif; ?>
+        <?php else: ?>
+            <h1 class="confirm-title">Suscripción realizada con éxito</h1>
+            <p class="confirm-text">A partir de ahora recibirás los avisos de publicación de <?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?>.</p>
+            <?php if ($siteAuthor !== ''): ?>
+                <p class="confirm-text">Enviado por: <?= htmlspecialchars($siteAuthor, ENT_QUOTES, 'UTF-8') ?></p>
+            <?php endif; ?>
+            <?php if ($siteUrl !== ''): ?>
+                <a class="confirm-link" href="<?= htmlspecialchars($siteUrl, ENT_QUOTES, 'UTF-8') ?>">Volver al sitio</a>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
 </body>

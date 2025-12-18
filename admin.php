@@ -1773,7 +1773,7 @@ function admin_gmail_send_message(string $from, string $to, string $subject, str
         return '=?UTF-8?B?' . base64_encode($value) . '?=';
     };
     $boundary = '=_NammuMailer_' . bin2hex(random_bytes(8));
-    $fromHeader = $fromName && trim($fromName) !== '' ? sprintf('"%s" <%s>', $encodeHeader($fromName), $from) : $from;
+    $fromHeader = $fromName && trim($fromName) !== '' ? $encodeHeader($fromName) . ' <' . $from . '>' : $from;
     $subjectHeader = $encodeHeader($subject);
     $headers = [
         'From: ' . $fromHeader,
@@ -3587,7 +3587,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $normalizedImage = ltrim($imagePath, '/');
                 $normalizedImage = str_replace(['../', '..\\', './', '.\\'], '', $normalizedImage);
-                $imageUrl = $baseForAssets . '/' . $normalizedImage;
+                $candidates = [];
+                $candidates[] = $normalizedImage;
+                if (!str_starts_with($normalizedImage, 'assets/')) {
+                    $candidates[] = 'assets/' . $normalizedImage;
+                }
+                foreach ($candidates as $cand) {
+                    $local = __DIR__ . '/' . $cand;
+                    if (is_file($local) || is_file(__DIR__ . '/' . ltrim($cand, '/'))) {
+                        $imageUrl = $baseForAssets . '/' . $cand;
+                        break;
+                    }
+                }
+                if ($imageUrl === '' && !empty($candidates)) {
+                    $imageUrl = $baseForAssets . '/' . $candidates[0];
+                }
             }
         }
         $logoPath = $settings['template']['images']['logo'] ?? '';

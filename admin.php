@@ -1777,6 +1777,7 @@ function admin_gmail_send_message(string $from, string $to, string $subject, str
     $subjectHeader = $encodeHeader($subject);
     $headers = [
         'From: ' . $fromHeader,
+        'Reply-To: ' . $fromHeader,
         'To: ' . $to,
         'Subject: ' . $subjectHeader,
         'MIME-Version: 1.0',
@@ -3585,6 +3586,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $imageUrl = $imagePath;
             } else {
                 $normalizedImage = ltrim($imagePath, '/');
+                $normalizedImage = str_replace(['../', '..\\', './', '.\\'], '', $normalizedImage);
                 $imageUrl = $baseForAssets . '/' . $normalizedImage;
             }
         }
@@ -3595,6 +3597,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $logoUrl = $logoPath;
             } else {
                 $normalizedLogo = ltrim($logoPath, '/');
+                $normalizedLogo = str_replace(['../', '..\\', './', '.\\'], '', $normalizedLogo);
                 $logoUrl = $baseForAssets . '/' . $normalizedLogo;
             }
         }
@@ -3640,7 +3643,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $html[] = '    <div style="padding:22px;">';
             $html[] = '      <h2 style="margin:0 0 12px 0; font-size:22px; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . ';">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
             if ($imageUrl !== '') {
-                $html[] = '      <img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-radius:12px; margin:0 0 14px 0;">';
+                $html[] = '      <div style="margin:0 0 14px 0;"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-radius:12px; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . ';"></div>';
             }
             if ($description !== '') {
                 $html[] = '      <p style="margin:0 0 14px 0; line-height:1.5;">' . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')) . '</p>';

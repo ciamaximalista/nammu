@@ -105,6 +105,17 @@
                                 $searchFloatingValue = $searchDefaults['floating'];
                             }
                             $searchFloating = $searchFloatingValue;
+                            $subscriptionDefaults = $defaults['subscription'] ?? ['mode' => 'none', 'position' => 'footer', 'floating' => 'off'];
+                            $templateSubscription = array_merge($subscriptionDefaults, $templateSettings['subscription'] ?? []);
+                            $subscriptionModesAllowed = ['none', 'home', 'single', 'both'];
+                            $subscriptionPositionsAllowed = ['title', 'footer'];
+                            $subscriptionMode = in_array($templateSubscription['mode'], $subscriptionModesAllowed, true) ? $templateSubscription['mode'] : $subscriptionDefaults['mode'];
+                            $subscriptionPosition = in_array($templateSubscription['position'], $subscriptionPositionsAllowed, true) ? $templateSubscription['position'] : $subscriptionDefaults['position'];
+                            $subscriptionFloatingValue = $templateSubscription['floating'] ?? $subscriptionDefaults['floating'];
+                            if (!in_array($subscriptionFloatingValue, ['off', 'on'], true)) {
+                                $subscriptionFloatingValue = $subscriptionDefaults['floating'];
+                            }
+                            $subscriptionFloating = $subscriptionFloatingValue;
                             ?>
 
                             <div class="tab-pane active">
@@ -767,11 +778,135 @@
                                                 ],
                                             ];
                                             ?>
-                                            <?php foreach ($searchFloatingOptions as $floatKey => $info): ?>
-                                                <?php $floatActive = ($searchFloating === $floatKey); ?>
-                                                <label class="home-card-style-option <?= $floatActive ? 'active' : '' ?>" data-search-floating-option="1">
+                                        <?php foreach ($searchFloatingOptions as $floatKey => $info): ?>
+                                            <?php $floatActive = ($searchFloating === $floatKey); ?>
+                                            <label class="home-card-style-option <?= $floatActive ? 'active' : '' ?>" data-search-floating-option="1">
+                                                <input type="radio"
+                                                    name="search_floating"
+                                                    value="<?= htmlspecialchars($floatKey, ENT_QUOTES, 'UTF-8') ?>"
+                                                    <?= $floatActive ? 'checked' : '' ?>>
+                                                <span class="search-floating-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">
+                                                    <span class="search-box">
+                                                        <span class="icon"></span>
+                                                    </span>
+                                                    <span class="search-hint"></span>
+                                                </span>
+                                                <span class="card-style-text">
+                                                    <strong><?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                                    <small><?= htmlspecialchars($info['caption'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                </span>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+
+                                    <h4 class="mt-4">Suscripción a la lista</h4>
+                                    <p class="text-muted">Muestra la caja para que los visitantes dejen su email y se unan a la lista.</p>
+                                    <div class="home-card-style-options" data-subscription-mode-options>
+                                        <?php
+                                        $subscriptionModeOptions = [
+                                            'none' => [
+                                                'label' => 'No mostrar',
+                                                'caption' => 'Sin caja de suscripción en el sitio',
+                                                'figure' => 'search-none',
+                                            ],
+                                            'home' => [
+                                                'label' => 'Sólo en la portada',
+                                                'caption' => 'Caja en la página principal',
+                                                'figure' => 'search-home',
+                                            ],
+                                            'single' => [
+                                                'label' => 'Sólo en las entradas',
+                                                'caption' => 'Aparece en cada artículo',
+                                                'figure' => 'search-single',
+                                            ],
+                                            'both' => [
+                                                'label' => 'Portada y entradas',
+                                                'caption' => 'Visible en listados y artículos',
+                                                'figure' => 'search-both',
+                                            ],
+                                        ];
+                                        ?>
+                                        <?php foreach ($subscriptionModeOptions as $modeKey => $info): ?>
+                                            <?php $modeActive = ($subscriptionMode === $modeKey); ?>
+                                            <label class="home-card-style-option <?= $modeActive ? 'active' : '' ?>" data-subscription-mode-option="1">
+                                                <input type="radio"
+                                                    name="subscription_mode"
+                                                    value="<?= htmlspecialchars($modeKey, ENT_QUOTES, 'UTF-8') ?>"
+                                                    <?= $modeActive ? 'checked' : '' ?>>
+                                                <span class="search-mode-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">
+                                                    <span class="search-box">
+                                                        <span class="icon"></span>
+                                                        <span class="line"></span>
+                                                    </span>
+                                                </span>
+                                                <span class="card-style-text">
+                                                    <strong><?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                                    <small><?= htmlspecialchars($info['caption'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                </span>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <div class="mt-3" data-subscription-position <?= $subscriptionMode === 'none' ? 'style="display:none;"' : '' ?>>
+                                        <label>Ubicación de la caja</label>
+                                        <div class="home-card-style-options">
+                                            <?php
+                                            $subscriptionPositionOptions = [
+                                                'title' => [
+                                                    'label' => 'Bajo el título',
+                                                    'caption' => 'Caja alineada con el encabezado principal',
+                                                    'figure' => 'search-pos-title',
+                                                ],
+                                                'footer' => [
+                                                    'label' => 'Sobre el footer',
+                                                    'caption' => 'Bloque destacado antes del pie de página',
+                                                    'figure' => 'search-pos-footer',
+                                                ],
+                                            ];
+                                            ?>
+                                            <?php foreach ($subscriptionPositionOptions as $posKey => $info): ?>
+                                                <?php $posActive = ($subscriptionPosition === $posKey); ?>
+                                                <label class="home-card-style-option <?= $posActive ? 'active' : '' ?>" data-subscription-position-option="1">
                                                     <input type="radio"
-                                                        name="search_floating"
+                                                        name="subscription_position"
+                                                        value="<?= htmlspecialchars($posKey, ENT_QUOTES, 'UTF-8') ?>"
+                                                        <?= $posActive ? 'checked' : '' ?>>
+                                                    <span class="search-position-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">
+                                                        <span class="search-box">
+                                                            <span class="icon"></span>
+                                                            <span class="line"></span>
+                                                        </span>
+                                                    </span>
+                                                    <span class="card-style-text">
+                                                        <strong><?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                                        <small><?= htmlspecialchars($info['caption'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                    </span>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3" data-subscription-floating>
+                                        <label>Suscripción flotante</label>
+                                        <p class="text-muted mb-2">Muestra una caja compacta flotando bajo el logotipo en páginas internas.</p>
+                                        <div class="home-card-style-options">
+                                            <?php
+                                            $subscriptionFloatingOptions = [
+                                                'off' => [
+                                                    'label' => 'Desactivado',
+                                                    'caption' => 'Sin caja flotante',
+                                                    'figure' => 'search-float-off',
+                                                ],
+                                                'on' => [
+                                                    'label' => 'Flotando en el margen',
+                                                    'caption' => 'Caja ligera junto al logotipo en vistas interiores',
+                                                    'figure' => 'search-float-on',
+                                                ],
+                                            ];
+                                            ?>
+                                            <?php foreach ($subscriptionFloatingOptions as $floatKey => $info): ?>
+                                                <?php $floatActive = ($subscriptionFloating === $floatKey); ?>
+                                                <label class="home-card-style-option <?= $floatActive ? 'active' : '' ?>" data-subscription-floating-option="1">
+                                                    <input type="radio"
+                                                        name="subscription_floating"
                                                         value="<?= htmlspecialchars($floatKey, ENT_QUOTES, 'UTF-8') ?>"
                                                         <?= $floatActive ? 'checked' : '' ?>>
                                                     <span class="search-floating-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">

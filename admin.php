@@ -1454,6 +1454,11 @@ function get_default_template_settings(): array {
             'position' => 'title',
             'floating' => 'off',
         ],
+        'subscription' => [
+            'mode' => 'none',
+            'position' => 'footer',
+            'floating' => 'off',
+        ],
         'entry' => [
             'toc' => [
                 'auto' => 'off',
@@ -3929,6 +3934,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($searchFloatingPosted, ['off', 'on'], true)) {
             $searchFloatingPosted = $searchDefaults['floating'] ?? 'off';
         }
+        $subscriptionDefaults = $defaults['subscription'] ?? ['mode' => 'none', 'position' => 'footer', 'floating' => 'off'];
+        $subscriptionModePosted = $_POST['subscription_mode'] ?? $subscriptionDefaults['mode'];
+        if (!in_array($subscriptionModePosted, ['none', 'home', 'single', 'both'], true)) {
+            $subscriptionModePosted = $subscriptionDefaults['mode'];
+        }
+        $subscriptionPositionPosted = $_POST['subscription_position'] ?? $subscriptionDefaults['position'];
+        if (!in_array($subscriptionPositionPosted, ['title', 'footer'], true)) {
+            $subscriptionPositionPosted = $subscriptionDefaults['position'];
+        }
+        if ($subscriptionModePosted === 'none') {
+            $subscriptionPositionPosted = $subscriptionDefaults['position'];
+        }
+        $subscriptionFloatingPosted = $_POST['subscription_floating'] ?? ($subscriptionDefaults['floating'] ?? 'off');
+        if (!in_array($subscriptionFloatingPosted, ['off', 'on'], true)) {
+            $subscriptionFloatingPosted = $subscriptionDefaults['floating'] ?? 'off';
+        }
         $entryTocDefaults = $defaults['entry']['toc'] ?? ['auto' => 'off', 'min_headings' => 3];
         $entryAutoPosted = $_POST['entry_toc_auto'] ?? ($entryTocDefaults['auto'] ?? 'off');
         if (!in_array($entryAutoPosted, ['on', 'off'], true)) {
@@ -3971,6 +3992,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'mode' => $searchModePosted,
                 'position' => $searchPositionPosted,
                 'floating' => $searchFloatingPosted,
+            ],
+            'subscription' => [
+                'mode' => $subscriptionModePosted,
+                'position' => $subscriptionPositionPosted,
+                'floating' => $subscriptionFloatingPosted,
             ],
             'entry' => [
                 'toc' => [

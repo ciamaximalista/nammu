@@ -1769,11 +1769,7 @@ function admin_gmail_send_message(string $from, string $to, string $subject, str
     $boundary = '=_NammuMailer_' . bin2hex(random_bytes(8));
     $displayName = $fromName && trim($fromName) !== '' ? trim($fromName) : '';
     if ($displayName !== '') {
-        if (preg_match('/^[\\x20-\\x7E]+$/', $displayName)) {
-            // ASCII safe, no encoding needed
-        } else {
-            $displayName = '=?UTF-8?B?' . base64_encode($displayName) . '?=';
-        }
+        $displayName = '=?UTF-8?B?' . base64_encode($displayName) . '?=';
     }
     $fromHeader = $displayName !== '' ? $displayName . ' <' . $from . '>' : $from;
     $subjectHeader = function_exists('mb_encode_mimeheader')
@@ -3659,7 +3655,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $html[] = '      <div style="font-size:20px; font-weight:700;">' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '</div>';
             $html[] = '    </div>';
             $html[] = '    <div style="padding:22px;">';
-            $html[] = '      <h2 style="margin:0 0 12px 0; font-size:22px; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . ';">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
+            $html[] = '      <h2 style="margin:0 0 14px 0; font-size:26px; line-height:1.3; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . ';">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
             if ($imageUrl !== '') {
                 $html[] = '      <div style="margin:0 0 14px 0;"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-radius:12px; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . ';"></div>';
             }

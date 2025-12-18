@@ -1769,8 +1769,8 @@ function admin_gmail_send_message(string $from, string $to, string $subject, str
     $boundary = '=_NammuMailer_' . bin2hex(random_bytes(8));
     $displayName = $fromName && trim($fromName) !== '' ? trim($fromName) : '';
     if ($displayName !== '') {
-        if (function_exists('mb_encode_mimeheader')) {
-            $displayName = mb_encode_mimeheader($displayName, 'UTF-8', 'Q', "\r\n");
+        if (preg_match('/^[\\x20-\\x7E]+$/', $displayName)) {
+            // ASCII safe, no encoding needed
         } else {
             $displayName = '=?UTF-8?B?' . base64_encode($displayName) . '?=';
         }
@@ -1781,7 +1781,6 @@ function admin_gmail_send_message(string $from, string $to, string $subject, str
         : '=?UTF-8?B?' . base64_encode($subject) . '?=';
     $headers = [
         'From: ' . $fromHeader,
-        'Sender: ' . $fromHeader,
         'Reply-To: ' . $fromHeader,
         'To: ' . $to,
         'Subject: ' . $subjectHeader,

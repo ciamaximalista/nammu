@@ -381,8 +381,9 @@ $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
             border: 1px solid rgba(0,0,0,0.08);
             box-shadow: 0 18px 32px rgba(0,0,0,0.12);
             padding: 0.6rem 0.75rem;
-            z-index: 1099;
+            z-index: 2000;
             backdrop-filter: blur(6px);
+            pointer-events: auto;
         }
         .floating-search-form {
             display: flex;
@@ -1230,6 +1231,23 @@ $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
         box.className = 'subscription-feedback';
         box.textContent = msg;
         target.appendChild(box);
+    })();
+    </script>
+    <script>
+    (function() {
+        var stack = Array.prototype.slice.call(document.querySelectorAll('.floating-search'));
+        if (!stack.length) return;
+        function restack() {
+            var isMobile = window.matchMedia('(max-width: 720px)').matches;
+            var offset = isMobile ? 16 : (parseInt(getComputedStyle(document.documentElement).fontSize, 10) * 2.5);
+            var gap = isMobile ? 12 : 14;
+            stack.forEach(function(el) {
+                el.style.bottom = offset + 'px';
+                offset += el.offsetHeight + gap;
+            });
+        }
+        window.addEventListener('resize', restack);
+        restack();
     })();
     </script>
 </body>

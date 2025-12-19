@@ -1631,6 +1631,29 @@ function admin_normalize_email(string $email): string {
     return $email;
 }
 
+function admin_parse_hex_color(string $hex, int &$r, int &$g, int &$b): bool {
+    $value = ltrim(trim($hex), '#');
+    if (strlen($value) === 3) {
+        $value = $value[0] . $value[0] . $value[1] . $value[1] . $value[2] . $value[2];
+    }
+    if (strlen($value) !== 6 || !ctype_xdigit($value)) {
+        return false;
+    }
+    $r = hexdec(substr($value, 0, 2));
+    $g = hexdec(substr($value, 2, 2));
+    $b = hexdec(substr($value, 4, 2));
+    return true;
+}
+
+function admin_pick_contrast_color(string $backgroundHex, string $light = '#ffffff', string $dark = '#111111'): string {
+    $r = $g = $b = 0;
+    if (!admin_parse_hex_color($backgroundHex, $r, $g, $b)) {
+        return $dark;
+    }
+    $yiq = (($r * 299) + ($g * 587) + ($b * 114)) / 1000;
+    return $yiq >= 160 ? $dark : $light;
+}
+
 function admin_load_mailing_subscribers(): array {
     $file = MAILING_SUBSCRIBERS_FILE;
     if (!is_file($file)) {
@@ -3680,11 +3703,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         $colors = $settings['template']['colors'] ?? [];
-        $primary = $colors['primary'] ?? '#1b8eed';
-        $bg = $colors['body_bg'] ?? '#f5f7fb';
-        $textColor = $colors['body_text'] ?? '#1f2933';
-        $footerBg = '#f9fafb';
-        $border = '#e5e7eb';
+        $colorBackground = $colors['background'] ?? '#ffffff';
+        $colorText = $colors['text'] ?? '#222222';
+        $colorHighlight = $colors['highlight'] ?? '#f3f6f9';
+        $colorAccent = $colors['accent'] ?? '#0a4c8a';
+        $colorH1 = $colors['h1'] ?? $colorAccent;
+        $colorH2 = $colors['h2'] ?? $colorText;
+        $headerBg = $colorH1;
+        $ctaColor = $colorH1;
+        $outerBg = $colorHighlight;
+        $cardBg = $colorBackground;
+        $footerBg = $colorHighlight;
+        $border = $colorAccent;
+        $headerText = admin_pick_contrast_color($headerBg, '#ffffff', '#111111');
+        $ctaText = admin_pick_contrast_color($ctaColor, '#ffffff', '#111111');
+        $footerText = admin_pick_contrast_color($footerBg, '#ffffff', $colorText);
         $titleFont = $settings['template']['fonts']['title'] ?? 'Arial';
         $bodyFont = $settings['template']['fonts']['body'] ?? 'Arial';
         $fontsUrl = '';
@@ -3721,37 +3754,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             return implode("\n", $lines);
         };
 
-        $buildHtml = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link, $imageUrl, $logoUrl, $primary, $bg, $textColor, $footerBg, $border, $ctaLabel, $fontsUrl, $titleFontCss, $bodyFontCss) {
+        $buildHtml = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link, $imageUrl, $logoUrl, $headerBg, $headerText, $ctaColor, $ctaText, $outerBg, $cardBg, $colorText, $colorH2, $footerBg, $footerText, $border, $ctaLabel, $fontsUrl, $titleFontCss, $bodyFontCss) {
             $safeUnsub = htmlspecialchars(admin_mailing_unsubscribe_link($recipientEmail), ENT_QUOTES, 'UTF-8');
             $html = [];
             if ($fontsUrl !== '') {
                 $html[] = '<link rel="stylesheet" href="' . htmlspecialchars($fontsUrl, ENT_QUOTES, 'UTF-8') . '">';
             }
             $html[] = '<style>h1,h2,h3,h4,h5,h6{font-family:' . $titleFontCss . ', Arial, sans-serif;} body,p,a,div,span{font-family:' . $bodyFontCss . ', Arial, sans-serif;}</style>';
-            $html[] = '<div style="font-family:' . $bodyFontCss . ', Arial, sans-serif; background:' . htmlspecialchars($bg, ENT_QUOTES, 'UTF-8') . '; padding:24px; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . ';">';
-            $html[] = '  <div style="max-width:720px; margin:0 auto; background:#ffffff; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '; border-radius:12px; overflow:hidden;">';
-            $html[] = '    <div style="background:' . htmlspecialchars($primary, ENT_QUOTES, 'UTF-8') . '; color:#fff; padding:18px 22px; text-align:center;">';
+            $html[] = '<div style="font-family:' . $bodyFontCss . ', Arial, sans-serif; background:' . htmlspecialchars($outerBg, ENT_QUOTES, 'UTF-8') . '; padding:24px; color:' . htmlspecialchars($colorText, ENT_QUOTES, 'UTF-8') . ';">';
+            $html[] = '  <div style="max-width:720px; margin:0 auto; background:' . htmlspecialchars($cardBg, ENT_QUOTES, 'UTF-8') . '; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33; border-radius:12px; overflow:hidden;">';
+            $html[] = '    <div style="background:' . htmlspecialchars($headerBg, ENT_QUOTES, 'UTF-8') . '; color:' . htmlspecialchars($headerText, ENT_QUOTES, 'UTF-8') . '; padding:18px 22px; text-align:center;">';
             if ($logoUrl !== '') {
-                $html[] = '      <div style="margin-bottom:10px;"><img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:64px; height:64px; object-fit:cover; border-radius:50%; box-shadow:0 4px 12px rgba(0,0,0,0.15); background:#fff;"></div>';
+                $html[] = '      <div style="margin-bottom:10px;"><img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:64px; height:64px; object-fit:cover; border-radius:50%; box-shadow:0 4px 12px rgba(0,0,0,0.15); background:' . htmlspecialchars($cardBg, ENT_QUOTES, 'UTF-8') . ';"></div>';
             }
             $html[] = '      <div style="font-size:14px; opacity:0.9; margin-bottom:4px;">' . htmlspecialchars($authorName, ENT_QUOTES, 'UTF-8') . '</div>';
             $html[] = '      <div style="font-size:20px; font-weight:700;">' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '</div>';
             $html[] = '    </div>';
             $html[] = '    <div style="padding:22px;">';
-            $html[] = '      <h2 style="margin:0 0 20px 0; font-size:38px; line-height:1.15; color:' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . '; font-family:' . $titleFontCss . ', Arial, sans-serif;">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
+            $html[] = '      <h2 style="margin:0 0 20px 0; font-size:38px; line-height:1.15; color:' . htmlspecialchars($colorH2, ENT_QUOTES, 'UTF-8') . '; font-family:' . $titleFontCss . ', Arial, sans-serif;">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
             if ($imageUrl !== '') {
-                $html[] = '      <div style="margin:0 0 14px 0;"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-radius:12px; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . ';"></div>';
+                $html[] = '      <div style="margin:0 0 14px 0;"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-radius:12px; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33;"></div>';
             }
             if ($description !== '') {
-                $html[] = '      <p style="margin:0 0 20px 0; line-height:1.75; font-size:20px; font-family:' . $bodyFontCss . ', Arial, sans-serif;">' . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')) . '</p>';
+                $html[] = '      <p style="margin:0 0 20px 0; line-height:1.75; font-size:20px; color:' . htmlspecialchars($colorText, ENT_QUOTES, 'UTF-8') . '; font-family:' . $bodyFontCss . ', Arial, sans-serif;">' . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')) . '</p>';
             }
             $html[] = '      <p style="margin:0 0 16px 0;">';
-            $html[] = '        <a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block; background:' . htmlspecialchars($primary, ENT_QUOTES, 'UTF-8') . '; color:#fff; padding:14px 18px; border-radius:10px; text-decoration:none; font-weight:600;">' . htmlspecialchars($ctaLabel, ENT_QUOTES, 'UTF-8') . '</a>';
+            $html[] = '        <a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block; background:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . '; color:' . htmlspecialchars($ctaText, ENT_QUOTES, 'UTF-8') . '; padding:14px 18px; border-radius:10px; text-decoration:none; font-weight:600;">' . htmlspecialchars($ctaLabel, ENT_QUOTES, 'UTF-8') . '</a>';
             $html[] = '      </p>';
             $html[] = '    </div>';
-            $html[] = '    <div style="padding:16px 22px; background:' . htmlspecialchars($footerBg, ENT_QUOTES, 'UTF-8') . '; border-top:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '; font-size:13px; color:#4b5563;">';
+            $html[] = '    <div style="padding:16px 22px; background:' . htmlspecialchars($footerBg, ENT_QUOTES, 'UTF-8') . '; border-top:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33; font-size:13px; color:' . htmlspecialchars($footerText, ENT_QUOTES, 'UTF-8') . '; opacity:0.8;">';
             $html[] = '      <p style="margin:0 0 6px 0;">Recibes este email porque estás suscrito a los avisos de ' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '.</p>';
-            $html[] = '      <p style="margin:0;"><a href="' . $safeUnsub . '" style="color:' . htmlspecialchars($primary, ENT_QUOTES, 'UTF-8') . ';">Puedes darte de baja pulsando aquí</a>.</p>';
+            $html[] = '      <p style="margin:0;"><a href="' . $safeUnsub . '" style="color:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . ';">Puedes darte de baja pulsando aquí</a>.</p>';
             $html[] = '    </div>';
             $html[] = '  </div>';
             $html[] = '</div>';

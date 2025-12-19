@@ -8,3 +8,4 @@ config/user.php
 config/config.yml
 config/media-tags.json
 config/mailing-subscribers.json
+config/mailing-tokens.json

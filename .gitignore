@@ -4,8 +4,8 @@ sitemap.xml
 assets/
 content/
 itinerarios/
-config/user.php
 config/config.yml
-config/media-tags.json
 config/mailing-subscribers.json
 config/mailing-tokens.json
+config/media-tags.json
+config/user.php

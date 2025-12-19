@@ -7,5 +7,7 @@ itinerarios/
 config/config.yml
 config/mailing-subscribers.json
 config/mailing-tokens.json
+config/mailing-pending
+config/mailing-secret.key
 config/media-tags.json
 config/user.php

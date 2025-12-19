@@ -1,0 +1,9 @@
+{
+    "access_token": "ya29.a0Aa7pCA-loG4Os7Uw9A_rPkoLS_8S_E_dHsjYnMG74pk3XJw4b-kWgpFtrW1S9umu3t9gboa8oFCSQNq3xqxXhQIkYoLXDEtBV71gbZtpWW_Qb0t-dPH5JtmdF-4-jjXRu1x0W_Xt7ZT3OsaB4GAHPSdOwmEVj45Xbm7dc5PBLJDm_75t8YwcrPAGMQHdhvWwaKs9zh8aCgYKAbYSARASFQHGX2MiwfDQ3pJuxRCF6rWvbnwvvg0206",
+    "expires_in": 3599,
+    "refresh_token": "1//03agWTNpKIBR7CgYIARAAGAMSNwF-L9IrS3E8cIASPPKMKqrSS0STiUIrMBaehgIMuZnO5RxV9Hn_npK3DpIa5jIgd8O2PDtvU2I",
+    "scope": "https://mail.google.com/",
+    "token_type": "Bearer",
+    "received_at": 1766135198,
+    "expires_at": 1766138797
+}

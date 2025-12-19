@@ -42,7 +42,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 - Estadísticas por itinerario: lectores de la presentación, usuarios que completaron el tema 1 (iniciados) y porcentaje por tema. Incluye botón **Poner estadísticas a cero** para reiniciar los contadores.
 - Feed dedicado `itinerarios.xml` y botones en los buscadores que llevan directo al índice de cursos.
 
-### Automatización y redes sociales
+### Automatización, lista de correo y redes sociales
 
 - Integración opcional con Telegram, WhatsApp Cloud API, Facebook Pages y Twitter/X: auto-posting al publicar o envío manual desde la tabla de “Editar”.
 - Plantillas de mensaje consistentes (título, descripción y URL pública) con escape apropiado para HTML o texto plano.
@@ -119,10 +119,20 @@ El modal “Insertar recurso” que aparece en Publicar, Editar e Itinerarios co
 
 ### Lista de correo con Gmail (OAuth2)
 
-1. En **Configuración**, introduce:
+
+
+1. Ve a **Google Cloud Console** con la cuenta de gmail que quieras usar  `https://console.cloud.google.com/ `
+   1. En la barra superior, haz clic en el selector de proyectos y selecciona **Proyecto nuevo**.
+   2. Ponle un nombre (ej. `Lista de Correo Nanmmu`) y haz clic en **Crear**.
+   3. Asegúrate de que el nuevo proyecto esté seleccionado en la barra superior.
+   4. En el menú lateral (hamburguesa ☰), ve a **APIs y servicios > Biblioteca**.
+   5. Busca **"Gmail API"**, selecciónala y haz clic en **Habilitar**.
+   6. Luego, en  el proyecto, nos saldrá un mensaje para configurar OAUTH. Pinchamos. Rellenamos campos eligiendo Público> Interno. 
+   7. En **Credenciales**  > **Crear Credenciales** > **ID de cliente de OAuth**, rellena campos, añade como URI autorizada la de tu blog y añade como URI de redirección autorizada: `https://tu-dominio/admin.php?page=lista-correo&gmail_callback=1` (ajusta protocolo/host). 
+   8. **Consejo**: Google Cloud Console es muy poco usable y tiene una gran variabilidad, utiliza alguna IA si te atascas en el proceso descrito.
+2. En **Configuración de Nammu**, introduce:
    - Dirección Gmail que se usará para enviar.
    - Client ID y Client Secret de una credencial OAuth 2.0 (tipo “Aplicación web”) creada en Google Cloud Console.
-2. En la credencial, añade como URI de redirección autorizada: `https://tu-dominio/admin.php?page=lista-correo&gmail_callback=1` (ajusta protocolo/host).
 3. Guarda y ve a la pestaña **Lista**. Pulsa “Conectar con Google” para abrir el consentimiento y obtener el `refresh_token`. El estado cambiará a “Conectado”.
 4. Desde **Lista** podrás añadir/eliminar correos; la lista vive en `config/mailing-subscribers.json` y los tokens en `config/mailing-tokens.json`.
 5. Si cambias de cuenta o credenciales, desconecta y vuelve a conectar para regenerar tokens.

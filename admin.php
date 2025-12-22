@@ -1970,6 +1970,158 @@ function admin_google_exchange_code(string $code, string $clientId, string $clie
     return $decoded;
 }
 
+function admin_prepare_mailing_payload(string $template, array $settings, string $title, string $description, string $link, string $imagePath): array {
+    $mailingConfig = $settings['mailing'] ?? [];
+    $format = $mailingConfig['format'] ?? 'html';
+    $isHtml = $format !== 'text';
+    $subject = $title;
+    $blogName = $settings['site_name'] ?? 'Tu blog';
+    $authorName = $settings['site_author'] ?? 'Autor';
+    $siteBase = rtrim($settings['site_url'] ?? '', '/');
+    $baseForAssets = $siteBase !== '' ? $siteBase : rtrim(admin_base_url(), '/');
+    $imageUrl = '';
+    if ($imagePath !== '') {
+        if (preg_match('#^https?://#i', $imagePath)) {
+            $imageUrl = $imagePath;
+        } else {
+            $normalizedImage = ltrim($imagePath, '/');
+            $normalizedImage = str_replace(['../', '..\\', './', '.\\'], '', $normalizedImage);
+            $candidates = [];
+            $candidates[] = $normalizedImage;
+            if (!str_starts_with($normalizedImage, 'assets/')) {
+                $candidates[] = 'assets/' . $normalizedImage;
+            }
+            foreach ($candidates as $cand) {
+                $local = __DIR__ . '/' . $cand;
+                if (is_file($local) || is_file(__DIR__ . '/' . ltrim($cand, '/'))) {
+                    $imageUrl = $baseForAssets . '/' . $cand;
+                    break;
+                }
+            }
+            if ($imageUrl === '' && !empty($candidates)) {
+                $imageUrl = $baseForAssets . '/' . $candidates[0];
+            }
+        }
+    }
+    $logoPath = $settings['template']['images']['logo'] ?? '';
+    $logoUrl = '';
+    if ($logoPath !== '') {
+        if (preg_match('#^https?://#i', $logoPath)) {
+            $logoUrl = $logoPath;
+        } else {
+            $normalizedLogo = ltrim($logoPath, '/');
+            $normalizedLogo = str_replace(['../', '..\\', './', '.\\'], '', $normalizedLogo);
+            $logoUrl = $baseForAssets . '/' . $normalizedLogo;
+        }
+    }
+    $colors = $settings['template']['colors'] ?? [];
+    $colorBackground = $colors['background'] ?? '#ffffff';
+    $colorText = $colors['text'] ?? '#222222';
+    $colorHighlight = $colors['highlight'] ?? '#f3f6f9';
+    $colorAccent = $colors['accent'] ?? '#0a4c8a';
+    $colorH1 = $colors['h1'] ?? $colorAccent;
+    $colorH2 = $colors['h2'] ?? $colorText;
+    $headerBg = $colorH1;
+    $ctaColor = $colorH1;
+    $outerBg = $colorHighlight;
+    $cardBg = $colorBackground;
+    $footerBg = $colorHighlight;
+    $border = $colorAccent;
+    $headerText = admin_pick_contrast_color($headerBg, '#ffffff', '#111111');
+    $ctaText = admin_pick_contrast_color($ctaColor, '#ffffff', '#111111');
+    $footerText = admin_pick_contrast_color($footerBg, '#ffffff', $colorText);
+    $titleFont = $settings['template']['fonts']['title'] ?? 'Arial';
+    $bodyFont = $settings['template']['fonts']['body'] ?? 'Arial';
+    $fontsUrl = '';
+    $fontFamilies = [];
+    foreach ([$titleFont, $bodyFont] as $fontCandidate) {
+        $clean = trim((string) $fontCandidate);
+        if ($clean !== '') {
+            $fontFamilies[] = str_replace(' ', '+', $clean) . ':wght@400;600;700';
+        }
+    }
+    if (!empty($fontFamilies)) {
+        $fontsUrl = 'https://fonts.googleapis.com/css2?family=' . implode('&family=', array_unique($fontFamilies)) . '&display=swap';
+    }
+    $titleFontCss = htmlspecialchars($titleFont, ENT_QUOTES, 'UTF-8');
+    $bodyFontCss = htmlspecialchars($bodyFont, ENT_QUOTES, 'UTF-8');
+    $ctaLabel = $template === 'itinerario' ? 'Comienza este itinerario' : ($template === 'page' ? 'Ver esta página' : 'Sigue leyendo');
+    $fromName = $authorName !== '' ? $authorName : $blogName;
+
+    $buildText = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link) {
+        $lines = [];
+        $lines[] = '**** ' . ($authorName !== '' ? $authorName : $blogName) . ' ****';
+        $lines[] = '**** ' . $blogName . ' ****';
+        $lines[] = '';
+        $lines[] = '== ' . $title . ' ==';
+        $lines[] = '';
+        if ($description !== '') {
+            $lines[] = $description;
+            $lines[] = '';
+        }
+        $lines[] = 'Sigue leyendo: ' . $link;
+        $lines[] = '';
+        $lines[] = '-----------';
+        $lines[] = 'Recibes este email porque estás suscrito a los avisos de ' . $blogName . '. Puedes darte de baja pulsando aquí: ' . admin_mailing_unsubscribe_link($recipientEmail);
+        return implode("\n", $lines);
+    };
+
+    $buildHtml = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link, $imageUrl, $logoUrl, $headerBg, $headerText, $ctaColor, $ctaText, $outerBg, $cardBg, $colorText, $colorH2, $footerBg, $footerText, $border, $ctaLabel, $fontsUrl, $titleFontCss, $bodyFontCss) {
+        $safeUnsub = htmlspecialchars(admin_mailing_unsubscribe_link($recipientEmail), ENT_QUOTES, 'UTF-8');
+        $html = [];
+        if ($fontsUrl !== '') {
+            $html[] = '<link rel="stylesheet" href="' . htmlspecialchars($fontsUrl, ENT_QUOTES, 'UTF-8') . '">';
+        }
+        $html[] = '<style>h1,h2,h3,h4,h5,h6{font-family:' . $titleFontCss . ', Arial, sans-serif;} body,p,a,div,span{font-family:' . $bodyFontCss . ', Arial, sans-serif;}</style>';
+        $html[] = '<div style="font-family:' . $bodyFontCss . ', Arial, sans-serif; background:' . htmlspecialchars($outerBg, ENT_QUOTES, 'UTF-8') . '; padding:24px; color:' . htmlspecialchars($colorText, ENT_QUOTES, 'UTF-8') . ';">';
+        $html[] = '  <div style="max-width:720px; margin:0 auto; background:' . htmlspecialchars($cardBg, ENT_QUOTES, 'UTF-8') . '; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33; border-radius:12px; overflow:hidden;">';
+        $html[] = '    <div style="background:' . htmlspecialchars($headerBg, ENT_QUOTES, 'UTF-8') . '; color:' . htmlspecialchars($headerText, ENT_QUOTES, 'UTF-8') . '; padding:18px 22px; text-align:center;">';
+        if ($logoUrl !== '') {
+            $html[] = '      <div style="margin-bottom:10px;"><img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:64px; height:64px; object-fit:cover; border-radius:50%; box-shadow:0 4px 12px rgba(0,0,0,0.15); background:' . htmlspecialchars($cardBg, ENT_QUOTES, 'UTF-8') . ';"></div>';
+        }
+        $html[] = '      <div style="font-size:14px; opacity:0.9; margin-bottom:4px;">' . htmlspecialchars($authorName, ENT_QUOTES, 'UTF-8') . '</div>';
+        $html[] = '      <div style="font-size:20px; font-weight:700;">' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '</div>';
+        $html[] = '    </div>';
+        $html[] = '    <div style="padding:22px;">';
+        $html[] = '      <h2 style="margin:0 0 20px 0; font-size:38px; line-height:1.15; color:' . htmlspecialchars($colorH2, ENT_QUOTES, 'UTF-8') . '; font-family:' . $titleFontCss . ', Arial, sans-serif;">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
+        if ($imageUrl !== '') {
+            $html[] = '      <div style="margin:0 0 14px 0;"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-radius:12px; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33;"></div>';
+        }
+        if ($description !== '') {
+            $html[] = '      <p style="margin:0 0 20px 0; line-height:1.75; font-size:20px; color:' . htmlspecialchars($colorText, ENT_QUOTES, 'UTF-8') . '; font-family:' . $bodyFontCss . ', Arial, sans-serif;">' . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')) . '</p>';
+        }
+        $html[] = '      <p style="margin:0 0 16px 0;">';
+        $html[] = '        <a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block; background:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . '; color:' . htmlspecialchars($ctaText, ENT_QUOTES, 'UTF-8') . '; padding:14px 18px; border-radius:10px; text-decoration:none; font-weight:600;">' . htmlspecialchars($ctaLabel, ENT_QUOTES, 'UTF-8') . '</a>';
+        $html[] = '      </p>';
+        $html[] = '    </div>';
+        $html[] = '    <div style="padding:16px 22px; background:' . htmlspecialchars($footerBg, ENT_QUOTES, 'UTF-8') . '; border-top:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33; font-size:13px; color:' . htmlspecialchars($footerText, ENT_QUOTES, 'UTF-8') . '; opacity:0.8;">';
+        $html[] = '      <p style="margin:0 0 6px 0;">Recibes este email porque estás suscrito a los avisos de ' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '.</p>';
+        $html[] = '      <p style="margin:0;"><a href="' . $safeUnsub . '" style="color:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . ';">Puedes darte de baja pulsando aquí</a>.</p>';
+        $html[] = '    </div>';
+        $html[] = '  </div>';
+        $html[] = '</div>';
+        return implode('', $html);
+    };
+
+    $bodyBuilder = function (string $recipientEmail) use ($isHtml, $buildText, $buildHtml) {
+        if ($isHtml) {
+            $text = $buildText($recipientEmail);
+            $html = $buildHtml($recipientEmail);
+            return [$text, $html];
+        }
+        $text = $buildText($recipientEmail);
+        $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
+        return [$text, $html];
+    };
+
+    return [
+        'subject' => $subject,
+        'bodyBuilder' => $bodyBuilder,
+        'fromName' => $fromName,
+        'mailingConfig' => $mailingConfig,
+    ];
+}
+
 function admin_gmail_update_display_name(string $sendAsEmail, string $displayName, string $accessToken): void {
     $sendAsEmail = trim($sendAsEmail);
     $displayName = trim($displayName);
@@ -2369,6 +2521,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     if (!$isDraft && $type !== 'Página') {
                         admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description);
+                        $settings = get_settings();
+                        $mailing = $settings['mailing'] ?? [];
+                        if (($mailing['auto_posts'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
+                            $subscribers = admin_load_mailing_subscribers();
+                            if (!empty($subscribers)) {
+                                $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
+                                $link = admin_public_post_url($slug);
+                                $payload = admin_prepare_mailing_payload('single', $settings, $title, $description, $link, $image);
+                                try {
+                                    admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                                } catch (Throwable $e) {
+                                    // ignore mailing errors on publish
+                                }
+                            }
+                        }
                     }
                     $redirectTemplate = $isDraft ? 'draft' : ($type === 'Página' ? 'page' : 'single');
                     header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&created=' . urlencode($targetFilename));
@@ -2520,6 +2687,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($shouldAutoShare) {
                         admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description);
                     }
+                    if ($shouldAutoShare) {
+                        $settings = get_settings();
+                        $mailing = $settings['mailing'] ?? [];
+                        if (($mailing['auto_posts'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
+                            $subscribers = admin_load_mailing_subscribers();
+                            if (!empty($subscribers)) {
+                                $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
+                                $link = admin_public_post_url($slug);
+                                $payload = admin_prepare_mailing_payload('single', $settings, $title, $description, $link, $image);
+                                try {
+                                    admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                                } catch (Throwable $e) {
+                                    // ignore mailing errors on publish
+                                }
+                            }
+                        }
+                    }
                     if ($renameRequested && $normalizedFilename !== '' && $normalizedFilename !== $targetFilename) {
                         $previousPath = CONTENT_DIR . '/' . $normalizedFilename;
                         if ($previousPath !== $finalPath && is_file($previousPath)) {
@@ -2629,6 +2813,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $originalSlugInput = trim($_POST['itinerary_original_slug'] ?? '');
         $mode = $_POST['itinerary_mode'] ?? '';
         $orderInput = (int) ($_POST['itinerary_order'] ?? 0);
+        $previousStatus = 'draft';
+        if ($originalSlugInput !== '') {
+            $existingItinerary = admin_load_itinerary($originalSlugInput);
+            if ($existingItinerary) {
+                $previousStatus = $existingItinerary->getStatus();
+            }
+        }
         if ($slugInput === '' && $title !== '') {
             $slugInput = $title;
         }
@@ -2698,6 +2889,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'Order' => $orderInput,
             ], $content, !empty($itineraryQuizResult['data']['questions']) ? $itineraryQuizResult['data'] : null);
             admin_regenerate_itinerary_feed();
+            $shouldAutoMail = $statusValue === 'published' && ($mode === 'new' || $previousStatus === 'draft');
+            if ($shouldAutoMail) {
+                $settings = get_settings();
+                $mailing = $settings['mailing'] ?? [];
+                if (($mailing['auto_itineraries'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
+                    $subscribers = admin_load_mailing_subscribers();
+                    if (!empty($subscribers)) {
+                        $link = admin_public_itinerary_url($saved->getSlug());
+                        $payload = admin_prepare_mailing_payload('itinerario', $settings, $title, $description, $link, $image);
+                        try {
+                            admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                        } catch (Throwable $e) {
+                            // ignore mailing errors on publish
+                        }
+                    }
+                }
+            }
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario guardado correctamente.'];
             header('Location: admin.php?page=itinerario&itinerary=' . urlencode($saved->getSlug()));
             exit;
@@ -3652,157 +3860,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $description = $metadata['Description'] ?? '';
         $slug = pathinfo($filename, PATHINFO_FILENAME);
         $link = admin_public_post_url($slug);
-        $mailingConfig = $settings['mailing'] ?? [];
-        $format = $mailingConfig['format'] ?? 'html';
-        $isHtml = $format !== 'text';
-        $subjectPrefix = 'Nueva entrada';
-        if ($template === 'page') {
-            $subjectPrefix = 'Nueva página';
-        } elseif ($template === 'itinerario') {
-            $subjectPrefix = 'Nuevo itinerario';
-        }
-        $subject = $title;
-        $blogName = $settings['site_name'] ?? 'Tu blog';
-        $authorName = $settings['site_author'] ?? 'Autor';
-        $siteBase = rtrim($settings['site_url'] ?? '', '/');
-        $baseForAssets = $siteBase !== '' ? $siteBase : rtrim(admin_base_url(), '/');
         $imagePath = $metadata['Image'] ?? ($metadata['image'] ?? '');
-        $imageUrl = '';
-        if ($imagePath !== '') {
-            if (preg_match('#^https?://#i', $imagePath)) {
-                $imageUrl = $imagePath;
-            } else {
-                $normalizedImage = ltrim($imagePath, '/');
-                $normalizedImage = str_replace(['../', '..\\', './', '.\\'], '', $normalizedImage);
-                $candidates = [];
-                $candidates[] = $normalizedImage;
-                if (!str_starts_with($normalizedImage, 'assets/')) {
-                    $candidates[] = 'assets/' . $normalizedImage;
-                }
-                foreach ($candidates as $cand) {
-                    $local = __DIR__ . '/' . $cand;
-                    if (is_file($local) || is_file(__DIR__ . '/' . ltrim($cand, '/'))) {
-                        $imageUrl = $baseForAssets . '/' . $cand;
-                        break;
-                    }
-                }
-                if ($imageUrl === '' && !empty($candidates)) {
-                    $imageUrl = $baseForAssets . '/' . $candidates[0];
-                }
-            }
-        }
-        $logoPath = $settings['template']['images']['logo'] ?? '';
-        $logoUrl = '';
-        if ($logoPath !== '') {
-            if (preg_match('#^https?://#i', $logoPath)) {
-                $logoUrl = $logoPath;
-            } else {
-                $normalizedLogo = ltrim($logoPath, '/');
-                $normalizedLogo = str_replace(['../', '..\\', './', '.\\'], '', $normalizedLogo);
-                $logoUrl = $baseForAssets . '/' . $normalizedLogo;
-            }
-        }
-        $colors = $settings['template']['colors'] ?? [];
-        $colorBackground = $colors['background'] ?? '#ffffff';
-        $colorText = $colors['text'] ?? '#222222';
-        $colorHighlight = $colors['highlight'] ?? '#f3f6f9';
-        $colorAccent = $colors['accent'] ?? '#0a4c8a';
-        $colorH1 = $colors['h1'] ?? $colorAccent;
-        $colorH2 = $colors['h2'] ?? $colorText;
-        $headerBg = $colorH1;
-        $ctaColor = $colorH1;
-        $outerBg = $colorHighlight;
-        $cardBg = $colorBackground;
-        $footerBg = $colorHighlight;
-        $border = $colorAccent;
-        $headerText = admin_pick_contrast_color($headerBg, '#ffffff', '#111111');
-        $ctaText = admin_pick_contrast_color($ctaColor, '#ffffff', '#111111');
-        $footerText = admin_pick_contrast_color($footerBg, '#ffffff', $colorText);
-        $titleFont = $settings['template']['fonts']['title'] ?? 'Arial';
-        $bodyFont = $settings['template']['fonts']['body'] ?? 'Arial';
-        $fontsUrl = '';
-        $fontFamilies = [];
-        foreach ([$titleFont, $bodyFont] as $fontCandidate) {
-            $clean = trim((string) $fontCandidate);
-            if ($clean !== '') {
-                $fontFamilies[] = str_replace(' ', '+', $clean) . ':wght@400;600;700';
-            }
-        }
-        if (!empty($fontFamilies)) {
-            $fontsUrl = 'https://fonts.googleapis.com/css2?family=' . implode('&family=', array_unique($fontFamilies)) . '&display=swap';
-        }
-        $titleFontCss = htmlspecialchars($titleFont, ENT_QUOTES, 'UTF-8');
-        $bodyFontCss = htmlspecialchars($bodyFont, ENT_QUOTES, 'UTF-8');
-        $ctaLabel = $template === 'itinerario' ? 'Comienza este itinerario' : ($template === 'page' ? 'Ver esta página' : 'Sigue leyendo');
-        $fromName = $authorName !== '' ? $authorName : $blogName;
-
-        $buildText = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link) {
-            $lines = [];
-            $lines[] = '**** ' . ($authorName !== '' ? $authorName : $blogName) . ' ****';
-            $lines[] = '**** ' . $blogName . ' ****';
-            $lines[] = '';
-            $lines[] = '== ' . $title . ' ==';
-            $lines[] = '';
-            if ($description !== '') {
-                $lines[] = $description;
-                $lines[] = '';
-            }
-            $lines[] = 'Sigue leyendo: ' . $link;
-            $lines[] = '';
-            $lines[] = '-----------';
-            $lines[] = 'Recibes este email porque estás suscrito a los avisos de ' . $blogName . '. Puedes darte de baja pulsando aquí: ' . admin_mailing_unsubscribe_link($recipientEmail);
-            return implode("\n", $lines);
-        };
-
-        $buildHtml = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link, $imageUrl, $logoUrl, $headerBg, $headerText, $ctaColor, $ctaText, $outerBg, $cardBg, $colorText, $colorH2, $footerBg, $footerText, $border, $ctaLabel, $fontsUrl, $titleFontCss, $bodyFontCss) {
-            $safeUnsub = htmlspecialchars(admin_mailing_unsubscribe_link($recipientEmail), ENT_QUOTES, 'UTF-8');
-            $html = [];
-            if ($fontsUrl !== '') {
-                $html[] = '<link rel="stylesheet" href="' . htmlspecialchars($fontsUrl, ENT_QUOTES, 'UTF-8') . '">';
-            }
-            $html[] = '<style>h1,h2,h3,h4,h5,h6{font-family:' . $titleFontCss . ', Arial, sans-serif;} body,p,a,div,span{font-family:' . $bodyFontCss . ', Arial, sans-serif;}</style>';
-            $html[] = '<div style="font-family:' . $bodyFontCss . ', Arial, sans-serif; background:' . htmlspecialchars($outerBg, ENT_QUOTES, 'UTF-8') . '; padding:24px; color:' . htmlspecialchars($colorText, ENT_QUOTES, 'UTF-8') . ';">';
-            $html[] = '  <div style="max-width:720px; margin:0 auto; background:' . htmlspecialchars($cardBg, ENT_QUOTES, 'UTF-8') . '; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33; border-radius:12px; overflow:hidden;">';
-            $html[] = '    <div style="background:' . htmlspecialchars($headerBg, ENT_QUOTES, 'UTF-8') . '; color:' . htmlspecialchars($headerText, ENT_QUOTES, 'UTF-8') . '; padding:18px 22px; text-align:center;">';
-            if ($logoUrl !== '') {
-                $html[] = '      <div style="margin-bottom:10px;"><img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:64px; height:64px; object-fit:cover; border-radius:50%; box-shadow:0 4px 12px rgba(0,0,0,0.15); background:' . htmlspecialchars($cardBg, ENT_QUOTES, 'UTF-8') . ';"></div>';
-            }
-            $html[] = '      <div style="font-size:14px; opacity:0.9; margin-bottom:4px;">' . htmlspecialchars($authorName, ENT_QUOTES, 'UTF-8') . '</div>';
-            $html[] = '      <div style="font-size:20px; font-weight:700;">' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '</div>';
-            $html[] = '    </div>';
-            $html[] = '    <div style="padding:22px;">';
-            $html[] = '      <h2 style="margin:0 0 20px 0; font-size:38px; line-height:1.15; color:' . htmlspecialchars($colorH2, ENT_QUOTES, 'UTF-8') . '; font-family:' . $titleFontCss . ', Arial, sans-serif;">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
-            if ($imageUrl !== '') {
-                $html[] = '      <div style="margin:0 0 14px 0;"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-radius:12px; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33;"></div>';
-            }
-            if ($description !== '') {
-                $html[] = '      <p style="margin:0 0 20px 0; line-height:1.75; font-size:20px; color:' . htmlspecialchars($colorText, ENT_QUOTES, 'UTF-8') . '; font-family:' . $bodyFontCss . ', Arial, sans-serif;">' . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')) . '</p>';
-            }
-            $html[] = '      <p style="margin:0 0 16px 0;">';
-            $html[] = '        <a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block; background:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . '; color:' . htmlspecialchars($ctaText, ENT_QUOTES, 'UTF-8') . '; padding:14px 18px; border-radius:10px; text-decoration:none; font-weight:600;">' . htmlspecialchars($ctaLabel, ENT_QUOTES, 'UTF-8') . '</a>';
-            $html[] = '      </p>';
-            $html[] = '    </div>';
-            $html[] = '    <div style="padding:16px 22px; background:' . htmlspecialchars($footerBg, ENT_QUOTES, 'UTF-8') . '; border-top:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33; font-size:13px; color:' . htmlspecialchars($footerText, ENT_QUOTES, 'UTF-8') . '; opacity:0.8;">';
-            $html[] = '      <p style="margin:0 0 6px 0;">Recibes este email porque estás suscrito a los avisos de ' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '.</p>';
-            $html[] = '      <p style="margin:0;"><a href="' . $safeUnsub . '" style="color:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . ';">Puedes darte de baja pulsando aquí</a>.</p>';
-            $html[] = '    </div>';
-            $html[] = '  </div>';
-            $html[] = '</div>';
-            return implode('', $html);
-        };
-
-        $bodyBuilder = function (string $recipientEmail) use ($isHtml, $buildText, $buildHtml) {
-            if ($isHtml) {
-                $text = $buildText($recipientEmail);
-                $html = $buildHtml($recipientEmail);
-                return [$text, $html];
-            }
-            $text = $buildText($recipientEmail);
-            $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
-            return [$text, $html];
-        };
+        $payload = admin_prepare_mailing_payload($template, $settings, $title, $description, $link, $imagePath);
         try {
-            $result = admin_send_mailing_broadcast($subject, '', '', $subscribers, $mailingConfig, $bodyBuilder, $fromName);
+            $result = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
             $message = 'Aviso enviado. OK: ' . $result['sent'] . ' / Fallos: ' . $result['failed'];
             if (!empty($result['error'])) {
                 $message .= ' (' . $result['error'] . ')';
@@ -7256,6 +7317,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var imageTargetPrefix = '';
             var imageTargetEditor = '';
             var lastImageTrigger = null;
+            var imageTargetSelection = null;
+            var imageTargetTextarea = null;
             var modalSearchInput = $('#modal-image-search');
             var tagsInput = $('#image_tags');
             var tagsTargetInput = $('#image-tags-target');
@@ -7427,6 +7490,30 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 return anyTextarea || null;
             }
 
+            function resolveImageTargetTextarea() {
+                var target = null;
+                if (imageTargetEditor) {
+                    try {
+                        target = document.querySelector(imageTargetEditor);
+                    } catch (selectorError) {
+                        target = null;
+                    }
+                }
+                if (!target && document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
+                    target = document.activeElement;
+                }
+                if (!target && lastFocusedTextarea && lastFocusedTextarea.tagName === 'TEXTAREA') {
+                    target = lastFocusedTextarea;
+                }
+                if (!target) {
+                    target = fallbackTextarea();
+                }
+                if (target && target.id === 'calloutBody') {
+                    return null;
+                }
+                return target;
+            }
+
             $(document).on('click', '[data-md-action="callout"]', function(evt) {
                 // Garantiza que el modal se abra aunque falle el toolbar handler
                 var toolbar = this.closest('[data-markdown-toolbar]');
@@ -7502,6 +7589,16 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 imageTargetInput = button.data('target-input') || '';
                 imageTargetPrefix = button.data('target-prefix') || '';
                 imageTargetEditor = button.data('target-editor') || '';
+                imageTargetTextarea = resolveImageTargetTextarea();
+                if (imageTargetTextarea && typeof imageTargetTextarea.selectionStart === 'number') {
+                    imageTargetSelection = {
+                        start: imageTargetTextarea.selectionStart,
+                        end: typeof imageTargetTextarea.selectionEnd === 'number' ? imageTargetTextarea.selectionEnd : imageTargetTextarea.selectionStart,
+                        scrollTop: imageTargetTextarea.scrollTop
+                    };
+                } else {
+                    imageTargetSelection = null;
+                }
                 var anchorInput = document.getElementById('imageUploadRedirectAnchor');
                 if (anchorInput) {
                     var anchorVal = '';
@@ -7523,6 +7620,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     return;
                 }
 
+            });
+
+            $('#imageModal').on('hidden.bs.modal', function () {
+                imageTargetSelection = null;
+                imageTargetTextarea = null;
             });
 
         
@@ -7873,7 +7975,13 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                         snippet = '![](' + source + ')';
                     }
                 }
-                insertTextAtCursor(contentTextArea, snippet);
+                if (imageTargetSelection && imageTargetTextarea === contentTextArea) {
+                    insertTextAtRange(contentTextArea, snippet, imageTargetSelection);
+                    imageTargetSelection = null;
+                    imageTargetTextarea = null;
+                } else {
+                    insertTextAtCursor(contentTextArea, snippet);
+                }
             }
 
             function applyUploadedMediaIfNeeded() {
@@ -7927,6 +8035,30 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                         $input.val(value);
                     }
                 });
+            }
+
+            function insertTextAtRange(textarea, text, range) {
+                if (!textarea || !range) {
+                    insertTextAtCursor(textarea, text);
+                    return;
+                }
+                var start = typeof range.start === 'number' ? range.start : textarea.value.length;
+                var end = typeof range.end === 'number' ? range.end : start;
+                var value = textarea.value;
+                textarea.value = value.substring(0, start) + text + value.substring(end);
+                var cursorPosition = start + text.length;
+                if (typeof setSelection === 'function') {
+                    setSelection(textarea, cursorPosition, cursorPosition, range.scrollTop);
+                } else {
+                    textarea.focus();
+                    if (typeof textarea.setSelectionRange === 'function') {
+                        textarea.setSelectionRange(cursorPosition, cursorPosition);
+                    }
+                    if (typeof range.scrollTop === 'number') {
+                        textarea.scrollTop = range.scrollTop;
+                    }
+                    triggerInput(textarea);
+                }
             }
 
             function insertTextAtCursor(textarea, text) {

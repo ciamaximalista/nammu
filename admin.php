@@ -3248,6 +3248,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (is_string($targetPrefixRaw)) {
             $targetPrefix = substr($targetPrefixRaw, 0, 100);
         }
+        $selectionStartRaw = $_POST['target_selection_start'] ?? '';
+        $selectionEndRaw = $_POST['target_selection_end'] ?? '';
+        $selectionScrollRaw = $_POST['target_selection_scroll'] ?? '';
+        $selection = null;
+        if ($selectionStartRaw !== '' && $selectionEndRaw !== '') {
+            $selection = [
+                'start' => max(0, (int) $selectionStartRaw),
+                'end' => max(0, (int) $selectionEndRaw),
+                'scrollTop' => max(0, (int) $selectionScrollRaw),
+            ];
+        }
         $normalizedFiles = [];
         if ($filesField !== null) {
             if (is_array($filesField['name'])) {
@@ -3348,6 +3359,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'editor' => $targetEditor,
                 'prefix' => $targetPrefix,
                 'anchor' => $redirectAnchor,
+                'selection' => $selection,
+                'return_to_modal' => in_array($targetType, ['field', 'editor'], true),
                 'files' => $savedAssets,
                 'restore_payload' => is_string($autosavePayloadRaw) ? $autosavePayloadRaw : '',
             ];
@@ -6113,6 +6126,9 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             <input type="hidden" name="target_input" id="imageUploadTargetInput" value="">
                             <input type="hidden" name="target_editor" id="imageUploadTargetEditor" value="">
                             <input type="hidden" name="target_prefix" id="imageUploadTargetPrefix" value="">
+                            <input type="hidden" name="target_selection_start" id="imageUploadSelectionStart" value="">
+                            <input type="hidden" name="target_selection_end" id="imageUploadSelectionEnd" value="">
+                            <input type="hidden" name="target_selection_scroll" id="imageUploadSelectionScroll" value="">
                             <div class="form-group mb-2">
                                 <label class="d-block">Subir nuevo archivo</label>
                                 <input type="file" name="asset_files[]" class="form-control-file" multiple>
@@ -7319,6 +7335,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var lastImageTrigger = null;
             var imageTargetSelection = null;
             var imageTargetTextarea = null;
+            var skipImageModalSelectionCapture = false;
             var modalSearchInput = $('#modal-image-search');
             var tagsInput = $('#image_tags');
             var tagsTargetInput = $('#image-tags-target');
@@ -7355,6 +7372,9 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var uploadTargetInputInput = document.getElementById('imageUploadTargetInput');
             var uploadTargetEditorInput = document.getElementById('imageUploadTargetEditor');
             var uploadTargetPrefixInput = document.getElementById('imageUploadTargetPrefix');
+            var uploadTargetSelectionStart = document.getElementById('imageUploadSelectionStart');
+            var uploadTargetSelectionEnd = document.getElementById('imageUploadSelectionEnd');
+            var uploadTargetSelectionScroll = document.getElementById('imageUploadSelectionScroll');
             var assetApply = window.nammuAssetApply || null;
 
             function collectEditorForm() {
@@ -7467,6 +7487,15 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     if (uploadTargetInputInput) uploadTargetInputInput.value = imageTargetInput || '';
                     if (uploadTargetEditorInput) uploadTargetEditorInput.value = imageTargetEditor || '';
                     if (uploadTargetPrefixInput) uploadTargetPrefixInput.value = imageTargetPrefix || '';
+                    if (uploadTargetSelectionStart) {
+                        uploadTargetSelectionStart.value = imageTargetSelection ? String(imageTargetSelection.start || 0) : '';
+                    }
+                    if (uploadTargetSelectionEnd) {
+                        uploadTargetSelectionEnd.value = imageTargetSelection ? String(imageTargetSelection.end || 0) : '';
+                    }
+                    if (uploadTargetSelectionScroll) {
+                        uploadTargetSelectionScroll.value = imageTargetSelection ? String(imageTargetSelection.scrollTop || 0) : '';
+                    }
                 });
             }
 
@@ -7585,19 +7614,25 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 var button = $(event.relatedTarget);
                 lastImageTrigger = button && button.length ? button[0] : null;
 
-                imageTargetMode = button.data('target-type') || '';
-                imageTargetInput = button.data('target-input') || '';
-                imageTargetPrefix = button.data('target-prefix') || '';
-                imageTargetEditor = button.data('target-editor') || '';
-                imageTargetTextarea = resolveImageTargetTextarea();
-                if (imageTargetTextarea && typeof imageTargetTextarea.selectionStart === 'number') {
-                    imageTargetSelection = {
-                        start: imageTargetTextarea.selectionStart,
-                        end: typeof imageTargetTextarea.selectionEnd === 'number' ? imageTargetTextarea.selectionEnd : imageTargetTextarea.selectionStart,
-                        scrollTop: imageTargetTextarea.scrollTop
-                    };
+                if (button && button.length) {
+                    imageTargetMode = button.data('target-type') || '';
+                    imageTargetInput = button.data('target-input') || '';
+                    imageTargetPrefix = button.data('target-prefix') || '';
+                    imageTargetEditor = button.data('target-editor') || '';
+                }
+                if (!skipImageModalSelectionCapture) {
+                    imageTargetTextarea = resolveImageTargetTextarea();
+                    if (imageTargetTextarea && typeof imageTargetTextarea.selectionStart === 'number') {
+                        imageTargetSelection = {
+                            start: imageTargetTextarea.selectionStart,
+                            end: typeof imageTargetTextarea.selectionEnd === 'number' ? imageTargetTextarea.selectionEnd : imageTargetTextarea.selectionStart,
+                            scrollTop: imageTargetTextarea.scrollTop
+                        };
+                    } else {
+                        imageTargetSelection = null;
+                    }
                 } else {
-                    imageTargetSelection = null;
+                    skipImageModalSelectionCapture = false;
                 }
                 var anchorInput = document.getElementById('imageUploadRedirectAnchor');
                 if (anchorInput) {
@@ -7999,6 +8034,36 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 if (!assetApply.files || !assetApply.files.length) {
                     return;
                 }
+                if (assetApply.return_to_modal) {
+                    imageTargetMode = assetApply.mode || '';
+                    imageTargetInput = assetApply.input || '';
+                    imageTargetEditor = assetApply.editor || '';
+                    imageTargetPrefix = assetApply.prefix || '';
+                    if (assetApply.editor) {
+                        try {
+                            imageTargetTextarea = document.querySelector(assetApply.editor);
+                        } catch (selectorError) {
+                            imageTargetTextarea = null;
+                        }
+                    }
+                    if (assetApply.selection) {
+                        imageTargetSelection = assetApply.selection;
+                    }
+                    if (modalSearchInput.length) {
+                        var filterName = assetApply.files[0] && assetApply.files[0].name ? assetApply.files[0].name : '';
+                        if (filterName) {
+                            modalSearchInput.val(filterName);
+                            applyModalFilter(filterName);
+                        }
+                    }
+                    if (assetApply.anchor) {
+                        window.location.hash = assetApply.anchor.replace('#', '');
+                    }
+                    skipImageModalSelectionCapture = true;
+                    $('#imageModal').modal('show');
+                    window.nammuAssetApply = null;
+                    return;
+                }
                 var firstFile = assetApply.files[0];
                 var targetValue = (assetApply.prefix || '') + (firstFile.name || '');
                 var targetSrc = firstFile.src || targetValue;
@@ -8049,15 +8114,22 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 var cursorPosition = start + text.length;
                 if (typeof setSelection === 'function') {
                     setSelection(textarea, cursorPosition, cursorPosition, range.scrollTop);
-                } else {
-                    textarea.focus();
-                    if (typeof textarea.setSelectionRange === 'function') {
-                        textarea.setSelectionRange(cursorPosition, cursorPosition);
-                    }
-                    if (typeof range.scrollTop === 'number') {
-                        textarea.scrollTop = range.scrollTop;
-                    }
-                    triggerInput(textarea);
+                    return;
+                }
+                textarea.focus();
+                if (typeof textarea.setSelectionRange === 'function') {
+                    textarea.setSelectionRange(cursorPosition, cursorPosition);
+                }
+                if (typeof range.scrollTop === 'number') {
+                    textarea.scrollTop = range.scrollTop;
+                }
+                try {
+                    var event = new Event('input', { bubbles: true });
+                    textarea.dispatchEvent(event);
+                } catch (evtError) {
+                    var legacy = document.createEvent('Event');
+                    legacy.initEvent('input', true, true);
+                    textarea.dispatchEvent(legacy);
                 }
             }
 

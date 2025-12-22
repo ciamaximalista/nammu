@@ -199,6 +199,22 @@
             $subscriberCount = 0;
         }
     }
+    $socialCounts = [];
+    if (function_exists('get_settings')) {
+        $settings = get_settings();
+        $telegramCount = admin_get_telegram_follower_count($settings['telegram'] ?? []);
+        if ($telegramCount !== null) {
+            $socialCounts['Telegram'] = $telegramCount;
+        }
+        $facebookCount = admin_get_facebook_follower_count($settings['facebook'] ?? []);
+        if ($facebookCount !== null) {
+            $socialCounts['Facebook'] = $facebookCount;
+        }
+        $twitterCount = admin_get_twitter_follower_count($settings['twitter'] ?? []);
+        if ($twitterCount !== null) {
+            $socialCounts['Twitter/X'] = $twitterCount;
+        }
+    }
     ?>
 
     <div class="tab-pane active">
@@ -222,7 +238,12 @@
                 <div class="card mb-4">
                     <div class="card-body">
                         <h4 class="h6 text-uppercase text-muted mb-3">Suscriptores</h4>
-                        <p class="mb-0"><strong>Lista de correo:</strong> <?= (int) $subscriberCount ?></p>
+                        <p class="mb-2"><strong>Lista de correo:</strong> <?= (int) $subscriberCount ?></p>
+                        <?php if (!empty($socialCounts)): ?>
+                            <?php foreach ($socialCounts as $label => $count): ?>
+                                <p class="mb-2"><strong><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>:</strong> <?= (int) $count ?></p>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="card mb-4">

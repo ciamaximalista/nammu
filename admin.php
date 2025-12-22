@@ -1174,6 +1174,59 @@ function admin_is_social_network_configured(string $network, array $settings): b
     }
 }
 
+function admin_get_telegram_follower_count(array $settings): ?int {
+    $token = trim((string) ($settings['token'] ?? ''));
+    $channel = trim((string) ($settings['channel'] ?? ''));
+    if ($token === '' || $channel === '') {
+        return null;
+    }
+    $endpoint = 'https://api.telegram.org/bot' . $token . '/getChatMemberCount?chat_id=' . rawurlencode($channel);
+    $payload = admin_http_get_json($endpoint);
+    if (!is_array($payload) || empty($payload['ok'])) {
+        return null;
+    }
+    return isset($payload['result']) ? (int) $payload['result'] : null;
+}
+
+function admin_get_facebook_follower_count(array $settings): ?int {
+    $token = trim((string) ($settings['token'] ?? ''));
+    $channel = trim((string) ($settings['channel'] ?? ''));
+    if ($token === '' || $channel === '') {
+        return null;
+    }
+    $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($channel)
+        . '?fields=followers_count&access_token=' . rawurlencode($token);
+    $payload = admin_http_get_json($endpoint);
+    if (!is_array($payload)) {
+        return null;
+    }
+    if (isset($payload['followers_count'])) {
+        return (int) $payload['followers_count'];
+    }
+    return null;
+}
+
+function admin_get_twitter_follower_count(array $settings): ?int {
+    $token = trim((string) ($settings['token'] ?? ''));
+    $channelRaw = trim((string) ($settings['channel'] ?? ''));
+    if ($token === '' || $channelRaw === '') {
+        return null;
+    }
+    $channel = ltrim($channelRaw, '@');
+    $headers = ['Authorization: Bearer ' . $token];
+    if (preg_match('/^\d+$/', $channel)) {
+        $endpoint = 'https://api.twitter.com/2/users/' . rawurlencode($channel) . '?user.fields=public_metrics';
+        $payload = admin_http_get_json($endpoint, $headers);
+    } else {
+        $endpoint = 'https://api.twitter.com/2/users/by/username/' . rawurlencode($channel) . '?user.fields=public_metrics';
+        $payload = admin_http_get_json($endpoint, $headers);
+    }
+    if (!is_array($payload) || !isset($payload['data']['public_metrics']['followers_count'])) {
+        return null;
+    }
+    return (int) $payload['data']['public_metrics']['followers_count'];
+}
+
 function admin_send_post_to_telegram(string $slug, string $title, string $description, array $telegramSettings): bool {
     $token = $telegramSettings['token'] ?? '';
     $channel = $telegramSettings['channel'] ?? '';
@@ -1341,6 +1394,53 @@ function admin_http_post_body(string $url, string $body, array $headers): bool {
         return $httpCode >= 200 && $httpCode < 300;
     }
     return true;
+}
+
+function admin_http_get_json(string $url, array $headers = []): ?array {
+    $responseBody = null;
+    $httpCode = null;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_HTTPGET, true);
+        if (!empty($headers)) {
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        }
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $responseBody = curl_exec($ch);
+        if ($responseBody !== false) {
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        }
+        curl_close($ch);
+    } else {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => implode("\r\n", $headers),
+                'timeout' => 10,
+            ],
+        ]);
+        $responseBody = @file_get_contents($url, false, $context);
+        if (isset($http_response_header) && is_array($http_response_header)) {
+            foreach ($http_response_header as $headerLine) {
+                if (preg_match('#HTTP/\d\.\d\s+(\d+)#', $headerLine, $matches)) {
+                    $httpCode = (int) $matches[1];
+                    break;
+                }
+            }
+        }
+    }
+    if ($responseBody === false || $responseBody === null) {
+        return null;
+    }
+    if ($httpCode !== null && ($httpCode < 200 || $httpCode >= 300)) {
+        return null;
+    }
+    $decoded = json_decode($responseBody, true);
+    if (!is_array($decoded)) {
+        return null;
+    }
+    return $decoded;
 }
 
 function admin_send_telegram_message(string $token, string $chatId, string $text, ?string $parseMode = null): bool {
@@ -2377,6 +2477,7 @@ function admin_autosave_from_payload($jsonPayload): array {
 // --- Routing and Logic ---
 
 $page = $_GET['page'] ?? (is_logged_in() ? 'dashboard' : 'login');
+$page = is_logged_in() && $page === 'login' ? 'dashboard' : $page;
 $isItineraryAdminPage = in_array($page, ['itinerarios', 'itinerario', 'itinerario-tema'], true);
 $error = null;
 $user_exists = file_exists(USER_FILE);

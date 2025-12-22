@@ -51,6 +51,10 @@ $showFloatingSubscription = $subscriptionFloatingEnabled;
 $hasFooterLogo = $footerLogoPosition !== 'none' && !empty($logoUrl);
 $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
 $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
+$statsConsentGiven = function_exists('nammu_has_stats_consent') ? nammu_has_stats_consent() : false;
+if (function_exists('nammu_record_visit')) {
+    nammu_record_visit();
+}
 ?><!DOCTYPE html>
 <html lang="es">
 <head>
@@ -179,6 +183,63 @@ $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
         }
         .callout-box p:last-child {
             margin-bottom: 0;
+        }
+        body.nammu-cookie-locked {
+            overflow: hidden;
+        }
+        body.nammu-cookie-locked .wrapper {
+            filter: blur(3px);
+            pointer-events: none;
+            user-select: none;
+        }
+        .nammu-cookie-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 16, 24, 0.85);
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+        .nammu-cookie-overlay.is-visible {
+            display: flex;
+        }
+        .nammu-cookie-card {
+            width: min(720px, 92vw);
+            background: #ffffff;
+            color: #222;
+            border-radius: 18px;
+            padding: 2rem;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+        }
+        .nammu-cookie-card h2 {
+            margin-top: 0;
+            font-size: 1.6rem;
+        }
+        .nammu-cookie-card p {
+            margin: 0 0 1rem;
+        }
+        .nammu-cookie-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+        .nammu-cookie-actions button {
+            border: none;
+            border-radius: 999px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .nammu-cookie-accept {
+            background: #1b8eed;
+            color: #fff;
+        }
+        .nammu-cookie-decline {
+            background: #e6e9ef;
+            color: #1b1b1b;
         }
         .embedded-video,
         .embedded-pdf {
@@ -720,7 +781,19 @@ $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
         }
     </style>
 </head>
-<body class="<?= htmlspecialchars($cornerClass, ENT_QUOTES, 'UTF-8') ?>">
+<body class="<?= htmlspecialchars($cornerClass, ENT_QUOTES, 'UTF-8') ?><?= $statsConsentGiven ? '' : ' nammu-cookie-locked' ?>">
+    <div class="nammu-cookie-overlay<?= $statsConsentGiven ? '' : ' is-visible' ?>" data-cookie-overlay aria-hidden="<?= $statsConsentGiven ? 'true' : 'false' ?>">
+        <div class="nammu-cookie-card" role="dialog" aria-modal="true" aria-labelledby="cookieNoticeTitle">
+            <h2 id="cookieNoticeTitle">Uso de cookies para estadisticas</h2>
+            <p>Para cumplir con la RGPD, necesitamos tu consentimiento para usar cookies de estadistica.</p>
+            <p>Los datos se usan exclusivamente para medir visitas y mejorar el contenido. No se comparten con terceros.</p>
+            <p>Debes aceptar para continuar la lectura.</p>
+            <div class="nammu-cookie-actions">
+                <button type="button" class="nammu-cookie-accept" data-cookie-accept>Aceptar y continuar</button>
+                <button type="button" class="nammu-cookie-decline" data-cookie-decline>Salir</button>
+            </div>
+        </div>
+    </div>
     <div class="wrapper">
         <main>
             <?= $content ?>
@@ -805,6 +878,51 @@ $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
             <?php endif; ?>
         </div>
     <?php endif; ?>
+    <script>
+    (function() {
+        var overlay = document.querySelector('[data-cookie-overlay]');
+        var acceptBtn = document.querySelector('[data-cookie-accept]');
+        var declineBtn = document.querySelector('[data-cookie-decline]');
+        if (!overlay || !acceptBtn) {
+            return;
+        }
+        function hasConsent() {
+            return document.cookie.split(';').some(function(part) {
+                return part.trim().indexOf('nammu_stats_consent=1') === 0;
+            });
+        }
+        function setCookie(name, value) {
+            document.cookie = name + '=' + value + ';path=/;max-age=31536000;samesite=lax';
+        }
+        function generateUid() {
+            if (window.crypto && window.crypto.getRandomValues) {
+                var bytes = new Uint8Array(16);
+                window.crypto.getRandomValues(bytes);
+                return Array.prototype.map.call(bytes, function(b) {
+                    return ('0' + b.toString(16)).slice(-2);
+                }).join('');
+            }
+            return Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2);
+        }
+        if (hasConsent()) {
+            overlay.classList.remove('is-visible');
+            overlay.setAttribute('aria-hidden', 'true');
+            return;
+        }
+        acceptBtn.addEventListener('click', function() {
+            setCookie('nammu_stats_consent', '1');
+            if (!document.cookie.split(';').some(function(part) { return part.trim().indexOf('nammu_stats_uid=') === 0; })) {
+                setCookie('nammu_stats_uid', generateUid());
+            }
+            window.location.reload();
+        });
+        if (declineBtn) {
+            declineBtn.addEventListener('click', function() {
+                window.location.href = 'about:blank';
+            });
+        }
+    })();
+    </script>
     <script>
     (function() {
         function buildCookieName(slug) {

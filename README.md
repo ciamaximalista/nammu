@@ -42,6 +42,11 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 - Estadísticas por itinerario: lectores de la presentación, usuarios que completaron el tema 1 (iniciados) y porcentaje por tema. Incluye botón **Poner estadísticas a cero** para reiniciar los contadores.
 - Feed dedicado `itinerarios.xml` y botones en los buscadores que llevan directo al índice de cursos.
 
+### Escritorio y cumplimiento RGPD
+
+- Escritorio Nammu con estadísticas del sitio: resumen de publicaciones, usuarios únicos, top de entradas/páginas, itinerarios iniciados/completados y suscriptores.
+- Aviso de cookies RGPD con consentimiento obligatorio para continuar, uso exclusivo de estadísticas y sin compartir datos con terceros.
+
 ### Automatización, lista de correo y redes sociales
 
 - Integración opcional con Telegram, WhatsApp Cloud API, Facebook Pages y Twitter/X: auto-posting al publicar o envío manual desde la tabla de “Editar”.

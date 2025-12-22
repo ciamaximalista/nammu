@@ -649,6 +649,18 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
             }
         }
     }
+    if ($hadPresentation) {
+        $allVisited = true;
+        foreach ($itinerary->getTopics() as $topicItem) {
+            if (!in_array($topicItem->getSlug(), $progressData['visited'], true)) {
+                $allVisited = false;
+                break;
+            }
+        }
+        if ($allVisited) {
+            nammu_record_itinerary_event($itinerary->getSlug(), 'complete');
+        }
+    }
     $documentData = $markdown->convertDocument($topic->getContent());
     $topicHtml = $documentData['html'];
     $topicsList = $itinerary->getTopics();
@@ -787,9 +799,11 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
     }
     $itineraryStatus = method_exists($itinerary, 'isDraft') && $itinerary->isDraft() ? 'draft' : 'published';
     $itineraryProgress = nammu_get_itinerary_progress($itinerary->getSlug());
-    if (!in_array('__presentation', $itineraryProgress['visited'], true)) {
+    $hadPresentation = in_array('__presentation', $itineraryProgress['visited'], true);
+    if (!$hadPresentation) {
         $itineraryProgress['visited'][] = '__presentation';
         nammu_set_itinerary_progress($itinerary->getSlug(), $itineraryProgress);
+        nammu_record_itinerary_event($itinerary->getSlug(), 'start');
     }
     $documentData = $markdown->convertDocument($itinerary->getContent());
     $itineraryHtml = $documentData['html'];
@@ -1084,6 +1098,11 @@ if ($slug !== null && $slug !== '') {
         $entryMinHeadings = 3;
     }
     $postTemplateName = strtolower($post->getTemplate());
+    if ($postTemplateName === 'page') {
+        nammu_record_pageview('pages', $post->getSlug(), $post->getTitle());
+    } else {
+        nammu_record_pageview('posts', $post->getSlug(), $post->getTitle());
+    }
     $renderableHeadings = array_filter($documentData['headings'], static function (array $heading): bool {
         return isset($heading['id'], $heading['text'], $heading['level'])
             && $heading['id'] !== ''

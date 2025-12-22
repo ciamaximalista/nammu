@@ -92,6 +92,206 @@ function nammu_route_path(): string
     return $path === '' ? '/' : $path;
 }
 
+function nammu_stats_consent_cookie_name(): string
+{
+    return 'nammu_stats_consent';
+}
+
+function nammu_stats_uid_cookie_name(): string
+{
+    return 'nammu_stats_uid';
+}
+
+function nammu_has_stats_consent(): bool
+{
+    return ($_COOKIE[nammu_stats_consent_cookie_name()] ?? '') === '1';
+}
+
+function nammu_stats_uid(): ?string
+{
+    if (!nammu_has_stats_consent()) {
+        return null;
+    }
+    $cookieName = nammu_stats_uid_cookie_name();
+    $existing = trim((string) ($_COOKIE[$cookieName] ?? ''));
+    if ($existing !== '') {
+        return $existing;
+    }
+    try {
+        $uid = bin2hex(random_bytes(16));
+    } catch (Throwable $e) {
+        $uid = bin2hex(pack('N', time())) . bin2hex(pack('N', mt_rand(1, PHP_INT_MAX)));
+    }
+    setcookie($cookieName, $uid, time() + 31536000, '/', '', false, false);
+    $_COOKIE[$cookieName] = $uid;
+    return $uid;
+}
+
+function nammu_analytics_file_path(): string
+{
+    return dirname(__DIR__) . '/config/analytics.json';
+}
+
+function nammu_load_analytics(): array
+{
+    $file = nammu_analytics_file_path();
+    if (!is_file($file)) {
+        return [
+            'visitors' => ['daily' => []],
+            'content' => ['posts' => [], 'pages' => []],
+            'itineraries' => ['items' => []],
+            'updated_at' => 0,
+        ];
+    }
+    $raw = file_get_contents($file);
+    if ($raw === false) {
+        return [
+            'visitors' => ['daily' => []],
+            'content' => ['posts' => [], 'pages' => []],
+            'itineraries' => ['items' => []],
+            'updated_at' => 0,
+        ];
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return [
+            'visitors' => ['daily' => []],
+            'content' => ['posts' => [], 'pages' => []],
+            'itineraries' => ['items' => []],
+            'updated_at' => 0,
+        ];
+    }
+    $decoded['visitors'] = $decoded['visitors'] ?? ['daily' => []];
+    $decoded['content'] = $decoded['content'] ?? ['posts' => [], 'pages' => []];
+    $decoded['itineraries'] = $decoded['itineraries'] ?? ['items' => []];
+    $decoded['updated_at'] = (int) ($decoded['updated_at'] ?? 0);
+    return $decoded;
+}
+
+function nammu_save_analytics(array $data): void
+{
+    $file = nammu_analytics_file_path();
+    $dir = dirname($file);
+    nammu_ensure_directory($dir, 0775);
+    $payload = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($payload === false) {
+        return;
+    }
+    @file_put_contents($file, $payload);
+}
+
+function nammu_analytics_touch_visit(array &$data, string $uid, string $date): bool
+{
+    if (!isset($data['visitors']['daily'][$date])) {
+        $data['visitors']['daily'][$date] = ['uids' => []];
+    }
+    if (!isset($data['visitors']['daily'][$date]['uids'])) {
+        $data['visitors']['daily'][$date]['uids'] = [];
+    }
+    if (isset($data['visitors']['daily'][$date]['uids'][$uid])) {
+        return false;
+    }
+    $data['visitors']['daily'][$date]['uids'][$uid] = 1;
+    return true;
+}
+
+function nammu_record_visit(): void
+{
+    if (!nammu_has_stats_consent()) {
+        return;
+    }
+    if (!empty($GLOBALS['nammu_analytics_visit_recorded'])) {
+        return;
+    }
+    $uid = nammu_stats_uid();
+    if ($uid === null) {
+        return;
+    }
+    $data = nammu_load_analytics();
+    $date = date('Y-m-d');
+    $changed = nammu_analytics_touch_visit($data, $uid, $date);
+    if ($changed) {
+        $data['updated_at'] = time();
+        nammu_save_analytics($data);
+    }
+    $GLOBALS['nammu_analytics_visit_recorded'] = true;
+}
+
+function nammu_record_pageview(string $type, string $slug, string $title = ''): void
+{
+    if (!nammu_has_stats_consent()) {
+        return;
+    }
+    $uid = nammu_stats_uid();
+    if ($uid === null) {
+        return;
+    }
+    $data = nammu_load_analytics();
+    $date = date('Y-m-d');
+    $changed = nammu_analytics_touch_visit($data, $uid, $date);
+    $bucket = $type === 'pages' ? 'pages' : 'posts';
+    if (!isset($data['content'][$bucket])) {
+        $data['content'][$bucket] = [];
+    }
+    if (!isset($data['content'][$bucket][$slug])) {
+        $data['content'][$bucket][$slug] = [
+            'title' => $title,
+            'total' => 0,
+            'daily' => [],
+        ];
+    }
+    if ($title !== '') {
+        $data['content'][$bucket][$slug]['title'] = $title;
+    }
+    $data['content'][$bucket][$slug]['total'] = (int) ($data['content'][$bucket][$slug]['total'] ?? 0) + 1;
+    if (!isset($data['content'][$bucket][$slug]['daily'][$date])) {
+        $data['content'][$bucket][$slug]['daily'][$date] = 0;
+    }
+    $data['content'][$bucket][$slug]['daily'][$date] = (int) ($data['content'][$bucket][$slug]['daily'][$date] ?? 0) + 1;
+    $data['updated_at'] = time();
+    nammu_save_analytics($data);
+    $GLOBALS['nammu_analytics_visit_recorded'] = true;
+}
+
+function nammu_record_itinerary_event(string $slug, string $event): void
+{
+    if (!nammu_has_stats_consent()) {
+        return;
+    }
+    $uid = nammu_stats_uid();
+    if ($uid === null) {
+        return;
+    }
+    $data = nammu_load_analytics();
+    $date = date('Y-m-d');
+    $changed = nammu_analytics_touch_visit($data, $uid, $date);
+    if (!isset($data['itineraries']['items'])) {
+        $data['itineraries']['items'] = [];
+    }
+    if (!isset($data['itineraries']['items'][$slug])) {
+        $data['itineraries']['items'][$slug] = [
+            'started_daily' => [],
+            'completed_daily' => [],
+        ];
+    }
+    $bucket = $event === 'complete' ? 'completed_daily' : 'started_daily';
+    if (!isset($data['itineraries']['items'][$slug][$bucket][$date])) {
+        $data['itineraries']['items'][$slug][$bucket][$date] = ['uids' => []];
+    }
+    if (!isset($data['itineraries']['items'][$slug][$bucket][$date]['uids'])) {
+        $data['itineraries']['items'][$slug][$bucket][$date]['uids'] = [];
+    }
+    if (!isset($data['itineraries']['items'][$slug][$bucket][$date]['uids'][$uid])) {
+        $data['itineraries']['items'][$slug][$bucket][$date]['uids'][$uid] = 1;
+        $changed = true;
+    }
+    if ($changed) {
+        $data['updated_at'] = time();
+        nammu_save_analytics($data);
+    }
+    $GLOBALS['nammu_analytics_visit_recorded'] = true;
+}
+
 function nammu_template_settings(): array
 {
     $defaults = nammu_default_template_settings();

@@ -2376,7 +2376,7 @@ function admin_autosave_from_payload($jsonPayload): array {
 
 // --- Routing and Logic ---
 
-$page = $_GET['page'] ?? 'login';
+$page = $_GET['page'] ?? (is_logged_in() ? 'dashboard' : 'login');
 $isItineraryAdminPage = in_array($page, ['itinerarios', 'itinerario', 'itinerario-tema'], true);
 $error = null;
 $user_exists = file_exists(USER_FILE);
@@ -2434,7 +2434,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['login'])) {
         if (verify_user($_POST['username'], $_POST['password'])) {
             $_SESSION['loggedin'] = true;
-            header('Location: admin.php?page=publish');
+            header('Location: admin.php?page=dashboard');
             exit;
         } else {
             $error = 'Usuario o contraseña incorrectos.';
@@ -5866,7 +5866,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                     <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
 
-                        <a class="navbar-brand" href="#"><img src="nammu.png" alt="Nammu Logo" style="max-width: 100px;"></a>
+                        <a class="navbar-brand" href="?page=dashboard"><img src="nammu.png" alt="Nammu Logo" style="max-width: 100px;"></a>
                         <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#adminNavbar" aria-controls="adminNavbar" aria-expanded="false" aria-label="Mostrar navegación">
                             <span class="navbar-toggler-icon"></span>
                         </button>
@@ -5875,46 +5875,77 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                             <ul class="navbar-nav mr-auto">
 
+                                <li class="nav-item <?= $page === 'dashboard' ? 'active' : '' ?>">
+                                    <a class="nav-link" href="?page=dashboard" title="Escritorio Nammu" aria-label="Escritorio Nammu">
+                                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M4 4h7v7H4V4zm9 0h7v4h-7V4zm0 6h7v10h-7V10zm-9 3h7v7H4v-7z" fill="currentColor"/>
+                                        </svg>
+                                    </a>
+                                </li>
+
                                 <li class="nav-item <?= $page === 'publish' ? 'active' : '' ?>">
-
-                                    <a class="nav-link" href="?page=publish"><h1>Publicar</h1></a>
-
+                                    <a class="nav-link" href="?page=publish" title="Publicar" aria-label="Publicar">
+                                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12 3l9 6-9 6-9-6 9-6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                            <path d="M3 15l9 6 9-6" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                        </svg>
+                                    </a>
                                 </li>
 
                                 <li class="nav-item <?= $page === 'edit' ? 'active' : '' ?>">
-
-                                    <a class="nav-link" href="?page=edit"><h1>Editar</h1></a>
-
+                                    <a class="nav-link" href="?page=edit" title="Editar" aria-label="Editar">
+                                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M4 20h4l10-10-4-4L4 16v4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                            <path d="M13 6l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        </svg>
+                                    </a>
                                 </li>
 
                                 <li class="nav-item <?= $page === 'resources' ? 'active' : '' ?>">
-
-                                    <a class="nav-link" href="?page=resources"><h1>Recursos</h1></a>
-
+                                    <a class="nav-link" href="?page=resources" title="Recursos" aria-label="Recursos">
+                                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                            <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+                                            <circle cx="9" cy="10" r="2" fill="currentColor"/>
+                                            <path d="M5 17l4-4 3 3 3-3 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                    </a>
                                 </li>
 
                                 <li class="nav-item <?= $page === 'template' ? 'active' : '' ?>">
-
-                                    <a class="nav-link" href="?page=template"><h1>Plantilla</h1></a>
-
+                                    <a class="nav-link" href="?page=template" title="Plantilla" aria-label="Plantilla">
+                                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M4 4h16v16H4V4z" stroke="currentColor" stroke-width="2"/>
+                                            <path d="M4 9h16M9 4v16" stroke="currentColor" stroke-width="2"/>
+                                        </svg>
+                                    </a>
                                 </li>
 
                                 <li class="nav-item <?= ($page === 'itinerarios' || $page === 'itinerario' || $page === 'itinerario-tema') ? 'active' : '' ?>">
-
-                                    <a class="nav-link" href="?page=itinerarios"><h1>Itinerarios</h1></a>
-
+                                    <a class="nav-link" href="?page=itinerarios" title="Itinerarios" aria-label="Itinerarios">
+                                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M4 5H10C11.1046 5 12 5.89543 12 7V19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                            <path d="M20 5H14C12.8954 5 12 5.89543 12 7V19H20C21.1046 19 22 18.1046 22 17V7C22 5.89543 21.1046 5 20 5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                            <line x1="12" y1="7" x2="12" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        </svg>
+                                    </a>
                                 </li>
 
                                 <li class="nav-item <?= $page === 'lista-correo' ? 'active' : '' ?>">
-
-                                    <a class="nav-link" href="?page=lista-correo"><h1>Lista</h1></a>
-
+                                    <a class="nav-link" href="?page=lista-correo" title="Lista" aria-label="Lista">
+                                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M4 6h16v12H4V6z" stroke="currentColor" stroke-width="2"/>
+                                            <path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                    </a>
                                 </li>
 
                                 <li class="nav-item <?= $page === 'configuracion' ? 'active' : '' ?>">
-
-                                    <a class="nav-link" href="?page=configuracion"><h1>Configuración</h1></a>
-
+                                    <a class="nav-link" href="?page=configuracion" title="Configuración" aria-label="Configuración">
+                                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12 8a4 4 0 100 8 4 4 0 000-8z" stroke="currentColor" stroke-width="2"/>
+                                            <path d="M3 12h3M18 12h3M12 3v3M12 18v3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        </svg>
+                                    </a>
                                 </li>
 
                             </ul>
@@ -5934,7 +5965,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
                     <div class="tab-content">
 
-                        <?php if ($page === 'publish'): ?>
+                        <?php if ($page === 'dashboard'): ?>
+
+                            <?php include __DIR__ . '/core/admin-page-dashboard.php'; ?>
+
+<?php elseif ($page === 'publish'): ?>
 
                             <?php include __DIR__ . '/core/admin-page-publish.php'; ?>
 

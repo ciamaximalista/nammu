@@ -10,4 +10,5 @@ config/mailing-tokens.json
 config/mailing-pending.json
 config/mailing-secret.key
 config/media-tags.json
+config/analytics.json
 config/user.php

@@ -151,7 +151,11 @@
                                         <td><?= htmlspecialchars($entry['postal_code'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
                                         <td><?= htmlspecialchars($entry['region'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
                                         <td><?= htmlspecialchars($entry['country'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                                        <td><?= htmlspecialchars($entry['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+                                        <?php
+                                        $emailValue = (string) ($entry['email'] ?? '');
+                                        $showEmail = $emailValue !== '' ? $emailValue : 'Sin email';
+                                        ?>
+                                        <td><?= htmlspecialchars($showEmail, ENT_QUOTES, 'UTF-8') ?></td>
                                         <td class="text-right">
                                             <details class="mb-2">
                                                 <summary class="btn btn-sm btn-outline-primary">Editar</summary>

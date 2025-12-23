@@ -4199,13 +4199,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $skipped = 0;
         while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
             $emailIndex = $map['email'] ?? null;
-            $email = ($emailIndex !== null && isset($row[$emailIndex])) ? postal_normalize_email((string) $row[$emailIndex]) : '';
-            if ($email === '') {
-                $skipped++;
-                continue;
-            }
             $data = [
-                'email' => $email,
+                'email' => '',
                 'name' => isset($map['name'], $row[$map['name']]) ? $row[$map['name']] : '',
                 'address' => isset($map['address'], $row[$map['address']]) ? $row[$map['address']] : '',
                 'city' => isset($map['city'], $row[$map['city']]) ? $row[$map['city']] : '',
@@ -4213,9 +4208,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'region' => isset($map['region'], $row[$map['region']]) ? $row[$map['region']] : '',
                 'country' => isset($map['country'], $row[$map['country']]) ? $row[$map['country']] : '',
             ];
+            $email = ($emailIndex !== null && isset($row[$emailIndex])) ? postal_normalize_email((string) $row[$emailIndex]) : '';
+            $data['email'] = $email;
             try {
                 $entries = postal_upsert_entry($data, null, $entries);
-                admin_maybe_add_to_mailing_list($email);
+                if ($email !== '') {
+                    admin_maybe_add_to_mailing_list($email);
+                }
                 $imported++;
             } catch (Throwable $e) {
                 $skipped++;

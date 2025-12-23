@@ -77,6 +77,108 @@
     }
     ksort($monthlyUids);
 
+    $last30Daily = [];
+    for ($i = 29; $i >= 0; $i--) {
+        $dayKey = $today->modify('-' . $i . ' days')->format('Y-m-d');
+        $payload = $visitorsDaily[$dayKey] ?? [];
+        $uids = is_array($payload) ? ($payload['uids'] ?? []) : [];
+        $last30Daily[$dayKey] = count($uids);
+    }
+    $last30DailyMax = max(1, max($last30Daily));
+    $last30Keys = array_keys($last30Daily);
+    $last30LabelStart = $last30Keys[0] ?? '';
+    $last30LabelMid = $last30Keys[(int) floor(count($last30Keys) / 2)] ?? '';
+    $last30LabelEnd = $last30Keys[count($last30Keys) - 1] ?? '';
+
+    $last12Months = [];
+    $monthCursor = $today->modify('first day of this month');
+    for ($i = 11; $i >= 0; $i--) {
+        $monthKey = $monthCursor->modify('-' . $i . ' months')->format('Y-m');
+        $last12Months[$monthKey] = isset($monthlyUids[$monthKey]) ? count($monthlyUids[$monthKey]) : 0;
+    }
+    $last12MonthsMax = max(1, max($last12Months));
+    $last12Keys = array_keys($last12Months);
+    $last12LabelStart = $last12Keys[0] ?? '';
+    $last12LabelMid = $last12Keys[(int) floor(count($last12Keys) / 2)] ?? '';
+    $last12LabelEnd = $last12Keys[count($last12Keys) - 1] ?? '';
+
+    $formatDateEs = static function (string $date): string {
+        try {
+            $dt = new DateTimeImmutable($date);
+            return $dt->format('d/m/y');
+        } catch (Throwable $e) {
+            return $date;
+        }
+    };
+    $formatDayMonthEs = static function (string $date): string {
+        try {
+            $dt = new DateTimeImmutable($date);
+            return $dt->format('d/m');
+        } catch (Throwable $e) {
+            return $date;
+        }
+    };
+    $formatMonthEs = static function (string $date): string {
+        try {
+            $dt = new DateTimeImmutable($date);
+            return $dt->format('m/y');
+        } catch (Throwable $e) {
+            return $date;
+        }
+    };
+
+    $buildLinePoints = static function (array $series, int $max): array {
+        $count = count($series);
+        if ($count === 0) {
+            return ['points' => '', 'coords' => [], 'max' => 0, 'maxIndex' => null];
+        }
+        $width = 300;
+        $height = 140;
+        $step = $count > 1 ? ($width / ($count - 1)) : 0;
+        $points = [];
+        $coords = [];
+        $maxValue = 0;
+        $maxIndex = null;
+        $index = 0;
+        foreach ($series as $value) {
+            $x = $step * $index;
+            $ratio = $max > 0 ? ($value / $max) : 0;
+            $y = $height - ($ratio * $height);
+            $points[] = sprintf('%.2f,%.2f', $x, $y);
+            $coords[] = ['x' => $x, 'y' => $y, 'value' => (int) $value];
+            if ($value >= $maxValue) {
+                $maxValue = (int) $value;
+                $maxIndex = $index;
+            }
+            $index++;
+        }
+        return [
+            'points' => implode(' ', $points),
+            'coords' => $coords,
+            'max' => $maxValue,
+            'maxIndex' => $maxIndex,
+        ];
+    };
+
+    $last30Line = $buildLinePoints($last30Daily, $last30DailyMax);
+    $last12Line = $buildLinePoints($last12Months, $last12MonthsMax);
+
+    $yearlyUids = [];
+    foreach ($visitorsDaily as $day => $payload) {
+        if (!is_string($day) || strlen($day) < 4) {
+            continue;
+        }
+        $yearKey = substr($day, 0, 4);
+        if (!isset($yearlyUids[$yearKey])) {
+            $yearlyUids[$yearKey] = [];
+        }
+        $uids = is_array($payload) ? ($payload['uids'] ?? []) : [];
+        foreach ($uids as $uid => $flag) {
+            $yearlyUids[$yearKey][$uid] = true;
+        }
+    }
+    ksort($yearlyUids);
+
     $topPosts = [];
     foreach ($postsStats as $slug => $item) {
         $total = (int) ($item['total'] ?? 0);
@@ -226,6 +328,61 @@
         </div>
 
         <div class="row">
+            <div class="col-lg-6">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h4 class="h6 text-uppercase text-muted mb-3">Usuarios únicos (últimos 30 días)</h4>
+                        <?php if ($last30Line['points'] === ''): ?>
+                            <p class="text-muted mb-0">Sin datos todavia.</p>
+                        <?php else: ?>
+                            <svg width="100%" height="170" viewBox="0 0 320 170" preserveAspectRatio="none" aria-hidden="true">
+                                <line x1="30" y1="10" x2="30" y2="140" stroke="#ccd6e0" stroke-width="1"></line>
+                                <line x1="30" y1="140" x2="300" y2="140" stroke="#ccd6e0" stroke-width="1"></line>
+                                <text x="4" y="14" font-size="10" fill="#6c757d"><?= (int) $last30DailyMax ?></text>
+                                <text x="12" y="140" font-size="10" fill="#6c757d">0</text>
+                                <text x="30" y="162" font-size="10" text-anchor="start" fill="#6c757d"><?= htmlspecialchars($formatDayMonthEs($last30LabelStart), ENT_QUOTES, 'UTF-8') ?></text>
+                                <text x="165" y="162" font-size="10" text-anchor="middle" fill="#6c757d"><?= htmlspecialchars($formatDayMonthEs($last30LabelMid), ENT_QUOTES, 'UTF-8') ?></text>
+                                <text x="300" y="162" font-size="10" text-anchor="end" fill="#6c757d"><?= htmlspecialchars($formatDayMonthEs($last30LabelEnd), ENT_QUOTES, 'UTF-8') ?></text>
+                                <g transform="translate(30,0)">
+                                    <polyline fill="none" stroke="#1b8eed" stroke-width="2" points="<?= htmlspecialchars($last30Line['points'], ENT_QUOTES, 'UTF-8') ?>"></polyline>
+                                    <?php foreach ($last30Line['coords'] as $point): ?>
+                                        <circle cx="<?= htmlspecialchars((string) $point['x'], ENT_QUOTES, 'UTF-8') ?>" cy="<?= htmlspecialchars((string) $point['y'], ENT_QUOTES, 'UTF-8') ?>" r="2.5" fill="#1b8eed"></circle>
+                                    <?php endforeach; ?>
+                                </g>
+                            </svg>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h4 class="h6 text-uppercase text-muted mb-3">Usuarios unicos (ultimo ano)</h4>
+                        <?php if ($last12Line['points'] === ''): ?>
+                            <p class="text-muted mb-0">Sin datos todavia.</p>
+                        <?php else: ?>
+                            <svg width="100%" height="170" viewBox="0 0 320 170" preserveAspectRatio="none" aria-hidden="true">
+                                <line x1="30" y1="10" x2="30" y2="140" stroke="#ccd6e0" stroke-width="1"></line>
+                                <line x1="30" y1="140" x2="300" y2="140" stroke="#ccd6e0" stroke-width="1"></line>
+                                <text x="4" y="14" font-size="10" fill="#6c757d"><?= (int) $last12MonthsMax ?></text>
+                                <text x="12" y="140" font-size="10" fill="#6c757d">0</text>
+                                <text x="30" y="162" font-size="10" text-anchor="start" fill="#6c757d"><?= htmlspecialchars($formatMonthEs($last12LabelStart . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
+                                <text x="165" y="162" font-size="10" text-anchor="middle" fill="#6c757d"><?= htmlspecialchars($formatMonthEs($last12LabelMid . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
+                                <text x="300" y="162" font-size="10" text-anchor="end" fill="#6c757d"><?= htmlspecialchars($formatMonthEs($last12LabelEnd . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
+                                <g transform="translate(30,0)">
+                                    <polyline fill="none" stroke="#0a4c8a" stroke-width="2" points="<?= htmlspecialchars($last12Line['points'], ENT_QUOTES, 'UTF-8') ?>"></polyline>
+                                    <?php foreach ($last12Line['coords'] as $point): ?>
+                                        <circle cx="<?= htmlspecialchars((string) $point['x'], ENT_QUOTES, 'UTF-8') ?>" cy="<?= htmlspecialchars((string) $point['y'], ENT_QUOTES, 'UTF-8') ?>" r="2.5" fill="#0a4c8a"></circle>
+                                    <?php endforeach; ?>
+                                </g>
+                            </svg>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
             <div class="col-lg-4">
                 <div class="card mb-4">
                     <div class="card-body">
@@ -266,7 +423,31 @@
                                     <?php else: ?>
                                         <?php foreach ($monthlyUids as $month => $uids): ?>
                                             <tr>
-                                                <td><?= htmlspecialchars($month, ENT_QUOTES, 'UTF-8') ?></td>
+                                                <td><?= htmlspecialchars($formatDateEs($month . '-01'), ENT_QUOTES, 'UTF-8') ?></td>
+                                                <td><?= (int) count($uids) ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="table-responsive mt-3">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Año</th>
+                                        <th>Usuarios</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($yearlyUids)): ?>
+                                        <tr>
+                                            <td colspan="2" class="text-muted">Sin datos todavia.</td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <?php foreach ($yearlyUids as $year => $uids): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars($year, ENT_QUOTES, 'UTF-8') ?></td>
                                                 <td><?= (int) count($uids) ?></td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -342,68 +523,72 @@
                     </div>
                 </div>
 
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3">Paginas mas leidas</h4>
-                        <?php if (empty($topPages)): ?>
-                            <p class="text-muted mb-0">Sin datos todavia.</p>
-                        <?php else: ?>
-                            <ol class="mb-0">
-                                <?php foreach ($topPages as $item): ?>
-                                    <li>
-                                        <?php $url = admin_public_post_url($item['slug']); ?>
-                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
-                                        </a>
-                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ol>
-                        <?php endif; ?>
+                <?php if ($pageCount > 0): ?>
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h4 class="h6 text-uppercase text-muted mb-3">Paginas mas leidas</h4>
+                            <?php if (empty($topPages)): ?>
+                                <p class="text-muted mb-0">Sin datos todavia.</p>
+                            <?php else: ?>
+                                <ol class="mb-0">
+                                    <?php foreach ($topPages as $item): ?>
+                                        <li>
+                                            <?php $url = admin_public_post_url($item['slug']); ?>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                            <?php endif; ?>
+                        </div>
                     </div>
-                </div>
+                <?php endif; ?>
 
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3">Itinerarios comenzados (usuarios unicos)</h4>
-                        <?php if (empty($topItineraryStarts)): ?>
-                            <p class="text-muted mb-0">Sin datos todavia.</p>
-                        <?php else: ?>
-                            <ol class="mb-0">
-                                <?php foreach ($topItineraryStarts as $item): ?>
-                                    <li>
-                                        <?php $url = admin_public_itinerary_url($item['slug']); ?>
-                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
-                                        </a>
-                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ol>
-                        <?php endif; ?>
+                <?php if ($itineraryCount > 0): ?>
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h4 class="h6 text-uppercase text-muted mb-3">Itinerarios comenzados (usuarios unicos)</h4>
+                            <?php if (empty($topItineraryStarts)): ?>
+                                <p class="text-muted mb-0">Sin datos todavia.</p>
+                            <?php else: ?>
+                                <ol class="mb-0">
+                                    <?php foreach ($topItineraryStarts as $item): ?>
+                                        <li>
+                                            <?php $url = admin_public_itinerary_url($item['slug']); ?>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                            <?php endif; ?>
+                        </div>
                     </div>
-                </div>
 
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3">Itinerarios completados (usuarios unicos)</h4>
-                        <?php if (empty($topItineraryCompletes)): ?>
-                            <p class="text-muted mb-0">Sin datos todavia.</p>
-                        <?php else: ?>
-                            <ol class="mb-0">
-                                <?php foreach ($topItineraryCompletes as $item): ?>
-                                    <li>
-                                        <?php $url = admin_public_itinerary_url($item['slug']); ?>
-                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
-                                        </a>
-                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ol>
-                        <?php endif; ?>
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h4 class="h6 text-uppercase text-muted mb-3">Itinerarios completados (usuarios unicos)</h4>
+                            <?php if (empty($topItineraryCompletes)): ?>
+                                <p class="text-muted mb-0">Sin datos todavia.</p>
+                            <?php else: ?>
+                                <ol class="mb-0">
+                                    <?php foreach ($topItineraryCompletes as $item): ?>
+                                        <li>
+                                            <?php $url = admin_public_itinerary_url($item['slug']); ?>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                            <?php endif; ?>
+                        </div>
                     </div>
-                </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>

@@ -6308,8 +6308,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 <li class="nav-item <?= $page === 'publish' ? 'active' : '' ?>">
                                     <a class="nav-link" href="?page=publish" title="Publicar" aria-label="Publicar">
                                         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M12 3l9 6-9 6-9-6 9-6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                                            <path d="M3 15l9 6 9-6" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                            <path d="M14 4l6 6-9.5 9.5H4v-6.5L13.5 4H14z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                            <path d="M12.5 5.5l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                            <path d="M8.5 15.5l5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                            <path d="M4 20h6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                         </svg>
                                     </a>
                                 </li>

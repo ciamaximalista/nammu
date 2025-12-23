@@ -46,6 +46,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 
 - Escritorio Nammu con estadísticas del sitio: resumen de publicaciones, usuarios únicos, top de entradas/páginas, itinerarios iniciados/completados y suscriptores.
 - Aviso de cookies RGPD con consentimiento obligatorio para continuar, uso exclusivo de estadísticas y sin compartir datos con terceros.
+- Anuncios flotantes configurables desde el admin: activación, alcance (portada o todo el sitio), texto/HTML e imagen para campañas puntuales.
 
 ### Automatización, lista de correo y redes sociales
 
@@ -53,6 +54,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 - Plantillas de mensaje consistentes (título, descripción y URL pública) con escape apropiado para HTML o texto plano.
 - Feedback inmediato en la UI usando `$_SESSION['social_feedback']`.
 - Lista de correo con suscriptores guardados en `config/`, uso de Gmail vía SMTP con OAuth2 y gestión básica de altas/bajas desde el panel.
+- Gestor de libreta de direcciones de correo postal que genera etiquetas para sobres y archivo CSV con los suscriptores postales, listo para enviar boletines o materiales por correo postal.
 
 ### Recursos técnicos clave
 

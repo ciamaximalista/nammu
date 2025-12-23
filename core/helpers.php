@@ -624,6 +624,113 @@ function nammu_social_settings(): array
     return $social;
 }
 
+function nammu_ads_settings(): array
+{
+    $config = nammu_load_config();
+    $defaults = [
+        'enabled' => 'off',
+        'scope' => 'home',
+        'text' => '',
+        'image' => '',
+    ];
+    $ads = array_merge($defaults, $config['ads'] ?? []);
+    if (!in_array($ads['scope'], ['home', 'all'], true)) {
+        $ads['scope'] = $defaults['scope'];
+    }
+    return $ads;
+}
+
+function nammu_postal_icon_svg(): string
+{
+    return '<svg width="24" height="24" viewBox="0 0 297 297" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M149.999,162.915v120.952c0,7.253,5.74,13.133,12.993,13.133c7.253,0,12.993-5.88,12.993-13.133V162.915h100.813c7.253,0,13.128-6.401,13.128-13.654V74.254c0-19.599-7.78-38.348-21.912-52.364C253.934,7.926,235.386,0,215.783,0H80.675C40.091,0,7.074,33.626,7.074,74.026v75.236c0,7.253,5.88,13.654,13.133,13.654H149.999z M33.06,135.929V74.026c0-25.918,21.376-47.003,47.476-47.003c26.1,0,47.474,21.188,47.474,47.231v61.675H33.06z M263.94,135.929H154.997V74.254c0-18.05-7.285-35.274-18.135-48.267h78.922c25.955,0,48.156,22.51,48.156,48.267V135.929z"/><path fill="currentColor" d="M80.036,58.311c-7.253,0-12.993,5.88-12.993,13.133v1.052c0,7.253,5.74,13.133,12.993,13.133c7.253,0,12.993-5.88,12.993-13.133v-1.052C93.029,64.19,87.289,58.311,80.036,58.311z"/></svg>';
+}
+
+function nammu_footer_icon_svgs(): array
+{
+    return [
+        'telegram' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M21.7 5.2a1 1 0 0 0-1.1-.1L3.5 12.1a1 1 0 0 0 .1 1.9l4.7 1.7 1.9 5.1a1 1 0 0 0 1.7.3l2.8-3.2 4.6 3.4a1 1 0 0 0 1.6-.6l2-12.4a1 1 0 0 0-.2-0.7zM9.5 14.8l8-6.4-6.2 7.6-.2 2.8-1.2-3.1-3.5-1.3 11.7-4.6-10.6 5z"/></svg>',
+        'whatsapp' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.6-1.2A9 9 0 1 0 12 3zm4.9 12.4c-.2.5-1 1-1.6 1.1-.4 0-.8.1-2.9-.9-2.3-1.1-3.8-3.3-4-3.6-.3-.4-1-1.3-1-2.2 0-.9.5-1.4.8-1.6.2-.2.5-.2.7-.2h.5c.2 0 .5-.1.8.6.2.5.8 2.2.8 2.3.1.2.1.4 0 .6-.1.2-.2.4-.3.5-.2.2-.3.3-.5.6-.2.2-.3.4-.1.7.2.3.9 1.5 2 2.4 1.4 1.2 2.5 1.5 2.9 1.6.3.1.5.1.7-.1.2-.2.8-.9 1-1.2.2-.3.4-.2.7-.1.2.1 1.6.7 1.9.8.2.1.4.2.4.3.1.1.1.6-.1 1.1z"/></svg>',
+        'facebook' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M14 8h3V5h-3c-2.2 0-4 1.8-4 4v3H7v3h3v7h3v-7h3l1-3h-4V9c0-.6.4-1 1-1z"/></svg>',
+        'twitter' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 4h3.7l4.3 5.2L17 4h3l-6.4 7.4L20 20h-3.7l-4.8-5.9L6.2 20H3l6.9-7.9L4 4z"/></svg>',
+        'email' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2v.3l8 5.2 8-5.2V8H4z"/></svg>',
+        'postal' => nammu_postal_icon_svg(),
+    ];
+}
+
+function nammu_build_footer_links(array $config, array $theme, string $baseUrl, string $postalUrl): array
+{
+    $icons = nammu_footer_icon_svgs();
+    $links = [];
+
+    $telegramChannel = trim((string) ($config['telegram']['channel'] ?? ''));
+    if ($telegramChannel !== '') {
+        $slug = ltrim($telegramChannel, '@');
+        if ($slug !== '') {
+            $links[] = [
+                'label' => 'Telegram',
+                'href' => 'https://t.me/' . rawurlencode($slug),
+                'svg' => $icons['telegram'],
+            ];
+        }
+    }
+
+    $whatsappTarget = trim((string) ($config['whatsapp']['recipient'] ?? ''));
+    if ($whatsappTarget === '') {
+        $whatsappTarget = trim((string) ($config['whatsapp']['channel'] ?? ''));
+    }
+    if ($whatsappTarget !== '') {
+        $clean = preg_replace('/\D+/', '', $whatsappTarget);
+        if ($clean !== '') {
+            $links[] = [
+                'label' => 'WhatsApp',
+                'href' => 'https://wa.me/' . $clean,
+                'svg' => $icons['whatsapp'],
+            ];
+        }
+    }
+
+    $facebookPage = trim((string) ($config['facebook']['channel'] ?? ''));
+    if ($facebookPage !== '') {
+        $links[] = [
+            'label' => 'Facebook',
+            'href' => 'https://www.facebook.com/' . rawurlencode($facebookPage),
+            'svg' => $icons['facebook'],
+        ];
+    }
+
+    $twitterHandle = trim((string) ($config['twitter']['channel'] ?? ''));
+    if ($twitterHandle !== '') {
+        $handle = ltrim($twitterHandle, '@');
+        if ($handle !== '') {
+            $links[] = [
+                'label' => 'X',
+                'href' => 'https://twitter.com/' . rawurlencode($handle),
+                'svg' => $icons['twitter'],
+            ];
+        }
+    }
+
+    $subscriptionMode = $theme['subscription']['mode'] ?? 'none';
+    if (in_array($subscriptionMode, ['home', 'single', 'both'], true)) {
+        $links[] = [
+            'label' => 'Lista de correo',
+            'href' => ($baseUrl !== '' ? rtrim($baseUrl, '/') : '') . '/avisos.php',
+            'svg' => $icons['email'],
+        ];
+    }
+
+    $postalEnabled = ($config['postal']['enabled'] ?? 'off') === 'on';
+    if ($postalEnabled) {
+        $links[] = [
+            'label' => 'Correo postal',
+            'href' => $postalUrl !== '' ? $postalUrl : '/correos.php',
+            'svg' => $icons['postal'],
+        ];
+    }
+
+    return $links;
+}
+
 function nammu_build_social_meta(array $data, array $socialConfig): array
 {
     $title = trim($data['title'] ?? '');

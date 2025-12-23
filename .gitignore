@@ -5,10 +5,15 @@ assets/
 content/
 itinerarios/
 config/config.yml
+config/*.json
+config/*.key
+config/*.yml
+config/*.php
 config/mailing-subscribers.json
 config/mailing-tokens.json
 config/mailing-pending.json
 config/mailing-secret.key
 config/media-tags.json
 config/analytics.json
+config/postal-subscribers.json
 config/user.php

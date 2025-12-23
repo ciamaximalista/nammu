@@ -334,6 +334,14 @@
             $subscriberCount = 0;
         }
     }
+    $postalSubscriberCount = 0;
+    if (function_exists('postal_load_entries')) {
+        try {
+            $postalSubscriberCount = count(postal_load_entries());
+        } catch (Throwable $e) {
+            $postalSubscriberCount = 0;
+        }
+    }
     $socialCounts = [];
     if (function_exists('get_settings')) {
         $settings = get_settings();
@@ -455,6 +463,9 @@
                     <div class="card-body">
                         <h4 class="h6 text-uppercase text-muted mb-3">Suscriptores</h4>
                         <p class="mb-2"><strong>Lista de correo:</strong> <?= (int) $subscriberCount ?></p>
+                        <?php if ($postalSubscriberCount > 0): ?>
+                            <p class="mb-2"><strong>Correo postal:</strong> <?= (int) $postalSubscriberCount ?></p>
+                        <?php endif; ?>
                         <?php if (!empty($socialCounts)): ?>
                             <?php foreach ($socialCounts as $label => $count): ?>
                                 <p class="mb-2"><strong><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>:</strong> <?= (int) $count ?></p>

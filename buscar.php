@@ -52,6 +52,10 @@ $homeDescription = $socialConfig['default_description'] !== '' ? $socialConfig['
 $homeImage = nammu_resolve_asset($socialConfig['home_image'] ?? '', $publicBaseUrl);
 
 $displaySiteTitle = $theme['blog'] !== '' ? $theme['blog'] : $siteTitle;
+$configData = nammu_load_config();
+$postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
+$postalLogoSvg = nammu_postal_icon_svg();
+$footerLinks = nammu_build_footer_links($configData, $theme, $homeUrl, $postalUrl);
 
 $renderer = new TemplateRenderer(__DIR__ . '/template', [
     'siteTitle' => $displaySiteTitle,
@@ -59,6 +63,10 @@ $renderer = new TemplateRenderer(__DIR__ . '/template', [
     'rssUrl' => $rssUrl !== '' ? $rssUrl : '/rss.xml',
     'baseUrl' => $homeUrl,
     'theme' => $theme,
+    'postalEnabled' => ($configData['postal']['enabled'] ?? 'off') === 'on',
+    'postalUrl' => $postalUrl,
+    'postalLogoSvg' => $postalLogoSvg,
+    'footerLinks' => $footerLinks,
 ]);
 
 $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseUrl): ?string {

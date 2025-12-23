@@ -30,6 +30,7 @@ $footerLogoPosition = $theme['footer_logo'] ?? 'none';
 if (!in_array($footerLogoPosition, ['none', 'top', 'bottom'], true)) {
     $footerLogoPosition = 'none';
 }
+$footerLinks = is_array($footerLinks ?? null) ? $footerLinks : [];
 $logoUrl = $theme['logo_url'] ?? null;
 $faviconUrl = $theme['favicon_url'] ?? null;
 $showLogo = $showLogo ?? false;
@@ -48,10 +49,52 @@ $floatingCategoriesUrl = $searchBaseNormalized === '' ? '/categorias' : $searchB
 $showFloatingSearch = $searchFloatingEnabled;
 $floatingSubscriptionAction = $searchBaseNormalized === '' ? '/subscribe.php' : $searchBaseNormalized . '/subscribe.php';
 $showFloatingSubscription = $subscriptionFloatingEnabled;
+$postalEnabled = $postalEnabled ?? false;
+$postalUrl = $postalUrl ?? '/correos.php';
+$postalLogoSvg = $postalLogoSvg ?? '';
+$hasItineraries = $hasItineraries ?? false;
+$itinerariesIndexUrl = $itinerariesIndexUrl ?? ($searchBaseNormalized === '' ? '/itinerarios' : $searchBaseNormalized . '/itinerarios');
+if ($postalLogoSvg === '' && function_exists('nammu_postal_icon_svg')) {
+    $postalLogoSvg = nammu_postal_icon_svg();
+}
 $hasFooterLogo = $footerLogoPosition !== 'none' && !empty($logoUrl);
 $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
 $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
-$statsConsentGiven = function_exists('nammu_has_stats_consent') ? nammu_has_stats_consent() : false;
+$userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+$isCrawler = $userAgent !== '' && preg_match('/(bot|crawl|spider|slurp|bingpreview|facebookexternalhit|facebot|linkedinbot|twitterbot|pinterest|whatsapp|telegram|yandex|baiduspider|duckduckbot|sogou|ia_archiver)/i', $userAgent);
+$statsConsentGiven = $isCrawler || (function_exists('nammu_has_stats_consent') ? nammu_has_stats_consent() : false);
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+$basePath = parse_url($baseHref, PHP_URL_PATH) ?? '/';
+$normalizedBase = rtrim($basePath, '/');
+$normalizedRequest = rtrim($requestPath, '/');
+if ($normalizedBase === '') {
+    $normalizedBase = '/';
+}
+if ($normalizedRequest === '') {
+    $normalizedRequest = '/';
+}
+$isHome = ($normalizedRequest === $normalizedBase) || ($normalizedRequest === $normalizedBase . '/index.php');
+$adsSettings = is_array($adsSettings ?? null) ? $adsSettings : (function_exists('nammu_ads_settings') ? nammu_ads_settings() : []);
+$adsEnabled = ($adsSettings['enabled'] ?? 'off') === 'on';
+$adsScope = $adsSettings['scope'] ?? 'home';
+$adsText = trim((string) ($adsSettings['text'] ?? ''));
+$adsImage = trim((string) ($adsSettings['image'] ?? ''));
+$adsImageUrl = $adsImage !== '' && function_exists('nammu_resolve_asset')
+    ? (nammu_resolve_asset($adsImage, $baseHref) ?? '')
+    : '';
+$adsHtml = '';
+if ($adsText !== '') {
+    if (strpos($adsText, '<') !== false) {
+        $adsHtml = $adsText;
+    } else {
+        $adsHtml = htmlspecialchars($adsText, ENT_QUOTES, 'UTF-8');
+    }
+}
+$adsClosedToday = ($_COOKIE['nammu_ad_closed'] ?? '') === date('Y-m-d');
+$showAdsBanner = $adsEnabled && $adsHtml !== '' && !$adsClosedToday && !$isCrawler && $statsConsentGiven;
+if ($adsScope === 'home' && !$isHome) {
+    $showAdsBanner = false;
+}
 if (function_exists('nammu_record_visit')) {
     nammu_record_visit();
 }
@@ -195,7 +238,7 @@ if (function_exists('nammu_record_visit')) {
         .nammu-cookie-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(10, 16, 24, 0.85);
+            background: rgba(10, 16, 24, 0.55);
             z-index: 9999;
             display: none;
             align-items: center;
@@ -212,6 +255,15 @@ if (function_exists('nammu_record_visit')) {
             border-radius: 18px;
             padding: 2rem;
             box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+        }
+        .nammu-cookie-logo {
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            object-fit: cover;
+            display: block;
+            margin: 0 auto 1rem;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
         }
         .nammu-cookie-card h2 {
             margin-top: 0;
@@ -384,6 +436,38 @@ if (function_exists('nammu_record_visit')) {
         .footer-logo-wrapper.footer-logo-bottom {
             margin-top: 1.2rem;
         }
+        .footer-social-links {
+            margin-top: 2rem;
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+        .footer-social-link {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            background: #ffffff;
+            color: <?= $colorAccent ?>;
+            border: 1px solid rgba(0,0,0,0.08);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+        .footer-social-link:hover {
+            background: <?= $colorHighlight ?>;
+            transform: translateY(-1px);
+            text-decoration: none;
+        }
+        .footer-social-link svg {
+            width: 18px;
+            height: 18px;
+            display: block;
+        }
         .footer-logo-link {
             display: inline-flex;
             align-items: center;
@@ -435,12 +519,12 @@ if (function_exists('nammu_record_visit')) {
         .floating-stack {
             position: fixed;
             top: calc(2.5rem + 48px + 0.9rem);
-            right: clamp(1.5rem, 5vw, 2.5rem);
-            width: clamp(220px, 24vw, 260px);
+            right: clamp(1.2rem, 4vw, 2rem);
+            width: clamp(190px, 20vw, 230px);
             z-index: 2000;
             display: flex;
             flex-direction: column;
-            gap: 0.75rem;
+            gap: 0.6rem;
             pointer-events: auto;
         }
         .floating-search {
@@ -449,18 +533,18 @@ if (function_exists('nammu_record_visit')) {
             background: rgba(255, 255, 255, 0.96);
             border-radius: var(--nammu-radius-md);
             border: 1px solid rgba(0,0,0,0.08);
-            box-shadow: 0 18px 32px rgba(0,0,0,0.12);
-            padding: 0.6rem 0.75rem;
+            box-shadow: 0 14px 26px rgba(0,0,0,0.12);
+            padding: 0.3rem 0.4rem;
             backdrop-filter: blur(6px);
         }
         .floating-search-form {
             display: flex;
             align-items: center;
-            gap: 0.45rem;
+            gap: 0.2rem;
         }
         .floating-search-icon {
-            width: 34px;
-            height: 34px;
+            width: 26px;
+            height: 26px;
             border-radius: 50%;
             background: <?= $colorHighlight ?>;
             border: 1px solid rgba(0,0,0,0.08);
@@ -475,10 +559,13 @@ if (function_exists('nammu_record_visit')) {
         .floating-search-form input[type="text"],
         .floating-search-form input[type="email"] {
             flex: 1 1 auto;
+            min-width: 0;
             border: none;
             border-bottom: 1px solid rgba(0,0,0,0.12);
-            padding: 0.35rem 0.25rem;
-            font-size: 0.95rem;
+            padding: 0.1rem 0.2rem;
+            font-size: 0.82rem;
+            height: 26px;
+            line-height: 1.2;
             background: transparent;
             color: <?= $colorText ?>;
         }
@@ -494,9 +581,9 @@ if (function_exists('nammu_record_visit')) {
         .floating-search-form button {
             border: none;
             background: <?= $colorAccent ?>;
-            width: 36px;
-            height: 36px;
-            border-radius: 12px;
+            width: 26px;
+            height: 26px;
+            border-radius: 9px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -506,10 +593,11 @@ if (function_exists('nammu_record_visit')) {
         .floating-search-form button svg {
             display: block;
         }
-        .floating-search-categories {
-            width: 36px;
-            height: 36px;
-            border-radius: 12px;
+        .floating-search-categories,
+        .floating-search-itineraries {
+            width: 26px;
+            height: 26px;
+            border-radius: 9px;
             background: <?= $colorHighlight ?>;
             border: 1px solid rgba(0,0,0,0.08);
             display: inline-flex;
@@ -519,9 +607,33 @@ if (function_exists('nammu_record_visit')) {
             transition: background 0.2s ease, border-color 0.2s ease;
             flex: 0 0 auto;
         }
-        .floating-search-categories:hover {
+        .floating-search-categories:hover,
+        .floating-search-itineraries:hover {
             background: rgba(0,0,0,0.08);
             border-color: rgba(0,0,0,0.12);
+        }
+        .floating-postal-link {
+            width: 26px;
+            height: 26px;
+            border-radius: 9px;
+            background: <?= $colorHighlight ?>;
+            border: 1px solid rgba(0,0,0,0.08);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            transition: background 0.2s ease, border-color 0.2s ease;
+            flex: 0 0 auto;
+            color: <?= $colorAccent ?>;
+        }
+        .floating-postal-link:hover {
+            background: rgba(0,0,0,0.08);
+            border-color: rgba(0,0,0,0.12);
+        }
+        .floating-postal-link svg {
+            width: 13px;
+            height: 13px;
+            display: block;
         }
         @media (max-width: 720px) {
             .floating-stack {
@@ -538,10 +650,13 @@ if (function_exists('nammu_record_visit')) {
         }
         .floating-subscription input[type="email"] {
             flex: 1 1 auto;
+            min-width: 0;
             border: none;
             border-bottom: 1px solid rgba(0,0,0,0.12);
-            padding: 0.35rem 0.25rem;
-            font-size: 0.95rem;
+            padding: 0.1rem 0.2rem;
+            font-size: 0.82rem;
+            height: 26px;
+            line-height: 1.2;
             background: transparent;
             color: <?= $colorText ?>;
         }
@@ -560,6 +675,94 @@ if (function_exists('nammu_record_visit')) {
             border: 1px solid rgba(0,0,0,0.05);
             border-radius: var(--nammu-radius-md);
             padding: 0.5rem 0.65rem;
+        }
+        .nammu-ad-banner {
+            position: fixed;
+            left: 1.5rem;
+            right: 1.5rem;
+            bottom: 1.5rem;
+            margin: 0 auto;
+            max-width: 980px;
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+            background: linear-gradient(120deg, rgba(255,255,255,0.96), <?= $colorHighlight ?>);
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 20px;
+            box-shadow: 0 18px 30px rgba(0,0,0,0.18);
+            overflow: hidden;
+            z-index: 2050;
+            backdrop-filter: blur(8px);
+        }
+        .nammu-ad-content {
+            padding: 1.2rem 1.6rem;
+            flex: 1 1 65%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0.4rem;
+        }
+        .nammu-ad-text {
+            font-size: 1rem;
+            color: <?= $colorText ?>;
+            line-height: 1.5;
+        }
+        .nammu-ad-text p {
+            margin: 0;
+        }
+        .nammu-ad-text h1,
+        .nammu-ad-text h2,
+        .nammu-ad-text h3,
+        .nammu-ad-text h4,
+        .nammu-ad-text h5,
+        .nammu-ad-text h6 {
+            margin: 0;
+        }
+        .nammu-ad-text strong {
+            color: <?= $colorAccent ?>;
+        }
+        .nammu-ad-image {
+            flex: 0 0 32%;
+            min-width: 150px;
+            position: relative;
+        }
+        .nammu-ad-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .nammu-ad-close {
+            position: absolute;
+            top: 0.6rem;
+            right: 0.6rem;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.65);
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 2;
+        }
+        .nammu-ad-close svg {
+            width: 14px;
+            height: 14px;
+        }
+        @media (max-width: 720px) {
+            .nammu-ad-banner {
+                left: 0.9rem;
+                right: 0.9rem;
+                bottom: 5.4rem;
+                flex-direction: column;
+            }
+            .nammu-ad-image {
+                width: 100%;
+                min-height: 140px;
+            }
         }
         .itinerary-single-content .post {
             gap: 1.5rem;
@@ -775,15 +978,20 @@ if (function_exists('nammu_record_visit')) {
             .floating-logo {
                 display: none;
             }
-            .floating-search {
-                display: none;
-            }
         }
     </style>
 </head>
+<?php $cookieLogo = $logoUrl !== null && $logoUrl !== '' ? $logoUrl : 'nammu.png'; ?>
+<?php
+$baseHost = '';
+if (!empty($baseUrl)) {
+    $baseHost = parse_url((string) $baseUrl, PHP_URL_HOST) ?? '';
+}
+?>
 <body class="<?= htmlspecialchars($cornerClass, ENT_QUOTES, 'UTF-8') ?><?= $statsConsentGiven ? '' : ' nammu-cookie-locked' ?>">
     <div class="nammu-cookie-overlay<?= $statsConsentGiven ? '' : ' is-visible' ?>" data-cookie-overlay aria-hidden="<?= $statsConsentGiven ? 'true' : 'false' ?>">
         <div class="nammu-cookie-card" role="dialog" aria-modal="true" aria-labelledby="cookieNoticeTitle">
+            <img class="nammu-cookie-logo" src="<?= htmlspecialchars($cookieLogo, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
             <h2 id="cookieNoticeTitle">Uso de cookies para estadisticas</h2>
             <p>Para cumplir con la RGPD, necesitamos tu consentimiento para usar cookies de estadistica.</p>
             <p>Los datos se usan exclusivamente para medir visitas y mejorar el contenido. No se comparten con terceros.</p>
@@ -807,6 +1015,19 @@ if (function_exists('nammu_record_visit')) {
                                 <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
                             </a>
                         </div>
+                        <?php if (!empty($footerLinks)): ?>
+                            <div class="footer-social-links">
+                                <?php foreach ($footerLinks as $link): ?>
+                                    <?php
+                                    $linkHost = parse_url((string) $link['href'], PHP_URL_HOST) ?? '';
+                                    $isExternal = $linkHost !== '' && $baseHost !== '' && $linkHost !== $baseHost;
+                                    ?>
+                                    <a class="footer-social-link" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
+                                        <?= $link['svg'] ?>
+                                    </a>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
                     <?php endif; ?>
                     <?php if ($footerHtml !== ''): ?>
                         <div class="footer-html-content">
@@ -819,6 +1040,19 @@ if (function_exists('nammu_record_visit')) {
                                 <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
                             </a>
                         </div>
+                        <?php if (!empty($footerLinks)): ?>
+                            <div class="footer-social-links">
+                                <?php foreach ($footerLinks as $link): ?>
+                                    <?php
+                                    $linkHost = parse_url((string) $link['href'], PHP_URL_HOST) ?? '';
+                                    $isExternal = $linkHost !== '' && $baseHost !== '' && $linkHost !== $baseHost;
+                                    ?>
+                                    <a class="footer-social-link" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
+                                        <?= $link['svg'] ?>
+                                    </a>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </footer>
@@ -848,6 +1082,11 @@ if (function_exists('nammu_record_visit')) {
                                 <polyline points="4,8 12,14 20,8" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                         </button>
+                        <?php if ($postalEnabled && $postalLogoSvg !== ''): ?>
+                            <a class="floating-postal-link" href="<?= htmlspecialchars($postalUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Suscripción postal">
+                                <?= $postalLogoSvg ?>
+                            </a>
+                        <?php endif; ?>
                     </form>
                 </div>
             <?php endif; ?>
@@ -873,7 +1112,33 @@ if (function_exists('nammu_record_visit')) {
                                 <line x1="8" y1="13" x2="16" y2="13" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
                             </svg>
                         </a>
+                        <?php if (!empty($hasItineraries) && !empty($itinerariesIndexUrl)): ?>
+                            <a class="floating-search-itineraries" href="<?= htmlspecialchars($itinerariesIndexUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Itinerarios">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M4 5H10C11.1046 5 12 5.89543 12 7V19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linejoin="round"/>
+                                    <path d="M20 5H14C12.8954 5 12 5.89543 12 7V19H20C21.1046 19 22 18.1046 22 17V7C22 5.89543 21.1046 5 20 5Z" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linejoin="round"/>
+                                    <line x1="12" y1="7" x2="12" y2="19" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                            </a>
+                        <?php endif; ?>
                     </form>
+                </div>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+    <?php if ($showAdsBanner && !$isCrawler): ?>
+        <div class="nammu-ad-banner" data-ad-banner>
+            <button class="nammu-ad-close" type="button" aria-label="Cerrar anuncio" data-ad-close>
+                <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </button>
+            <div class="nammu-ad-content">
+                <div class="nammu-ad-text"><?= $adsHtml ?></div>
+            </div>
+            <?php if ($adsImageUrl !== ''): ?>
+                <div class="nammu-ad-image">
+                    <img src="<?= htmlspecialchars($adsImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Imagen del anuncio">
                 </div>
             <?php endif; ?>
         </div>
@@ -921,6 +1186,34 @@ if (function_exists('nammu_record_visit')) {
                 window.location.href = 'about:blank';
             });
         }
+    })();
+    </script>
+    <script>
+    (function() {
+        var banner = document.querySelector('[data-ad-banner]');
+        var closeBtn = document.querySelector('[data-ad-close]');
+        if (!banner || !closeBtn) {
+            return;
+        }
+        function hasConsent() {
+            return document.cookie.split(';').some(function(part) {
+                return part.trim().indexOf('nammu_stats_consent=1') === 0;
+            });
+        }
+        closeBtn.addEventListener('click', function() {
+            banner.style.display = 'none';
+            if (!hasConsent()) {
+                return;
+            }
+            var now = new Date();
+            var y = now.getFullYear();
+            var m = String(now.getMonth() + 1).padStart(2, '0');
+            var d = String(now.getDate()).padStart(2, '0');
+            var value = y + '-' + m + '-' + d;
+            var expiry = new Date();
+            expiry.setHours(23, 59, 59, 999);
+            document.cookie = 'nammu_ad_closed=' + value + ';path=/;expires=' + expiry.toUTCString() + ';samesite=lax';
+        });
     })();
     </script>
     <script>

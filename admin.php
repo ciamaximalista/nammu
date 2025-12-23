@@ -3,6 +3,7 @@ session_start();
 
 require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
+require_once __DIR__ . '/core/postal.php';
 
 // Load dependencies (optional)
 $autoload = __DIR__ . '/vendor/autoload.php';
@@ -971,6 +972,20 @@ function get_settings() {
         'format' => 'html',
     ];
     $mailing = array_merge($mailingDefaults, $config['mailing'] ?? []);
+    $postalDefaults = [
+        'enabled' => 'off',
+    ];
+    $postal = array_merge($postalDefaults, $config['postal'] ?? []);
+    $adsDefaults = [
+        'enabled' => 'off',
+        'scope' => 'home',
+        'text' => '',
+        'image' => '',
+    ];
+    $ads = array_merge($adsDefaults, $config['ads'] ?? []);
+    if (!in_array($ads['scope'], ['home', 'all'], true)) {
+        $ads['scope'] = $adsDefaults['scope'];
+    }
 
     return [
         'sort_order' => $sort_order,
@@ -997,6 +1012,8 @@ function get_settings() {
         'facebook' => $facebook,
         'twitter' => $twitter,
         'mailing' => $mailing,
+        'postal' => $postal,
+        'ads' => $ads,
         'entry' => $entry,
     ];
 }
@@ -2505,6 +2522,18 @@ if (!is_array($mailingFeedback) || !isset($mailingFeedback['message'], $mailingF
 } else {
     unset($_SESSION['mailing_feedback']);
 }
+$postalFeedback = $_SESSION['postal_feedback'] ?? null;
+if (!is_array($postalFeedback) || !isset($postalFeedback['message'], $postalFeedback['type'])) {
+    $postalFeedback = null;
+} else {
+    unset($_SESSION['postal_feedback']);
+}
+$adsFeedback = $_SESSION['ads_feedback'] ?? null;
+if (!is_array($adsFeedback) || !isset($adsFeedback['message'], $adsFeedback['type'])) {
+    $adsFeedback = null;
+} else {
+    unset($_SESSION['ads_feedback']);
+}
 $assetApply = $_SESSION['asset_apply'] ?? null;
 if (!is_array($assetApply)) {
     $assetApply = null;
@@ -3306,7 +3335,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($redirectUrlRaw !== '' && preg_match($pattern, $redirectUrlRaw)) {
             $redirectTarget = 'admin.php?' . $redirectUrlRaw;
         } else {
-            $allowedPages = ['resources','publish','edit','edit-post','template','itinerarios','itinerario','configuracion'];
+            $allowedPages = ['resources','publish','edit','edit-post','template','itinerarios','itinerario','configuracion','correo-postal','anuncios'];
             if (in_array($redirectPageRaw, $allowedPages, true)) {
                 $redirectTarget = 'admin.php?page=' . $redirectPageRaw;
                 if ($redirectPageRaw === 'edit-post') {
@@ -3929,6 +3958,119 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
         }
         header('Location: admin.php?page=lista-correo');
+        exit;
+    } elseif (isset($_POST['save_ads_settings'])) {
+        $enabled = isset($_POST['ads_enabled']) ? 'on' : 'off';
+        $scope = $_POST['ads_scope'] ?? 'home';
+        if (!in_array($scope, ['home', 'all'], true)) {
+            $scope = 'home';
+        }
+        $text = trim((string) ($_POST['ads_text'] ?? ''));
+        $image = trim((string) ($_POST['ads_image'] ?? ''));
+        try {
+            $config = load_config_file();
+            if (!isset($config['ads'])) {
+                $config['ads'] = [];
+            }
+            $config['ads']['enabled'] = $enabled;
+            $config['ads']['scope'] = $scope;
+            $config['ads']['text'] = $text;
+            $config['ads']['image'] = $image;
+            save_config_file($config);
+            $_SESSION['ads_feedback'] = [
+                'type' => 'success',
+                'message' => 'Preferencias de anuncios guardadas.',
+            ];
+        } catch (Throwable $e) {
+            $_SESSION['ads_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudieron guardar las preferencias: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: admin.php?page=anuncios');
+        exit;
+    } elseif (isset($_POST['save_postal_settings'])) {
+        $enabled = isset($_POST['postal_enabled']) ? 'on' : 'off';
+        try {
+            $config = load_config_file();
+            if (!isset($config['postal'])) {
+                $config['postal'] = [];
+            }
+            $config['postal']['enabled'] = $enabled;
+            save_config_file($config);
+            $_SESSION['postal_feedback'] = [
+                'type' => 'success',
+                'message' => 'Preferencias de correo postal guardadas.',
+            ];
+        } catch (Throwable $e) {
+            $_SESSION['postal_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudieron guardar las preferencias: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: admin.php?page=correo-postal');
+        exit;
+    } elseif (isset($_POST['postal_update'])) {
+        $entries = postal_load_entries();
+        $email = postal_normalize_email((string) ($_POST['postal_email'] ?? ''));
+        $passwordRaw = trim((string) ($_POST['postal_password'] ?? ''));
+        $passwordHash = $passwordRaw !== '' ? password_hash($passwordRaw, PASSWORD_DEFAULT) : null;
+        try {
+            $entries = postal_upsert_entry([
+                'email' => $email,
+                'name' => $_POST['postal_name'] ?? '',
+                'address' => $_POST['postal_address'] ?? '',
+                'city' => $_POST['postal_city'] ?? '',
+                'postal_code' => $_POST['postal_postal_code'] ?? '',
+                'region' => $_POST['postal_region'] ?? '',
+                'country' => $_POST['postal_country'] ?? '',
+            ], $passwordHash, $entries);
+            postal_save_entries($entries);
+            $_SESSION['postal_feedback'] = [
+                'type' => 'success',
+                'message' => 'Dirección postal actualizada.',
+            ];
+        } catch (Throwable $e) {
+            $_SESSION['postal_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudo guardar: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: admin.php?page=correo-postal');
+        exit;
+    } elseif (isset($_POST['postal_delete'])) {
+        $entries = postal_load_entries();
+        $email = postal_normalize_email((string) ($_POST['postal_email'] ?? ''));
+        $entries = postal_delete_entry($email, $entries);
+        try {
+            postal_save_entries($entries);
+            $_SESSION['postal_feedback'] = [
+                'type' => 'success',
+                'message' => 'Dirección eliminada.',
+            ];
+        } catch (Throwable $e) {
+            $_SESSION['postal_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudo eliminar: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: admin.php?page=correo-postal');
+        exit;
+    } elseif (isset($_POST['download_postal_csv'])) {
+        $entries = postal_load_entries();
+        $csv = postal_csv_export($entries);
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="correos-postales.csv"');
+        echo $csv;
+        exit;
+    } elseif (isset($_POST['download_postal_pdf'])) {
+        $entries = postal_load_entries();
+        $theme = nammu_template_settings();
+        $fontName = $theme['fonts']['body'] ?? 'Helvetica';
+        $pdf = postal_build_labels_pdf($entries, $fontName);
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="correos-postales.pdf"');
+        echo $pdf;
         exit;
     } elseif (isset($_POST['send_mailing_post'])) {
         $filename = nammu_normalize_filename($_POST['mailing_filename'] ?? '');
@@ -6040,6 +6182,25 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                     </a>
                                 </li>
 
+                                <li class="nav-item <?= $page === 'correo-postal' ? 'active' : '' ?>">
+                                    <a class="nav-link" href="?page=correo-postal" title="Correo Postal" aria-label="Correo Postal">
+                                        <svg width="44" height="44" viewBox="-55 -55 407 407" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                            <path fill="currentColor" d="M149.999,162.915v120.952c0,7.253,5.74,13.133,12.993,13.133c7.253,0,12.993-5.88,12.993-13.133V162.915h100.813c7.253,0,13.128-6.401,13.128-13.654V74.254c0-19.599-7.78-38.348-21.912-52.364C253.934,7.926,235.386,0,215.783,0H80.675C40.091,0,7.074,33.626,7.074,74.026v75.236c0,7.253,5.88,13.654,13.133,13.654H149.999z M33.06,135.929V74.026c0-25.918,21.376-47.003,47.476-47.003c26.1,0,47.474,21.188,47.474,47.231v61.675H33.06z M263.94,135.929H154.997V74.254c0-18.05-7.285-35.274-18.135-48.267h78.922c25.955,0,48.156,22.51,48.156,48.267V135.929z"/>
+                                            <path fill="currentColor" d="M80.036,58.311c-7.253,0-12.993,5.88-12.993,13.133v1.052c0,7.253,5.74,13.133,12.993,13.133c7.253,0,12.993-5.88,12.993-13.133v-1.052C93.029,64.19,87.289,58.311,80.036,58.311z"/>
+                                        </svg>
+                                    </a>
+                                </li>
+
+                                <li class="nav-item <?= $page === 'anuncios' ? 'active' : '' ?>">
+                                    <a class="nav-link" href="?page=anuncios" title="Anuncios" aria-label="Anuncios">
+                                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M4 10v4l8 2V6l-8 2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                            <path d="M12 6l8-2v16l-8-2" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                            <path d="M6 14l2 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        </svg>
+                                    </a>
+                                </li>
+
                                 <li class="nav-item <?= $page === 'configuracion' ? 'active' : '' ?>">
                                     <a class="nav-link" href="?page=configuracion" title="Configuración" aria-label="Configuración">
                                         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -6102,6 +6263,14 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 <?php elseif ($page === 'lista-correo'): ?>
 
     <?php include __DIR__ . '/core/admin-page-lista-correo.php'; ?>
+
+<?php elseif ($page === 'correo-postal'): ?>
+
+    <?php include __DIR__ . '/core/admin-page-correo-postal.php'; ?>
+
+<?php elseif ($page === 'anuncios'): ?>
+
+    <?php include __DIR__ . '/core/admin-page-anuncios.php'; ?>
 
 <?php elseif ($page === 'configuracion'): ?>
 

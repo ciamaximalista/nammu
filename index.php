@@ -70,6 +70,10 @@ $sortOrderValue = strtolower((string) ($configData['pages_order_by'] ?? 'date'))
 $sortOrder = in_array($sortOrderValue, ['date', 'alpha'], true) ? $sortOrderValue : 'date';
 $isAlphabeticalOrder = ($sortOrder === 'alpha');
 $lettersIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/letras';
+$postalEnabled = ($configData['postal']['enabled'] ?? 'off') === 'on';
+$postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
+$postalLogoSvg = nammu_postal_icon_svg();
+$footerLinks = nammu_build_footer_links($configData, $theme, $homeUrl, $postalUrl);
 
 $renderer = new TemplateRenderer(__DIR__ . '/template', [
     'siteTitle' => $displaySiteTitle,
@@ -80,6 +84,10 @@ $renderer = new TemplateRenderer(__DIR__ . '/template', [
 ]);
 $renderer->setGlobal('lettersIndexUrl', $isAlphabeticalOrder ? $lettersIndexUrl : null);
 $renderer->setGlobal('showLetterIndexButton', $isAlphabeticalOrder);
+$renderer->setGlobal('postalEnabled', $postalEnabled);
+$renderer->setGlobal('postalUrl', $postalUrl);
+$renderer->setGlobal('postalLogoSvg', $postalLogoSvg);
+$renderer->setGlobal('footerLinks', $footerLinks);
 
 $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseUrl): ?string {
     if ($image === null || $image === '') {

@@ -80,6 +80,9 @@ if ($subscriptionSuccess) {
 } elseif ($subscriptionError) {
     $subscriptionMessage = 'No pudimos procesar ese correo. Revisa la dirección e inténtalo de nuevo.';
 }
+$postalEnabled = $postalEnabled ?? false;
+$postalUrl = $postalUrl ?? '/correos.php';
+$postalLogoSvg = $postalLogoSvg ?? '';
 $renderSearchBox = static function (string $variant) use ($searchAction, $searchActionBase, $accentColor, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
@@ -126,7 +129,7 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
     <?php
     return (string) ob_get_clean();
 };
-$renderSubscriptionBox = static function (string $variant) use ($subscriptionAction, $accentColor, $highlight, $textColor, $subscriptionMessage, $currentUrl): string {
+$renderSubscriptionBox = static function (string $variant) use ($subscriptionAction, $accentColor, $highlight, $textColor, $subscriptionMessage, $currentUrl, $postalEnabled, $postalUrl, $postalLogoSvg): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?> site-subscription-box">
         <form class="site-search-form subscription-form" method="post" action="<?= htmlspecialchars($subscriptionAction, ENT_QUOTES, 'UTF-8') ?>">
@@ -144,12 +147,36 @@ $renderSubscriptionBox = static function (string $variant) use ($subscriptionAct
                     <polyline points="4,8 12,14 20,8" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </button>
+            <?php if ($postalEnabled && $postalLogoSvg !== ''): ?>
+                <a class="subscription-postal-link" href="<?= htmlspecialchars($postalUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Suscripción postal">
+                    <?= $postalLogoSvg ?>
+                </a>
+            <?php endif; ?>
         </form>
         <?php if ($subscriptionMessage !== ''): ?>
             <div class="subscription-feedback" style="color: <?= htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') ?>; background: <?= htmlspecialchars($highlight, ENT_QUOTES, 'UTF-8') ?>; border-radius: 10px; padding:10px; margin-top:10px; font-size:14px;">
                 <?= htmlspecialchars($subscriptionMessage, ENT_QUOTES, 'UTF-8') ?>
             </div>
         <?php endif; ?>
+    </div>
+    <?php
+    return (string) ob_get_clean();
+};
+$renderPostalBox = static function (string $variant) use ($postalEnabled, $postalUrl, $postalLogoSvg): string {
+    if (!$postalEnabled || $postalLogoSvg === '') {
+        return '';
+    }
+    ob_start(); ?>
+    <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?> site-subscription-box">
+        <div class="postal-only-box">
+            <a class="subscription-postal-link" href="<?= htmlspecialchars($postalUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Suscripción postal">
+                <?= $postalLogoSvg ?>
+            </a>
+            <div class="postal-only-text">
+                <strong>Correo postal</strong>
+                <span>Suscríbete para recibir envíos físicos.</span>
+            </div>
+        </div>
     </div>
     <?php
     return (string) ob_get_clean();
@@ -237,6 +264,11 @@ $renderSubscriptionBox = static function (string $variant) use ($subscriptionAct
 <?php if ($subscriptionBottom): ?>
     <section class="site-search-block placement-bottom site-subscription-block">
         <?= $renderSubscriptionBox('variant-panel') ?>
+    </section>
+<?php endif; ?>
+<?php if (!$subscriptionTop && !$subscriptionBottom && $postalEnabled): ?>
+    <section class="site-search-block placement-bottom site-subscription-block">
+        <?= $renderPostalBox('variant-panel') ?>
     </section>
 <?php endif; ?>
 <?php if ($searchBottom): ?>
@@ -344,6 +376,41 @@ $renderSubscriptionBox = static function (string $variant) use ($subscriptionAct
         height: 44px;
         width: 44px;
     }
+    .site-subscription-box .subscription-postal-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: rgba(0,0,0,0.05);
+        margin-left: 0.4rem;
+        padding: 0;
+        text-decoration: none;
+        transition: background 0.2s ease;
+        color: <?= $accentColor ?>;
+    }
+    .site-subscription-box .subscription-postal-link:hover {
+        background: rgba(0,0,0,0.12);
+    }
+    .site-subscription-box .subscription-postal-link svg {
+        width: 20px;
+        height: 20px;
+        display: block;
+    }
+    .postal-only-box {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .postal-only-box .postal-only-text {
+        display: flex;
+        flex-direction: column;
+    }
+    .postal-only-box .postal-only-text span {
+        font-size: 0.92rem;
+        color: <?= $textColor ?>;
+    }
     .site-subscription-box .subscription-feedback {
         border: 1px solid rgba(0,0,0,0.05);
     }
@@ -373,8 +440,12 @@ $renderSubscriptionBox = static function (string $variant) use ($subscriptionAct
         .site-search-form input[type="email"],
         .site-search-form button,
         .search-categories-link,
-        .search-letters-link {
+        .search-letters-link,
+        .subscription-postal-link {
             width: 100%;
+        }
+        .site-subscription-box .subscription-postal-link {
+            margin-left: 0;
         }
     }
     .post-grid {

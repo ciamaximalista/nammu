@@ -98,6 +98,50 @@ function postal_csv_export(array $entries): string
     return $csv;
 }
 
+function postal_reset_data_file(): string
+{
+    return dirname(__DIR__) . '/config/postal-reset.json';
+}
+
+function postal_load_reset_tokens(): array
+{
+    $file = postal_reset_data_file();
+    if (!is_file($file)) {
+        return [];
+    }
+    $raw = file_get_contents($file);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function postal_save_reset_tokens(array $tokens): void
+{
+    $file = postal_reset_data_file();
+    $dir = dirname($file);
+    nammu_ensure_directory($dir, 0775);
+    $payload = json_encode(array_values($tokens), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($payload === false) {
+        throw new RuntimeException('No se pudo serializar los tokens de reset.');
+    }
+    file_put_contents($file, $payload, LOCK_EX);
+    @chmod($file, 0664);
+}
+
+function postal_prune_reset_tokens(array $tokens): array
+{
+    $now = time();
+    return array_values(array_filter($tokens, static function ($item) use ($now) {
+        if (!is_array($item)) {
+            return false;
+        }
+        $expires = $item['expires_at'] ?? 0;
+        return is_numeric($expires) && (int) $expires > $now;
+    }));
+}
+
 function postal_pick_pdf_font(string $fontName): string
 {
     $normalized = strtolower($fontName);

@@ -12,6 +12,8 @@ use Nammu\Core\MarkdownConverter;
 use Nammu\Core\TemplateRenderer;
 
 define('MAILING_SUBSCRIBERS_FILE', __DIR__ . '/config/mailing-subscribers.json');
+define('MAILING_PENDING_FILE', __DIR__ . '/config/mailing-pending.json');
+define('MAILING_TOKENS_FILE', __DIR__ . '/config/mailing-tokens.json');
 
 function postal_normalize_mailing_email(string $email): string
 {
@@ -59,6 +61,250 @@ function postal_sync_mailing_subscriber(string $email): void
     }
     $subscribers[] = $normalized;
     postal_save_mailing_subscribers($subscribers);
+}
+
+function postal_load_mailing_pending(): array
+{
+    if (!is_file(MAILING_PENDING_FILE)) {
+        return [];
+    }
+    $raw = file_get_contents(MAILING_PENDING_FILE);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function postal_save_mailing_pending(array $pending): void
+{
+    $dir = dirname(MAILING_PENDING_FILE);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+    $payload = json_encode(array_values($pending), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($payload === false) {
+        throw new RuntimeException('No se pudo guardar la lista de pendientes.');
+    }
+    file_put_contents(MAILING_PENDING_FILE, $payload, LOCK_EX);
+    @chmod(MAILING_PENDING_FILE, 0664);
+}
+
+function postal_load_mailing_tokens(): array
+{
+    if (!is_file(MAILING_TOKENS_FILE)) {
+        return [];
+    }
+    $raw = file_get_contents(MAILING_TOKENS_FILE);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function postal_save_mailing_tokens(array $tokens): void
+{
+    $dir = dirname(MAILING_TOKENS_FILE);
+    nammu_ensure_directory($dir);
+    $payload = json_encode($tokens, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($payload === false) {
+        throw new RuntimeException('No se pudo guardar tokens de mailing.');
+    }
+    file_put_contents(MAILING_TOKENS_FILE, $payload, LOCK_EX);
+    @chmod(MAILING_TOKENS_FILE, 0660);
+}
+
+function postal_google_refresh_access_token(string $clientId, string $clientSecret, string $refreshToken): array
+{
+    $postData = http_build_query([
+        'client_id' => $clientId,
+        'client_secret' => $clientSecret,
+        'refresh_token' => $refreshToken,
+        'grant_type' => 'refresh_token',
+    ]);
+    $opts = [
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
+            'content' => $postData,
+            'timeout' => 12,
+            'ignore_errors' => true,
+        ],
+    ];
+    $raw = @file_get_contents('https://oauth2.googleapis.com/token', false, stream_context_create($opts));
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded) || isset($decoded['error'])) {
+        throw new RuntimeException('No se pudo refrescar el token de Gmail');
+    }
+    if (isset($decoded['expires_in'])) {
+        $decoded['expires_at'] = time() + (int) $decoded['expires_in'];
+    }
+    return $decoded;
+}
+
+function postal_gmail_send(string $fromEmail, string $fromName, string $to, string $subject, string $body, string $accessToken): bool
+{
+    $boundary = '=_NammuPostal_' . bin2hex(random_bytes(6));
+    $encodedName = function_exists('mb_encode_mimeheader')
+        ? mb_encode_mimeheader($fromName, 'UTF-8', 'Q', "\r\n")
+        : '=?UTF-8?B?' . base64_encode($fromName) . '?=';
+    $fromHeader = $encodedName . ' <' . $fromEmail . '>';
+    $headers = [
+        'From: ' . $fromHeader,
+        'To: ' . $to,
+        'Subject: ' . (function_exists('mb_encode_mimeheader') ? mb_encode_mimeheader($subject, 'UTF-8', 'Q', "\r\n") : '=?UTF-8?B?' . base64_encode($subject) . '?='),
+        'MIME-Version: 1.0',
+        'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
+    ];
+    $messageParts = [
+        '--' . $boundary,
+        'Content-Type: text/plain; charset=UTF-8',
+        'Content-Transfer-Encoding: 7bit',
+        '',
+        $body,
+        '--' . $boundary . '--',
+    ];
+    $raw = implode("\r\n", array_merge($headers, [''], $messageParts));
+    $payload = json_encode(['raw' => rtrim(strtr(base64_encode($raw), '+/', '-_'), '=')]);
+    if ($payload === false) {
+        return false;
+    }
+    $opts = [
+        'http' => [
+            'method' => 'POST',
+            'header' => "Authorization: Bearer {$accessToken}\r\nContent-Type: application/json\r\n",
+            'content' => $payload,
+            'timeout' => 12,
+            'ignore_errors' => true,
+        ],
+    ];
+    $resp = @file_get_contents('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', false, stream_context_create($opts));
+    if ($resp === false) {
+        return false;
+    }
+    $decoded = json_decode($resp, true);
+    return is_array($decoded) && isset($decoded['id']);
+}
+
+function postal_send_mailing_confirmation(string $email, string $token, string $siteTitle): void
+{
+    $base = nammu_base_url();
+    if ($base === '') {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $base = $scheme . '://' . $host;
+    }
+    $link = rtrim($base, '/') . '/subscribe_confirm.php?email=' . urlencode($email) . '&token=' . urlencode($token);
+    $siteLabel = $siteTitle !== '' ? $siteTitle : 'tu sitio';
+    $subject = 'Confirma tu suscripción a ' . $siteLabel;
+    $bodyLines = [
+        "Hola,",
+        "",
+        "Confirma tu suscripción a {$siteLabel} haciendo clic en el enlace:",
+        $link,
+        "",
+        "Si no solicitaste esta suscripción, ignora este mensaje.",
+    ];
+    $body = implode("\n", $bodyLines);
+
+    $config = nammu_load_config();
+    $mailing = $config['mailing'] ?? [];
+    $clientId = $mailing['client_id'] ?? '';
+    $clientSecret = $mailing['client_secret'] ?? '';
+    $fromEmail = $mailing['gmail_address'] ?? '';
+    $tokens = postal_load_mailing_tokens();
+    $refresh = $tokens['refresh_token'] ?? '';
+
+    $sent = false;
+    if ($clientId !== '' && $clientSecret !== '' && $fromEmail !== '' && $refresh !== '') {
+        try {
+            $refreshed = postal_google_refresh_access_token($clientId, $clientSecret, $refresh);
+            $accessToken = $refreshed['access_token'] ?? '';
+            if ($accessToken !== '') {
+                $fromName = $config['site_author'] ?? ($config['site_name'] ?? 'Nammu');
+                $sent = postal_gmail_send($fromEmail, $fromName, $email, $subject, $body, $accessToken);
+                $tokens['access_token'] = $accessToken;
+                if (isset($refreshed['expires_at'])) {
+                    $tokens['expires_at'] = $refreshed['expires_at'];
+                }
+                postal_save_mailing_tokens($tokens);
+            }
+        } catch (Throwable $e) {
+            $sent = false;
+        }
+    }
+
+    if ($sent) {
+        return;
+    }
+
+    $headers = [];
+    $fromName = $siteTitle !== '' ? $siteTitle : 'Nammu';
+    $encodedName = '=?UTF-8?B?' . base64_encode($fromName) . '?=';
+    $headers[] = 'From: ' . $encodedName . ' <no-reply@' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '>';
+    $headers[] = 'Content-Type: text/plain; charset=UTF-8';
+    @mail($email, $subject, $body, implode("\r\n", $headers));
+}
+
+function postal_send_password_reset(string $email, string $token, string $siteTitle): void
+{
+    $base = nammu_base_url();
+    if ($base === '') {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $base = $scheme . '://' . $host;
+    }
+    $link = rtrim($base, '/') . '/correos-reset.php?email=' . urlencode($email) . '&token=' . urlencode($token);
+    $siteLabel = $siteTitle !== '' ? $siteTitle : 'tu sitio';
+    $subject = 'Restablece tu contrasena en ' . $siteLabel;
+    $bodyLines = [
+        "Hola,",
+        "",
+        "Puedes restablecer tu contrasena de {$siteLabel} desde este enlace:",
+        $link,
+        "",
+        "Si no solicitaste este cambio, ignora este mensaje.",
+    ];
+    $body = implode("\n", $bodyLines);
+
+    $config = nammu_load_config();
+    $mailing = $config['mailing'] ?? [];
+    $clientId = $mailing['client_id'] ?? '';
+    $clientSecret = $mailing['client_secret'] ?? '';
+    $fromEmail = $mailing['gmail_address'] ?? '';
+    $tokens = postal_load_mailing_tokens();
+    $refresh = $tokens['refresh_token'] ?? '';
+
+    $sent = false;
+    if ($clientId !== '' && $clientSecret !== '' && $fromEmail !== '' && $refresh !== '') {
+        try {
+            $refreshed = postal_google_refresh_access_token($clientId, $clientSecret, $refresh);
+            $accessToken = $refreshed['access_token'] ?? '';
+            if ($accessToken !== '') {
+                $fromName = $config['site_author'] ?? ($config['site_name'] ?? 'Nammu');
+                $sent = postal_gmail_send($fromEmail, $fromName, $email, $subject, $body, $accessToken);
+                $tokens['access_token'] = $accessToken;
+                if (isset($refreshed['expires_at'])) {
+                    $tokens['expires_at'] = $refreshed['expires_at'];
+                }
+                postal_save_mailing_tokens($tokens);
+            }
+        } catch (Throwable $e) {
+            $sent = false;
+        }
+    }
+
+    if ($sent) {
+        return;
+    }
+
+    $headers = [];
+    $fromName = $siteTitle !== '' ? $siteTitle : 'Nammu';
+    $encodedName = '=?UTF-8?B?' . base64_encode($fromName) . '?=';
+    $headers[] = 'From: ' . $encodedName . ' <no-reply@' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '>';
+    $headers[] = 'Content-Type: text/plain; charset=UTF-8';
+    @mail($email, $subject, $body, implode("\r\n", $headers));
 }
 
 $config = nammu_load_config();
@@ -130,6 +376,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         unset($_SESSION['postal_user_email']);
         $loggedEmail = '';
         $loggedEntry = null;
+    } elseif (isset($_POST['postal_forgot'])) {
+        $email = postal_normalize_email($_POST['forgot_email'] ?? '');
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $message = 'Introduce un email valido para recuperar tu contrasena.';
+            $messageType = 'danger';
+        } else {
+            $entry = postal_get_entry($email, $entries);
+            if ($entry) {
+                try {
+                    $tokens = postal_prune_reset_tokens(postal_load_reset_tokens());
+                    $tokens = array_values(array_filter($tokens, static function ($item) use ($email) {
+                        return is_array($item) && ($item['email'] ?? '') !== $email;
+                    }));
+                    $token = bin2hex(random_bytes(16));
+                    $tokens[] = [
+                        'email' => $email,
+                        'token' => $token,
+                        'expires_at' => time() + 86400,
+                    ];
+                    postal_save_reset_tokens($tokens);
+                    postal_send_password_reset($email, $token, $siteTitle);
+                } catch (Throwable $e) {
+                    $message = 'No pudimos enviar el email de recuperacion.';
+                    $messageType = 'danger';
+                    $entry = null;
+                }
+            }
+            if ($message === '') {
+                $message = 'Si el email existe, te hemos enviado un enlace para restablecer la contrasena.';
+                $messageType = 'success';
+            }
+        }
     } elseif (isset($_POST['postal_register'])) {
         if (!$postalEnabled) {
             $message = 'La lista de correo postal no está activa.';
@@ -156,11 +434,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ], $hash, $entries);
                 try {
                     postal_save_entries($entries);
-                    postal_sync_mailing_subscriber($email);
+                    $alreadySubscribed = false;
+                    $mailingSubscribers = postal_load_mailing_subscribers();
+                    foreach ($mailingSubscribers as $existing) {
+                        if (postal_normalize_mailing_email((string) $existing) === $email) {
+                            $alreadySubscribed = true;
+                            break;
+                        }
+                    }
+                    if (!$alreadySubscribed) {
+                        $pending = postal_load_mailing_pending();
+                        $token = bin2hex(random_bytes(16));
+                        $pending = array_values(array_filter($pending, static function ($item) use ($email) {
+                            return is_array($item) && ($item['email'] ?? '') !== $email;
+                        }));
+                        $pending[] = [
+                            'email' => $email,
+                            'token' => $token,
+                            'created_at' => date('c'),
+                        ];
+                        postal_save_mailing_pending($pending);
+                        postal_send_mailing_confirmation($email, $token, $siteTitle);
+                    }
                     $_SESSION['postal_user_email'] = $email;
                     $loggedEmail = $email;
                     $loggedEntry = $entries[$email] ?? null;
-                    $message = 'Registro completado. Puedes editar tus datos cuando quieras.';
+                    $message = $alreadySubscribed
+                        ? 'Registro completado. Puedes editar tus datos cuando quieras.'
+                        : 'Registro completado. Te enviamos un email para confirmar los avisos por correo.';
                     $messageType = 'success';
                 } catch (Throwable $e) {
                     $message = 'No se pudo guardar tu dirección.';
@@ -382,6 +683,15 @@ ob_start();
                         </label>
                         <button type="submit" name="postal_login" class="postal-btn postal-btn--ghost">Entrar</button>
                     </form>
+                    <div class="postal-divider"></div>
+                    <p class="postal-mini">¿Olvidaste tu contrasena?</p>
+                    <form method="post" class="postal-form postal-form--compact">
+                        <label>
+                            <span>Email</span>
+                            <input type="email" name="forgot_email" required>
+                        </label>
+                        <button type="submit" name="postal_forgot" class="postal-btn postal-btn--ghost">Enviar enlace</button>
+                    </form>
                 </div>
             </div>
         <?php endif; ?>
@@ -507,6 +817,25 @@ ob_start();
     .postal-form input:focus {
         outline: 2px solid <?= $accentColor ?>;
         border-color: <?= $accentColor ?>;
+    }
+    .postal-divider {
+        height: 1px;
+        background: rgba(0,0,0,0.08);
+        margin: 1.2rem 0 1rem;
+    }
+    .postal-mini {
+        margin: 0 0 0.75rem;
+        font-size: 0.92rem;
+        color: <?= $textColor ?>;
+    }
+    .postal-form--compact label {
+        font-size: 0.9rem;
+    }
+    .postal-form--compact input {
+        padding: 0.6rem 0.75rem;
+    }
+    .postal-form--compact .postal-btn {
+        margin-top: 0.75rem;
     }
     .postal-grid {
         display: grid;

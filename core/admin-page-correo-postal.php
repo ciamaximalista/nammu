@@ -49,6 +49,24 @@
 
                 <div class="card mb-3 border-0 shadow-sm">
                     <div class="card-body">
+                        <h4 class="h6 mb-3">Importar CSV</h4>
+                        <form method="post" enctype="multipart/form-data" class="row align-items-end">
+                            <div class="col-md-8">
+                                <div class="form-group">
+                                    <label class="small">Archivo CSV</label>
+                                    <input type="file" name="postal_csv" class="form-control-file" accept=".csv" required>
+                                </div>
+                                <small class="form-text text-muted">Columnas esperadas: Email, Nombre, Direccion, Poblacion, Codigo Postal, Provincia/Region, Pais.</small>
+                            </div>
+                            <div class="col-md-4">
+                                <button type="submit" name="import_postal_csv" class="btn btn-outline-primary">Importar direcciones</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card mb-3 border-0 shadow-sm">
+                    <div class="card-body">
                         <h4 class="h6 mb-3">Anadir suscriptor postal</h4>
                         <form method="post" class="row">
                             <input type="hidden" name="postal_update" value="1">

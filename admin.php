@@ -1748,6 +1748,75 @@ function admin_normalize_email(string $email): string {
     return $email;
 }
 
+function admin_normalize_csv_header(string $header): string {
+    $header = trim($header);
+    if ($header === '') {
+        return '';
+    }
+    $header = preg_replace('/^\xEF\xBB\xBF/u', '', $header);
+    $header = mb_strtolower($header, 'UTF-8');
+    $replacements = [
+        'á' => 'a', 'à' => 'a', 'ä' => 'a', 'â' => 'a',
+        'é' => 'e', 'è' => 'e', 'ë' => 'e', 'ê' => 'e',
+        'í' => 'i', 'ì' => 'i', 'ï' => 'i', 'î' => 'i',
+        'ó' => 'o', 'ò' => 'o', 'ö' => 'o', 'ô' => 'o',
+        'ú' => 'u', 'ù' => 'u', 'ü' => 'u', 'û' => 'u',
+        'ñ' => 'n',
+    ];
+    $header = strtr($header, $replacements);
+    $header = preg_replace('/[^a-z0-9]+/', ' ', $header);
+    return trim($header);
+}
+
+function admin_postal_csv_column_map(array $headers): array {
+    $map = [];
+    foreach ($headers as $index => $header) {
+        $key = admin_normalize_csv_header((string) $header);
+        if ($key === '') {
+            continue;
+        }
+        if (in_array($key, ['email', 'correo', 'correo electronico', 'e mail'], true)) {
+            $map['email'] = $index;
+        } elseif (in_array($key, ['nombre', 'nombre y apellidos', 'nombre completo'], true)) {
+            $map['name'] = $index;
+        } elseif (in_array($key, ['direccion', 'direccion postal', 'domicilio'], true)) {
+            $map['address'] = $index;
+        } elseif (in_array($key, ['poblacion', 'ciudad', 'localidad'], true)) {
+            $map['city'] = $index;
+        } elseif (in_array($key, ['codigo postal', 'cp', 'postal code', 'codigo'], true)) {
+            $map['postal_code'] = $index;
+        } elseif (in_array($key, ['provincia', 'region', 'provincia region', 'provincia region'], true)) {
+            $map['region'] = $index;
+        } elseif (in_array($key, ['pais', 'pais de residencia', 'country'], true)) {
+            $map['country'] = $index;
+        }
+    }
+    return $map;
+}
+
+function admin_maybe_add_to_mailing_list(string $email): void {
+    $normalized = admin_normalize_email($email);
+    if ($normalized === '') {
+        return;
+    }
+    try {
+        $subscribers = admin_load_mailing_subscribers();
+    } catch (Throwable $e) {
+        return;
+    }
+    foreach ($subscribers as $subscriber) {
+        if (admin_normalize_email((string) $subscriber) === $normalized) {
+            return;
+        }
+    }
+    $subscribers[] = $normalized;
+    try {
+        admin_save_mailing_subscribers($subscribers);
+    } catch (Throwable $e) {
+        return;
+    }
+}
+
 function admin_parse_hex_color(string $hex, int &$r, int &$g, int &$b): bool {
     $value = ltrim(trim($hex), '#');
     if (strlen($value) === 3) {
@@ -4026,6 +4095,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'country' => $_POST['postal_country'] ?? '',
             ], $passwordHash, $entries);
             postal_save_entries($entries);
+            if ($email !== '') {
+                admin_maybe_add_to_mailing_list($email);
+            }
             $_SESSION['postal_feedback'] = [
                 'type' => 'success',
                 'message' => 'Dirección postal actualizada.',
@@ -4071,6 +4143,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Content-Type: application/pdf');
         header('Content-Disposition: attachment; filename="correos-postales.pdf"');
         echo $pdf;
+        exit;
+    } elseif (isset($_POST['import_postal_csv'])) {
+        $file = $_FILES['postal_csv'] ?? null;
+        if (!$file || !is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            $_SESSION['postal_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudo leer el archivo CSV.',
+            ];
+            header('Location: admin.php?page=correo-postal');
+            exit;
+        }
+        if (!is_uploaded_file($file['tmp_name'] ?? '')) {
+            $_SESSION['postal_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Archivo CSV invalido.',
+            ];
+            header('Location: admin.php?page=correo-postal');
+            exit;
+        }
+        $handle = fopen($file['tmp_name'], 'r');
+        if (!$handle) {
+            $_SESSION['postal_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudo abrir el archivo CSV.',
+            ];
+            header('Location: admin.php?page=correo-postal');
+            exit;
+        }
+        $firstLine = fgets($handle);
+        rewind($handle);
+        $delimiter = ',';
+        if (is_string($firstLine) && substr_count($firstLine, ';') > substr_count($firstLine, ',')) {
+            $delimiter = ';';
+        }
+        $headers = fgetcsv($handle, 0, $delimiter);
+        if ($headers === false) {
+            fclose($handle);
+            $_SESSION['postal_feedback'] = [
+                'type' => 'danger',
+                'message' => 'El CSV esta vacio.',
+            ];
+            header('Location: admin.php?page=correo-postal');
+            exit;
+        }
+        $map = admin_postal_csv_column_map($headers);
+        $defaultOrder = ['email', 'name', 'address', 'city', 'postal_code', 'region', 'country'];
+        $hasHeader = count($map) >= 2 && isset($map['email']);
+        if (!$hasHeader) {
+            $map = array_flip($defaultOrder);
+            rewind($handle);
+        }
+        $entries = postal_load_entries();
+        $imported = 0;
+        $skipped = 0;
+        while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+            $emailIndex = $map['email'] ?? null;
+            $email = ($emailIndex !== null && isset($row[$emailIndex])) ? postal_normalize_email((string) $row[$emailIndex]) : '';
+            if ($email === '') {
+                $skipped++;
+                continue;
+            }
+            $data = [
+                'email' => $email,
+                'name' => isset($map['name'], $row[$map['name']]) ? $row[$map['name']] : '',
+                'address' => isset($map['address'], $row[$map['address']]) ? $row[$map['address']] : '',
+                'city' => isset($map['city'], $row[$map['city']]) ? $row[$map['city']] : '',
+                'postal_code' => isset($map['postal_code'], $row[$map['postal_code']]) ? $row[$map['postal_code']] : '',
+                'region' => isset($map['region'], $row[$map['region']]) ? $row[$map['region']] : '',
+                'country' => isset($map['country'], $row[$map['country']]) ? $row[$map['country']] : '',
+            ];
+            try {
+                $entries = postal_upsert_entry($data, null, $entries);
+                admin_maybe_add_to_mailing_list($email);
+                $imported++;
+            } catch (Throwable $e) {
+                $skipped++;
+            }
+        }
+        fclose($handle);
+        try {
+            postal_save_entries($entries);
+            $_SESSION['postal_feedback'] = [
+                'type' => 'success',
+                'message' => 'Importacion completada. Nuevos: ' . $imported . '. Omitidos: ' . $skipped . '.',
+            ];
+        } catch (Throwable $e) {
+            $_SESSION['postal_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudo guardar la libreta: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: admin.php?page=correo-postal');
         exit;
     } elseif (isset($_POST['send_mailing_post'])) {
         $filename = nammu_normalize_filename($_POST['mailing_filename'] ?? '');

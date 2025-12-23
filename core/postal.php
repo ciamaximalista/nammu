@@ -220,6 +220,36 @@ function postal_pdf_normalize_text(string $text): string
     return strtr($text, $replacements);
 }
 
+function postal_wrap_label_lines(string $text, int $maxChars): array
+{
+    $text = trim($text);
+    if ($text === '') {
+        return [];
+    }
+    if ($maxChars < 5) {
+        return [$text];
+    }
+    $words = preg_split('/\s+/u', $text) ?: [];
+    $lines = [];
+    $current = '';
+    foreach ($words as $word) {
+        if ($current === '') {
+            $current = $word;
+            continue;
+        }
+        if (mb_strlen($current . ' ' . $word, 'UTF-8') <= $maxChars) {
+            $current .= ' ' . $word;
+            continue;
+        }
+        $lines[] = $current;
+        $current = $word;
+    }
+    if ($current !== '') {
+        $lines[] = $current;
+    }
+    return $lines;
+}
+
 function postal_build_labels_pdf(array $entries, string $fontName): string
 {
     $entries = array_values($entries);
@@ -235,6 +265,9 @@ function postal_build_labels_pdf(array $entries, string $fontName): string
     $fontSize = 10;
     $lineHeight = 12;
     $perPage = $cols * $rows;
+    $textWidth = $labelWidth - 12;
+    $charsPerLine = (int) floor($textWidth / ($fontSize * 0.55));
+    $maxLines = (int) floor(($labelHeight - 20) / $lineHeight);
 
     $pages = [];
     for ($offset = 0; $offset < count($entries); $offset += $perPage) {
@@ -258,16 +291,26 @@ function postal_build_labels_pdf(array $entries, string $fontName): string
             $row = (int) floor($index / $cols);
             $x = $marginX + ($col * $labelWidth) + 6;
             $yTop = $pageHeight - $marginY - ($row * $labelHeight) - 16;
-            $lines = [
+            $rawLines = [
                 $entry['name'] ?? '',
                 $entry['address'] ?? '',
                 trim(($entry['postal_code'] ?? '') . ' ' . ($entry['city'] ?? '')),
                 $entry['region'] ?? '',
                 $entry['country'] ?? '',
             ];
+            $lines = [];
+            foreach ($rawLines as $line) {
+                $wrapped = postal_wrap_label_lines((string) $line, $charsPerLine);
+                foreach ($wrapped as $wrappedLine) {
+                    $lines[] = $wrappedLine;
+                }
+            }
             $lineOffset = 0;
-            foreach ($lines as $line) {
-                $lineText = trim((string) $line);
+            foreach ($lines as $lineText) {
+                if ($lineOffset >= $maxLines) {
+                    break;
+                }
+                $lineText = trim((string) $lineText);
                 if ($lineText === '') {
                     continue;
                 }

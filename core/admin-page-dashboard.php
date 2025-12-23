@@ -127,13 +127,15 @@
         }
     };
 
-    $buildLinePoints = static function (array $series, int $max): array {
+    $chartTop = 30;
+    $chartBottom = 150;
+    $buildLinePoints = static function (array $series, int $max, int $top, int $bottom): array {
         $count = count($series);
         if ($count === 0) {
             return ['points' => '', 'coords' => [], 'max' => 0, 'maxIndex' => null];
         }
-        $width = 300;
-        $height = 140;
+        $width = 270;
+        $height = $bottom - $top;
         $step = $count > 1 ? ($width / ($count - 1)) : 0;
         $points = [];
         $coords = [];
@@ -143,7 +145,7 @@
         foreach ($series as $value) {
             $x = $step * $index;
             $ratio = $max > 0 ? ($value / $max) : 0;
-            $y = $height - ($ratio * $height);
+            $y = $bottom - ($ratio * $height);
             $points[] = sprintf('%.2f,%.2f', $x, $y);
             $coords[] = ['x' => $x, 'y' => $y, 'value' => (int) $value];
             if ($value >= $maxValue) {
@@ -160,8 +162,8 @@
         ];
     };
 
-    $last30Line = $buildLinePoints($last30Daily, $last30DailyMax);
-    $last12Line = $buildLinePoints($last12Months, $last12MonthsMax);
+    $last30Line = $buildLinePoints($last30Daily, $last30DailyMax, $chartTop, $chartBottom);
+    $last12Line = $buildLinePoints($last12Months, $last12MonthsMax, $chartTop, $chartBottom);
 
     $yearlyUids = [];
     foreach ($visitorsDaily as $day => $payload) {
@@ -293,6 +295,37 @@
     $topItineraryStarts = array_slice($topItineraryStarts, 0, 10);
     $topItineraryCompletes = array_slice($topItineraryCompletes, 0, 10);
 
+    $resourceCounts = [
+        'images' => 0,
+        'videos' => 0,
+        'audios' => 0,
+        'pdfs' => 0,
+        'epubs' => 0,
+        'docs' => 0,
+        'others' => 0,
+    ];
+    if (function_exists('get_media_items')) {
+        $mediaItems = get_media_items(1, 0);
+        foreach ($mediaItems['items'] ?? [] as $item) {
+            $ext = strtolower((string) ($item['extension'] ?? ''));
+            if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'], true)) {
+                $resourceCounts['images']++;
+            } elseif (in_array($ext, ['mp4', 'webm', 'mov', 'm4v', 'ogv', 'ogg'], true)) {
+                $resourceCounts['videos']++;
+            } elseif (in_array($ext, ['mp3', 'wav', 'flac', 'm4a', 'aac', 'oga'], true)) {
+                $resourceCounts['audios']++;
+            } elseif ($ext === 'pdf') {
+                $resourceCounts['pdfs']++;
+            } elseif ($ext === 'epub') {
+                $resourceCounts['epubs']++;
+            } elseif (in_array($ext, ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'md', 'txt', 'rtf'], true)) {
+                $resourceCounts['docs']++;
+            } else {
+                $resourceCounts['others']++;
+            }
+        }
+    }
+
     $subscriberCount = 0;
     if (function_exists('admin_load_mailing_subscribers')) {
         try {
@@ -336,13 +369,13 @@
                             <p class="text-muted mb-0">Sin datos todavia.</p>
                         <?php else: ?>
                             <svg width="100%" height="170" viewBox="0 0 320 170" preserveAspectRatio="none" aria-hidden="true">
-                                <line x1="30" y1="10" x2="30" y2="140" stroke="#ccd6e0" stroke-width="1"></line>
-                                <line x1="30" y1="140" x2="300" y2="140" stroke="#ccd6e0" stroke-width="1"></line>
-                                <text x="4" y="14" font-size="10" fill="#6c757d"><?= (int) $last30DailyMax ?></text>
-                                <text x="12" y="140" font-size="10" fill="#6c757d">0</text>
-                                <text x="30" y="162" font-size="10" text-anchor="start" fill="#6c757d"><?= htmlspecialchars($formatDayMonthEs($last30LabelStart), ENT_QUOTES, 'UTF-8') ?></text>
-                                <text x="165" y="162" font-size="10" text-anchor="middle" fill="#6c757d"><?= htmlspecialchars($formatDayMonthEs($last30LabelMid), ENT_QUOTES, 'UTF-8') ?></text>
-                                <text x="300" y="162" font-size="10" text-anchor="end" fill="#6c757d"><?= htmlspecialchars($formatDayMonthEs($last30LabelEnd), ENT_QUOTES, 'UTF-8') ?></text>
+                                <line x1="30" y1="<?= (int) $chartTop ?>" x2="30" y2="<?= (int) $chartBottom ?>" stroke="#ccd6e0" stroke-width="1"></line>
+                                <line x1="30" y1="<?= (int) $chartBottom ?>" x2="300" y2="<?= (int) $chartBottom ?>" stroke="#ccd6e0" stroke-width="1"></line>
+                                <text x="4" y="<?= (int) $chartTop ?>" font-size="10" fill="#6c757d"><?= (int) $last30DailyMax ?></text>
+                                <text x="12" y="<?= (int) $chartBottom ?>" font-size="10" fill="#6c757d">0</text>
+                                <text x="30" y="166" font-size="10" text-anchor="start" fill="#6c757d"><?= htmlspecialchars($formatDayMonthEs($last30LabelStart), ENT_QUOTES, 'UTF-8') ?></text>
+                                <text x="165" y="166" font-size="10" text-anchor="middle" fill="#6c757d"><?= htmlspecialchars($formatDayMonthEs($last30LabelMid), ENT_QUOTES, 'UTF-8') ?></text>
+                                <text x="300" y="166" font-size="10" text-anchor="end" fill="#6c757d"><?= htmlspecialchars($formatDayMonthEs($last30LabelEnd), ENT_QUOTES, 'UTF-8') ?></text>
                                 <g transform="translate(30,0)">
                                     <polyline fill="none" stroke="#1b8eed" stroke-width="2" points="<?= htmlspecialchars($last30Line['points'], ENT_QUOTES, 'UTF-8') ?>"></polyline>
                                     <?php foreach ($last30Line['coords'] as $point): ?>
@@ -362,13 +395,13 @@
                             <p class="text-muted mb-0">Sin datos todavia.</p>
                         <?php else: ?>
                             <svg width="100%" height="170" viewBox="0 0 320 170" preserveAspectRatio="none" aria-hidden="true">
-                                <line x1="30" y1="10" x2="30" y2="140" stroke="#ccd6e0" stroke-width="1"></line>
-                                <line x1="30" y1="140" x2="300" y2="140" stroke="#ccd6e0" stroke-width="1"></line>
-                                <text x="4" y="14" font-size="10" fill="#6c757d"><?= (int) $last12MonthsMax ?></text>
-                                <text x="12" y="140" font-size="10" fill="#6c757d">0</text>
-                                <text x="30" y="162" font-size="10" text-anchor="start" fill="#6c757d"><?= htmlspecialchars($formatMonthEs($last12LabelStart . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
-                                <text x="165" y="162" font-size="10" text-anchor="middle" fill="#6c757d"><?= htmlspecialchars($formatMonthEs($last12LabelMid . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
-                                <text x="300" y="162" font-size="10" text-anchor="end" fill="#6c757d"><?= htmlspecialchars($formatMonthEs($last12LabelEnd . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
+                                <line x1="30" y1="<?= (int) $chartTop ?>" x2="30" y2="<?= (int) $chartBottom ?>" stroke="#ccd6e0" stroke-width="1"></line>
+                                <line x1="30" y1="<?= (int) $chartBottom ?>" x2="300" y2="<?= (int) $chartBottom ?>" stroke="#ccd6e0" stroke-width="1"></line>
+                                <text x="4" y="<?= (int) $chartTop ?>" font-size="10" fill="#6c757d"><?= (int) $last12MonthsMax ?></text>
+                                <text x="12" y="<?= (int) $chartBottom ?>" font-size="10" fill="#6c757d">0</text>
+                                <text x="30" y="166" font-size="10" text-anchor="start" fill="#6c757d"><?= htmlspecialchars($formatMonthEs($last12LabelStart . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
+                                <text x="165" y="166" font-size="10" text-anchor="middle" fill="#6c757d"><?= htmlspecialchars($formatMonthEs($last12LabelMid . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
+                                <text x="300" y="166" font-size="10" text-anchor="end" fill="#6c757d"><?= htmlspecialchars($formatMonthEs($last12LabelEnd . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
                                 <g transform="translate(30,0)">
                                     <polyline fill="none" stroke="#0a4c8a" stroke-width="2" points="<?= htmlspecialchars($last12Line['points'], ENT_QUOTES, 'UTF-8') ?>"></polyline>
                                     <?php foreach ($last12Line['coords'] as $point): ?>
@@ -390,6 +423,32 @@
                         <p class="mb-2"><strong>Entradas:</strong> <?= (int) $postCount ?></p>
                         <p class="mb-2"><strong>Paginas:</strong> <?= (int) $pageCount ?></p>
                         <p class="mb-0"><strong>Itinerarios:</strong> <?= (int) $itineraryCount ?></p>
+                    </div>
+                </div>
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h4 class="h6 text-uppercase text-muted mb-3">Recursos</h4>
+                        <?php if ($resourceCounts['images'] > 0): ?>
+                            <p class="mb-2"><strong>Imagenes:</strong> <?= (int) $resourceCounts['images'] ?></p>
+                        <?php endif; ?>
+                        <?php if ($resourceCounts['videos'] > 0): ?>
+                            <p class="mb-2"><strong>Videos:</strong> <?= (int) $resourceCounts['videos'] ?></p>
+                        <?php endif; ?>
+                        <?php if ($resourceCounts['audios'] > 0): ?>
+                            <p class="mb-2"><strong>Audios:</strong> <?= (int) $resourceCounts['audios'] ?></p>
+                        <?php endif; ?>
+                        <?php if ($resourceCounts['pdfs'] > 0): ?>
+                            <p class="mb-2"><strong>PDFs:</strong> <?= (int) $resourceCounts['pdfs'] ?></p>
+                        <?php endif; ?>
+                        <?php if ($resourceCounts['epubs'] > 0): ?>
+                            <p class="mb-2"><strong>EPUBs:</strong> <?= (int) $resourceCounts['epubs'] ?></p>
+                        <?php endif; ?>
+                        <?php if ($resourceCounts['docs'] > 0): ?>
+                            <p class="mb-2"><strong>Documentos:</strong> <?= (int) $resourceCounts['docs'] ?></p>
+                        <?php endif; ?>
+                        <?php if ($resourceCounts['others'] > 0): ?>
+                            <p class="mb-0"><strong>Otros:</strong> <?= (int) $resourceCounts['others'] ?></p>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="card mb-4">

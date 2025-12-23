@@ -193,7 +193,7 @@ function nammu_allowed_media_extensions(): array {
         'jpg','jpeg','png','gif','webp','svg',
         'mp4','webm','mov','m4v','ogv','ogg',
         'mp3','wav','flac','m4a','aac','oga',
-        'pdf','doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp','md','txt','rtf'
+        'pdf','epub','doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp','md','txt','rtf'
     ];
 }
 

@@ -4351,7 +4351,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 // If logged in, show admin panel
 $isLoggedIn = is_logged_in();
 if ($isLoggedIn) {
-    $page = $_GET['page'] ?? 'publish';
+    $page = $_GET['page'] ?? 'dashboard';
 } else {
     $page = $user_exists ? 'login' : 'register';
 }

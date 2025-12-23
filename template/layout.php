@@ -96,6 +96,11 @@ $showAdsBanner = $adsEnabled && $adsHtml !== '' && !$adsClosedToday && !$isCrawl
 if ($adsScope === 'home' && !$isHome) {
     $showAdsBanner = false;
 }
+$serverDay = date('Y-m-d');
+$serverDayExpires = date(DATE_RFC2822, strtotime('today 23:59:59'));
+$serverConsentDate = date('Y-m-d');
+$serverConsentExpires = gmdate('D, d M Y H:i:s T', time() + 31536000);
+$serverYearExpires = gmdate('D, d M Y H:i:s T', time() + 31536000);
 if (function_exists('nammu_record_visit')) {
     nammu_record_visit();
 }
@@ -1012,8 +1017,8 @@ if (!empty($baseUrl)) {
     $baseHost = parse_url((string) $baseUrl, PHP_URL_HOST) ?? '';
 }
 ?>
-<body class="<?= htmlspecialchars($cornerClass, ENT_QUOTES, 'UTF-8') ?><?= $statsConsentGiven ? '' : ' nammu-cookie-locked' ?>">
-    <div class="nammu-cookie-overlay<?= $statsConsentGiven ? '' : ' is-visible' ?>" data-cookie-overlay aria-hidden="<?= $statsConsentGiven ? 'true' : 'false' ?>">
+<body class="<?= htmlspecialchars($cornerClass, ENT_QUOTES, 'UTF-8') ?><?= $statsConsentGiven ? '' : ' nammu-cookie-locked' ?>" data-server-year-expires="<?= htmlspecialchars($serverYearExpires, ENT_QUOTES, 'UTF-8') ?>">
+    <div class="nammu-cookie-overlay<?= $statsConsentGiven ? '' : ' is-visible' ?>" data-cookie-overlay data-server-date="<?= htmlspecialchars($serverConsentDate, ENT_QUOTES, 'UTF-8') ?>" data-server-expires="<?= htmlspecialchars($serverConsentExpires, ENT_QUOTES, 'UTF-8') ?>" aria-hidden="<?= $statsConsentGiven ? 'true' : 'false' ?>">
         <div class="nammu-cookie-card" role="dialog" aria-modal="true" aria-labelledby="cookieNoticeTitle">
             <img class="nammu-cookie-logo" src="<?= htmlspecialchars($cookieLogo, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
             <h2 id="cookieNoticeTitle">Uso de cookies para estadisticas</h2>
@@ -1150,7 +1155,7 @@ if (!empty($baseUrl)) {
         </div>
     <?php endif; ?>
     <?php if ($showAdsBanner && !$isCrawler): ?>
-        <div class="nammu-ad-banner" data-ad-banner>
+        <div class="nammu-ad-banner" data-ad-banner data-server-date="<?= htmlspecialchars($serverDay, ENT_QUOTES, 'UTF-8') ?>" data-server-expires="<?= htmlspecialchars($serverDayExpires, ENT_QUOTES, 'UTF-8') ?>">
             <button class="nammu-ad-close" type="button" aria-label="Cerrar anuncio" data-ad-close>
                 <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -1179,7 +1184,11 @@ if (!empty($baseUrl)) {
                 return part.trim().indexOf('nammu_stats_consent=1') === 0;
             });
         }
-        function setCookie(name, value) {
+        function setCookie(name, value, expires) {
+            if (expires) {
+                document.cookie = name + '=' + value + ';path=/;expires=' + expires + ';samesite=lax';
+                return;
+            }
             document.cookie = name + '=' + value + ';path=/;max-age=31536000;samesite=lax';
         }
         function generateUid() {
@@ -1198,9 +1207,10 @@ if (!empty($baseUrl)) {
             return;
         }
         acceptBtn.addEventListener('click', function() {
-            setCookie('nammu_stats_consent', '1');
+            var serverExpires = overlay.getAttribute('data-server-expires') || '';
+            setCookie('nammu_stats_consent', '1', serverExpires);
             if (!document.cookie.split(';').some(function(part) { return part.trim().indexOf('nammu_stats_uid=') === 0; })) {
-                setCookie('nammu_stats_uid', generateUid());
+                setCookie('nammu_stats_uid', generateUid(), serverExpires);
             }
             window.location.reload();
         });
@@ -1218,6 +1228,8 @@ if (!empty($baseUrl)) {
         if (!banner || !closeBtn) {
             return;
         }
+        var serverDate = banner.getAttribute('data-server-date') || '';
+        var serverExpires = banner.getAttribute('data-server-expires') || '';
         function hasConsent() {
             return document.cookie.split(';').some(function(part) {
                 return part.trim().indexOf('nammu_stats_consent=1') === 0;
@@ -1228,14 +1240,21 @@ if (!empty($baseUrl)) {
             if (!hasConsent()) {
                 return;
             }
-            var now = new Date();
-            var y = now.getFullYear();
-            var m = String(now.getMonth() + 1).padStart(2, '0');
-            var d = String(now.getDate()).padStart(2, '0');
-            var value = y + '-' + m + '-' + d;
-            var expiry = new Date();
-            expiry.setHours(23, 59, 59, 999);
-            document.cookie = 'nammu_ad_closed=' + value + ';path=/;expires=' + expiry.toUTCString() + ';samesite=lax';
+            var value = serverDate || '';
+            var expiry = serverExpires || '';
+            if (value === '') {
+                var now = new Date();
+                var y = now.getFullYear();
+                var m = String(now.getMonth() + 1).padStart(2, '0');
+                var d = String(now.getDate()).padStart(2, '0');
+                value = y + '-' + m + '-' + d;
+            }
+            if (expiry === '') {
+                var localExpiry = new Date();
+                localExpiry.setHours(23, 59, 59, 999);
+                expiry = localExpiry.toUTCString();
+            }
+            document.cookie = 'nammu_ad_closed=' + value + ';path=/;expires=' + expiry + ';samesite=lax';
         });
     })();
     </script>
@@ -1273,6 +1292,11 @@ if (!empty($baseUrl)) {
         function writeProgress(slug, data) {
             var name = buildCookieName(slug);
             var payload = encodeURIComponent(JSON.stringify(data));
+            var expires = document.body ? document.body.getAttribute('data-server-year-expires') : '';
+            if (expires) {
+                document.cookie = name + '=' + payload + ';path=/;expires=' + expires + ';samesite=lax';
+                return;
+            }
             document.cookie = name + '=' + payload + ';path=/;max-age=31536000;samesite=lax';
         }
         function ensureStructure(slug) {

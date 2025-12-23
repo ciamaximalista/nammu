@@ -319,6 +319,76 @@
     }
     ksort($yearlyUids);
 
+    $todayKey = $today->format('Y-m-d');
+    $todayPayload = $visitorsDaily[$todayKey] ?? [];
+    $todayUids = is_array($todayPayload) ? ($todayPayload['uids'] ?? []) : [];
+    $todayCount = count($todayUids);
+
+    $dayNames = [
+        'sun' => 'Domingo',
+        'mon' => 'Lunes',
+        'tue' => 'Martes',
+        'wed' => 'Miercoles',
+        'thu' => 'Jueves',
+        'fri' => 'Viernes',
+        'sat' => 'Sabado',
+    ];
+    $monthNames = [
+        1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril',
+        5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto',
+        9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre',
+    ];
+    $last7DailyList = [];
+    $dailyKeys = array_keys($visitorsDaily);
+    sort($dailyKeys);
+    $firstDayKey = $dailyKeys[0] ?? '';
+    for ($i = 0; $i < 7; $i++) {
+        $day = $today->modify('-' . $i . ' days');
+        $dayKey = $day->format('Y-m-d');
+        if ($firstDayKey !== '' && $dayKey < $firstDayKey) {
+            break;
+        }
+        $payload = $visitorsDaily[$dayKey] ?? [];
+        $uids = is_array($payload) ? ($payload['uids'] ?? []) : [];
+        $dayLabelKey = strtolower($day->format('D'));
+        $last7DailyList[] = [
+            'label' => $dayNames[$dayLabelKey] ?? $dayKey,
+            'count' => count($uids),
+        ];
+    }
+
+    $last12MonthsList = [];
+    $monthlyKeys = array_keys($monthlyUids);
+    sort($monthlyKeys);
+    $firstMonthKey = $monthlyKeys[0] ?? '';
+    $monthCursor = $today->modify('first day of this month');
+    for ($i = 0; $i < 12; $i++) {
+        $month = $monthCursor->modify('-' . $i . ' months');
+        $monthKey = $month->format('Y-m');
+        if ($firstMonthKey !== '' && $monthKey < $firstMonthKey) {
+            break;
+        }
+        $count = isset($monthlyUids[$monthKey]) ? count($monthlyUids[$monthKey]) : 0;
+        $monthNum = (int) $month->format('n');
+        $last12MonthsList[] = [
+            'label' => ($monthNames[$monthNum] ?? $month->format('m')) . ' ' . $month->format('Y'),
+            'count' => $count,
+        ];
+    }
+
+    $yearList = [];
+    $yearKeys = array_keys($yearlyUids);
+    rsort($yearKeys);
+    foreach ($yearKeys as $year) {
+        if ($year === '') {
+            continue;
+        }
+        $yearList[] = [
+            'label' => $year,
+            'count' => count($yearlyUids[$year]),
+        ];
+    }
+
     $topPosts = [];
     foreach ($postsStats as $slug => $item) {
         $total = (int) ($item['total'] ?? 0);
@@ -499,6 +569,29 @@
     ?>
 
     <div class="tab-pane active">
+        <style>
+            .dashboard-card-title {
+                color: #1b8eed !important;
+            }
+            .dashboard-section-title {
+                color: #ea2f28 !important;
+            }
+            .dashboard-links a {
+                color: #7fa7d9 !important;
+            }
+            .dashboard-links a:hover {
+                color: #7fa7d9 !important;
+            }
+            .dashboard-links li:first-child {
+                background: #1b8eed;
+                border-radius: 8px;
+                padding: 0.2rem 0.4rem;
+            }
+            .dashboard-links li:first-child a,
+            .dashboard-links li:first-child span {
+                color: #ffffff !important;
+            }
+        </style>
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-2">
             <div>
                 <h2 class="mb-1">Escritorio Nammu</h2>
@@ -565,7 +658,7 @@
             <div class="col-lg-4">
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3">Publicaciones</h4>
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Publicaciones</h4>
                         <p class="mb-2"><strong>Entradas:</strong> <?= (int) $postCount ?></p>
                         <p class="mb-2"><strong>Paginas:</strong> <?= (int) $pageCount ?></p>
                         <p class="mb-0"><strong>Itinerarios:</strong> <?= (int) $itineraryCount ?></p>
@@ -573,7 +666,7 @@
                 </div>
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3">Recursos</h4>
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Recursos</h4>
                         <?php if ($resourceCounts['images'] > 0): ?>
                             <p class="mb-2"><strong>Imagenes:</strong> <?= (int) $resourceCounts['images'] ?></p>
                         <?php endif; ?>
@@ -599,7 +692,7 @@
                 </div>
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3">Suscriptores</h4>
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Suscriptores</h4>
                         <p class="mb-2"><strong>Lista de correo:</strong> <?= (int) $subscriberCount ?></p>
                         <?php if ($postalSubscriberCount > 0): ?>
                             <p class="mb-2"><strong>Correo postal:</strong> <?= (int) $postalSubscriberCount ?></p>
@@ -613,50 +706,50 @@
                 </div>
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3">Usuarios unicos</h4>
-                        <p class="mb-2"><strong>Ultimos 30 dias:</strong> <?= (int) $unique30Count ?></p>
-                        <div class="table-responsive">
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Usuarios unicos</h4>
+                        <p class="mb-3"><strong>Hoy:</strong> <?= (int) $todayCount ?></p>
+
+                        <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Ultimos 7 dias</p>
+                        <div class="table-responsive mb-3">
                             <table class="table table-sm mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Mes</th>
-                                        <th>Usuarios</th>
-                                    </tr>
-                                </thead>
                                 <tbody>
-                                    <?php if (empty($monthlyUids)): ?>
+                                    <?php foreach ($last7DailyList as $item): ?>
                                         <tr>
-                                            <td colspan="2" class="text-muted">Sin datos todavia.</td>
+                                            <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td class="text-right"><?= (int) $item['count'] ?></td>
                                         </tr>
-                                    <?php else: ?>
-                                        <?php foreach ($monthlyUids as $month => $uids): ?>
-                                            <tr>
-                                                <td><?= htmlspecialchars($formatDateEs($month . '-01'), ENT_QUOTES, 'UTF-8') ?></td>
-                                                <td><?= (int) count($uids) ?></td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
+                                    <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
-                        <div class="table-responsive mt-3">
+
+                        <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Ultimos 12 meses</p>
+                        <div class="table-responsive mb-3">
                             <table class="table table-sm mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Año</th>
-                                        <th>Usuarios</th>
-                                    </tr>
-                                </thead>
                                 <tbody>
-                                    <?php if (empty($yearlyUids)): ?>
+                                    <?php foreach ($last12MonthsList as $item): ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td class="text-right"><?= (int) $item['count'] ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Años</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <tbody>
+                                    <?php if (empty($yearList)): ?>
                                         <tr>
                                             <td colspan="2" class="text-muted">Sin datos todavia.</td>
                                         </tr>
                                     <?php else: ?>
-                                        <?php foreach ($yearlyUids as $year => $uids): ?>
+                                        <?php foreach ($yearList as $item): ?>
                                             <tr>
-                                                <td><?= htmlspecialchars($year, ENT_QUOTES, 'UTF-8') ?></td>
-                                                <td><?= (int) count($uids) ?></td>
+                                                <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                <td class="text-right"><?= (int) $item['count'] ?></td>
                                             </tr>
                                         <?php endforeach; ?>
                                     <?php endif; ?>
@@ -670,11 +763,11 @@
             <div class="col-lg-8">
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3">Entradas mas leidas</h4>
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Entradas mas leidas</h4>
                         <?php if (empty($topPosts)): ?>
                             <p class="text-muted mb-0">Sin datos todavia.</p>
                         <?php else: ?>
-                            <ol class="mb-0">
+                            <ol class="mb-0 dashboard-links">
                                 <?php foreach ($topPosts as $item): ?>
                                     <li>
                                         <?php $url = admin_public_post_url($item['slug']); ?>
@@ -691,11 +784,11 @@
 
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3">Entradas mas leidas (ultima semana)</h4>
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Entradas mas leidas (ultima semana)</h4>
                         <?php if (empty($topPostsWeek)): ?>
                             <p class="text-muted mb-0">Sin datos todavia.</p>
                         <?php else: ?>
-                            <ol class="mb-0">
+                            <ol class="mb-0 dashboard-links">
                                 <?php foreach ($topPostsWeek as $item): ?>
                                     <li>
                                         <?php $url = admin_public_post_url($item['slug']); ?>
@@ -712,11 +805,11 @@
 
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3">Entradas mas leidas (ultimo mes)</h4>
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Entradas mas leidas (ultimo mes)</h4>
                         <?php if (empty($topPostsMonth)): ?>
                             <p class="text-muted mb-0">Sin datos todavia.</p>
                         <?php else: ?>
-                            <ol class="mb-0">
+                            <ol class="mb-0 dashboard-links">
                                 <?php foreach ($topPostsMonth as $item): ?>
                                     <li>
                                         <?php $url = admin_public_post_url($item['slug']); ?>
@@ -734,11 +827,11 @@
                 <?php if ($pageCount > 0): ?>
                     <div class="card mb-4">
                         <div class="card-body">
-                            <h4 class="h6 text-uppercase text-muted mb-3">Paginas mas leidas</h4>
+                            <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Paginas mas leidas</h4>
                             <?php if (empty($topPages)): ?>
                                 <p class="text-muted mb-0">Sin datos todavia.</p>
                             <?php else: ?>
-                                <ol class="mb-0">
+                                <ol class="mb-0 dashboard-links">
                                     <?php foreach ($topPages as $item): ?>
                                         <li>
                                             <?php $url = admin_public_post_url($item['slug']); ?>
@@ -756,12 +849,12 @@
 
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3">Plataforma (ultimos 30 dias)</h4>
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Plataforma (ultimos 30 dias)</h4>
                         <?php if (empty($deviceList) && empty($browserList) && empty($systemList) && empty($languageList)): ?>
                             <p class="text-muted mb-0">Sin datos todavia.</p>
                         <?php else: ?>
                             <?php if (!empty($deviceList)): ?>
-                                <p class="text-muted mb-2 text-uppercase small">Dispositivo</p>
+                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Dispositivo</p>
                                 <div class="table-responsive mb-3">
                                     <table class="table table-sm mb-0">
                                         <tbody>
@@ -776,7 +869,7 @@
                                 </div>
                             <?php endif; ?>
                             <?php if (!empty($browserList)): ?>
-                                <p class="text-muted mb-2 text-uppercase small">Navegador</p>
+                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Navegador</p>
                                 <div class="table-responsive mb-3">
                                     <table class="table table-sm mb-0">
                                         <tbody>
@@ -791,7 +884,7 @@
                                 </div>
                             <?php endif; ?>
                             <?php if (!empty($systemList)): ?>
-                                <p class="text-muted mb-2 text-uppercase small">Sistema (escritorio)</p>
+                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Sistema (escritorio)</p>
                                 <div class="table-responsive mb-3">
                                     <table class="table table-sm mb-0">
                                         <tbody>
@@ -806,7 +899,7 @@
                                 </div>
                             <?php endif; ?>
                             <?php if (!empty($languageList)): ?>
-                                <p class="text-muted mb-2 text-uppercase small">Lengua</p>
+                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Lengua</p>
                                 <div class="table-responsive">
                                     <table class="table table-sm mb-0">
                                         <tbody>
@@ -827,11 +920,11 @@
                 <?php if ($itineraryCount > 0): ?>
                     <div class="card mb-4">
                         <div class="card-body">
-                            <h4 class="h6 text-uppercase text-muted mb-3">Itinerarios comenzados (usuarios unicos)</h4>
+                            <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Itinerarios comenzados (usuarios unicos)</h4>
                             <?php if (empty($topItineraryStarts)): ?>
                                 <p class="text-muted mb-0">Sin datos todavia.</p>
                             <?php else: ?>
-                                <ol class="mb-0">
+                                <ol class="mb-0 dashboard-links">
                                     <?php foreach ($topItineraryStarts as $item): ?>
                                         <li>
                                             <?php $url = admin_public_itinerary_url($item['slug']); ?>
@@ -848,11 +941,11 @@
 
                     <div class="card mb-4">
                         <div class="card-body">
-                            <h4 class="h6 text-uppercase text-muted mb-3">Itinerarios completados (usuarios unicos)</h4>
+                            <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Itinerarios completados (usuarios unicos)</h4>
                             <?php if (empty($topItineraryCompletes)): ?>
                                 <p class="text-muted mb-0">Sin datos todavia.</p>
                             <?php else: ?>
-                                <ol class="mb-0">
+                                <ol class="mb-0 dashboard-links">
                                     <?php foreach ($topItineraryCompletes as $item): ?>
                                         <li>
                                             <?php $url = admin_public_itinerary_url($item['slug']); ?>

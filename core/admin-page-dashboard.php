@@ -847,6 +847,50 @@
                     </div>
                 <?php endif; ?>
 
+                <?php if ($itineraryCount > 0): ?>
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Itinerarios comenzados (usuarios unicos)</h4>
+                            <?php if (empty($topItineraryStarts)): ?>
+                                <p class="text-muted mb-0">Sin datos todavia.</p>
+                            <?php else: ?>
+                                <ol class="mb-0 dashboard-links">
+                                    <?php foreach ($topItineraryStarts as $item): ?>
+                                        <li>
+                                            <?php $url = admin_public_itinerary_url($item['slug']); ?>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Itinerarios completados (usuarios unicos)</h4>
+                            <?php if (empty($topItineraryCompletes)): ?>
+                                <p class="text-muted mb-0">Sin datos todavia.</p>
+                            <?php else: ?>
+                                <ol class="mb-0 dashboard-links">
+                                    <?php foreach ($topItineraryCompletes as $item): ?>
+                                        <li>
+                                            <?php $url = admin_public_itinerary_url($item['slug']); ?>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
                 <div class="card mb-4">
                     <div class="card-body">
                         <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Plataforma (ultimos 30 dias)</h4>
@@ -916,50 +960,6 @@
                         <?php endif; ?>
                     </div>
                 </div>
-
-                <?php if ($itineraryCount > 0): ?>
-                    <div class="card mb-4">
-                        <div class="card-body">
-                            <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Itinerarios comenzados (usuarios unicos)</h4>
-                            <?php if (empty($topItineraryStarts)): ?>
-                                <p class="text-muted mb-0">Sin datos todavia.</p>
-                            <?php else: ?>
-                                <ol class="mb-0 dashboard-links">
-                                    <?php foreach ($topItineraryStarts as $item): ?>
-                                        <li>
-                                            <?php $url = admin_public_itinerary_url($item['slug']); ?>
-                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
-                                            </a>
-                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ol>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <div class="card mb-4">
-                        <div class="card-body">
-                            <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Itinerarios completados (usuarios unicos)</h4>
-                            <?php if (empty($topItineraryCompletes)): ?>
-                                <p class="text-muted mb-0">Sin datos todavia.</p>
-                            <?php else: ?>
-                                <ol class="mb-0 dashboard-links">
-                                    <?php foreach ($topItineraryCompletes as $item): ?>
-                                        <li>
-                                            <?php $url = admin_public_itinerary_url($item['slug']); ?>
-                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
-                                            </a>
-                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ol>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endif; ?>
             </div>
         </div>
     </div>

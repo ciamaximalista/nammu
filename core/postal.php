@@ -42,18 +42,44 @@ function postal_normalize_email(string $email): string
 function postal_get_entry(string $email, array $entries): ?array
 {
     $key = postal_normalize_email($email);
-    return $entries[$key] ?? null;
+    if ($key !== '' && isset($entries[$key])) {
+        return $entries[$key];
+    }
+    if ($key === '') {
+        return null;
+    }
+    foreach ($entries as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        if (postal_normalize_email((string) ($entry['email'] ?? '')) === $key) {
+            return $entry;
+        }
+    }
+    return null;
 }
 
 function postal_upsert_entry(array $data, ?string $passwordHash, array $entries): array
 {
     $email = postal_normalize_email((string) ($data['email'] ?? ''));
-    if ($email === '') {
-        throw new RuntimeException('El email es obligatorio.');
+    $key = $email;
+    if ($key === '') {
+        $key = trim((string) ($data['id'] ?? ''));
+        if ($key === '') {
+            $key = 'id-' . bin2hex(random_bytes(6));
+        }
     }
-    $current = $entries[$email] ?? null;
+    $current = $entries[$key] ?? null;
     $now = date('c');
-    $entries[$email] = [
+    $entryId = $current['id'] ?? '';
+    if ($entryId === '') {
+        $entryId = trim((string) ($data['id'] ?? ''));
+    }
+    if ($entryId === '' && $email === '') {
+        $entryId = $key;
+    }
+    $entries[$key] = [
+        'id' => $entryId,
         'email' => $email,
         'name' => trim((string) ($data['name'] ?? '')),
         'address' => trim((string) ($data['address'] ?? '')),
@@ -73,6 +99,19 @@ function postal_delete_entry(string $email, array $entries): array
     $key = postal_normalize_email($email);
     if (isset($entries[$key])) {
         unset($entries[$key]);
+        return $entries;
+    }
+    if ($key === '') {
+        return $entries;
+    }
+    foreach ($entries as $entryKey => $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        if (postal_normalize_email((string) ($entry['email'] ?? '')) === $key) {
+            unset($entries[$entryKey]);
+            break;
+        }
     }
     return $entries;
 }

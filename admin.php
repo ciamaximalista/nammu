@@ -4082,11 +4082,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['postal_update'])) {
         $entries = postal_load_entries();
         $email = postal_normalize_email((string) ($_POST['postal_email'] ?? ''));
+        $entryId = trim((string) ($_POST['postal_id'] ?? ''));
         $passwordRaw = trim((string) ($_POST['postal_password'] ?? ''));
         $passwordHash = $passwordRaw !== '' ? password_hash($passwordRaw, PASSWORD_DEFAULT) : null;
         try {
             $entries = postal_upsert_entry([
                 'email' => $email,
+                'id' => $entryId,
                 'name' => $_POST['postal_name'] ?? '',
                 'address' => $_POST['postal_address'] ?? '',
                 'city' => $_POST['postal_city'] ?? '',
@@ -4113,7 +4115,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['postal_delete'])) {
         $entries = postal_load_entries();
         $email = postal_normalize_email((string) ($_POST['postal_email'] ?? ''));
-        $entries = postal_delete_entry($email, $entries);
+        $entryId = trim((string) ($_POST['postal_id'] ?? ''));
+        $deleteKey = $email !== '' ? $email : $entryId;
+        if ($deleteKey === '') {
+            $_SESSION['postal_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Falta el identificador para borrar.',
+            ];
+            header('Location: admin.php?page=correo-postal');
+            exit;
+        }
+        $entries = postal_delete_entry($deleteKey, $entries);
         try {
             postal_save_entries($entries);
             $_SESSION['postal_feedback'] = [
@@ -4201,6 +4213,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $emailIndex = $map['email'] ?? null;
             $data = [
                 'email' => '',
+                'id' => '',
                 'name' => isset($map['name'], $row[$map['name']]) ? $row[$map['name']] : '',
                 'address' => isset($map['address'], $row[$map['address']]) ? $row[$map['address']] : '',
                 'city' => isset($map['city'], $row[$map['city']]) ? $row[$map['city']] : '',
@@ -4210,6 +4223,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
             $email = ($emailIndex !== null && isset($row[$emailIndex])) ? postal_normalize_email((string) $row[$emailIndex]) : '';
             $data['email'] = $email;
+            if ($email === '') {
+                $data['id'] = 'id-' . bin2hex(random_bytes(6));
+            }
             try {
                 $entries = postal_upsert_entry($data, null, $entries);
                 if ($email !== '') {

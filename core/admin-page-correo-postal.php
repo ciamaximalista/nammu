@@ -161,6 +161,7 @@
                                                 <summary class="btn btn-sm btn-outline-primary">Editar</summary>
                                                 <form method="post" class="mt-2">
                                                     <input type="hidden" name="postal_email" value="<?= htmlspecialchars($entry['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="postal_id" value="<?= htmlspecialchars($entry['id'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                                                     <div class="form-group">
                                                         <label class="small">Nombre</label>
                                                         <input type="text" name="postal_name" class="form-control" value="<?= htmlspecialchars($entry['name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
@@ -194,6 +195,7 @@
                                             </details>
                                             <form method="post" onsubmit="return confirm('¿Eliminar esta dirección?');">
                                                 <input type="hidden" name="postal_email" value="<?= htmlspecialchars($entry['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="postal_id" value="<?= htmlspecialchars($entry['id'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                                                 <button type="submit" name="postal_delete" class="btn btn-sm btn-outline-danger">Borrar</button>
                                             </form>
                                         </td>

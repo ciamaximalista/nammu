@@ -30,6 +30,7 @@
     $visitorsDaily = $analytics['visitors']['daily'] ?? [];
     $postsStats = $analytics['content']['posts'] ?? [];
     $pagesStats = $analytics['content']['pages'] ?? [];
+    $platformDaily = $analytics['platform']['daily'] ?? [];
 
     $today = new DateTimeImmutable('today');
     $last30Start = $today->modify('-29 days');
@@ -60,6 +61,143 @@
         }
     }
     $unique30Count = count($unique30);
+
+    $collectPlatformUids = static function (string $category) use ($platformDaily, $startKey): array {
+        $result = [];
+        foreach ($platformDaily as $day => $payload) {
+            if (!is_string($day) || $day < $startKey) {
+                continue;
+            }
+            $bucket = is_array($payload) ? ($payload[$category] ?? []) : [];
+            foreach ($bucket as $label => $data) {
+                $uids = is_array($data) ? ($data['uids'] ?? []) : [];
+                foreach ($uids as $uid => $flag) {
+                    $result[$label][$uid] = true;
+                }
+            }
+        }
+        return $result;
+    };
+
+    $platformDevices = $collectPlatformUids('device');
+    $platformBrowsers = $collectPlatformUids('browser');
+    $platformSystems = $collectPlatformUids('os');
+    $platformLanguages = $collectPlatformUids('language');
+    $desktopUids = $platformDevices['desktop'] ?? [];
+    $desktopCount = count($desktopUids);
+
+    $buildPercentTable = static function (array $map, array $labelMap): array {
+        $counts = [];
+        foreach ($map as $label => $uids) {
+            $count = is_array($uids) ? count($uids) : 0;
+            if ($count > 0) {
+                $counts[$label] = $count;
+            }
+        }
+        $total = array_sum($counts);
+        if ($total <= 0) {
+            return [];
+        }
+        $items = [];
+        foreach ($counts as $label => $count) {
+            $raw = ($count / $total) * 100;
+            $percent = (int) round($raw);
+            if ($percent === 0 && $count > 0) {
+                $percent = 1;
+            }
+            $items[] = [
+                'label' => $label,
+                'count' => $count,
+                'percent' => $percent,
+                'remainder' => $raw - floor($raw),
+            ];
+        }
+        $sum = array_sum(array_column($items, 'percent'));
+        $diff = 100 - $sum;
+        if ($diff !== 0) {
+            usort($items, static function (array $a, array $b): int {
+                return $b['remainder'] <=> $a['remainder'];
+            });
+            if ($diff > 0) {
+                $i = 0;
+                while ($diff > 0) {
+                    $items[$i % count($items)]['percent']++;
+                    $diff--;
+                    $i++;
+                }
+            } else {
+                $diff = abs($diff);
+                $i = 0;
+                while ($diff > 0) {
+                    $index = $i % count($items);
+                    if ($items[$index]['percent'] > 1) {
+                        $items[$index]['percent']--;
+                        $diff--;
+                    }
+                    $i++;
+                }
+            }
+        }
+        $rows = [];
+        foreach ($items as $item) {
+            if ($item['percent'] <= 0) {
+                continue;
+            }
+        $rows[] = [
+            'label' => $labelMap[$item['label']] ?? ucfirst((string) $item['label']),
+            'percent' => $item['percent'],
+            'count' => $item['count'],
+        ];
+        }
+        usort($rows, static function (array $a, array $b): int {
+            return $b['percent'] <=> $a['percent'];
+        });
+        return $rows;
+    };
+
+    $languageLabel = static function (string $code): string {
+        $map = [
+            'es' => 'Espanol',
+            'en' => 'Ingles',
+            'fr' => 'Frances',
+            'de' => 'Aleman',
+            'it' => 'Italiano',
+            'pt' => 'Portugues',
+            'ca' => 'Catalan',
+            'eu' => 'Euskera',
+            'gl' => 'Gallego',
+        ];
+        if (isset($map[$code])) {
+            return $map[$code];
+        }
+        return strtoupper($code);
+    };
+
+    $deviceList = $buildPercentTable($platformDevices, [
+        'desktop' => 'Escritorio',
+        'mobile' => 'Movil',
+        'tablet' => 'Tablet',
+    ]);
+    $browserList = $buildPercentTable($platformBrowsers, [
+        'chrome' => 'Chrome',
+        'firefox' => 'Firefox',
+        'edge' => 'Edge',
+        'safari' => 'Safari',
+        'opera' => 'Opera',
+        'otros' => 'Otros',
+    ]);
+    $systemList = $buildPercentTable($platformSystems, [
+        'windows' => 'Windows',
+        'macos' => 'macOS',
+        'linux' => 'Linux',
+        'chromeos' => 'ChromeOS',
+        'otros' => 'Otros',
+    ]);
+    $languageLabelMap = [];
+    foreach ($platformLanguages as $code => $uids) {
+        $languageLabelMap[$code] = $languageLabel((string) $code);
+    }
+    $languageList = $buildPercentTable($platformLanguages, $languageLabelMap);
 
     $monthlyUids = [];
     foreach ($visitorsDaily as $day => $payload) {
@@ -615,6 +753,76 @@
                         </div>
                     </div>
                 <?php endif; ?>
+
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h4 class="h6 text-uppercase text-muted mb-3">Plataforma (ultimos 30 dias)</h4>
+                        <?php if (empty($deviceList) && empty($browserList) && empty($systemList) && empty($languageList)): ?>
+                            <p class="text-muted mb-0">Sin datos todavia.</p>
+                        <?php else: ?>
+                            <?php if (!empty($deviceList)): ?>
+                                <p class="text-muted mb-2 text-uppercase small">Dispositivo</p>
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <?php foreach ($deviceList as $item): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                    <td class="text-right"><?= (int) $item['percent'] ?>% (<?= (int) $item['count'] ?>)</td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($browserList)): ?>
+                                <p class="text-muted mb-2 text-uppercase small">Navegador</p>
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <?php foreach ($browserList as $item): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                    <td class="text-right"><?= (int) $item['percent'] ?>% (<?= (int) $item['count'] ?>)</td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($systemList)): ?>
+                                <p class="text-muted mb-2 text-uppercase small">Sistema (escritorio)</p>
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <?php foreach ($systemList as $item): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                    <td class="text-right"><?= (int) $item['percent'] ?>% (<?= (int) $item['count'] ?>)</td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($languageList)): ?>
+                                <p class="text-muted mb-2 text-uppercase small">Lengua</p>
+                                <div class="table-responsive">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <?php foreach ($languageList as $item): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                    <td class="text-right"><?= (int) $item['percent'] ?>% (<?= (int) $item['count'] ?>)</td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
 
                 <?php if ($itineraryCount > 0): ?>
                     <div class="card mb-4">

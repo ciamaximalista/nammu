@@ -48,6 +48,7 @@ $floatingSearchAction = $searchBaseNormalized === '' ? '/buscar.php' : $searchBa
 $floatingCategoriesUrl = $searchBaseNormalized === '' ? '/categorias' : $searchBaseNormalized . '/categorias';
 $showFloatingSearch = $searchFloatingEnabled;
 $floatingSubscriptionAction = $searchBaseNormalized === '' ? '/subscribe.php' : $searchBaseNormalized . '/subscribe.php';
+$avisosUrl = $searchBaseNormalized === '' ? '/avisos.php' : $searchBaseNormalized . '/avisos.php';
 $showFloatingSubscription = $subscriptionFloatingEnabled;
 $postalEnabled = $postalEnabled ?? false;
 $postalUrl = $postalUrl ?? '/correos.php';
@@ -590,6 +591,29 @@ if (function_exists('nammu_record_visit')) {
             cursor: pointer;
             flex: 0 0 auto;
         }
+        .floating-avisos-link {
+            width: 26px;
+            height: 26px;
+            border-radius: 9px;
+            background: <?= $colorHighlight ?>;
+            border: 1px solid rgba(0,0,0,0.08);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            transition: background 0.2s ease, border-color 0.2s ease;
+            flex: 0 0 auto;
+            color: <?= $colorAccent ?>;
+        }
+        .floating-avisos-link:hover {
+            background: rgba(0,0,0,0.08);
+            border-color: rgba(0,0,0,0.12);
+        }
+        .floating-avisos-link svg {
+            width: 13px;
+            height: 13px;
+            display: block;
+        }
         .floating-search-form button svg {
             display: block;
         }
@@ -1067,8 +1091,7 @@ if (!empty($baseUrl)) {
         <div class="floating-stack">
             <?php if ($showFloatingSubscription): ?>
                 <div class="floating-search floating-subscription" data-floating-subscription>
-                    <form class="floating-search-form subscription-form" method="post" action="<?= htmlspecialchars($floatingSubscriptionAction, ENT_QUOTES, 'UTF-8') ?>">
-                        <input type="hidden" name="back" value="<?= htmlspecialchars($currentUrl, ENT_QUOTES, 'UTF-8') ?>">
+                    <form class="floating-search-form subscription-form" method="get" action="<?= htmlspecialchars($avisosUrl, ENT_QUOTES, 'UTF-8') ?>">
                         <span class="floating-search-icon" aria-hidden="true">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <rect x="3" y="5" width="18" height="14" rx="2" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
@@ -1076,12 +1099,12 @@ if (!empty($baseUrl)) {
                             </svg>
                         </span>
                 <input type="email" name="subscriber_email" placeholder="Pon tu email para suscribirte" required>
-                        <button type="submit" aria-label="Suscribirme">
+                        <a class="floating-avisos-link" href="<?= htmlspecialchars($avisosUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Avisos por email">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
-                                <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="white" stroke-width="2"/>
-                                <polyline points="4,8 12,14 20,8" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                                <polyline points="4,8 12,14 20,8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
-                        </button>
+                        </a>
                         <?php if ($postalEnabled && $postalLogoSvg !== ''): ?>
                             <a class="floating-postal-link" href="<?= htmlspecialchars($postalUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Suscripción postal">
                                 <?= $postalLogoSvg ?>

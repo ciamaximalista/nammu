@@ -160,10 +160,10 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $accent
     return (string) ob_get_clean();
 };
 $renderSubscriptionBox = static function (string $variant) use ($subscriptionAction, $accentColor, $highlight, $textColor, $subscriptionMessage, $currentUrl, $postalEnabled, $postalUrl, $postalLogoSvg): string {
+    $avisosUrl = $subscriptionAction !== '' ? str_replace('/subscribe.php', '/avisos.php', $subscriptionAction) : '/avisos.php';
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?> site-subscription-box">
-        <form class="site-search-form subscription-form" method="post" action="<?= htmlspecialchars($subscriptionAction, ENT_QUOTES, 'UTF-8') ?>">
-            <input type="hidden" name="back" value="<?= htmlspecialchars($currentUrl, ENT_QUOTES, 'UTF-8') ?>">
+        <form class="site-search-form subscription-form" method="get" action="<?= htmlspecialchars($avisosUrl, ENT_QUOTES, 'UTF-8') ?>">
             <span class="search-icon subscription-icon" aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect x="3" y="5" width="18" height="14" rx="2" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
@@ -171,12 +171,12 @@ $renderSubscriptionBox = static function (string $variant) use ($subscriptionAct
                 </svg>
             </span>
             <input type="email" name="subscriber_email" placeholder="Pon tu email para suscribirte" required>
-            <button type="submit" aria-label="Suscribirme" title="Suscribirme" style="background: <?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>; color:#fff;">
+            <a class="subscription-avisos-link" href="<?= htmlspecialchars($avisosUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Avisos por email">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="white" stroke-width="2"/>
-                    <polyline points="4,8 12,14 20,8" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <polyline points="4,8 12,14 20,8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-            </button>
+            </a>
             <?php if ($postalEnabled && $postalLogoSvg !== ''): ?>
                 <a class="subscription-postal-link" href="<?= htmlspecialchars($postalUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Suscripción postal">
                     <?= $postalLogoSvg ?>
@@ -645,12 +645,14 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         border: 1px solid rgba(0,0,0,0.1);
         font-size: 1rem;
     }
-    .site-subscription-box .site-search-form button {
+    .site-subscription-box .site-search-form button,
+    .site-subscription-box .subscription-avisos-link {
         padding: 0;
         height: 44px;
         width: 44px;
     }
-    .site-subscription-box .subscription-postal-link {
+    .site-subscription-box .subscription-postal-link,
+    .site-subscription-box .subscription-avisos-link {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -664,10 +666,12 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         transition: background 0.2s ease;
         color: <?= $accentColor ?>;
     }
-    .site-subscription-box .subscription-postal-link:hover {
+    .site-subscription-box .subscription-postal-link:hover,
+    .site-subscription-box .subscription-avisos-link:hover {
         background: rgba(0,0,0,0.12);
     }
-    .site-subscription-box .subscription-postal-link svg {
+    .site-subscription-box .subscription-postal-link svg,
+    .site-subscription-box .subscription-avisos-link svg {
         width: 20px;
         height: 20px;
         display: block;
@@ -1151,10 +1155,12 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         .site-search-form button,
         .search-categories-link,
         .search-letters-link,
-        .subscription-postal-link {
+        .subscription-postal-link,
+        .subscription-avisos-link {
             width: 100%;
         }
-        .site-subscription-box .subscription-postal-link {
+        .site-subscription-box .subscription-postal-link,
+        .site-subscription-box .subscription-avisos-link {
             margin-left: 0;
         }
     }

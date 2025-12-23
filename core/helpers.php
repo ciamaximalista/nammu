@@ -158,12 +158,14 @@ function nammu_load_analytics(): array
             'visitors' => ['daily' => []],
             'content' => ['posts' => [], 'pages' => []],
             'itineraries' => ['items' => []],
+            'platform' => ['daily' => []],
             'updated_at' => 0,
         ];
     }
     $decoded['visitors'] = $decoded['visitors'] ?? ['daily' => []];
     $decoded['content'] = $decoded['content'] ?? ['posts' => [], 'pages' => []];
     $decoded['itineraries'] = $decoded['itineraries'] ?? ['items' => []];
+    $decoded['platform'] = $decoded['platform'] ?? ['daily' => []];
     $decoded['updated_at'] = (int) ($decoded['updated_at'] ?? 0);
     return $decoded;
 }
@@ -195,6 +197,139 @@ function nammu_analytics_touch_visit(array &$data, string $uid, string $date): b
     return true;
 }
 
+function nammu_detect_device_type(string $userAgent): string
+{
+    $ua = strtolower($userAgent);
+    if ($ua === '') {
+        return 'desktop';
+    }
+    if (preg_match('/tablet|ipad|playbook|silk|android(?!.*mobile)/i', $ua)) {
+        return 'tablet';
+    }
+    if (preg_match('/mobi|iphone|ipod|android|blackberry|phone|iemobile|opera mini|mobile/i', $ua)) {
+        return 'mobile';
+    }
+    return 'desktop';
+}
+
+function nammu_detect_browser(string $userAgent): string
+{
+    $ua = strtolower($userAgent);
+    if ($ua === '') {
+        return 'otros';
+    }
+    if (preg_match('/edg\//', $ua)) {
+        return 'edge';
+    }
+    if (preg_match('/opr\/|opera/', $ua)) {
+        return 'opera';
+    }
+    if (preg_match('/firefox\/|fxios/', $ua)) {
+        return 'firefox';
+    }
+    if (preg_match('/chrome\/|crios|chromium/', $ua) && !preg_match('/edg\//', $ua) && !preg_match('/opr\//', $ua)) {
+        return 'chrome';
+    }
+    if (preg_match('/safari/', $ua) && !preg_match('/chrome|crios|chromium|edg\//', $ua)) {
+        return 'safari';
+    }
+    return 'otros';
+}
+
+function nammu_detect_os(string $userAgent): string
+{
+    $ua = strtolower($userAgent);
+    if ($ua === '') {
+        return 'otros';
+    }
+    if (preg_match('/windows nt/', $ua)) {
+        return 'windows';
+    }
+    if (preg_match('/cros/', $ua)) {
+        return 'chromeos';
+    }
+    if (preg_match('/mac os x/', $ua)) {
+        return 'macos';
+    }
+    if (preg_match('/linux/', $ua)) {
+        return 'linux';
+    }
+    return 'otros';
+}
+
+function nammu_detect_language(string $acceptLanguage): string
+{
+    $raw = trim($acceptLanguage);
+    if ($raw === '') {
+        return '';
+    }
+    $first = explode(',', $raw)[0] ?? '';
+    $first = trim(explode(';', $first)[0] ?? '');
+    $first = strtolower($first);
+    if ($first === '') {
+        return '';
+    }
+    $parts = explode('-', $first);
+    return $parts[0] ?? $first;
+}
+
+function nammu_record_platform_visit(array &$data, string $uid, string $date): bool
+{
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    $device = nammu_detect_device_type($ua);
+    $browser = nammu_detect_browser($ua);
+    $language = nammu_detect_language($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '');
+    $changed = false;
+
+    if (!isset($data['platform']['daily'][$date])) {
+        $data['platform']['daily'][$date] = [];
+    }
+    $bucket = &$data['platform']['daily'][$date];
+
+    $setUid = static function (array &$target, string $value, string $uid) use (&$changed): void {
+        if ($value === '') {
+            return;
+        }
+        if (!isset($target[$value])) {
+            $target[$value] = ['uids' => []];
+        }
+        if (!isset($target[$value]['uids'])) {
+            $target[$value]['uids'] = [];
+        }
+        if (!isset($target[$value]['uids'][$uid])) {
+            $target[$value]['uids'][$uid] = 1;
+            $changed = true;
+        }
+    };
+
+    if (!isset($bucket['device'])) {
+        $bucket['device'] = [];
+    }
+    $setUid($bucket['device'], $device, $uid);
+
+    if (!isset($bucket['browser'])) {
+        $bucket['browser'] = [];
+    }
+    $setUid($bucket['browser'], $browser, $uid);
+
+    if ($language !== '') {
+        if (!isset($bucket['language'])) {
+            $bucket['language'] = [];
+        }
+        $setUid($bucket['language'], $language, $uid);
+    }
+
+    if ($device === 'desktop') {
+        $os = nammu_detect_os($ua);
+        if (!isset($bucket['os'])) {
+            $bucket['os'] = [];
+        }
+        $setUid($bucket['os'], $os, $uid);
+    }
+
+    return $changed;
+}
+
 function nammu_record_visit(): void
 {
     if (!nammu_has_stats_consent()) {
@@ -210,6 +345,9 @@ function nammu_record_visit(): void
     $data = nammu_load_analytics();
     $date = date('Y-m-d');
     $changed = nammu_analytics_touch_visit($data, $uid, $date);
+    if (nammu_record_platform_visit($data, $uid, $date)) {
+        $changed = true;
+    }
     if ($changed) {
         $data['updated_at'] = time();
         nammu_save_analytics($data);

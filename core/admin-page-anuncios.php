@@ -33,7 +33,7 @@
     <div class="tab-pane active">
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
             <div>
-                <h2 class="mb-1">Anuncios</h2>
+                <h2 class="mb-1">Difusión</h2>
                 <p class="text-muted mb-0">Crea anuncios flotantes, envía notificaciones push directamente a tus lectores e integra las actualizaciones de blog con tus redes sociales.</p>
             </div>
         </div>

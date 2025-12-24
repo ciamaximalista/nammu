@@ -6414,7 +6414,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                 </li>
 
                                 <li class="nav-item <?= $page === 'anuncios' ? 'active' : '' ?>">
-                                    <a class="nav-link" href="?page=anuncios" title="Anuncios" aria-label="Anuncios">
+                                    <a class="nav-link" href="?page=anuncios" title="Difusión" aria-label="Difusión">
                                         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
                                             <path d="M4 10v4l8 2V6l-8 2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
                                             <path d="M12 6l8-2v16l-8-2" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>

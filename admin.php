@@ -1539,6 +1539,33 @@ function admin_maybe_auto_post_to_social_networks(string $filename, string $titl
     }
 }
 
+function admin_maybe_enqueue_push_notification(string $type, string $title, string $description, string $url, string $image = ''): void {
+    if (!function_exists('nammu_enqueue_push_notification')) {
+        return;
+    }
+    $settings = get_settings();
+    $push = $settings['ads'] ?? [];
+    if (($push['push_enabled'] ?? 'off') !== 'on') {
+        return;
+    }
+    if ($type === 'post' && ($push['push_posts'] ?? 'off') !== 'on') {
+        return;
+    }
+    if ($type === 'itinerary' && ($push['push_itineraries'] ?? 'off') !== 'on') {
+        return;
+    }
+    $payload = [
+        'title' => $title,
+        'body' => $description,
+        'url' => $url,
+        'icon' => $image,
+    ];
+    $result = function_exists('nammu_send_push_notification') ? nammu_send_push_notification($payload) : ['skipped' => true];
+    if (!empty($result['skipped'])) {
+        nammu_enqueue_push_notification($payload);
+    }
+}
+
 function get_default_template_settings(): array {
     return [
         'fonts' => [
@@ -2725,11 +2752,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description);
                         $settings = get_settings();
                         $mailing = $settings['mailing'] ?? [];
+                        $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
+                        $link = admin_public_post_url($slug);
                         if (($mailing['auto_posts'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
                             $subscribers = admin_load_mailing_subscribers();
                             if (!empty($subscribers)) {
-                                $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
-                                $link = admin_public_post_url($slug);
                                 $payload = admin_prepare_mailing_payload('single', $settings, $title, $description, $link, $image);
                                 try {
                                     admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
@@ -2738,6 +2765,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 }
                             }
                         }
+                        admin_maybe_enqueue_push_notification('post', $title, $description, $link, $image);
                     }
                     $redirectTemplate = $isDraft ? 'draft' : ($type === 'Página' ? 'page' : 'single');
                     header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&created=' . urlencode($targetFilename));
@@ -2892,11 +2920,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($shouldAutoShare) {
                         $settings = get_settings();
                         $mailing = $settings['mailing'] ?? [];
+                        $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
+                        $link = admin_public_post_url($slug);
                         if (($mailing['auto_posts'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
                             $subscribers = admin_load_mailing_subscribers();
                             if (!empty($subscribers)) {
-                                $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
-                                $link = admin_public_post_url($slug);
                                 $payload = admin_prepare_mailing_payload('single', $settings, $title, $description, $link, $image);
                                 try {
                                     admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
@@ -2905,6 +2933,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 }
                             }
                         }
+                        admin_maybe_enqueue_push_notification('post', $title, $description, $link, $image);
                     }
                     if ($renameRequested && $normalizedFilename !== '' && $normalizedFilename !== $targetFilename) {
                         $previousPath = CONTENT_DIR . '/' . $normalizedFilename;
@@ -3107,6 +3136,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                 }
+                $link = admin_public_itinerary_url($saved->getSlug());
+                admin_maybe_enqueue_push_notification('itinerary', $title, $description, $link, $image);
             }
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario guardado correctamente.'];
             header('Location: admin.php?page=itinerario&itinerary=' . urlencode($saved->getSlug()));

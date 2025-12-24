@@ -667,9 +667,15 @@
             $postalSubscriberCount = 0;
         }
     }
+    $pushSubscriberCount = 0;
+    $pushEnabled = false;
     $socialCounts = [];
     if (function_exists('get_settings')) {
         $settings = get_settings();
+        $pushEnabled = (($settings['ads']['push_enabled'] ?? 'off') === 'on');
+        if ($pushEnabled && function_exists('nammu_push_subscriber_count')) {
+            $pushSubscriberCount = nammu_push_subscriber_count();
+        }
         $telegramCount = admin_get_telegram_follower_count($settings['telegram'] ?? []);
         if ($telegramCount !== null) {
             $socialCounts['Telegram'] = $telegramCount;
@@ -822,6 +828,9 @@
                         <p class="mb-2"><strong>Lista de correo:</strong> <?= (int) $subscriberCount ?></p>
                         <?php if ($postalSubscriberCount > 0): ?>
                             <p class="mb-2"><strong>Correo postal:</strong> <?= (int) $postalSubscriberCount ?></p>
+                        <?php endif; ?>
+                        <?php if ($pushEnabled && $pushSubscriberCount > 0): ?>
+                            <p class="mb-2"><strong>Notificaciones Push:</strong> <?= (int) $pushSubscriberCount ?></p>
                         <?php endif; ?>
                         <?php if (!empty($socialCounts)): ?>
                             <?php foreach ($socialCounts as $label => $count): ?>

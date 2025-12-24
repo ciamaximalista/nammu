@@ -96,6 +96,11 @@ $showAdsBanner = $adsEnabled && $adsHtml !== '' && !$adsClosedToday && !$isCrawl
 if ($adsScope === 'home' && !$isHome) {
     $showAdsBanner = false;
 }
+$pushEnabled = ($adsSettings['push_enabled'] ?? 'off') === 'on';
+$pushPublicKey = function_exists('nammu_push_public_key') ? nammu_push_public_key() : '';
+$pushSubscribeUrl = $searchBaseNormalized === '' ? '/push-subscribe.php' : $searchBaseNormalized . '/push-subscribe.php';
+$pushUnsubscribeUrl = $searchBaseNormalized === '' ? '/push-unsubscribe.php' : $searchBaseNormalized . '/push-unsubscribe.php';
+$showPushPrompt = $pushEnabled && $pushPublicKey !== '' && !$isCrawler;
 $serverDay = date('Y-m-d');
 $serverDayExpires = date(DATE_RFC2822, strtotime('today 23:59:59'));
 $serverConsentDate = date('Y-m-d');
@@ -781,6 +786,56 @@ if (function_exists('nammu_record_visit')) {
             width: 14px;
             height: 14px;
         }
+        .nammu-push-banner {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 1.5rem;
+            width: min(560px, calc(100% - 32px));
+            background: #ffffff;
+            border-radius: 18px;
+            padding: 16px 20px;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+            display: none;
+            align-items: center;
+            gap: 16px;
+            z-index: 3000;
+        }
+        .nammu-push-banner.is-visible {
+            display: flex;
+        }
+        .nammu-push-banner.has-ad {
+            bottom: 7.2rem;
+        }
+        .nammu-push-banner h3 {
+            font-size: 1rem;
+            margin: 0 0 6px;
+            color: #1b1b1b;
+        }
+        .nammu-push-banner p {
+            margin: 0;
+            color: #5a6470;
+            font-size: 0.9rem;
+        }
+        .nammu-push-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-left: auto;
+        }
+        .nammu-push-actions button {
+            border-radius: 999px;
+            padding: 6px 16px;
+            border: 1px solid #1b8eed;
+            background: #1b8eed;
+            color: #ffffff;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .nammu-push-actions button.secondary {
+            background: transparent;
+            color: #1b8eed;
+        }
         @media (max-width: 720px) {
             .nammu-ad-banner {
                 left: 0.9rem;
@@ -791,6 +846,19 @@ if (function_exists('nammu_record_visit')) {
             .nammu-ad-image {
                 width: 100%;
                 min-height: 140px;
+            }
+            .nammu-push-banner {
+                bottom: 5.4rem;
+                border-radius: 16px;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .nammu-push-banner.has-ad {
+                bottom: 10.2rem;
+            }
+            .nammu-push-actions {
+                margin-left: 0;
+                width: 100%;
             }
         }
         .itinerary-single-content .post {
@@ -1154,6 +1222,18 @@ if (!empty($baseUrl)) {
             <?php endif; ?>
         </div>
     <?php endif; ?>
+    <?php if ($showPushPrompt): ?>
+        <div class="nammu-push-banner" data-push-banner data-push-public-key="<?= htmlspecialchars($pushPublicKey, ENT_QUOTES, 'UTF-8') ?>" data-push-subscribe="<?= htmlspecialchars($pushSubscribeUrl, ENT_QUOTES, 'UTF-8') ?>" data-push-unsubscribe="<?= htmlspecialchars($pushUnsubscribeUrl, ENT_QUOTES, 'UTF-8') ?>">
+            <div>
+                <h3>Recibe avisos del blog</h3>
+                <p>Activa las notificaciones push para conocer nuevas entradas o itinerarios.</p>
+            </div>
+            <div class="nammu-push-actions">
+                <button type="button" data-push-accept>Activar avisos</button>
+                <button type="button" class="secondary" data-push-decline>Ahora no</button>
+            </div>
+        </div>
+    <?php endif; ?>
     <?php if ($showAdsBanner && !$isCrawler): ?>
         <div class="nammu-ad-banner" data-ad-banner data-server-date="<?= htmlspecialchars($serverDay, ENT_QUOTES, 'UTF-8') ?>" data-server-expires="<?= htmlspecialchars($serverDayExpires, ENT_QUOTES, 'UTF-8') ?>">
             <button class="nammu-ad-close" type="button" aria-label="Cerrar anuncio" data-ad-close>
@@ -1255,6 +1335,203 @@ if (!empty($baseUrl)) {
                 expiry = localExpiry.toUTCString();
             }
             document.cookie = 'nammu_ad_closed=' + value + ';path=/;expires=' + expiry + ';samesite=lax';
+        });
+    })();
+    </script>
+    <script>
+    (function() {
+        var banner = document.querySelector('[data-push-banner]');
+        if (!banner) {
+            return;
+        }
+        if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+            return;
+        }
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+            return;
+        }
+        var publicKey = banner.getAttribute('data-push-public-key') || '';
+        var subscribeUrl = banner.getAttribute('data-push-subscribe') || '';
+        var unsubscribeUrl = banner.getAttribute('data-push-unsubscribe') || '';
+        if (!publicKey || !subscribeUrl) {
+            return;
+        }
+        var acceptBtn = banner.querySelector('[data-push-accept]');
+        var declineBtn = banner.querySelector('[data-push-decline]');
+        var snoozeKey = 'nammu_push_snooze';
+        var snoozeDays = 7;
+
+        function hasConsent() {
+            return document.cookie.split(';').some(function(part) {
+                return part.trim().indexOf('nammu_stats_consent=1') === 0;
+            });
+        }
+
+        function hasSnooze() {
+            var value = '';
+            try {
+                value = localStorage.getItem(snoozeKey);
+            } catch (e) {
+                value = '';
+            }
+            if (!value) {
+                return false;
+            }
+            var until = new Date(value);
+            return until > new Date();
+        }
+
+        function setSnooze() {
+            var until = new Date();
+            until.setDate(until.getDate() + snoozeDays);
+            try {
+                localStorage.setItem(snoozeKey, until.toISOString());
+            } catch (e) {
+                return;
+            }
+        }
+
+        function urlBase64ToUint8Array(base64String) {
+            var padding = '='.repeat((4 - base64String.length % 4) % 4);
+            var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            var rawData = window.atob(base64);
+            var outputArray = new Uint8Array(rawData.length);
+            for (var i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        function syncSubscription(subscription) {
+            var payload = subscription;
+            if (subscription && typeof subscription.toJSON === 'function') {
+                payload = subscription.toJSON();
+            }
+            return fetch(subscribeUrl, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                credentials: 'same-origin',
+                body: JSON.stringify(payload)
+            });
+        }
+
+        function ensureSubscribed() {
+            return navigator.serviceWorker.register('<?= htmlspecialchars($searchBaseNormalized === '' ? '/push-sw.js' : $searchBaseNormalized . '/push-sw.js', ENT_QUOTES, 'UTF-8') ?>')
+                .then(function(registration) {
+                    return registration.pushManager.getSubscription().then(function(subscription) {
+                        if (subscription) {
+                            return syncSubscription(subscription).then(function(response) {
+                                if (!response || !response.ok) {
+                                    return null;
+                                }
+                                return subscription;
+                            });
+                        }
+                        return registration.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: urlBase64ToUint8Array(publicKey)
+                        }).then(function(newSub) {
+                            return syncSubscription(newSub).then(function(response) {
+                                if (!response || !response.ok) {
+                                    return null;
+                                }
+                                return newSub;
+                            });
+                        });
+                    });
+                });
+        }
+
+        function refreshAfterSuccess() {
+            if (banner.classList.contains('is-visible')) {
+                setTimeout(function() {
+                    window.location.reload();
+                }, 300);
+            }
+        }
+
+        function adjustPosition() {
+            var adBanner = document.querySelector('[data-ad-banner]');
+            if (adBanner && adBanner.offsetParent !== null) {
+                var height = adBanner.getBoundingClientRect().height || 0;
+                var gap = window.matchMedia('(max-width: 720px)').matches ? 18 : 24;
+                banner.style.bottom = (height + gap) + 'px';
+                return;
+            }
+            banner.style.bottom = '';
+        }
+
+        function maybeShow() {
+            if (!hasConsent()) {
+                return;
+            }
+            if (Notification.permission === 'granted' || Notification.permission === 'denied') {
+                return;
+            }
+            if (hasSnooze()) {
+                return;
+            }
+            banner.classList.add('is-visible');
+            banner.classList.remove('has-ad');
+            adjustPosition();
+        }
+
+        function showBanner() {
+            if (!hasConsent() || hasSnooze()) {
+                return;
+            }
+            banner.classList.add('is-visible');
+            banner.classList.remove('has-ad');
+            adjustPosition();
+        }
+
+        if (acceptBtn) {
+            acceptBtn.addEventListener('click', function() {
+                Notification.requestPermission().then(function(permission) {
+                    if (permission !== 'granted') {
+                        setSnooze();
+                        banner.classList.remove('is-visible');
+                        return;
+                    }
+                    ensureSubscribed().then(function(subscription) {
+                        if (subscription) {
+                            refreshAfterSuccess();
+                        }
+                    }).finally(function() {
+                        banner.classList.remove('is-visible');
+                    });
+                });
+            });
+        }
+
+        if (declineBtn) {
+            declineBtn.addEventListener('click', function() {
+                setSnooze();
+                banner.classList.remove('is-visible');
+            });
+        }
+
+        if (Notification.permission === 'granted') {
+            if (!hasConsent()) {
+                return;
+            }
+            ensureSubscribed().then(function(subscription) {
+                if (!subscription) {
+                    showBanner();
+                    return;
+                }
+                refreshAfterSuccess();
+            }).catch(function() {
+                showBanner();
+            });
+        } else {
+            maybeShow();
+        }
+
+        window.addEventListener('resize', function() {
+            if (banner.classList.contains('is-visible')) {
+                adjustPosition();
+            }
         });
     })();
     </script>

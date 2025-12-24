@@ -47,6 +47,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 - Escritorio Nammu con estadísticas del sitio: resumen de publicaciones, usuarios únicos, top de entradas/páginas, itinerarios iniciados/completados y suscriptores.
 - Aviso de cookies RGPD con consentimiento obligatorio para continuar, uso exclusivo de estadísticas y sin compartir datos con terceros.
 - Anuncios flotantes configurables desde el admin: activación, alcance (portada o todo el sitio), texto/HTML e imagen para campañas puntuales.
+- Notificaciones push opcionales para avisar de nuevas entradas o itinerarios, con control desde la pestaña **Difusión**.
 
 ### Automatización, lista de correo y redes sociales
 
@@ -65,6 +66,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 ## Requisitos mínimos
 
 - PHP 8.0 o superior con extensiones estándar (`json`, `mbstring`, `iconv`, `curl` recomendado).
+- Para notificaciones push: extensión `openssl` habilitada.
 - Servidor web capaz de ejecutar PHP y escribir en `content/`, `assets/` e `itinerarios/`.
 - Composer opcional para aprovechar Symfony Yaml (el núcleo funciona sin él).
 
@@ -88,6 +90,16 @@ sudo find /var/www/html/<carpeta-publica> -type f -exec chmod 664 {} \;
 
 Sustituye `<tu-usuario>` y `<carpeta-publica>` según tu entorno. Usa el grupo del proceso web (www-data, apache, nginx…).
 
+### Notificaciones push (opcional)
+
+Para activar las notificaciones push necesitas instalar la librería Web Push y servir el sitio por HTTPS:
+
+```bash
+cd /var/www/html/<carpeta-publica>
+composer require minishlink/web-push
+```
+
+Después activa **Notificaciones Push** en la pestaña **Difusión**. El sistema generará las claves VAPID y mostrará el prompt al lector cuando haya aceptado cookies.
 
 ## Actualización
 

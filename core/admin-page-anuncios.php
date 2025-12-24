@@ -9,6 +9,11 @@
     $pushEnabled = ($ads['push_enabled'] ?? 'off') === 'on';
     $pushPosts = ($ads['push_posts'] ?? 'off') === 'on';
     $pushItineraries = ($ads['push_itineraries'] ?? 'off') === 'on';
+    $pushStatus = function_exists('nammu_push_dependencies_status') ? nammu_push_dependencies_status() : ['ok' => false, 'message' => 'Sistema no disponible.'];
+    $pushAvailable = (bool) ($pushStatus['ok'] ?? false);
+    $pushPublicKey = $pushAvailable && function_exists('nammu_push_public_key') ? nammu_push_public_key() : '';
+    $pushSubscriberCount = $pushAvailable && function_exists('nammu_push_subscriber_count') ? nammu_push_subscriber_count() : 0;
+    $pushQueueCount = $pushAvailable && function_exists('nammu_push_queue_count') ? nammu_push_queue_count() : 0;
     $telegramSettings = $settings['telegram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
     $telegramAutoEnabled = ($telegramSettings['auto_post'] ?? 'off') === 'on';
     $whatsappSettings = $settings['whatsapp'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off', 'recipient' => ''];
@@ -41,6 +46,15 @@
         <?php if ($adsFeedback): ?>
             <div class="alert alert-<?= htmlspecialchars($adsFeedback['type'], ENT_QUOTES, 'UTF-8') ?>">
                 <?= htmlspecialchars($adsFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
+        <?php if (!$pushAvailable): ?>
+            <div class="alert alert-warning">
+                <strong>Notificaciones push no disponibles.</strong>
+                <?= htmlspecialchars($pushStatus['message'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+                Para activarlas instala las dependencias con Composer:
+                <code>composer require minishlink/web-push</code>
+                y asegúrate de tener habilitada la extensión OpenSSL en PHP.
             </div>
         <?php endif; ?>
 
@@ -101,7 +115,7 @@
                     </div>
 
                     <div class="border rounded p-3 bg-light" id="push_preferences" <?= $pushEnabled ? '' : 'style="display:none;"' ?>>
-                        <p class="text-muted text-uppercase small mb-2">Preferencias de envio</p>
+                        <p class="text-muted text-uppercase small mb-2">Preferencias de envío</p>
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="checkbox" name="push_posts" id="push_posts" value="1" <?= $pushPosts ? 'checked' : '' ?>>
                             <label class="form-check-label" for="push_posts">Enviar aviso de cada nueva entrada publicada</label>
@@ -110,6 +124,13 @@
                             <input class="form-check-input" type="checkbox" name="push_itineraries" id="push_itineraries" value="1" <?= $pushItineraries ? 'checked' : '' ?>>
                             <label class="form-check-label" for="push_itineraries">Enviar aviso de cada nuevo itinerario publicado</label>
                         </div>
+                    </div>
+                    <div class="border rounded p-3 mt-3">
+                        <p class="text-muted text-uppercase small mb-2">Estado del sistema</p>
+                        <p class="mb-1"><strong>Dependencias:</strong> <?= $pushAvailable ? 'Disponibles' : 'No disponibles' ?></p>
+                        <p class="mb-1"><strong>Clave VAPID:</strong> <?= $pushPublicKey !== '' ? 'Generada' : 'Pendiente' ?></p>
+                        <p class="mb-1"><strong>Suscriptores:</strong> <?= (int) $pushSubscriberCount ?></p>
+                        <p class="mb-0"><strong>Cola pendiente:</strong> <?= (int) $pushQueueCount ?></p>
                     </div>
 
                     <button type="submit" name="save_push_settings" class="btn btn-outline-primary mt-3">Guardar notificaciones push</button>

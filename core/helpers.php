@@ -823,6 +823,340 @@ function nammu_postal_icon_svg(): string
     return '<svg width="24" height="24" viewBox="0 0 297 297" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M149.999,162.915v120.952c0,7.253,5.74,13.133,12.993,13.133c7.253,0,12.993-5.88,12.993-13.133V162.915h100.813c7.253,0,13.128-6.401,13.128-13.654V74.254c0-19.599-7.78-38.348-21.912-52.364C253.934,7.926,235.386,0,215.783,0H80.675C40.091,0,7.074,33.626,7.074,74.026v75.236c0,7.253,5.88,13.654,13.133,13.654H149.999z M33.06,135.929V74.026c0-25.918,21.376-47.003,47.476-47.003c26.1,0,47.474,21.188,47.474,47.231v61.675H33.06z M263.94,135.929H154.997V74.254c0-18.05-7.285-35.274-18.135-48.267h78.922c25.955,0,48.156,22.51,48.156,48.267V135.929z"/><path fill="currentColor" d="M80.036,58.311c-7.253,0-12.993,5.88-12.993,13.133v1.052c0,7.253,5.74,13.133,12.993,13.133c7.253,0,12.993-5.88,12.993-13.133v-1.052C93.029,64.19,87.289,58.311,80.036,58.311z"/></svg>';
 }
 
+function nammu_push_vapid_file(): string
+{
+    return dirname(__DIR__) . '/config/push-vapid.json';
+}
+
+function nammu_push_subscriptions_file(): string
+{
+    return dirname(__DIR__) . '/config/push-subscriptions.json';
+}
+
+function nammu_push_queue_file(): string
+{
+    return dirname(__DIR__) . '/config/push-queue.json';
+}
+
+function nammu_base64url_encode(string $data): string
+{
+    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+}
+
+function nammu_base64url_decode(string $data): string
+{
+    $padded = strtr($data, '-_', '+/');
+    $padding = strlen($padded) % 4;
+    if ($padding > 0) {
+        $padded .= str_repeat('=', 4 - $padding);
+    }
+    $decoded = base64_decode($padded, true);
+    return $decoded === false ? '' : $decoded;
+}
+
+function nammu_ensure_push_vapid_keys(): array
+{
+    $file = nammu_push_vapid_file();
+    if (is_file($file)) {
+        $decoded = json_decode((string) file_get_contents($file), true);
+        if (is_array($decoded) && !empty($decoded['public_key'])) {
+            return $decoded;
+        }
+    }
+
+    if (!function_exists('openssl_pkey_new')) {
+        return [];
+    }
+
+    $resource = openssl_pkey_new([
+        'private_key_type' => OPENSSL_KEYTYPE_EC,
+        'curve_name' => 'prime256v1',
+    ]);
+    if ($resource === false) {
+        return [];
+    }
+
+    $privatePem = '';
+    openssl_pkey_export($resource, $privatePem);
+    $details = openssl_pkey_get_details($resource);
+    $ec = $details['ec'] ?? null;
+    if (!is_array($ec) || empty($ec['x']) || empty($ec['y'])) {
+        return [];
+    }
+
+    $publicRaw = "\x04" . $ec['x'] . $ec['y'];
+    $publicKey = nammu_base64url_encode($publicRaw);
+    $privateKey = isset($ec['d']) ? nammu_base64url_encode($ec['d']) : '';
+    $payload = [
+        'public_key' => $publicKey,
+        'private_key' => $privateKey,
+        'private_key_pem' => $privatePem,
+        'created_at' => date('c'),
+    ];
+
+    nammu_ensure_directory(dirname($file));
+    @file_put_contents($file, json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
+    return $payload;
+}
+
+function nammu_push_public_key(): string
+{
+    $keys = nammu_ensure_push_vapid_keys();
+    return is_array($keys) ? (string) ($keys['public_key'] ?? '') : '';
+}
+
+function nammu_load_push_subscriptions(): array
+{
+    $file = nammu_push_subscriptions_file();
+    if (!is_file($file)) {
+        return [];
+    }
+    $decoded = json_decode((string) file_get_contents($file), true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function nammu_load_push_queue(): array
+{
+    $file = nammu_push_queue_file();
+    if (!is_file($file)) {
+        return [];
+    }
+    $decoded = json_decode((string) file_get_contents($file), true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function nammu_push_queue_count(): int
+{
+    return count(nammu_load_push_queue());
+}
+
+function nammu_push_subscriber_count(): int
+{
+    return count(nammu_load_push_subscriptions());
+}
+
+function nammu_push_dependencies_status(): array
+{
+    $hasWebPush = class_exists('\\Minishlink\\WebPush\\WebPush');
+    $hasOpenssl = function_exists('openssl_pkey_new');
+    $ok = $hasWebPush && $hasOpenssl;
+    $message = '';
+    if (!$hasWebPush) {
+        $message = 'Faltan dependencias de Web Push (composer).';
+    } elseif (!$hasOpenssl) {
+        $message = 'Falta la extensión OpenSSL de PHP.';
+    }
+    return [
+        'ok' => $ok,
+        'has_webpush' => $hasWebPush,
+        'has_openssl' => $hasOpenssl,
+        'message' => $message,
+    ];
+}
+
+function nammu_enqueue_push_notification(array $payload): void
+{
+    if (empty($payload['title']) || empty($payload['url'])) {
+        return;
+    }
+    $queue = nammu_load_push_queue();
+    $queue[] = [
+        'title' => (string) $payload['title'],
+        'body' => (string) ($payload['body'] ?? ''),
+        'url' => (string) $payload['url'],
+        'icon' => (string) ($payload['icon'] ?? ''),
+        'badge' => (string) ($payload['badge'] ?? ''),
+        'created_at' => date('c'),
+    ];
+    $file = nammu_push_queue_file();
+    nammu_ensure_directory(dirname($file));
+    file_put_contents($file, json_encode($queue, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+}
+
+function nammu_save_push_subscriptions(array $subscriptions): void
+{
+    $file = nammu_push_subscriptions_file();
+    nammu_ensure_directory(dirname($file));
+    file_put_contents($file, json_encode($subscriptions, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+}
+
+function nammu_store_push_subscription(array $subscription): bool
+{
+    $endpoint = trim((string) ($subscription['endpoint'] ?? ''));
+    $keys = $subscription['keys'] ?? [];
+    if (!is_array($keys)) {
+        $keys = [];
+    }
+    $p256dh = trim((string) ($keys['p256dh'] ?? ($subscription['p256dh'] ?? '')));
+    $auth = trim((string) ($keys['auth'] ?? ($subscription['auth'] ?? '')));
+    if ($endpoint === '' || $p256dh === '' || $auth === '') {
+        return false;
+    }
+    $subscriptions = nammu_load_push_subscriptions();
+    $id = hash('sha256', $endpoint);
+    $subscriptions[$id] = [
+        'endpoint' => $endpoint,
+        'keys' => [
+            'p256dh' => $p256dh,
+            'auth' => $auth,
+        ],
+        'updated_at' => date('c'),
+    ];
+    nammu_save_push_subscriptions($subscriptions);
+    return true;
+}
+
+function nammu_webpush_client(): ?object
+{
+    if (!class_exists('\\Minishlink\\WebPush\\WebPush')) {
+        return null;
+    }
+    $keys = nammu_ensure_push_vapid_keys();
+    $publicKey = trim((string) ($keys['public_key'] ?? ''));
+    $privateKey = trim((string) ($keys['private_key'] ?? ''));
+    if ($privateKey === '' && !empty($keys['private_key_pem'])) {
+        $privateKey = (string) $keys['private_key_pem'];
+    }
+    if ($publicKey === '' || $privateKey === '') {
+        return null;
+    }
+    $config = nammu_load_config();
+    $subject = $config['site_url'] ?? '';
+    if (!is_string($subject) || $subject === '') {
+        $subject = nammu_base_url();
+    }
+    if (!is_string($subject) || $subject === '') {
+        $subject = 'mailto:admin@localhost';
+    }
+    $auth = [
+        'VAPID' => [
+            'subject' => $subject,
+            'publicKey' => $publicKey,
+            'privateKey' => $privateKey,
+        ],
+    ];
+
+    return new \Minishlink\WebPush\WebPush($auth);
+}
+
+function nammu_send_push_notification(array $payload): array
+{
+    $client = nammu_webpush_client();
+    if ($client === null) {
+        return ['sent' => 0, 'failed' => 0, 'skipped' => true];
+    }
+    $subscriptions = nammu_load_push_subscriptions();
+    if (empty($subscriptions)) {
+        return ['sent' => 0, 'failed' => 0, 'skipped' => true];
+    }
+
+    $title = trim((string) ($payload['title'] ?? ''));
+    if ($title === '') {
+        return ['sent' => 0, 'failed' => 0, 'skipped' => true];
+    }
+    $baseUrl = nammu_base_url();
+    $url = (string) ($payload['url'] ?? '');
+    if ($url !== '' && !preg_match('#^https?://#i', $url)) {
+        $url = rtrim($baseUrl, '/') . '/' . ltrim($url, '/');
+    }
+    $icon = (string) ($payload['icon'] ?? '');
+    if ($icon !== '' && !preg_match('#^https?://#i', $icon)) {
+        $icon = rtrim($baseUrl, '/') . '/' . ltrim($icon, '/');
+    }
+    if ($icon === '') {
+        $icon = rtrim($baseUrl, '/') . '/nammu.png';
+    }
+    $body = (string) ($payload['body'] ?? '');
+    $data = [
+        'title' => $title,
+        'body' => $body,
+        'url' => $url !== '' ? $url : ($baseUrl !== '' ? $baseUrl : '/'),
+        'icon' => $icon,
+        'badge' => $icon,
+    ];
+    $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    $sent = 0;
+    $failed = 0;
+    $removed = 0;
+    $toRemove = [];
+
+    foreach ($subscriptions as $id => $subscriptionData) {
+        $endpoint = (string) ($subscriptionData['endpoint'] ?? '');
+        $keys = $subscriptionData['keys'] ?? [];
+        $p256dh = (string) ($keys['p256dh'] ?? '');
+        $auth = (string) ($keys['auth'] ?? '');
+        if ($endpoint === '' || $p256dh === '' || $auth === '') {
+            continue;
+        }
+        $subscription = \Minishlink\WebPush\Subscription::create([
+            'endpoint' => $endpoint,
+            'keys' => [
+                'p256dh' => $p256dh,
+                'auth' => $auth,
+            ],
+        ]);
+        $report = $client->sendOneNotification($subscription, $json);
+        if ($report->isSuccess()) {
+            $sent++;
+            continue;
+        }
+        $failed++;
+        $response = $report->getResponse();
+        $status = $response ? $response->getStatusCode() : 0;
+        if ($status === 404 || $status === 410) {
+            $toRemove[] = $id;
+        }
+    }
+
+    if (!empty($toRemove)) {
+        foreach ($toRemove as $id) {
+            unset($subscriptions[$id]);
+            $removed++;
+        }
+        nammu_save_push_subscriptions($subscriptions);
+    }
+
+    return ['sent' => $sent, 'failed' => $failed, 'removed' => $removed];
+}
+
+function nammu_dispatch_push_queue(): array
+{
+    $queue = nammu_load_push_queue();
+    if (empty($queue)) {
+        return ['sent' => 0, 'failed' => 0, 'skipped' => true];
+    }
+    $summary = ['sent' => 0, 'failed' => 0, 'skipped' => false];
+    foreach ($queue as $payload) {
+        $result = nammu_send_push_notification(is_array($payload) ? $payload : []);
+        $summary['sent'] += (int) ($result['sent'] ?? 0);
+        $summary['failed'] += (int) ($result['failed'] ?? 0);
+        if (!empty($result['skipped'])) {
+            $summary['skipped'] = true;
+        }
+    }
+    if (empty($summary['skipped'])) {
+        $file = nammu_push_queue_file();
+        @file_put_contents($file, json_encode([], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    }
+    return $summary;
+}
+
+function nammu_remove_push_subscription(string $endpoint): void
+{
+    $endpoint = trim($endpoint);
+    if ($endpoint === '') {
+        return;
+    }
+    $subscriptions = nammu_load_push_subscriptions();
+    $id = hash('sha256', $endpoint);
+    if (isset($subscriptions[$id])) {
+        unset($subscriptions[$id]);
+        nammu_save_push_subscriptions($subscriptions);
+    }
+}
+
 function nammu_footer_icon_svgs(): array
 {
     return [

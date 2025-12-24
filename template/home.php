@@ -86,12 +86,14 @@ $subscriptionPositionValue = $subscriptionSettings['position'] ?? 'footer';
 $subscriptionMode = in_array($subscriptionModeValue, ['none', 'home', 'single', 'both'], true) ? $subscriptionModeValue : 'none';
 $subscriptionPositionSetting = in_array($subscriptionPositionValue, ['title', 'footer'], true) ? $subscriptionPositionValue : 'footer';
 $showHomeSubscription = in_array($subscriptionMode, ['home', 'both'], true);
+$subscriptionEnabled = $subscriptionMode !== 'none';
 $homeSubscriptionTop = $showHomeSubscription && $subscriptionPositionSetting === 'title';
 $homeSubscriptionBottom = $showHomeSubscription && $subscriptionPositionSetting === 'footer';
 $searchActionBase = $baseHref ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
 $subscriptionAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/subscribe.php';
 $categoriesIndexUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/categorias';
+$avisosUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php';
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseHref ?? '/') !== '' ? rtrim($baseHref ?? '/', '/') . '/itinerarios' : '/itinerarios');
 $hasItineraries = !empty($hasItineraries);
@@ -114,6 +116,7 @@ if ($subscriptionSuccess) {
 $postalEnabled = $postalEnabled ?? false;
 $postalUrl = $postalUrl ?? '/correos.php';
 $postalLogoSvg = $postalLogoSvg ?? '';
+$hasPaginationLeft = $subscriptionEnabled || ($postalEnabled && $postalLogoSvg !== '');
 $renderSearchBox = static function (string $variant) use ($searchAction, $accentColor, $highlight, $textColor, $searchActionBase, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
@@ -526,6 +529,23 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     $hasNext = !empty($pagination['has_next']) && $currentPage < $totalPages;
     ?>
     <nav class="home-pagination" aria-label="Paginación">
+        <?php if ($hasPaginationLeft): ?>
+            <div class="home-pagination-left">
+                <?php if ($subscriptionEnabled): ?>
+                <a class="page-link page-icon-link" href="<?= htmlspecialchars($avisosUrl, ENT_QUOTES, 'UTF-8') ?>" title="Lista de correo" aria-label="Lista de correo">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="3" y="5" width="18" height="14" rx="2" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                        <polyline points="3,7 12,13 21,7" fill="none" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </a>
+                <?php endif; ?>
+                <?php if ($postalEnabled && $postalLogoSvg !== ''): ?>
+                    <a class="page-link page-icon-link" href="<?= htmlspecialchars($postalUrl, ENT_QUOTES, 'UTF-8') ?>" title="Correo postal" aria-label="Correo postal">
+                        <?= $postalLogoSvg ?>
+                    </a>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
         <div class="home-pagination-links">
             <?php if ($hasPrev): ?>
                 <a class="page-link prev" href="<?= htmlspecialchars($buildPageUrl($currentPage - 1), ENT_QUOTES, 'UTF-8') ?>">&laquo; Anteriores</a>
@@ -1098,6 +1118,12 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         justify-content: center;
         flex: 1 1 auto;
     }
+    .home-pagination-left {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-right: auto;
+    }
     .home-pagination-shortcuts {
         display: inline-flex;
         align-items: center;
@@ -1126,6 +1152,12 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     }
     .home-pagination .page-icon-link {
         padding: 0.45rem 0.55rem;
+    }
+    .home-pagination-left .page-icon-link svg,
+    .home-pagination-shortcuts .page-icon-link svg {
+        width: 18px;
+        height: 18px;
+        display: block;
     }
     .home-pagination .page-status {
         font-weight: 600;

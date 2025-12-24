@@ -1022,13 +1022,19 @@
                 <?php endif; ?>
 
                 <?php if ($itineraryCount > 0): ?>
-                    <div class="card mb-4">
+                    <div class="card mb-4 dashboard-stat-block">
                         <div class="card-body">
-                            <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Itinerarios comenzados (usuarios unicos)</h4>
-                            <?php if (empty($topItineraryStarts)): ?>
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Itinerarios (usuarios unicos)</h4>
+                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="itineraries" data-stat-toggle-type="mode">
+                                    <button type="button" class="btn btn-outline-primary active" data-stat-mode="starts">Comenzaron</button>
+                                    <button type="button" class="btn btn-outline-primary" data-stat-mode="completes">Completaron</button>
+                                </div>
+                            </div>
+                            <?php if (empty($topItineraryStarts) && empty($topItineraryCompletes)): ?>
                                 <p class="text-muted mb-0">Sin datos todavia.</p>
                             <?php else: ?>
-                                <ol class="mb-0 dashboard-links">
+                                <ol class="mb-0 dashboard-links" data-stat-list="itineraries" data-stat-mode="starts">
                                     <?php foreach ($topItineraryStarts as $item): ?>
                                         <li>
                                             <?php $url = admin_public_itinerary_url($item['slug']); ?>
@@ -1039,17 +1045,7 @@
                                         </li>
                                     <?php endforeach; ?>
                                 </ol>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <div class="card mb-4">
-                        <div class="card-body">
-                            <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Itinerarios completados (usuarios unicos)</h4>
-                            <?php if (empty($topItineraryCompletes)): ?>
-                                <p class="text-muted mb-0">Sin datos todavia.</p>
-                            <?php else: ?>
-                                <ol class="mb-0 dashboard-links">
+                                <ol class="mb-0 dashboard-links d-none" data-stat-list="itineraries" data-stat-mode="completes">
                                     <?php foreach ($topItineraryCompletes as $item): ?>
                                         <li>
                                             <?php $url = admin_public_itinerary_url($item['slug']); ?>

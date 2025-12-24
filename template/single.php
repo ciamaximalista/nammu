@@ -509,6 +509,7 @@ if ($isPageTemplate && $formattedDate !== '') {
     .post {
         display: grid;
         gap: 1.5rem;
+        max-width: 100%;
     }
     .post-header {
         display: grid;
@@ -576,6 +577,20 @@ if ($isPageTemplate && $formattedDate !== '') {
         max-width: min(760px, 100%);
         margin: 0 auto 1.5rem;
         color: <?= $colorText ?>;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+    .post-body * {
+        max-width: 100%;
+    }
+    .post-body table {
+        width: 100%;
+        display: block;
+        overflow-x: auto;
+        border-collapse: collapse;
+    }
+    .post-body iframe {
+        max-width: 100%;
     }
     .post-body h1 {
         margin: 2.8rem 0 1.35rem;

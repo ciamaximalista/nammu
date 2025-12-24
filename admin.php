@@ -981,6 +981,9 @@ function get_settings() {
         'scope' => 'home',
         'text' => '',
         'image' => '',
+        'push_enabled' => 'off',
+        'push_posts' => 'off',
+        'push_itineraries' => 'off',
     ];
     $ads = array_merge($adsDefaults, $config['ads'] ?? []);
     if (!in_array($ads['scope'], ['home', 'all'], true)) {
@@ -3780,7 +3783,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        header('Location: admin.php?page=configuracion');
+        header('Location: admin.php?page=anuncios');
         exit;
     } elseif (isset($_POST['save_settings'])) {
         $sort_order = $_POST['sort_order'] ?? 'date';
@@ -3789,6 +3792,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $site_author = trim($_POST['site_author'] ?? '');
         $site_name = trim($_POST['site_name'] ?? '');
         $site_url = trim($_POST['site_url'] ?? '');
+        $social_default_description = trim($_POST['social_default_description'] ?? '');
 
         try {
             $config = load_config_file();
@@ -3817,6 +3821,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $config['site_url'] = $site_url;
             } else {
                 unset($config['site_url']);
+            }
+
+            $social = $config['social'] ?? [];
+            if ($social_default_description !== '') {
+                $social['default_description'] = $social_default_description;
+            } else {
+                unset($social['default_description']);
+            }
+            if (!empty($social)) {
+                $config['social'] = $social;
+            } else {
+                unset($config['social']);
             }
 
             save_config_file($config);
@@ -4049,6 +4065,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['ads_feedback'] = [
                 'type' => 'success',
                 'message' => 'Preferencias de anuncios guardadas.',
+            ];
+        } catch (Throwable $e) {
+            $_SESSION['ads_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudieron guardar las preferencias: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: admin.php?page=anuncios');
+        exit;
+    } elseif (isset($_POST['save_push_settings'])) {
+        $pushEnabled = isset($_POST['push_enabled']) ? 'on' : 'off';
+        $pushPosts = isset($_POST['push_posts']) ? 'on' : 'off';
+        $pushItineraries = isset($_POST['push_itineraries']) ? 'on' : 'off';
+        try {
+            $config = load_config_file();
+            if (!isset($config['ads'])) {
+                $config['ads'] = [];
+            }
+            $config['ads']['push_enabled'] = $pushEnabled;
+            $config['ads']['push_posts'] = $pushPosts;
+            $config['ads']['push_itineraries'] = $pushItineraries;
+            save_config_file($config);
+            $_SESSION['ads_feedback'] = [
+                'type' => 'success',
+                'message' => 'Preferencias de notificaciones push guardadas.',
             ];
         } catch (Throwable $e) {
             $_SESSION['ads_feedback'] = [

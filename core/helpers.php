@@ -807,6 +807,9 @@ function nammu_ads_settings(): array
         'scope' => 'home',
         'text' => '',
         'image' => '',
+        'push_enabled' => 'off',
+        'push_posts' => 'off',
+        'push_itineraries' => 'off',
     ];
     $ads = array_merge($defaults, $config['ads'] ?? []);
     if (!in_array($ads['scope'], ['home', 'all'], true)) {

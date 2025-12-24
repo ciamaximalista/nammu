@@ -477,6 +477,10 @@ function nammu_template_settings(): array
     $colors = array_merge($defaults['colors'], $template['colors'] ?? []);
     $images = array_merge($defaults['images'], $template['images'] ?? []);
     $footer = $template['footer'] ?? ($defaults['footer'] ?? '');
+    $footerNammu = $template['footer_nammu'] ?? ($defaults['footer_nammu'] ?? 'on');
+    if (!in_array($footerNammu, ['on', 'off'], true)) {
+        $footerNammu = $defaults['footer_nammu'] ?? 'on';
+    }
     $footerLogo = $template['footer_logo'] ?? ($defaults['footer_logo'] ?? 'none');
     if (!in_array($footerLogo, ['none', 'top', 'bottom'], true)) {
         $footerLogo = $defaults['footer_logo'] ?? 'none';
@@ -623,6 +627,7 @@ function nammu_template_settings(): array
         'fontUrl' => $fontUrl,
         'footer' => $footer,
         'footer_logo' => $footerLogo,
+        'footer_nammu' => $footerNammu,
         'global' => $global,
         'corners' => $cornerStyle,
         'home' => $home,
@@ -658,6 +663,7 @@ function nammu_default_template_settings(): array
         ],
         'footer' => '',
         'footer_logo' => 'top',
+        'footer_nammu' => 'on',
         'images' => [
             'logo' => '',
         ],

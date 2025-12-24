@@ -26,6 +26,7 @@ $colorBrand = htmlspecialchars($themeColors['brand'] ?? '#1b1b1b', ENT_QUOTES, '
 $colorCodeBackground = htmlspecialchars($themeColors['code_background'] ?? '#000000', ENT_QUOTES, 'UTF-8');
 $colorCodeText = htmlspecialchars($themeColors['code_text'] ?? '#90ee90', ENT_QUOTES, 'UTF-8');
 $footerHtml = $theme['footer_html'] ?? '';
+$footerNammuEnabled = ($theme['footer_nammu'] ?? 'on') === 'on';
 $footerLogoPosition = $theme['footer_logo'] ?? 'none';
 if (!in_array($footerLogoPosition, ['none', 'top', 'bottom'], true)) {
     $footerLogoPosition = 'none';
@@ -59,7 +60,7 @@ if ($postalLogoSvg === '' && function_exists('nammu_postal_icon_svg')) {
     $postalLogoSvg = nammu_postal_icon_svg();
 }
 $hasFooterLogo = $footerLogoPosition !== 'none' && !empty($logoUrl);
-$showFooterBlock = ($footerHtml !== '') || $hasFooterLogo;
+$showFooterBlock = ($footerHtml !== '') || $hasFooterLogo || $footerNammuEnabled;
 $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
 $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
 $isCrawler = $userAgent !== '' && preg_match('/(bot|crawl|spider|slurp|bingpreview|facebookexternalhit|facebot|linkedinbot|twitterbot|pinterest|whatsapp|telegram|yandex|baiduspider|duckduckbot|sogou|ia_archiver)/i', $userAgent);
@@ -507,6 +508,16 @@ if (function_exists('nammu_record_visit')) {
         }
         .footer-html-content p:last-child {
             margin-bottom: 0;
+        }
+        .footer-nammu-link {
+            margin: 0.6rem 0 0.2rem;
+            text-align: center;
+            font-size: 0.7rem;
+            color: <?= $colorText ?>;
+            opacity: 0.75;
+        }
+        .footer-nammu-link a {
+            color: <?= $colorAccent ?>;
         }
         .floating-logo {
             position: fixed;
@@ -1105,53 +1116,60 @@ if (!empty($baseUrl)) {
         </main>
         <?php if ($showFooterBlock): ?>
             <footer>
-                <div class="site-footer-block">
-                    <?php if ($hasFooterLogo && $footerLogoPosition === 'top'): ?>
-                        <div class="footer-logo-wrapper footer-logo-top">
-                            <a class="footer-logo-link" href="<?= htmlspecialchars($baseUrl ?? '/', ENT_QUOTES, 'UTF-8') ?>" aria-label="Ir a la portada">
-                                <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
-                            </a>
-                        </div>
-                        <?php if (!empty($footerLinks)): ?>
-                            <div class="footer-social-links">
-                                <?php foreach ($footerLinks as $link): ?>
-                                    <?php
-                                    $linkHost = parse_url((string) $link['href'], PHP_URL_HOST) ?? '';
-                                    $isExternal = $linkHost !== '' && $baseHost !== '' && $linkHost !== $baseHost;
-                                    ?>
-                                    <a class="footer-social-link" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
-                                        <?= $link['svg'] ?>
-                                    </a>
-                                <?php endforeach; ?>
+                <?php if ($footerHtml !== '' || $hasFooterLogo): ?>
+                    <div class="site-footer-block">
+                        <?php if ($hasFooterLogo && $footerLogoPosition === 'top'): ?>
+                            <div class="footer-logo-wrapper footer-logo-top">
+                                <a class="footer-logo-link" href="<?= htmlspecialchars($baseUrl ?? '/', ENT_QUOTES, 'UTF-8') ?>" aria-label="Ir a la portada">
+                                    <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
+                                </a>
+                            </div>
+                            <?php if (!empty($footerLinks)): ?>
+                                <div class="footer-social-links">
+                                    <?php foreach ($footerLinks as $link): ?>
+                                        <?php
+                                        $linkHost = parse_url((string) $link['href'], PHP_URL_HOST) ?? '';
+                                        $isExternal = $linkHost !== '' && $baseHost !== '' && $linkHost !== $baseHost;
+                                        ?>
+                                        <a class="footer-social-link" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
+                                            <?= $link['svg'] ?>
+                                        </a>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                        <?php if ($footerHtml !== ''): ?>
+                            <div class="footer-html-content">
+                                <?= $footerHtml ?>
                             </div>
                         <?php endif; ?>
-                    <?php endif; ?>
-                    <?php if ($footerHtml !== ''): ?>
-                        <div class="footer-html-content">
-                            <?= $footerHtml ?>
-                        </div>
-                    <?php endif; ?>
-                    <?php if ($hasFooterLogo && $footerLogoPosition === 'bottom'): ?>
-                        <div class="footer-logo-wrapper footer-logo-bottom">
-                            <a class="footer-logo-link" href="<?= htmlspecialchars($baseUrl ?? '/', ENT_QUOTES, 'UTF-8') ?>" aria-label="Ir a la portada">
-                                <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
-                            </a>
-                        </div>
-                        <?php if (!empty($footerLinks)): ?>
-                            <div class="footer-social-links">
-                                <?php foreach ($footerLinks as $link): ?>
-                                    <?php
-                                    $linkHost = parse_url((string) $link['href'], PHP_URL_HOST) ?? '';
-                                    $isExternal = $linkHost !== '' && $baseHost !== '' && $linkHost !== $baseHost;
-                                    ?>
-                                    <a class="footer-social-link" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
-                                        <?= $link['svg'] ?>
-                                    </a>
-                                <?php endforeach; ?>
+                        <?php if ($hasFooterLogo && $footerLogoPosition === 'bottom'): ?>
+                            <div class="footer-logo-wrapper footer-logo-bottom">
+                                <a class="footer-logo-link" href="<?= htmlspecialchars($baseUrl ?? '/', ENT_QUOTES, 'UTF-8') ?>" aria-label="Ir a la portada">
+                                    <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
+                                </a>
                             </div>
+                            <?php if (!empty($footerLinks)): ?>
+                                <div class="footer-social-links">
+                                    <?php foreach ($footerLinks as $link): ?>
+                                        <?php
+                                        $linkHost = parse_url((string) $link['href'], PHP_URL_HOST) ?? '';
+                                        $isExternal = $linkHost !== '' && $baseHost !== '' && $linkHost !== $baseHost;
+                                        ?>
+                                        <a class="footer-social-link" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
+                                            <?= $link['svg'] ?>
+                                        </a>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
                         <?php endif; ?>
-                    <?php endif; ?>
-                </div>
+                    </div>
+                <?php endif; ?>
+                <?php if ($footerNammuEnabled): ?>
+                    <div class="footer-nammu-link">
+                        Sitio web realizado con <a href="https://ruralnext.org/nammu">Nammu</a>, software libre para el rural.
+                    </div>
+                <?php endif; ?>
             </footer>
         <?php endif; ?>
     </div>

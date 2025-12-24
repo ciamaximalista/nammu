@@ -1677,6 +1677,7 @@ function get_default_template_settings(): array {
         ],
         'footer' => '',
         'footer_logo' => 'top',
+        'footer_nammu' => 'on',
         'images' => [
             'logo' => '',
         ],
@@ -4560,6 +4561,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $footerMd = trim($_POST['footer_md'] ?? '');
+        $footerNammuPosted = isset($_POST['footer_nammu']) ? 'on' : 'off';
         $footerLogoPosted = $_POST['footer_logo_position'] ?? $defaults['footer_logo'];
         if (!in_array($footerLogoPosted, ['none', 'top', 'bottom'], true)) {
             $footerLogoPosted = $defaults['footer_logo'];
@@ -4697,6 +4699,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'images' => $images,
             'footer' => $footerMd,
             'footer_logo' => $footerLogoPosted,
+            'footer_nammu' => $footerNammuPosted,
             'global' => [
                 'corners' => $cornerStylePosted,
             ],

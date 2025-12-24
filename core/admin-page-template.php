@@ -21,6 +21,7 @@
                             if (!in_array($footerLogoPosition, ['none', 'top', 'bottom'], true)) {
                                 $footerLogoPosition = $defaults['footer_logo'];
                             }
+                            $footerNammuEnabled = ($templateSettings['footer_nammu'] ?? ($defaults['footer_nammu'] ?? 'on')) === 'on';
                             $templateHome = $templateSettings['home'] ?? [];
                             $colorLabels = [
                                 'h1' => 'Color H1',
@@ -1001,6 +1002,12 @@
                                         <?php endforeach; ?>
                                     </div>
                                     <p class="text-muted mt-3">Este contenido se mostrará al final de cada página. Introduce HTML directamente (por ejemplo, &lt;strong&gt;...&lt;/strong&gt; o enlaces con &lt;a&gt; ).</p>
+                                    <div class="form-group">
+                                        <div class="custom-control custom-checkbox">
+                                            <input type="checkbox" class="custom-control-input" id="footer_nammu" name="footer_nammu" value="1" <?= $footerNammuEnabled ? 'checked' : '' ?>>
+                                            <label class="custom-control-label" for="footer_nammu">Añadir enlace a Nammu</label>
+                                        </div>
+                                    </div>
                                     <div class="form-group">
                                         <label for="footer_md">Contenido del footer (HTML)</label>
                                         <textarea name="footer_md" id="footer_md" rows="6" class="form-control" placeholder="Bloque de contacto, enlaces legales..."><?= htmlspecialchars($footerMd ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>

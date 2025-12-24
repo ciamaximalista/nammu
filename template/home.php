@@ -91,6 +91,7 @@ $homeSubscriptionBottom = $showHomeSubscription && $subscriptionPositionSetting 
 $searchActionBase = $baseHref ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
 $subscriptionAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/subscribe.php';
+$categoriesIndexUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/categorias';
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseHref ?? '/') !== '' ? rtrim($baseHref ?? '/', '/') . '/itinerarios' : '/itinerarios');
 $hasItineraries = !empty($hasItineraries);
@@ -525,19 +526,39 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     $hasNext = !empty($pagination['has_next']) && $currentPage < $totalPages;
     ?>
     <nav class="home-pagination" aria-label="Paginación">
-        <?php if ($hasPrev): ?>
-            <a class="page-link prev" href="<?= htmlspecialchars($buildPageUrl($currentPage - 1), ENT_QUOTES, 'UTF-8') ?>">&laquo; Anteriores</a>
-        <?php else: ?>
-            <span class="page-link prev disabled">&laquo; Anteriores</span>
-        <?php endif; ?>
+        <div class="home-pagination-links">
+            <?php if ($hasPrev): ?>
+                <a class="page-link prev" href="<?= htmlspecialchars($buildPageUrl($currentPage - 1), ENT_QUOTES, 'UTF-8') ?>">&laquo; Anteriores</a>
+            <?php else: ?>
+                <span class="page-link prev disabled">&laquo; Anteriores</span>
+            <?php endif; ?>
 
-        <span class="page-status">Página <?= htmlspecialchars((string) $currentPage, ENT_QUOTES, 'UTF-8') ?> de <?= htmlspecialchars((string) $totalPages, ENT_QUOTES, 'UTF-8') ?></span>
+            <span class="page-status">Página <?= htmlspecialchars((string) $currentPage, ENT_QUOTES, 'UTF-8') ?> de <?= htmlspecialchars((string) $totalPages, ENT_QUOTES, 'UTF-8') ?></span>
 
-        <?php if ($hasNext): ?>
-            <a class="page-link next" href="<?= htmlspecialchars($buildPageUrl($currentPage + 1), ENT_QUOTES, 'UTF-8') ?>">Siguientes &raquo;</a>
-        <?php else: ?>
-            <span class="page-link next disabled">Siguientes &raquo;</span>
-        <?php endif; ?>
+            <?php if ($hasNext): ?>
+                <a class="page-link next" href="<?= htmlspecialchars($buildPageUrl($currentPage + 1), ENT_QUOTES, 'UTF-8') ?>">Siguientes &raquo;</a>
+            <?php else: ?>
+                <span class="page-link next disabled">Siguientes &raquo;</span>
+            <?php endif; ?>
+        </div>
+        <div class="home-pagination-shortcuts">
+            <a class="page-link page-icon-link" href="<?= htmlspecialchars($categoriesIndexUrl, ENT_QUOTES, 'UTF-8') ?>" title="Categorías" aria-label="Categorías">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                    <line x1="8" y1="9" x2="16" y2="9" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                    <line x1="8" y1="13" x2="16" y2="13" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                </svg>
+            </a>
+            <?php if (!empty($hasItineraries) && !empty($itinerariesIndexUrl)): ?>
+                <a class="page-link page-icon-link" href="<?= htmlspecialchars($itinerariesIndexUrl, ENT_QUOTES, 'UTF-8') ?>" title="Itinerarios" aria-label="Itinerarios">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 5H10C11.1046 5 12 5.89543 12 7V19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linejoin="round"/>
+                        <path d="M20 5H14C12.8954 5 12 5.89543 12 7V19H20C21.1046 19 22 18.1046 22 17V7C22 5.89543 21.1046 5 20 5Z" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linejoin="round"/>
+                        <line x1="12" y1="7" x2="12" y2="19" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </a>
+            <?php endif; ?>
+        </div>
     </nav>
 <?php endif; ?>
 
@@ -1067,6 +1088,21 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         align-items: center;
         justify-content: center;
         font-size: 0.95rem;
+        width: 100%;
+    }
+    .home-pagination-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-items: center;
+        justify-content: center;
+        flex: 1 1 auto;
+    }
+    .home-pagination-shortcuts {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-left: auto;
     }
     .home-pagination .page-link {
         padding: 0.5rem 0.9rem;
@@ -1087,6 +1123,9 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     .home-pagination .page-link.disabled {
         opacity: 0.45;
         pointer-events: none;
+    }
+    .home-pagination .page-icon-link {
+        padding: 0.45rem 0.55rem;
     }
     .home-pagination .page-status {
         font-weight: 600;

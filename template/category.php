@@ -438,16 +438,23 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     }
     @media (max-width: 640px) {
         .site-search-form {
-            flex-direction: column;
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 0.5rem;
         }
         .site-search-form input[type="text"],
-        .site-search-form input[type="email"],
+        .site-search-form input[type="email"] {
+            flex: 1 1 100%;
+            width: 100%;
+        }
         .site-search-form button,
         .search-categories-link,
         .search-letters-link,
+        .search-itineraries-link,
         .subscription-postal-link,
         .subscription-avisos-link {
-            width: 100%;
+            width: 40px;
+            height: 40px;
         }
         .site-subscription-box .subscription-postal-link,
         .site-subscription-box .subscription-avisos-link {

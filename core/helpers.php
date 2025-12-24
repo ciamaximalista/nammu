@@ -306,17 +306,36 @@ function nammu_record_platform_visit(array &$data, string $uid, string $date): b
         $bucket['device'] = [];
     }
     $setUid($bucket['device'], $device, $uid);
+    if (!isset($bucket['device'])) {
+        $bucket['device'] = [];
+    }
+    foreach (['desktop', 'mobile', 'tablet'] as $fallbackDevice) {
+        if (!isset($bucket['device'][$fallbackDevice])) {
+            $bucket['device'][$fallbackDevice] = ['uids' => []];
+        }
+    }
 
     if (!isset($bucket['browser'])) {
         $bucket['browser'] = [];
     }
     $setUid($bucket['browser'], $browser, $uid);
+    if (!isset($bucket['browser'])) {
+        $bucket['browser'] = [];
+    }
+    if (!isset($bucket['browser']['otros'])) {
+        $bucket['browser']['otros'] = ['uids' => []];
+    }
 
     if ($language !== '') {
         if (!isset($bucket['language'])) {
             $bucket['language'] = [];
         }
         $setUid($bucket['language'], $language, $uid);
+    } else {
+        if (!isset($bucket['language'])) {
+            $bucket['language'] = [];
+        }
+        $setUid($bucket['language'], 'otros', $uid);
     }
 
     if ($device === 'desktop') {
@@ -325,6 +344,9 @@ function nammu_record_platform_visit(array &$data, string $uid, string $date): b
             $bucket['os'] = [];
         }
         $setUid($bucket['os'], $os, $uid);
+        if (!isset($bucket['os']['otros'])) {
+            $bucket['os']['otros'] = ['uids' => []];
+        }
     }
 
     return $changed;
@@ -383,9 +405,24 @@ function nammu_record_pageview(string $type, string $slug, string $title = ''): 
     }
     $data['content'][$bucket][$slug]['total'] = (int) ($data['content'][$bucket][$slug]['total'] ?? 0) + 1;
     if (!isset($data['content'][$bucket][$slug]['daily'][$date])) {
-        $data['content'][$bucket][$slug]['daily'][$date] = 0;
+        $data['content'][$bucket][$slug]['daily'][$date] = [
+            'views' => 0,
+            'uids' => [],
+        ];
     }
-    $data['content'][$bucket][$slug]['daily'][$date] = (int) ($data['content'][$bucket][$slug]['daily'][$date] ?? 0) + 1;
+    $dailyEntry = $data['content'][$bucket][$slug]['daily'][$date];
+    if (!is_array($dailyEntry)) {
+        $dailyEntry = [
+            'views' => (int) $dailyEntry,
+            'uids' => [],
+        ];
+    }
+    $dailyEntry['views'] = (int) ($dailyEntry['views'] ?? 0) + 1;
+    if (!isset($dailyEntry['uids']) || !is_array($dailyEntry['uids'])) {
+        $dailyEntry['uids'] = [];
+    }
+    $dailyEntry['uids'][$uid] = 1;
+    $data['content'][$bucket][$slug]['daily'][$date] = $dailyEntry;
     $data['updated_at'] = time();
     nammu_save_analytics($data);
     $GLOBALS['nammu_analytics_visit_recorded'] = true;

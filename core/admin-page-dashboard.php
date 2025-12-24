@@ -44,9 +44,52 @@
             if (!is_string($day) || $day < $startKey || $day > $endKey) {
                 continue;
             }
-            $total += (int) $count;
+            if (is_array($count)) {
+                $total += (int) ($count['views'] ?? 0);
+            } else {
+                $total += (int) $count;
+            }
         }
         return $total;
+    };
+
+    $uniqueRange = static function (array $daily, DateTimeImmutable $start, DateTimeImmutable $end): int {
+        $uids = [];
+        $startKey = $start->format('Y-m-d');
+        $endKey = $end->format('Y-m-d');
+        foreach ($daily as $day => $payload) {
+            if (!is_string($day) || $day < $startKey || $day > $endKey) {
+                continue;
+            }
+            if (!is_array($payload)) {
+                continue;
+            }
+            $dayUids = $payload['uids'] ?? [];
+            if (!is_array($dayUids)) {
+                continue;
+            }
+            foreach ($dayUids as $uid => $flag) {
+                $uids[$uid] = true;
+            }
+        }
+        return count($uids);
+    };
+
+    $uniqueAll = static function (array $daily): int {
+        $uids = [];
+        foreach ($daily as $payload) {
+            if (!is_array($payload)) {
+                continue;
+            }
+            $dayUids = $payload['uids'] ?? [];
+            if (!is_array($dayUids)) {
+                continue;
+            }
+            foreach ($dayUids as $uid => $flag) {
+                $uids[$uid] = true;
+            }
+        }
+        return count($uids);
     };
 
     $unique30 = [];
@@ -83,6 +126,26 @@
     $platformBrowsers = $collectPlatformUids('browser');
     $platformSystems = $collectPlatformUids('os');
     $platformLanguages = $collectPlatformUids('language');
+
+    $ensureDeviceBuckets = static function (array $map, array $days): array {
+        if (empty($days)) {
+            return $map;
+        }
+        foreach (['desktop', 'mobile', 'tablet'] as $label) {
+            if (!isset($map[$label])) {
+                $map[$label] = [];
+            }
+        }
+        return $map;
+    };
+    $platformDevices = $ensureDeviceBuckets($platformDevices, $platformDaily);
+
+    if (!isset($platformBrowsers['otros'])) {
+        $platformBrowsers['otros'] = [];
+    }
+    if (!isset($platformLanguages['otros'])) {
+        $platformLanguages['otros'] = [];
+    }
     $desktopUids = $platformDevices['desktop'] ?? [];
     $desktopCount = count($desktopUids);
 
@@ -200,6 +263,7 @@
     $languageList = $buildPercentTable($platformLanguages, $languageLabelMap);
 
     $monthlyUids = [];
+    $monthlyTotals = [];
     foreach ($visitorsDaily as $day => $payload) {
         if (!is_string($day) || strlen($day) < 7) {
             continue;
@@ -212,6 +276,14 @@
         foreach ($uids as $uid => $flag) {
             $monthlyUids[$month][$uid] = true;
         }
+        $monthlyTotals[$month] = ($monthlyTotals[$month] ?? 0) + count($uids);
+    }
+    $currentMonthKey = $today->format('Y-m');
+    if (!isset($monthlyUids[$currentMonthKey])) {
+        $monthlyUids[$currentMonthKey] = [];
+    }
+    if (!isset($monthlyTotals[$currentMonthKey])) {
+        $monthlyTotals[$currentMonthKey] = 0;
     }
     ksort($monthlyUids);
 
@@ -304,6 +376,7 @@
     $last12Line = $buildLinePoints($last12Months, $last12MonthsMax, $chartTop, $chartBottom);
 
     $yearlyUids = [];
+    $yearlyTotals = [];
     foreach ($visitorsDaily as $day => $payload) {
         if (!is_string($day) || strlen($day) < 4) {
             continue;
@@ -316,6 +389,14 @@
         foreach ($uids as $uid => $flag) {
             $yearlyUids[$yearKey][$uid] = true;
         }
+        $yearlyTotals[$yearKey] = ($yearlyTotals[$yearKey] ?? 0) + count($uids);
+    }
+    $currentYearKey = $today->format('Y');
+    if (!isset($yearlyUids[$currentYearKey])) {
+        $yearlyUids[$currentYearKey] = [];
+    }
+    if (!isset($yearlyTotals[$currentYearKey])) {
+        $yearlyTotals[$currentYearKey] = 0;
     }
     ksort($yearlyUids);
 
@@ -368,7 +449,7 @@
         if ($firstMonthKey !== '' && $monthKey < $firstMonthKey) {
             break;
         }
-        $count = isset($monthlyUids[$monthKey]) ? count($monthlyUids[$monthKey]) : 0;
+        $count = $monthlyTotals[$monthKey] ?? 0;
         $monthNum = (int) $month->format('n');
         $last12MonthsList[] = [
             'label' => ($monthNames[$monthNum] ?? $month->format('m')) . ' ' . $month->format('Y'),
@@ -385,26 +466,35 @@
         }
         $yearList[] = [
             'label' => $year,
-            'count' => count($yearlyUids[$year]),
+            'count' => $yearlyTotals[$year] ?? 0,
         ];
     }
 
-    $topPosts = [];
+    $allPosts = [];
     foreach ($postsStats as $slug => $item) {
         $total = (int) ($item['total'] ?? 0);
         if ($total <= 0) {
             continue;
         }
-        $topPosts[] = [
+        $allPosts[] = [
             'slug' => $slug,
             'title' => $item['title'] ?? $slug,
             'count' => $total,
+            'unique' => $uniqueAll($item['daily'] ?? []),
         ];
     }
+    $topPosts = $allPosts;
     usort($topPosts, static function (array $a, array $b): int {
         return $b['count'] <=> $a['count'];
     });
     $topPosts = array_slice($topPosts, 0, 10);
+    $topPostsByUnique = array_values(array_filter($allPosts, static function (array $item): bool {
+        return (int) ($item['unique'] ?? 0) > 0;
+    }));
+    usort($topPostsByUnique, static function (array $a, array $b): int {
+        return $b['unique'] <=> $a['unique'];
+    });
+    $topPostsByUnique = array_slice($topPostsByUnique, 0, 10);
 
     $topPostsWeek = [];
     $topPostsMonth = [];
@@ -417,6 +507,7 @@
                 'slug' => $slug,
                 'title' => $item['title'] ?? $slug,
                 'count' => $countWeek,
+                'unique' => $uniqueRange($daily, $last7Start, $today),
             ];
         }
         if ($countMonth > 0) {
@@ -424,9 +515,26 @@
                 'slug' => $slug,
                 'title' => $item['title'] ?? $slug,
                 'count' => $countMonth,
+                'unique' => $uniqueRange($daily, $last30Start, $today),
             ];
         }
     }
+    $topPostsWeekByUnique = $topPostsWeek;
+    usort($topPostsWeekByUnique, static function (array $a, array $b): int {
+        return $b['unique'] <=> $a['unique'];
+    });
+    $topPostsWeekByUnique = array_values(array_filter($topPostsWeekByUnique, static function (array $item): bool {
+        return (int) ($item['unique'] ?? 0) > 0;
+    }));
+    $topPostsWeekByUnique = array_slice($topPostsWeekByUnique, 0, 10);
+    $topPostsMonthByUnique = $topPostsMonth;
+    usort($topPostsMonthByUnique, static function (array $a, array $b): int {
+        return $b['unique'] <=> $a['unique'];
+    });
+    $topPostsMonthByUnique = array_values(array_filter($topPostsMonthByUnique, static function (array $item): bool {
+        return (int) ($item['unique'] ?? 0) > 0;
+    }));
+    $topPostsMonthByUnique = array_slice($topPostsMonthByUnique, 0, 10);
     usort($topPostsWeek, static function (array $a, array $b): int {
         return $b['count'] <=> $a['count'];
     });
@@ -436,22 +544,31 @@
     $topPostsWeek = array_slice($topPostsWeek, 0, 10);
     $topPostsMonth = array_slice($topPostsMonth, 0, 10);
 
-    $topPages = [];
+    $allPages = [];
     foreach ($pagesStats as $slug => $item) {
         $total = (int) ($item['total'] ?? 0);
         if ($total <= 0) {
             continue;
         }
-        $topPages[] = [
+        $allPages[] = [
             'slug' => $slug,
             'title' => $item['title'] ?? $slug,
             'count' => $total,
+            'unique' => $uniqueAll($item['daily'] ?? []),
         ];
     }
+    $topPages = $allPages;
     usort($topPages, static function (array $a, array $b): int {
         return $b['count'] <=> $a['count'];
     });
     $topPages = array_slice($topPages, 0, 10);
+    $topPagesByUnique = array_values(array_filter($allPages, static function (array $item): bool {
+        return (int) ($item['unique'] ?? 0) > 0;
+    }));
+    usort($topPagesByUnique, static function (array $a, array $b): int {
+        return $b['unique'] <=> $a['unique'];
+    });
+    $topPagesByUnique = array_slice($topPagesByUnique, 0, 10);
 
     $topItineraryStarts = [];
     $topItineraryCompletes = [];
@@ -590,6 +707,15 @@
             .dashboard-links li:first-child a,
             .dashboard-links li:first-child span {
                 color: #ffffff !important;
+            }
+            .dashboard-toggle .btn {
+                color: #1b8eed;
+                border-color: #1b8eed;
+            }
+            .dashboard-toggle .btn.active {
+                background: #1b8eed;
+                color: #ffffff;
+                border-color: #1b8eed;
             }
         </style>
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-2">
@@ -761,13 +887,31 @@
             </div>
 
             <div class="col-lg-8">
-                <div class="card mb-4">
+                <?php
+                $hasPostStats = !empty($topPosts) || !empty($topPostsByUnique)
+                    || !empty($topPostsWeek) || !empty($topPostsWeekByUnique)
+                    || !empty($topPostsMonth) || !empty($topPostsMonthByUnique);
+                ?>
+                <div class="card mb-4 dashboard-stat-block">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Entradas mas leidas</h4>
-                        <?php if (empty($topPosts)): ?>
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                            <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Entradas mas leidas</h4>
+                            <div class="d-flex flex-column align-items-start">
+                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle my-2" role="group" data-stat-toggle="posts" data-stat-toggle-type="mode">
+                                    <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
+                                    <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
+                                </div>
+                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle my-2" role="group" data-stat-toggle="posts" data-stat-toggle-type="period">
+                                    <button type="button" class="btn btn-outline-primary" data-stat-period="week">Ultimos 7 dias</button>
+                                    <button type="button" class="btn btn-outline-primary" data-stat-period="month">Ultimos 30 dias</button>
+                                    <button type="button" class="btn btn-outline-primary active" data-stat-period="all">Desde el comienzo del blog</button>
+                                </div>
+                            </div>
+                        </div>
+                        <?php if (!$hasPostStats): ?>
                             <p class="text-muted mb-0">Sin datos todavia.</p>
                         <?php else: ?>
-                            <ol class="mb-0 dashboard-links">
+                            <ol class="mb-0 dashboard-links" data-stat-list="posts" data-stat-mode="views" data-stat-period="all">
                                 <?php foreach ($topPosts as $item): ?>
                                     <li>
                                         <?php $url = admin_public_post_url($item['slug']); ?>
@@ -778,17 +922,18 @@
                                     </li>
                                 <?php endforeach; ?>
                             </ol>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Entradas mas leidas (ultima semana)</h4>
-                        <?php if (empty($topPostsWeek)): ?>
-                            <p class="text-muted mb-0">Sin datos todavia.</p>
-                        <?php else: ?>
-                            <ol class="mb-0 dashboard-links">
+                            <ol class="mb-0 dashboard-links d-none" data-stat-list="posts" data-stat-mode="users" data-stat-period="all">
+                                <?php foreach ($topPostsByUnique as $item): ?>
+                                    <li>
+                                        <?php $url = admin_public_post_url($item['slug']); ?>
+                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <span class="text-muted">(<?= (int) $item['unique'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
+                            <ol class="mb-0 dashboard-links d-none" data-stat-list="posts" data-stat-mode="views" data-stat-period="week">
                                 <?php foreach ($topPostsWeek as $item): ?>
                                     <li>
                                         <?php $url = admin_public_post_url($item['slug']); ?>
@@ -799,17 +944,18 @@
                                     </li>
                                 <?php endforeach; ?>
                             </ol>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Entradas mas leidas (ultimo mes)</h4>
-                        <?php if (empty($topPostsMonth)): ?>
-                            <p class="text-muted mb-0">Sin datos todavia.</p>
-                        <?php else: ?>
-                            <ol class="mb-0 dashboard-links">
+                            <ol class="mb-0 dashboard-links d-none" data-stat-list="posts" data-stat-mode="users" data-stat-period="week">
+                                <?php foreach ($topPostsWeekByUnique as $item): ?>
+                                    <li>
+                                        <?php $url = admin_public_post_url($item['slug']); ?>
+                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <span class="text-muted">(<?= (int) $item['unique'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
+                            <ol class="mb-0 dashboard-links d-none" data-stat-list="posts" data-stat-mode="views" data-stat-period="month">
                                 <?php foreach ($topPostsMonth as $item): ?>
                                     <li>
                                         <?php $url = admin_public_post_url($item['slug']); ?>
@@ -820,18 +966,35 @@
                                     </li>
                                 <?php endforeach; ?>
                             </ol>
+                            <ol class="mb-0 dashboard-links d-none" data-stat-list="posts" data-stat-mode="users" data-stat-period="month">
+                                <?php foreach ($topPostsMonthByUnique as $item): ?>
+                                    <li>
+                                        <?php $url = admin_public_post_url($item['slug']); ?>
+                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <span class="text-muted">(<?= (int) $item['unique'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
                         <?php endif; ?>
                     </div>
                 </div>
 
                 <?php if ($pageCount > 0): ?>
-                    <div class="card mb-4">
+                    <div class="card mb-4 dashboard-stat-block">
                         <div class="card-body">
-                            <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Paginas mas leidas</h4>
-                            <?php if (empty($topPages)): ?>
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Paginas mas leidas</h4>
+                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="mode">
+                                    <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
+                                    <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
+                                </div>
+                            </div>
+                            <?php if (empty($topPages) && empty($topPagesByUnique)): ?>
                                 <p class="text-muted mb-0">Sin datos todavia.</p>
                             <?php else: ?>
-                                <ol class="mb-0 dashboard-links">
+                                <ol class="mb-0 dashboard-links" data-stat-list="pages-all" data-stat-mode="views">
                                     <?php foreach ($topPages as $item): ?>
                                         <li>
                                             <?php $url = admin_public_post_url($item['slug']); ?>
@@ -839,6 +1002,17 @@
                                                 <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
                                             </a>
                                             <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                                <ol class="mb-0 dashboard-links d-none" data-stat-list="pages-all" data-stat-mode="users">
+                                    <?php foreach ($topPagesByUnique as $item): ?>
+                                        <li>
+                                            <?php $url = admin_public_post_url($item['slug']); ?>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['unique'] ?>)</span>
                                         </li>
                                     <?php endforeach; ?>
                                 </ol>
@@ -963,4 +1137,40 @@
             </div>
         </div>
     </div>
+    <script>
+        document.querySelectorAll('.dashboard-stat-block').forEach(function(block) {
+            function updateLists() {
+                var modeBtn = block.querySelector('[data-stat-toggle-type="mode"] .active');
+                var periodBtn = block.querySelector('[data-stat-toggle-type="period"] .active');
+                var mode = modeBtn ? modeBtn.getAttribute('data-stat-mode') : null;
+                var period = periodBtn ? periodBtn.getAttribute('data-stat-period') : null;
+
+                block.querySelectorAll('[data-stat-list]').forEach(function(list) {
+                    var match = true;
+                    if (mode && list.getAttribute('data-stat-mode') !== mode) {
+                        match = false;
+                    }
+                    if (period && list.getAttribute('data-stat-period') !== period) {
+                        match = false;
+                    }
+                    list.classList.toggle('d-none', !match);
+                });
+            }
+
+            block.querySelectorAll('[data-stat-toggle]').forEach(function(group) {
+                group.addEventListener('click', function(event) {
+                    var btn = event.target.closest('[data-stat-mode], [data-stat-period]');
+                    if (!btn) {
+                        return;
+                    }
+                    group.querySelectorAll('[data-stat-mode], [data-stat-period]').forEach(function(item) {
+                        item.classList.toggle('active', item === btn);
+                    });
+                    updateLists();
+                });
+            });
+
+            updateLists();
+        });
+    </script>
 <?php endif; ?>

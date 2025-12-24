@@ -346,7 +346,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         background: <?= $colorHighlight ?>;
         box-sizing: border-box;
         max-width: 100%;
-        overflow: hidden;
+        overflow: visible;
     }
     .site-search-box.variant-panel {
         background: #fff;
@@ -446,6 +446,22 @@ if ($isPageTemplate && $formattedDate !== '') {
             width: 32px;
             height: 32px;
         }
+        .post-brand .site-search-form input[type="text"] {
+            padding: 0.5rem 0.6rem;
+            font-size: 0.9rem;
+        }
+        .post-brand .site-search-form button {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+        }
+        .post-brand .search-categories-link,
+        .post-brand .search-letters-link,
+        .post-brand .search-itineraries-link {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+        }
         .site-search-form input[type="text"],
         .site-search-form input[type="email"] {
             flex: 1 1 auto;
@@ -510,11 +526,14 @@ if ($isPageTemplate && $formattedDate !== '') {
         display: grid;
         gap: 1.5rem;
         max-width: 100%;
+        box-sizing: border-box;
     }
     .post-header {
         display: grid;
         gap: 1rem;
         text-align: center;
+        width: 100%;
+        box-sizing: border-box;
     }
     .post-brand {
         display: flex;
@@ -550,6 +569,11 @@ if ($isPageTemplate && $formattedDate !== '') {
         text-transform: uppercase;
         letter-spacing: 0.08em;
         font-weight: 600;
+        max-width: 100%;
+        flex-wrap: wrap;
+        justify-content: center;
+        text-align: center;
+        overflow-wrap: anywhere;
     }
     .post-intro {
         max-width: min(760px, 100%);
@@ -567,6 +591,8 @@ if ($isPageTemplate && $formattedDate !== '') {
         margin: 0;
         display: flex;
         justify-content: center;
+        width: 100%;
+        box-sizing: border-box;
     }
     .post-hero img {
         width: min(960px, 100%);
@@ -579,6 +605,8 @@ if ($isPageTemplate && $formattedDate !== '') {
         color: <?= $colorText ?>;
         overflow-wrap: anywhere;
         word-break: break-word;
+        width: 100%;
+        box-sizing: border-box;
     }
     .post-body * {
         max-width: 100%;
@@ -591,6 +619,53 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .post-body iframe {
         max-width: 100%;
+    }
+    @media (max-width: 1100px) {
+        .site-search-box {
+            padding: 0.6rem 0.7rem;
+        }
+        .site-search-form {
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+        .site-search-box:not(.site-subscription-box) .site-search-form {
+            flex-wrap: nowrap;
+            gap: 0.35rem;
+        }
+        .site-search-form .search-icon {
+            width: 32px;
+            height: 32px;
+        }
+        .site-search-form input[type="text"],
+        .site-search-form input[type="email"] {
+            flex: 1 1 100%;
+            width: 100%;
+            min-width: 0;
+            padding: 0.5rem 0.6rem;
+            font-size: 0.9rem;
+        }
+        .site-search-box:not(.site-subscription-box) .site-search-form input[type="text"] {
+            flex: 1 1 auto;
+            width: auto;
+        }
+        .site-search-form button,
+        .search-categories-link,
+        .search-letters-link,
+        .search-itineraries-link,
+        .subscription-postal-link,
+        .subscription-avisos-link {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+        }
+        .post-brand .site-search-form {
+            gap: 0.4rem;
+        }
+        .post-brand .site-search-form input[type="text"] {
+            flex: 1 1 100%;
+            width: 100%;
+        }
     }
     .post-body h1 {
         margin: 2.8rem 0 1.35rem;

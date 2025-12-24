@@ -957,6 +957,12 @@ function get_settings() {
         'recipient' => '',
         'auto_post' => 'off',
     ], $config);
+    $instagram = admin_extract_social_settings('instagram', [
+        'token' => '',
+        'channel' => '',
+        'recipient' => '',
+        'auto_post' => 'off',
+    ], $config);
     $mailingDefaults = [
         'provider' => 'gmail',
         'gmail_address' => '',
@@ -1014,6 +1020,7 @@ function get_settings() {
         'whatsapp' => $whatsapp,
         'facebook' => $facebook,
         'twitter' => $twitter,
+        'instagram' => $instagram,
         'mailing' => $mailing,
         'postal' => $postal,
         'ads' => $ads,
@@ -1167,6 +1174,12 @@ function admin_cached_social_settings(?string $key = null): array {
                 'recipient' => '',
                 'auto_post' => 'off',
             ], $config),
+            'instagram' => admin_extract_social_settings('instagram', [
+                'token' => '',
+                'channel' => '',
+                'recipient' => '',
+                'auto_post' => 'off',
+            ], $config),
         ];
     }
     if ($key === null) {
@@ -1189,6 +1202,8 @@ function admin_is_social_network_configured(string $network, array $settings): b
             return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
         case 'twitter':
             return ($settings['token'] ?? '') !== '';
+        case 'instagram':
+            return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
         default:
             return false;
     }
@@ -1358,10 +1373,71 @@ function admin_send_twitter_post(string $slug, string $title, string $descriptio
     ]);
 }
 
+function admin_build_instagram_caption(string $slug, string $title): string {
+    $parts = [];
+    $titleTrim = trim($title);
+    if ($titleTrim !== '') {
+        $parts[] = $titleTrim;
+    }
+    $url = admin_public_post_url($slug);
+    if ($url !== '') {
+        $parts[] = $url;
+    }
+    return implode("\n\n", $parts);
+}
+
+function admin_send_instagram_post(string $slug, string $title, string $image, array $settings): bool {
+    $token = trim((string) ($settings['token'] ?? ''));
+    $accountId = trim((string) ($settings['channel'] ?? ''));
+    if ($token === '' || $accountId === '') {
+        return false;
+    }
+    $imageTrim = trim($image);
+    if ($imageTrim === '') {
+        return false;
+    }
+    $baseUrl = admin_base_url();
+    $imageUrl = function_exists('nammu_resolve_asset') ? nammu_resolve_asset($imageTrim, $baseUrl) : '';
+    if ($imageUrl === null || $imageUrl === '') {
+        return false;
+    }
+    $caption = admin_build_instagram_caption($slug, $title);
+    $createEndpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($accountId) . '/media';
+    $createResponse = admin_http_post_form_json($createEndpoint, [
+        'image_url' => $imageUrl,
+        'caption' => $caption,
+        'access_token' => $token,
+    ]);
+    if (!is_array($createResponse) || empty($createResponse['id'])) {
+        return false;
+    }
+    $creationId = (string) $createResponse['id'];
+    $publishEndpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($accountId) . '/media_publish';
+    $publishResponse = admin_http_post_form_json($publishEndpoint, [
+        'creation_id' => $creationId,
+        'access_token' => $token,
+    ]);
+    return is_array($publishResponse) && !empty($publishResponse['id']);
+}
+
 function admin_http_post_json(string $url, array $payload, array $headers = []): bool {
     $body = json_encode($payload);
     $headers[] = 'Content-Length: ' . strlen((string) $body);
     return admin_http_post_body($url, $body, $headers);
+}
+
+function admin_http_post_form_json(string $url, array $params): ?array {
+    $body = http_build_query($params);
+    $headers = [
+        'Content-Type: application/x-www-form-urlencoded',
+        'Content-Length: ' . strlen($body),
+    ];
+    $responseBody = admin_http_post_body_response($url, $body, $headers);
+    if ($responseBody === null) {
+        return null;
+    }
+    $decoded = json_decode($responseBody, true);
+    return is_array($decoded) ? $decoded : null;
 }
 
 function admin_http_post_form(string $url, array $params): bool {
@@ -1374,8 +1450,18 @@ function admin_http_post_form(string $url, array $params): bool {
 }
 
 function admin_http_post_body(string $url, string $body, array $headers): bool {
+    $responseBody = admin_http_post_body_response($url, $body, $headers, $httpCode);
+    if ($responseBody === null) {
+        return false;
+    }
+    if ($httpCode !== null) {
+        return $httpCode >= 200 && $httpCode < 300;
+    }
+    return true;
+}
+
+function admin_http_post_body_response(string $url, string $body, array $headers, ?int &$httpCode = null): ?string {
     $responseBody = null;
-    $httpCode = null;
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_POST, true);
@@ -1408,12 +1494,9 @@ function admin_http_post_body(string $url, string $body, array $headers): bool {
         }
     }
     if ($responseBody === false || $responseBody === null) {
-        return false;
+        return null;
     }
-    if ($httpCode !== null) {
-        return $httpCode >= 200 && $httpCode < 300;
-    }
-    return true;
+    return $responseBody;
 }
 
 function admin_http_get_json(string $url, array $headers = []): ?array {
@@ -1519,7 +1602,7 @@ function admin_send_telegram_message(string $token, string $chatId, string $text
     return false;
 }
 
-function admin_maybe_auto_post_to_social_networks(string $filename, string $title, string $description): void {
+function admin_maybe_auto_post_to_social_networks(string $filename, string $title, string $description, string $image = ''): void {
     $slug = pathinfo($filename, PATHINFO_FILENAME);
     if ($slug === '') {
         $slug = $filename;
@@ -1536,6 +1619,11 @@ function admin_maybe_auto_post_to_social_networks(string $filename, string $titl
     }
     if (($settings['twitter']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('twitter', $settings['twitter'])) {
         admin_send_twitter_post($slug, $title, $description, $settings['twitter']);
+    }
+    if (($settings['instagram']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('instagram', $settings['instagram'])) {
+        if (trim($image) !== '') {
+            admin_send_instagram_post($slug, $title, $image, $settings['instagram']);
+        }
     }
 }
 
@@ -2749,7 +2837,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = 'No se pudo guardar el contenido. Revisa los permisos de la carpeta content/.';
                 } else {
                     if (!$isDraft && $type !== 'Página') {
-                        admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description);
+                        admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image);
                         $settings = get_settings();
                         $mailing = $settings['mailing'] ?? [];
                         $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
@@ -2915,7 +3003,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                     if ($shouldAutoShare) {
-                        admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description);
+                        admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image);
                     }
                     if ($shouldAutoShare) {
                         $settings = get_settings();
@@ -2972,6 +3060,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'whatsapp' => 'WhatsApp',
             'facebook' => 'Facebook',
             'twitter' => 'X',
+            'instagram' => 'Instagram',
         ];
         if (!isset($networkLabels[$networkKey])) {
             $_SESSION['social_feedback'] = ['type' => 'danger', 'message' => 'Red social no válida.'];
@@ -2993,12 +3082,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $slug = $slug !== '' ? $slug : $filename;
                     $title = $metadata['Title'] ?? $slug;
                     $description = $metadata['Description'] ?? '';
+                    $image = $metadata['Image'] ?? '';
                     $allSocialSettings = admin_cached_social_settings();
                     $networkSettings = $allSocialSettings[$networkKey] ?? [];
                     if (!admin_is_social_network_configured($networkKey, $networkSettings)) {
-                        $feedback['message'] = 'Configura correctamente ' . $networkLabels[$networkKey] . ' en la pestaña Configuración antes de enviar.';
+                        $feedback['message'] = 'Configura correctamente ' . $networkLabels[$networkKey] . ' en la pestaña Difusión antes de enviar.';
                     } else {
                         $sent = false;
+                        $customError = null;
                         switch ($networkKey) {
                             case 'telegram':
                                 $sent = admin_send_post_to_telegram($slug, $title, $description, $networkSettings);
@@ -3012,12 +3103,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             case 'twitter':
                                 $sent = admin_send_twitter_post($slug, $title, $description, $networkSettings);
                                 break;
+                            case 'instagram':
+                                if (trim($image) === '') {
+                                    $customError = 'Instagram requiere una imagen destacada para enviar la publicación.';
+                                    break;
+                                }
+                                $sent = admin_send_instagram_post($slug, $title, $image, $networkSettings);
+                                break;
                         }
                         if ($sent) {
                             $feedback = [
                                 'type' => 'success',
                                 'message' => 'La publicación se envió correctamente a ' . $networkLabels[$networkKey] . '.',
                             ];
+                        } elseif ($customError !== null) {
+                            $feedback['message'] = $customError;
                         } else {
                             $feedback['message'] = 'No se pudo enviar la publicación a ' . $networkLabels[$networkKey] . '. Comprueba las credenciales.';
                         }
@@ -3895,6 +3995,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $twitter_token = trim($_POST['twitter_token'] ?? '');
         $twitter_channel = trim($_POST['twitter_channel'] ?? '');
         $twitter_auto = isset($_POST['twitter_auto']) ? 'on' : 'off';
+        $instagram_token = trim($_POST['instagram_token'] ?? '');
+        $instagram_channel = trim($_POST['instagram_channel'] ?? '');
+        $instagram_auto = isset($_POST['instagram_auto']) ? 'on' : 'off';
 
         try {
             $config = load_config_file();
@@ -3949,6 +4052,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ];
             } else {
                 unset($config['twitter']);
+            }
+            if ($instagram_token !== '' || $instagram_channel !== '' || $instagram_auto === 'on') {
+                $config['instagram'] = [
+                    'token' => $instagram_token,
+                    'channel' => $instagram_channel,
+                    'auto_post' => $instagram_auto,
+                ];
+            } else {
+                unset($config['instagram']);
             }
 
             save_config_file($config);

@@ -66,12 +66,14 @@ if ($editFeedback !== null) {
             'whatsapp' => $settings['whatsapp'] ?? [],
             'facebook' => $settings['facebook'] ?? [],
             'twitter' => $settings['twitter'] ?? [],
+            'instagram' => $settings['instagram'] ?? [],
         ];
         $networkLabels = [
             'telegram' => 'Telegram',
             'whatsapp' => 'WhatsApp',
             'facebook' => 'Facebook',
             'twitter' => 'X',
+            'instagram' => 'Instagram',
         ];
         $mailingReady = admin_is_mailing_ready($settings);
         ?>

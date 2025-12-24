@@ -22,6 +22,8 @@
     $facebookAutoEnabled = ($facebookSettings['auto_post'] ?? 'off') === 'on';
     $twitterSettings = $settings['twitter'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
     $twitterAutoEnabled = ($twitterSettings['auto_post'] ?? 'off') === 'on';
+    $instagramSettings = $settings['instagram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
+    $instagramAutoEnabled = ($instagramSettings['auto_post'] ?? 'off') === 'on';
     if ($adsImage !== '') {
         if (str_starts_with($adsImage, 'http')) {
             $adsImagePreview = $adsImage;
@@ -173,7 +175,7 @@
                     </div>
 
                     <h4 class="mt-4">Telegram (opcional)</h4>
-                    <p class="text-muted">Conecta un bot y un canal/grupo para compartir automáticamente las nuevas entradas.</p>
+                    <p class="text-muted">Conecta un bot y un canal/grupo para compartir automáticamente las nuevas entradas. <a href="#" data-toggle="modal" data-target="#telegramHelpModal">Ver guía rápida</a></p>
                     <div class="form-group">
                         <label for="telegram_token">Token del bot</label>
                         <input type="text" name="telegram_token" id="telegram_token" class="form-control" value="<?= htmlspecialchars($telegramSettings['token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="123456789:ABCDef...">
@@ -188,9 +190,32 @@
                         <input type="checkbox" class="form-check-input" name="telegram_auto" id="telegram_auto" value="1" <?= $telegramAutoEnabled ? 'checked' : '' ?>>
                         <label for="telegram_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
                     </div>
+                    <div class="modal fade" id="telegramHelpModal" tabindex="-1" role="dialog" aria-labelledby="telegramHelpModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="telegramHelpModalLabel">Guía rápida para Telegram</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <ol class="mb-3">
+                                        <li>Crea un bot con <code>@BotFather</code> y copia el token.</li>
+                                        <li>Añade el bot como administrador en tu canal o grupo.</li>
+                                        <li>Introduce el token y el @del canal o el ID numérico del grupo.</li>
+                                    </ol>
+                                    <p class="mb-0">Telegram permite enlaces clicables en los mensajes.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <h4 class="mt-4">WhatsApp (opcional)</h4>
-                    <p class="text-muted">Usa la API de WhatsApp Business Cloud para avisar a tus contactos o grupos.</p>
+                    <p class="text-muted">Usa la API de WhatsApp Business Cloud para avisar a tus contactos o grupos. <a href="#" data-toggle="modal" data-target="#whatsappHelpModal">Ver guía rápida</a></p>
                     <div class="form-group">
                         <label for="whatsapp_token">Token del bot o app</label>
                         <input type="text" name="whatsapp_token" id="whatsapp_token" class="form-control" value="<?= htmlspecialchars($whatsappSettings['token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Token de acceso">
@@ -210,9 +235,32 @@
                         <input type="checkbox" class="form-check-input" name="whatsapp_auto" id="whatsapp_auto" value="1" <?= $whatsappAutoEnabled ? 'checked' : '' ?>>
                         <label for="whatsapp_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
                     </div>
+                    <div class="modal fade" id="whatsappHelpModal" tabindex="-1" role="dialog" aria-labelledby="whatsappHelpModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="whatsappHelpModalLabel">Guía rápida para WhatsApp</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <ol class="mb-3">
+                                        <li>Activa WhatsApp Business Cloud en Meta Developers.</li>
+                                        <li>Obtén el token y el <code>phone number ID</code>.</li>
+                                        <li>Indica el número destino en formato internacional (sin +).</li>
+                                    </ol>
+                                    <p class="mb-0">WhatsApp suele exigir plantillas aprobadas para mensajes fuera de ventana de 24h.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <h4 class="mt-4">Facebook (opcional)</h4>
-                    <p class="text-muted">Comparte tus entradas en una página o grupo usando la Graph API.</p>
+                    <p class="text-muted">Comparte tus entradas en una página o grupo usando la Graph API. <a href="#" data-toggle="modal" data-target="#facebookHelpModal">Ver guía rápida</a></p>
                     <div class="form-group">
                         <label for="facebook_token">Token de acceso</label>
                         <input type="text" name="facebook_token" id="facebook_token" class="form-control" value="<?= htmlspecialchars($facebookSettings['token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="EAABsb...">
@@ -227,9 +275,32 @@
                         <input type="checkbox" class="form-check-input" name="facebook_auto" id="facebook_auto" value="1" <?= $facebookAutoEnabled ? 'checked' : '' ?>>
                         <label for="facebook_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
                     </div>
+                    <div class="modal fade" id="facebookHelpModal" tabindex="-1" role="dialog" aria-labelledby="facebookHelpModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="facebookHelpModalLabel">Guía rápida para Facebook</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <ol class="mb-3">
+                                        <li>Crea una app en Meta Developers y habilita Graph API.</li>
+                                        <li>Genera un token con permisos para publicar en la página.</li>
+                                        <li>Introduce el ID de la página y el token.</li>
+                                    </ol>
+                                    <p class="mb-0">Puedes obtener el ID de página en la configuración avanzada de Facebook.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <h4 class="mt-4">Twitter / X (opcional)</h4>
-                    <p class="text-muted">Publica un tweet con el título y enlace de cada entrada.</p>
+                    <p class="text-muted">Publica un tweet con el título y enlace de cada entrada. <a href="#" data-toggle="modal" data-target="#twitterHelpModal">Ver guía rápida</a></p>
                     <div class="form-group">
                         <label for="twitter_token">Token / Bearer</label>
                         <input type="text" name="twitter_token" id="twitter_token" class="form-control" value="<?= htmlspecialchars($twitterSettings['token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Bearer ...">
@@ -243,6 +314,71 @@
                     <div class="form-check mb-3">
                         <input type="checkbox" class="form-check-input" name="twitter_auto" id="twitter_auto" value="1" <?= $twitterAutoEnabled ? 'checked' : '' ?>>
                         <label for="twitter_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
+                    </div>
+                    <div class="modal fade" id="twitterHelpModal" tabindex="-1" role="dialog" aria-labelledby="twitterHelpModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="twitterHelpModalLabel">Guía rápida para Twitter / X</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <ol class="mb-3">
+                                        <li>Crea un proyecto en el portal de desarrolladores de X.</li>
+                                        <li>Genera un Bearer Token o token con permisos de publicación.</li>
+                                        <li>Introduce el token y el usuario o ID de la cuenta.</li>
+                                    </ol>
+                                    <p class="mb-0">Si el texto supera 280 caracteres se truncará.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h4 class="mt-4">Instagram (opcional)</h4>
+                    <p class="text-muted">Requiere cuenta Business/Creator vinculada a una página de Facebook. Publica la imagen destacada con título y enlace. <a href="#" data-toggle="modal" data-target="#instagramHelpModal">Ver guía rápida</a></p>
+                    <div class="form-group">
+                        <label for="instagram_token">Token de acceso</label>
+                        <input type="text" name="instagram_token" id="instagram_token" class="form-control" value="<?= htmlspecialchars($instagramSettings['token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="EAAG...">
+                        <small class="form-text text-muted">Token con permisos para publicar en Instagram Graph API.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="instagram_channel">ID de cuenta de Instagram</label>
+                        <input type="text" name="instagram_channel" id="instagram_channel" class="form-control" value="<?= htmlspecialchars($instagramSettings['channel'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="17841400000000000">
+                        <small class="form-text text-muted">ID numérico de la cuenta de Instagram vinculada.</small>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" name="instagram_auto" id="instagram_auto" value="1" <?= $instagramAutoEnabled ? 'checked' : '' ?>>
+                        <label for="instagram_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
+                    </div>
+
+                    <div class="modal fade" id="instagramHelpModal" tabindex="-1" role="dialog" aria-labelledby="instagramHelpModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="instagramHelpModalLabel">Guía rápida para Instagram</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <ol class="mb-3">
+                                        <li>Convierte tu cuenta en Business o Creator y vincúlala a una página de Facebook.</li>
+                                        <li>En Meta Developers crea una app con permisos: <code>instagram_basic</code>, <code>instagram_content_publish</code> y <code>pages_show_list</code>.</li>
+                                        <li>Genera un access token de larga duración y consigue el ID de la cuenta de Instagram conectada.</li>
+                                        <li>Introduce el token y el ID en este formulario.</li>
+                                    </ol>
+                                    <p class="mb-0">El enlace se incluye en el texto del post, pero Instagram no lo hace clicable.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <button type="submit" name="save_social" class="btn btn-outline-primary">Guardar redes sociales</button>

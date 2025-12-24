@@ -347,6 +347,8 @@ if ($isPageTemplate && $formattedDate !== '') {
         box-sizing: border-box;
         max-width: 100%;
         overflow: visible;
+        margin-left: auto;
+        margin-right: auto;
     }
     .site-search-box.variant-panel {
         background: #fff;
@@ -367,10 +369,10 @@ if ($isPageTemplate && $formattedDate !== '') {
     .site-search-form input[type="text"],
     .site-search-form input[type="email"] {
         flex: 1;
-        padding: 0.75rem 1rem;
+        padding: 0.6rem 0.8rem;
         border-radius: var(--nammu-radius-md);
         border: 1px solid rgba(0,0,0,0.1);
-        font-size: 1rem;
+        font-size: 0.95rem;
     }
     .site-search-form input:focus {
         outline: 2px solid <?= $colorAccent ?>;
@@ -378,30 +380,31 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .site-subscription-box .site-search-form {
         flex-wrap: nowrap;
+        justify-content: center;
     }
     .site-subscription-box .site-search-form input[type="email"] {
-        flex: 1 1 240px;
-        padding: 0.7rem 0.9rem;
-        border-radius: 12px;
+        flex: 1 1 auto;
+        padding: 0.35rem 0.45rem;
+        border-radius: 8px;
         border: 1px solid rgba(0,0,0,0.1);
-        font-size: 1rem;
+        font-size: 0.85rem;
     }
     .site-subscription-box .site-search-form button,
     .site-subscription-box .subscription-avisos-link {
         padding: 0;
-        height: 42px;
-        width: 42px;
+        height: 26px;
+        width: 26px;
     }
     .site-subscription-box .subscription-postal-link,
     .site-subscription-box .subscription-avisos-link {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
         background: rgba(0,0,0,0.05);
-        margin-left: 0.4rem;
+        margin-left: 0.2rem;
         padding: 0;
         text-decoration: none;
         transition: background 0.2s ease;
@@ -413,8 +416,8 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .site-subscription-box .subscription-postal-link svg,
     .site-subscription-box .subscription-avisos-link svg {
-        width: 20px;
-        height: 20px;
+        width: 14px;
+        height: 14px;
         display: block;
     }
     .postal-only-box {
@@ -487,17 +490,17 @@ if ($isPageTemplate && $formattedDate !== '') {
     .site-search-form button {
         border: none;
         background: <?= $colorAccent ?>;
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
     }
     .site-search-form .search-icon {
-        width: 40px;
-        height: 40px;
+        width: 36px;
+        height: 36px;
         border-radius: 50%;
         background: rgba(0,0,0,0.05);
         display: inline-flex;
@@ -507,9 +510,9 @@ if ($isPageTemplate && $formattedDate !== '') {
     .search-categories-link,
     .search-letters-link,
     .search-itineraries-link {
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
         background: rgba(0,0,0,0.05);
         display: inline-flex;
         align-items: center;
@@ -622,32 +625,28 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     @media (max-width: 1100px) {
         .site-search-box {
-            padding: 0.6rem 0.7rem;
+            padding: 0.35rem 0.4rem;
+            max-width: 100%;
+        }
+        .site-subscription-box {
+            max-width: min(720px, 100%);
         }
         .site-search-form {
             flex-direction: row;
-            flex-wrap: wrap;
-            gap: 0.4rem;
-        }
-        .site-search-box:not(.site-subscription-box) .site-search-form {
             flex-wrap: nowrap;
-            gap: 0.35rem;
+            gap: 0.25rem;
         }
         .site-search-form .search-icon {
-            width: 32px;
-            height: 32px;
+            width: 22px;
+            height: 22px;
         }
         .site-search-form input[type="text"],
         .site-search-form input[type="email"] {
-            flex: 1 1 100%;
-            width: 100%;
-            min-width: 0;
-            padding: 0.5rem 0.6rem;
-            font-size: 0.9rem;
-        }
-        .site-search-box:not(.site-subscription-box) .site-search-form input[type="text"] {
             flex: 1 1 auto;
             width: auto;
+            min-width: 0;
+            padding: 0.25rem 0.35rem;
+            font-size: 0.8rem;
         }
         .site-search-form button,
         .search-categories-link,
@@ -655,16 +654,12 @@ if ($isPageTemplate && $formattedDate !== '') {
         .search-itineraries-link,
         .subscription-postal-link,
         .subscription-avisos-link {
-            width: 32px;
-            height: 32px;
-            border-radius: 10px;
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
         }
         .post-brand .site-search-form {
-            gap: 0.4rem;
-        }
-        .post-brand .site-search-form input[type="text"] {
-            flex: 1 1 100%;
-            width: 100%;
+            gap: 0.25rem;
         }
     }
     .post-body h1 {

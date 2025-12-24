@@ -34,7 +34,7 @@
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
             <div>
                 <h2 class="mb-1">Difusión</h2>
-                <p class="text-muted mb-0">Crea anuncios flotantes, envía notificaciones push directamente a tus lectores e integra las actualizaciones de blog con tus redes sociales.</p>
+                <p class="text-muted mb-0">Crea anuncios flotantes, envía notificaciones push directamente a tus lectores e integra la actividad y los contenidos del blog en tus redes sociales.</p>
             </div>
         </div>
 

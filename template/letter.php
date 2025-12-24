@@ -303,14 +303,28 @@ $renderPostCards = static function (array $subset, bool $hideMeta = false) use (
     }
     @media (max-width: 640px) {
         .site-search-form {
-            flex-direction: column;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            gap: 0.35rem;
+        }
+        .site-search-form .search-icon {
+            width: 32px;
+            height: 32px;
         }
         .site-search-form input[type="text"],
         .site-search-form button,
         .search-categories-link,
         .search-letters-link,
         .search-itineraries-link {
-            width: 100%;
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+        }
+        .site-search-form input[type="text"] {
+            flex: 1 1 auto;
+            min-width: 0;
+            padding: 0.5rem 0.6rem;
+            font-size: 0.9rem;
         }
     }
 

@@ -141,6 +141,11 @@ $renderSubscriptionBox = static function (string $variant) use ($subscriptionAct
                 </svg>
             </span>
             <input type="email" name="subscriber_email" placeholder="Pon tu email para suscribirte" required>
+            <button type="submit" aria-label="Enviar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 4L9 16L4 11" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
             <a class="subscription-avisos-link" href="<?= htmlspecialchars($avisosUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Avisos por email">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
                     <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -439,13 +444,19 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     @media (max-width: 640px) {
         .site-search-form {
             flex-direction: row;
-            flex-wrap: wrap;
-            gap: 0.5rem;
+            flex-wrap: nowrap;
+            gap: 0.35rem;
+        }
+        .site-search-form .search-icon {
+            width: 32px;
+            height: 32px;
         }
         .site-search-form input[type="text"],
         .site-search-form input[type="email"] {
-            flex: 1 1 100%;
-            width: 100%;
+            flex: 1 1 auto;
+            min-width: 0;
+            padding: 0.5rem 0.6rem;
+            font-size: 0.9rem;
         }
         .site-search-form button,
         .search-categories-link,
@@ -453,8 +464,9 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
         .search-itineraries-link,
         .subscription-postal-link,
         .subscription-avisos-link {
-            width: 40px;
-            height: 40px;
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
         }
         .site-subscription-box .subscription-postal-link,
         .site-subscription-box .subscription-avisos-link {

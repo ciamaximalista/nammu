@@ -1167,7 +1167,7 @@ if (!empty($baseUrl)) {
                 <?php endif; ?>
                 <?php if ($footerNammuEnabled): ?>
                     <div class="footer-nammu-link">
-                        Sitio web realizado con <a href="https://ruralnext.org/nammu">Nammu</a>, software libre para el rural.
+                        Sitio web realizado con <a href="https://ruralnext.org/nammu" target="_blank" rel="noopener">Nammu</a> en <a href="https://ruralnext.org" target="_blank" rel="noopener">RuralNEXT</a>, software libre para el rural.
                     </div>
                 <?php endif; ?>
             </footer>

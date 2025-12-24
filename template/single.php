@@ -344,6 +344,9 @@ if ($isPageTemplate && $formattedDate !== '') {
         padding: 1rem 1.25rem;
         border: 1px solid rgba(0,0,0,0.05);
         background: <?= $colorHighlight ?>;
+        box-sizing: border-box;
+        max-width: 100%;
+        overflow: hidden;
     }
     .site-search-box.variant-panel {
         background: #fff;
@@ -358,6 +361,8 @@ if ($isPageTemplate && $formattedDate !== '') {
         display: flex;
         align-items: center;
         gap: 0.75rem;
+        width: 100%;
+        min-width: 0;
     }
     .site-search-form input[type="text"],
     .site-search-form input[type="email"] {
@@ -433,6 +438,9 @@ if ($isPageTemplate && $formattedDate !== '') {
             flex-direction: row;
             flex-wrap: nowrap;
             gap: 0.35rem;
+        }
+        .site-search-box {
+            padding: 0.6rem 0.7rem;
         }
         .site-search-form .search-icon {
             width: 32px;

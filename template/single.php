@@ -628,6 +628,12 @@ if ($isPageTemplate && $formattedDate !== '') {
             padding: 0.35rem 0.4rem;
             max-width: 100%;
         }
+        .site-search-block {
+            margin: 0.7rem auto;
+        }
+        .site-search-block.placement-top {
+            margin: 0.5rem auto 0.6rem;
+        }
         .site-subscription-box {
             max-width: min(720px, 100%);
         }

@@ -1410,13 +1410,14 @@ function nammu_slugify_label(string $text): string
 function nammu_collect_categories_from_posts(array $posts): array
 {
     $categories = [];
+    $uncategorizedName = 'Sin Categoría';
     foreach ($posts as $post) {
         if (!$post instanceof Post) {
             continue;
         }
         $category = trim($post->getCategory());
         if ($category === '') {
-            continue;
+            $category = $uncategorizedName;
         }
         $slug = nammu_slugify_label($category);
         if ($slug === '') {

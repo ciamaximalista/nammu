@@ -22,6 +22,7 @@ $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/itinerarios' : '/itinerarios');
 $hasItineraries = !empty($hasItineraries);
+$hasCategories = !empty($hasCategories);
 $hasResults = !empty($results);
 $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
 ?>
@@ -38,13 +39,15 @@ $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
                     <?php endforeach; ?>
                 </select>
                 <button type="submit">Buscar</button>
-                <a class="search-categories-link" href="<?= htmlspecialchars(rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/categorias', ENT_QUOTES, 'UTF-8') ?>" aria-label="Índice de categorías">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
-                        <line x1="8" y1="9" x2="16" y2="9" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
-                        <line x1="8" y1="13" x2="16" y2="13" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
-                    </svg>
-                </a>
+                <?php if ($hasCategories): ?>
+                    <a class="search-categories-link" href="<?= htmlspecialchars(rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/categorias', ENT_QUOTES, 'UTF-8') ?>" aria-label="Índice de categorías">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                            <line x1="8" y1="9" x2="16" y2="9" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                            <line x1="8" y1="13" x2="16" y2="13" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                        </svg>
+                    </a>
+                <?php endif; ?>
                 <?php if ($showLetterButton && $letterIndexUrlValue): ?>
                     <a class="search-letters-link" href="<?= htmlspecialchars($letterIndexUrlValue, ENT_QUOTES, 'UTF-8') ?>" aria-label="Índice alfabético">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -92,7 +95,10 @@ $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
                 <header>
                     <span class="result-pill"><?= htmlspecialchars($item['type_label'], ENT_QUOTES, 'UTF-8') ?></span>
                     <?php if ($item['category'] !== ''): ?>
-                        <span class="result-pill faded"><?= htmlspecialchars($item['category'], ENT_QUOTES, 'UTF-8') ?></span>
+                        <?php $categorySlug = nammu_slugify_label($item['category']); ?>
+                        <?php if ($categorySlug !== '' && $categorySlug !== 'sin-categoria'): ?>
+                            <span class="result-pill faded"><?= htmlspecialchars($item['category'], ENT_QUOTES, 'UTF-8') ?></span>
+                        <?php endif; ?>
                     <?php endif; ?>
                     <?php if ($item['date'] !== ''): ?>
                         <time datetime="<?= htmlspecialchars($item['date'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($item['date'], ENT_QUOTES, 'UTF-8') ?></time>

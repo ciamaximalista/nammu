@@ -82,12 +82,23 @@ $renderer = new TemplateRenderer(__DIR__ . '/template', [
     'baseUrl' => $homeUrl,
     'theme' => $theme,
 ]);
+$allPostsForCategories = $contentRepository->all();
+$categoryMapAll = nammu_collect_categories_from_posts($allPostsForCategories);
+$uncategorizedSlug = nammu_slugify_label('Sin Categoría');
+$hasCategories = false;
+foreach ($categoryMapAll as $slugKey => $data) {
+    if ($slugKey !== $uncategorizedSlug) {
+        $hasCategories = true;
+        break;
+    }
+}
 $renderer->setGlobal('lettersIndexUrl', $isAlphabeticalOrder ? $lettersIndexUrl : null);
 $renderer->setGlobal('showLetterIndexButton', $isAlphabeticalOrder);
 $renderer->setGlobal('postalEnabled', $postalEnabled);
 $renderer->setGlobal('postalUrl', $postalUrl);
 $renderer->setGlobal('postalLogoSvg', $postalLogoSvg);
 $renderer->setGlobal('footerLinks', $footerLinks);
+$renderer->setGlobal('hasCategories', $hasCategories);
 
 $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseUrl): ?string {
     if ($image === null || $image === '') {
@@ -522,10 +533,12 @@ if ($letterSlugRequest !== null) {
 $slug = null;
 
 if ($isCategoriesIndex) {
-    $allPosts = $contentRepository->all();
-    $categoryMap = nammu_collect_categories_from_posts($allPosts);
+    $categoryMap = $categoryMapAll;
     $categoriesList = [];
     foreach ($categoryMap as $slugKey => $data) {
+        if ($slugKey === $uncategorizedSlug) {
+            continue;
+        }
         $categoriesList[] = [
             'slug' => $slugKey,
             'name' => $data['name'],
@@ -562,8 +575,7 @@ if ($isCategoriesIndex) {
 }
 
 if ($categorySlugRequest !== null) {
-    $allPosts = $contentRepository->all();
-    $categoryMap = nammu_collect_categories_from_posts($allPosts);
+    $categoryMap = $categoryMapAll;
     $slugKey = strtolower($categorySlugRequest);
     if (!isset($categoryMap[$slugKey])) {
         $renderNotFound('Categoría no encontrada', 'No existe ninguna publicación asociada a esta categoría.', $routePath);

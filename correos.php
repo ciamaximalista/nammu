@@ -345,6 +345,15 @@ $postalEnabled = ($config['postal']['enabled'] ?? 'off') === 'on';
 $postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
 $postalLogoSvg = nammu_postal_icon_svg();
 $footerLinks = nammu_build_footer_links($config, $theme, $homeUrl, $postalUrl);
+$categoryMapAll = nammu_collect_categories_from_posts($contentRepository->all());
+$uncategorizedSlug = nammu_slugify_label('Sin Categoría');
+$hasCategories = false;
+foreach ($categoryMapAll as $slugKey => $data) {
+    if ($slugKey !== $uncategorizedSlug) {
+        $hasCategories = true;
+        break;
+    }
+}
 $message = '';
 $messageType = 'info';
 $colors = $theme['colors'] ?? [];
@@ -527,6 +536,7 @@ $renderer = new TemplateRenderer(__DIR__ . '/template', [
     'postalLogoSvg' => $postalLogoSvg,
     'footerLinks' => $footerLinks,
 ]);
+$renderer->setGlobal('hasCategories', $hasCategories);
     
 $sortOrderValue = strtolower((string) ($config['pages_order_by'] ?? 'date'));
 $sortOrder = in_array($sortOrderValue, ['date', 'alpha'], true) ? $sortOrderValue : 'date';

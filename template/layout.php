@@ -1248,18 +1248,6 @@ if (!empty($baseUrl)) {
             <?php endif; ?>
         </div>
     <?php endif; ?>
-    <?php if ($showPushPrompt): ?>
-        <div class="nammu-push-banner" data-push-banner data-push-public-key="<?= htmlspecialchars($pushPublicKey, ENT_QUOTES, 'UTF-8') ?>" data-push-subscribe="<?= htmlspecialchars($pushSubscribeUrl, ENT_QUOTES, 'UTF-8') ?>" data-push-unsubscribe="<?= htmlspecialchars($pushUnsubscribeUrl, ENT_QUOTES, 'UTF-8') ?>">
-            <div>
-                <h3>Recibe avisos del blog</h3>
-                <p>Activa las notificaciones push para conocer nuevas entradas o itinerarios.</p>
-            </div>
-            <div class="nammu-push-actions">
-                <button type="button" data-push-accept>Activar avisos</button>
-                <button type="button" class="secondary" data-push-decline>Ahora no</button>
-            </div>
-        </div>
-    <?php endif; ?>
     <?php if ($showAdsBanner && !$isCrawler): ?>
         <div class="nammu-ad-banner" data-ad-banner data-server-date="<?= htmlspecialchars($serverDay, ENT_QUOTES, 'UTF-8') ?>" data-server-expires="<?= htmlspecialchars($serverDayExpires, ENT_QUOTES, 'UTF-8') ?>">
             <button class="nammu-ad-close" type="button" aria-label="Cerrar anuncio" data-ad-close>
@@ -1366,8 +1354,8 @@ if (!empty($baseUrl)) {
     </script>
     <script>
     (function() {
-        var banner = document.querySelector('[data-push-banner]');
-        if (!banner) {
+        var pushEnabled = <?= $showPushPrompt ? 'true' : 'false' ?>;
+        if (!pushEnabled) {
             return;
         }
         if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -1376,16 +1364,14 @@ if (!empty($baseUrl)) {
         if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
             return;
         }
-        var publicKey = banner.getAttribute('data-push-public-key') || '';
-        var subscribeUrl = banner.getAttribute('data-push-subscribe') || '';
-        var unsubscribeUrl = banner.getAttribute('data-push-unsubscribe') || '';
+        var publicKey = <?= json_encode($pushPublicKey, JSON_UNESCAPED_SLASHES) ?> || '';
+        var subscribeUrl = <?= json_encode($pushSubscribeUrl, JSON_UNESCAPED_SLASHES) ?> || '';
+        var unsubscribeUrl = <?= json_encode($pushUnsubscribeUrl, JSON_UNESCAPED_SLASHES) ?> || '';
         if (!publicKey || !subscribeUrl) {
             return;
         }
-        var acceptBtn = banner.querySelector('[data-push-accept]');
-        var declineBtn = banner.querySelector('[data-push-decline]');
-        var snoozeKey = 'nammu_push_snooze';
-        var snoozeDays = 7;
+        var promptedKey = 'nammu_push_prompted';
+        var promptCooldownDays = 16;
 
         function hasConsent() {
             return document.cookie.split(';').some(function(part) {
@@ -1393,25 +1379,26 @@ if (!empty($baseUrl)) {
             });
         }
 
-        function hasSnooze() {
-            var value = '';
+        function wasPrompted() {
             try {
-                value = localStorage.getItem(snoozeKey);
+                var stored = localStorage.getItem(promptedKey);
+                if (!stored) {
+                    return false;
+                }
+                var lastPrompt = new Date(stored);
+                if (isNaN(lastPrompt.getTime())) {
+                    return false;
+                }
+                var diffMs = Date.now() - lastPrompt.getTime();
+                return diffMs < (promptCooldownDays * 24 * 60 * 60 * 1000);
             } catch (e) {
-                value = '';
-            }
-            if (!value) {
                 return false;
             }
-            var until = new Date(value);
-            return until > new Date();
         }
 
-        function setSnooze() {
-            var until = new Date();
-            until.setDate(until.getDate() + snoozeDays);
+        function setPrompted() {
             try {
-                localStorage.setItem(snoozeKey, until.toISOString());
+                localStorage.setItem(promptedKey, new Date().toISOString());
             } catch (e) {
                 return;
             }
@@ -1468,95 +1455,31 @@ if (!empty($baseUrl)) {
                 });
         }
 
-        function refreshAfterSuccess() {
-            if (banner.classList.contains('is-visible')) {
-                setTimeout(function() {
-                    window.location.reload();
-                }, 300);
-            }
-        }
-
-        function adjustPosition() {
-            var adBanner = document.querySelector('[data-ad-banner]');
-            if (adBanner && adBanner.offsetParent !== null) {
-                var height = adBanner.getBoundingClientRect().height || 0;
-                var gap = window.matchMedia('(max-width: 720px)').matches ? 18 : 24;
-                banner.style.bottom = (height + gap) + 'px';
-                return;
-            }
-            banner.style.bottom = '';
-        }
-
-        function maybeShow() {
-            if (!hasConsent()) {
-                return;
-            }
-            if (Notification.permission === 'granted' || Notification.permission === 'denied') {
-                return;
-            }
-            if (hasSnooze()) {
-                return;
-            }
-            banner.classList.add('is-visible');
-            banner.classList.remove('has-ad');
-            adjustPosition();
-        }
-
-        function showBanner() {
-            if (!hasConsent() || hasSnooze()) {
-                return;
-            }
-            banner.classList.add('is-visible');
-            banner.classList.remove('has-ad');
-            adjustPosition();
-        }
-
-        if (acceptBtn) {
-            acceptBtn.addEventListener('click', function() {
-                Notification.requestPermission().then(function(permission) {
-                    if (permission !== 'granted') {
-                        setSnooze();
-                        banner.classList.remove('is-visible');
-                        return;
-                    }
-                    ensureSubscribed().then(function(subscription) {
-                        if (subscription) {
-                            refreshAfterSuccess();
-                        }
-                    }).finally(function() {
-                        banner.classList.remove('is-visible');
-                    });
-                });
-            });
-        }
-
-        if (declineBtn) {
-            declineBtn.addEventListener('click', function() {
-                setSnooze();
-                banner.classList.remove('is-visible');
-            });
-        }
-
-        if (Notification.permission === 'granted') {
-            if (!hasConsent()) {
-                return;
-            }
-            ensureSubscribed().then(function(subscription) {
-                if (!subscription) {
-                    showBanner();
-                    return;
-                }
-                refreshAfterSuccess();
+        function trySubscribe() {
+            return ensureSubscribed().then(function() {
+                return true;
             }).catch(function() {
-                showBanner();
+                return false;
             });
-        } else {
-            maybeShow();
         }
 
-        window.addEventListener('resize', function() {
-            if (banner.classList.contains('is-visible')) {
-                adjustPosition();
+        if (!hasConsent()) {
+            return;
+        }
+        if (Notification.permission === 'granted') {
+            trySubscribe();
+            return;
+        }
+        if (Notification.permission === 'denied') {
+            return;
+        }
+        if (wasPrompted()) {
+            return;
+        }
+        setPrompted();
+        Notification.requestPermission().then(function(permission) {
+            if (permission === 'granted') {
+                trySubscribe();
             }
         });
     })();

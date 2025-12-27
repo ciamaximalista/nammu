@@ -10,6 +10,13 @@ use Nammu\Core\ContentRepository;
 use Nammu\Core\MarkdownConverter;
 use Nammu\Core\TemplateRenderer;
 
+if (function_exists('nammu_publish_scheduled_posts')) {
+    nammu_publish_scheduled_posts(__DIR__ . '/content');
+}
+if (function_exists('nammu_process_scheduled_notifications_queue')) {
+    nammu_process_scheduled_notifications_queue();
+}
+
 define('MAILING_SUBSCRIBERS_FILE', __DIR__ . '/config/mailing-subscribers.json');
 define('MAILING_PENDING_FILE', __DIR__ . '/config/mailing-pending.json');
 define('MAILING_TOKENS_FILE', __DIR__ . '/config/mailing-tokens.json');

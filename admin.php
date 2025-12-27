@@ -27,6 +27,12 @@ define('MEDIA_TAGS_FILE', __DIR__ . '/config/media-tags.json');
 define('MAILING_SUBSCRIBERS_FILE', __DIR__ . '/config/mailing-subscribers.json');
 define('MAILING_SECRET_FILE', __DIR__ . '/config/mailing-secret.key');
 nammu_ensure_directory(ITINERARIES_DIR);
+if (function_exists('nammu_publish_scheduled_posts')) {
+    nammu_publish_scheduled_posts(CONTENT_DIR);
+}
+if (function_exists('nammu_process_scheduled_notifications_queue')) {
+    nammu_process_scheduled_notifications_queue();
+}
 
 // --- Helper Functions ---
 
@@ -2770,6 +2776,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $timestamp = time();
         }
         $date = date('Y-m-d', $timestamp);
+        $publishAtDate = trim($_POST['publish_at_date'] ?? '');
+        $publishAtTime = trim($_POST['publish_at_time'] ?? '');
         $image = trim($_POST['image'] ?? '');
         $description = trim($_POST['description'] ?? '');
         $type = $_POST['type'] ?? 'Entrada';
@@ -2777,6 +2785,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $filenameInput = trim($_POST['filename'] ?? '');
         $isDraft = isset($_POST['save_draft']);
         $statusValue = $isDraft ? 'draft' : 'published';
+        $publishAtValue = '';
         $slugPattern = '/^[a-z0-9-]+$/i';
 
         if ($filenameInput !== '' && !preg_match($slugPattern, $filenameInput)) {
@@ -2827,6 +2836,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
                 $file_content .= "Status: " . $statusValue . "
 ";
+                if ($isDraft && $publishAtDate !== '') {
+                    $publishAtTime = $publishAtTime !== '' ? $publishAtTime : '00:00';
+                    $publishTimestamp = strtotime($publishAtDate . ' ' . $publishAtTime);
+                    if ($publishTimestamp !== false) {
+                        $publishAtValue = date('Y-m-d H:i', $publishTimestamp);
+                    }
+                }
+                if ($publishAtValue !== '') {
+                    $file_content .= "PublishAt: " . $publishAtValue . "
+";
+                }
                 $file_content .= "Ordo: " . $ordo . "
 ";
                 $file_content .= "---
@@ -2868,6 +2888,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $title = $_POST['title'] ?? '';
         $category = $_POST['category'] ?? '';
         $date = $_POST['date'] ? date('Y-m-d', strtotime($_POST['date'])) : date('Y-m-d');
+        $publishAtDate = trim($_POST['publish_at_date'] ?? '');
+        $publishAtTime = trim($_POST['publish_at_time'] ?? '');
         $image = $_POST['image'] ?? '';
         $description = $_POST['description'] ?? '';
         $type = $_POST['type'] ?? null;
@@ -2955,6 +2977,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($error === null) {
             $finalPath = CONTENT_DIR . '/' . $targetFilename;
+            $publishAtValue = '';
+            if ($status === 'draft' && $publishAtDate !== '') {
+                $publishAtTime = $publishAtTime !== '' ? $publishAtTime : '00:00';
+                $publishTimestamp = strtotime($publishAtDate . ' ' . $publishAtTime);
+                if ($publishTimestamp !== false) {
+                    $publishAtValue = date('Y-m-d H:i', $publishTimestamp);
+                }
+            }
 
             $file_content = "---
 ";
@@ -2972,6 +3002,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
             $file_content .= "Status: " . $status . "
 ";
+            if ($publishAtValue !== '') {
+                $file_content .= "PublishAt: " . $publishAtValue . "
+";
+            }
             $file_content .= "Ordo: " . $ordo . "
 ";
             $file_content .= "---
@@ -9944,6 +9978,29 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 };
                 input.addEventListener('input', applySanitizedValue);
                 input.addEventListener('blur', applyTrimmedValue);
+            });
+        });
+        </script>
+
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var confirmButtons = document.querySelectorAll('[data-confirm-publish]');
+            if (!confirmButtons.length) {
+                return;
+            }
+            confirmButtons.forEach(function(button) {
+                button.addEventListener('click', function(event) {
+                    if (!window.confirm('¿Seguro que quieres continuar?')) {
+                        event.preventDefault();
+                        var form = button.closest('form');
+                        if (form) {
+                            var notice = form.querySelector('[data-publish-cancelled]');
+                            if (notice) {
+                                notice.classList.remove('d-none');
+                            }
+                        }
+                    }
+                });
             });
         });
         </script>

@@ -48,6 +48,19 @@
         </div>
 
         <div class="form-group">
+            <label>Programar publicación (borradores)</label>
+            <div class="form-row">
+                <div class="col-md-6">
+                    <input type="date" name="publish_at_date" class="form-control" placeholder="Fecha">
+                </div>
+                <div class="col-md-6">
+                    <input type="time" name="publish_at_time" class="form-control" placeholder="Hora">
+                </div>
+            </div>
+            <small class="form-text text-muted">Si guardas como borrador, se publicará automáticamente en esa fecha y hora.</small>
+        </div>
+
+        <div class="form-group">
 
             <label for="image">Imagen</label>
 
@@ -126,8 +139,9 @@
         </div>
 
         <div class="mt-3">
-            <button type="submit" name="publish" class="btn btn-primary mr-2">Publicar</button>
-            <button type="submit" name="save_draft" value="1" class="btn btn-outline-secondary">Guardar como borrador</button>
+            <div class="alert alert-warning d-none" data-publish-cancelled>Los cambios no se han guardado.</div>
+            <button type="submit" name="publish" class="btn btn-primary mr-2" data-confirm-publish="1">Publicar</button>
+            <button type="submit" name="save_draft" value="1" class="btn btn-outline-secondary" data-confirm-publish="1">Guardar como borrador</button>
         </div>
 
     </form>

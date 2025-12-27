@@ -21,4 +21,5 @@ config/push-vapid.json
 config/push-subscriptions.json
 config/push-queue.json
 config/postal-reset.json
+config/scheduled-*.json
 vendor/

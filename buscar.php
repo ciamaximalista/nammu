@@ -12,6 +12,13 @@ use Nammu\Core\MarkdownConverter;
 use Nammu\Core\TemplateRenderer;
 use Throwable;
 
+if (function_exists('nammu_publish_scheduled_posts')) {
+    nammu_publish_scheduled_posts(__DIR__ . '/content');
+}
+if (function_exists('nammu_process_scheduled_notifications_queue')) {
+    nammu_process_scheduled_notifications_queue();
+}
+
 $contentDir = __DIR__ . '/content';
 $itinerariesDir = __DIR__ . '/itinerarios';
 $contentRepository = new ContentRepository($contentDir);

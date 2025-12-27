@@ -237,6 +237,16 @@ if ($editFeedback !== null) {
                 $currentStatusValue = 'published';
             }
             $isDraftEditing = $currentStatusValue === 'draft';
+            $publishAtRaw = trim((string) ($post_data['metadata']['PublishAt'] ?? ''));
+            $publishAtDate = '';
+            $publishAtTime = '';
+            if ($publishAtRaw !== '') {
+                $publishAtTimestamp = strtotime($publishAtRaw);
+                if ($publishAtTimestamp !== false) {
+                    $publishAtDate = date('Y-m-d', $publishAtTimestamp);
+                    $publishAtTime = date('H:i', $publishAtTimestamp);
+                }
+            }
         ?>
 
         <?php if ($editFeedback !== null): ?>
@@ -289,6 +299,21 @@ if ($editFeedback !== null) {
                 <input type="date" name="date" id="date" class="form-control" value="<?= htmlspecialchars(format_date_for_input($post_data['metadata']['Date'] ?? null), ENT_QUOTES, 'UTF-8') ?>" required>
 
             </div>
+
+            <?php if ($isDraftEditing): ?>
+                <div class="form-group">
+                    <label>Programar publicación</label>
+                    <div class="form-row">
+                        <div class="col-md-6">
+                            <input type="date" name="publish_at_date" class="form-control" value="<?= htmlspecialchars($publishAtDate, ENT_QUOTES, 'UTF-8') ?>" placeholder="Fecha">
+                        </div>
+                        <div class="col-md-6">
+                            <input type="time" name="publish_at_time" class="form-control" value="<?= htmlspecialchars($publishAtTime, ENT_QUOTES, 'UTF-8') ?>" placeholder="Hora">
+                        </div>
+                    </div>
+                    <small class="form-text text-muted">Si defines una fecha y hora, se publicará automáticamente.</small>
+                </div>
+            <?php endif; ?>
 
             <div class="form-group">
 
@@ -366,10 +391,11 @@ if ($editFeedback !== null) {
             </div>
 
             <div class="mt-3">
+                <div class="alert alert-warning d-none" data-publish-cancelled>Los cambios no se han guardado.</div>
                 <button type="submit" name="update" class="btn btn-primary">Actualizar</button>
                 <?php if ($isDraftEditing): ?>
-                    <button type="submit" name="publish_draft_entry" value="1" class="btn btn-success ml-2">Publicar como entrada</button>
-                    <button type="submit" name="publish_draft_page" value="1" class="btn btn-success ml-2">Publicar como página</button>
+                    <button type="submit" name="publish_draft_entry" value="1" class="btn btn-success ml-2" data-confirm-publish="1">Publicar como entrada</button>
+                    <button type="submit" name="publish_draft_page" value="1" class="btn btn-success ml-2" data-confirm-publish="1">Publicar como página</button>
                 <?php elseif ($currentTypeValue === 'Entrada' && !$isDraftEditing): ?>
                     <button type="submit" name="convert_to_draft" value="1" class="btn btn-outline-secondary ml-2">Pasar a borrador</button>
                 <?php endif; ?>

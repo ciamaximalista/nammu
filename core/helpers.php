@@ -1458,6 +1458,218 @@ function nammu_collect_categories_from_posts(array $posts): array
     return $categories;
 }
 
+function nammu_publish_scheduled_posts(string $contentDir): int
+{
+    $files = glob(rtrim($contentDir, '/') . '/*.md') ?: [];
+    $now = time();
+    $published = 0;
+
+    foreach ($files as $file) {
+        if (!is_file($file)) {
+            continue;
+        }
+        $raw = file_get_contents($file);
+        if ($raw === false) {
+            continue;
+        }
+        if (!preg_match('/^---\\s*\\R(.*?)\\R---\\s*\\R?(.*)$/s', $raw, $matches)) {
+            continue;
+        }
+        $metaRaw = $matches[1];
+        $body = $matches[2] ?? '';
+        $lines = preg_split('/\\R/', $metaRaw) ?: [];
+        $meta = [];
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            if ($trimmed === '' || str_starts_with($trimmed, '#')) {
+                continue;
+            }
+            if (!str_contains($line, ':')) {
+                continue;
+            }
+            [$key, $value] = explode(':', $line, 2);
+            $meta[trim($key)] = trim($value);
+        }
+        $status = strtolower($meta['Status'] ?? '');
+        $template = strtolower($meta['Template'] ?? 'post');
+        $publishAt = $meta['PublishAt'] ?? '';
+        if ($status !== 'draft' || $publishAt === '') {
+            continue;
+        }
+        $publishTimestamp = strtotime($publishAt);
+        if ($publishTimestamp === false || $publishTimestamp > $now) {
+            continue;
+        }
+        $publishDate = date('Y-m-d', $publishTimestamp);
+        $updatedLines = [];
+        $statusSet = false;
+        $dateSet = false;
+        foreach ($lines as $line) {
+            if (!str_contains($line, ':')) {
+                $updatedLines[] = $line;
+                continue;
+            }
+            [$key, $value] = explode(':', $line, 2);
+            $key = trim($key);
+            if ($key === 'PublishAt') {
+                continue;
+            }
+            if ($key === 'Status') {
+                $updatedLines[] = 'Status: published';
+                $statusSet = true;
+                continue;
+            }
+            if ($key === 'Date') {
+                $updatedLines[] = 'Date: ' . $publishDate;
+                $dateSet = true;
+                continue;
+            }
+            $updatedLines[] = $line;
+        }
+        if (!$statusSet) {
+            $updatedLines[] = 'Status: published';
+        }
+        if (!$dateSet) {
+            $updatedLines[] = 'Date: ' . $publishDate;
+        }
+        $updatedMeta = implode("\n", $updatedLines);
+        $newContent = "---\n" . $updatedMeta . "\n---\n" . ltrim($body);
+        if ($newContent !== $raw && file_put_contents($file, $newContent) !== false) {
+            $published++;
+            $slug = basename($file, '.md');
+            $payload = [
+                'filename' => basename($file),
+                'slug' => $slug,
+                'title' => $meta['Title'] ?? $slug,
+                'description' => $meta['Description'] ?? '',
+                'image' => $meta['Image'] ?? '',
+                'template' => $template,
+                'published_at' => date('Y-m-d H:i', $publishTimestamp),
+            ];
+            nammu_handle_scheduled_post_notifications($payload);
+        }
+    }
+
+    return $published;
+}
+
+function nammu_scheduled_notifications_file(): string
+{
+    return __DIR__ . '/../config/scheduled-notifications.json';
+}
+
+function nammu_load_scheduled_notifications(): array
+{
+    $file = nammu_scheduled_notifications_file();
+    if (!is_file($file)) {
+        return [];
+    }
+    $raw = file_get_contents($file);
+    if ($raw === false) {
+        return [];
+    }
+    $data = json_decode($raw, true);
+    return is_array($data) ? $data : [];
+}
+
+function nammu_save_scheduled_notifications(array $queue): void
+{
+    $file = nammu_scheduled_notifications_file();
+    nammu_ensure_directory(dirname($file));
+    file_put_contents($file, json_encode(array_values($queue), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+}
+
+function nammu_enqueue_scheduled_notification(array $payload): void
+{
+    $queue = nammu_load_scheduled_notifications();
+    $filename = $payload['filename'] ?? '';
+    if ($filename !== '') {
+        foreach ($queue as $existing) {
+            if (($existing['filename'] ?? '') === $filename) {
+                return;
+            }
+        }
+    }
+    $queue[] = $payload;
+    nammu_save_scheduled_notifications($queue);
+}
+
+function nammu_handle_scheduled_post_notifications(array $payload): void
+{
+    if (!nammu_try_send_scheduled_post_notifications($payload)) {
+        nammu_enqueue_scheduled_notification($payload);
+    }
+}
+
+function nammu_try_send_scheduled_post_notifications(array $payload): bool
+{
+    $template = strtolower((string) ($payload['template'] ?? 'post'));
+    if ($template === 'page') {
+        return true;
+    }
+    $requiredAdmin = function_exists('admin_maybe_auto_post_to_social_networks')
+        && function_exists('admin_maybe_enqueue_push_notification')
+        && function_exists('get_settings')
+        && function_exists('admin_is_mailing_ready')
+        && function_exists('admin_load_mailing_subscribers')
+        && function_exists('admin_prepare_mailing_payload')
+        && function_exists('admin_send_mailing_broadcast')
+        && function_exists('admin_public_post_url');
+    if (!$requiredAdmin) {
+        return false;
+    }
+
+    $filename = (string) ($payload['filename'] ?? '');
+    $slug = (string) ($payload['slug'] ?? '');
+    $title = (string) ($payload['title'] ?? $slug);
+    $description = (string) ($payload['description'] ?? '');
+    $image = (string) ($payload['image'] ?? '');
+
+    if ($filename !== '') {
+        admin_maybe_auto_post_to_social_networks($filename, $title, $description, $image);
+    }
+
+    $settings = get_settings();
+    $mailing = $settings['mailing'] ?? [];
+    $link = $slug !== '' ? admin_public_post_url($slug) : '';
+    if (($mailing['auto_posts'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
+        $subscribers = admin_load_mailing_subscribers();
+        if (!empty($subscribers) && $link !== '') {
+            $payloadMail = admin_prepare_mailing_payload('single', $settings, $title, $description, $link, $image);
+            try {
+                admin_send_mailing_broadcast($payloadMail['subject'], '', '', $subscribers, $payloadMail['mailingConfig'], $payloadMail['bodyBuilder'], $payloadMail['fromName']);
+            } catch (Throwable $e) {
+                // ignore mailing errors on scheduled publish
+            }
+        }
+    }
+
+    if ($link !== '') {
+        admin_maybe_enqueue_push_notification('post', $title, $description, $link, $image);
+    }
+
+    return true;
+}
+
+function nammu_process_scheduled_notifications_queue(): array
+{
+    $queue = nammu_load_scheduled_notifications();
+    if (empty($queue)) {
+        return ['processed' => 0, 'remaining' => 0];
+    }
+    $remaining = [];
+    $processed = 0;
+    foreach ($queue as $payload) {
+        if (nammu_try_send_scheduled_post_notifications(is_array($payload) ? $payload : [])) {
+            $processed++;
+            continue;
+        }
+        $remaining[] = $payload;
+    }
+    nammu_save_scheduled_notifications($remaining);
+    return ['processed' => $processed, 'remaining' => count($remaining)];
+}
+
 function nammu_letter_key_from_title(string $title): string
 {
     $title = trim($title);

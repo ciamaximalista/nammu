@@ -84,7 +84,7 @@
 
                 <input type="text" name="google_fonts_api" id="google_fonts_api" class="form-control" value="<?= htmlspecialchars($settings['google_fonts_api'] ?? '') ?>" placeholder="AIza...">
 
-                <small class="form-text text-muted">Introduce tu clave API para cargar fuentes personalizadas desde Google Fonts.</small>
+                <small class="form-text text-muted">Introduce tu clave API para cargar fuentes personalizadas desde Google Fonts. <a href="#" data-toggle="modal" data-target="#googleFontsHelpModal">Ver guía rápida</a></small>
 
             </div>
 
@@ -105,7 +105,7 @@
             <div class="form-group">
                 <label for="mailing_client_id">Google Client ID</label>
                 <input type="text" name="mailing_client_id" id="mailing_client_id" class="form-control" value="<?= htmlspecialchars($mailingClientId, ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxx.apps.googleusercontent.com">
-                <small class="form-text text-muted">Credenciales OAuth 2.0 (tipo aplicación web) desde Google Cloud Console.</small>
+                <small class="form-text text-muted">Credenciales OAuth 2.0 (tipo aplicación web) desde Google Cloud Console. <a href="#" data-toggle="modal" data-target="#gmailOAuthHelpModal">Ver guía rápida</a></small>
             </div>
             <div class="form-group">
                 <label for="mailing_client_secret">Google Client Secret</label>
@@ -136,6 +136,57 @@
                 <div class="alert alert-warning mb-0">Aún no hay dirección configurada. Guárdala para habilitar la autenticación con Google.</div>
             <?php endif; ?>
         </form>
+
+        <div class="modal fade" id="googleFontsHelpModal" tabindex="-1" role="dialog" aria-labelledby="googleFontsHelpModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="googleFontsHelpModalLabel">Guía rápida: API Key de Google Fonts</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <ol class="mb-0">
+                            <li>Entra en <strong>Google Cloud Console</strong> y crea un proyecto nuevo.</li>
+                            <li>Ve a <strong>APIs y servicios &gt; Biblioteca</strong> y habilita <strong>Google Fonts Developer API</strong>.</li>
+                            <li>En <strong>APIs y servicios &gt; Credenciales</strong> crea una <strong>Clave de API</strong>.</li>
+                            <li>Copia la clave y pégala en este campo.</li>
+                        </ol>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="gmailOAuthHelpModal" tabindex="-1" role="dialog" aria-labelledby="gmailOAuthHelpModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="gmailOAuthHelpModalLabel">Guía rápida: Client ID y Secret (Gmail)</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <ol class="mb-3">
+                            <li>En <strong>Google Cloud Console</strong>, crea o selecciona un proyecto.</li>
+                            <li>En <strong>APIs y servicios &gt; Biblioteca</strong>, habilita <strong>Gmail API</strong>.</li>
+                            <li>En <strong>APIs y servicios &gt; Pantalla de consentimiento OAuth</strong>, configura la app (tipo interno/público).</li>
+                            <li>En <strong>Credenciales</strong>, crea un <strong>ID de cliente de OAuth</strong> tipo <strong>Aplicación web</strong>.</li>
+                            <li>Añade como <strong>URI de redirección autorizada</strong>: <code>https://tu-dominio/admin.php?page=lista-correo&amp;gmail_callback=1</code></li>
+                            <li>Copia el <strong>Client ID</strong> y el <strong>Client Secret</strong> y pégalos aquí.</li>
+                        </ol>
+                        <p class="mb-0 text-muted">Después conecta desde la pestaña <strong>Lista</strong> para autorizar el envío.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
             <hr class="my-5">
             <h3>Cuenta de acceso</h3>

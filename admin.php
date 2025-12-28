@@ -135,6 +135,7 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string
             'date' => $date,
             'timestamp' => $timestamp,
             'status' => $isDraft ? 'draft' : 'published',
+            'publish_at' => $metadata['PublishAt'] ?? '',
         ];
     }
 

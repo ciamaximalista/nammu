@@ -76,6 +76,21 @@ if ($editFeedback !== null) {
             'instagram' => 'Instagram',
         ];
         $mailingReady = admin_is_mailing_ready($settings);
+        $monthNames = [
+            1 => 'enero',
+            2 => 'febrero',
+            3 => 'marzo',
+            4 => 'abril',
+            5 => 'mayo',
+            6 => 'junio',
+            7 => 'julio',
+            8 => 'agosto',
+            9 => 'septiembre',
+            10 => 'octubre',
+            11 => 'noviembre',
+            12 => 'diciembre',
+        ];
+        $nowTimestamp = time();
         ?>
 
         <table class="table table-striped">
@@ -120,7 +135,25 @@ if ($editFeedback !== null) {
 
                     <tr>
 
-                        <td><?= htmlspecialchars($post['title']) ?></td>
+                        <td>
+                            <?= htmlspecialchars($post['title']) ?>
+                            <?php
+                            $publishAtRaw = trim((string) ($post['publish_at'] ?? ''));
+                            $publishAtTs = $publishAtRaw !== '' ? strtotime($publishAtRaw) : false;
+                            ?>
+                            <?php if ($templateFilter === 'draft' && $publishAtTs !== false && $publishAtTs > $nowTimestamp): ?>
+                                <?php
+                                $day = date('j', $publishAtTs);
+                                $monthIndex = (int) date('n', $publishAtTs);
+                                $year = date('Y', $publishAtTs);
+                                $time = date('H:i', $publishAtTs);
+                                $monthName = $monthNames[$monthIndex] ?? '';
+                                ?>
+                                <div class="draft-schedule-badge">
+                                    Programado para el <?= htmlspecialchars($day, ENT_QUOTES, 'UTF-8') ?> de <?= htmlspecialchars($monthName, ENT_QUOTES, 'UTF-8') ?> de <?= htmlspecialchars($year, ENT_QUOTES, 'UTF-8') ?> a las <?= htmlspecialchars($time, ENT_QUOTES, 'UTF-8') ?>
+                                </div>
+                            <?php endif; ?>
+                        </td>
 
                         <td><?= htmlspecialchars($post['description']) ?></td>
 
@@ -189,6 +222,20 @@ if ($editFeedback !== null) {
             </tbody>
 
         </table>
+
+        <style>
+            .draft-schedule-badge {
+                display: inline-block;
+                margin-top: 0.4rem;
+                padding: 0.25rem 0.5rem;
+                border-radius: 6px;
+                background: #ea2f28;
+                color: #ffffff;
+                font-size: 0.78rem;
+                font-weight: 600;
+                letter-spacing: 0.01em;
+            }
+        </style>
 
 
         <nav aria-label="Page navigation">

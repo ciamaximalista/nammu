@@ -68,12 +68,16 @@ function mailing_prefs_from_selection(array $selected, array $available): array
         'itineraries' => false,
         'newsletter' => false,
     ];
-    foreach ($prefs as $key => $value) {
-        if (empty($available[$key])) {
-            $prefs[$key] = false;
-        } else {
-            $prefs[$key] = in_array($key, $selected, true);
-        }
+    $wantsAvisos = in_array('avisos', $selected, true);
+    $wantsNewsletter = in_array('newsletter', $selected, true);
+    if (!empty($available['posts']) && $wantsAvisos) {
+        $prefs['posts'] = true;
+    }
+    if (!empty($available['itineraries']) && $wantsAvisos) {
+        $prefs['itineraries'] = true;
+    }
+    if (!empty($available['newsletter']) && $wantsNewsletter) {
+        $prefs['newsletter'] = true;
     }
     return $prefs;
 }
@@ -336,7 +340,41 @@ $displaySiteTitle = $theme['blog'] !== '' ? $theme['blog'] : $siteTitle;
 
 $availablePrefs = mailing_available_prefs($config);
 $prefsDefault = mailing_default_prefs($availablePrefs);
-$prefsAvailableKeys = array_keys(array_filter($availablePrefs));
+$prefsAvailableKeys = [];
+if (!empty($availablePrefs['posts']) || !empty($availablePrefs['itineraries'])) {
+    $prefsAvailableKeys[] = 'avisos';
+}
+if (!empty($availablePrefs['newsletter'])) {
+    $prefsAvailableKeys[] = 'newsletter';
+}
+$hasAvisos = in_array('avisos', $prefsAvailableKeys, true);
+$hasNewsletter = in_array('newsletter', $prefsAvailableKeys, true);
+$hasAnySubscription = $hasAvisos || $hasNewsletter;
+$pageLabel = $hasAvisos && $hasNewsletter ? 'Avisos por email y newsletters' : ($hasNewsletter ? 'Newsletter' : 'Avisos');
+$pageIntro = $hasAvisos && $hasNewsletter
+    ? 'Suscribete para recibir avisos y newsletters o confirma la baja si ya no quieres recibirlos.'
+    : ($hasNewsletter
+        ? 'Suscribete para recibir la newsletter o confirma la baja si ya no quieres recibirla.'
+        : 'Suscribete para recibir avisos de nuevas publicaciones o confirma la baja si ya no quieres recibirlos.');
+$badgeLabel = $hasAvisos && $hasNewsletter ? 'Avisos y newsletters' : ($hasNewsletter ? 'Newsletter' : 'Avisos por email');
+$subscribeTitle = $hasAvisos && $hasNewsletter ? 'Alta en avisos y newsletters' : ($hasNewsletter ? 'Alta en newsletter' : 'Alta en avisos');
+$subscribeCopy = $hasAvisos && $hasNewsletter
+    ? 'Recibe un email de confirmacion para activar tus preferencias.'
+    : ($hasNewsletter
+        ? 'Recibe un email de confirmacion para activar la newsletter.'
+        : 'Recibe un email de confirmacion para activar los avisos.');
+$updateTitle = $hasAvisos && $hasNewsletter ? 'Modificar preferencias' : ($hasNewsletter ? 'Actualizar newsletter' : 'Actualizar avisos');
+$updateCopy = $hasAvisos && $hasNewsletter
+    ? 'Actualiza tus opciones y confirma el cambio desde el email.'
+    : ($hasNewsletter
+        ? 'Actualiza tu suscripcion y confirma el cambio desde el email.'
+        : 'Actualiza tus avisos y confirma el cambio desde el email.');
+$unsubscribeTitle = $hasAvisos && $hasNewsletter ? 'Baja' : ($hasNewsletter ? 'Baja de newsletter' : 'Baja de avisos');
+$unsubscribeCopy = $hasAvisos && $hasNewsletter
+    ? 'Recibe un email para confirmar la baja.'
+    : ($hasNewsletter
+        ? 'Recibe un email para confirmar la baja de la newsletter.'
+        : 'Recibe un email para confirmar la baja de los avisos.');
 
 $postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
 $postalLogoSvg = nammu_postal_icon_svg();
@@ -460,8 +498,7 @@ $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseU
 });
 
 $prefsOptions = [
-    'posts' => 'Avisos de nuevas entradas',
-    'itineraries' => 'Avisos de nuevos itinerarios',
+    'avisos' => 'Avisos',
     'newsletter' => 'Newsletter',
 ];
 
@@ -470,9 +507,9 @@ ob_start();
 <section class="postal-page">
     <div class="postal-hero">
         <div class="postal-hero__content">
-            <span class="postal-hero__badge">Avisos por email</span>
-            <h1>Recibe avisos en tu correo</h1>
-            <p>Suscribete para recibir avisos de nuevas publicaciones y newsletters o confirma la baja si ya no quieres recibirlos.</p>
+            <span class="postal-hero__badge"><?= htmlspecialchars($badgeLabel, ENT_QUOTES, 'UTF-8') ?></span>
+            <h1><?= htmlspecialchars($pageLabel, ENT_QUOTES, 'UTF-8') ?></h1>
+            <p><?= htmlspecialchars($pageIntro, ENT_QUOTES, 'UTF-8') ?></p>
         </div>
         <div class="postal-hero__logo" aria-hidden="true">
             <svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -487,68 +524,85 @@ ob_start();
         </div>
     <?php endif; ?>
 
-    <div class="postal-grid-shell">
+    <?php if ($hasAnySubscription): ?>
+        <div class="postal-grid-shell">
+            <div class="postal-card">
+                <h2><?= htmlspecialchars($subscribeTitle, ENT_QUOTES, 'UTF-8') ?></h2>
+                <p><?= htmlspecialchars($subscribeCopy, ENT_QUOTES, 'UTF-8') ?></p>
+                <form method="post" class="postal-form">
+                    <input type="hidden" name="subscription_action" value="subscribe">
+                    <label>
+                        <span>Email</span>
+                        <input type="email" name="subscriber_email" required>
+                    </label>
+                    <?php if (!empty($prefsAvailableKeys)): ?>
+                        <div class="postal-form__choices">
+                            <?php foreach ($prefsOptions as $key => $label): ?>
+                                <?php if (in_array($key, $prefsAvailableKeys, true)): ?>
+                                    <?php
+                                    $isChecked = $key === 'avisos'
+                                        ? (!empty($prefsDefault['posts']) || !empty($prefsDefault['itineraries']))
+                                        : !empty($prefsDefault['newsletter']);
+                                    ?>
+                                    <label class="postal-check">
+                                        <input type="checkbox" name="subscription_prefs[]" value="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>" <?= $isChecked ? 'checked' : '' ?>>
+                                        <span><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></span>
+                                    </label>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                    <button type="submit" class="postal-btn postal-btn--primary">Suscribirme</button>
+                </form>
+            </div>
+            <div class="postal-card">
+                <h2><?= htmlspecialchars($updateTitle, ENT_QUOTES, 'UTF-8') ?></h2>
+                <p><?= htmlspecialchars($updateCopy, ENT_QUOTES, 'UTF-8') ?></p>
+                <form method="post" class="postal-form">
+                    <input type="hidden" name="subscription_action" value="update">
+                    <label>
+                        <span>Email</span>
+                        <input type="email" name="subscriber_email" required>
+                    </label>
+                    <?php if (!empty($prefsAvailableKeys)): ?>
+                        <div class="postal-form__choices">
+                            <?php foreach ($prefsOptions as $key => $label): ?>
+                                <?php if (in_array($key, $prefsAvailableKeys, true)): ?>
+                                    <?php
+                                    $isChecked = $key === 'avisos'
+                                        ? (!empty($prefsDefault['posts']) || !empty($prefsDefault['itineraries']))
+                                        : !empty($prefsDefault['newsletter']);
+                                    ?>
+                                    <label class="postal-check">
+                                        <input type="checkbox" name="subscription_prefs[]" value="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>" <?= $isChecked ? 'checked' : '' ?>>
+                                        <span><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></span>
+                                    </label>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                    <button type="submit" class="postal-btn postal-btn--primary">Actualizar preferencias</button>
+                </form>
+            </div>
+            <div class="postal-card postal-card--aside">
+                <h2><?= htmlspecialchars($unsubscribeTitle, ENT_QUOTES, 'UTF-8') ?></h2>
+                <p><?= htmlspecialchars($unsubscribeCopy, ENT_QUOTES, 'UTF-8') ?></p>
+                <form method="post" class="postal-form">
+                    <input type="hidden" name="subscription_action" value="unsubscribe">
+                    <label>
+                        <span>Email</span>
+                        <input type="email" name="subscriber_email" required>
+                    </label>
+                    <button type="submit" class="postal-btn postal-btn--ghost">Darme de baja</button>
+                </form>
+            </div>
+        </div>
+    <?php else: ?>
         <div class="postal-card">
-            <h2>Alta en avisos</h2>
-            <p>Recibe un email de confirmacion para activar tu suscripcion.</p>
-            <form method="post" class="postal-form">
-                <input type="hidden" name="subscription_action" value="subscribe">
-                <label>
-                    <span>Email</span>
-                    <input type="email" name="subscriber_email" required>
-                </label>
-                <?php if (!empty($prefsAvailableKeys)): ?>
-                    <div class="postal-form__choices">
-                        <?php foreach ($prefsOptions as $key => $label): ?>
-                            <?php if (!empty($availablePrefs[$key])): ?>
-                                <label class="postal-check">
-                                    <input type="checkbox" name="subscription_prefs[]" value="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>" <?= !empty($prefsDefault[$key]) ? 'checked' : '' ?>>
-                                    <span><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></span>
-                                </label>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-                <button type="submit" class="postal-btn postal-btn--primary">Suscribirme</button>
-            </form>
+            <h2>Avisos y newsletters no configurados</h2>
+            <p>El administrador del blog no ha configurado todavia ni el sistema de avisos ni las newsletters.</p>
         </div>
-        <div class="postal-card">
-            <h2>Modificar preferencias</h2>
-            <p>Actualiza tus opciones y confirma el cambio desde el email.</p>
-            <form method="post" class="postal-form">
-                <input type="hidden" name="subscription_action" value="update">
-                <label>
-                    <span>Email</span>
-                    <input type="email" name="subscriber_email" required>
-                </label>
-                <?php if (!empty($prefsAvailableKeys)): ?>
-                    <div class="postal-form__choices">
-                        <?php foreach ($prefsOptions as $key => $label): ?>
-                            <?php if (!empty($availablePrefs[$key])): ?>
-                                <label class="postal-check">
-                                    <input type="checkbox" name="subscription_prefs[]" value="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>" <?= !empty($prefsDefault[$key]) ? 'checked' : '' ?>>
-                                    <span><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></span>
-                                </label>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-                <button type="submit" class="postal-btn postal-btn--primary">Actualizar preferencias</button>
-            </form>
-        </div>
-        <div class="postal-card postal-card--aside">
-            <h2>Baja en avisos</h2>
-            <p>Recibe un email para confirmar la baja de la lista.</p>
-            <form method="post" class="postal-form">
-                <input type="hidden" name="subscription_action" value="unsubscribe">
-                <label>
-                    <span>Email</span>
-                    <input type="email" name="subscriber_email" required>
-                </label>
-                <button type="submit" class="postal-btn postal-btn--ghost">Darme de baja</button>
-            </form>
-        </div>
-    </div>
+    <?php endif; ?>
 </section>
 
 <style>
@@ -721,21 +775,21 @@ ob_start();
 $content = ob_get_clean();
 
 $postalPost = new Nammu\Core\Post('avisos', [
-    'Title' => 'Avisos por email',
-    'Description' => 'Suscríbete para recibir avisos de nuevas publicaciones.',
+    'Title' => $pageLabel,
+    'Description' => $pageIntro,
     'Template' => 'page',
 ], '');
 
 $pageContent = $renderer->render('single', [
-    'pageTitle' => 'Avisos por email',
+    'pageTitle' => $pageLabel,
     'post' => $postalPost,
     'htmlContent' => $content,
     'autoTocHtml' => '',
 ]);
 
 echo $renderer->render('layout', [
-    'pageTitle' => 'Avisos por email',
-    'metaDescription' => 'Gestión de avisos por email.',
+    'pageTitle' => $pageLabel,
+    'metaDescription' => $pageIntro,
     'content' => $pageContent,
     'showLogo' => true,
 ]);

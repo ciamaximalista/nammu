@@ -993,6 +993,10 @@ function get_settings() {
         'format' => 'html',
     ];
     $mailing = array_merge($mailingDefaults, $config['mailing'] ?? []);
+    $mailingHasFlag = is_array($config['mailing'] ?? null) && array_key_exists('auto_newsletter', $config['mailing']);
+    if (!$mailingHasFlag && ($mailing['gmail_address'] ?? '') !== '') {
+        $mailing['auto_newsletter'] = 'on';
+    }
     $postalDefaults = [
         'enabled' => 'off',
     ];

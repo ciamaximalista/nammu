@@ -78,6 +78,7 @@ if ($editFeedback !== null) {
             'instagram' => 'Instagram',
         ];
         $mailingReady = admin_is_mailing_ready($settings);
+        $mailingNewsletterEnabled = ($settings['mailing']['auto_newsletter'] ?? 'off') === 'on';
         $monthNames = [
             1 => 'enero',
             2 => 'febrero',
@@ -448,7 +449,9 @@ if ($editFeedback !== null) {
                 <?php elseif ($currentTypeValue === 'Entrada' && !$isDraftEditing): ?>
                     <button type="submit" name="convert_to_draft" value="1" class="btn btn-outline-secondary ml-2">Pasar a borrador</button>
                 <?php endif; ?>
-                <button type="submit" name="send_newsletter_edit" value="1" class="btn btn-warning ml-2" data-confirm-publish="1">Enviar como newsletter</button>
+                <?php if ($mailingNewsletterEnabled): ?>
+                    <button type="submit" name="send_newsletter_edit" value="1" class="btn btn-warning ml-2" data-confirm-publish="1">Enviar como newsletter</button>
+                <?php endif; ?>
             </div>
 
             </form>

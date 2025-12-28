@@ -27,6 +27,57 @@ function mailing_normalize_email(string $email): string
     return strtolower(trim($email));
 }
 
+function mailing_available_prefs(array $config): array
+{
+    $mailing = $config['mailing'] ?? [];
+    return [
+        'posts' => ($mailing['auto_posts'] ?? 'off') === 'on',
+        'itineraries' => ($mailing['auto_itineraries'] ?? 'off') === 'on',
+        'newsletter' => ($mailing['auto_newsletter'] ?? 'off') === 'on',
+    ];
+}
+
+function mailing_default_prefs(array $available): array
+{
+    $hasAny = false;
+    $prefs = [
+        'posts' => false,
+        'itineraries' => false,
+        'newsletter' => false,
+    ];
+    foreach ($prefs as $key => $value) {
+        if (!empty($available[$key])) {
+            $prefs[$key] = true;
+            $hasAny = true;
+        }
+    }
+    if (!$hasAny) {
+        return [
+            'posts' => true,
+            'itineraries' => true,
+            'newsletter' => true,
+        ];
+    }
+    return $prefs;
+}
+
+function mailing_prefs_from_selection(array $selected, array $available): array
+{
+    $prefs = [
+        'posts' => false,
+        'itineraries' => false,
+        'newsletter' => false,
+    ];
+    foreach ($prefs as $key => $value) {
+        if (empty($available[$key])) {
+            $prefs[$key] = false;
+        } else {
+            $prefs[$key] = in_array($key, $selected, true);
+        }
+    }
+    return $prefs;
+}
+
 function mailing_load_subscribers(): array
 {
     if (!is_file(MAILING_SUBSCRIBERS_FILE)) {
@@ -245,7 +296,7 @@ function mailing_send_unsubscribe_confirmation(array $config, string $email, str
     $token = mailing_unsubscribe_token($email);
     $link = rtrim($baseUrl !== '' ? $baseUrl : nammu_base_url(), '/') . '/unsubscribe.php?email=' . urlencode($email) . '&token=' . urlencode($token);
     $subject = 'Confirma tu baja en ' . $siteLabel;
-    $body = "Hola,\n\nConfirma tu baja de los avisos de {$siteLabel} haciendo clic en el enlace:\n{$link}\n\nSi no solicitaste esta baja, ignora este mensaje.";
+    $body = "Hola,\n\nConfirma tu baja de las comunicaciones de {$siteLabel} haciendo clic en el enlace:\n{$link}\n\nSi no solicitaste esta baja, ignora este mensaje.";
     mailing_send_message($config, $email, $subject, $body);
 }
 
@@ -283,6 +334,10 @@ if (!empty($theme['logo_url'])) {
 }
 $displaySiteTitle = $theme['blog'] !== '' ? $theme['blog'] : $siteTitle;
 
+$availablePrefs = mailing_available_prefs($config);
+$prefsDefault = mailing_default_prefs($availablePrefs);
+$prefsAvailableKeys = array_keys(array_filter($availablePrefs));
+
 $postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
 $postalLogoSvg = nammu_postal_icon_svg();
 $footerLinks = nammu_build_footer_links($config, $theme, $homeUrl, $postalUrl);
@@ -302,8 +357,15 @@ $messageType = 'info';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = mailing_normalize_email($_POST['subscriber_email'] ?? '');
     $action = $_POST['subscription_action'] ?? '';
+    $prefsSelected = $_POST['subscription_prefs'] ?? [];
+    $prefsSelected = is_array($prefsSelected) ? $prefsSelected : [];
+    $prefsSelected = array_values(array_intersect($prefsSelected, $prefsAvailableKeys));
+    $prefs = mailing_prefs_from_selection($prefsSelected, $availablePrefs);
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $message = 'Introduce un email valido.';
+        $messageType = 'danger';
+    } elseif (!empty($prefsAvailableKeys) && empty($prefsSelected) && in_array($action, ['subscribe', 'update'], true)) {
+        $message = 'Selecciona al menos una opcion de envio.';
         $messageType = 'danger';
     } elseif ($action === 'subscribe') {
         $pending = mailing_load_pending();
@@ -315,11 +377,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'email' => $email,
             'token' => $token,
             'created_at' => time(),
+            'prefs' => !empty($prefsAvailableKeys) ? $prefs : $prefsDefault,
         ];
         try {
             mailing_save_pending($pending);
             mailing_send_subscribe_confirmation($config, $email, $token, $publicBaseUrl);
             $message = 'Hemos enviado un email de confirmacion. Revisa tu correo.';
+            $messageType = 'success';
+        } catch (Throwable $e) {
+            $message = 'No pudimos procesar la solicitud. Intentalo de nuevo.';
+            $messageType = 'danger';
+        }
+    } elseif ($action === 'update') {
+        $pending = mailing_load_pending();
+        $token = bin2hex(random_bytes(16));
+        $pending = array_values(array_filter($pending, static function ($item) use ($email) {
+            return !is_array($item) || ($item['email'] ?? '') !== $email;
+        }));
+        $pending[] = [
+            'email' => $email,
+            'token' => $token,
+            'created_at' => time(),
+            'prefs' => !empty($prefsAvailableKeys) ? $prefs : $prefsDefault,
+        ];
+        try {
+            mailing_save_pending($pending);
+            mailing_send_subscribe_confirmation($config, $email, $token, $publicBaseUrl);
+            $message = 'Hemos enviado un email para confirmar tus cambios.';
             $messageType = 'success';
         } catch (Throwable $e) {
             $message = 'No pudimos procesar la solicitud. Intentalo de nuevo.';
@@ -375,6 +459,12 @@ $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseU
     return $publicBaseUrl !== '' ? $publicBaseUrl . '/' . $path : '/' . $path;
 });
 
+$prefsOptions = [
+    'posts' => 'Avisos de nuevas entradas',
+    'itineraries' => 'Avisos de nuevos itinerarios',
+    'newsletter' => 'Newsletter',
+];
+
 ob_start();
 ?>
 <section class="postal-page">
@@ -382,7 +472,7 @@ ob_start();
         <div class="postal-hero__content">
             <span class="postal-hero__badge">Avisos por email</span>
             <h1>Recibe avisos en tu correo</h1>
-            <p>Suscribete para recibir avisos de nuevas publicaciones o confirma la baja si ya no quieres recibirlos.</p>
+            <p>Suscribete para recibir avisos de nuevas publicaciones y newsletters o confirma la baja si ya no quieres recibirlos.</p>
         </div>
         <div class="postal-hero__logo" aria-hidden="true">
             <svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -407,7 +497,43 @@ ob_start();
                     <span>Email</span>
                     <input type="email" name="subscriber_email" required>
                 </label>
+                <?php if (!empty($prefsAvailableKeys)): ?>
+                    <div class="postal-form__choices">
+                        <?php foreach ($prefsOptions as $key => $label): ?>
+                            <?php if (!empty($availablePrefs[$key])): ?>
+                                <label class="postal-check">
+                                    <input type="checkbox" name="subscription_prefs[]" value="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>" <?= !empty($prefsDefault[$key]) ? 'checked' : '' ?>>
+                                    <span><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></span>
+                                </label>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
                 <button type="submit" class="postal-btn postal-btn--primary">Suscribirme</button>
+            </form>
+        </div>
+        <div class="postal-card">
+            <h2>Modificar preferencias</h2>
+            <p>Actualiza tus opciones y confirma el cambio desde el email.</p>
+            <form method="post" class="postal-form">
+                <input type="hidden" name="subscription_action" value="update">
+                <label>
+                    <span>Email</span>
+                    <input type="email" name="subscriber_email" required>
+                </label>
+                <?php if (!empty($prefsAvailableKeys)): ?>
+                    <div class="postal-form__choices">
+                        <?php foreach ($prefsOptions as $key => $label): ?>
+                            <?php if (!empty($availablePrefs[$key])): ?>
+                                <label class="postal-check">
+                                    <input type="checkbox" name="subscription_prefs[]" value="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>" <?= !empty($prefsDefault[$key]) ? 'checked' : '' ?>>
+                                    <span><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></span>
+                                </label>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+                <button type="submit" class="postal-btn postal-btn--primary">Actualizar preferencias</button>
             </form>
         </div>
         <div class="postal-card postal-card--aside">
@@ -510,7 +636,7 @@ ob_start();
     }
     .postal-grid-shell {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
         gap: 1.5rem;
     }
     .postal-form label {
@@ -532,6 +658,23 @@ ob_start();
     .postal-form input:focus {
         outline: 2px solid <?= $theme['colors']['accent'] ?? '#0a4c8a' ?>;
         border-color: <?= $theme['colors']['accent'] ?? '#0a4c8a' ?>;
+    }
+    .postal-form__choices {
+        display: grid;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+    .postal-check {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-weight: 600;
+        color: <?= $theme['colors']['text'] ?? '#222222' ?>;
+    }
+    .postal-check input {
+        width: 16px;
+        height: 16px;
+        accent-color: <?= $theme['colors']['accent'] ?? '#0a4c8a' ?>;
     }
     .postal-btn {
         border: none;

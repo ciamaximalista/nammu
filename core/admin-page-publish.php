@@ -142,6 +142,7 @@
             <div class="alert alert-warning d-none" data-publish-cancelled>Los cambios no se han guardado.</div>
             <button type="submit" name="publish" class="btn btn-primary mr-2" data-confirm-publish="1">Publicar</button>
             <button type="submit" name="save_draft" value="1" class="btn btn-outline-secondary" data-confirm-publish="1">Guardar como borrador</button>
+            <button type="submit" name="send_newsletter" value="1" class="btn btn-warning ml-2" data-confirm-publish="1">Enviar como newsletter</button>
         </div>
 
     </form>

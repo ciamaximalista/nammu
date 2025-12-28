@@ -12,12 +12,24 @@
         $mailingClientSecret = $mailingSettings['client_secret'] ?? '';
         $mailingAutoPosts = ($mailingSettings['auto_posts'] ?? 'off') === 'on';
         $mailingAutoItineraries = ($mailingSettings['auto_itineraries'] ?? 'off') === 'on';
+        $mailingAutoNewsletter = ($mailingSettings['auto_newsletter'] ?? 'off') === 'on';
         $mailingFormat = $mailingSettings['format'] ?? 'html';
-        $mailingSubscribers = admin_load_mailing_subscribers();
-        $mailingCount = count($mailingSubscribers);
+        $mailingEntries = admin_load_mailing_subscriber_entries();
+        $mailingCount = count($mailingEntries);
         $mailingTokens = admin_load_mailing_tokens();
         $isConnected = !empty($mailingTokens['refresh_token']);
         $canConnect = $mailingGmail !== '' && $mailingClientId !== '' && $mailingClientSecret !== '';
+        $subsPerPage = 25;
+        $subsPage = (int) ($_GET['subs_page'] ?? 1);
+        if ($subsPage < 1) {
+            $subsPage = 1;
+        }
+        $subsTotalPages = $mailingCount > 0 ? (int) ceil($mailingCount / $subsPerPage) : 1;
+        if ($subsPage > $subsTotalPages) {
+            $subsPage = $subsTotalPages;
+        }
+        $subsOffset = ($subsPage - 1) * $subsPerPage;
+        $mailingEntriesPage = array_slice($mailingEntries, $subsOffset, $subsPerPage);
         ?>
 
         <p class="text-muted">Configura y consulta aquí la futura lista de correo. Usaremos tu cuenta de Gmail (SMTP con OAuth2 sobre SSL/TLS, puerto 465) para enviar mensajes cuando el módulo esté activo.</p>
@@ -83,21 +95,64 @@
                             <button type="submit" class="btn btn-sm btn-primary mb-2">Añadir</button>
                         </form>
                     </div>
-                    <?php if (empty($mailingSubscribers)): ?>
+                    <?php if (empty($mailingEntries)): ?>
                         <p class="text-muted mb-0">Aún no hay suscriptores. Añade el primero usando el formulario.</p>
                     <?php else: ?>
-                        <ul class="list-group">
-                            <?php foreach ($mailingSubscribers as $subscriber): ?>
-                                <li class="list-group-item d-flex align-items-center justify-content-between">
-                                    <span><?= htmlspecialchars($subscriber, ENT_QUOTES, 'UTF-8') ?></span>
-                                    <form method="post" class="mb-0" onsubmit="return confirm('¿Eliminar este correo de la lista?');">
-                                        <input type="hidden" name="remove_subscriber" value="1">
-                                        <input type="hidden" name="subscriber_email" value="<?= htmlspecialchars($subscriber, ENT_QUOTES, 'UTF-8') ?>">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
-                                    </form>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-borderless mb-0">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Correo</th>
+                                        <th scope="col">Suscripcion</th>
+                                        <th scope="col" class="text-right">Accion</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($mailingEntriesPage as $subscriber): ?>
+                                        <?php
+                                        $prefs = $subscriber['prefs'] ?? admin_mailing_default_prefs();
+                                        $hasAvisos = !empty($prefs['posts']) || !empty($prefs['itineraries']);
+                                        $hasNewsletter = !empty($prefs['newsletter']);
+                                        if ($hasAvisos && $hasNewsletter) {
+                                            $label = 'Todo';
+                                        } elseif ($hasNewsletter) {
+                                            $label = 'Newsletter';
+                                        } else {
+                                            $label = 'Avisos';
+                                        }
+                                        ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars((string) ($subscriber['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td class="text-right">
+                                                <form method="post" class="mb-0" onsubmit="return confirm('¿Eliminar este correo de la lista?');">
+                                                    <input type="hidden" name="remove_subscriber" value="1">
+                                                    <input type="hidden" name="subscriber_email" value="<?= htmlspecialchars((string) ($subscriber['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <?php if ($subsTotalPages > 1): ?>
+                            <nav class="mt-3" aria-label="Paginacion de suscriptores">
+                                <ul class="pagination pagination-sm mb-0">
+                                    <li class="page-item <?= $subsPage <= 1 ? 'disabled' : '' ?>">
+                                        <a class="page-link" href="?page=lista-correo&amp;subs_page=<?= $subsPage - 1 ?>#suscriptores">Anterior</a>
+                                    </li>
+                                    <?php for ($pageIndex = 1; $pageIndex <= $subsTotalPages; $pageIndex++): ?>
+                                        <li class="page-item <?= $pageIndex === $subsPage ? 'active' : '' ?>">
+                                            <a class="page-link" href="?page=lista-correo&amp;subs_page=<?= $pageIndex ?>#suscriptores"><?= $pageIndex ?></a>
+                                        </li>
+                                    <?php endfor; ?>
+                                    <li class="page-item <?= $subsPage >= $subsTotalPages ? 'disabled' : '' ?>">
+                                        <a class="page-link" href="?page=lista-correo&amp;subs_page=<?= $subsPage + 1 ?>#suscriptores">Siguiente</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -113,6 +168,10 @@
                         <div class="form-check mb-3">
                             <input type="checkbox" class="form-check-input" name="mailing_auto_itineraries" id="mailing_auto_itineraries" value="1" <?= $mailingAutoItineraries ? 'checked' : '' ?>>
                             <label class="form-check-label" for="mailing_auto_itineraries">Enviar aviso de cada nuevo itinerario publicado</label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" name="mailing_auto_newsletter" id="mailing_auto_newsletter" value="1" <?= $mailingAutoNewsletter ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="mailing_auto_newsletter">Activar newsletter</label>
                         </div>
                         <div class="form-group">
                             <label for="mailing_format">Enviar aviso en formato</label>

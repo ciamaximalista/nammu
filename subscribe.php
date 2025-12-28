@@ -11,6 +11,38 @@ function subscription_normalize_email(string $email): string {
     return strtolower(trim($email));
 }
 
+function subscription_available_prefs(array $config): array {
+    $mailing = $config['mailing'] ?? [];
+    return [
+        'posts' => ($mailing['auto_posts'] ?? 'off') === 'on',
+        'itineraries' => ($mailing['auto_itineraries'] ?? 'off') === 'on',
+        'newsletter' => ($mailing['auto_newsletter'] ?? 'off') === 'on',
+    ];
+}
+
+function subscription_default_prefs(array $available): array {
+    $hasAny = false;
+    $prefs = [
+        'posts' => false,
+        'itineraries' => false,
+        'newsletter' => false,
+    ];
+    foreach ($prefs as $key => $value) {
+        if (!empty($available[$key])) {
+            $prefs[$key] = true;
+            $hasAny = true;
+        }
+    }
+    if (!$hasAny) {
+        return [
+            'posts' => true,
+            'itineraries' => true,
+            'newsletter' => true,
+        ];
+    }
+    return $prefs;
+}
+
 function subscription_load_subscribers(): array {
     if (!is_file(MAILING_SUBSCRIBERS_FILE)) {
         return [];
@@ -252,11 +284,14 @@ if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
 $pending = subscription_load_pending();
 $token = bin2hex(random_bytes(16));
 $configData = nammu_load_config();
+$availablePrefs = subscription_available_prefs($configData);
+$prefsDefault = subscription_default_prefs($availablePrefs);
 $siteTitle = isset($configData['site_name']) && is_string($configData['site_name']) ? trim($configData['site_name']) : '';
 $pendingEntry = [
     'email' => $email,
     'token' => $token,
     'created_at' => time(),
+    'prefs' => $prefsDefault,
 ];
 $pending = array_values(array_filter($pending, static function ($item) use ($email) {
     return !is_array($item) || ($item['email'] ?? '') !== $email;

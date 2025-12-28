@@ -55,6 +55,9 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 - Integración opcional con Telegram, WhatsApp Cloud API, Facebook Pages y Twitter/X: auto-posting al publicar o envío manual desde la tabla de “Editar”.
 - Plantillas de mensaje consistentes (título, descripción y URL pública) con escape apropiado para HTML o texto plano.
 - Feedback inmediato en la UI usando `$_SESSION['social_feedback']`.
+- Avisos por email: mensajes automáticos con título, descripción y enlace al publicar entradas o itinerarios.
+- Newsletter: envíos completos del contenido (no publican en el blog) y se gestionan desde Publicar/Editar.
+- Ambas funciones comparten la misma lista de correo, pero el lector puede elegir si recibe avisos, newsletter o ambos.
 - Lista de correo con suscriptores guardados en `config/`, uso de Gmail vía SMTP con OAuth2 y gestión básica de altas/bajas desde el panel.
 - Gestor de libreta de direcciones de correo postal que genera etiquetas para sobres y archivo CSV con los suscriptores postales, listo para enviar boletines o materiales por correo postal.
 
@@ -137,6 +140,10 @@ Si cediste propiedad al usuario del servidor para que pueda escribir, ejecuta `s
 
 El modal “Insertar recurso” que aparece en Publicar, Editar e Itinerarios comparte el mismo buscador, así que puedes localizar imágenes etiquetadas sin salir del formulario.
 
+Ejemplo rápido:
+- **Avisos**: publica una entrada/itinerario y, si están activados, se envía un aviso con título + descripción + enlace.
+- **Newsletter**: usa “Enviar como newsletter” desde Publicar o Editar; se envía el contenido completo y no se publica en el blog.
+
 ### Lista de correo con Gmail (OAuth2)
 
 
@@ -154,8 +161,9 @@ El modal “Insertar recurso” que aparece en Publicar, Editar e Itinerarios co
    - Dirección Gmail que se usará para enviar.
    - Client ID y Client Secret de una credencial OAuth 2.0 (tipo “Aplicación web”) creada en Google Cloud Console.
 3. Guarda y ve a la pestaña **Lista**. Pulsa “Conectar con Google” para abrir el consentimiento y obtener el `refresh_token`. El estado cambiará a “Conectado”.
-4. Desde **Lista** podrás añadir/eliminar correos; la lista vive en `config/mailing-subscribers.json` y los tokens en `config/mailing-tokens.json`.
-5. Si cambias de cuenta o credenciales, desconecta y vuelve a conectar para regenerar tokens.
+4. Desde **Lista** podrás añadir/eliminar correos y activar avisos y newsletters; los lectores pueden elegir sus preferencias de envío.
+5. La lista vive en `config/mailing-subscribers.json` y los tokens en `config/mailing-tokens.json`.
+6. Si cambias de cuenta o credenciales, desconecta y vuelve a conectar para regenerar tokens.
 
 ### Recursos avanzados
 

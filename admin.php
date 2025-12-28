@@ -71,7 +71,7 @@ function parse_yaml_front_matter($content) {
 function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string $searchTerm = '') {
     $settings = get_settings();
     $sort_order = $settings['sort_order'] ?? 'date';
-    $templateFilter = in_array($templateFilter, ['single', 'page', 'draft'], true) ? $templateFilter : 'single';
+    $templateFilter = in_array($templateFilter, ['single', 'page', 'draft', 'newsletter'], true) ? $templateFilter : 'single';
     $normalizedSearch = '';
     if ($searchTerm !== '') {
         $normalizedSearch = function_exists('mb_strtolower')
@@ -88,7 +88,11 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string
         $status = strtolower($metadata['Status'] ?? 'published');
         $isEntry = in_array($template, ['single', 'post'], true);
         $isDraft = ($status === 'draft');
-        if ($templateFilter === 'draft') {
+        if ($templateFilter === 'newsletter') {
+            if ($template !== 'newsletter') {
+                continue;
+            }
+        } elseif ($templateFilter === 'draft') {
             if (!$isDraft) {
                 continue;
             }
@@ -100,6 +104,9 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string
                 continue;
             }
             if ($templateFilter === 'page' && $template !== 'page') {
+                continue;
+            }
+            if ($template === 'newsletter') {
                 continue;
             }
         }
@@ -982,6 +989,7 @@ function get_settings() {
         'status' => 'disconnected',
         'auto_posts' => 'off',
         'auto_itineraries' => 'off',
+        'auto_newsletter' => 'off',
         'format' => 'html',
     ];
     $mailing = array_merge($mailingDefaults, $config['mailing'] ?? []);
@@ -1926,18 +1934,21 @@ function admin_maybe_add_to_mailing_list(string $email): void {
         return;
     }
     try {
-        $subscribers = admin_load_mailing_subscribers();
+        $subscribers = admin_load_mailing_subscriber_entries();
     } catch (Throwable $e) {
         return;
     }
     foreach ($subscribers as $subscriber) {
-        if (admin_normalize_email((string) $subscriber) === $normalized) {
+        if (admin_normalize_email((string) ($subscriber['email'] ?? '')) === $normalized) {
             return;
         }
     }
-    $subscribers[] = $normalized;
+    $subscribers[] = [
+        'email' => $normalized,
+        'prefs' => admin_mailing_default_prefs(),
+    ];
     try {
-        admin_save_mailing_subscribers($subscribers);
+        admin_save_mailing_subscriber_entries($subscribers);
     } catch (Throwable $e) {
         return;
     }
@@ -1966,11 +1977,60 @@ function admin_pick_contrast_color(string $backgroundHex, string $light = '#ffff
     return $yiq >= 160 ? $dark : $light;
 }
 
-function admin_load_mailing_subscribers(): array {
+function admin_mailing_default_prefs(): array {
+    return [
+        'posts' => true,
+        'itineraries' => true,
+        'newsletter' => true,
+    ];
+}
+
+function admin_mailing_normalize_prefs(array $prefs): array {
+    $defaults = admin_mailing_default_prefs();
+    $normalized = [];
+    foreach ($defaults as $key => $default) {
+        $value = $prefs[$key] ?? $default;
+        if (is_string($value)) {
+            $value = strtolower($value) !== 'off' && $value !== '0' && $value !== '';
+        } else {
+            $value = (bool) $value;
+        }
+        $normalized[$key] = $value;
+    }
+    return $normalized;
+}
+
+function admin_mailing_normalize_entry($entry): ?array {
+    if (is_string($entry)) {
+        $email = admin_normalize_email($entry);
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+        return [
+            'email' => $email,
+            'prefs' => admin_mailing_default_prefs(),
+        ];
+    }
+    if (!is_array($entry)) {
+        return null;
+    }
+    $email = admin_normalize_email((string) ($entry['email'] ?? ''));
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return null;
+    }
+    $prefsRaw = $entry['prefs'] ?? [];
+    $prefs = is_array($prefsRaw) ? admin_mailing_normalize_prefs($prefsRaw) : admin_mailing_default_prefs();
+    return [
+        'email' => $email,
+        'prefs' => $prefs,
+    ];
+}
+
+function admin_load_mailing_subscriber_entries(): array {
     $file = MAILING_SUBSCRIBERS_FILE;
     if (!is_file($file)) {
         try {
-            admin_save_mailing_subscribers([]);
+            admin_save_mailing_subscriber_entries([]);
         } catch (Throwable $e) {
             return [];
         }
@@ -1984,31 +2044,42 @@ function admin_load_mailing_subscribers(): array {
         return [];
     }
     $unique = [];
-    foreach ($decoded as $email) {
-        $normalized = admin_normalize_email((string) $email);
-        if ($normalized === '' || !filter_var($normalized, FILTER_VALIDATE_EMAIL)) {
+    foreach ($decoded as $entry) {
+        $normalized = admin_mailing_normalize_entry($entry);
+        if ($normalized === null) {
             continue;
         }
-        $unique[$normalized] = true;
+        $email = $normalized['email'];
+        if (!isset($unique[$email])) {
+            $unique[$email] = $normalized;
+            continue;
+        }
+        $existingPrefs = $unique[$email]['prefs'] ?? admin_mailing_default_prefs();
+        $incomingPrefs = $normalized['prefs'] ?? admin_mailing_default_prefs();
+        foreach ($incomingPrefs as $key => $value) {
+            $existingPrefs[$key] = ($existingPrefs[$key] ?? false) || $value;
+        }
+        $unique[$email]['prefs'] = $existingPrefs;
     }
-    return array_keys($unique);
+    return array_values($unique);
 }
 
-function admin_save_mailing_subscribers(array $subscribers): void {
+function admin_save_mailing_subscriber_entries(array $entries): void {
     $file = MAILING_SUBSCRIBERS_FILE;
     $dir = dirname($file);
     if (!nammu_ensure_directory($dir)) {
         throw new RuntimeException('No se pudo crear el directorio de configuración para la lista de correo');
     }
     $unique = [];
-    foreach ($subscribers as $email) {
-        $normalized = admin_normalize_email((string) $email);
-        if ($normalized === '' || !filter_var($normalized, FILTER_VALIDATE_EMAIL)) {
+    foreach ($entries as $entry) {
+        $normalized = admin_mailing_normalize_entry($entry);
+        if ($normalized === null) {
             continue;
         }
-        $unique[$normalized] = true;
+        $email = $normalized['email'];
+        $unique[$email] = $normalized;
     }
-    $payload = json_encode(array_keys($unique), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    $payload = json_encode(array_values($unique), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if ($payload === false) {
         throw new RuntimeException('No se pudo serializar la lista de suscriptores');
     }
@@ -2016,6 +2087,58 @@ function admin_save_mailing_subscribers(array $subscribers): void {
         throw new RuntimeException('No se pudo escribir el archivo de suscriptores');
     }
     @chmod($file, 0664);
+}
+
+function admin_load_mailing_subscribers(): array {
+    $entries = admin_load_mailing_subscriber_entries();
+    $emails = [];
+    foreach ($entries as $entry) {
+        $email = admin_normalize_email((string) ($entry['email'] ?? ''));
+        if ($email !== '') {
+            $emails[] = $email;
+        }
+    }
+    return $emails;
+}
+
+function admin_save_mailing_subscribers(array $subscribers): void {
+    $entries = [];
+    foreach ($subscribers as $subscriber) {
+        $normalized = admin_mailing_normalize_entry($subscriber);
+        if ($normalized === null) {
+            continue;
+        }
+        $entries[] = $normalized;
+    }
+    admin_save_mailing_subscriber_entries($entries);
+}
+
+function admin_mailing_recipients_for_type(string $type, array $settings): array {
+    $type = strtolower(trim($type));
+    $allowed = ['posts', 'itineraries', 'newsletter'];
+    if (!in_array($type, $allowed, true)) {
+        return [];
+    }
+    $entries = admin_load_mailing_subscriber_entries();
+    $recipients = [];
+    foreach ($entries as $entry) {
+        $prefs = $entry['prefs'] ?? admin_mailing_default_prefs();
+        if (!empty($prefs[$type])) {
+            $recipients[] = $entry['email'];
+        }
+    }
+    return $recipients;
+}
+
+function admin_mailing_type_for_template(string $template): string {
+    $template = strtolower(trim($template));
+    if ($template === 'itinerario') {
+        return 'itineraries';
+    }
+    if ($template === 'newsletter') {
+        return 'newsletter';
+    }
+    return 'posts';
 }
 
 function admin_load_mailing_tokens(): array {
@@ -2374,7 +2497,7 @@ function admin_prepare_mailing_payload(string $template, array $settings, string
         $lines[] = 'Sigue leyendo: ' . $link;
         $lines[] = '';
         $lines[] = '-----------';
-        $lines[] = 'Recibes este email porque estás suscrito a los avisos de ' . $blogName . '. Puedes darte de baja pulsando aquí: ' . admin_mailing_unsubscribe_link($recipientEmail);
+        $lines[] = 'Recibes este email porque estás suscrito a las comunicaciones de ' . $blogName . '. Puedes darte de baja pulsando aquí: ' . admin_mailing_unsubscribe_link($recipientEmail);
         return implode("\n", $lines);
     };
 
@@ -2407,7 +2530,163 @@ function admin_prepare_mailing_payload(string $template, array $settings, string
         $html[] = '      </p>';
         $html[] = '    </div>';
         $html[] = '    <div style="padding:16px 22px; background:' . htmlspecialchars($footerBg, ENT_QUOTES, 'UTF-8') . '; border-top:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33; font-size:13px; color:' . htmlspecialchars($footerText, ENT_QUOTES, 'UTF-8') . '; opacity:0.8;">';
-        $html[] = '      <p style="margin:0 0 6px 0;">Recibes este email porque estás suscrito a los avisos de ' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '.</p>';
+        $html[] = '      <p style="margin:0 0 6px 0;">Recibes este email porque estás suscrito a las comunicaciones de ' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '.</p>';
+        $html[] = '      <p style="margin:0;"><a href="' . $safeUnsub . '" style="color:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . ';">Puedes darte de baja pulsando aquí</a>.</p>';
+        $html[] = '    </div>';
+        $html[] = '  </div>';
+        $html[] = '</div>';
+        return implode('', $html);
+    };
+
+    $bodyBuilder = function (string $recipientEmail) use ($isHtml, $buildText, $buildHtml) {
+        if ($isHtml) {
+            $text = $buildText($recipientEmail);
+            $html = $buildHtml($recipientEmail);
+            return [$text, $html];
+        }
+        $text = $buildText($recipientEmail);
+        $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
+        return [$text, $html];
+    };
+
+    return [
+        'subject' => $subject,
+        'bodyBuilder' => $bodyBuilder,
+        'fromName' => $fromName,
+        'mailingConfig' => $mailingConfig,
+    ];
+}
+
+function admin_prepare_newsletter_payload(array $settings, string $title, string $contentHtml, string $contentText, string $imagePath): array {
+    $mailingConfig = $settings['mailing'] ?? [];
+    $format = $mailingConfig['format'] ?? 'html';
+    $isHtml = $format !== 'text';
+    $subject = $title;
+    $blogName = $settings['site_name'] ?? 'Tu blog';
+    $authorName = $settings['site_author'] ?? 'Autor';
+    $siteBase = rtrim($settings['site_url'] ?? '', '/');
+    $baseForAssets = $siteBase !== '' ? $siteBase : rtrim(admin_base_url(), '/');
+    $link = $siteBase !== '' ? $siteBase : rtrim(admin_base_url(), '/');
+    $imageUrl = '';
+    if ($imagePath !== '') {
+        if (preg_match('#^https?://#i', $imagePath)) {
+            $imageUrl = $imagePath;
+        } else {
+            $normalizedImage = ltrim($imagePath, '/');
+            $normalizedImage = str_replace(['../', '..\\', './', '.\\'], '', $normalizedImage);
+            $candidates = [];
+            $candidates[] = $normalizedImage;
+            if (!str_starts_with($normalizedImage, 'assets/')) {
+                $candidates[] = 'assets/' . $normalizedImage;
+            }
+            foreach ($candidates as $cand) {
+                $local = __DIR__ . '/' . $cand;
+                if (is_file($local) || is_file(__DIR__ . '/' . ltrim($cand, '/'))) {
+                    $imageUrl = $baseForAssets . '/' . $cand;
+                    break;
+                }
+            }
+            if ($imageUrl === '' && !empty($candidates)) {
+                $imageUrl = $baseForAssets . '/' . $candidates[0];
+            }
+        }
+    }
+    $logoPath = $settings['template']['images']['logo'] ?? '';
+    $logoUrl = '';
+    if ($logoPath !== '') {
+        if (preg_match('#^https?://#i', $logoPath)) {
+            $logoUrl = $logoPath;
+        } else {
+            $normalizedLogo = ltrim($logoPath, '/');
+            $normalizedLogo = str_replace(['../', '..\\', './', '.\\'], '', $normalizedLogo);
+            $logoUrl = $baseForAssets . '/' . $normalizedLogo;
+        }
+    }
+    $colors = $settings['template']['colors'] ?? [];
+    $colorBackground = $colors['background'] ?? '#ffffff';
+    $colorText = $colors['text'] ?? '#222222';
+    $colorHighlight = $colors['highlight'] ?? '#f3f6f9';
+    $colorAccent = $colors['accent'] ?? '#0a4c8a';
+    $colorH1 = $colors['h1'] ?? $colorAccent;
+    $colorH2 = $colors['h2'] ?? $colorText;
+    $headerBg = $colorH1;
+    $ctaColor = $colorH1;
+    $outerBg = $colorHighlight;
+    $cardBg = $colorBackground;
+    $footerBg = $colorHighlight;
+    $border = $colorAccent;
+    $headerText = admin_pick_contrast_color($headerBg, '#ffffff', '#111111');
+    $ctaText = admin_pick_contrast_color($ctaColor, '#ffffff', '#111111');
+    $footerText = admin_pick_contrast_color($footerBg, '#ffffff', $colorText);
+    $titleFont = $settings['template']['fonts']['title'] ?? 'Arial';
+    $bodyFont = $settings['template']['fonts']['body'] ?? 'Arial';
+    $fontsUrl = '';
+    $fontFamilies = [];
+    foreach ([$titleFont, $bodyFont] as $fontCandidate) {
+        $clean = trim((string) $fontCandidate);
+        if ($clean !== '') {
+            $fontFamilies[] = str_replace(' ', '+', $clean) . ':wght@400;600;700';
+        }
+    }
+    if (!empty($fontFamilies)) {
+        $fontsUrl = 'https://fonts.googleapis.com/css2?family=' . implode('&family=', array_unique($fontFamilies)) . '&display=swap';
+    }
+    $titleFontCss = htmlspecialchars($titleFont, ENT_QUOTES, 'UTF-8');
+    $bodyFontCss = htmlspecialchars($bodyFont, ENT_QUOTES, 'UTF-8');
+    $fromName = $authorName !== '' ? $authorName : $blogName;
+
+    $buildText = function (string $recipientEmail) use ($authorName, $blogName, $title, $contentText, $link) {
+        $lines = [];
+        $lines[] = '**** ' . ($authorName !== '' ? $authorName : $blogName) . ' ****';
+        $lines[] = '**** ' . $blogName . ' ****';
+        $lines[] = '';
+        $lines[] = '== ' . $title . ' ==';
+        $lines[] = '';
+        if ($contentText !== '') {
+            $lines[] = $contentText;
+            $lines[] = '';
+        }
+        if ($link !== '') {
+            $lines[] = 'Visita el sitio: ' . $link;
+            $lines[] = '';
+        }
+        $lines[] = '-----------';
+        $lines[] = 'Recibes este email porque estás suscrito a las comunicaciones de ' . $blogName . '. Puedes darte de baja pulsando aquí: ' . admin_mailing_unsubscribe_link($recipientEmail);
+        return implode("\n", $lines);
+    };
+
+    $buildHtml = function (string $recipientEmail) use ($authorName, $blogName, $title, $contentHtml, $link, $imageUrl, $logoUrl, $headerBg, $headerText, $ctaColor, $ctaText, $outerBg, $cardBg, $colorText, $colorH2, $footerBg, $footerText, $border, $fontsUrl, $titleFontCss, $bodyFontCss) {
+        $safeUnsub = htmlspecialchars(admin_mailing_unsubscribe_link($recipientEmail), ENT_QUOTES, 'UTF-8');
+        $html = [];
+        if ($fontsUrl !== '') {
+            $html[] = '<link rel="stylesheet" href="' . htmlspecialchars($fontsUrl, ENT_QUOTES, 'UTF-8') . '">';
+        }
+        $html[] = '<style>h1,h2,h3,h4,h5,h6{font-family:' . $titleFontCss . ', Arial, sans-serif;} body,p,a,div,span{font-family:' . $bodyFontCss . ', Arial, sans-serif;} a{color:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . ';}</style>';
+        $html[] = '<div style="font-family:' . $bodyFontCss . ', Arial, sans-serif; background:' . htmlspecialchars($outerBg, ENT_QUOTES, 'UTF-8') . '; padding:24px; color:' . htmlspecialchars($colorText, ENT_QUOTES, 'UTF-8') . ';">';
+        $html[] = '  <div style="max-width:720px; margin:0 auto; background:' . htmlspecialchars($cardBg, ENT_QUOTES, 'UTF-8') . '; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33; border-radius:12px; overflow:hidden;">';
+        $html[] = '    <div style="background:' . htmlspecialchars($headerBg, ENT_QUOTES, 'UTF-8') . '; color:' . htmlspecialchars($headerText, ENT_QUOTES, 'UTF-8') . '; padding:18px 22px; text-align:center;">';
+        if ($logoUrl !== '') {
+            $html[] = '      <div style="margin-bottom:10px;"><img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:64px; height:64px; object-fit:cover; border-radius:50%; box-shadow:0 4px 12px rgba(0,0,0,0.15); background:' . htmlspecialchars($cardBg, ENT_QUOTES, 'UTF-8') . ';"></div>';
+        }
+        $html[] = '      <div style="font-size:14px; opacity:0.9; margin-bottom:4px;">' . htmlspecialchars($authorName, ENT_QUOTES, 'UTF-8') . '</div>';
+        $html[] = '      <div style="font-size:20px; font-weight:700;">' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '</div>';
+        $html[] = '    </div>';
+        $html[] = '    <div style="padding:22px;">';
+        $html[] = '      <h2 style="margin:0 0 20px 0; font-size:32px; line-height:1.15; color:' . htmlspecialchars($colorH2, ENT_QUOTES, 'UTF-8') . '; font-family:' . $titleFontCss . ', Arial, sans-serif;">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
+        if ($imageUrl !== '') {
+            $html[] = '      <div style="margin:0 0 14px 0;"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-radius:12px; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33;"></div>';
+        }
+        if ($contentHtml !== '') {
+            $html[] = '      <div style="margin:0; line-height:1.75; font-size:18px; color:' . htmlspecialchars($colorText, ENT_QUOTES, 'UTF-8') . '; font-family:' . $bodyFontCss . ', Arial, sans-serif;">' . $contentHtml . '</div>';
+        }
+        if ($link !== '') {
+            $html[] = '      <p style="margin:20px 0 0 0;">';
+            $html[] = '        <a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block; background:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . '; color:' . htmlspecialchars($ctaText, ENT_QUOTES, 'UTF-8') . '; padding:14px 18px; border-radius:10px; text-decoration:none; font-weight:600;">Visitar el sitio</a>';
+            $html[] = '      </p>';
+        }
+        $html[] = '    </div>';
+        $html[] = '    <div style="padding:16px 22px; background:' . htmlspecialchars($footerBg, ENT_QUOTES, 'UTF-8') . '; border-top:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33; font-size:13px; color:' . htmlspecialchars($footerText, ENT_QUOTES, 'UTF-8') . '; opacity:0.8;">';
+        $html[] = '      <p style="margin:0 0 6px 0;">Recibes este email porque estás suscrito a las comunicaciones de ' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '.</p>';
         $html[] = '      <p style="margin:0;"><a href="' . $safeUnsub . '" style="color:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . ';">Puedes darte de baja pulsando aquí</a>.</p>';
         $html[] = '    </div>';
         $html[] = '  </div>';
@@ -2768,6 +3047,102 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         session_destroy();
         header('Location: admin.php');
         exit;
+    } elseif (isset($_POST['send_newsletter'])) {
+        $title = trim($_POST['title'] ?? '');
+        $category = trim($_POST['category'] ?? '');
+        $dateInput = $_POST['date'] ?? '';
+        $timestamp = $dateInput !== '' ? strtotime($dateInput) : time();
+        if ($timestamp === false) {
+            $timestamp = time();
+        }
+        $date = date('Y-m-d', $timestamp);
+        $image = trim($_POST['image'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        $filenameInput = trim($_POST['filename'] ?? '');
+        $slugPattern = '/^[a-z0-9-]+$/i';
+        if ($filenameInput !== '' && !preg_match($slugPattern, $filenameInput)) {
+            $error = 'El slug solo puede contener letras, números y guiones medios.';
+        }
+        if ($filenameInput === '' && $title !== '') {
+            $filenameInput = nammu_slugify($title);
+        }
+        if ($error === null) {
+            $filename = nammu_unique_filename($filenameInput !== '' ? $filenameInput : 'newsletter');
+        } else {
+            $filename = '';
+        }
+        $content = $_POST['content'] ?? '';
+        $settings = get_settings();
+        if (!admin_is_mailing_ready($settings)) {
+            $error = 'Configura el correo de la lista antes de enviar la newsletter.';
+        }
+        $mailing = $settings['mailing'] ?? [];
+        if ($error === null && ($mailing['auto_newsletter'] ?? 'off') !== 'on') {
+            $error = 'Activa la newsletter en Lista > Preferencias de envio.';
+        }
+        $subscribers = admin_mailing_recipients_for_type('newsletter', $settings);
+        if ($error === null && empty($subscribers)) {
+            $error = 'No hay suscriptores en la lista de correo.';
+        }
+        if ($error === null && $filename !== '') {
+            $markdown = new MarkdownConverter();
+            $contentHtml = $markdown->toHtml($content);
+            $contentText = trim(strip_tags($contentHtml));
+            $payload = admin_prepare_newsletter_payload($settings, $title, $contentHtml, $contentText, $image);
+            try {
+                admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+            } catch (Throwable $e) {
+                $error = 'No se pudo enviar la newsletter. Revisa la configuración de correo.';
+            }
+        }
+        if ($error === null && $filename !== '') {
+            $all_posts = get_all_posts_metadata();
+            $max_ordo = 0;
+            foreach ($all_posts as $post) {
+                if (isset($post['metadata']['Ordo']) && (int)$post['metadata']['Ordo'] > $max_ordo) {
+                    $max_ordo = (int)$post['metadata']['Ordo'];
+                }
+            }
+            $ordo = $max_ordo + 1;
+            $targetFilename = nammu_normalize_filename($filename . '.md');
+            if ($targetFilename === '') {
+                $error = 'El nombre de archivo no es válido.';
+            } else {
+                $filepath = CONTENT_DIR . '/' . $targetFilename;
+                $file_content = "---
+";
+                $file_content .= "Title: " . $title . "
+";
+                $file_content .= "Template: newsletter
+";
+                $file_content .= "Category: " . $category . "
+";
+                $file_content .= "Date: " . $date . "
+";
+                $file_content .= "Image: " . $image . "
+";
+                $file_content .= "Description: " . $description . "
+";
+                $file_content .= "Status: newsletter
+";
+                $file_content .= "Ordo: " . $ordo . "
+";
+                $file_content .= "---
+
+";
+                $file_content .= $content;
+                if (file_put_contents($filepath, $file_content) === false) {
+                    $error = 'No se pudo guardar la newsletter. Revisa los permisos de la carpeta content/.';
+                } else {
+                    $_SESSION['mailing_feedback'] = [
+                        'type' => 'success',
+                        'message' => 'Newsletter enviada correctamente.',
+                    ];
+                    header('Location: admin.php?page=edit&template=newsletter&created=' . urlencode($targetFilename));
+                    exit;
+                }
+            }
+        }
     } elseif (isset($_POST['publish']) || isset($_POST['save_draft'])) {
         $title = trim($_POST['title'] ?? '');
         $category = trim($_POST['category'] ?? '');
@@ -2865,7 +3240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
                         $link = admin_public_post_url($slug);
                         if (($mailing['auto_posts'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
-                            $subscribers = admin_load_mailing_subscribers();
+                            $subscribers = admin_mailing_recipients_for_type('posts', $settings);
                             if (!empty($subscribers)) {
                                 $payload = admin_prepare_mailing_payload('single', $settings, $title, $description, $link, $image);
                                 try {
@@ -2883,6 +3258,106 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
+    } elseif (isset($_POST['send_newsletter_edit'])) {
+        $title = trim($_POST['title'] ?? '');
+        $editFilename = trim($_POST['filename'] ?? '');
+        $category = trim($_POST['category'] ?? '');
+        $dateInput = $_POST['date'] ?? '';
+        $timestamp = $dateInput !== '' ? strtotime($dateInput) : time();
+        if ($timestamp === false) {
+            $timestamp = time();
+        }
+        $date = date('Y-m-d', $timestamp);
+        $image = trim($_POST['image'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        $content = $_POST['content'] ?? '';
+        $settings = get_settings();
+        if (!admin_is_mailing_ready($settings)) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Configura el correo de la lista antes de enviar la newsletter.',
+            ];
+            header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+            exit;
+        }
+        $mailing = $settings['mailing'] ?? [];
+        if (($mailing['auto_newsletter'] ?? 'off') !== 'on') {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'warning',
+                'message' => 'Activa la newsletter en Lista > Preferencias de envio.',
+            ];
+            header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+            exit;
+        }
+        $subscribers = admin_mailing_recipients_for_type('newsletter', $settings);
+        if (empty($subscribers)) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'warning',
+                'message' => 'No hay suscriptores en la lista de correo.',
+            ];
+            header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+            exit;
+        }
+        $markdown = new MarkdownConverter();
+        $contentHtml = $markdown->toHtml($content);
+        $contentText = trim(strip_tags($contentHtml));
+        $payload = admin_prepare_newsletter_payload($settings, $title, $contentHtml, $contentText, $image);
+        try {
+            admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+        } catch (Throwable $e) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudo enviar la newsletter. Revisa la configuración de correo.',
+            ];
+            header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+            exit;
+        }
+        $filenameBase = nammu_slugify($title !== '' ? $title : 'newsletter');
+        if ($filenameBase === '') {
+            $filenameBase = 'newsletter';
+        }
+        $filename = nammu_unique_filename($filenameBase);
+        $targetFilename = nammu_normalize_filename($filename . '.md');
+        if ($targetFilename !== '') {
+            $all_posts = get_all_posts_metadata();
+            $max_ordo = 0;
+            foreach ($all_posts as $post) {
+                if (isset($post['metadata']['Ordo']) && (int)$post['metadata']['Ordo'] > $max_ordo) {
+                    $max_ordo = (int)$post['metadata']['Ordo'];
+                }
+            }
+            $ordo = $max_ordo + 1;
+            $filepath = CONTENT_DIR . '/' . $targetFilename;
+            $file_content = "---
+";
+            $file_content .= "Title: " . $title . "
+";
+            $file_content .= "Template: newsletter
+";
+            $file_content .= "Category: " . $category . "
+";
+            $file_content .= "Date: " . $date . "
+";
+            $file_content .= "Image: " . $image . "
+";
+            $file_content .= "Description: " . $description . "
+";
+            $file_content .= "Status: newsletter
+";
+            $file_content .= "Ordo: " . $ordo . "
+";
+            $file_content .= "---
+
+";
+            $file_content .= $content;
+            @file_put_contents($filepath, $file_content);
+        }
+        $_SESSION['mailing_feedback'] = [
+            'type' => 'success',
+            'message' => 'Newsletter enviada correctamente.',
+        ];
+        header('Location: admin.php?page=edit&template=newsletter&created=' . urlencode($targetFilename));
+        exit;
     } elseif (isset($_POST['update']) || isset($_POST['publish_draft_entry']) || isset($_POST['publish_draft_page']) || isset($_POST['convert_to_draft'])) {
         $existing_post_data = null;
         $filename = $_POST['filename'] ?? '';
@@ -3047,7 +3522,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
                         $link = admin_public_post_url($slug);
                         if (($mailing['auto_posts'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
-                            $subscribers = admin_load_mailing_subscribers();
+                            $subscribers = admin_mailing_recipients_for_type('posts', $settings);
                             if (!empty($subscribers)) {
                                 $payload = admin_prepare_mailing_payload('single', $settings, $title, $description, $link, $image);
                                 try {
@@ -3089,7 +3564,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $networkKey = $_POST['social_network'] ?? '';
         $filename = $_POST['social_filename'] ?? '';
         $templateTarget = $_POST['social_template'] ?? 'single';
-        $templateTarget = in_array($templateTarget, ['single', 'page', 'draft'], true) ? $templateTarget : 'single';
+        $templateTarget = in_array($templateTarget, ['single', 'page', 'draft', 'newsletter'], true) ? $templateTarget : 'single';
         $redirectTemplate = urlencode($templateTarget);
         $networkLabels = [
             'telegram' => 'Telegram',
@@ -3261,7 +3736,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $settings = get_settings();
                 $mailing = $settings['mailing'] ?? [];
                 if (($mailing['auto_itineraries'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
-                    $subscribers = admin_load_mailing_subscribers();
+                    $subscribers = admin_mailing_recipients_for_type('itineraries', $settings);
                     if (!empty($subscribers)) {
                         $link = admin_public_itinerary_url($saved->getSlug());
                         $payload = admin_prepare_mailing_payload('itinerario', $settings, $title, $description, $link, $image);
@@ -3494,7 +3969,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $filename = $_POST['delete_filename'] ?? '';
         $filename = trim($filename);
         $templateTarget = $_POST['delete_template'] ?? 'single';
-        $templateTarget = in_array($templateTarget, ['single', 'page', 'draft'], true) ? $templateTarget : 'single';
+        $templateTarget = in_array($templateTarget, ['single', 'page', 'draft', 'newsletter'], true) ? $templateTarget : 'single';
         $templateParam = urlencode($templateTarget);
         if ($filename !== '') {
             // Ensure only filenames from content directory are used
@@ -4146,15 +4621,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         try {
-            $subscribers = admin_load_mailing_subscribers();
-            if (in_array($email, $subscribers, true)) {
+            $subscribers = admin_load_mailing_subscriber_entries();
+            $exists = false;
+            foreach ($subscribers as $subscriber) {
+                if (admin_normalize_email((string) ($subscriber['email'] ?? '')) === $email) {
+                    $exists = true;
+                    break;
+                }
+            }
+            if ($exists) {
                 $_SESSION['mailing_feedback'] = [
                     'type' => 'info',
                     'message' => 'Esa dirección ya está en la lista.',
                 ];
             } else {
-                $subscribers[] = $email;
-                admin_save_mailing_subscribers($subscribers);
+                $subscribers[] = [
+                    'email' => $email,
+                    'prefs' => admin_mailing_default_prefs(),
+                ];
+                admin_save_mailing_subscriber_entries($subscribers);
                 $_SESSION['mailing_feedback'] = [
                     'type' => 'success',
                     'message' => 'Suscriptor añadido correctamente.',
@@ -4180,11 +4665,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         try {
-            $subscribers = admin_load_mailing_subscribers();
+            $subscribers = admin_load_mailing_subscriber_entries();
             $filtered = array_values(array_filter($subscribers, static function ($item) use ($email) {
-                return admin_normalize_email((string) $item) !== $email;
+                return admin_normalize_email((string) ($item['email'] ?? '')) !== $email;
             }));
-            admin_save_mailing_subscribers($filtered);
+            admin_save_mailing_subscriber_entries($filtered);
             $_SESSION['mailing_feedback'] = [
                 'type' => 'success',
                 'message' => 'Suscriptor eliminado.',
@@ -4200,6 +4685,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['save_mailing_flags'])) {
         $autoPosts = isset($_POST['mailing_auto_posts']) ? 'on' : 'off';
         $autoItineraries = isset($_POST['mailing_auto_itineraries']) ? 'on' : 'off';
+        $autoNewsletter = isset($_POST['mailing_auto_newsletter']) ? 'on' : 'off';
         $format = $_POST['mailing_format'] ?? 'html';
         $format = $format === 'text' ? 'text' : 'html';
         try {
@@ -4209,6 +4695,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $config['mailing']['auto_posts'] = $autoPosts;
             $config['mailing']['auto_itineraries'] = $autoItineraries;
+            $config['mailing']['auto_newsletter'] = $autoNewsletter;
             $config['mailing']['format'] = $format;
             save_config_file($config);
             $_SESSION['mailing_feedback'] = [
@@ -4484,7 +4971,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . $redirect);
             exit;
         }
-        $subscribers = admin_load_mailing_subscribers();
+        $recipientType = admin_mailing_type_for_template($template);
+        $subscribers = admin_mailing_recipients_for_type($recipientType, $settings);
         if (empty($subscribers)) {
             $_SESSION['mailing_feedback'] = [
                 'type' => 'warning',
@@ -10407,7 +10895,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 modal.find('[data-delete-post-title]').text(title || '(sin título)');
                 modal.find('[data-delete-post-file]').text(filename || '');
                 modal.find('#delete-post-filename').val(filename);
-                if (['single', 'page', 'draft'].indexOf(type) === -1) {
+                if (['single', 'page', 'draft', 'newsletter'].indexOf(type) === -1) {
                     type = 'single';
                 }
                 modal.find('#delete-post-template').val(type);

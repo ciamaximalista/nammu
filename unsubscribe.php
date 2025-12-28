@@ -33,7 +33,40 @@ function mailing_unsubscribe_token(string $email): string {
     return hash_hmac('sha256', mailing_normalize_email($email), mailing_secret());
 }
 
-function mailing_load_subscribers(): array {
+function mailing_default_prefs(): array {
+    return [
+        'posts' => true,
+        'itineraries' => true,
+        'newsletter' => true,
+    ];
+}
+
+function mailing_normalize_entry($entry): ?array {
+    if (is_string($entry)) {
+        $email = mailing_normalize_email($entry);
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+        return [
+            'email' => $email,
+            'prefs' => mailing_default_prefs(),
+        ];
+    }
+    if (!is_array($entry)) {
+        return null;
+    }
+    $email = mailing_normalize_email((string) ($entry['email'] ?? ''));
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return null;
+    }
+    $prefs = $entry['prefs'] ?? mailing_default_prefs();
+    return [
+        'email' => $email,
+        'prefs' => is_array($prefs) ? $prefs : mailing_default_prefs(),
+    ];
+}
+
+function mailing_load_entries(): array {
     if (!is_file(MAILING_SUBSCRIBERS_FILE)) {
         return [];
     }
@@ -46,24 +79,26 @@ function mailing_load_subscribers(): array {
         return [];
     }
     $unique = [];
-    foreach ($decoded as $email) {
-        $norm = mailing_normalize_email((string) $email);
-        if ($norm !== '' && filter_var($norm, FILTER_VALIDATE_EMAIL)) {
-            $unique[$norm] = true;
+    foreach ($decoded as $entry) {
+        $normalized = mailing_normalize_entry($entry);
+        if ($normalized === null) {
+            continue;
         }
+        $unique[$normalized['email']] = $normalized;
     }
-    return array_keys($unique);
+    return array_values($unique);
 }
 
-function mailing_save_subscribers(array $subscribers): void {
+function mailing_save_entries(array $subscribers): void {
     $unique = [];
-    foreach ($subscribers as $email) {
-        $norm = mailing_normalize_email((string) $email);
-        if ($norm !== '' && filter_var($norm, FILTER_VALIDATE_EMAIL)) {
-            $unique[$norm] = true;
+    foreach ($subscribers as $entry) {
+        $normalized = mailing_normalize_entry($entry);
+        if ($normalized === null) {
+            continue;
         }
+        $unique[$normalized['email']] = $normalized;
     }
-    $payload = json_encode(array_keys($unique), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    $payload = json_encode(array_values($unique), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if ($payload === false) {
         throw new RuntimeException('No se pudo serializar la lista.');
     }
@@ -104,11 +139,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unsubscribe_confirm']
         $error = 'El enlace de baja no es válido o ha caducado.';
     } else {
         try {
-            $list = mailing_load_subscribers();
+            $list = mailing_load_entries();
             $filtered = array_values(array_filter($list, static function ($item) use ($emailPost) {
-                return mailing_normalize_email((string) $item) !== $emailPost;
+                return mailing_normalize_email((string) ($item['email'] ?? '')) !== $emailPost;
             }));
-            mailing_save_subscribers($filtered);
+            mailing_save_entries($filtered);
             $removed = true;
             $valid = true;
         } catch (Throwable $e) {
@@ -149,10 +184,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unsubscribe_confirm']
             <?php endif; ?>
 
             <?php if ($removed): ?>
-                <div class="alert success">Hemos dado de baja <strong><?= htmlspecialchars($email, ENT_QUOTES, 'UTF-8') ?></strong> de los avisos de <?= htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') ?>.</div>
+                <div class="alert success">Hemos dado de baja <strong><?= htmlspecialchars($email, ENT_QUOTES, 'UTF-8') ?></strong> de las comunicaciones de <?= htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') ?>.</div>
                 <p>Gracias por haber estado suscrito.</p>
             <?php elseif ($valid): ?>
-                <p>Vas a darte de baja de los avisos de <?= htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') ?>.</p>
+                <p>Vas a darte de baja de las comunicaciones de <?= htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') ?>.</p>
                 <p>Confirma pulsando el botón.</p>
                 <form method="post">
                     <input type="hidden" name="email" value="<?= htmlspecialchars($email, ENT_QUOTES, 'UTF-8') ?>">

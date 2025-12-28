@@ -10,6 +10,68 @@ function subscription_normalize_email(string $email): string {
     return strtolower(trim($email));
 }
 
+function subscription_default_prefs(): array {
+    return [
+        'posts' => true,
+        'itineraries' => true,
+        'newsletter' => true,
+    ];
+}
+
+function subscription_normalize_prefs(array $prefs): array {
+    $defaults = subscription_default_prefs();
+    $normalized = [];
+    foreach ($defaults as $key => $default) {
+        $value = $prefs[$key] ?? $default;
+        if (is_string($value)) {
+            $value = strtolower($value) !== 'off' && $value !== '0' && $value !== '';
+        } else {
+            $value = (bool) $value;
+        }
+        $normalized[$key] = $value;
+    }
+    return $normalized;
+}
+
+function subscription_normalize_entry($entry): ?array {
+    if (is_string($entry)) {
+        $email = subscription_normalize_email($entry);
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+        return [
+            'email' => $email,
+            'prefs' => subscription_default_prefs(),
+        ];
+    }
+    if (!is_array($entry)) {
+        return null;
+    }
+    $email = subscription_normalize_email((string) ($entry['email'] ?? ''));
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return null;
+    }
+    $prefsRaw = $entry['prefs'] ?? [];
+    $prefs = is_array($prefsRaw) ? subscription_normalize_prefs($prefsRaw) : subscription_default_prefs();
+    return [
+        'email' => $email,
+        'prefs' => $prefs,
+    ];
+}
+
+function subscription_normalize_subscribers(array $subscribers): array {
+    $unique = [];
+    foreach ($subscribers as $entry) {
+        $normalized = subscription_normalize_entry($entry);
+        if ($normalized === null) {
+            continue;
+        }
+        $email = $normalized['email'];
+        $unique[$email] = $normalized;
+    }
+    return $unique;
+}
+
 function subscription_load(array $fileDef): array {
     [$file, $default] = $fileDef;
     if (!is_file($file)) {
@@ -63,17 +125,27 @@ if ($email === '' || $token === '') {
         $showError = true;
         $errorMessage = 'Este enlace de confirmación no es válido o ya se utilizó.';
     } else {
+        $matchedEntry = $pending[$matchIndex] ?? null;
         unset($pending[$matchIndex]);
         $pending = array_values($pending);
 
-        $subscribers = subscription_load([MAILING_SUBSCRIBERS_FILE, []]);
-        if (!in_array($email, $subscribers, true)) {
-            $subscribers[] = $email;
+        $prefs = subscription_default_prefs();
+        if (is_array($matchedEntry)) {
+            $prefsRaw = $matchedEntry['prefs'] ?? null;
+            if (is_array($prefsRaw)) {
+                $prefs = subscription_normalize_prefs($prefsRaw);
+            }
         }
+        $subscribersRaw = subscription_load([MAILING_SUBSCRIBERS_FILE, []]);
+        $subscribers = subscription_normalize_subscribers($subscribersRaw);
+        $subscribers[$email] = [
+            'email' => $email,
+            'prefs' => $prefs,
+        ];
 
         try {
             subscription_save(MAILING_PENDING_FILE, $pending);
-            subscription_save(MAILING_SUBSCRIBERS_FILE, $subscribers);
+            subscription_save(MAILING_SUBSCRIBERS_FILE, array_values($subscribers));
         } catch (Throwable $e) {
             $showError = true;
             $errorMessage = 'No pudimos confirmar tu suscripción. Inténtalo de nuevo.';
@@ -148,7 +220,7 @@ if ($siteUrl === '') {
             <?php endif; ?>
         <?php else: ?>
             <h1 class="confirm-title">Suscripción realizada con éxito</h1>
-            <p class="confirm-text">A partir de ahora recibirás los avisos de publicación de <?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?>.</p>
+            <p class="confirm-text">A partir de ahora recibirás las comunicaciones de <?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> según tus preferencias.</p>
             <?php if ($siteAuthor !== ''): ?>
                 <p class="confirm-text">Enviado por: <?= htmlspecialchars($siteAuthor, ENT_QUOTES, 'UTF-8') ?></p>
             <?php endif; ?>

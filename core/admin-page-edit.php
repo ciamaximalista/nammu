@@ -11,7 +11,7 @@ if ($editFeedback !== null) {
 
         <?php
         $templateFilter = $_GET['template'] ?? 'single';
-        $allowedFilters = ['single', 'page', 'draft'];
+        $allowedFilters = ['single', 'page', 'draft', 'newsletter'];
         if (!in_array($templateFilter, $allowedFilters, true)) {
             $templateFilter = 'single';
         }
@@ -19,6 +19,7 @@ if ($editFeedback !== null) {
             'single' => 'Entradas',
             'page' => 'Páginas',
             'draft' => 'Borradores',
+            'newsletter' => 'Newsletters',
         ][$templateFilter];
         $searchQuery = trim($_GET['q'] ?? '');
         $searchQueryParam = $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '';
@@ -56,6 +57,7 @@ if ($editFeedback !== null) {
         <div class="btn-group mb-3" role="group" aria-label="Filtrar por tipo">
             <a href="?page=edit&template=single<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'single' ? 'active' : '' ?>">Entradas</a>
             <a href="?page=edit&template=page<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'page' ? 'active' : '' ?>">Páginas</a>
+            <a href="?page=edit&template=newsletter<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'newsletter' ? 'active' : '' ?>">Newsletters</a>
             <a href="?page=edit&template=draft<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'draft' ? 'active' : '' ?>">Borradores</a>
         </div>
 
@@ -446,6 +448,7 @@ if ($editFeedback !== null) {
                 <?php elseif ($currentTypeValue === 'Entrada' && !$isDraftEditing): ?>
                     <button type="submit" name="convert_to_draft" value="1" class="btn btn-outline-secondary ml-2">Pasar a borrador</button>
                 <?php endif; ?>
+                <button type="submit" name="send_newsletter_edit" value="1" class="btn btn-warning ml-2" data-confirm-publish="1">Enviar como newsletter</button>
             </div>
 
             </form>

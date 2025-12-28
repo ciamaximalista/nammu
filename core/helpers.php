@@ -1611,7 +1611,7 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
         && function_exists('admin_maybe_enqueue_push_notification')
         && function_exists('get_settings')
         && function_exists('admin_is_mailing_ready')
-        && function_exists('admin_load_mailing_subscribers')
+        && function_exists('admin_mailing_recipients_for_type')
         && function_exists('admin_prepare_mailing_payload')
         && function_exists('admin_send_mailing_broadcast')
         && function_exists('admin_public_post_url');
@@ -1633,7 +1633,7 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
     $mailing = $settings['mailing'] ?? [];
     $link = $slug !== '' ? admin_public_post_url($slug) : '';
     if (($mailing['auto_posts'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
-        $subscribers = admin_load_mailing_subscribers();
+        $subscribers = admin_mailing_recipients_for_type('posts', $settings);
         if (!empty($subscribers) && $link !== '') {
             $payloadMail = admin_prepare_mailing_payload('single', $settings, $title, $description, $link, $image);
             try {

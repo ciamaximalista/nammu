@@ -10,6 +10,18 @@
     <?php
     $mailingNewsletterEnabled = isset($settings['mailing'])
         && (($settings['mailing']['auto_newsletter'] ?? (($settings['mailing']['gmail_address'] ?? '') !== '' ? 'on' : 'off')) === 'on');
+    $siteLang = $settings['site_lang'] ?? 'es';
+    $languageOptions = [
+        'es' => 'Español',
+        'ca' => 'Català',
+        'eu' => 'Euskera',
+        'gl' => 'Galego',
+        'en' => 'English',
+        'fr' => 'Français',
+        'it' => 'Italiano',
+        'pt' => 'Português',
+        'de' => 'Deutsch',
+    ];
     ?>
 
     <form method="post">
@@ -50,6 +62,17 @@
 
             <input type="date" name="date" id="date" class="form-control" value="<?= date('Y-m-d') ?>" required>
 
+        </div>
+
+        <div class="form-group">
+            <label for="lang">Lengua de la entrada</label>
+            <select name="lang" id="lang" class="form-control">
+                <?php foreach ($languageOptions as $code => $label): ?>
+                    <option value="<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>" <?= $siteLang === $code ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
         </div>
 
         <div class="form-group">

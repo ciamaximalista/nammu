@@ -140,6 +140,7 @@ function nammu_load_analytics(): array
             'visitors' => ['daily' => []],
             'content' => ['posts' => [], 'pages' => []],
             'itineraries' => ['items' => []],
+            'sources' => ['daily' => []],
             'updated_at' => 0,
         ];
     }
@@ -159,6 +160,7 @@ function nammu_load_analytics(): array
             'content' => ['posts' => [], 'pages' => []],
             'itineraries' => ['items' => []],
             'platform' => ['daily' => []],
+            'sources' => ['daily' => []],
             'updated_at' => 0,
         ];
     }
@@ -166,8 +168,61 @@ function nammu_load_analytics(): array
     $decoded['content'] = $decoded['content'] ?? ['posts' => [], 'pages' => []];
     $decoded['itineraries'] = $decoded['itineraries'] ?? ['items' => []];
     $decoded['platform'] = $decoded['platform'] ?? ['daily' => []];
+    $decoded['sources'] = $decoded['sources'] ?? ['daily' => []];
     $decoded['updated_at'] = (int) ($decoded['updated_at'] ?? 0);
     return $decoded;
+}
+
+function nammu_detect_referrer_source(string $referer, string $host): array
+{
+    $referer = trim($referer);
+    if ($referer === '') {
+        return ['bucket' => 'direct', 'detail' => ''];
+    }
+    $refHost = parse_url($referer, PHP_URL_HOST);
+    $refHost = $refHost ? strtolower($refHost) : '';
+    if ($refHost === '') {
+        return ['bucket' => 'direct', 'detail' => ''];
+    }
+    $host = strtolower($host);
+    if ($host !== '' && ($refHost === $host || str_ends_with($refHost, '.' . $host))) {
+        return ['bucket' => 'direct', 'detail' => ''];
+    }
+    $searchEngines = [
+        'google.' => 'Google Search',
+        'bing.com' => 'Bing',
+        'duckduckgo.com' => 'DuckDuckGo',
+        'yahoo.' => 'Yahoo',
+        'yandex.' => 'Yandex',
+        'baidu.' => 'Baidu',
+        'ecosia.org' => 'Ecosia',
+        'startpage.com' => 'Startpage',
+    ];
+    foreach ($searchEngines as $needle => $label) {
+        if (str_contains($refHost, $needle)) {
+            return ['bucket' => 'search', 'detail' => $label];
+        }
+    }
+    $socialDomains = [
+        't.me' => 'Telegram',
+        'telegram.me' => 'Telegram',
+        'facebook.com' => 'Facebook',
+        'fb.com' => 'Facebook',
+        'instagram.com' => 'Instagram',
+        'twitter.com' => 'Twitter/X',
+        'x.com' => 'Twitter/X',
+        't.co' => 'Twitter/X',
+        'linkedin.com' => 'LinkedIn',
+        'pinterest.' => 'Pinterest',
+        'whatsapp.com' => 'WhatsApp',
+        'wa.me' => 'WhatsApp',
+    ];
+    foreach ($socialDomains as $needle => $label) {
+        if (str_contains($refHost, $needle)) {
+            return ['bucket' => 'social', 'detail' => $label];
+        }
+    }
+    return ['bucket' => 'other', 'detail' => ''];
 }
 
 function nammu_save_analytics(array $data): void
@@ -370,6 +425,33 @@ function nammu_record_visit(): void
     if (nammu_record_platform_visit($data, $uid, $date)) {
         $changed = true;
     }
+    $referrer = $_SERVER['HTTP_REFERER'] ?? '';
+    $host = $_SERVER['HTTP_HOST'] ?? '';
+    $source = nammu_detect_referrer_source($referrer, $host);
+    if (!isset($data['sources']['daily'][$date])) {
+        $data['sources']['daily'][$date] = [];
+    }
+    $bucket = $source['bucket'] ?? 'other';
+    $detail = $source['detail'] ?? '';
+    if (!isset($data['sources']['daily'][$date][$bucket]['uids'])) {
+        $data['sources']['daily'][$date][$bucket]['uids'] = [];
+    }
+    if (!isset($data['sources']['daily'][$date][$bucket]['uids'][$uid])) {
+        $data['sources']['daily'][$date][$bucket]['uids'][$uid] = 1;
+        $changed = true;
+    }
+    if ($detail !== '' && in_array($bucket, ['search', 'social'], true)) {
+        if (!isset($data['sources']['daily'][$date][$bucket]['detail'])) {
+            $data['sources']['daily'][$date][$bucket]['detail'] = [];
+        }
+        if (!isset($data['sources']['daily'][$date][$bucket]['detail'][$detail]['uids'])) {
+            $data['sources']['daily'][$date][$bucket]['detail'][$detail]['uids'] = [];
+        }
+        if (!isset($data['sources']['daily'][$date][$bucket]['detail'][$detail]['uids'][$uid])) {
+            $data['sources']['daily'][$date][$bucket]['detail'][$detail]['uids'][$uid] = 1;
+            $changed = true;
+        }
+    }
     if ($changed) {
         $data['updated_at'] = time();
         nammu_save_analytics($data);
@@ -532,6 +614,10 @@ function nammu_template_settings(): array
     $home['header'] = $homeHeader;
     $author = $config['site_author'] ?? '';
     $blog = $config['site_name'] ?? '';
+    $lang = $config['site_lang'] ?? 'es';
+    if (!is_string($lang) || $lang === '') {
+        $lang = 'es';
+    }
 
     $fontRequests = [];
     $titleFont = $fonts['title'] ?? '';
@@ -633,6 +719,7 @@ function nammu_template_settings(): array
         'home' => $home,
         'author' => $author,
         'blog' => $blog,
+        'lang' => $lang,
         'search' => $searchConfig,
         'subscription' => $subscriptionConfig,
         'entry' => $entryConfig,
@@ -1275,6 +1362,17 @@ function nammu_build_social_meta(array $data, array $socialConfig): array
     }
     if (!empty($socialConfig['facebook_app_id'])) {
         $properties['fb:app_id'] = $socialConfig['facebook_app_id'];
+    }
+    if (($data['type'] ?? '') === 'article') {
+        if (!empty($data['published_time'])) {
+            $properties['article:published_time'] = $data['published_time'];
+        }
+        if (!empty($data['modified_time'])) {
+            $properties['article:modified_time'] = $data['modified_time'];
+        }
+        if (!empty($data['author'])) {
+            $properties['article:author'] = $data['author'];
+        }
     }
 
     $names = [

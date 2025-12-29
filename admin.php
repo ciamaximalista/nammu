@@ -516,6 +516,10 @@ function admin_regenerate_itinerary_feed(): void {
         $config = load_config_file();
         $siteTitle = trim((string) ($config['site_name'] ?? 'Nammu Blog'));
         $siteDescription = trim((string) ($config['social']['default_description'] ?? ''));
+        $siteLang = $config['site_lang'] ?? 'es';
+        if (!is_string($siteLang) || $siteLang === '') {
+            $siteLang = 'es';
+        }
 
         $markdown = new MarkdownConverter();
         $posts = [];
@@ -564,10 +568,15 @@ function admin_regenerate_itinerary_feed(): void {
             return strcmp($a->getSlug(), $b->getSlug());
         });
 
+        $itinerariesIndexUrl = ($baseUrl !== '' ? rtrim($baseUrl, '/') : '') . '/itinerarios';
+        $itinerariesFeedUrl = ($baseUrl !== '' ? rtrim($baseUrl, '/') : '') . '/itinerarios.xml';
         $feedContent = (new RssGenerator(
             $baseUrl,
             $siteTitle . ' — Itinerarios',
-            'Itinerarios recientes'
+            'Itinerarios recientes',
+            $itinerariesIndexUrl,
+            $itinerariesFeedUrl,
+            $siteLang
         ))->generate(
             $posts,
             static function (Post $post) use ($urls): string {
@@ -851,6 +860,10 @@ function get_settings() {
     $authorName = $config['site_author'] ?? '';
     $blogName = $config['site_name'] ?? '';
     $siteUrl = $config['site_url'] ?? '';
+    $siteLang = $config['site_lang'] ?? 'es';
+    if (!is_string($siteLang) || $siteLang === '') {
+        $siteLang = 'es';
+    }
 
     $fonts = array_merge($defaults['fonts'], $templateConfig['fonts'] ?? []);
     $colors = array_merge($defaults['colors'], $templateConfig['colors'] ?? []);
@@ -1021,6 +1034,7 @@ function get_settings() {
         'site_author' => $authorName,
         'site_name' => $blogName,
         'site_url' => $siteUrl,
+        'site_lang' => $siteLang,
         'template' => [
             'fonts' => $fonts,
             'colors' => $colors,
@@ -3062,6 +3076,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $date = date('Y-m-d', $timestamp);
         $image = trim($_POST['image'] ?? '');
         $description = trim($_POST['description'] ?? '');
+        $lang = trim($_POST['lang'] ?? '');
         $filenameInput = trim($_POST['filename'] ?? '');
         $slugPattern = '/^[a-z0-9-]+$/i';
         if ($filenameInput !== '' && !preg_match($slugPattern, $filenameInput)) {
@@ -3127,6 +3142,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
                 $file_content .= "Description: " . $description . "
 ";
+                if ($lang !== '') {
+                    $file_content .= "Lang: " . $lang . "
+";
+                }
                 $file_content .= "Status: newsletter
 ";
                 $file_content .= "Ordo: " . $ordo . "
@@ -3160,6 +3179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $publishAtTime = trim($_POST['publish_at_time'] ?? '');
         $image = trim($_POST['image'] ?? '');
         $description = trim($_POST['description'] ?? '');
+        $lang = trim($_POST['lang'] ?? '');
         $type = $_POST['type'] ?? 'Entrada';
         $type = $type === 'Página' ? 'Página' : 'Entrada';
         $filenameInput = trim($_POST['filename'] ?? '');
@@ -3214,6 +3234,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
                 $file_content .= "Description: " . $description . "
 ";
+                if ($lang !== '') {
+                    $file_content .= "Lang: " . $lang . "
+";
+                }
                 $file_content .= "Status: " . $statusValue . "
 ";
                 if ($isDraft && $publishAtDate !== '') {
@@ -3274,6 +3298,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $date = date('Y-m-d', $timestamp);
         $image = trim($_POST['image'] ?? '');
         $description = trim($_POST['description'] ?? '');
+        $lang = trim($_POST['lang'] ?? '');
         $content = $_POST['content'] ?? '';
         $settings = get_settings();
         if (!admin_is_mailing_ready($settings)) {
@@ -3346,6 +3371,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
             $file_content .= "Description: " . $description . "
 ";
+            if ($lang !== '') {
+                $file_content .= "Lang: " . $lang . "
+";
+            }
             $file_content .= "Status: newsletter
 ";
             $file_content .= "Ordo: " . $ordo . "
@@ -3372,6 +3401,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $publishAtTime = trim($_POST['publish_at_time'] ?? '');
         $image = $_POST['image'] ?? '';
         $description = $_POST['description'] ?? '';
+        $lang = trim($_POST['lang'] ?? '');
         $type = $_POST['type'] ?? null;
         $statusPosted = strtolower(trim($_POST['status'] ?? ''));
         $publishDraftAsEntry = isset($_POST['publish_draft_entry']);
@@ -3385,6 +3415,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $existing_post_data = get_post_content($normalizedFilename);
             $ordo = $existing_post_data['metadata']['Ordo'] ?? '';
             $previousStatus = strtolower($existing_post_data['metadata']['Status'] ?? 'published');
+            if ($lang === '') {
+                $lang = trim((string) ($existing_post_data['metadata']['Lang'] ?? ''));
+            }
             if ($type === null) {
                 $currentTemplate = strtolower($existing_post_data['metadata']['Template'] ?? 'post');
                 $type = $currentTemplate === 'page' ? 'Página' : 'Entrada';
@@ -3480,6 +3513,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
             $file_content .= "Description: " . $description . "
 ";
+            if ($lang !== '') {
+                $file_content .= "Lang: " . $lang . "
+";
+            }
             $file_content .= "Status: " . $status . "
 ";
             if ($publishAtValue !== '') {
@@ -4438,6 +4475,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $site_author = trim($_POST['site_author'] ?? '');
         $site_name = trim($_POST['site_name'] ?? '');
         $site_url = trim($_POST['site_url'] ?? '');
+        $site_lang = trim($_POST['site_lang'] ?? 'es');
         $social_default_description = trim($_POST['social_default_description'] ?? '');
 
         try {
@@ -4467,6 +4505,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $config['site_url'] = $site_url;
             } else {
                 unset($config['site_url']);
+            }
+            if ($site_lang !== '') {
+                $config['site_lang'] = $site_lang;
+            } else {
+                unset($config['site_lang']);
             }
 
             $social = $config['social'] ?? [];
@@ -9060,7 +9103,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
             }
 
-            function showInsertActions(mediaName, mediaType, mediaSrc, mediaMime) {
+            function showInsertActions(mediaName, mediaType, mediaSrc, mediaMime, mediaTags) {
                 if (!insertActions.length) {
                     return;
                 }
@@ -9068,7 +9111,8 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     name: mediaName,
                     type: mediaType,
                     src: mediaSrc,
-                    mime: mediaMime
+                    mime: mediaMime,
+                    tags: mediaTags || ''
                 };
                 if (insertActionGroups.length) {
                     var groupKey = 'image';
@@ -9126,6 +9170,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 var mediaType = $media.data('mediaType') || 'image';
                 var mediaSrc = $media.data('mediaSrc') || '';
                 var mediaMime = $media.data('mediaMime') || '';
+                var mediaTags = $media.data('mediaTags') || '';
 
                 if (!mediaName) {
                     return;
@@ -9147,7 +9192,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 } else if (imageTargetMode === 'editor') {
 
                     if (mediaType === 'image' || mediaType === 'pdf' || mediaType === 'video') {
-                        showInsertActions(mediaName, mediaType, mediaSrc, mediaMime);
+                        showInsertActions(mediaName, mediaType, mediaSrc, mediaMime, mediaTags);
                         return;
                     }
 
@@ -9160,7 +9205,53 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 
             });
 
-            function insertMediaInContent(type, source, mime, mode) {
+            function resolvePostTitle() {
+                var titleValue = '';
+                if (lastImageTrigger && typeof lastImageTrigger.closest === 'function') {
+                    var form = lastImageTrigger.closest('form');
+                    if (form) {
+                        var titleInput = form.querySelector('[name="title"]');
+                        if (titleInput && titleInput.value) {
+                            titleValue = titleInput.value;
+                        }
+                    }
+                }
+                if (!titleValue) {
+                    var fallback = document.querySelector('input[name="title"]');
+                    if (fallback && fallback.value) {
+                        titleValue = fallback.value;
+                    }
+                }
+                return (titleValue || '').toString().trim();
+            }
+
+            function resolveImageText(tagsText) {
+                var tags = (tagsText || '').toString().split(',').map(function(tag) {
+                    return tag.trim();
+                }).filter(Boolean);
+                if (tags.length) {
+                    return tags.join(', ');
+                }
+                return resolvePostTitle();
+            }
+
+            function escapeHtmlAttr(value) {
+                return (value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+            }
+
+            function escapeMarkdownAlt(value) {
+                return (value || '').replace(/]/g, '\\]');
+            }
+
+            function escapeMarkdownTitle(value) {
+                return (value || '').replace(/"/g, '\\"');
+            }
+
+            function insertMediaInContent(type, source, mime, mode, tagsText) {
                 if (!source) {
                     source = '';
                 }
@@ -9204,10 +9295,21 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 } else if (type === 'document') {
                     snippet = '[' + (source.split('/').pop() || 'Documento') + '](' + source + ')';
                 } else {
+                    var imageText = resolveImageText(tagsText);
+                    var altText = escapeMarkdownAlt(imageText);
+                    var titleText = escapeMarkdownTitle(imageText);
                     if (mode === 'vignette') {
-                        snippet = '\n\n<img src="' + source + '" alt="" style="float:right; max-width:33%; margin:0 0 1rem 1rem;" />\n\n';
+                        var altAttr = escapeHtmlAttr(imageText);
+                        var titleAttr = escapeHtmlAttr(imageText);
+                        snippet = '\n\n<img src="' + source + '" alt="' + altAttr + '" title="' + titleAttr + '" style="float:right; max-width:33%; margin:0 0 1rem 1rem;" />\n\n';
                     } else {
-                        snippet = '![](' + source + ')';
+                        if (altText !== '' && titleText !== '') {
+                            snippet = '![' + altText + '](' + source + ' "' + titleText + '")';
+                        } else if (altText !== '') {
+                            snippet = '![' + altText + '](' + source + ')';
+                        } else {
+                            snippet = '![](' + source + ')';
+                        }
                     }
                 }
                 if (imageTargetSelection && imageTargetTextarea === contentTextArea) {
@@ -9361,7 +9463,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     return;
                 }
                 var mode = $(this).data('insert-mode') || 'full';
-                insertMediaInContent(pendingInsert.type, pendingInsert.src, pendingInsert.mime, mode);
+                insertMediaInContent(pendingInsert.type, pendingInsert.src, pendingInsert.mime, mode, pendingInsert.tags);
                 $('#imageModal').modal('hide');
                 pendingInsert = null;
                 insertActions.addClass('d-none');

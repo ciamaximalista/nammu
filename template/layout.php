@@ -36,6 +36,8 @@ $logoUrl = $theme['logo_url'] ?? null;
 $faviconUrl = $theme['favicon_url'] ?? null;
 $showLogo = $showLogo ?? false;
 $socialMeta = $socialMeta ?? [];
+$jsonLd = $jsonLd ?? [];
+$metaRobots = $metaRobots ?? '';
 $themeGlobal = $theme['global'] ?? [];
 $cornerStyle = $theme['corners'] ?? ($themeGlobal['corners'] ?? 'rounded');
 $cornerClass = $cornerStyle === 'square' ? 'corners-square' : 'corners-rounded';
@@ -111,14 +113,22 @@ $serverYearExpires = gmdate('D, d M Y H:i:s T', time() + 31536000);
 if (function_exists('nammu_record_visit')) {
     nammu_record_visit();
 }
+if (!empty($theme['lang'])) {
+    $pageLang = $theme['lang'];
+}
+$pageLang = $pageLang ?? 'es';
+$pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
 ?><!DOCTYPE html>
-<html lang="es">
+<html lang="<?= $pageLang ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= htmlspecialchars($pageTitle !== '' ? "{$pageTitle} — {$siteTitle}" : $siteTitle, ENT_QUOTES, 'UTF-8') ?></title>
     <?php if (($metaDescription ?? '') !== ''): ?>
         <meta name="description" content="<?= htmlspecialchars($metaDescription, ENT_QUOTES, 'UTF-8') ?>">
+    <?php endif; ?>
+    <?php if ($metaRobots !== ''): ?>
+        <meta name="robots" content="<?= htmlspecialchars($metaRobots, ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
     <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($rssUrl, ENT_QUOTES, 'UTF-8') ?>">
     <?php if ($fontLink): ?>
@@ -140,6 +150,9 @@ if (function_exists('nammu_record_visit')) {
             <meta name="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?>" content="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>">
         <?php endif; ?>
     <?php endforeach; ?>
+    <?php if (!empty($jsonLd)): ?>
+        <script type="application/ld+json"><?= json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
+    <?php endif; ?>
     <style>
         :root {
             --nammu-radius-lg: 18px;

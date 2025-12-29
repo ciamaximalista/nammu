@@ -60,9 +60,38 @@ $homeImage = nammu_resolve_asset($socialConfig['home_image'] ?? '', $publicBaseU
 
 $displaySiteTitle = $theme['blog'] !== '' ? $theme['blog'] : $siteTitle;
 $configData = nammu_load_config();
+$siteLang = $configData['site_lang'] ?? 'es';
+if (!is_string($siteLang) || $siteLang === '') {
+    $siteLang = 'es';
+}
 $postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
 $postalLogoSvg = nammu_postal_icon_svg();
 $footerLinks = nammu_build_footer_links($configData, $theme, $homeUrl, $postalUrl);
+$logoForJsonLd = $theme['logo_url'] ?? '';
+$orgJsonLd = [
+    '@context' => 'https://schema.org',
+    '@type' => 'Organization',
+    'name' => $siteNameForMeta,
+    'url' => $publicBaseUrl !== '' ? $publicBaseUrl : $homeUrl,
+];
+if (!empty($logoForJsonLd)) {
+    $orgJsonLd['logo'] = $logoForJsonLd;
+}
+$siteJsonLd = [
+    '@context' => 'https://schema.org',
+    '@type' => 'WebSite',
+    'name' => $siteNameForMeta,
+    'url' => $publicBaseUrl !== '' ? $publicBaseUrl : $homeUrl,
+    'description' => $homeDescription,
+    'inLanguage' => $siteLang,
+];
+if ($publicBaseUrl !== '') {
+    $siteJsonLd['potentialAction'] = [
+        '@type' => 'SearchAction',
+        'target' => rtrim($publicBaseUrl, '/') . '/buscar.php?q={search_term_string}',
+        'query-input' => 'required name=search_term_string',
+    ];
+}
 $categoryMapAll = nammu_collect_categories_from_posts($contentRepository->all());
 $uncategorizedSlug = nammu_slugify_label('Sin Categoría');
 $hasCategories = false;
@@ -85,6 +114,7 @@ $renderer = new TemplateRenderer(__DIR__ . '/template', [
     'footerLinks' => $footerLinks,
 ]);
 $renderer->setGlobal('hasCategories', $hasCategories);
+$renderer->setGlobal('pageLang', $siteLang);
 
 $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseUrl): ?string {
     if ($image === null || $image === '') {
@@ -235,6 +265,9 @@ echo $renderer->render('layout', [
     'metaDescription' => $searchDescription,
     'content' => $content,
     'socialMeta' => $socialMeta,
+    'jsonLd' => [$siteJsonLd, $orgJsonLd],
+    'pageLang' => $siteLang,
+    'metaRobots' => 'noindex, follow',
     'showLogo' => true,
 ]);
 

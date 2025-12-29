@@ -7,12 +7,25 @@ class RssGenerator
     private string $siteTitle;
     private string $siteDescription;
     private string $baseUrl;
+    private string $channelLink;
+    private string $selfLink;
+    private string $language;
 
-    public function __construct(string $baseUrl, string $siteTitle = 'Nammu Blog', string $siteDescription = '')
+    public function __construct(
+        string $baseUrl,
+        string $siteTitle = 'Nammu Blog',
+        string $siteDescription = '',
+        ?string $channelLink = null,
+        ?string $selfLink = null,
+        ?string $language = null
+    )
     {
         $this->baseUrl = rtrim($baseUrl, '/');
         $this->siteTitle = $siteTitle !== '' ? $siteTitle : 'Nammu Blog';
         $this->siteDescription = $siteDescription;
+        $this->channelLink = $channelLink !== null ? $this->normalizeUrl($channelLink) : '';
+        $this->selfLink = $selfLink !== null ? $this->normalizeUrl($selfLink) : '';
+        $this->language = $language !== null ? trim($language) : '';
     }
 
     /**
@@ -75,15 +88,20 @@ XML;
         $itemsXml = implode("\n", $items);
         $title = htmlspecialchars($this->siteTitle, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $description = htmlspecialchars($this->siteDescription, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $link = $this->baseUrl !== '' ? $this->baseUrl : '/';
+        $link = $this->channelLink !== '' ? $this->channelLink : ($this->baseUrl !== '' ? $this->baseUrl : '/');
+        $language = $this->language !== '' ? "\n    <language>{$this->language}</language>" : '';
+        $atomNamespace = $this->selfLink !== '' ? ' xmlns:atom="http://www.w3.org/2005/Atom"' : '';
+        $atomLink = $this->selfLink !== '' ? "\n    <atom:link href=\"{$this->selfLink}\" rel=\"self\" type=\"application/rss+xml\" />" : '';
+        $generator = "\n    <generator>Nammu</generator>";
 
         return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"{$atomNamespace}>
 <channel>
     <title>{$title}</title>
     <link>{$link}</link>
     <description>{$description}</description>
+    {$generator}{$language}{$atomLink}
     <lastBuildDate>{$this->lastBuildDate($posts)}</lastBuildDate>
 {$itemsXml}
 </channel>

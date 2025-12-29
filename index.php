@@ -73,6 +73,10 @@ $homeImage = nammu_resolve_asset($socialConfig['home_image'] ?? '', $publicBaseU
 $displaySiteTitle = $theme['blog'] !== '' ? $theme['blog'] : $siteTitle;
 
 $configData = nammu_load_config();
+$siteLang = $configData['site_lang'] ?? 'es';
+if (!is_string($siteLang) || $siteLang === '') {
+    $siteLang = 'es';
+}
 $sortOrderValue = strtolower((string) ($configData['pages_order_by'] ?? 'date'));
 $sortOrder = in_array($sortOrderValue, ['date', 'alpha'], true) ? $sortOrderValue : 'date';
 $isAlphabeticalOrder = ($sortOrder === 'alpha');
@@ -81,6 +85,31 @@ $postalEnabled = ($configData['postal']['enabled'] ?? 'off') === 'on';
 $postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
 $postalLogoSvg = nammu_postal_icon_svg();
 $footerLinks = nammu_build_footer_links($configData, $theme, $homeUrl, $postalUrl);
+$logoForJsonLd = $theme['logo_url'] ?? '';
+$orgJsonLd = [
+    '@context' => 'https://schema.org',
+    '@type' => 'Organization',
+    'name' => $siteNameForMeta,
+    'url' => $publicBaseUrl !== '' ? $publicBaseUrl : $homeUrl,
+];
+if (!empty($logoForJsonLd)) {
+    $orgJsonLd['logo'] = $logoForJsonLd;
+}
+$siteJsonLd = [
+    '@context' => 'https://schema.org',
+    '@type' => 'WebSite',
+    'name' => $siteNameForMeta,
+    'url' => $publicBaseUrl !== '' ? $publicBaseUrl : $homeUrl,
+    'description' => $homeDescription,
+    'inLanguage' => $siteLang,
+];
+if ($publicBaseUrl !== '') {
+    $siteJsonLd['potentialAction'] = [
+        '@type' => 'SearchAction',
+        'target' => rtrim($publicBaseUrl, '/') . '/buscar.php?q={search_term_string}',
+        'query-input' => 'required name=search_term_string',
+    ];
+}
 
 $renderer = new TemplateRenderer(__DIR__ . '/template', [
     'siteTitle' => $displaySiteTitle,
@@ -106,6 +135,7 @@ $renderer->setGlobal('postalUrl', $postalUrl);
 $renderer->setGlobal('postalLogoSvg', $postalLogoSvg);
 $renderer->setGlobal('footerLinks', $footerLinks);
 $renderer->setGlobal('hasCategories', $hasCategories);
+$renderer->setGlobal('pageLang', $siteLang);
 
 $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseUrl): ?string {
     if ($image === null || $image === '') {
@@ -195,7 +225,7 @@ $letterSlugRequest = null;
 if (!$isLettersIndex && preg_match('#^/letra/([^/]+)/?$#i', $routePath, $matchLetter)) {
     $letterSlugRequest = strtolower($matchLetter[1]);
 }
-$buildSitemapEntries = static function (array $posts, array $theme, string $publicBaseUrl): array {
+$buildSitemapEntries = static function (array $posts, array $theme, string $publicBaseUrl) use ($itineraryListing, $buildItineraryUrl, $buildItineraryTopicUrl, $isAlphabeticalOrder): array {
     $entries = [];
     $timestampFromPost = static function (Post $post): ?int {
         $date = $post->getDate();
@@ -229,11 +259,13 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
 
     foreach ($posts as $post) {
         $postTimestamp = $timestampFromPost($post);
+        $imageUrl = nammu_resolve_asset($post->getImage(), $publicBaseUrl);
         $entries[] = [
             'loc' => '/' . rawurlencode($post->getSlug()),
             'lastmod' => $postTimestamp !== null ? gmdate('c', $postTimestamp) : null,
             'changefreq' => 'weekly',
             'priority' => 0.8,
+            'image' => $imageUrl ?: null,
         ];
     }
 
@@ -297,6 +329,64 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
         }
     }
 
+    if (!empty($itineraryListing)) {
+        $latestItineraryTimestamp = null;
+        foreach ($itineraryListing as $itineraryItem) {
+            if (!$itineraryItem instanceof \Nammu\Core\Itinerary) {
+                continue;
+            }
+            $meta = $itineraryItem->getMetadata();
+            $dateValue = $meta['Updated'] ?? ($meta['Date'] ?? '');
+            $ts = $dateValue !== '' ? strtotime($dateValue) : null;
+            if ($ts !== false && $ts !== null) {
+                $latestItineraryTimestamp = $latestItineraryTimestamp === null ? $ts : max($latestItineraryTimestamp, $ts);
+            }
+            $imageUrl = nammu_resolve_asset($itineraryItem->getImage(), $publicBaseUrl);
+            $entries[] = [
+                'loc' => $buildItineraryUrl($itineraryItem),
+                'lastmod' => $ts !== false && $ts !== null ? gmdate('c', $ts) : null,
+                'changefreq' => 'weekly',
+                'priority' => 0.7,
+                'image' => $imageUrl ?: null,
+            ];
+            foreach ($itineraryItem->getTopics() as $topicItem) {
+                if (!$topicItem instanceof \Nammu\Core\ItineraryTopic) {
+                    continue;
+                }
+                $entries[] = [
+                    'loc' => $buildItineraryTopicUrl($itineraryItem, $topicItem),
+                    'lastmod' => $ts !== false && $ts !== null ? gmdate('c', $ts) : null,
+                    'changefreq' => 'weekly',
+                    'priority' => 0.6,
+                ];
+            }
+        }
+        $entries[] = [
+            'loc' => '/itinerarios',
+            'lastmod' => $latestItineraryTimestamp !== null ? gmdate('c', $latestItineraryTimestamp) : null,
+            'changefreq' => 'weekly',
+            'priority' => 0.7,
+        ];
+    }
+
+    if ($isAlphabeticalOrder) {
+        $letterGroups = nammu_group_items_by_letter($posts);
+        $entries[] = [
+            'loc' => '/letras',
+            'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
+            'changefreq' => 'weekly',
+            'priority' => 0.6,
+        ];
+        foreach ($letterGroups as $letter => $groupPosts) {
+            $entries[] = [
+                'loc' => '/letra/' . rawurlencode(nammu_letter_slug($letter)),
+                'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
+                'changefreq' => 'weekly',
+                'priority' => 0.5,
+            ];
+        }
+    }
+
     return $entries;
 };
 $renderNotFound = static function (string $title, string $description, string $path) use (
@@ -325,6 +415,8 @@ $renderNotFound = static function (string $title, string $description, string $p
         'metaDescription' => $description !== '' ? $description : 'La página solicitada no se encuentra disponible',
         'content' => $content,
         'socialMeta' => $social,
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
         'showLogo' => false,
     ]);
     exit;
@@ -353,7 +445,7 @@ if ($routePath !== '/' && $routePath !== '/index.php') {
 
 if ($routePath === '/rss.xml') {
     $posts = $contentRepository->all();
-    $rssGenerator = new RssGenerator($publicBaseUrl, $siteTitle, $siteDescription);
+    $rssGenerator = new RssGenerator($publicBaseUrl, $siteTitle, $siteDescription, $homeUrl, $rssUrl, $siteLang);
     $rss = $rssGenerator->generate(
         $posts,
         static fn (Post $post): string => '/' . rawurlencode($post->getSlug()),
@@ -382,6 +474,8 @@ if ($routePath === '/sitemap.xml') {
 }
 
 if ($routePath === '/itinerarios.xml') {
+    $itinerariesIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/itinerarios';
+    $itinerariesFeedUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/itinerarios.xml';
     $itineraryFeedPosts = [];
     $itineraryPostUrls = [];
     foreach ($itineraryListing as $itineraryItem) {
@@ -433,7 +527,10 @@ if ($routePath === '/itinerarios.xml') {
     $itineraryFeedContent = (new RssGenerator(
         $publicBaseUrl,
         $siteTitle . ' — Itinerarios',
-        'Itinerarios recientes'
+        'Itinerarios recientes',
+        $itinerariesIndexUrl,
+        $itinerariesFeedUrl,
+        $siteLang
     ))->generate(
         $itineraryFeedPosts,
         static function (Post $post) use ($itineraryPostUrls): string {
@@ -488,6 +585,8 @@ if ($isLettersIndex) {
         'metaDescription' => 'Listado completo de letras iniciales disponibles en el sitio.',
         'content' => $content,
         'socialMeta' => $socialMeta,
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
     exit;
@@ -532,6 +631,8 @@ if ($letterSlugRequest !== null) {
         'metaDescription' => 'Listado de publicaciones que comienzan por la letra ' . $letterDisplay . '.',
         'content' => $content,
         'socialMeta' => $socialMeta,
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
     exit;
@@ -576,6 +677,8 @@ if ($isCategoriesIndex) {
         'metaDescription' => 'Listado completo de categorías disponibles en el sitio.',
         'content' => $content,
         'socialMeta' => $socialMeta,
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
     exit;
@@ -643,6 +746,8 @@ if ($categorySlugRequest !== null) {
         'metaDescription' => 'Listado de artículos publicados en la categoría ' . $categoryTitle,
         'content' => $content,
         'socialMeta' => $socialMeta,
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
     exit;
@@ -813,6 +918,8 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
         'metaDescription' => $topicDescription,
         'content' => $content,
         'socialMeta' => $topicSocialMeta,
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
     exit;
@@ -1053,6 +1160,8 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
         'metaDescription' => $itineraryDescription,
         'content' => $content,
         'socialMeta' => $itinerarySocialMeta,
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
     exit;
@@ -1078,6 +1187,8 @@ if (preg_match('#^/itinerarios/?$#i', $routePath)) {
         'metaDescription' => $description,
         'content' => $content,
         'socialMeta' => $itineraryIndexMeta,
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
     exit;
@@ -1148,11 +1259,12 @@ if ($slug !== null && $slug !== '') {
             $autoTocHtml = $generatedToc;
         }
     }
+    $postFilePath = __DIR__ . '/content/' . $post->getSlug() . '.md';
     $content = $renderer->render('single', [
         'pageTitle' => $post->getTitle(),
         'post' => $post,
         'htmlContent' => $converted,
-        'postFilePath' => __DIR__ . '/content/' . $post->getSlug() . '.md',
+        'postFilePath' => $postFilePath,
         'autoTocHtml' => $autoTocHtml,
     ]);
 
@@ -1165,6 +1277,39 @@ if ($slug !== null && $slug !== '') {
         $postDescription = nammu_excerpt_text($converted, 220);
     }
     $postCanonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/' . rawurlencode($post->getSlug());
+    $postLang = trim((string) ($post->getMetadata()['Lang'] ?? ''));
+    if ($postLang === '') {
+        $postLang = $siteLang;
+    }
+    $publishedTime = $post->getDate() ? $post->getDate()->format('c') : '';
+    $modifiedTime = is_file($postFilePath) ? gmdate('c', filemtime($postFilePath)) : '';
+    $authorName = trim((string) ($configData['site_author'] ?? $siteNameForMeta));
+    $postJsonLd = [
+        '@context' => 'https://schema.org',
+        '@type' => 'BlogPosting',
+        'headline' => $post->getTitle(),
+        'description' => $postDescription,
+        'mainEntityOfPage' => $postCanonical,
+        'inLanguage' => $postLang,
+    ];
+    if ($publishedTime !== '') {
+        $postJsonLd['datePublished'] = $publishedTime;
+    }
+    if ($modifiedTime !== '') {
+        $postJsonLd['dateModified'] = $modifiedTime;
+    }
+    if ($postImage !== null && $postImage !== '') {
+        $postJsonLd['image'] = $postImage;
+    }
+    if ($authorName !== '') {
+        $postJsonLd['author'] = [
+            '@type' => 'Person',
+            'name' => $authorName,
+        ];
+    }
+    if (!empty($orgJsonLd)) {
+        $postJsonLd['publisher'] = $orgJsonLd;
+    }
     $postSocialMeta = nammu_build_social_meta([
         'type' => 'article',
         'title' => $post->getTitle(),
@@ -1172,6 +1317,9 @@ if ($slug !== null && $slug !== '') {
         'url' => $postCanonical,
         'image' => $postImage,
         'site_name' => $siteNameForMeta,
+        'published_time' => $publishedTime,
+        'modified_time' => $modifiedTime,
+        'author' => $authorName,
     ], $socialConfig);
 
     echo $renderer->render('layout', [
@@ -1179,6 +1327,8 @@ if ($slug !== null && $slug !== '') {
         'metaDescription' => $post->getDescription() !== '' ? $post->getDescription() : $siteDescription,
         'content' => $content,
         'socialMeta' => $postSocialMeta,
+        'jsonLd' => [$siteJsonLd, $orgJsonLd, $postJsonLd],
+        'pageLang' => $postLang,
         'showLogo' => true,
     ]);
     exit;
@@ -1310,11 +1460,13 @@ echo $renderer->render('layout', [
     'metaDescription' => $siteDescription,
     'content' => $content,
     'socialMeta' => $homeSocialMeta,
+    'jsonLd' => [$siteJsonLd, $orgJsonLd],
+    'pageLang' => $siteLang,
     'showLogo' => ($routePath !== '/' && $routePath !== '/index.php'),
 ]);
 
 if ($publicBaseUrl !== '') {
-    @file_put_contents(__DIR__ . '/rss.xml', (new RssGenerator($publicBaseUrl, $siteTitle, $siteDescription))->generate(
+    @file_put_contents(__DIR__ . '/rss.xml', (new RssGenerator($publicBaseUrl, $siteTitle, $siteDescription, $homeUrl, $rssUrl, $siteLang))->generate(
         $posts,
         static fn (Post $post): string => '/' . rawurlencode($post->getSlug()),
         $markdown
@@ -1363,10 +1515,15 @@ if ($publicBaseUrl !== '') {
         }
         return strcmp($a->getSlug(), $b->getSlug());
     });
+    $itinerariesIndexUrlLocal = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/itinerarios';
+    $itinerariesFeedUrlLocal = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/itinerarios.xml';
     $itineraryFeedContent = (new RssGenerator(
         $publicBaseUrl,
         $siteTitle . ' — Itinerarios',
-        'Itinerarios recientes'
+        'Itinerarios recientes',
+        $itinerariesIndexUrlLocal,
+        $itinerariesFeedUrlLocal,
+        $siteLang
     ))->generate(
         $itineraryFeedPosts,
         static function (Post $post) use ($itineraryPostUrls): string {

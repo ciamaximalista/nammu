@@ -18,9 +18,18 @@ class SitemapGenerator
      */
     public function generate(array $entries): string
     {
+        $hasImages = false;
+        foreach ($entries as $entry) {
+            if (!empty($entry['image'])) {
+                $hasImages = true;
+                break;
+            }
+        }
         $xml = [
             '<?xml version="1.0" encoding="UTF-8"?>',
-            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+            $hasImages
+                ? '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">'
+                : '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
         ];
 
         foreach ($entries as $entry) {
@@ -44,6 +53,19 @@ class SitemapGenerator
                 $priority = $this->normalizePriority($entry['priority']);
                 if ($priority !== null) {
                     $xml[] = '    <priority>' . $priority . '</priority>';
+                }
+            }
+
+            if (!empty($entry['image'])) {
+                $images = is_array($entry['image']) ? $entry['image'] : [$entry['image']];
+                foreach ($images as $image) {
+                    $imageLoc = $this->normalizeUrl((string) $image);
+                    if ($imageLoc === '') {
+                        continue;
+                    }
+                    $xml[] = '    <image:image>';
+                    $xml[] = '      <image:loc>' . htmlspecialchars($imageLoc, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</image:loc>';
+                    $xml[] = '    </image:image>';
                 }
             }
 
@@ -121,4 +143,3 @@ class SitemapGenerator
         return number_format($priority, 1, '.', '');
     }
 }
-

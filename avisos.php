@@ -339,6 +339,10 @@ if (!empty($theme['logo_url'])) {
 $displaySiteTitle = $theme['blog'] !== '' ? $theme['blog'] : $siteTitle;
 
 $availablePrefs = mailing_available_prefs($config);
+$siteLang = $config['site_lang'] ?? 'es';
+if (!is_string($siteLang) || $siteLang === '') {
+    $siteLang = 'es';
+}
 $prefsDefault = mailing_default_prefs($availablePrefs);
 $prefsAvailableKeys = [];
 if (!empty($availablePrefs['posts']) || !empty($availablePrefs['itineraries'])) {
@@ -379,6 +383,24 @@ $unsubscribeCopy = $hasAvisos && $hasNewsletter
 $postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
 $postalLogoSvg = nammu_postal_icon_svg();
 $footerLinks = nammu_build_footer_links($config, $theme, $homeUrl, $postalUrl);
+$logoForJsonLd = $theme['logo_url'] ?? '';
+$orgJsonLd = [
+    '@context' => 'https://schema.org',
+    '@type' => 'Organization',
+    'name' => $displaySiteTitle,
+    'url' => $homeUrl,
+];
+if (!empty($logoForJsonLd)) {
+    $orgJsonLd['logo'] = $logoForJsonLd;
+}
+$siteJsonLd = [
+    '@context' => 'https://schema.org',
+    '@type' => 'WebSite',
+    'name' => $displaySiteTitle,
+    'url' => $homeUrl,
+    'description' => $siteDescription,
+    'inLanguage' => $siteLang,
+];
 $categoryMapAll = nammu_collect_categories_from_posts($contentRepository->all());
 $uncategorizedSlug = nammu_slugify_label('Sin Categoría');
 $hasCategories = false;
@@ -791,5 +813,7 @@ echo $renderer->render('layout', [
     'pageTitle' => $pageLabel,
     'metaDescription' => $pageIntro,
     'content' => $pageContent,
+    'jsonLd' => [$siteJsonLd, $orgJsonLd],
+    'pageLang' => $siteLang,
     'showLogo' => true,
 ]);

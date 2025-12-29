@@ -300,6 +300,22 @@ if ($editFeedback !== null) {
             }
             $mailingSettings = $settings['mailing'] ?? (function_exists('get_settings') ? (get_settings()['mailing'] ?? []) : []);
             $mailingNewsletterEnabled = (($mailingSettings['auto_newsletter'] ?? (($mailingSettings['gmail_address'] ?? '') !== '' ? 'on' : 'off')) === 'on');
+            $siteLang = $settings['site_lang'] ?? 'es';
+            $languageOptions = [
+                'es' => 'Español',
+                'ca' => 'Català',
+                'eu' => 'Euskera',
+                'gl' => 'Galego',
+                'en' => 'English',
+                'fr' => 'Français',
+                'it' => 'Italiano',
+                'pt' => 'Português',
+                'de' => 'Deutsch',
+            ];
+            $postLang = trim((string) ($post_data['metadata']['Lang'] ?? ''));
+            if ($postLang === '') {
+                $postLang = $siteLang;
+            }
         ?>
 
         <?php if ($editFeedback !== null): ?>
@@ -351,6 +367,17 @@ if ($editFeedback !== null) {
 
                 <input type="date" name="date" id="date" class="form-control" value="<?= htmlspecialchars(format_date_for_input($post_data['metadata']['Date'] ?? null), ENT_QUOTES, 'UTF-8') ?>" required>
 
+            </div>
+
+            <div class="form-group">
+                <label for="lang">Lengua de la entrada</label>
+                <select name="lang" id="lang" class="form-control">
+                    <?php foreach ($languageOptions as $code => $label): ?>
+                        <option value="<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>" <?= $postLang === $code ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
 
             <?php if ($isDraftEditing): ?>

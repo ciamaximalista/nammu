@@ -529,6 +529,9 @@ function admin_regenerate_itinerary_feed(): void {
             if (!$itinerary instanceof Itinerary) {
                 continue;
             }
+            if (method_exists($itinerary, 'isDraft') && $itinerary->isDraft()) {
+                continue;
+            }
             $metadata = $itinerary->getMetadata();
             $description = $itinerary->getDescription();
             if ($description === '') {

@@ -8,7 +8,8 @@
     <?php endif; ?>
 
     <?php
-    $mailingNewsletterEnabled = isset($settings['mailing']) && ($settings['mailing']['auto_newsletter'] ?? 'off') === 'on';
+    $mailingNewsletterEnabled = isset($settings['mailing'])
+        && (($settings['mailing']['auto_newsletter'] ?? (($settings['mailing']['gmail_address'] ?? '') !== '' ? 'on' : 'off')) === 'on');
     ?>
 
     <form method="post">

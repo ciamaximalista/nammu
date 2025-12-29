@@ -651,12 +651,28 @@
         }
     }
 
-    $subscriberCount = 0;
-    if (function_exists('admin_load_mailing_subscribers')) {
+    $avisosPostsCount = 0;
+    $avisosItinerariesCount = 0;
+    $newsletterSubscriberCount = 0;
+    if (function_exists('admin_load_mailing_subscriber_entries')) {
         try {
-            $subscriberCount = count(admin_load_mailing_subscribers());
+            $entries = admin_load_mailing_subscriber_entries();
+            foreach ($entries as $entry) {
+                $prefs = $entry['prefs'] ?? [];
+                if (!empty($prefs['posts'])) {
+                    $avisosPostsCount++;
+                }
+                if (!empty($prefs['itineraries'])) {
+                    $avisosItinerariesCount++;
+                }
+                if (!empty($prefs['newsletter'])) {
+                    $newsletterSubscriberCount++;
+                }
+            }
         } catch (Throwable $e) {
-            $subscriberCount = 0;
+            $avisosPostsCount = 0;
+            $avisosItinerariesCount = 0;
+            $newsletterSubscriberCount = 0;
         }
     }
     $postalSubscriberCount = 0;
@@ -825,7 +841,15 @@
                 <div class="card mb-4">
                     <div class="card-body">
                         <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Suscriptores</h4>
-                        <p class="mb-2"><strong>Lista de correo:</strong> <?= (int) $subscriberCount ?></p>
+                        <?php if ($avisosPostsCount > 0): ?>
+                            <p class="mb-2"><strong>Avisos entradas:</strong> <?= (int) $avisosPostsCount ?></p>
+                        <?php endif; ?>
+                        <?php if ($avisosItinerariesCount > 0): ?>
+                            <p class="mb-2"><strong>Avisos itinerarios:</strong> <?= (int) $avisosItinerariesCount ?></p>
+                        <?php endif; ?>
+                        <?php if ($newsletterSubscriberCount > 0): ?>
+                            <p class="mb-2"><strong>Newsletter:</strong> <?= (int) $newsletterSubscriberCount ?></p>
+                        <?php endif; ?>
                         <?php if ($postalSubscriberCount > 0): ?>
                             <p class="mb-2"><strong>Correo postal:</strong> <?= (int) $postalSubscriberCount ?></p>
                         <?php endif; ?>

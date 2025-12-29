@@ -78,7 +78,7 @@ if ($editFeedback !== null) {
             'instagram' => 'Instagram',
         ];
         $mailingReady = admin_is_mailing_ready($settings);
-        $mailingNewsletterEnabled = ($settings['mailing']['auto_newsletter'] ?? 'off') === 'on';
+        $mailingNewsletterEnabled = (($settings['mailing']['auto_newsletter'] ?? (($settings['mailing']['gmail_address'] ?? '') !== '' ? 'on' : 'off')) === 'on');
         $monthNames = [
             1 => 'enero',
             2 => 'febrero',

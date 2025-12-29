@@ -78,7 +78,8 @@ if ($editFeedback !== null) {
             'instagram' => 'Instagram',
         ];
         $mailingReady = admin_is_mailing_ready($settings);
-        $mailingNewsletterEnabled = (($settings['mailing']['auto_newsletter'] ?? (($settings['mailing']['gmail_address'] ?? '') !== '' ? 'on' : 'off')) === 'on');
+        $mailingSettings = $settings['mailing'] ?? (function_exists('get_settings') ? (get_settings()['mailing'] ?? []) : []);
+        $mailingNewsletterEnabled = (($mailingSettings['auto_newsletter'] ?? (($mailingSettings['gmail_address'] ?? '') !== '' ? 'on' : 'off')) === 'on');
         $monthNames = [
             1 => 'enero',
             2 => 'febrero',
@@ -297,6 +298,8 @@ if ($editFeedback !== null) {
                     $publishAtTime = date('H:i', $publishAtTimestamp);
                 }
             }
+            $mailingSettings = $settings['mailing'] ?? (function_exists('get_settings') ? (get_settings()['mailing'] ?? []) : []);
+            $mailingNewsletterEnabled = (($mailingSettings['auto_newsletter'] ?? (($mailingSettings['gmail_address'] ?? '') !== '' ? 'on' : 'off')) === 'on');
         ?>
 
         <?php if ($editFeedback !== null): ?>

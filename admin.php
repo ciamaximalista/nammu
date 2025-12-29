@@ -10483,7 +10483,10 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             }
             confirmButtons.forEach(function(button) {
                 button.addEventListener('click', function(event) {
-                    if (!window.confirm('¿Seguro que quieres continuar?')) {
+                    var label = button.getAttribute('data-confirm-label') || button.textContent || '';
+                    label = label.replace(/\s+/g, ' ').trim();
+                    var action = label !== '' ? (label.charAt(0).toLowerCase() + label.slice(1)) : 'continuar';
+                    if (!window.confirm('¿Estás seguro de querer ' + action + '?')) {
                         event.preventDefault();
                         var form = button.closest('form');
                         if (form) {

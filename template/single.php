@@ -391,6 +391,7 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .site-subscription-box .site-search-form input[type="email"] {
         flex: 1 1 auto;
+        min-width: 0;
         padding: 0.6rem 0.8rem;
         border-radius: var(--nammu-radius-md);
         border: 1px solid rgba(0,0,0,0.1);
@@ -411,7 +412,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         height: 38px;
         border-radius: 10px;
         background: rgba(0,0,0,0.05);
-        margin-left: 0.2rem;
+        margin-left: 0;
         padding: 0;
         text-decoration: none;
         transition: background 0.2s ease;
@@ -485,6 +486,17 @@ if ($isPageTemplate && $formattedDate !== '') {
         .search-itineraries-link,
         .subscription-postal-link,
         .subscription-avisos-link {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+        }
+        .site-subscription-box .site-search-form input[type="email"] {
+            padding: 0.5rem 0.6rem;
+            font-size: 0.9rem;
+        }
+        .site-subscription-box .site-search-form button,
+        .site-subscription-box .subscription-postal-link,
+        .site-subscription-box .subscription-avisos-link {
             width: 32px;
             height: 32px;
             border-radius: 10px;
@@ -669,6 +681,17 @@ if ($isPageTemplate && $formattedDate !== '') {
         .search-itineraries-link,
         .subscription-postal-link,
         .subscription-avisos-link {
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+        }
+        .site-subscription-box .site-search-form input[type="email"] {
+            padding: 0.25rem 0.35rem;
+            font-size: 0.8rem;
+        }
+        .site-subscription-box .site-search-form button,
+        .site-subscription-box .subscription-postal-link,
+        .site-subscription-box .subscription-avisos-link {
             width: 22px;
             height: 22px;
             border-radius: 6px;

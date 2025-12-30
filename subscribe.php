@@ -286,6 +286,14 @@ $token = bin2hex(random_bytes(16));
 $configData = nammu_load_config();
 $availablePrefs = subscription_available_prefs($configData);
 $prefsDefault = subscription_default_prefs($availablePrefs);
+$forceAll = ($_POST['force_all'] ?? '') === '1';
+if ($forceAll) {
+    $prefsDefault = [
+        'posts' => true,
+        'itineraries' => true,
+        'newsletter' => true,
+    ];
+}
 $siteTitle = isset($configData['site_name']) && is_string($configData['site_name']) ? trim($configData['site_name']) : '';
 $pendingEntry = [
     'email' => $email,

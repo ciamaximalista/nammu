@@ -110,14 +110,16 @@ $renderSubscriptionBox = static function (string $variant) use ($subscriptionAct
     $avisosUrl = $subscriptionAction !== '' ? str_replace('/subscribe.php', '/avisos.php', $subscriptionAction) : '/avisos.php';
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?> site-subscription-box">
-        <form class="site-search-form subscription-form" method="get" action="<?= htmlspecialchars($avisosUrl, ENT_QUOTES, 'UTF-8') ?>">
+        <form class="site-search-form subscription-form" method="post" action="<?= htmlspecialchars($subscriptionAction, ENT_QUOTES, 'UTF-8') ?>">
             <span class="search-icon subscription-icon" aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect x="3" y="5" width="18" height="14" rx="2" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
                     <polyline points="3,7 12,13 21,7" fill="none" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </span>
-            <input type="email" name="subscriber_email" placeholder="Pon tu email para suscribirte" required>
+            <input type="hidden" name="back" value="<?= htmlspecialchars($currentUrl, ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="force_all" value="1">
+            <input type="email" name="subscriber_email" placeholder="Suscríbete" required>
             <button type="submit" aria-label="Enviar">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
                     <path d="M21 4L9 16L4 11" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -389,25 +391,25 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .site-subscription-box .site-search-form input[type="email"] {
         flex: 1 1 auto;
-        padding: 0.35rem 0.45rem;
-        border-radius: 8px;
+        padding: 0.6rem 0.8rem;
+        border-radius: var(--nammu-radius-md);
         border: 1px solid rgba(0,0,0,0.1);
-        font-size: 0.85rem;
+        font-size: 0.95rem;
     }
     .site-subscription-box .site-search-form button,
     .site-subscription-box .subscription-avisos-link {
         padding: 0;
-        height: 26px;
-        width: 26px;
+        height: 38px;
+        width: 38px;
     }
     .site-subscription-box .subscription-postal-link,
     .site-subscription-box .subscription-avisos-link {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 26px;
-        height: 26px;
-        border-radius: 8px;
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
         background: rgba(0,0,0,0.05);
         margin-left: 0.2rem;
         padding: 0;
@@ -421,8 +423,8 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .site-subscription-box .subscription-postal-link svg,
     .site-subscription-box .subscription-avisos-link svg {
-        width: 14px;
-        height: 14px;
+        width: 16px;
+        height: 16px;
         display: block;
     }
     .postal-only-box {

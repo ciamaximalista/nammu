@@ -635,6 +635,8 @@ if ($isPageTemplate && $formattedDate !== '') {
         }
         .site-search-block {
             margin: 0.7rem auto;
+            padding: 0 0.6rem;
+            box-sizing: border-box;
         }
         .site-search-block.placement-top {
             margin: 0.5rem auto 0.6rem;
@@ -671,6 +673,18 @@ if ($isPageTemplate && $formattedDate !== '') {
         }
         .post-brand .site-search-form {
             gap: 0.25rem;
+        }
+        .post-brand .site-search-form input[type="text"] {
+            padding: 0.25rem 0.35rem;
+            font-size: 0.8rem;
+        }
+        .post-brand .site-search-form button,
+        .post-brand .search-categories-link,
+        .post-brand .search-letters-link,
+        .post-brand .search-itineraries-link {
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
         }
     }
     .post-body h1 {

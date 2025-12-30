@@ -222,7 +222,31 @@ function nammu_detect_referrer_source(string $referer, string $host): array
             return ['bucket' => 'social', 'detail' => $label];
         }
     }
-    return ['bucket' => 'other', 'detail' => ''];
+    return ['bucket' => 'other', 'detail' => 'Sitios web'];
+}
+
+function nammu_detect_user_agent_source(string $userAgent): array
+{
+    $userAgent = strtolower(trim($userAgent));
+    if ($userAgent === '') {
+        return ['bucket' => '', 'detail' => ''];
+    }
+    $uaSocial = [
+        'telegram' => 'Telegram',
+        'whatsapp' => 'WhatsApp',
+        'instagram' => 'Instagram',
+        'facebook' => 'Facebook',
+        'fbav' => 'Facebook',
+        'fban' => 'Facebook',
+        'twitter' => 'Twitter/X',
+        'x.com' => 'Twitter/X',
+    ];
+    foreach ($uaSocial as $needle => $label) {
+        if (str_contains($userAgent, $needle)) {
+            return ['bucket' => 'social', 'detail' => $label];
+        }
+    }
+    return ['bucket' => '', 'detail' => ''];
 }
 
 function nammu_save_analytics(array $data): void
@@ -428,6 +452,12 @@ function nammu_record_visit(): void
     $referrer = $_SERVER['HTTP_REFERER'] ?? '';
     $host = $_SERVER['HTTP_HOST'] ?? '';
     $source = nammu_detect_referrer_source($referrer, $host);
+    if (($source['bucket'] ?? '') === 'direct') {
+        $uaSource = nammu_detect_user_agent_source($_SERVER['HTTP_USER_AGENT'] ?? '');
+        if (($uaSource['bucket'] ?? '') !== '') {
+            $source = $uaSource;
+        }
+    }
     if (!isset($data['sources']['daily'][$date])) {
         $data['sources']['daily'][$date] = [];
     }
@@ -440,7 +470,7 @@ function nammu_record_visit(): void
         $data['sources']['daily'][$date][$bucket]['uids'][$uid] = 1;
         $changed = true;
     }
-    if ($detail !== '' && in_array($bucket, ['search', 'social'], true)) {
+    if ($detail !== '' && in_array($bucket, ['search', 'social', 'other'], true)) {
         if (!isset($data['sources']['daily'][$date][$bucket]['detail'])) {
             $data['sources']['daily'][$date][$bucket]['detail'] = [];
         }

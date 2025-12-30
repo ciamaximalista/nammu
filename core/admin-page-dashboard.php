@@ -3,13 +3,30 @@
     $postsMetadata = get_all_posts_metadata();
     $postCount = 0;
     $pageCount = 0;
+    $postCountsByYear = [];
     foreach ($postsMetadata as $item) {
         $template = strtolower($item['metadata']['Template'] ?? 'post');
         if ($template === 'page') {
             $pageCount++;
         } elseif (in_array($template, ['post', 'single'], true)) {
             $postCount++;
+            $dateValue = $item['metadata']['Date'] ?? ($item['metadata']['Updated'] ?? '');
+            $timestamp = $dateValue !== '' ? strtotime($dateValue) : false;
+            if ($timestamp === false) {
+                $filename = $item['filename'] ?? '';
+                $filePath = $filename !== '' ? CONTENT_DIR . '/' . $filename : '';
+                $timestamp = ($filePath !== '' && is_file($filePath)) ? @filemtime($filePath) : false;
+            }
+            if ($timestamp !== false) {
+                $year = (int) date('Y', $timestamp);
+                if ($year > 0) {
+                    $postCountsByYear[$year] = ($postCountsByYear[$year] ?? 0) + 1;
+                }
+            }
         }
+    }
+    if (!empty($postCountsByYear)) {
+        krsort($postCountsByYear);
     }
     $itineraryCount = 0;
     $itineraryTitleMap = [];
@@ -317,6 +334,7 @@
     $sourceMainRows = $buildPercentTable($sourceMain, $sourceMainLabels);
     $searchDetailRows = $buildPercentTable($collectSourceUids('search'), []);
     $socialDetailRows = $buildPercentTable($collectSourceUids('social'), []);
+    $otherDetailRows = $buildPercentTable($collectSourceUids('other'), []);
 
     $monthlyUids = [];
     $monthlyTotals = [];
@@ -864,6 +882,20 @@
                     <div class="card-body">
                         <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Publicaciones</h4>
                         <p class="mb-2"><strong>Entradas:</strong> <?= (int) $postCount ?></p>
+                        <?php if (!empty($postCountsByYear)): ?>
+                            <div class="table-responsive mb-2">
+                                <table class="table table-sm mb-0">
+                                    <tbody>
+                                        <?php foreach ($postCountsByYear as $year => $count): ?>
+                                            <tr>
+                                                <td><?= (int) $year ?></td>
+                                                <td class="text-right"><?= (int) $count ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
                         <p class="mb-2"><strong>Paginas:</strong> <?= (int) $pageCount ?></p>
                         <p class="mb-0"><strong>Itinerarios:</strong> <?= (int) $itineraryCount ?></p>
                     </div>
@@ -1256,6 +1288,21 @@
                                     <table class="table table-sm mb-0">
                                         <tbody>
                                             <?php foreach ($socialDetailRows as $item): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                    <td class="text-right"><?= (int) $item['percent'] ?>%</td>
+                                                </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
+                            <?php if (!empty($otherDetailRows)): ?>
+                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Sitios web</p>
+                                <div class="table-responsive">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <?php foreach ($otherDetailRows as $item): ?>
                                                 <tr>
                                                     <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
                                                     <td class="text-right"><?= (int) $item['percent'] ?>%</td>

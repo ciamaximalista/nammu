@@ -396,7 +396,10 @@ $renderNotFound = static function (string $title, string $description, string $p
     $socialConfig,
     $publicBaseUrl,
     $homeImage,
-    $siteNameForMeta
+    $siteNameForMeta,
+    $siteJsonLd,
+    $orgJsonLd,
+    $siteLang
 ): void {
     http_response_code(404);
     $content = $renderer->render('404', [

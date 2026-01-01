@@ -9299,20 +9299,14 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     snippet = '[' + (source.split('/').pop() || 'Documento') + '](' + source + ')';
                 } else {
                     var imageText = resolveImageText(tagsText);
-                    var altText = escapeMarkdownAlt(imageText);
-                    var titleText = escapeMarkdownTitle(imageText);
+                    var altText = escapeHtmlAttr(imageText || '');
+                    var titleText = escapeHtmlAttr(imageText || '');
                     if (mode === 'vignette') {
-                        var altAttr = escapeHtmlAttr(imageText);
-                        var titleAttr = escapeHtmlAttr(imageText);
-                        snippet = '\n\n<img src="' + source + '" alt="' + altAttr + '" title="' + titleAttr + '" style="float:right; max-width:33%; margin:0 0 1rem 1rem;" />\n\n';
+                        var altAttr = altText;
+                        var titleAttr = titleText;
+                        snippet = '\n\n<img src="' + source + '" alt="' + altAttr + '"' + (titleAttr ? ' title="' + titleAttr + '"' : '') + ' style="float:right; max-width:33%; margin:0 0 1rem 1rem;" />\n\n';
                     } else {
-                        if (altText !== '' && titleText !== '') {
-                            snippet = '![' + altText + '](' + source + ' "' + titleText + '")';
-                        } else if (altText !== '') {
-                            snippet = '![' + altText + '](' + source + ')';
-                        } else {
-                            snippet = '![](' + source + ')';
-                        }
+                        snippet = '\n\n<img src="' + source + '" alt="' + altText + '"' + (titleText ? ' title="' + titleText + '"' : '') + ' />\n\n';
                     }
                 }
                 if (imageTargetSelection && imageTargetTextarea === contentTextArea) {

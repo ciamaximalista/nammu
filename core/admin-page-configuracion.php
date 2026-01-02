@@ -9,6 +9,11 @@
                 <?= htmlspecialchars($accountFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
             </div>
         <?php endif; ?>
+        <?php if (isset($searchConsoleFeedback) && $searchConsoleFeedback !== null): ?>
+            <div class="alert alert-<?= $searchConsoleFeedback['type'] === 'success' ? 'success' : 'danger' ?>">
+                <?= htmlspecialchars($searchConsoleFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
         <?php
         $telegramSettings = $settings['telegram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
         $telegramAutoEnabled = ($telegramSettings['auto_post'] ?? 'off') === 'on';
@@ -24,6 +29,11 @@
         $mailingClientSecret = $mailingSettings['client_secret'] ?? '';
         $mailingStatus = $mailingSettings['status'] ?? 'disconnected';
         $siteLang = $settings['site_lang'] ?? 'es';
+        $searchConsoleSettings = $settings['search_console'] ?? [];
+        $gscProperty = $searchConsoleSettings['property'] ?? '';
+        $gscClientId = $searchConsoleSettings['client_id'] ?? '';
+        $gscClientSecret = $searchConsoleSettings['client_secret'] ?? '';
+        $gscRefreshToken = $searchConsoleSettings['refresh_token'] ?? '';
         $languageOptions = [
             'es' => 'Español',
             'ca' => 'Català',
@@ -112,8 +122,28 @@
 
             </div>
 
-            <div class="text-right mb-4">
-                <button type="submit" name="save_settings" class="btn btn-primary">Guardar configuración general</button>
+            <div class="form-group">
+                <label for="gsc_property">Google Search Console (propiedad)</label>
+                <input type="url" name="gsc_property" id="gsc_property" class="form-control" value="<?= htmlspecialchars($gscProperty, ENT_QUOTES, 'UTF-8') ?>" placeholder="https://tusitio.com/">
+                <small class="form-text text-muted">Introduce la propiedad exacta verificada en Search Console. <a href="#" data-toggle="modal" data-target="#gscHelpModal">Ver guía rápida</a></small>
+            </div>
+            <div class="form-group">
+                <label for="gsc_client_id">Google Client ID (Search Console)</label>
+                <input type="text" name="gsc_client_id" id="gsc_client_id" class="form-control" value="<?= htmlspecialchars($gscClientId, ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxx.apps.googleusercontent.com">
+            </div>
+            <div class="form-group">
+                <label for="gsc_client_secret">Google Client Secret (Search Console)</label>
+                <input type="text" name="gsc_client_secret" id="gsc_client_secret" class="form-control" value="<?= htmlspecialchars($gscClientSecret, ENT_QUOTES, 'UTF-8') ?>" placeholder="********">
+            </div>
+            <div class="form-group">
+                <label for="gsc_refresh_token">Refresh Token (Search Console)</label>
+                <input type="text" name="gsc_refresh_token" id="gsc_refresh_token" class="form-control" value="<?= htmlspecialchars($gscRefreshToken, ENT_QUOTES, 'UTF-8') ?>" placeholder="1//0g...">
+                <small class="form-text text-muted">Necesario para consultar datos de búsquedas desde el servidor.</small>
+            </div>
+
+            <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 mb-4">
+                <button type="submit" name="test_gsc" class="btn btn-outline-secondary mr-2 mb-2">Probar conexión Search Console</button>
+                <button type="submit" name="save_settings" class="btn btn-primary mb-2">Guardar configuración general</button>
             </div>
 
         </form>
@@ -204,6 +234,34 @@
                             <li>Copia el <strong>Client ID</strong> y el <strong>Client Secret</strong> y pégalos aquí.</li>
                         </ol>
                         <p class="mb-0 text-muted">Después conecta desde la pestaña <strong>Lista</strong> para autorizar el envío.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="gscHelpModal" tabindex="-1" role="dialog" aria-labelledby="gscHelpModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="gscHelpModalLabel">Guía rápida: Google Search Console API</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <ol class="mb-3">
+                            <li>Verifica tu sitio en <strong>Google Search Console</strong> y copia la propiedad exacta.</li>
+                            <li>En <strong>Google Cloud Console</strong>, crea o selecciona un proyecto.</li>
+                            <li>Habilita <strong>Google Search Console API</strong> en <strong>APIs y servicios &gt; Biblioteca</strong>.</li>
+                            <li>Configura la <strong>Pantalla de consentimiento OAuth</strong>.</li>
+                            <li>Crea un <strong>ID de cliente OAuth</strong> tipo <strong>Aplicación web</strong>.</li>
+                            <li>Obtén un <strong>refresh token</strong> con el scope: <code>https://www.googleapis.com/auth/webmasters.readonly</code> (por ejemplo usando OAuth Playground).</li>
+                            <li>Pega aquí la propiedad, el Client ID, el Client Secret y el refresh token.</li>
+                        </ol>
+                        <p class="mb-0 text-muted">El proyecto debe tener acceso a la propiedad en Search Console.</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>

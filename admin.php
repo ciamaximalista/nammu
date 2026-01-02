@@ -1030,6 +1030,7 @@ function get_settings() {
     if (!in_array($ads['scope'], ['home', 'all'], true)) {
         $ads['scope'] = $adsDefaults['scope'];
     }
+    $searchConsole = $config['search_console'] ?? [];
 
     return [
         'sort_order' => $sort_order,
@@ -1038,6 +1039,7 @@ function get_settings() {
         'site_name' => $blogName,
         'site_url' => $siteUrl,
         'site_lang' => $siteLang,
+        'search_console' => $searchConsole,
         'template' => [
             'fonts' => $fonts,
             'colors' => $colors,
@@ -1139,6 +1141,91 @@ function admin_base_url(): string {
     }
     $base = rtrim($scheme . '://' . $host . $portSuffix . $dir, '/');
     return $base;
+}
+
+function admin_google_refresh_access_token(string $clientId, string $clientSecret, string $refreshToken): array {
+    $postData = http_build_query([
+        'client_id' => $clientId,
+        'client_secret' => $clientSecret,
+        'refresh_token' => $refreshToken,
+        'grant_type' => 'refresh_token',
+    ]);
+    $opts = [
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
+            'content' => $postData,
+            'timeout' => 12,
+            'ignore_errors' => true,
+        ],
+    ];
+    $raw = @file_get_contents('https://oauth2.googleapis.com/token', false, stream_context_create($opts));
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded) || isset($decoded['error'])) {
+        throw new RuntimeException('No se pudo refrescar el token de Google.');
+    }
+    return $decoded;
+}
+
+function admin_gsc_query(string $accessToken, string $property, string $startDate, string $endDate, array $dimensions = [], int $rowLimit = 10): array {
+    $property = trim($property);
+    if ($property === '') {
+        throw new RuntimeException('Propiedad de Search Console no válida.');
+    }
+    $siteUrl = rawurlencode($property);
+    $payload = [
+        'startDate' => $startDate,
+        'endDate' => $endDate,
+        'rowLimit' => $rowLimit,
+    ];
+    if (!empty($dimensions)) {
+        $payload['dimensions'] = $dimensions;
+    }
+    $body = json_encode($payload);
+    if ($body === false) {
+        throw new RuntimeException('No se pudo preparar la consulta de Search Console.');
+    }
+    $opts = [
+        'http' => [
+            'method' => 'POST',
+            'header' => "Authorization: Bearer {$accessToken}\r\nContent-Type: application/json\r\n",
+            'content' => $body,
+            'timeout' => 12,
+            'ignore_errors' => true,
+        ],
+    ];
+    $url = 'https://www.googleapis.com/webmasters/v3/sites/' . $siteUrl . '/searchAnalytics/query';
+    $resp = @file_get_contents($url, false, stream_context_create($opts));
+    $decoded = json_decode((string) $resp, true);
+    if (!is_array($decoded)) {
+        throw new RuntimeException('Respuesta inválida de Search Console.');
+    }
+    if (isset($decoded['error'])) {
+        $message = is_array($decoded['error']) ? ($decoded['error']['message'] ?? 'Error en Search Console') : 'Error en Search Console';
+        throw new RuntimeException($message);
+    }
+    return $decoded;
+}
+
+function admin_gsc_get(string $accessToken, string $url): array {
+    $opts = [
+        'http' => [
+            'method' => 'GET',
+            'header' => "Authorization: Bearer {$accessToken}\r\n",
+            'timeout' => 12,
+            'ignore_errors' => true,
+        ],
+    ];
+    $resp = @file_get_contents($url, false, stream_context_create($opts));
+    $decoded = json_decode((string) $resp, true);
+    if (!is_array($decoded)) {
+        throw new RuntimeException('Respuesta inválida de Search Console.');
+    }
+    if (isset($decoded['error'])) {
+        $message = is_array($decoded['error']) ? ($decoded['error']['message'] ?? 'Error en Search Console') : 'Error en Search Console';
+        throw new RuntimeException($message);
+    }
+    return $decoded;
 }
 
 function admin_public_post_url(string $slug): string {
@@ -3017,6 +3104,12 @@ if (!is_array($mailingFeedback) || !isset($mailingFeedback['message'], $mailingF
 } else {
     unset($_SESSION['mailing_feedback']);
 }
+$searchConsoleFeedback = $_SESSION['search_console_feedback'] ?? null;
+if (!is_array($searchConsoleFeedback) || !isset($searchConsoleFeedback['message'], $searchConsoleFeedback['type'])) {
+    $searchConsoleFeedback = null;
+} else {
+    unset($_SESSION['search_console_feedback']);
+}
 $postalFeedback = $_SESSION['postal_feedback'] ?? null;
 if (!is_array($postalFeedback) || !isset($postalFeedback['message'], $postalFeedback['type'])) {
     $postalFeedback = null;
@@ -4471,6 +4564,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         header('Location: admin.php?page=anuncios');
         exit;
+    } elseif (isset($_POST['test_gsc'])) {
+        $gsc_property = trim($_POST['gsc_property'] ?? '');
+        $gsc_client_id = trim($_POST['gsc_client_id'] ?? '');
+        $gsc_client_secret = trim($_POST['gsc_client_secret'] ?? '');
+        $gsc_refresh_token = trim($_POST['gsc_refresh_token'] ?? '');
+        $feedback = [
+            'type' => 'danger',
+            'message' => 'Faltan datos para conectar con Search Console.',
+        ];
+        if ($gsc_property !== '' && $gsc_client_id !== '' && $gsc_client_secret !== '' && $gsc_refresh_token !== '') {
+            try {
+                $tokenData = admin_google_refresh_access_token($gsc_client_id, $gsc_client_secret, $gsc_refresh_token);
+                $accessToken = $tokenData['access_token'] ?? '';
+                if ($accessToken === '') {
+                    throw new RuntimeException('No se pudo obtener un access token válido.');
+                }
+                $opts = [
+                    'http' => [
+                        'method' => 'GET',
+                        'header' => "Authorization: Bearer {$accessToken}\r\n",
+                        'timeout' => 12,
+                        'ignore_errors' => true,
+                    ],
+                ];
+                $resp = @file_get_contents('https://www.googleapis.com/webmasters/v3/sites', false, stream_context_create($opts));
+                $statusLine = $http_response_header[0] ?? '';
+                $statusOk = is_string($statusLine) && preg_match('/\s200\s/', $statusLine);
+                $decoded = json_decode((string) $resp, true);
+                $propertyFound = false;
+                if (is_array($decoded) && !empty($decoded['siteEntry'])) {
+                    $normalizedProperty = rtrim($gsc_property, '/') . '/';
+                    foreach ($decoded['siteEntry'] as $entry) {
+                        $siteUrl = $entry['siteUrl'] ?? '';
+                        if ($siteUrl === $gsc_property || $siteUrl === $normalizedProperty) {
+                            $propertyFound = true;
+                            break;
+                        }
+                    }
+                }
+                if ($statusOk && $propertyFound) {
+                    $feedback = [
+                        'type' => 'success',
+                        'message' => 'Conexión correcta con Search Console.',
+                    ];
+                } elseif ($statusOk) {
+                    $feedback = [
+                        'type' => 'danger',
+                        'message' => 'La cuenta no tiene acceso a la propiedad indicada en Search Console.',
+                    ];
+                } else {
+                    $errorMsg = is_array($decoded) ? ($decoded['error']['message'] ?? '') : '';
+                    $feedback = [
+                        'type' => 'danger',
+                        'message' => $errorMsg !== '' ? $errorMsg : 'No se pudo conectar con Search Console.',
+                    ];
+                }
+            } catch (Throwable $e) {
+                $feedback = [
+                    'type' => 'danger',
+                    'message' => 'Error al conectar con Search Console: ' . $e->getMessage(),
+                ];
+            }
+        }
+        $_SESSION['search_console_feedback'] = $feedback;
+        header('Location: admin.php?page=configuracion');
+        exit;
     } elseif (isset($_POST['save_settings'])) {
         $sort_order = $_POST['sort_order'] ?? 'date';
         $sort_order = $sort_order === 'alpha' ? 'alpha' : 'date';
@@ -4480,6 +4639,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $site_url = trim($_POST['site_url'] ?? '');
         $site_lang = trim($_POST['site_lang'] ?? 'es');
         $social_default_description = trim($_POST['social_default_description'] ?? '');
+        $gsc_property = trim($_POST['gsc_property'] ?? '');
+        $gsc_client_id = trim($_POST['gsc_client_id'] ?? '');
+        $gsc_client_secret = trim($_POST['gsc_client_secret'] ?? '');
+        $gsc_refresh_token = trim($_POST['gsc_refresh_token'] ?? '');
 
         try {
             $config = load_config_file();
@@ -4513,6 +4676,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $config['site_lang'] = $site_lang;
             } else {
                 unset($config['site_lang']);
+            }
+            if ($gsc_property !== '' || $gsc_client_id !== '' || $gsc_client_secret !== '' || $gsc_refresh_token !== '') {
+                $config['search_console'] = [
+                    'property' => $gsc_property,
+                    'client_id' => $gsc_client_id,
+                    'client_secret' => $gsc_client_secret,
+                    'refresh_token' => $gsc_refresh_token,
+                ];
+            } else {
+                unset($config['search_console']);
             }
 
             $social = $config['social'] ?? [];

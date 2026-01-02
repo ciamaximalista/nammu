@@ -1143,30 +1143,6 @@ function admin_base_url(): string {
     return $base;
 }
 
-function admin_google_refresh_access_token(string $clientId, string $clientSecret, string $refreshToken): array {
-    $postData = http_build_query([
-        'client_id' => $clientId,
-        'client_secret' => $clientSecret,
-        'refresh_token' => $refreshToken,
-        'grant_type' => 'refresh_token',
-    ]);
-    $opts = [
-        'http' => [
-            'method' => 'POST',
-            'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
-            'content' => $postData,
-            'timeout' => 12,
-            'ignore_errors' => true,
-        ],
-    ];
-    $raw = @file_get_contents('https://oauth2.googleapis.com/token', false, stream_context_create($opts));
-    $decoded = json_decode($raw, true);
-    if (!is_array($decoded) || isset($decoded['error'])) {
-        throw new RuntimeException('No se pudo refrescar el token de Google.');
-    }
-    return $decoded;
-}
-
 function admin_gsc_query(string $accessToken, string $property, string $startDate, string $endDate, array $dimensions = [], int $rowLimit = 10): array {
     $property = trim($property);
     if ($property === '') {

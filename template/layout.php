@@ -1315,6 +1315,10 @@ if (!empty($baseUrl)) {
         }
         acceptBtn.addEventListener('click', function() {
             var serverExpires = overlay.getAttribute('data-server-expires') || '';
+            var referrer = document.referrer || '';
+            if (referrer) {
+                setCookie('nammu_stats_referrer', encodeURIComponent(referrer), serverExpires);
+            }
             setCookie('nammu_stats_consent', '1', serverExpires);
             if (!document.cookie.split(';').some(function(part) { return part.trim().indexOf('nammu_stats_uid=') === 0; })) {
                 setCookie('nammu_stats_uid', generateUid(), serverExpires);

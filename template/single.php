@@ -350,13 +350,13 @@ if ($isPageTemplate && $formattedDate !== '') {
         width: 100%;
     }
     .post-brand .site-search-form input[type="text"] {
-        padding: 0.6rem 0.8rem;
+        padding: 0.55rem 0.7rem;
         font-size: 0.95rem;
     }
     .post-brand .site-search-form button {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
+        width: 36px;
+        height: 36px;
+        border-radius: 9px;
     }
     .site-search-box {
         border-radius: var(--nammu-radius-lg);
@@ -381,15 +381,15 @@ if ($isPageTemplate && $formattedDate !== '') {
     .site-search-form {
         display: flex;
         align-items: center;
-        gap: 0.75rem;
+        gap: 0.6rem;
         width: 100%;
         min-width: 0;
     }
     .site-search-form input[type="text"],
     .site-search-form input[type="email"] {
-        flex: 1 1 150px;
+        flex: 1 1 130px;
         min-width: 0;
-        padding: 0.6rem 0.8rem;
+        padding: 0.55rem 0.7rem;
         border-radius: var(--nammu-radius-md);
         border: 1px solid rgba(0,0,0,0.1);
         font-size: 0.95rem;
@@ -524,9 +524,9 @@ if ($isPageTemplate && $formattedDate !== '') {
     .site-search-form button {
         border: none;
         background: <?= $colorAccent ?>;
-        width: 38px;
-        height: 38px;
-        border-radius: 10px;
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -545,9 +545,9 @@ if ($isPageTemplate && $formattedDate !== '') {
     .search-letters-link,
     .search-itineraries-link,
     .search-podcast-link {
-        width: 38px;
-        height: 38px;
-        border-radius: 10px;
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
         background: rgba(0,0,0,0.05);
         display: inline-flex;
         align-items: center;

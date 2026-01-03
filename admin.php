@@ -3274,7 +3274,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audioLengthInput = trim($_POST['audio_length'] ?? '');
         $audioDuration = trim($_POST['audio_duration'] ?? '');
         $type = $_POST['type'] ?? 'Entrada';
-        $type = $type === 'Página' ? 'Página' : ($type === 'Podcast' ? 'Podcast' : 'Entrada');
+        if ($type === 'Página') {
+            $type = 'Página';
+        } elseif ($type === 'Podcast') {
+            $type = 'Podcast';
+        } elseif ($type === 'Newsletter') {
+            $type = 'Newsletter';
+        } else {
+            $type = 'Entrada';
+        }
         $filenameInput = trim($_POST['filename'] ?? '');
         $isDraft = isset($_POST['save_draft']);
         $statusValue = $isDraft ? 'draft' : 'published';
@@ -3328,6 +3336,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($audioLength === '' && $audioLengthInput !== '' && ctype_digit($audioLengthInput)) {
                 $audioLength = $audioLengthInput;
             }
+        } elseif ($type === 'Newsletter') {
+            $category = '';
         }
 
         if ($filename !== '') {
@@ -3341,7 +3351,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
                 $file_content .= "Title: " . $title . "
 ";
-                $templateValue = $type === 'Página' ? 'page' : ($type === 'Podcast' ? 'podcast' : 'post');
+                $templateValue = $type === 'Página' ? 'page' : ($type === 'Podcast' ? 'podcast' : ($type === 'Newsletter' ? 'newsletter' : 'post'));
                 $file_content .= "Template: " . $templateValue . "
 ";
                 $file_content .= "Category: " . $category . "
@@ -3413,7 +3423,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($type === 'Podcast') {
                         admin_regenerate_podcast_feed();
                     }
-                    $redirectTemplate = $isDraft ? 'draft' : ($type === 'Página' ? 'page' : ($type === 'Podcast' ? 'podcast' : 'single'));
+                    $redirectTemplate = $isDraft ? 'draft' : ($type === 'Página' ? 'page' : ($type === 'Podcast' ? 'podcast' : ($type === 'Newsletter' ? 'newsletter' : 'single')));
                     header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&created=' . urlencode($targetFilename));
                     exit;
                 }
@@ -3557,13 +3567,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if ($type === null) {
                 $currentTemplate = strtolower($existing_post_data['metadata']['Template'] ?? 'post');
-                $type = $currentTemplate === 'page' ? 'Página' : ($currentTemplate === 'podcast' ? 'Podcast' : 'Entrada');
+                if ($currentTemplate === 'page') {
+                    $type = 'Página';
+                } elseif ($currentTemplate === 'podcast') {
+                    $type = 'Podcast';
+                } elseif ($currentTemplate === 'newsletter') {
+                    $type = 'Newsletter';
+                } else {
+                    $type = 'Entrada';
+                }
             }
         } else {
             $ordo = '';
         }
 
-        $type = $type === 'Página' ? 'Página' : ($type === 'Podcast' ? 'Podcast' : 'Entrada');
+        if ($type === 'Página') {
+            $type = 'Página';
+        } elseif ($type === 'Podcast') {
+            $type = 'Podcast';
+        } elseif ($type === 'Newsletter') {
+            $type = 'Newsletter';
+        } else {
+            $type = 'Entrada';
+        }
         if ($publishDraftAsEntry) {
             $type = 'Entrada';
         } elseif ($publishDraftAsPage) {
@@ -3571,7 +3597,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($publishDraftAsPodcast) {
             $type = 'Podcast';
         }
-        $template = $type === 'Página' ? 'page' : ($type === 'Podcast' ? 'podcast' : 'post');
+        $template = $type === 'Página' ? 'page' : ($type === 'Podcast' ? 'podcast' : ($type === 'Newsletter' ? 'newsletter' : 'post'));
         if ($publishDraftAsEntry || $publishDraftAsPage || $publishDraftAsPodcast) {
             $status = 'published';
         } elseif ($convertToDraft) {
@@ -3607,6 +3633,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($audioLength === '' && $audioLengthInput !== '' && ctype_digit($audioLengthInput)) {
                 $audioLength = $audioLengthInput;
             }
+        } elseif ($type === 'Newsletter') {
+            $category = '';
         }
 
         $targetFilename = $normalizedFilename;
@@ -3759,7 +3787,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($template === 'podcast') {
                         admin_regenerate_podcast_feed();
                     }
-                    $redirectTemplate = $status === 'draft' ? 'draft' : ($template === 'page' ? 'page' : ($template === 'podcast' ? 'podcast' : 'single'));
+                    $redirectTemplate = $status === 'draft' ? 'draft' : ($template === 'page' ? 'page' : ($template === 'podcast' ? 'podcast' : ($template === 'newsletter' ? 'newsletter' : 'single')));
                     $feedbackMessage = 'Contenido actualizado correctamente.';
                     if ($publishDraftAsEntry) {
                         $feedbackMessage = 'Borrador publicado como entrada.';
@@ -7745,6 +7773,14 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                                     <?php else: ?>
                                         <small class="d-block text-muted text-truncate mt-1">Sin etiquetas</small>
                                     <?php endif; ?>
+                                    <div class="mt-2">
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-info edit-tags-btn"
+                                                data-tag-list="<?= htmlspecialchars($media_tags_text, ENT_QUOTES, 'UTF-8') ?>"
+                                                data-tag-target="<?= htmlspecialchars($media_relative, ENT_QUOTES, 'UTF-8') ?>">
+                                            Etiquetas
+                                        </button>
+                                    </div>
 
                                 </div>
 

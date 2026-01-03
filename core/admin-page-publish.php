@@ -26,7 +26,7 @@
 
     <form method="post">
 
-        <div class="form-group post-only">
+        <div class="form-group">
 
             <label for="title" data-podcast-label="Título del episodio" data-post-label="Título">Título</label>
 
@@ -55,17 +55,18 @@
             <input type="text" name="audio_duration" id="audio_duration" class="form-control" placeholder="00:45:00">
         </div>
 
-        <div class="form-group post-only">
+        <div class="form-group">
             <label>Tipo</label>
             <input type="hidden" name="type" id="type" value="Entrada" data-type-value>
             <div class="btn-group d-flex flex-wrap" role="group" data-type-toggle>
-                <button type="button" class="btn btn-outline-secondary active" data-type-option="Entrada" aria-pressed="true">Entrada</button>
-                <button type="button" class="btn btn-outline-secondary" data-type-option="Página" aria-pressed="false">Página</button>
-                <button type="button" class="btn btn-outline-secondary" data-type-option="Podcast" aria-pressed="false">Podcast</button>
+                <button type="button" class="btn btn-primary active" data-type-option="Entrada" aria-pressed="true">Entrada</button>
+                <button type="button" class="btn btn-outline-primary" data-type-option="Página" aria-pressed="false">Página</button>
+                <button type="button" class="btn btn-outline-primary" data-type-option="Newsletter" aria-pressed="false">Newsletter</button>
+                <button type="button" class="btn btn-outline-primary" data-type-option="Podcast" aria-pressed="false">Podcast</button>
             </div>
         </div>
 
-        <div class="form-group post-only">
+        <div class="form-group entry-only">
 
             <label for="category">Categoría</label>
 
@@ -73,7 +74,7 @@
 
         </div>
 
-        <div class="form-group post-only">
+        <div class="form-group">
 
             <label for="date">Fecha</label>
 
@@ -131,7 +132,7 @@
 
         </div>
 
-        <div class="form-group post-only">
+        <div class="form-group non-podcast">
 
             <label for="content_publish">Contenido (Markdown)</label>
             <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#content_publish">
@@ -164,7 +165,7 @@
 
         </div>
 
-        <div class="form-group">
+        <div class="form-group non-podcast">
 
             <label for="filename" data-podcast-label="Slug del episodio (opcional)" data-post-label="Slug del post (nombre de archivo sin .md)">Slug del post (nombre de archivo sin .md)</label>
 
@@ -185,10 +186,10 @@
 
         <div class="mt-3">
             <div class="alert alert-warning d-none" data-publish-cancelled>Los cambios no se han guardado.</div>
-            <button type="submit" name="publish" class="btn btn-primary mr-2" data-confirm-publish="1" data-podcast-label="Publicar como podcast" data-post-label="Publicar">Publicar</button>
+            <button type="submit" name="publish" class="btn btn-primary mr-2" data-confirm-publish="1" data-podcast-label="Emitir" data-post-label="Publicar" data-publish-button="1">Publicar</button>
             <button type="submit" name="save_draft" value="1" class="btn btn-outline-secondary" data-confirm-publish="1">Guardar como borrador</button>
             <?php if ($mailingNewsletterEnabled): ?>
-                <button type="submit" name="send_newsletter" value="1" class="btn btn-warning ml-2" data-confirm-publish="1" data-newsletter-button="1">Enviar como newsletter</button>
+                <button type="submit" name="send_newsletter" value="1" class="btn btn-primary mr-2 d-none" data-confirm-publish="1" data-newsletter-button="1">Enviar</button>
             <?php endif; ?>
         </div>
 
@@ -204,12 +205,13 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     var podcastOnly = document.querySelectorAll('.podcast-only');
-    var postOnly = document.querySelectorAll('.post-only');
+    var nonPodcast = document.querySelectorAll('.non-podcast');
+    var entryOnly = document.querySelectorAll('.entry-only');
     var titleLabel = document.querySelector('label[for="title"]');
     var descriptionLabel = document.querySelector('label[for="description"]');
     var imageLabel = document.querySelector('label[for="image"]');
     var slugLabel = document.querySelector('label[for="filename"]');
-    var publishButton = document.querySelector('button[name="publish"]');
+    var publishButton = document.querySelector('[data-publish-button]');
     var audioInput = document.getElementById('audio');
     var durationInput = document.getElementById('audio_duration');
     var lengthInput = document.getElementById('audio_length');
@@ -283,12 +285,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function togglePodcastFields() {
-        var isPodcast = typeValueInput.value === 'Podcast';
+        var typeValue = typeValueInput.value || 'Entrada';
+        var isPodcast = typeValue === 'Podcast';
+        var isEntry = typeValue === 'Entrada';
+        var isNewsletter = typeValue === 'Newsletter';
         podcastOnly.forEach(function(el) {
             el.classList.toggle('d-none', !isPodcast);
         });
-        postOnly.forEach(function(el) {
+        nonPodcast.forEach(function(el) {
             el.classList.toggle('d-none', isPodcast);
+        });
+        entryOnly.forEach(function(el) {
+            el.classList.toggle('d-none', !isEntry);
         });
         if (titleLabel && titleLabel.dataset.podcastLabel && titleLabel.dataset.postLabel) {
             titleLabel.textContent = isPodcast ? titleLabel.dataset.podcastLabel : titleLabel.dataset.postLabel;
@@ -305,8 +313,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (publishButton && publishButton.dataset.podcastLabel && publishButton.dataset.postLabel) {
             publishButton.textContent = isPodcast ? publishButton.dataset.podcastLabel : publishButton.dataset.postLabel;
         }
+        if (publishButton) {
+            publishButton.classList.toggle('d-none', isNewsletter);
+        }
         if (newsletterButton) {
-            newsletterButton.classList.toggle('d-none', isPodcast);
+            newsletterButton.classList.toggle('d-none', !isNewsletter);
         }
         if (audioInput) {
             audioInput.required = isPodcast;
@@ -325,6 +336,13 @@ document.addEventListener('DOMContentLoaded', function() {
             var isActive = other === button;
             other.classList.toggle('active', isActive);
             other.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            if (isActive) {
+                other.classList.add('btn-primary');
+                other.classList.remove('btn-outline-primary');
+            } else {
+                other.classList.remove('btn-primary');
+                other.classList.add('btn-outline-primary');
+            }
         });
         togglePodcastFields();
     }

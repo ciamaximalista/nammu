@@ -4,10 +4,16 @@
     $postCount = 0;
     $pageCount = 0;
     $postCountsByYear = [];
+    $newsletterCount = 0;
+    $podcastCount = 0;
     foreach ($postsMetadata as $item) {
         $template = strtolower($item['metadata']['Template'] ?? 'post');
         if ($template === 'page') {
             $pageCount++;
+        } elseif ($template === 'newsletter') {
+            $newsletterCount++;
+        } elseif ($template === 'podcast') {
+            $podcastCount++;
         } elseif (in_array($template, ['post', 'single'], true)) {
             $postCount++;
             $dateValue = $item['metadata']['Date'] ?? ($item['metadata']['Updated'] ?? '');
@@ -1049,6 +1055,8 @@
                             </div>
                         <?php endif; ?>
                         <p class="mb-2"><strong>Paginas:</strong> <?= (int) $pageCount ?></p>
+                        <p class="mb-2"><strong>Newsletters:</strong> <?= (int) $newsletterCount ?></p>
+                        <p class="mb-2"><strong>Podcast:</strong> <?= (int) $podcastCount ?></p>
                         <p class="mb-0"><strong>Itinerarios:</strong> <?= (int) $itineraryCount ?></p>
                     </div>
                 </div>

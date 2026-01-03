@@ -686,7 +686,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         }
         .site-search-form input[type="text"],
         .site-search-form input[type="email"] {
-            flex: 1 1 80px;
+            flex: 0 1 60px;
             width: auto;
             min-width: 0;
             padding: 0.25rem 0.35rem;

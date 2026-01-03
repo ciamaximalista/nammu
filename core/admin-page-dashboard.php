@@ -62,11 +62,35 @@
         'last_crawl' => '',
     ];
     $gscError = '';
+    $gscCachePath = dirname(__DIR__) . '/config/gsc-cache.json';
+    $gscCacheTtl = 2 * 24 * 60 * 60;
+    $gscCache = null;
+    $gscUpdatedAtLabel = '';
+    if (is_file($gscCachePath)) {
+        $rawCache = @file_get_contents($gscCachePath);
+        $decodedCache = is_string($rawCache) && $rawCache !== '' ? json_decode($rawCache, true) : null;
+        if (is_array($decodedCache)) {
+            $gscCache = $decodedCache;
+        }
+    }
 
     $today = new DateTimeImmutable('today');
     $last30Start = $today->modify('-29 days');
     $last7Start = $today->modify('-6 days');
-    if ($gscProperty !== '' && $gscClientId !== '' && $gscClientSecret !== '' && $gscRefreshToken !== '' && function_exists('admin_google_refresh_access_token')) {
+    $gscCacheValid = is_array($gscCache)
+        && ($gscCache['property'] ?? '') === $gscProperty
+        && isset($gscCache['updated_at']);
+    $gscCacheFresh = $gscCacheValid && (time() - (int) $gscCache['updated_at']) < $gscCacheTtl;
+    if ($gscCacheFresh) {
+        $gscTotals3m = $gscCache['totals3m'] ?? null;
+        $gscTotals28 = $gscCache['totals28'] ?? null;
+        $gscQueries3m = $gscCache['queries3m'] ?? [];
+        $gscQueries28 = $gscCache['queries28'] ?? [];
+        $gscSitemapInfo = $gscCache['sitemap'] ?? ['last_crawl' => ''];
+        $gscUpdatedAtLabel = !empty($gscCache['updated_at'])
+            ? (new DateTimeImmutable('@' . (int) $gscCache['updated_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('d/m/y')
+            : '';
+    } elseif ($gscProperty !== '' && $gscClientId !== '' && $gscClientSecret !== '' && $gscRefreshToken !== '' && function_exists('admin_google_refresh_access_token')) {
         try {
             $tokenData = admin_google_refresh_access_token($gscClientId, $gscClientSecret, $gscRefreshToken);
             $accessToken = $tokenData['access_token'] ?? '';
@@ -152,8 +176,33 @@
                     }
                 }
             }
+            $cachePayload = [
+                'property' => $gscProperty,
+                'updated_at' => time(),
+                'totals3m' => $gscTotals3m,
+                'totals28' => $gscTotals28,
+                'queries3m' => $gscQueries3m,
+                'queries28' => $gscQueries28,
+                'sitemap' => $gscSitemapInfo,
+            ];
+            $cacheJson = json_encode($cachePayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            if ($cacheJson !== false) {
+                @file_put_contents($gscCachePath, $cacheJson, LOCK_EX);
+            }
+            $gscUpdatedAtLabel = (new DateTimeImmutable('now'))->format('d/m/y');
         } catch (Throwable $e) {
-            $gscError = $e->getMessage();
+            if ($gscCacheValid) {
+                $gscTotals3m = $gscCache['totals3m'] ?? null;
+                $gscTotals28 = $gscCache['totals28'] ?? null;
+                $gscQueries3m = $gscCache['queries3m'] ?? [];
+                $gscQueries28 = $gscCache['queries28'] ?? [];
+                $gscSitemapInfo = $gscCache['sitemap'] ?? ['last_crawl' => ''];
+                $gscUpdatedAtLabel = !empty($gscCache['updated_at'])
+                    ? (new DateTimeImmutable('@' . (int) $gscCache['updated_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('d/m/y')
+                    : '';
+            } else {
+                $gscError = $e->getMessage();
+            }
         }
     }
 
@@ -1427,6 +1476,9 @@
                             <?php elseif ($gscTotals3m === null || $gscTotals28 === null): ?>
                                 <p class="text-muted mb-0">Sin datos disponibles.</p>
                             <?php else: ?>
+                                <?php if ($gscUpdatedAtLabel !== ''): ?>
+                                    <p class="text-muted mb-2">Datos servidos por Google Search Console API el <?= htmlspecialchars($gscUpdatedAtLabel, ENT_QUOTES, 'UTF-8') ?></p>
+                                <?php endif; ?>
                                 <div class="table-responsive mb-3">
                                     <table class="table table-sm mb-0">
                                         <thead>

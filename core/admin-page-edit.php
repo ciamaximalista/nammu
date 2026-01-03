@@ -11,7 +11,7 @@ if ($editFeedback !== null) {
 
         <?php
         $templateFilter = $_GET['template'] ?? 'single';
-        $allowedFilters = ['single', 'page', 'draft', 'newsletter'];
+        $allowedFilters = ['single', 'page', 'draft', 'newsletter', 'podcast'];
         if (!in_array($templateFilter, $allowedFilters, true)) {
             $templateFilter = 'single';
         }
@@ -20,6 +20,7 @@ if ($editFeedback !== null) {
             'page' => 'Páginas',
             'draft' => 'Borradores',
             'newsletter' => 'Newsletters',
+            'podcast' => 'Podcasts',
         ][$templateFilter];
         $searchQuery = trim($_GET['q'] ?? '');
         $searchQueryParam = $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '';
@@ -58,6 +59,7 @@ if ($editFeedback !== null) {
             <a href="?page=edit&template=single<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'single' ? 'active' : '' ?>">Entradas</a>
             <a href="?page=edit&template=page<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'page' ? 'active' : '' ?>">Páginas</a>
             <a href="?page=edit&template=newsletter<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'newsletter' ? 'active' : '' ?>">Newsletters</a>
+            <a href="?page=edit&template=podcast<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'podcast' ? 'active' : '' ?>">Podcasts</a>
             <a href="?page=edit&template=draft<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'draft' ? 'active' : '' ?>">Borradores</a>
         </div>
 
@@ -167,7 +169,13 @@ if ($editFeedback !== null) {
                         $postSlug = pathinfo($post['filename'], PATHINFO_FILENAME);
                         $postLink = admin_public_post_url($postSlug);
                         ?>
-                        <td><a href="<?= htmlspecialchars($postLink, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($post['filename']) ?></a></td>
+                        <td>
+                            <?php if ($templateFilter === 'podcast'): ?>
+                                <?= htmlspecialchars($post['filename']) ?>
+                            <?php else: ?>
+                                <a href="<?= htmlspecialchars($postLink, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($post['filename']) ?></a>
+                            <?php endif; ?>
+                        </td>
 
                         <td class="text-center">
                             <?php
@@ -281,8 +289,8 @@ if ($editFeedback !== null) {
 
         if ($post_data):
             $currentTemplateValue = strtolower($post_data['metadata']['Template'] ?? 'post');
-            $currentTypeValue = $currentTemplateValue === 'page' ? 'Página' : 'Entrada';
-            $editHeading = $currentTypeValue === 'Página' ? 'Editar Página' : 'Editar Entrada';
+            $currentTypeValue = $currentTemplateValue === 'page' ? 'Página' : ($currentTemplateValue === 'podcast' ? 'Podcast' : 'Entrada');
+            $editHeading = $currentTypeValue === 'Página' ? 'Editar Página' : ($currentTypeValue === 'Podcast' ? 'Editar Podcast' : 'Editar Entrada');
             $currentStatusValue = strtolower($post_data['metadata']['Status'] ?? 'published');
             if (!in_array($currentStatusValue, ['draft', 'published'], true)) {
                 $currentStatusValue = 'published';
@@ -316,6 +324,9 @@ if ($editFeedback !== null) {
             if ($postLang === '') {
                 $postLang = $siteLang;
             }
+            $audioValue = $post_data['metadata']['Audio'] ?? '';
+            $audioLength = $post_data['metadata']['AudioLength'] ?? '';
+            $audioDuration = $post_data['metadata']['AudioDuration'] ?? '';
         ?>
 
         <?php if ($editFeedback !== null): ?>
@@ -333,7 +344,7 @@ if ($editFeedback !== null) {
 
             <div class="form-group">
 
-                <label for="title">Título</label>
+                <label for="title" data-podcast-label="Título del episodio" data-post-label="Título">Título</label>
 
                 <input type="text" name="title" id="title" class="form-control" value="<?= htmlspecialchars($post_data['metadata']['Title'] ?? '') ?>" required>
 
@@ -349,11 +360,13 @@ if ($editFeedback !== null) {
 
                     <option value="Página" <?= $currentTypeValue === 'Página' ? 'selected' : '' ?>>Página</option>
 
+                    <option value="Podcast" <?= $currentTypeValue === 'Podcast' ? 'selected' : '' ?>>Podcast</option>
+
                 </select>
 
             </div>
 
-            <div class="form-group">
+            <div class="form-group post-only">
 
                 <label for="category">Categoría</label>
 
@@ -397,7 +410,7 @@ if ($editFeedback !== null) {
 
             <div class="form-group">
 
-                <label for="image">Imagen</label>
+                <label for="image" data-podcast-label="Imagen asociada al episodio" data-post-label="Imagen">Imagen</label>
 
                 <div class="input-group">
 
@@ -415,13 +428,13 @@ if ($editFeedback !== null) {
 
             <div class="form-group">
 
-                <label for="description">Descripción</label>
+                <label for="description" data-podcast-label="Descripción" data-post-label="Descripción">Descripción</label>
 
                 <textarea name="description" id="description" class="form-control" rows="3"><?= htmlspecialchars($post_data['metadata']['Description'] ?? '') ?></textarea>
 
             </div>
 
-            <div class="form-group">
+            <div class="form-group post-only">
 
                 <label for="content_edit">Contenido (Markdown)</label>
                 <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#content_edit">
@@ -454,6 +467,27 @@ if ($editFeedback !== null) {
 
             </div>
 
+            <div class="form-group podcast-only d-none">
+                <label for="audio">Archivo de audio (mp3)</label>
+                <div class="input-group">
+                    <input type="text" name="audio" id="audio" class="form-control" value="<?= htmlspecialchars($audioValue, ENT_QUOTES, 'UTF-8') ?>" readonly>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="audio" data-target-prefix="" data-target-accept="audio">Seleccionar audio</button>
+                    </div>
+                </div>
+                <small class="form-text text-muted">Selecciona un archivo mp3 desde Recursos.</small>
+            </div>
+
+            <div class="form-group podcast-only d-none">
+                <label for="audio_length">Longitud del archivo (bytes)</label>
+                <input type="text" name="audio_length" id="audio_length" class="form-control" value="<?= htmlspecialchars($audioLength, ENT_QUOTES, 'UTF-8') ?>" placeholder="Se calcula automáticamente si es posible">
+            </div>
+
+            <div class="form-group podcast-only d-none">
+                <label for="audio_duration">Duración (hh:mm:ss)</label>
+                <input type="text" name="audio_duration" id="audio_duration" class="form-control" value="<?= htmlspecialchars($audioDuration, ENT_QUOTES, 'UTF-8') ?>" placeholder="00:45:00">
+            </div>
+
             <div class="form-group">
                 <label for="new_filename">Slug del post (nombre de archivo sin .md)</label>
                 <input type="text"
@@ -474,9 +508,13 @@ if ($editFeedback !== null) {
                 <div class="alert alert-warning d-none" data-publish-cancelled>Los cambios no se han guardado.</div>
                 <button type="submit" name="update" class="btn btn-primary">Actualizar</button>
                 <?php if ($isDraftEditing): ?>
-                    <button type="submit" name="publish_draft_entry" value="1" class="btn btn-success ml-2" data-confirm-publish="1">Publicar como entrada</button>
-                    <button type="submit" name="publish_draft_page" value="1" class="btn btn-success ml-2" data-confirm-publish="1">Publicar como página</button>
-                <?php elseif ($currentTypeValue === 'Entrada' && !$isDraftEditing): ?>
+                    <?php if ($currentTypeValue === 'Podcast'): ?>
+                        <button type="submit" name="publish_draft_podcast" value="1" class="btn btn-success ml-2" data-confirm-publish="1">Publicar como podcast</button>
+                    <?php else: ?>
+                        <button type="submit" name="publish_draft_entry" value="1" class="btn btn-success ml-2" data-confirm-publish="1">Publicar como entrada</button>
+                        <button type="submit" name="publish_draft_page" value="1" class="btn btn-success ml-2" data-confirm-publish="1">Publicar como página</button>
+                    <?php endif; ?>
+                <?php elseif (in_array($currentTypeValue, ['Entrada', 'Podcast'], true) && !$isDraftEditing): ?>
                     <button type="submit" name="convert_to_draft" value="1" class="btn btn-outline-secondary ml-2">Pasar a borrador</button>
                 <?php endif; ?>
                 <?php if ($mailingNewsletterEnabled): ?>
@@ -485,6 +523,50 @@ if ($editFeedback !== null) {
             </div>
 
             </form>
+
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                var typeSelect = document.getElementById('type');
+                if (!typeSelect) {
+                    return;
+                }
+                var podcastOnly = document.querySelectorAll('.podcast-only');
+                var postOnly = document.querySelectorAll('.post-only');
+                var titleLabel = document.querySelector('label[for="title"]');
+                var descriptionLabel = document.querySelector('label[for="description"]');
+                var imageLabel = document.querySelector('label[for="image"]');
+                var audioInput = document.getElementById('audio');
+                var durationInput = document.getElementById('audio_duration');
+
+                function togglePodcastFields() {
+                    var isPodcast = typeSelect.value === 'Podcast';
+                    podcastOnly.forEach(function(el) {
+                        el.classList.toggle('d-none', !isPodcast);
+                    });
+                    postOnly.forEach(function(el) {
+                        el.classList.toggle('d-none', isPodcast);
+                    });
+                    if (titleLabel && titleLabel.dataset.podcastLabel && titleLabel.dataset.postLabel) {
+                        titleLabel.textContent = isPodcast ? titleLabel.dataset.podcastLabel : titleLabel.dataset.postLabel;
+                    }
+                    if (descriptionLabel && descriptionLabel.dataset.podcastLabel && descriptionLabel.dataset.postLabel) {
+                        descriptionLabel.textContent = isPodcast ? descriptionLabel.dataset.podcastLabel : descriptionLabel.dataset.postLabel;
+                    }
+                    if (imageLabel && imageLabel.dataset.podcastLabel && imageLabel.dataset.postLabel) {
+                        imageLabel.textContent = isPodcast ? imageLabel.dataset.podcastLabel : imageLabel.dataset.postLabel;
+                    }
+                    if (audioInput) {
+                        audioInput.required = isPodcast;
+                    }
+                    if (durationInput) {
+                        durationInput.required = isPodcast;
+                    }
+                }
+
+                typeSelect.addEventListener('change', togglePodcastFields);
+                togglePodcastFields();
+            });
+            </script>
 
         <?php else: ?>
 

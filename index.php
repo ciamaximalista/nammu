@@ -465,6 +465,16 @@ if ($routePath === '/rss.xml') {
     exit;
 }
 
+if ($routePath === '/podcast.xml') {
+    $podcastFeed = nammu_generate_podcast_feed($publicBaseUrl, $config);
+    header('Content-Type: application/rss+xml; charset=UTF-8');
+    echo $podcastFeed;
+    if ($publicBaseUrl !== '') {
+        @file_put_contents(__DIR__ . '/podcast.xml', $podcastFeed);
+    }
+    exit;
+}
+
 if ($routePath === '/sitemap.xml') {
     $posts = $contentRepository->all();
     $sitemapGenerator = new SitemapGenerator($publicBaseUrl);
@@ -1536,6 +1546,7 @@ if ($publicBaseUrl !== '') {
         false
     );
     @file_put_contents(__DIR__ . '/itinerarios.xml', $itineraryFeedContent);
+    @file_put_contents(__DIR__ . '/podcast.xml', nammu_generate_podcast_feed($publicBaseUrl, $config));
 }
 $sitemapGenerator = new SitemapGenerator($publicBaseUrl);
 $sitemapXml = $sitemapGenerator->generate($buildSitemapEntries($posts, $theme, $publicBaseUrl));

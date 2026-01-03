@@ -1582,6 +1582,145 @@ function nammu_resolve_asset(?string $path, string $baseUrl): ?string
     return '/' . $normalized;
 }
 
+function nammu_read_front_matter(string $content): array
+{
+    $parts = preg_split('/^---\\s*$/m', $content, 3);
+    if ($parts === false || count($parts) < 3) {
+        return [];
+    }
+    $yaml = $parts[1];
+    $lines = preg_split('/\\r?\\n/', $yaml) ?: [];
+    $metadata = [];
+    foreach ($lines as $line) {
+        if (strpos($line, ':') === false) {
+            continue;
+        }
+        [$key, $value] = explode(':', $line, 2);
+        $metadata[trim($key)] = trim($value);
+    }
+    return $metadata;
+}
+
+function nammu_collect_podcast_items(string $contentDir, string $baseUrl = ''): array
+{
+    $items = [];
+    $files = glob(rtrim($contentDir, '/') . '/*.md') ?: [];
+    foreach ($files as $file) {
+        $raw = @file_get_contents($file);
+        if ($raw === false) {
+            continue;
+        }
+        $metadata = nammu_read_front_matter($raw);
+        $template = strtolower((string) ($metadata['Template'] ?? ''));
+        if ($template !== 'podcast') {
+            continue;
+        }
+        $status = strtolower((string) ($metadata['Status'] ?? 'published'));
+        if ($status === 'draft') {
+            continue;
+        }
+        $dateValue = trim((string) ($metadata['Date'] ?? ''));
+        $timestamp = $dateValue !== '' ? strtotime($dateValue) : false;
+        if ($timestamp === false) {
+            $timestamp = @filemtime($file) ?: time();
+        }
+        $audio = trim((string) ($metadata['Audio'] ?? ''));
+        $audioLength = trim((string) ($metadata['AudioLength'] ?? ''));
+        $audioDuration = trim((string) ($metadata['AudioDuration'] ?? ''));
+        if ($audioLength === '' && $audio !== '') {
+            $audioPath = ltrim($audio, '/');
+            $audioPath = str_starts_with($audioPath, 'assets/') ? substr($audioPath, strlen('assets/')) : $audioPath;
+            $candidate = dirname($contentDir) . '/assets/' . $audioPath;
+            if (is_file($candidate)) {
+                $audioLength = (string) filesize($candidate);
+            }
+        }
+        $items[] = [
+            'filename' => basename($file),
+            'title' => (string) ($metadata['Title'] ?? ''),
+            'description' => (string) ($metadata['Description'] ?? ''),
+            'image' => nammu_resolve_asset((string) ($metadata['Image'] ?? ''), $baseUrl),
+            'audio' => nammu_resolve_asset($audio, $baseUrl),
+            'audio_length' => $audioLength,
+            'audio_duration' => $audioDuration !== '' ? $audioDuration : '00:00:00',
+            'timestamp' => $timestamp,
+        ];
+    }
+    usort($items, static function (array $a, array $b): int {
+        return ($b['timestamp'] ?? 0) <=> ($a['timestamp'] ?? 0);
+    });
+    return $items;
+}
+
+function nammu_generate_podcast_feed(string $baseUrl, array $config): string
+{
+    $baseUrl = rtrim($baseUrl, '/');
+    $siteTitle = trim((string) ($config['site_name'] ?? 'Nammu Blog'));
+    $siteDescription = trim((string) (($config['social']['default_description'] ?? '') ?: ''));
+    $siteLang = trim((string) ($config['site_lang'] ?? 'es'));
+    $siteAuthor = trim((string) ($config['site_author'] ?? ''));
+    $ownerEmail = trim((string) ($config['mailing']['gmail_address'] ?? ''));
+    $social = $config['social'] ?? [];
+    $homeImage = nammu_resolve_asset((string) ($social['home_image'] ?? ''), $baseUrl);
+    $items = nammu_collect_podcast_items(dirname(__DIR__) . '/content', $baseUrl);
+    $channelLink = $baseUrl !== '' ? $baseUrl : '/';
+    $lastBuild = gmdate(DATE_RSS, !empty($items) ? (int) $items[0]['timestamp'] : time());
+    $titleEsc = htmlspecialchars($siteTitle !== '' ? $siteTitle : 'Podcast', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $descEsc = htmlspecialchars($siteDescription, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $authorEsc = htmlspecialchars($siteAuthor, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $langEsc = htmlspecialchars($siteLang !== '' ? $siteLang : 'es', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $ownerNameEsc = $authorEsc !== '' ? $authorEsc : $titleEsc;
+    $ownerEmailEsc = htmlspecialchars($ownerEmail, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+    $itemsXml = [];
+    foreach ($items as $item) {
+        $itemTitle = htmlspecialchars($item['title'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $itemDescription = htmlspecialchars($item['description'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $pubDate = gmdate(DATE_RSS, (int) $item['timestamp']);
+        $guid = 'podcast:' . md5((string) ($item['filename'] ?? $item['audio']));
+        $audioUrl = htmlspecialchars($item['audio'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $audioLength = htmlspecialchars((string) ($item['audio_length'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $durationEsc = htmlspecialchars($item['audio_duration'] ?? '00:00:00', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $imageUrl = htmlspecialchars($item['image'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $imageTag = $imageUrl !== '' ? "\n      <itunes:image href=\"{$imageUrl}\" />" : '';
+        $itemsXml[] = <<<XML
+    <item>
+      <title>{$itemTitle}</title>
+      <description>{$itemDescription}</description>
+      <pubDate>{$pubDate}</pubDate>
+      <guid isPermaLink="false">{$guid}</guid>
+      <enclosure url="{$audioUrl}" length="{$audioLength}" type="audio/mpeg" />
+      <itunes:duration>{$durationEsc}</itunes:duration>
+      <itunes:explicit>no</itunes:explicit>{$imageTag}
+    </item>
+XML;
+    }
+    $itemsBlock = implode("\n", $itemsXml);
+    $itunesImageTag = $homeImage !== '' ? "\n    <itunes:image href=\"" . htmlspecialchars($homeImage, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "\" />" : '';
+    $ownerEmailTag = $ownerEmailEsc !== '' ? "<itunes:email>{$ownerEmailEsc}</itunes:email>" : "<itunes:email></itunes:email>";
+
+    return <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>{$titleEsc}</title>
+    <description>{$descEsc}</description>
+    <link>{$channelLink}</link>
+    <language>{$langEsc}</language>
+    <lastBuildDate>{$lastBuild}</lastBuildDate>
+    <itunes:author>{$authorEsc}</itunes:author>{$itunesImageTag}
+    <itunes:category text="Tecnología" />
+    <itunes:explicit>no</itunes:explicit>
+    <itunes:owner>
+      <itunes:name>{$ownerNameEsc}</itunes:name>
+      {$ownerEmailTag}
+    </itunes:owner>
+{$itemsBlock}
+  </channel>
+</rss>
+XML;
+}
+
 function nammu_slugify_label(string $text): string
 {
     $text = trim($text);

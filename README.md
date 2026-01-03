@@ -15,6 +15,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 - Sistema de borradores con filtros “Entradas / Páginas / Borradores”, publicación directa desde el formulario y sello rojo en la vista pública cuando está sin publicar.
 - Publicaciones programadas con fecha y hora: se publican automáticamente y lanzan los avisos configurados (email, push y redes sociales).
 - Buscador interno dentro de la pestaña “Editar” que filtra por título, descripción, categoría o archivo para localizar contenidos en segundos.
+- Podcasts: entradas tipo episodio con audio mp3 obligatorio, metadatos específicos y feed `podcast.xml` compatible con plataformas de podcasting.
 
 ### Biblioteca multimedia integrada
 
@@ -193,6 +194,7 @@ Ejemplo rápido:
 - `rss.xml`: feed RSS 2.0 con títulos, descripciones higienizadas, enlaces absolutos e imágenes destacadas.
 - `sitemap.xml`: inventario de entradas, páginas e itinerarios para buscadores.
 - `itinerarios.xml`: feed específico de cursos/libros para reutilizar el contenido en otras plataformas.
+- `podcast.xml`: feed RSS de podcast con metadatos iTunes, duración y archivo mp3.
 
 ## Licencia y soporte
 

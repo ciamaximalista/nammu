@@ -24,6 +24,14 @@
     $twitterAutoEnabled = ($twitterSettings['auto_post'] ?? 'off') === 'on';
     $instagramSettings = $settings['instagram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
     $instagramAutoEnabled = ($instagramSettings['auto_post'] ?? 'off') === 'on';
+    $podcastServices = $settings['podcast_services'] ?? [];
+    $podcastSpotify = trim((string) ($podcastServices['spotify'] ?? ''));
+    $podcastIvoox = trim((string) ($podcastServices['ivoox'] ?? ''));
+    $podcastApple = trim((string) ($podcastServices['apple'] ?? ''));
+    $podcastGoogle = trim((string) ($podcastServices['google'] ?? ''));
+    $podcastYouTube = trim((string) ($podcastServices['youtube_music'] ?? ''));
+    $siteBaseUrl = function_exists('nammu_base_url') ? nammu_base_url() : '';
+    $podcastFeedUrl = $siteBaseUrl !== '' ? rtrim($siteBaseUrl, '/') . '/podcast.xml' : '/podcast.xml';
     if ($adsImage !== '') {
         if (str_starts_with($adsImage, 'http')) {
             $adsImagePreview = $adsImage;
@@ -378,6 +386,31 @@
                                     <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="border rounded p-3 bg-light mt-4">
+                        <h4 class="h6 text-uppercase mb-2">Servicios de Podcast</h4>
+                        <p class="text-muted mb-3">Usa esta URL para dar de alta el feed: <code><?= htmlspecialchars($podcastFeedUrl, ENT_QUOTES, 'UTF-8') ?></code></p>
+                        <div class="form-group">
+                            <label for="podcast_spotify">Spotify</label>
+                            <input type="text" name="podcast_spotify" id="podcast_spotify" class="form-control" value="<?= htmlspecialchars($podcastSpotify, ENT_QUOTES, 'UTF-8') ?>" placeholder="URL o ID del podcast en Spotify">
+                        </div>
+                        <div class="form-group">
+                            <label for="podcast_ivoox">iVoox</label>
+                            <input type="text" name="podcast_ivoox" id="podcast_ivoox" class="form-control" value="<?= htmlspecialchars($podcastIvoox, ENT_QUOTES, 'UTF-8') ?>" placeholder="URL o ID del podcast en iVoox">
+                        </div>
+                        <div class="form-group">
+                            <label for="podcast_apple">Apple Podcasts</label>
+                            <input type="text" name="podcast_apple" id="podcast_apple" class="form-control" value="<?= htmlspecialchars($podcastApple, ENT_QUOTES, 'UTF-8') ?>" placeholder="URL o ID en Apple Podcasts">
+                        </div>
+                        <div class="form-group">
+                            <label for="podcast_google">Google Podcasts</label>
+                            <input type="text" name="podcast_google" id="podcast_google" class="form-control" value="<?= htmlspecialchars($podcastGoogle, ENT_QUOTES, 'UTF-8') ?>" placeholder="URL o ID en Google Podcasts">
+                        </div>
+                        <div class="form-group mb-0">
+                            <label for="podcast_youtube_music">YouTube Music</label>
+                            <input type="text" name="podcast_youtube_music" id="podcast_youtube_music" class="form-control" value="<?= htmlspecialchars($podcastYouTube, ENT_QUOTES, 'UTF-8') ?>" placeholder="URL o ID en YouTube Music">
                         </div>
                     </div>
 

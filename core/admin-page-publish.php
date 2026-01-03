@@ -28,10 +28,31 @@
 
         <div class="form-group">
 
-            <label for="title">Título</label>
+            <label for="title" data-podcast-label="Título del episodio" data-post-label="Título">Título</label>
 
             <input type="text" name="title" id="title" class="form-control" required>
 
+        </div>
+
+        <div class="form-group podcast-only d-none">
+            <label for="audio">Archivo de audio (mp3)</label>
+            <div class="input-group">
+                <input type="text" name="audio" id="audio" class="form-control" readonly>
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="audio" data-target-prefix="" data-target-accept="audio">Seleccionar audio</button>
+                </div>
+            </div>
+            <small class="form-text text-muted">Selecciona un archivo mp3 desde Recursos.</small>
+        </div>
+
+        <div class="form-group podcast-only d-none">
+            <label for="audio_length">Longitud del archivo (bytes)</label>
+            <input type="text" name="audio_length" id="audio_length" class="form-control" placeholder="Se calcula automáticamente si es posible">
+        </div>
+
+        <div class="form-group podcast-only d-none">
+            <label for="audio_duration">Duración (hh:mm:ss)</label>
+            <input type="text" name="audio_duration" id="audio_duration" class="form-control" placeholder="00:45:00">
         </div>
 
         <div class="form-group">
@@ -44,11 +65,13 @@
 
                 <option value="Página">Página</option>
 
+                <option value="Podcast">Podcast</option>
+
             </select>
 
         </div>
 
-        <div class="form-group">
+        <div class="form-group post-only">
 
             <label for="category">Categoría</label>
 
@@ -90,7 +113,7 @@
 
         <div class="form-group">
 
-            <label for="image">Imagen</label>
+            <label for="image" data-podcast-label="Imagen asociada al episodio" data-post-label="Imagen">Imagen</label>
 
             <div class="input-group">
 
@@ -108,13 +131,13 @@
 
         <div class="form-group">
 
-            <label for="description">Entradilla</label>
+            <label for="description" data-podcast-label="Descripción" data-post-label="Entradilla">Entradilla</label>
 
             <textarea name="description" id="description" class="form-control" rows="3"></textarea>
 
         </div>
 
-        <div class="form-group">
+        <div class="form-group post-only">
 
             <label for="content_publish">Contenido (Markdown)</label>
             <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#content_publish">
@@ -178,3 +201,47 @@
     </form>
 
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var typeSelect = document.getElementById('type');
+    if (!typeSelect) {
+        return;
+    }
+    var podcastOnly = document.querySelectorAll('.podcast-only');
+    var postOnly = document.querySelectorAll('.post-only');
+    var titleLabel = document.querySelector('label[for="title"]');
+    var descriptionLabel = document.querySelector('label[for="description"]');
+    var imageLabel = document.querySelector('label[for="image"]');
+    var audioInput = document.getElementById('audio');
+    var durationInput = document.getElementById('audio_duration');
+
+    function togglePodcastFields() {
+        var isPodcast = typeSelect.value === 'Podcast';
+        podcastOnly.forEach(function(el) {
+            el.classList.toggle('d-none', !isPodcast);
+        });
+        postOnly.forEach(function(el) {
+            el.classList.toggle('d-none', isPodcast);
+        });
+        if (titleLabel && titleLabel.dataset.podcastLabel && titleLabel.dataset.postLabel) {
+            titleLabel.textContent = isPodcast ? titleLabel.dataset.podcastLabel : titleLabel.dataset.postLabel;
+        }
+        if (descriptionLabel && descriptionLabel.dataset.podcastLabel && descriptionLabel.dataset.postLabel) {
+            descriptionLabel.textContent = isPodcast ? descriptionLabel.dataset.podcastLabel : descriptionLabel.dataset.postLabel;
+        }
+        if (imageLabel && imageLabel.dataset.podcastLabel && imageLabel.dataset.postLabel) {
+            imageLabel.textContent = isPodcast ? imageLabel.dataset.podcastLabel : imageLabel.dataset.postLabel;
+        }
+        if (audioInput) {
+            audioInput.required = isPodcast;
+        }
+        if (durationInput) {
+            durationInput.required = isPodcast;
+        }
+    }
+
+    typeSelect.addEventListener('change', togglePodcastFields);
+    togglePodcastFields();
+});
+</script>

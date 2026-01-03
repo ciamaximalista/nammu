@@ -71,7 +71,7 @@ function parse_yaml_front_matter($content) {
 function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string $searchTerm = '') {
     $settings = get_settings();
     $sort_order = $settings['sort_order'] ?? 'date';
-    $templateFilter = in_array($templateFilter, ['single', 'page', 'draft', 'newsletter'], true) ? $templateFilter : 'single';
+    $templateFilter = in_array($templateFilter, ['single', 'page', 'draft', 'newsletter', 'podcast'], true) ? $templateFilter : 'single';
     $normalizedSearch = '';
     if ($searchTerm !== '') {
         $normalizedSearch = function_exists('mb_strtolower')
@@ -92,6 +92,10 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string
             if ($template !== 'newsletter') {
                 continue;
             }
+        } elseif ($templateFilter === 'podcast') {
+            if ($template !== 'podcast') {
+                continue;
+            }
         } elseif ($templateFilter === 'draft') {
             if (!$isDraft) {
                 continue;
@@ -107,6 +111,9 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string
                 continue;
             }
             if ($template === 'newsletter') {
+                continue;
+            }
+            if ($template === 'podcast') {
                 continue;
             }
         }
@@ -592,6 +599,17 @@ function admin_regenerate_itinerary_feed(): void {
         @file_put_contents(__DIR__ . '/itinerarios.xml', $feedContent);
     } catch (Throwable $e) {
         error_log('No se pudo regenerar itinerarios.xml: ' . $e->getMessage());
+    }
+}
+
+function admin_regenerate_podcast_feed(): void {
+    try {
+        $baseUrl = nammu_base_url();
+        $config = load_config_file();
+        $feed = nammu_generate_podcast_feed($baseUrl, $config);
+        @file_put_contents(__DIR__ . '/podcast.xml', $feed);
+    } catch (Throwable $e) {
+        error_log('No se pudo regenerar podcast.xml: ' . $e->getMessage());
     }
 }
 
@@ -3252,8 +3270,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $image = trim($_POST['image'] ?? '');
         $description = trim($_POST['description'] ?? '');
         $lang = trim($_POST['lang'] ?? '');
+        $audio = trim($_POST['audio'] ?? '');
+        $audioLengthInput = trim($_POST['audio_length'] ?? '');
+        $audioDuration = trim($_POST['audio_duration'] ?? '');
         $type = $_POST['type'] ?? 'Entrada';
-        $type = $type === 'Página' ? 'Página' : 'Entrada';
+        $type = $type === 'Página' ? 'Página' : ($type === 'Podcast' ? 'Podcast' : 'Entrada');
         $filenameInput = trim($_POST['filename'] ?? '');
         $isDraft = isset($_POST['save_draft']);
         $statusValue = $isDraft ? 'draft' : 'published';
@@ -3284,6 +3305,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ordo = $max_ordo + 1;
 
         $content = $_POST['content'] ?? '';
+        $audioLength = '';
+        if ($type === 'Podcast') {
+            if ($audio === '') {
+                $error = 'El archivo mp3 del podcast es obligatorio.';
+            }
+            if ($audio !== '' && !preg_match('/\.mp3$/i', $audio)) {
+                $error = 'El audio del podcast debe ser un archivo mp3.';
+            }
+            if ($audioDuration === '') {
+                $error = 'Indica la duración del episodio en formato hh:mm:ss.';
+            }
+            $category = '';
+            if ($audio !== '') {
+                $audioPath = ltrim($audio, '/');
+                $audioPath = str_starts_with($audioPath, 'assets/') ? substr($audioPath, strlen('assets/')) : $audioPath;
+                $candidate = ASSETS_DIR . '/' . $audioPath;
+                if (is_file($candidate)) {
+                    $audioLength = (string) filesize($candidate);
+                }
+            }
+            if ($audioLength === '' && $audioLengthInput !== '' && ctype_digit($audioLengthInput)) {
+                $audioLength = $audioLengthInput;
+            }
+        }
 
         if ($filename !== '') {
             $targetFilename = nammu_normalize_filename($filename . '.md');
@@ -3296,7 +3341,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
                 $file_content .= "Title: " . $title . "
 ";
-                $file_content .= "Template: " . ($type === 'Página' ? 'page' : 'post') . "
+                $templateValue = $type === 'Página' ? 'page' : ($type === 'Podcast' ? 'podcast' : 'post');
+                $file_content .= "Template: " . $templateValue . "
 ";
                 $file_content .= "Category: " . $category . "
 ";
@@ -3306,6 +3352,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
                 $file_content .= "Description: " . $description . "
 ";
+                if ($type === 'Podcast') {
+                    $file_content .= "Audio: " . $audio . "
+";
+                    if ($audioLength !== '') {
+                        $file_content .= "AudioLength: " . $audioLength . "
+";
+                    }
+                    if ($audioDuration !== '') {
+                        $file_content .= "AudioDuration: " . $audioDuration . "
+";
+                    }
+                }
                 if ($lang !== '') {
                     $file_content .= "Lang: " . $lang . "
 ";
@@ -3333,7 +3391,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (file_put_contents($filepath, $file_content) === false) {
                     $error = 'No se pudo guardar el contenido. Revisa los permisos de la carpeta content/.';
                 } else {
-                    if (!$isDraft && $type !== 'Página') {
+                    if (!$isDraft && $type === 'Entrada') {
                         admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image);
                         $settings = get_settings();
                         $mailing = $settings['mailing'] ?? [];
@@ -3352,7 +3410,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                         admin_maybe_enqueue_push_notification('post', $title, $description, $link, $image);
                     }
-                    $redirectTemplate = $isDraft ? 'draft' : ($type === 'Página' ? 'page' : 'single');
+                    if ($type === 'Podcast') {
+                        admin_regenerate_podcast_feed();
+                    }
+                    $redirectTemplate = $isDraft ? 'draft' : ($type === 'Página' ? 'page' : ($type === 'Podcast' ? 'podcast' : 'single'));
                     header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&created=' . urlencode($targetFilename));
                     exit;
                 }
@@ -3463,7 +3524,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
         header('Location: admin.php?page=edit&template=newsletter&created=' . urlencode($targetFilename));
         exit;
-    } elseif (isset($_POST['update']) || isset($_POST['publish_draft_entry']) || isset($_POST['publish_draft_page']) || isset($_POST['convert_to_draft'])) {
+    } elseif (isset($_POST['update']) || isset($_POST['publish_draft_entry']) || isset($_POST['publish_draft_page']) || isset($_POST['publish_draft_podcast']) || isset($_POST['convert_to_draft'])) {
         $existing_post_data = null;
         $filename = $_POST['filename'] ?? '';
         $title = $_POST['title'] ?? '';
@@ -3474,10 +3535,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $image = $_POST['image'] ?? '';
         $description = $_POST['description'] ?? '';
         $lang = trim($_POST['lang'] ?? '');
+        $audio = trim($_POST['audio'] ?? '');
+        $audioLengthInput = trim($_POST['audio_length'] ?? '');
+        $audioDuration = trim($_POST['audio_duration'] ?? '');
         $type = $_POST['type'] ?? null;
         $statusPosted = strtolower(trim($_POST['status'] ?? ''));
         $publishDraftAsEntry = isset($_POST['publish_draft_entry']);
         $publishDraftAsPage = isset($_POST['publish_draft_page']);
+        $publishDraftAsPodcast = isset($_POST['publish_draft_podcast']);
         $convertToDraft = isset($_POST['convert_to_draft']);
 
         // Preserve existing Ordo value on update
@@ -3492,20 +3557,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if ($type === null) {
                 $currentTemplate = strtolower($existing_post_data['metadata']['Template'] ?? 'post');
-                $type = $currentTemplate === 'page' ? 'Página' : 'Entrada';
+                $type = $currentTemplate === 'page' ? 'Página' : ($currentTemplate === 'podcast' ? 'Podcast' : 'Entrada');
             }
         } else {
             $ordo = '';
         }
 
-        $type = $type === 'Página' ? 'Página' : 'Entrada';
+        $type = $type === 'Página' ? 'Página' : ($type === 'Podcast' ? 'Podcast' : 'Entrada');
         if ($publishDraftAsEntry) {
             $type = 'Entrada';
         } elseif ($publishDraftAsPage) {
             $type = 'Página';
+        } elseif ($publishDraftAsPodcast) {
+            $type = 'Podcast';
         }
-        $template = $type === 'Página' ? 'page' : 'post';
-        if ($publishDraftAsEntry || $publishDraftAsPage) {
+        $template = $type === 'Página' ? 'page' : ($type === 'Podcast' ? 'podcast' : 'post');
+        if ($publishDraftAsEntry || $publishDraftAsPage || $publishDraftAsPodcast) {
             $status = 'published';
         } elseif ($convertToDraft) {
             $status = 'draft';
@@ -3517,6 +3584,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $originalSlugBase = $normalizedFilename !== '' ? pathinfo($normalizedFilename, PATHINFO_FILENAME) : '';
         $originalSlugNormalized = $originalSlugBase !== '' ? nammu_slugify($originalSlugBase) : '';
         $content = $_POST['content'] ?? '';
+        $audioLength = '';
+        if ($type === 'Podcast') {
+            if ($audio === '') {
+                $error = 'El archivo mp3 del podcast es obligatorio.';
+            }
+            if ($audio !== '' && !preg_match('/\.mp3$/i', $audio)) {
+                $error = 'El audio del podcast debe ser un archivo mp3.';
+            }
+            if ($audioDuration === '') {
+                $error = 'Indica la duración del episodio en formato hh:mm:ss.';
+            }
+            $category = '';
+            if ($audio !== '') {
+                $audioPath = ltrim($audio, '/');
+                $audioPath = str_starts_with($audioPath, 'assets/') ? substr($audioPath, strlen('assets/')) : $audioPath;
+                $candidate = ASSETS_DIR . '/' . $audioPath;
+                if (is_file($candidate)) {
+                    $audioLength = (string) filesize($candidate);
+                }
+            }
+            if ($audioLength === '' && $audioLengthInput !== '' && ctype_digit($audioLengthInput)) {
+                $audioLength = $audioLengthInput;
+            }
+        }
 
         $targetFilename = $normalizedFilename;
         $renameRequested = false;
@@ -3585,6 +3676,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
             $file_content .= "Description: " . $description . "
 ";
+            if ($type === 'Podcast') {
+                $file_content .= "Audio: " . $audio . "
+";
+                if ($audioLength !== '') {
+                    $file_content .= "AudioLength: " . $audioLength . "
+";
+                }
+                if ($audioDuration !== '') {
+                    $file_content .= "AudioDuration: " . $audioDuration . "
+";
+                }
+            }
             if ($lang !== '') {
                 $file_content .= "Lang: " . $lang . "
 ";
@@ -3653,12 +3756,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             @unlink($previousPath);
                         }
                     }
-                    $redirectTemplate = $status === 'draft' ? 'draft' : ($template === 'page' ? 'page' : 'single');
+                    if ($template === 'podcast') {
+                        admin_regenerate_podcast_feed();
+                    }
+                    $redirectTemplate = $status === 'draft' ? 'draft' : ($template === 'page' ? 'page' : ($template === 'podcast' ? 'podcast' : 'single'));
                     $feedbackMessage = 'Contenido actualizado correctamente.';
                     if ($publishDraftAsEntry) {
                         $feedbackMessage = 'Borrador publicado como entrada.';
                     } elseif ($publishDraftAsPage) {
                         $feedbackMessage = 'Borrador publicado como página.';
+                    } elseif ($publishDraftAsPodcast) {
+                        $feedbackMessage = 'Borrador publicado como podcast.';
                     } elseif ($convertToDraft) {
                         $feedbackMessage = 'Contenido pasado a borrador.';
                     }
@@ -3677,7 +3785,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $networkKey = $_POST['social_network'] ?? '';
         $filename = $_POST['social_filename'] ?? '';
         $templateTarget = $_POST['social_template'] ?? 'single';
-        $templateTarget = in_array($templateTarget, ['single', 'page', 'draft', 'newsletter'], true) ? $templateTarget : 'single';
+        $templateTarget = in_array($templateTarget, ['single', 'page', 'draft', 'newsletter', 'podcast'], true) ? $templateTarget : 'single';
         $redirectTemplate = urlencode($templateTarget);
         $networkLabels = [
             'telegram' => 'Telegram',
@@ -4082,7 +4190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $filename = $_POST['delete_filename'] ?? '';
         $filename = trim($filename);
         $templateTarget = $_POST['delete_template'] ?? 'single';
-        $templateTarget = in_array($templateTarget, ['single', 'page', 'draft', 'newsletter'], true) ? $templateTarget : 'single';
+        $templateTarget = in_array($templateTarget, ['single', 'page', 'draft', 'newsletter', 'podcast'], true) ? $templateTarget : 'single';
         $templateParam = urlencode($templateTarget);
         if ($filename !== '') {
             // Ensure only filenames from content directory are used
@@ -4723,6 +4831,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $instagram_token = trim($_POST['instagram_token'] ?? '');
         $instagram_channel = trim($_POST['instagram_channel'] ?? '');
         $instagram_auto = isset($_POST['instagram_auto']) ? 'on' : 'off';
+        $podcast_spotify = trim($_POST['podcast_spotify'] ?? '');
+        $podcast_ivoox = trim($_POST['podcast_ivoox'] ?? '');
+        $podcast_apple = trim($_POST['podcast_apple'] ?? '');
+        $podcast_google = trim($_POST['podcast_google'] ?? '');
+        $podcast_youtube_music = trim($_POST['podcast_youtube_music'] ?? '');
 
         try {
             $config = load_config_file();
@@ -4786,6 +4899,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ];
             } else {
                 unset($config['instagram']);
+            }
+            $podcastServices = [
+                'spotify' => $podcast_spotify,
+                'ivoox' => $podcast_ivoox,
+                'apple' => $podcast_apple,
+                'google' => $podcast_google,
+                'youtube_music' => $podcast_youtube_music,
+            ];
+            $hasPodcastServices = array_filter($podcastServices, static function ($value) {
+                return $value !== '';
+            });
+            if (!empty($hasPodcastServices)) {
+                $config['podcast_services'] = $podcastServices;
+            } else {
+                unset($config['podcast_services']);
             }
 
             save_config_file($config);
@@ -8742,6 +8870,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             var imageTargetInput = '';
             var imageTargetPrefix = '';
             var imageTargetEditor = '';
+            var imageTargetAccept = '';
             var lastImageTrigger = null;
             var imageTargetSelection = null;
             var imageTargetTextarea = null;
@@ -9029,6 +9158,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     imageTargetInput = button.data('target-input') || '';
                     imageTargetPrefix = button.data('target-prefix') || '';
                     imageTargetEditor = button.data('target-editor') || '';
+                    imageTargetAccept = button.data('target-accept') || '';
                 }
                 if (!skipImageModalSelectionCapture) {
                     imageTargetTextarea = resolveImageTargetTextarea();
@@ -9344,9 +9474,15 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 }
 
                 if (imageTargetMode === 'field') {
-
-                    if (mediaType !== 'image') {
-                        alert('Solo puedes seleccionar imágenes para este campo.');
+                    var acceptList = (imageTargetAccept || 'image').toString().split(',').map(function(value) {
+                        return value.trim().toLowerCase();
+                    }).filter(Boolean);
+                    if (!acceptList.length) {
+                        acceptList = ['image'];
+                    }
+                    if (acceptList.indexOf(mediaType.toLowerCase()) === -1) {
+                        var acceptLabel = acceptList.join(', ');
+                        alert('Solo puedes seleccionar archivos de tipo ' + acceptLabel + ' para este campo.');
                         return;
                     }
                     var targetId = imageTargetInput || 'image';
@@ -11165,7 +11301,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 modal.find('[data-delete-post-title]').text(title || '(sin título)');
                 modal.find('[data-delete-post-file]').text(filename || '');
                 modal.find('#delete-post-filename').val(filename);
-                if (['single', 'page', 'draft', 'newsletter'].indexOf(type) === -1) {
+                if (['single', 'page', 'draft', 'newsletter', 'podcast'].indexOf(type) === -1) {
                     type = 'single';
                 }
                 modal.find('#delete-post-template').val(type);

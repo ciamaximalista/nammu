@@ -342,7 +342,7 @@ if ($editFeedback !== null) {
             <input type="hidden" name="filename" value="<?= htmlspecialchars($safeEditFilename, ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" name="status" value="<?= htmlspecialchars($currentStatusValue, ENT_QUOTES, 'UTF-8') ?>">
 
-            <div class="form-group">
+            <div class="form-group post-only">
 
                 <label for="title" data-podcast-label="Título del episodio" data-post-label="Título">Título</label>
 
@@ -634,19 +634,36 @@ if ($editFeedback !== null) {
                     }
                 }
 
-                var typeButtons = typeToggle.querySelectorAll('[data-type-option]');
-                typeButtons.forEach(function(button) {
-                    button.addEventListener('click', function() {
-                        var value = button.getAttribute('data-type-option') || 'Entrada';
-                        typeValueInput.value = value;
-                        typeButtons.forEach(function(other) {
-                            var isActive = other === button;
-                            other.classList.toggle('active', isActive);
-                            other.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-                        });
-                        togglePodcastFields();
+                var typeButtons = Array.prototype.slice.call(typeToggle.querySelectorAll('[data-type-option]'));
+
+                function setTypeFromButton(button) {
+                    var value = button.getAttribute('data-type-option') || 'Entrada';
+                    typeValueInput.value = value;
+                    typeButtons.forEach(function(other) {
+                        var isActive = other === button;
+                        other.classList.toggle('active', isActive);
+                        other.setAttribute('aria-pressed', isActive ? 'true' : 'false');
                     });
+                    togglePodcastFields();
+                }
+
+                typeToggle.addEventListener('click', function(event) {
+                    var target = event.target;
+                    if (target && target.closest) {
+                        var button = target.closest('[data-type-option]');
+                        if (button) {
+                            event.preventDefault();
+                            setTypeFromButton(button);
+                        }
+                    }
                 });
+
+                if (typeButtons.length) {
+                    var activeButton = typeButtons.find(function(button) {
+                        return button.classList.contains('active');
+                    }) || typeButtons[0];
+                    setTypeFromButton(activeButton);
+                }
                 if (audioInput) {
                     audioInput.addEventListener('change', updateAudioMetadata);
                 }

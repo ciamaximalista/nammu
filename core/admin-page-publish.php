@@ -26,7 +26,7 @@
 
     <form method="post">
 
-        <div class="form-group">
+        <div class="form-group post-only">
 
             <label for="title" data-podcast-label="Título del episodio" data-post-label="Título">Título</label>
 
@@ -55,7 +55,7 @@
             <input type="text" name="audio_duration" id="audio_duration" class="form-control" placeholder="00:45:00">
         </div>
 
-        <div class="form-group">
+        <div class="form-group post-only">
             <label>Tipo</label>
             <input type="hidden" name="type" id="type" value="Entrada" data-type-value>
             <div class="btn-group d-flex flex-wrap" role="group" data-type-toggle>
@@ -73,7 +73,7 @@
 
         </div>
 
-        <div class="form-group">
+        <div class="form-group post-only">
 
             <label for="date">Fecha</label>
 
@@ -316,19 +316,36 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    var typeButtons = typeToggle.querySelectorAll('[data-type-option]');
-    typeButtons.forEach(function(button) {
-        button.addEventListener('click', function() {
-            var value = button.getAttribute('data-type-option') || 'Entrada';
-            typeValueInput.value = value;
-            typeButtons.forEach(function(other) {
-                var isActive = other === button;
-                other.classList.toggle('active', isActive);
-                other.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-            });
-            togglePodcastFields();
+    var typeButtons = Array.prototype.slice.call(typeToggle.querySelectorAll('[data-type-option]'));
+
+    function setTypeFromButton(button) {
+        var value = button.getAttribute('data-type-option') || 'Entrada';
+        typeValueInput.value = value;
+        typeButtons.forEach(function(other) {
+            var isActive = other === button;
+            other.classList.toggle('active', isActive);
+            other.setAttribute('aria-pressed', isActive ? 'true' : 'false');
         });
+        togglePodcastFields();
+    }
+
+    typeToggle.addEventListener('click', function(event) {
+        var target = event.target;
+        if (target && target.closest) {
+            var button = target.closest('[data-type-option]');
+            if (button) {
+                event.preventDefault();
+                setTypeFromButton(button);
+            }
+        }
     });
+
+    if (typeButtons.length) {
+        var activeButton = typeButtons.find(function(button) {
+            return button.classList.contains('active');
+        }) || typeButtons[0];
+        setTypeFromButton(activeButton);
+    }
     if (audioInput) {
         audioInput.addEventListener('change', updateAudioMetadata);
     }

@@ -1,9 +1,7 @@
 <?php
 /**
- * @var string $category
+ * @var array<int, array{title:string,description:string,date:string,image:?string,audio:string,duration:string}> $episodes
  * @var int $count
- * @var array<int, array{slug:string,title:string,description:string,date:string,category:string,image:?string}> $posts
- * @var bool $hideMetaBand
  */
 $colors = $theme['colors'] ?? [];
 $highlight = htmlspecialchars($colors['highlight'] ?? '#f3f6f9', ENT_QUOTES, 'UTF-8');
@@ -63,10 +61,9 @@ $subscriptionBottom = $shouldShowSubscription && $subscriptionPositionSetting ==
 $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
 $subscriptionAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/subscribe.php';
-$hideMetaBand = !empty($hideMetaBand);
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
-$itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/itinerarios' : '/itinerarios');
-$podcastIndexUrl = $podcastIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/podcast' : '/podcast');
+$itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl, '/') . '/itinerarios' : '/itinerarios');
+$podcastIndexUrl = $podcastIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl, '/') . '/podcast' : '/podcast');
 $hasItineraries = !empty($hasItineraries);
 $hasPodcast = !empty($hasPodcast);
 $hasCategories = !empty($hasCategories);
@@ -204,11 +201,12 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     return (string) ob_get_clean();
 };
 ?>
+
 <section class="category-detail-hero">
     <div>
-        <p class="category-label">Categoría</p>
-        <h1><?= htmlspecialchars($category, ENT_QUOTES, 'UTF-8') ?></h1>
-        <p class="category-count"><?= htmlspecialchars((string) $count, ENT_QUOTES, 'UTF-8') ?> <?= $count === 1 ? 'entrada publicada' : 'entradas publicadas' ?></p>
+        <p class="category-label">Podcast</p>
+        <h1>Podcast</h1>
+        <p class="category-count"><?= htmlspecialchars((string) $count, ENT_QUOTES, 'UTF-8') ?> <?= $count === 1 ? 'episodio publicado' : 'episodios publicados' ?></p>
     </div>
 </section>
 
@@ -223,14 +221,14 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     </section>
 <?php endif; ?>
 
-<?php if (empty($posts)): ?>
-    <p>No hay publicaciones en esta categoría todavía.</p>
+<?php if (empty($episodes)): ?>
+    <p>No hay episodios publicados todavía.</p>
 <?php else: ?>
     <section class="post-grid columns-<?= $columns ?> blocks-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?>">
-        <?php foreach ($posts as $post): ?>
+        <?php foreach ($episodes as $episode): ?>
             <?php
-            $link = $postUrl($post['slug']);
-            $imageUrl = $resolveImage($post['image']);
+            $audioLink = $episode['audio'] ?? '';
+            $imageUrl = $resolveImage($episode['image'] ?? '');
             $cardClassParts = ['post-card', 'style-' . $cardStyle];
             if ($cardStyle === 'full') {
                 $cardClassParts[] = 'full-mode-' . $fullImageMode;
@@ -253,31 +251,32 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
             }
             $thumbClass = implode(' ', $thumbClassParts);
             $metaPieces = [];
-            if ($post['date'] !== '') {
-                $metaPieces[] = htmlspecialchars($post['date'], ENT_QUOTES, 'UTF-8');
+            if (!empty($episode['date'])) {
+                $metaPieces[] = htmlspecialchars($episode['date'], ENT_QUOTES, 'UTF-8');
             }
-            if (!empty($post['category'])) {
-                $categorySlug = nammu_slugify_label($post['category']);
-                if ($categorySlug !== '' && $categorySlug !== 'sin-categoria') {
-                    $categoryUrl = ($baseUrl ?? '/') !== '' ? rtrim($baseUrl, '/') . '/categoria/' . rawurlencode($categorySlug) : '/categoria/' . rawurlencode($categorySlug);
-                    $metaPieces[] = '<a class="category-tag-link" href="' . htmlspecialchars($categoryUrl, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($post['category'], ENT_QUOTES, 'UTF-8') . '</a>';
-                }
+            if (!empty($episode['duration'])) {
+                $metaPieces[] = htmlspecialchars($episode['duration'], ENT_QUOTES, 'UTF-8');
             }
             $metaHtml = implode(' · ', $metaPieces);
             ?>
             <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
                 <?php if ($imageUrl): ?>
-                    <a class="<?= htmlspecialchars($thumbClass, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($link, ENT_QUOTES, 'UTF-8') ?>">
-                        <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?>">
+                    <a class="<?= htmlspecialchars($thumbClass, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($audioLink, ENT_QUOTES, 'UTF-8') ?>">
+                        <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($episode['title'], ENT_QUOTES, 'UTF-8') ?>">
                     </a>
                 <?php endif; ?>
                 <div class="post-body">
-                    <h2><a href="<?= htmlspecialchars($link, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?></a></h2>
-            <?php if (!$hideMetaBand && $metaHtml !== ''): ?>
-                <p class="post-meta"><?= $metaHtml ?></p>
-            <?php endif; ?>
-                    <?php if ($post['description'] !== ''): ?>
-                        <p class="post-description"><?= htmlspecialchars($post['description'], ENT_QUOTES, 'UTF-8') ?></p>
+                    <h2><a href="<?= htmlspecialchars($audioLink, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($episode['title'], ENT_QUOTES, 'UTF-8') ?></a></h2>
+                    <?php if ($metaHtml !== ''): ?>
+                        <p class="post-meta"><?= $metaHtml ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($episode['description'])): ?>
+                        <p class="post-description"><?= htmlspecialchars($episode['description'], ENT_QUOTES, 'UTF-8') ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($audioLink)): ?>
+                        <audio class="podcast-player" controls preload="none">
+                            <source src="<?= htmlspecialchars($audioLink, ENT_QUOTES, 'UTF-8') ?>" type="audio/mpeg">
+                        </audio>
                     <?php endif; ?>
                 </div>
             </article>
@@ -390,117 +389,43 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     }
     .site-subscription-box .site-search-form input[type="email"] {
         flex: 1 1 240px;
-        padding: 0.75rem 1rem;
-        border-radius: var(--nammu-radius-md);
-        border: 1px solid rgba(0,0,0,0.1);
-        font-size: 1rem;
     }
-    .site-subscription-box .site-search-form button,
-    .site-subscription-box .subscription-avisos-link {
-        padding: 0;
-        height: 44px;
-        width: 44px;
+    .site-subscription-box .subscription-icon {
+        background: <?= $accentBackground ?>;
+        border: 1px solid <?= $accentBorder ?>;
     }
-    .site-subscription-box .subscription-postal-link,
-    .site-subscription-box .subscription-avisos-link {
+    .site-subscription-box .subscription-avisos-link,
+    .site-subscription-box .subscription-postal-link {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        border: 1px solid <?= $accentBorder ?>;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
-        background: rgba(0,0,0,0.05);
-        margin-left: 0.4rem;
-        padding: 0;
-        text-decoration: none;
-        transition: background 0.2s ease;
         color: <?= $accentColor ?>;
+        background: <?= $accentBackground ?>;
     }
-    .site-subscription-box .subscription-postal-link:hover,
-    .site-subscription-box .subscription-avisos-link:hover {
-        background: rgba(0,0,0,0.12);
-    }
-    .site-subscription-box .subscription-postal-link svg,
-    .site-subscription-box .subscription-avisos-link svg {
-        width: 20px;
-        height: 20px;
-        display: block;
-    }
-    .postal-only-box {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-    }
-    .postal-only-box .postal-only-text {
-        display: flex;
-        flex-direction: column;
-    }
-    .postal-only-box .postal-only-text span {
-        font-size: 0.92rem;
-        color: <?= $textColor ?>;
-    }
-    .site-subscription-box .subscription-feedback {
-        border: 1px solid rgba(0,0,0,0.05);
-    }
-    .search-categories-link,
-    .search-letters-link,
-    .search-itineraries-link,
-    .search-podcast-link {
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
-        background: rgba(0,0,0,0.05);
+    .site-search-form .search-categories-link,
+    .site-search-form .search-letters-link,
+    .site-search-form .search-itineraries-link,
+    .site-search-form .search-podcast-link {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        border: 1px solid rgba(0,0,0,0.1);
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        text-decoration: none;
-        transition: background 0.2s ease;
-    }
-    .search-categories-link:hover,
-    .search-letters-link:hover,
-    .search-itineraries-link:hover,
-    .search-podcast-link:hover {
-        background: rgba(0,0,0,0.12);
-    }
-    @media (max-width: 640px) {
-        .site-search-form {
-            flex-direction: row;
-            flex-wrap: nowrap;
-            gap: 0.35rem;
-        }
-        .site-search-form .search-icon {
-            width: 32px;
-            height: 32px;
-        }
-        .site-search-form input[type="text"],
-        .site-search-form input[type="email"] {
-            flex: 1 1 auto;
-            min-width: 0;
-            padding: 0.5rem 0.6rem;
-            font-size: 0.9rem;
-        }
-        .site-search-form button,
-        .search-categories-link,
-        .search-letters-link,
-        .search-itineraries-link,
-        .search-podcast-link,
-        .subscription-postal-link,
-        .subscription-avisos-link {
-            width: 32px;
-            height: 32px;
-            border-radius: 10px;
-        }
-        .site-subscription-box .subscription-postal-link,
-        .site-subscription-box .subscription-avisos-link {
-            margin-left: 0;
-        }
+        color: <?= $accentColor ?>;
+        background: rgba(0,0,0,0.04);
     }
     .post-grid {
         display: grid;
         gap: 1.5rem;
     }
     .post-grid.columns-1 {
-        grid-template-columns: minmax(0, 1fr);
+        grid-template-columns: 1fr;
     }
     .post-grid.columns-2 {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -508,247 +433,117 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     .post-grid.columns-3 {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
-    @media (max-width: 900px) {
+    @media (max-width: 1100px) {
         .post-grid.columns-3 {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
     }
-    @media (max-width: 640px) {
+    @media (max-width: 860px) {
         .post-grid.columns-2,
         .post-grid.columns-3 {
-            grid-template-columns: minmax(0, 1fr);
+            grid-template-columns: 1fr;
+        }
+        .site-search-form {
+            flex-wrap: wrap;
         }
     }
     .post-card {
-        border: 1px solid rgba(0,0,0,0.05);
-        border-radius: var(--nammu-radius-md);
-        padding: 1.15rem;
-        background: <?= $highlight ?>;
-        color: <?= $textColor ?>;
         position: relative;
+        background: <?= $blocksMode === 'boxed' ? '#fff' : 'transparent' ?>;
+        border-radius: var(--nammu-radius-lg);
+        box-shadow: <?= $blocksMode === 'boxed' ? '0 8px 20px rgba(0,0,0,0.06)' : 'none' ?>;
         overflow: hidden;
-        box-sizing: border-box;
+        border: <?= $blocksMode === 'boxed' ? '1px solid rgba(0,0,0,0.06)' : 'none' ?>;
+        display: grid;
+        grid-template-columns: 1fr;
     }
     .post-card::after {
         content: '';
-        display: table;
-        clear: both;
-    }
-    .post-card .post-thumb {
-        display: block;
+        position: absolute;
+        inset: 0;
+        border-radius: var(--nammu-radius-lg);
+        border: 1px solid rgba(0,0,0,0.06);
+        opacity: <?= $blocksMode === 'boxed' ? '0' : '1' ?>;
+        pointer-events: none;
     }
     .post-card .post-thumb img {
         width: 100%;
-        display: block;
+        height: 100%;
         object-fit: cover;
-        border-radius: var(--nammu-radius-md);
+        display: block;
     }
     .post-card .post-body {
-        display: block;
-    }
-    .post-card .post-body > *:not(:last-child) {
-        margin-bottom: 0.6rem;
-    }
-    .post-card.style-media-right .post-thumb {
-        float: right;
-        width: clamp(110px, 34%, 170px);
-        aspect-ratio: 1 / 1;
-        margin-left: 1.25rem;
-        margin-bottom: 0.5rem;
-        shape-outside: inset(0 round var(--nammu-radius-lg));
-        -webkit-shape-outside: inset(0 round var(--nammu-radius-lg));
-        overflow: hidden;
-        border-radius: var(--nammu-radius-lg);
-    }
-    .post-card.style-media-right .post-thumb img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
-        border-radius: inherit;
-    }
-    .post-card.style-square-tall-right {
-        display: grid;
-        grid-template-columns: 1fr clamp(110px, 34%, 170px);
-        grid-template-rows: 1fr;
-        gap: 1rem;
-        align-items: stretch;
-        min-height: 220px;
-    }
-    .post-card.style-square-tall-right .post-thumb {
-        grid-column: 2;
-        grid-row: 1;
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        overflow: hidden;
-        border-radius: var(--nammu-radius-lg);
-        align-self: stretch;
-        justify-self: center;
-    }
-    .post-card.style-square-tall-right .post-thumb img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
-        border-radius: inherit;
-    }
-    .post-card.style-square-tall-right .post-body {
-        grid-column: 1;
-        grid-row: 1;
+        padding: 1.4rem 1.6rem 1.6rem;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        gap: 0.6rem;
+        gap: 0.65rem;
     }
-    .post-card.style-circle-right .post-thumb {
-        border-radius: 50%;
-        shape-outside: circle();
-        -webkit-shape-outside: circle();
+    .post-card.style-media-right {
+        grid-template-columns: 1fr 160px;
     }
-    @media (max-width: 720px) {
-        .post-card.style-media-right {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .post-card.style-media-right .post-body {
-            width: 100%;
-            text-align: left;
-        }
-        .post-card.style-media-right .post-thumb {
-            float: none;
-            width: min(240px, 75vw);
-            margin: 0 auto 0.85rem auto;
-            shape-outside: none;
-            -webkit-shape-outside: none;
-        }
-        .post-card.style-media-right .post-thumb img {
-            border-radius: var(--nammu-radius-md);
-        }
-        .post-card.style-square-tall-right {
-            grid-template-columns: 1fr;
-            grid-template-rows: 1fr;
-            min-height: 220px;
-        }
-        .post-card.style-square-tall-right .post-thumb {
-            grid-column: 1;
-            width: 100%;
-            height: 100%;
-        }
-        .post-card.style-square-tall-right .post-thumb img {
-            height: 100%;
-        }
-        .post-card.style-circle-right .post-thumb {
-            width: min(200px, 60vw);
-        }
-        .post-grid.columns-1 .post-card.style-media-right {
-            display: block;
-        }
-        .post-grid.columns-1 .post-card.style-media-right .post-thumb {
-            float: none;
-            width: 100%;
-            margin: 0 0 0.85rem 0;
-            shape-outside: none;
-            -webkit-shape-outside: none;
-            border-radius: var(--nammu-radius-lg);
-        }
-        .post-grid.columns-1 .post-card.style-media-right .post-thumb img {
-            border-radius: inherit;
-        }
-        .post-grid.columns-1 .post-card.style-circle-right .post-thumb {
-            width: 100%;
-            border-radius: 50%;
-        }
-        .post-grid.columns-1 .post-card.style-media-right {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .post-grid.columns-1 .post-card.style-media-right .post-thumb {
-            float: none;
-            width: min(240px, 70%);
-            margin: 0 auto 0.85rem auto;
-            shape-outside: none;
-            -webkit-shape-outside: none;
-        }
-        .post-grid.columns-1 .post-card.style-circle-right .post-thumb {
-            width: min(200px, 55%);
-        }
+    .post-card.style-media-right .post-thumb {
+        order: 2;
+    }
+    .post-card.style-media-right .post-body {
+        order: 1;
+    }
+    .post-card.style-square-tall-right {
+        grid-template-columns: 1fr 200px;
+    }
+    .post-card.style-square-tall-right .post-thumb img {
+        height: 100%;
     }
     .post-card.style-full .post-thumb {
-        width: 100%;
-        overflow: hidden;
-    }
-    .post-card.style-full .post-thumb img {
-        border-radius: var(--nammu-radius-md);
+        height: 210px;
     }
     .post-card.style-full.full-mode-natural .post-thumb img {
-        height: auto;
-        width: 100%;
-    }
-    .post-card.style-full.full-mode-crop .post-thumb {
-        aspect-ratio: 16 / 9;
+        object-fit: contain;
+        background: <?= $highlight ?>;
     }
     .post-card.style-full.full-mode-crop .post-thumb img {
-        width: 100%;
-        height: 100%;
         object-fit: cover;
     }
-    .post-card.style-full .post-body {
-        margin-top: 0.9rem;
-    }
     .post-card h2 {
+        font-size: 1.4rem;
         margin: 0;
-        font-size: 1.6rem;
         color: <?= $headingSecondaryColor ?>;
-        word-break: break-word;
-        hyphens: auto;
-        overflow-wrap: anywhere;
     }
     .post-card h2 a {
         color: inherit;
+        text-decoration: none;
     }
     .post-card .post-meta {
-        margin: 0;
-        display: block;
-        padding: 0.5rem 0.75rem;
-        font-size: 0.9rem;
-        letter-spacing: 0.012em;
-        background: <?= htmlspecialchars($accentBackground, ENT_QUOTES, 'UTF-8') ?>;
-        border: 1px solid <?= htmlspecialchars($accentBorder, ENT_QUOTES, 'UTF-8') ?>;
         color: <?= $accentColor ?>;
-        border-radius: var(--nammu-radius-sm);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
     .post-card .post-description {
         margin: 0;
-    }
-    .post-grid.blocks-flat {
-        gap: 2.25rem 1.75rem;
+        color: <?= $textColor ?>;
     }
     .post-grid.blocks-flat .post-card {
-        background: transparent;
-        border: none;
-        padding: 0;
+        border-radius: 0;
+        box-shadow: none;
+        border-bottom: 1px solid rgba(0,0,0,0.08);
     }
-    @media (min-width: 721px) {
-        .post-grid.blocks-flat:not(.columns-1) .post-card.style-media-right .post-thumb {
-            margin-left: clamp(1rem, 3vw, 1.5rem);
+    .post-grid.blocks-flat .post-card:last-child {
+        border-bottom: none;
+    }
+    .podcast-player {
+        width: 100%;
+        margin-top: 0.6rem;
+        border-radius: 999px;
+        background: <?= $highlight ?>;
+    }
+    @media (max-width: 720px) {
+        .post-card.style-media-right,
+        .post-card.style-square-tall-right {
+            grid-template-columns: 1fr;
         }
-    }
-    .post-grid.blocks-flat .post-card.style-full .post-body {
-        margin-top: 1.15rem;
-    }
-    .category-tag-link {
-        color: <?= $accentColor ?>;
-        text-decoration: none;
-        border-bottom: 1px dotted rgba(0,0,0,0.5);
-        padding-bottom: 0.05rem;
-    }
-    .category-tag-link {
-        color: <?= $accentColor ?>;
-        text-decoration: none;
-        border-bottom: 1px dotted rgba(0,0,0,0.5);
-        padding-bottom: 0.05rem;
+        .post-card.style-media-right .post-thumb,
+        .post-card.style-square-tall-right .post-thumb {
+            order: 1;
+        }
     }
 </style>

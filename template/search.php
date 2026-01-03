@@ -22,6 +22,8 @@ $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/itinerarios' : '/itinerarios');
 $hasItineraries = !empty($hasItineraries);
+$podcastIndexUrl = $podcastIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/podcast' : '/podcast');
+$hasPodcast = !empty($hasPodcast);
 $hasCategories = !empty($hasCategories);
 $hasResults = !empty($results);
 $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
@@ -66,9 +68,19 @@ $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
                         </svg>
                     </a>
                 <?php endif; ?>
+                <?php if (!empty($hasPodcast) && !empty($podcastIndexUrl)): ?>
+                    <a class="search-podcast-link" href="<?= htmlspecialchars($podcastIndexUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Podcast">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="9" y="3" width="6" height="10" rx="3" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                            <path d="M5 11C5 14.866 8.134 18 12 18C15.866 18 19 14.866 19 11" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                            <line x1="12" y1="18" x2="12" y2="22" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                            <line x1="8" y1="22" x2="16" y2="22" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </a>
+                <?php endif; ?>
             </div>
             <div class="search-hints">
-                Frases exactas entre comillas (“bosque mediterráneo”), excluye con <code>-urbano</code>, filtra por campo (<code>title:plantación</code>) o tipo (<code>tipo:página</code>).
+                Frases exactas entre comillas (“bosque mediterráneo”), excluye con <code>-urbano</code>, filtra por campo (<code>title:plantación</code>) o tipo (<code>tipo:página</code>, <code>tipo:podcast</code>, <code>tipo:newsletter</code>).
             </div>
         </form>
     </div>
@@ -104,7 +116,11 @@ $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
                         <time datetime="<?= htmlspecialchars($item['date'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($item['date'], ENT_QUOTES, 'UTF-8') ?></time>
                     <?php endif; ?>
                 </header>
-                <h2><a href="<?= htmlspecialchars($item['url'], ENT_QUOTES, 'UTF-8') ?>"><?= $item['title'] ?></a></h2>
+                <?php if (!empty($item['audio_url']) && $item['type_label'] === 'Podcast'): ?>
+                    <h2><?= $item['title'] ?></h2>
+                <?php else: ?>
+                    <h2><a href="<?= htmlspecialchars($item['url'], ENT_QUOTES, 'UTF-8') ?>"><?= $item['title'] ?></a></h2>
+                <?php endif; ?>
                 <?php if ($item['description'] !== ''): ?>
                     <p class="result-description"><?= $item['description'] ?></p>
                 <?php endif; ?>
@@ -112,7 +128,13 @@ $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
                     <p class="result-snippet"><?= $item['snippet'] ?></p>
                 <?php endif; ?>
                 <footer>
-                    <a class="result-link" href="<?= htmlspecialchars($item['url'], ENT_QUOTES, 'UTF-8') ?>">Abrir contenido</a>
+                    <?php if (!empty($item['audio_url']) && $item['type_label'] === 'Podcast'): ?>
+                        <audio class="result-audio" controls preload="none">
+                            <source src="<?= htmlspecialchars($item['audio_url'], ENT_QUOTES, 'UTF-8') ?>" type="audio/mpeg">
+                        </audio>
+                    <?php else: ?>
+                        <a class="result-link" href="<?= htmlspecialchars($item['url'], ENT_QUOTES, 'UTF-8') ?>">Abrir contenido</a>
+                    <?php endif; ?>
                     <span class="result-score">Relevancia <?= number_format((float) $item['score'], 1) ?></span>
                 </footer>
             </article>
@@ -191,7 +213,8 @@ $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
     }
     .search-categories-link,
     .search-letters-link,
-    .search-itineraries-link {
+    .search-itineraries-link,
+    .search-podcast-link {
         flex: 0 0 auto;
         width: 48px;
         height: 48px;
@@ -205,7 +228,8 @@ $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
     }
     .search-categories-link:hover,
     .search-letters-link:hover,
-    .search-itineraries-link:hover {
+    .search-itineraries-link:hover,
+    .search-podcast-link:hover {
         background: rgba(0,0,0,0.12);
     }
     .search-hints {
@@ -298,6 +322,12 @@ $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
         margin-top: 0.75rem;
         font-size: 0.9rem;
     }
+    .result-audio {
+        width: min(320px, 100%);
+        height: 38px;
+        border-radius: 999px;
+        background: <?= $highlight ?>;
+    }
     .result-link {
         color: <?= $accentColor ?>;
         font-weight: 600;
@@ -339,7 +369,8 @@ $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
         .search-form button,
         .search-categories-link,
         .search-letters-link,
-        .search-itineraries-link {
+        .search-itineraries-link,
+        .search-podcast-link {
             width: 100%;
         }
         .search-result-card footer {

@@ -96,7 +96,9 @@ $categoriesIndexUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, 
 $avisosUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php';
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseHref ?? '/') !== '' ? rtrim($baseHref ?? '/', '/') . '/itinerarios' : '/itinerarios');
+$podcastIndexUrl = $podcastIndexUrl ?? (($baseHref ?? '/') !== '' ? rtrim($baseHref ?? '/', '/') . '/podcast' : '/podcast');
 $hasItineraries = !empty($hasItineraries);
+$hasPodcast = !empty($hasPodcast);
 $hasCategories = !empty($hasCategories);
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
 $isAlphabetical = !empty($isAlphabetical);
@@ -118,7 +120,7 @@ $postalEnabled = $postalEnabled ?? false;
 $postalUrl = $postalUrl ?? '/correos.php';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $hasPaginationLeft = $subscriptionEnabled || ($postalEnabled && $postalLogoSvg !== '');
-$renderSearchBox = static function (string $variant) use ($searchAction, $accentColor, $highlight, $textColor, $searchActionBase, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories): string {
+$renderSearchBox = static function (string $variant) use ($searchAction, $accentColor, $highlight, $textColor, $searchActionBase, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories, $hasPodcast, $podcastIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
         <form class="site-search-form" method="get" action="<?= htmlspecialchars($searchAction, ENT_QUOTES, 'UTF-8') ?>">
@@ -158,6 +160,16 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $accent
                         <path d="M4 5H10C11.1046 5 12 5.89543 12 7V19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linejoin="round"/>
                         <path d="M20 5H14C12.8954 5 12 5.89543 12 7V19H20C21.1046 19 22 18.1046 22 17V7C22 5.89543 21.1046 5 20 5Z" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linejoin="round"/>
                         <line x1="12" y1="7" x2="12" y2="19" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </a>
+            <?php endif; ?>
+            <?php if (!empty($hasPodcast) && !empty($podcastIndexUrl)): ?>
+                <a class="search-podcast-link" href="<?= htmlspecialchars($podcastIndexUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Podcast">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="9" y="3" width="6" height="10" rx="3" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                        <path d="M5 11C5 14.866 8.134 18 12 18C15.866 18 19 14.866 19 11" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="12" y1="18" x2="12" y2="22" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="8" y1="22" x2="16" y2="22" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                 </a>
             <?php endif; ?>
@@ -587,6 +599,16 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
                     </svg>
                 </a>
             <?php endif; ?>
+            <?php if (!empty($hasPodcast) && !empty($podcastIndexUrl)): ?>
+                <a class="page-link page-icon-link" href="<?= htmlspecialchars($podcastIndexUrl, ENT_QUOTES, 'UTF-8') ?>" title="Podcast" aria-label="Podcast">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="9" y="3" width="6" height="10" rx="3" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                        <path d="M5 11C5 14.866 8.134 18 12 18C15.866 18 19 14.866 19 11" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="12" y1="18" x2="12" y2="22" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="8" y1="22" x2="16" y2="22" stroke="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </a>
+            <?php endif; ?>
         </div>
     </nav>
 <?php endif; ?>
@@ -659,7 +681,8 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     }
     .search-categories-link,
     .search-letters-link,
-    .search-itineraries-link {
+    .search-itineraries-link,
+    .search-podcast-link {
         width: 44px;
         height: 44px;
         border-radius: 12px;
@@ -671,7 +694,9 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         transition: background 0.2s ease;
     }
     .search-categories-link:hover,
-    .search-letters-link:hover {
+    .search-letters-link:hover,
+    .search-itineraries-link:hover,
+    .search-podcast-link:hover {
         background: rgba(0,0,0,0.1);
     }
     .site-search-form button svg {
@@ -748,7 +773,8 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         border: 1px solid rgba(0,0,0,0.05);
     }
     .search-categories-link,
-    .search-letters-link {
+    .search-letters-link,
+    .search-podcast-link {
         width: 44px;
         height: 44px;
         border-radius: 12px;
@@ -761,7 +787,8 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     }
     .search-categories-link:hover,
     .search-letters-link:hover,
-    .search-itineraries-link:hover {
+    .search-itineraries-link:hover,
+    .search-podcast-link:hover {
         background: rgba(0,0,0,0.12);
     }
     .home-hero-graphic {
@@ -1252,6 +1279,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         .search-categories-link,
         .search-letters-link,
         .search-itineraries-link,
+        .search-podcast-link,
         .subscription-postal-link,
         .subscription-avisos-link {
             width: 32px;

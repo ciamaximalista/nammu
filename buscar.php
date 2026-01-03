@@ -214,6 +214,7 @@ foreach ($results as $item) {
         'category' => $item['category'],
         'date' => $item['date_display'],
         'score' => $item['score'],
+        'audio_url' => $item['audio_url'] ?? '',
     ];
 }
 
@@ -227,13 +228,15 @@ $content = $renderer->render('search', [
         'todo' => 'Todo el sitio',
         'post' => 'Sólo entradas',
         'page' => 'Sólo páginas',
+        'newsletter' => 'Sólo newsletters',
+        'podcast' => 'Sólo podcasts',
         'itinerary' => 'Sólo itinerarios',
     ],
     'tips' => [
         'Usa comillas para buscar frases exactas, por ejemplo "bosque mediterráneo".',
         'Filtra por campos: title:"Plantación", category:educación, content:escuela.',
         'Excluye términos con el prefijo -, por ejemplo bosque -urbano.',
-        'Limita por tipo con tipo:entrada, tipo:página o tipo:itinerario.',
+        'Limita por tipo con tipo:entrada, tipo:página, tipo:podcast, tipo:newsletter o tipo:itinerario.',
     ],
     'hasItineraries' => !empty($loadedItineraries),
     'itinerariesIndexUrl' => $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios',
@@ -296,6 +299,8 @@ function nammu_collect_documents(string $contentDir, MarkdownConverter $markdown
         $type = match ($template) {
             'page' => 'page',
             'single', 'post' => 'post',
+            'newsletter' => 'newsletter',
+            'podcast' => 'podcast',
             default => 'other',
         };
 
@@ -350,6 +355,14 @@ function nammu_collect_documents(string $contentDir, MarkdownConverter $markdown
                 'slug' => $slug,
             ],
         ];
+        if ($template === 'podcast') {
+            $audioPath = nammu_meta_value_to_string($metadata['Audio'] ?? '');
+            $documents[count($documents) - 1]['audio_url'] = nammu_build_audio_url($audioPath);
+            $documents[count($documents) - 1]['relative_url'] = $documents[count($documents) - 1]['audio_url'] ?? $documents[count($documents) - 1]['relative_url'];
+            $documents[count($documents) - 1]['type_label_override'] = 'Podcast';
+        } elseif ($template === 'newsletter') {
+            $documents[count($documents) - 1]['type_label_override'] = 'Newsletter';
+        }
     }
 
     return $documents;
@@ -372,6 +385,27 @@ function nammu_extract_document(string $raw): array
     $body = ltrim($matches[2] ?? '');
 
     return [$meta, $body];
+}
+
+function nammu_build_audio_url(string $path): string
+{
+    $publicBaseUrl = '';
+    if (isset($GLOBALS['publicBaseUrl']) && is_string($GLOBALS['publicBaseUrl'])) {
+        $publicBaseUrl = rtrim($GLOBALS['publicBaseUrl'], '/');
+    }
+    $path = trim($path);
+    if ($path === '') {
+        return '';
+    }
+    if (preg_match('#^https?://#i', $path)) {
+        return $path;
+    }
+    $normalized = ltrim($path, '/');
+    if (str_starts_with($normalized, 'assets/')) {
+        $normalized = substr($normalized, 7);
+    }
+    $relative = '/assets/' . $normalized;
+    return $publicBaseUrl !== '' ? $publicBaseUrl . $relative : $relative;
 }
 
 function nammu_meta_value_to_string(mixed $value): string
@@ -507,6 +541,8 @@ function nammu_normalize_search_type(string $type): string
     return match ($type) {
         'post', 'posts', 'entrada', 'entradas', 'blog' => 'post',
         'page', 'pages', 'pagina', 'página', 'paginas', 'páginas' => 'page',
+        'newsletter', 'newsletters', 'boletin', 'boletín' => 'newsletter',
+        'podcast', 'podcasts', 'episodio', 'episodios' => 'podcast',
         'itinerario', 'itinerarios', 'curso', 'cursos', 'libro', 'libros' => 'itinerary',
         default => 'todo',
     };
@@ -534,6 +570,12 @@ function nammu_execute_search(array $documents, array $conditions, string $typeF
             continue;
         }
         if ($typeFilter === 'page' && $doc['type'] !== 'page') {
+            continue;
+        }
+        if ($typeFilter === 'newsletter' && $doc['type'] !== 'newsletter') {
+            continue;
+        }
+        if ($typeFilter === 'podcast' && $doc['type'] !== 'podcast') {
             continue;
         }
 
@@ -585,12 +627,15 @@ function nammu_execute_search(array $documents, array $conditions, string $typeF
             'type_label' => $doc['type_label_override'] ?? match ($doc['type']) {
                 'page' => 'Página',
                 'post' => 'Entrada',
+                'newsletter' => 'Newsletter',
+                'podcast' => 'Podcast',
                 default => 'Documento',
             },
             'date_display' => $doc['date_display'],
             'score' => $score,
             'snippet' => $snippet,
             'relative_url' => $doc['relative_url'] ?? '/' . rawurlencode($doc['slug']),
+            'audio_url' => $doc['audio_url'] ?? '',
             'highlight_terms' => $highlightTerms,
         ];
     }

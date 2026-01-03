@@ -46,6 +46,9 @@ $baseUrl = $configBaseUrl !== '' ? $configBaseUrl : nammu_base_url();
 $publicBaseUrl = $baseUrl;
 $homeUrl = $publicBaseUrl !== '' ? $publicBaseUrl : '/';
 $rssUrl = ($publicBaseUrl !== '' ? $publicBaseUrl : '') . '/rss.xml';
+$podcastIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/podcast';
+$podcastItems = nammu_collect_podcast_items(__DIR__ . '/content', $publicBaseUrl);
+$hasPodcast = !empty($podcastItems);
 
 $theme = nammu_template_settings();
 $footerRaw = $theme['footer'] ?? '';
@@ -136,6 +139,8 @@ $renderer->setGlobal('postalUrl', $postalUrl);
 $renderer->setGlobal('postalLogoSvg', $postalLogoSvg);
 $renderer->setGlobal('footerLinks', $footerLinks);
 $renderer->setGlobal('hasCategories', $hasCategories);
+$renderer->setGlobal('hasPodcast', $hasPodcast);
+$renderer->setGlobal('podcastIndexUrl', $podcastIndexUrl);
 $renderer->setGlobal('pageLang', $siteLang);
 
 $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseUrl): ?string {
@@ -556,6 +561,48 @@ if ($routePath === '/itinerarios.xml') {
     header('Content-Type: application/rss+xml; charset=UTF-8');
     echo $itineraryFeedContent;
     @file_put_contents(__DIR__ . '/itinerarios.xml', $itineraryFeedContent);
+    exit;
+}
+
+if (preg_match('#^/podcast/?$#i', $routePath)) {
+    $rawEpisodes = nammu_collect_podcast_items(__DIR__ . '/content', $publicBaseUrl);
+    $episodes = [];
+    foreach ($rawEpisodes as $episode) {
+        $timestamp = (int) ($episode['timestamp'] ?? 0);
+        $episodes[] = [
+            'title' => (string) ($episode['title'] ?? ''),
+            'description' => (string) ($episode['description'] ?? ''),
+            'date' => $timestamp > 0 ? date('d/m/y', $timestamp) : '',
+            'image' => $episode['image'] ?? null,
+            'audio' => (string) ($episode['audio'] ?? ''),
+            'duration' => (string) ($episode['audio_duration'] ?? ''),
+        ];
+    }
+    $count = count($episodes);
+    $content = $renderer->render('podcast', [
+        'episodes' => $episodes,
+        'count' => $count,
+        'hasItineraries' => !empty($itineraryListing),
+    ]);
+    $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/podcast' : '/podcast';
+    $description = 'Episodios de nuestro podcast.';
+    $podcastMeta = nammu_build_social_meta([
+        'type' => 'website',
+        'title' => 'Podcast — ' . $siteNameForMeta,
+        'description' => $description,
+        'url' => $canon,
+        'image' => $homeImage,
+        'site_name' => $siteNameForMeta,
+    ], $socialConfig);
+    echo $renderer->render('layout', [
+        'pageTitle' => 'Podcast',
+        'metaDescription' => $description,
+        'content' => $content,
+        'socialMeta' => $podcastMeta,
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
+        'showLogo' => true,
+    ]);
     exit;
 }
 

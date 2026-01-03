@@ -230,6 +230,14 @@ document.addEventListener('DOMContentLoaded', function() {
         return String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
     }
 
+    function trimLeadingSlashes(value) {
+        var output = value || '';
+        while (output.charAt(0) === '/' || output.charAt(0) === '\\') {
+            output = output.slice(1);
+        }
+        return output;
+    }
+
     function resolveAudioUrl(value) {
         if (!value) {
             return '';
@@ -238,9 +246,9 @@ document.addEventListener('DOMContentLoaded', function() {
             return value;
         }
         if (value.indexOf('assets/') === 0) {
-            return '/' + value.replace(/^\\/+/, '');
+            return '/' + trimLeadingSlashes(value);
         }
-        return '/assets/' + value.replace(/^\\/+/, '');
+        return '/assets/' + trimLeadingSlashes(value);
     }
 
     function updateAudioMetadata() {

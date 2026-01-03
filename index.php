@@ -88,7 +88,7 @@ $lettersIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '
 $postalEnabled = ($configData['postal']['enabled'] ?? 'off') === 'on';
 $postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
 $postalLogoSvg = nammu_postal_icon_svg();
-$footerLinks = nammu_build_footer_links($configData, $theme, $homeUrl, $postalUrl);
+$footerLinks = nammu_build_footer_links($configData, $theme, $homeUrl, $postalUrl, !empty($itineraryListing), $hasPodcast);
 $logoForJsonLd = $theme['logo_url'] ?? '';
 $orgJsonLd = [
     '@context' => 'https://schema.org',

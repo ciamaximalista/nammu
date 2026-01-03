@@ -48,7 +48,10 @@ $displaySiteTitle = $theme['blog'] !== '' ? $theme['blog'] : $siteTitle;
 $postalEnabled = ($config['postal']['enabled'] ?? 'off') === 'on';
 $postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
 $postalLogoSvg = nammu_postal_icon_svg();
-$footerLinks = nammu_build_footer_links($config, $theme, $homeUrl, $postalUrl);
+$itineraryItems = is_dir(__DIR__ . '/itinerarios') ? glob(__DIR__ . '/itinerarios/*') : [];
+$hasItineraries = !empty($itineraryItems);
+$hasPodcast = !empty(nammu_collect_podcast_items(__DIR__ . '/content', $publicBaseUrl));
+$footerLinks = nammu_build_footer_links($config, $theme, $homeUrl, $postalUrl, $hasItineraries, $hasPodcast);
 
 $entries = postal_load_entries();
 $tokens = postal_prune_reset_tokens(postal_load_reset_tokens());

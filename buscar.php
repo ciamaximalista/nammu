@@ -66,7 +66,9 @@ if (!is_string($siteLang) || $siteLang === '') {
 }
 $postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
 $postalLogoSvg = nammu_postal_icon_svg();
-$footerLinks = nammu_build_footer_links($configData, $theme, $homeUrl, $postalUrl);
+$hasItineraries = !empty(is_dir(__DIR__ . '/itinerarios') ? glob(__DIR__ . '/itinerarios/*') : []);
+$hasPodcast = !empty(nammu_collect_podcast_items(__DIR__ . '/content', $publicBaseUrl));
+$footerLinks = nammu_build_footer_links($configData, $theme, $homeUrl, $postalUrl, $hasItineraries, $hasPodcast);
 $logoForJsonLd = $theme['logo_url'] ?? '';
 $orgJsonLd = [
     '@context' => 'https://schema.org',

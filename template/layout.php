@@ -133,6 +133,12 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
         <meta name="robots" content="<?= htmlspecialchars($metaRobots, ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
     <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($rssUrl, ENT_QUOTES, 'UTF-8') ?>">
+    <?php if (!empty($hasItineraries)): ?>
+        <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Itinerarios" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/itinerarios.xml' : $searchBaseNormalized . '/itinerarios.xml', ENT_QUOTES, 'UTF-8') ?>">
+    <?php endif; ?>
+    <?php if (!empty($hasPodcast)): ?>
+        <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Podcast" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/podcast.xml' : $searchBaseNormalized . '/podcast.xml', ENT_QUOTES, 'UTF-8') ?>">
+    <?php endif; ?>
     <?php if ($fontLink): ?>
         <link rel="stylesheet" href="<?= htmlspecialchars($fontLink, ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>

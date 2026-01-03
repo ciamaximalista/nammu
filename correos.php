@@ -355,7 +355,8 @@ if (!is_string($siteLang) || $siteLang === '') {
 $postalEnabled = ($config['postal']['enabled'] ?? 'off') === 'on';
 $postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
 $postalLogoSvg = nammu_postal_icon_svg();
-$footerLinks = nammu_build_footer_links($config, $theme, $homeUrl, $postalUrl);
+$hasPodcast = !empty(nammu_collect_podcast_items(__DIR__ . '/content', $publicBaseUrl));
+$footerLinks = nammu_build_footer_links($config, $theme, $homeUrl, $postalUrl, $hasItineraries, $hasPodcast);
 $logoForJsonLd = $theme['logo_url'] ?? '';
 $orgJsonLd = [
     '@context' => 'https://schema.org',
@@ -574,8 +575,6 @@ $lettersIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '
 $renderer->setGlobal('lettersIndexUrl', $isAlphabeticalOrder ? $lettersIndexUrl : null);
 $renderer->setGlobal('showLetterIndexButton', $isAlphabeticalOrder);
 $itinerariesIndexUrl = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios';
-$itineraryItems = is_dir(__DIR__ . '/itinerarios') ? glob(__DIR__ . '/itinerarios/*') : [];
-$hasItineraries = !empty($itineraryItems);
 $renderer->setGlobal('itinerariesIndexUrl', $itinerariesIndexUrl);
 $renderer->setGlobal('hasItineraries', $hasItineraries);
 $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseUrl): ?string {

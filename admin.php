@@ -5889,6 +5889,16 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             margin: 0 auto 20px;
             max-width: 150px;
         }
+        select.form-control {
+            height: auto;
+            min-height: calc(1.5em + .75rem + 2px);
+            line-height: 1.4;
+            padding-top: 0.45rem;
+            padding-bottom: 0.45rem;
+        }
+        select.form-control option {
+            line-height: 1.4;
+        }
         .itinerary-form-card {
             position: relative;
         }

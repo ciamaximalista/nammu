@@ -37,6 +37,7 @@ $siteTitle = $siteDocument['metadata']['Title'] ?? 'Nammu Blog';
 $siteDescription = $siteDocument['metadata']['Description'] ?? '';
 $siteBio = $siteDocument['content'] ?? '';
 
+$config = nammu_load_config();
 $configBaseUrl = $config['site_url'] ?? '';
 if (is_string($configBaseUrl)) {
     $configBaseUrl = rtrim(trim($configBaseUrl), '/');
@@ -72,7 +73,7 @@ $homeImage = nammu_resolve_asset($socialConfig['home_image'] ?? '', $publicBaseU
 
 $displaySiteTitle = $theme['blog'] !== '' ? $theme['blog'] : $siteTitle;
 
-$configData = nammu_load_config();
+$configData = $config;
 $siteLang = $configData['site_lang'] ?? 'es';
 if (!is_string($siteLang) || $siteLang === '') {
     $siteLang = 'es';

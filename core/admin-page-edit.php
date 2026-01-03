@@ -352,16 +352,11 @@ if ($editFeedback !== null) {
 
             <div class="form-group">
                 <label>Tipo</label>
-                <div class="btn-group btn-group-toggle d-flex flex-wrap" data-toggle="buttons" data-type-toggle>
-                    <label class="btn btn-outline-secondary <?= $currentTypeValue === 'Entrada' ? 'active' : '' ?>">
-                        <input type="radio" name="type" value="Entrada" autocomplete="off" <?= $currentTypeValue === 'Entrada' ? 'checked' : '' ?>> Entrada
-                    </label>
-                    <label class="btn btn-outline-secondary <?= $currentTypeValue === 'Página' ? 'active' : '' ?>">
-                        <input type="radio" name="type" value="Página" autocomplete="off" <?= $currentTypeValue === 'Página' ? 'checked' : '' ?>> Página
-                    </label>
-                    <label class="btn btn-outline-secondary <?= $currentTypeValue === 'Podcast' ? 'active' : '' ?>">
-                        <input type="radio" name="type" value="Podcast" autocomplete="off" <?= $currentTypeValue === 'Podcast' ? 'checked' : '' ?>> Podcast
-                    </label>
+                <input type="hidden" name="type" id="type" value="<?= htmlspecialchars($currentTypeValue, ENT_QUOTES, 'UTF-8') ?>" data-type-value>
+                <div class="btn-group d-flex flex-wrap" role="group" data-type-toggle>
+                    <button type="button" class="btn btn-outline-secondary <?= $currentTypeValue === 'Entrada' ? 'active' : '' ?>" data-type-option="Entrada" aria-pressed="<?= $currentTypeValue === 'Entrada' ? 'true' : 'false' ?>">Entrada</button>
+                    <button type="button" class="btn btn-outline-secondary <?= $currentTypeValue === 'Página' ? 'active' : '' ?>" data-type-option="Página" aria-pressed="<?= $currentTypeValue === 'Página' ? 'true' : 'false' ?>">Página</button>
+                    <button type="button" class="btn btn-outline-secondary <?= $currentTypeValue === 'Podcast' ? 'active' : '' ?>" data-type-option="Podcast" aria-pressed="<?= $currentTypeValue === 'Podcast' ? 'true' : 'false' ?>">Podcast</button>
                 </div>
             </div>
 
@@ -526,7 +521,8 @@ if ($editFeedback !== null) {
             <script>
             document.addEventListener('DOMContentLoaded', function() {
                 var typeToggle = document.querySelector('[data-type-toggle]');
-                if (!typeToggle) {
+                var typeValueInput = document.querySelector('[data-type-value]');
+                if (!typeToggle || !typeValueInput) {
                     return;
                 }
                 var podcastOnly = document.querySelectorAll('.podcast-only');
@@ -608,8 +604,7 @@ if ($editFeedback !== null) {
                 }
 
                 function togglePodcastFields() {
-                    var selected = typeToggle.querySelector('input[name="type"]:checked');
-                    var isPodcast = selected && selected.value === 'Podcast';
+                    var isPodcast = typeValueInput.value === 'Podcast';
                     podcastOnly.forEach(function(el) {
                         el.classList.toggle('d-none', !isPodcast);
                     });
@@ -639,9 +634,18 @@ if ($editFeedback !== null) {
                     }
                 }
 
-                var typeInputs = typeToggle.querySelectorAll('input[name="type"]');
-                typeInputs.forEach(function(input) {
-                    input.addEventListener('change', togglePodcastFields);
+                var typeButtons = typeToggle.querySelectorAll('[data-type-option]');
+                typeButtons.forEach(function(button) {
+                    button.addEventListener('click', function() {
+                        var value = button.getAttribute('data-type-option') || 'Entrada';
+                        typeValueInput.value = value;
+                        typeButtons.forEach(function(other) {
+                            var isActive = other === button;
+                            other.classList.toggle('active', isActive);
+                            other.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                        });
+                        togglePodcastFields();
+                    });
                 });
                 if (audioInput) {
                     audioInput.addEventListener('change', updateAudioMetadata);

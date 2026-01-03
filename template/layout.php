@@ -1155,7 +1155,7 @@ if (!empty($baseUrl)) {
                                         $linkHost = parse_url((string) $link['href'], PHP_URL_HOST) ?? '';
                                         $isExternal = $linkHost !== '' && $baseHost !== '' && $linkHost !== $baseHost;
                                         ?>
-                                        <a class="footer-social-link" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
+                                        <a class="footer-social-link" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
                                             <?= $link['svg'] ?>
                                         </a>
                                     <?php endforeach; ?>
@@ -1180,7 +1180,7 @@ if (!empty($baseUrl)) {
                                         $linkHost = parse_url((string) $link['href'], PHP_URL_HOST) ?? '';
                                         $isExternal = $linkHost !== '' && $baseHost !== '' && $linkHost !== $baseHost;
                                         ?>
-                                        <a class="footer-social-link" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
+                                        <a class="footer-social-link" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
                                             <?= $link['svg'] ?>
                                         </a>
                                     <?php endforeach; ?>

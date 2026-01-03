@@ -31,6 +31,12 @@ $itinerariesBaseDir = __DIR__ . '/itinerarios';
 nammu_ensure_directory($itinerariesBaseDir);
 $itineraryRepository = new ItineraryRepository($itinerariesBaseDir);
 $markdown = new MarkdownConverter();
+$itineraryListing = array_values(array_filter(
+    $itineraryRepository->all(),
+    static function ($itinerary): bool {
+        return $itinerary instanceof \Nammu\Core\Itinerary ? $itinerary->isPublished() : false;
+    }
+));
 
 $siteDocument = $contentRepository->getDocument('index');
 $siteTitle = $siteDocument['metadata']['Title'] ?? 'Nammu Blog';
@@ -184,12 +190,6 @@ $renderer->setGlobal('paginationUrl', function (int $page) use ($publicBaseUrl):
 $renderer->setGlobal('itineraryUrl', $buildItineraryUrl);
 $renderer->setGlobal('itineraryTopicUrl', $buildItineraryTopicUrl);
 $renderer->setGlobal('itinerariesIndexUrl', $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios');
-$itineraryListing = array_values(array_filter(
-    $itineraryRepository->all(),
-    static function ($itinerary): bool {
-        return $itinerary instanceof \Nammu\Core\Itinerary ? $itinerary->isPublished() : false;
-    }
-));
 $renderer->setGlobal('hasItineraries', !empty($itineraryListing));
 
 $renderer->setGlobal('markdownToHtml', function (string $markdownText) use ($markdown): string {

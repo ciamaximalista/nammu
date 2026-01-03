@@ -9490,6 +9490,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     if ($input.length) {
                         var prefix = imageTargetPrefix || '';
                         $input.val(prefix + mediaName);
+                        $input.trigger('change');
                     }
 
                 } else if (imageTargetMode === 'editor') {

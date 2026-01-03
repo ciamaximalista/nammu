@@ -172,7 +172,7 @@
 
         <div class="form-group">
 
-            <label for="filename">Slug del post (nombre de archivo sin .md)</label>
+            <label for="filename" data-podcast-label="Slug del episodio (opcional)" data-post-label="Slug del post (nombre de archivo sin .md)">Slug del post (nombre de archivo sin .md)</label>
 
             <input type="text"
                    name="filename"
@@ -191,10 +191,10 @@
 
         <div class="mt-3">
             <div class="alert alert-warning d-none" data-publish-cancelled>Los cambios no se han guardado.</div>
-            <button type="submit" name="publish" class="btn btn-primary mr-2" data-confirm-publish="1">Publicar</button>
+            <button type="submit" name="publish" class="btn btn-primary mr-2" data-confirm-publish="1" data-podcast-label="Publicar como podcast" data-post-label="Publicar">Publicar</button>
             <button type="submit" name="save_draft" value="1" class="btn btn-outline-secondary" data-confirm-publish="1">Guardar como borrador</button>
             <?php if ($mailingNewsletterEnabled): ?>
-                <button type="submit" name="send_newsletter" value="1" class="btn btn-warning ml-2" data-confirm-publish="1">Enviar como newsletter</button>
+                <button type="submit" name="send_newsletter" value="1" class="btn btn-warning ml-2" data-confirm-publish="1" data-newsletter-button="1">Enviar como newsletter</button>
             <?php endif; ?>
         </div>
 
@@ -213,8 +213,71 @@ document.addEventListener('DOMContentLoaded', function() {
     var titleLabel = document.querySelector('label[for="title"]');
     var descriptionLabel = document.querySelector('label[for="description"]');
     var imageLabel = document.querySelector('label[for="image"]');
+    var slugLabel = document.querySelector('label[for="filename"]');
+    var publishButton = document.querySelector('button[name="publish"]');
     var audioInput = document.getElementById('audio');
     var durationInput = document.getElementById('audio_duration');
+    var lengthInput = document.getElementById('audio_length');
+    var newsletterButton = document.querySelector('[data-newsletter-button="1"]');
+
+    function formatDuration(seconds) {
+        if (!Number.isFinite(seconds) || seconds <= 0) {
+            return '';
+        }
+        var total = Math.floor(seconds);
+        var hours = Math.floor(total / 3600);
+        var minutes = Math.floor((total % 3600) / 60);
+        var secs = total % 60;
+        return String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    }
+
+    function resolveAudioUrl(value) {
+        if (!value) {
+            return '';
+        }
+        if (value.indexOf('http://') === 0 || value.indexOf('https://') === 0) {
+            return value;
+        }
+        if (value.indexOf('assets/') === 0) {
+            return '/' + value.replace(/^\\/+/, '');
+        }
+        return '/assets/' + value.replace(/^\\/+/, '');
+    }
+
+    function updateAudioMetadata() {
+        if (!audioInput || !audioInput.value) {
+            return;
+        }
+        var url = resolveAudioUrl(audioInput.value.trim());
+        if (!url) {
+            return;
+        }
+        if (lengthInput && !lengthInput.value) {
+            fetch(url, { method: 'HEAD' })
+                .then(function(response) {
+                    var length = response.headers.get('content-length');
+                    if (length && lengthInput && !lengthInput.value) {
+                        lengthInput.value = length;
+                    }
+                })
+                .catch(function() {});
+        }
+        if (durationInput && !durationInput.value) {
+            var audioProbe = new Audio();
+            audioProbe.preload = 'metadata';
+            audioProbe.addEventListener('loadedmetadata', function() {
+                var formatted = formatDuration(audioProbe.duration);
+                if (formatted && durationInput && !durationInput.value) {
+                    durationInput.value = formatted;
+                }
+                audioProbe.src = '';
+            });
+            audioProbe.addEventListener('error', function() {
+                audioProbe.src = '';
+            });
+            audioProbe.src = url;
+        }
+    }
 
     function togglePodcastFields() {
         var isPodcast = typeSelect.value === 'Podcast';
@@ -233,6 +296,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (imageLabel && imageLabel.dataset.podcastLabel && imageLabel.dataset.postLabel) {
             imageLabel.textContent = isPodcast ? imageLabel.dataset.podcastLabel : imageLabel.dataset.postLabel;
         }
+        if (slugLabel && slugLabel.dataset.podcastLabel && slugLabel.dataset.postLabel) {
+            slugLabel.textContent = isPodcast ? slugLabel.dataset.podcastLabel : slugLabel.dataset.postLabel;
+        }
+        if (publishButton && publishButton.dataset.podcastLabel && publishButton.dataset.postLabel) {
+            publishButton.textContent = isPodcast ? publishButton.dataset.podcastLabel : publishButton.dataset.postLabel;
+        }
+        if (newsletterButton) {
+            newsletterButton.classList.toggle('d-none', isPodcast);
+        }
         if (audioInput) {
             audioInput.required = isPodcast;
         }
@@ -242,6 +314,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     typeSelect.addEventListener('change', togglePodcastFields);
+    if (audioInput) {
+        audioInput.addEventListener('change', updateAudioMetadata);
+    }
     togglePodcastFields();
+    updateAudioMetadata();
 });
 </script>

@@ -1032,6 +1032,10 @@ function get_settings() {
     if (!$mailingHasFlag && ($mailing['gmail_address'] ?? '') !== '') {
         $mailing['auto_newsletter'] = 'on';
     }
+    $mailingHasPodcastFlag = is_array($config['mailing'] ?? null) && array_key_exists('auto_podcast', $config['mailing']);
+    if (!$mailingHasPodcastFlag) {
+        $mailing['auto_podcast'] = 'on';
+    }
     $postalDefaults = [
         'enabled' => 'off',
     ];

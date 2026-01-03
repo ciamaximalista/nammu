@@ -891,7 +891,7 @@
         try {
             $entries = admin_load_mailing_subscriber_entries();
             foreach ($entries as $entry) {
-                $prefs = $entry['prefs'] ?? [];
+                $prefs = $entry['prefs'] ?? admin_mailing_default_prefs();
                 if (!empty($prefs['posts'])) {
                     $avisosPostsCount++;
                 }

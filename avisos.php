@@ -30,10 +30,14 @@ function mailing_normalize_email(string $email): string
 function mailing_available_prefs(array $config): array
 {
     $mailing = $config['mailing'] ?? [];
+    $autoPodcast = $mailing['auto_podcast'] ?? null;
+    if ($autoPodcast === null && !array_key_exists('auto_podcast', $mailing)) {
+        $autoPodcast = 'on';
+    }
     return [
         'posts' => ($mailing['auto_posts'] ?? 'off') === 'on',
         'itineraries' => ($mailing['auto_itineraries'] ?? 'off') === 'on',
-        'podcast' => ($mailing['auto_podcast'] ?? 'off') === 'on',
+        'podcast' => $autoPodcast === 'on',
         'newsletter' => ($mailing['auto_newsletter'] ?? 'off') === 'on',
     ];
 }

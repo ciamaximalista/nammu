@@ -4545,6 +4545,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $gsc_client_id = trim($_POST['gsc_client_id'] ?? '');
         $gsc_client_secret = trim($_POST['gsc_client_secret'] ?? '');
         $gsc_refresh_token = trim($_POST['gsc_refresh_token'] ?? '');
+        try {
+            $config = load_config_file();
+            if ($gsc_property !== '' || $gsc_client_id !== '' || $gsc_client_secret !== '' || $gsc_refresh_token !== '') {
+                $config['search_console'] = [
+                    'property' => $gsc_property,
+                    'client_id' => $gsc_client_id,
+                    'client_secret' => $gsc_client_secret,
+                    'refresh_token' => $gsc_refresh_token,
+                ];
+            } else {
+                unset($config['search_console']);
+            }
+            save_config_file($config);
+        } catch (Throwable $e) {
+            $_SESSION['search_console_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Error guardando Search Console: ' . $e->getMessage(),
+            ];
+            header('Location: admin.php?page=configuracion');
+            exit;
+        }
         $feedback = [
             'type' => 'danger',
             'message' => 'Faltan datos para conectar con Search Console.',
@@ -4609,28 +4630,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['save_settings'])) {
         $sort_order = $_POST['sort_order'] ?? 'date';
         $sort_order = $sort_order === 'alpha' ? 'alpha' : 'date';
-        $google_fonts_api = trim($_POST['google_fonts_api'] ?? '');
         $site_author = trim($_POST['site_author'] ?? '');
         $site_name = trim($_POST['site_name'] ?? '');
         $site_url = trim($_POST['site_url'] ?? '');
         $site_lang = trim($_POST['site_lang'] ?? 'es');
         $social_default_description = trim($_POST['social_default_description'] ?? '');
-        $gsc_property = trim($_POST['gsc_property'] ?? '');
-        $gsc_client_id = trim($_POST['gsc_client_id'] ?? '');
-        $gsc_client_secret = trim($_POST['gsc_client_secret'] ?? '');
-        $gsc_refresh_token = trim($_POST['gsc_refresh_token'] ?? '');
 
         try {
             $config = load_config_file();
 
             $config['pages_order_by'] = $sort_order;
             $config['pages_order'] = $sort_order === 'date' ? 'desc' : 'asc';
-
-            if ($google_fonts_api !== '') {
-                $config['google_fonts_api'] = $google_fonts_api;
-            } else {
-                unset($config['google_fonts_api']);
-            }
 
             if ($site_author !== '') {
                 $config['site_author'] = $site_author;
@@ -4653,16 +4663,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 unset($config['site_lang']);
             }
-            if ($gsc_property !== '' || $gsc_client_id !== '' || $gsc_client_secret !== '' || $gsc_refresh_token !== '') {
-                $config['search_console'] = [
-                    'property' => $gsc_property,
-                    'client_id' => $gsc_client_id,
-                    'client_secret' => $gsc_client_secret,
-                    'refresh_token' => $gsc_refresh_token,
-                ];
-            } else {
-                unset($config['search_console']);
-            }
 
             $social = $config['social'] ?? [];
             if ($social_default_description !== '') {
@@ -4682,6 +4682,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = "Error guardando la configuración: " . $e->getMessage();
         }
 
+        header('Location: admin.php?page=configuracion');
+        exit;
+    } elseif (isset($_POST['save_google_fonts'])) {
+        $google_fonts_api = trim($_POST['google_fonts_api'] ?? '');
+        try {
+            $config = load_config_file();
+            if ($google_fonts_api !== '') {
+                $config['google_fonts_api'] = $google_fonts_api;
+            } else {
+                unset($config['google_fonts_api']);
+            }
+            save_config_file($config);
+        } catch (Throwable $e) {
+            $error = "Error guardando Google Fonts: " . $e->getMessage();
+        }
         header('Location: admin.php?page=configuracion');
         exit;
     } elseif (isset($_POST['save_social'])) {

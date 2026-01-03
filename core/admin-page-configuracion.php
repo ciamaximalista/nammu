@@ -112,16 +112,28 @@
                 <small class="form-text text-muted">Se usa como idioma por defecto en la portada y nuevas entradas.</small>
             </div>
 
-            <div class="form-group">
-
-                <label for="google_fonts_api">API Key de Google Fonts</label>
-
-                <input type="text" name="google_fonts_api" id="google_fonts_api" class="form-control" value="<?= htmlspecialchars($settings['google_fonts_api'] ?? '') ?>" placeholder="AIza...">
-
-                <small class="form-text text-muted">Introduce tu clave API para cargar fuentes personalizadas desde Google Fonts. <a href="#" data-toggle="modal" data-target="#googleFontsHelpModal">Ver guía rápida</a></small>
-
+            <div class="text-right mb-4">
+                <button type="submit" name="save_settings" class="btn btn-primary">Guardar configuración general</button>
             </div>
 
+        </form>
+
+        <form method="post" class="mt-4">
+            <h4 class="mt-2">Google Fonts</h4>
+            <p class="text-muted mb-3">Gestiona la API Key que permite cargar tipografías desde Google Fonts.</p>
+            <div class="form-group">
+                <label for="google_fonts_api">API Key de Google Fonts</label>
+                <input type="text" name="google_fonts_api" id="google_fonts_api" class="form-control" value="<?= htmlspecialchars($settings['google_fonts_api'] ?? '') ?>" placeholder="AIza...">
+                <small class="form-text text-muted">Introduce tu clave API para cargar fuentes personalizadas desde Google Fonts. <a href="#" data-toggle="modal" data-target="#googleFontsHelpModal">Ver guía rápida</a></small>
+            </div>
+            <div class="text-right mb-4">
+                <button type="submit" name="save_google_fonts" class="btn btn-outline-primary">Guardar Google Fonts</button>
+            </div>
+        </form>
+
+        <form method="post" class="mt-4">
+            <h4 class="mt-2">Google Search Console</h4>
+            <p class="text-muted mb-3">Conecta Search Console para acceder a datos de búsquedas.</p>
             <div class="form-group">
                 <label for="gsc_property">Google Search Console (propiedad)</label>
                 <input type="url" name="gsc_property" id="gsc_property" class="form-control" value="<?= htmlspecialchars($gscProperty, ENT_QUOTES, 'UTF-8') ?>" placeholder="https://tusitio.com/">
@@ -140,12 +152,9 @@
                 <input type="text" name="gsc_refresh_token" id="gsc_refresh_token" class="form-control" value="<?= htmlspecialchars($gscRefreshToken, ENT_QUOTES, 'UTF-8') ?>" placeholder="1//0g...">
                 <small class="form-text text-muted">Necesario para consultar datos de búsquedas desde el servidor.</small>
             </div>
-
             <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 mb-4">
-                <button type="submit" name="test_gsc" class="btn btn-outline-secondary mr-2 mb-2">Probar conexión Search Console</button>
-                <button type="submit" name="save_settings" class="btn btn-primary mb-2">Guardar configuración general</button>
+                <button type="submit" name="test_gsc" class="btn btn-outline-primary mb-2">Guardar y probar</button>
             </div>
-
         </form>
 
         <form method="post" class="mt-4" id="mailing">
@@ -258,8 +267,12 @@
                             <li>Habilita <strong>Google Search Console API</strong> en <strong>APIs y servicios &gt; Biblioteca</strong>.</li>
                             <li>Configura la <strong>Pantalla de consentimiento OAuth</strong>.</li>
                             <li>Crea un <strong>ID de cliente OAuth</strong> tipo <strong>Aplicación web</strong>.</li>
-                            <li>Obtén un <strong>refresh token</strong> con el scope: <code>https://www.googleapis.com/auth/webmasters.readonly</code> (por ejemplo usando OAuth Playground).</li>
-                            <li>Pega aquí la propiedad, el Client ID, el Client Secret y el refresh token.</li>
+                            <li>Ve a <a href="https://developers.google.com/oauthplayground" target="_blank" rel="noopener">OAuth 2.0 Playground</a> y abre el icono de ajustes (⚙️).</li>
+                            <li>Activa <strong>Use your own OAuth credentials</strong> y pega tu Client ID y Client Secret.</li>
+                            <li>En <strong>Step 1</strong>, añade el scope <code>https://www.googleapis.com/auth/webmasters.readonly</code> y pulsa <strong>Authorize APIs</strong>.</li>
+                            <li>En <strong>Step 2</strong>, pulsa <strong>Exchange authorization code for tokens</strong>.</li>
+                            <li>Copia el <strong>refresh_token</strong> generado y pégalo aquí.</li>
+                            <li>Pega también la propiedad, el Client ID y el Client Secret.</li>
                         </ol>
                         <p class="mb-0 text-muted">El proyecto debe tener acceso a la propiedad en Search Console.</p>
                     </div>

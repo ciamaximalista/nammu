@@ -99,6 +99,17 @@ if ($editFeedback !== null) {
         $nowTimestamp = time();
         ?>
 
+        <?php
+        $showSocialColumn = ($templateFilter !== 'newsletter');
+        $columnCount = 4;
+        if ($templateFilter !== 'podcast') {
+            $columnCount++;
+        }
+        if ($showSocialColumn) {
+            $columnCount++;
+        }
+        ?>
+
         <table class="table table-striped">
 
             <thead>
@@ -115,7 +126,9 @@ if ($editFeedback !== null) {
                         <th>Nombre de archivo</th>
                     <?php endif; ?>
 
-                    <th class="text-center">Redes</th>
+                    <?php if ($showSocialColumn): ?>
+                        <th class="text-center">Redes</th>
+                    <?php endif; ?>
 
                     <th></th>
 
@@ -134,7 +147,7 @@ if ($editFeedback !== null) {
                 if (empty($posts_data['posts'])):
                 ?>
                     <tr>
-                        <td colspan="6" class="text-center text-muted">No hay <?= strtolower($currentTypeLabel) ?> disponibles.</td>
+                        <td colspan="<?= $columnCount ?>" class="text-center text-muted">No hay <?= strtolower($currentTypeLabel) ?> disponibles.</td>
                     </tr>
                 <?php
                 else:
@@ -177,6 +190,7 @@ if ($editFeedback !== null) {
                             </td>
                         <?php endif; ?>
 
+                        <?php if ($showSocialColumn): ?>
                         <td class="text-center">
                             <?php
                             $availableNetworks = [];
@@ -186,7 +200,7 @@ if ($editFeedback !== null) {
                                 }
                             }
                             ?>
-                            <?php if ((!empty($availableNetworks) && in_array($templateFilter, ['single', 'draft'], true)) || $mailingReady): ?>
+                            <?php if (!empty($availableNetworks) && in_array($templateFilter, ['single', 'draft', 'podcast'], true)): ?>
                                 <?php foreach ($availableNetworks as $networkKey): ?>
                                     <form method="post" class="d-inline-block mb-1">
                                         <input type="hidden" name="social_network" value="<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>">
@@ -208,6 +222,7 @@ if ($editFeedback !== null) {
                                 <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
+                        <?php endif; ?>
 
                         <td class="text-right">
                             <div class="d-flex flex-column align-items-end">

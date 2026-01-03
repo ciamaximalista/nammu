@@ -1231,6 +1231,29 @@ function admin_public_post_url(string $slug): string {
     return $base . $path;
 }
 
+function admin_public_asset_url(string $path): string {
+    $path = trim($path);
+    if ($path === '') {
+        return '';
+    }
+    if (preg_match('#^https?://#i', $path)) {
+        return $path;
+    }
+    $base = admin_base_url();
+    if (function_exists('nammu_resolve_asset')) {
+        $resolved = nammu_resolve_asset($path, $base);
+        if (is_string($resolved) && $resolved !== '') {
+            return $resolved;
+        }
+    }
+    $normalized = ltrim($path, '/');
+    if (str_starts_with($normalized, 'assets/')) {
+        $normalized = substr($normalized, 7);
+    }
+    $relative = '/assets/' . $normalized;
+    return $base !== '' ? $base . $relative : $relative;
+}
+
 function admin_public_itinerary_url(string $slug): string {
     $base = admin_base_url();
     $path = '/itinerarios/' . rawurlencode($slug);
@@ -1249,6 +1272,18 @@ function admin_extract_social_settings(string $key, array $defaults, ?array $con
     $values['token'] = trim((string) ($values['token'] ?? ''));
     $values['channel'] = trim((string) ($values['channel'] ?? ''));
     $values['recipient'] = trim((string) ($values['recipient'] ?? ''));
+    if (isset($values['api_key'])) {
+        $values['api_key'] = trim((string) $values['api_key']);
+    }
+    if (isset($values['api_secret'])) {
+        $values['api_secret'] = trim((string) $values['api_secret']);
+    }
+    if (isset($values['access_token'])) {
+        $values['access_token'] = trim((string) $values['access_token']);
+    }
+    if (isset($values['access_secret'])) {
+        $values['access_secret'] = trim((string) $values['access_secret']);
+    }
     $values['auto_post'] = ($values['auto_post'] ?? 'off') === 'on' ? 'on' : 'off';
     return $values;
 }
@@ -1290,6 +1325,10 @@ function admin_cached_social_settings(?string $key = null): array {
                 'channel' => '',
                 'recipient' => '',
                 'auto_post' => 'off',
+                'api_key' => '',
+                'api_secret' => '',
+                'access_token' => '',
+                'access_secret' => '',
             ], $config),
             'instagram' => admin_extract_social_settings('instagram', [
                 'token' => '',
@@ -1379,13 +1418,17 @@ function admin_get_twitter_follower_count(array $settings): ?int {
     return (int) $payload['data']['public_metrics']['followers_count'];
 }
 
-function admin_send_post_to_telegram(string $slug, string $title, string $description, array $telegramSettings): bool {
+function admin_send_post_to_telegram(string $slug, string $title, string $description, array $telegramSettings, string $urlOverride = '', string $imageUrl = ''): bool {
     $token = $telegramSettings['token'] ?? '';
     $channel = $telegramSettings['channel'] ?? '';
     if ($token === '' || $channel === '') {
         return false;
     }
-    $message = admin_build_telegram_message($slug, $title, $description);
+    $message = admin_build_telegram_message($slug, $title, $description, $urlOverride);
+    $imageUrl = trim($imageUrl);
+    if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
+        return admin_send_telegram_photo($token, $channel, $imageUrl, $message);
+    }
     return admin_send_telegram_message($token, $channel, $message, 'HTML');
 }
 
@@ -1393,7 +1436,7 @@ function admin_telegram_escape(string $text): string {
     return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
-function admin_build_post_message(string $slug, string $title, string $description): string {
+function admin_build_post_message(string $slug, string $title, string $description, string $urlOverride = '', string $imageUrl = ''): string {
     $parts = [];
     $title = trim($title);
     $description = trim($description);
@@ -1403,9 +1446,13 @@ function admin_build_post_message(string $slug, string $title, string $descripti
     if ($description !== '') {
         $parts[] = $description;
     }
-    $url = admin_public_post_url($slug);
+    $url = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
     if ($url !== '') {
         $parts[] = $url;
+    }
+    $imageUrl = trim($imageUrl);
+    if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
+        $parts[] = $imageUrl;
     }
     if (empty($parts)) {
         $parts[] = 'Nueva publicación disponible';
@@ -1413,7 +1460,7 @@ function admin_build_post_message(string $slug, string $title, string $descripti
     return implode("\n\n", $parts);
 }
 
-function admin_build_telegram_message(string $slug, string $title, string $description): string {
+function admin_build_telegram_message(string $slug, string $title, string $description, string $urlOverride = ''): string {
     $parts = [];
     $titleTrim = trim($title);
     if ($titleTrim !== '') {
@@ -1423,7 +1470,7 @@ function admin_build_telegram_message(string $slug, string $title, string $descr
     if ($descriptionTrim !== '') {
         $parts[] = admin_telegram_escape($descriptionTrim);
     }
-    $url = admin_public_post_url($slug);
+    $url = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
     if ($url !== '') {
         $parts[] = admin_telegram_escape($url);
     }
@@ -1433,7 +1480,7 @@ function admin_build_telegram_message(string $slug, string $title, string $descr
     return implode("\n\n", $parts);
 }
 
-function admin_send_whatsapp_post(string $slug, string $title, string $description, array $settings): bool {
+function admin_send_whatsapp_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = ''): bool {
     $token = $settings['token'] ?? '';
     $phoneId = $settings['channel'] ?? '';
     $recipient = $settings['recipient'] ?? '';
@@ -1441,12 +1488,28 @@ function admin_send_whatsapp_post(string $slug, string $title, string $descripti
         return false;
     }
     $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($phoneId) . '/messages';
+    $imageUrl = trim($imageUrl);
+    if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'to' => $recipient,
+            'type' => 'image',
+            'image' => [
+                'link' => $imageUrl,
+                'caption' => admin_build_post_message($slug, $title, $description, $urlOverride),
+            ],
+        ];
+        return admin_http_post_json($endpoint, $payload, [
+            'Authorization: Bearer ' . $token,
+            'Content-Type: application/json',
+        ]);
+    }
     $payload = [
         'messaging_product' => 'whatsapp',
         'to' => $recipient,
         'type' => 'text',
         'text' => [
-            'body' => admin_build_post_message($slug, $title, $description),
+            'body' => admin_build_post_message($slug, $title, $description, $urlOverride, $imageUrl),
         ],
     ];
     return admin_http_post_json($endpoint, $payload, [
@@ -1455,27 +1518,60 @@ function admin_send_whatsapp_post(string $slug, string $title, string $descripti
     ]);
 }
 
-function admin_send_facebook_post(string $slug, string $title, string $description, array $settings): bool {
+function admin_send_facebook_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = ''): bool {
     $token = $settings['token'] ?? '';
     $pageId = $settings['channel'] ?? '';
     if ($token === '' || $pageId === '') {
         return false;
     }
+    $imageUrl = trim($imageUrl);
+    if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
+        $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($pageId) . '/photos';
+        $params = [
+            'url' => $imageUrl,
+            'caption' => admin_build_post_message($slug, $title, $description, $urlOverride),
+            'access_token' => $token,
+        ];
+        return admin_http_post_form($endpoint, $params);
+    }
     $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($pageId) . '/feed';
     $params = [
-        'message' => admin_build_post_message($slug, $title, $description),
+        'message' => admin_build_post_message($slug, $title, $description, $urlOverride, $imageUrl),
         'access_token' => $token,
     ];
     return admin_http_post_form($endpoint, $params);
 }
 
-function admin_send_twitter_post(string $slug, string $title, string $description, array $settings): bool {
+function admin_send_twitter_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = ''): bool {
     $token = $settings['token'] ?? '';
+    $imageUrl = trim($imageUrl);
+    if ($imageUrl !== '' && admin_twitter_has_media_credentials($settings)) {
+        $mediaId = admin_twitter_upload_media($imageUrl, $settings);
+        if ($mediaId !== '') {
+            $endpoint = 'https://api.twitter.com/2/tweets';
+            $text = admin_build_post_message($slug, $title, $description, $urlOverride);
+            if (function_exists('mb_strlen')) {
+                if (mb_strlen($text, 'UTF-8') > 280) {
+                    $text = mb_substr($text, 0, 275, 'UTF-8') . '…';
+                }
+            } elseif (strlen($text) > 280) {
+                $text = substr($text, 0, 275) . '…';
+            }
+            $payload = [
+                'text' => $text,
+                'media' => [
+                    'media_ids' => [$mediaId],
+                ],
+            ];
+            return admin_twitter_post_json_oauth1($endpoint, $payload, $settings);
+        }
+        return false;
+    }
     if ($token === '') {
         return false;
     }
     $endpoint = 'https://api.twitter.com/2/tweets';
-    $text = admin_build_post_message($slug, $title, $description);
+    $text = admin_build_post_message($slug, $title, $description, $urlOverride, $imageUrl);
     if (function_exists('mb_strlen')) {
         if (mb_strlen($text, 'UTF-8') > 280) {
             $text = mb_substr($text, 0, 275, 'UTF-8') . '…';
@@ -1490,20 +1586,132 @@ function admin_send_twitter_post(string $slug, string $title, string $descriptio
     ]);
 }
 
-function admin_build_instagram_caption(string $slug, string $title): string {
+function admin_twitter_has_media_credentials(array $settings): bool {
+    return trim((string) ($settings['api_key'] ?? '')) !== ''
+        && trim((string) ($settings['api_secret'] ?? '')) !== ''
+        && trim((string) ($settings['access_token'] ?? '')) !== ''
+        && trim((string) ($settings['access_secret'] ?? '')) !== '';
+}
+
+function admin_twitter_upload_media(string $imageUrl, array $settings): string {
+    $binary = admin_http_get_binary($imageUrl);
+    if ($binary === '') {
+        return '';
+    }
+    $endpoint = 'https://upload.twitter.com/1.1/media/upload.json';
+    $boundary = '----Nammu' . bin2hex(random_bytes(8));
+    $mime = 'application/octet-stream';
+    if (class_exists('finfo')) {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $detected = $finfo->buffer($binary);
+        if (is_string($detected) && $detected !== '') {
+            $mime = $detected;
+        }
+    }
+    $body = '--' . $boundary . "\r\n";
+    $body .= 'Content-Disposition: form-data; name="media"; filename="podcast-image"' . "\r\n";
+    $body .= 'Content-Type: ' . $mime . "\r\n\r\n";
+    $body .= $binary . "\r\n";
+    $body .= '--' . $boundary . "--\r\n";
+    $authHeader = admin_twitter_oauth_header('POST', $endpoint, $settings);
+    $headers = [
+        'Authorization: ' . $authHeader,
+        'Content-Type: multipart/form-data; boundary=' . $boundary,
+        'Content-Length: ' . strlen($body),
+    ];
+    $response = admin_http_post_raw($endpoint, $body, $headers);
+    if ($response === '') {
+        return '';
+    }
+    $decoded = json_decode($response, true);
+    if (!is_array($decoded)) {
+        return '';
+    }
+    return (string) ($decoded['media_id_string'] ?? '');
+}
+
+function admin_twitter_post_json_oauth1(string $endpoint, array $payload, array $settings): bool {
+    $authHeader = admin_twitter_oauth_header('POST', $endpoint, $settings);
+    return admin_http_post_json($endpoint, $payload, [
+        'Authorization: ' . $authHeader,
+        'Content-Type: application/json',
+    ]);
+}
+
+function admin_twitter_oauth_header(string $method, string $url, array $settings): string {
+    $oauth = [
+        'oauth_consumer_key' => trim((string) ($settings['api_key'] ?? '')),
+        'oauth_nonce' => bin2hex(random_bytes(16)),
+        'oauth_signature_method' => 'HMAC-SHA1',
+        'oauth_timestamp' => (string) time(),
+        'oauth_token' => trim((string) ($settings['access_token'] ?? '')),
+        'oauth_version' => '1.0',
+    ];
+    $baseParams = [];
+    foreach ($oauth as $key => $value) {
+        $baseParams[rawurlencode($key)] = rawurlencode($value);
+    }
+    ksort($baseParams);
+    $paramString = [];
+    foreach ($baseParams as $key => $value) {
+        $paramString[] = $key . '=' . $value;
+    }
+    $baseUrl = $url;
+    $baseString = strtoupper($method) . '&' . rawurlencode($baseUrl) . '&' . rawurlencode(implode('&', $paramString));
+    $signingKey = rawurlencode((string) ($settings['api_secret'] ?? '')) . '&' . rawurlencode((string) ($settings['access_secret'] ?? ''));
+    $signature = base64_encode(hash_hmac('sha1', $baseString, $signingKey, true));
+    $oauth['oauth_signature'] = $signature;
+    $headerParts = [];
+    foreach ($oauth as $key => $value) {
+        $headerParts[] = $key . '="' . rawurlencode($value) . '"';
+    }
+    return 'OAuth ' . implode(', ', $headerParts);
+}
+
+function admin_http_get_binary(string $url): string {
+    $opts = [
+        'http' => [
+            'method' => 'GET',
+            'timeout' => 10,
+            'ignore_errors' => true,
+        ],
+    ];
+    $data = @file_get_contents($url, false, stream_context_create($opts));
+    return is_string($data) ? $data : '';
+}
+
+function admin_http_post_raw(string $url, string $body, array $headers): string {
+    $opts = [
+        'http' => [
+            'method' => 'POST',
+            'header' => implode("\r\n", $headers),
+            'content' => $body,
+            'ignore_errors' => true,
+            'timeout' => 15,
+        ],
+    ];
+    $response = @file_get_contents($url, false, stream_context_create($opts));
+    return is_string($response) ? $response : '';
+}
+
+function admin_build_instagram_caption(string $slug, string $title, string $description, string $urlOverride = ''): string {
     $parts = [];
     $titleTrim = trim($title);
     if ($titleTrim !== '') {
         $parts[] = $titleTrim;
     }
-    $url = admin_public_post_url($slug);
+    $descriptionTrim = trim($description);
+    if ($descriptionTrim !== '') {
+        $parts[] = $descriptionTrim;
+    }
+    $url = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
     if ($url !== '') {
         $parts[] = $url;
     }
     return implode("\n\n", $parts);
 }
 
-function admin_send_instagram_post(string $slug, string $title, string $image, array $settings): bool {
+function admin_send_instagram_post(string $slug, string $title, string $image, array $settings, string $description = '', string $urlOverride = ''): bool {
     $token = trim((string) ($settings['token'] ?? ''));
     $accountId = trim((string) ($settings['channel'] ?? ''));
     if ($token === '' || $accountId === '') {
@@ -1518,7 +1726,7 @@ function admin_send_instagram_post(string $slug, string $title, string $image, a
     if ($imageUrl === null || $imageUrl === '') {
         return false;
     }
-    $caption = admin_build_instagram_caption($slug, $title);
+    $caption = admin_build_instagram_caption($slug, $title, $description, $urlOverride);
     $createEndpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($accountId) . '/media';
     $createResponse = admin_http_post_form_json($createEndpoint, [
         'image_url' => $imageUrl,
@@ -1719,27 +1927,39 @@ function admin_send_telegram_message(string $token, string $chatId, string $text
     return false;
 }
 
-function admin_maybe_auto_post_to_social_networks(string $filename, string $title, string $description, string $image = ''): void {
+function admin_send_telegram_photo(string $token, string $chatId, string $photoUrl, string $caption): bool {
+    $endpoint = 'https://api.telegram.org/bot' . rawurlencode($token) . '/sendPhoto';
+    $payload = [
+        'chat_id' => $chatId,
+        'photo' => $photoUrl,
+        'caption' => $caption,
+        'parse_mode' => 'HTML',
+        'disable_web_page_preview' => false,
+    ];
+    return admin_http_post_form($endpoint, $payload);
+}
+
+function admin_maybe_auto_post_to_social_networks(string $filename, string $title, string $description, string $image = '', string $urlOverride = '', string $imageUrl = ''): void {
     $slug = pathinfo($filename, PATHINFO_FILENAME);
     if ($slug === '') {
         $slug = $filename;
     }
     $settings = admin_cached_social_settings();
     if (($settings['telegram']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('telegram', $settings['telegram'])) {
-        admin_send_post_to_telegram($slug, $title, $description, $settings['telegram']);
+        admin_send_post_to_telegram($slug, $title, $description, $settings['telegram'], $urlOverride, $imageUrl);
     }
     if (($settings['whatsapp']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('whatsapp', $settings['whatsapp'])) {
-        admin_send_whatsapp_post($slug, $title, $description, $settings['whatsapp']);
+        admin_send_whatsapp_post($slug, $title, $description, $settings['whatsapp'], $urlOverride, $imageUrl);
     }
     if (($settings['facebook']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('facebook', $settings['facebook'])) {
-        admin_send_facebook_post($slug, $title, $description, $settings['facebook']);
+        admin_send_facebook_post($slug, $title, $description, $settings['facebook'], $urlOverride, $imageUrl);
     }
     if (($settings['twitter']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('twitter', $settings['twitter'])) {
-        admin_send_twitter_post($slug, $title, $description, $settings['twitter']);
+        admin_send_twitter_post($slug, $title, $description, $settings['twitter'], $urlOverride, $imageUrl);
     }
     if (($settings['instagram']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('instagram', $settings['instagram'])) {
         if (trim($image) !== '') {
-            admin_send_instagram_post($slug, $title, $image, $settings['instagram']);
+            admin_send_instagram_post($slug, $title, $image, $settings['instagram'], $description, $urlOverride);
         }
     }
 }
@@ -3420,6 +3640,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                         admin_maybe_enqueue_push_notification('post', $title, $description, $link, $image);
                     }
+                    if (!$isDraft && $type === 'Podcast') {
+                        $audioUrl = admin_public_asset_url($audio);
+                        $imageUrl = admin_public_asset_url($image);
+                        if ($audioUrl !== '') {
+                            admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image, $audioUrl, $imageUrl);
+                        }
+                    }
                     if ($type === 'Podcast') {
                         admin_regenerate_podcast_feed();
                     }
@@ -3752,13 +3979,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($writeSucceeded) {
                     $shouldAutoShare = false;
+                    $shouldAutoSharePodcast = false;
                     if ($template === 'post' && $status === 'published') {
                         if ($publishDraftAsEntry || $previousStatus === 'draft') {
                             $shouldAutoShare = true;
                         }
                     }
+                    if ($template === 'podcast' && $status === 'published') {
+                        if ($publishDraftAsPodcast || $previousStatus === 'draft') {
+                            $shouldAutoSharePodcast = true;
+                        }
+                    }
                     if ($shouldAutoShare) {
                         admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image);
+                    }
+                    if ($shouldAutoSharePodcast) {
+                        $audioUrl = admin_public_asset_url($audio);
+                        $imageUrl = admin_public_asset_url($image);
+                        if ($audioUrl !== '') {
+                            admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image, $audioUrl, $imageUrl);
+                        }
                     }
                     if ($shouldAutoShare) {
                         $settings = get_settings();
@@ -3836,13 +4076,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $postData = get_post_content($filename);
             if ($postData) {
                 $metadata = $postData['metadata'] ?? [];
-                $template = strtolower($metadata['Template'] ?? 'post');
-                if (in_array($template, ['single', 'post'], true)) {
+                $template = strtolower(trim((string) ($metadata['Template'] ?? 'post')));
+                if (in_array($template, ['single', 'post', 'podcast'], true)) {
                     $slug = pathinfo($filename, PATHINFO_FILENAME);
                     $slug = $slug !== '' ? $slug : $filename;
                     $title = $metadata['Title'] ?? $slug;
                     $description = $metadata['Description'] ?? '';
                     $image = $metadata['Image'] ?? '';
+                    $customUrl = '';
+                    $imageUrl = '';
+                    if ($template === 'podcast') {
+                        $audioPath = (string) ($metadata['Audio'] ?? '');
+                        $customUrl = admin_public_asset_url($audioPath);
+                        $imagePath = (string) ($metadata['Image'] ?? '');
+                        $imageUrl = admin_public_asset_url($imagePath);
+                        if ($customUrl === '') {
+                            $feedback['message'] = 'No se encontró el mp3 del podcast para compartir.';
+                            $_SESSION['social_feedback'] = $feedback;
+                            header('Location: admin.php?page=edit&template=' . $redirectTemplate);
+                            exit;
+                        }
+                    }
                     $allSocialSettings = admin_cached_social_settings();
                     $networkSettings = $allSocialSettings[$networkKey] ?? [];
                     if (!admin_is_social_network_configured($networkKey, $networkSettings)) {
@@ -3852,23 +4106,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $customError = null;
                         switch ($networkKey) {
                             case 'telegram':
-                                $sent = admin_send_post_to_telegram($slug, $title, $description, $networkSettings);
+                                $sent = admin_send_post_to_telegram($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
                                 break;
                             case 'whatsapp':
-                                $sent = admin_send_whatsapp_post($slug, $title, $description, $networkSettings);
+                                $sent = admin_send_whatsapp_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
                                 break;
                             case 'facebook':
-                                $sent = admin_send_facebook_post($slug, $title, $description, $networkSettings);
+                                $sent = admin_send_facebook_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
                                 break;
                             case 'twitter':
-                                $sent = admin_send_twitter_post($slug, $title, $description, $networkSettings);
+                                $sent = admin_send_twitter_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
                                 break;
                             case 'instagram':
                                 if (trim($image) === '') {
                                     $customError = 'Instagram requiere una imagen destacada para enviar la publicación.';
                                     break;
                                 }
-                                $sent = admin_send_instagram_post($slug, $title, $image, $networkSettings);
+                                $sent = admin_send_instagram_post($slug, $title, $image, $networkSettings, $description, $customUrl);
                                 break;
                         }
                         if ($sent) {
@@ -3883,7 +4137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                 } else {
-                    $feedback['message'] = 'Sólo las entradas pueden enviarse a redes sociales.';
+                    $feedback['message'] = 'Sólo las entradas y podcasts pueden enviarse a redes sociales.';
                 }
             }
         }
@@ -4834,6 +5088,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = "Error guardando Google Fonts: " . $e->getMessage();
         }
         header('Location: admin.php?page=configuracion');
+        exit;
+    } elseif (isset($_POST['save_twitter_media'])) {
+        $twitter_api_key = trim($_POST['twitter_api_key'] ?? '');
+        $twitter_api_secret = trim($_POST['twitter_api_secret'] ?? '');
+        $twitter_access_token = trim($_POST['twitter_access_token'] ?? '');
+        $twitter_access_secret = trim($_POST['twitter_access_secret'] ?? '');
+        try {
+            $config = load_config_file();
+            $twitter = $config['twitter'] ?? [];
+            if (!is_array($twitter)) {
+                $twitter = [];
+            }
+            $twitter['api_key'] = $twitter_api_key;
+            $twitter['api_secret'] = $twitter_api_secret;
+            $twitter['access_token'] = $twitter_access_token;
+            $twitter['access_secret'] = $twitter_access_secret;
+            $hasCoreTwitter = isset($twitter['token'], $twitter['channel']) || ($twitter['auto_post'] ?? 'off') === 'on';
+            $hasMediaTwitter = ($twitter_api_key !== '' || $twitter_api_secret !== '' || $twitter_access_token !== '' || $twitter_access_secret !== '');
+            if ($hasCoreTwitter || $hasMediaTwitter) {
+                $config['twitter'] = $twitter;
+            } else {
+                unset($config['twitter']);
+            }
+            save_config_file($config);
+        } catch (Throwable $e) {
+            $error = "Error guardando Twitter / X: " . $e->getMessage();
+        }
+        header('Location: admin.php?page=configuracion#twitter-media');
         exit;
     } elseif (isset($_POST['save_social'])) {
         $social_default_description = trim($_POST['social_default_description'] ?? '');

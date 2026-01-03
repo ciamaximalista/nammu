@@ -23,6 +23,10 @@
         $facebookAutoEnabled = ($facebookSettings['auto_post'] ?? 'off') === 'on';
         $twitterSettings = $settings['twitter'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
         $twitterAutoEnabled = ($twitterSettings['auto_post'] ?? 'off') === 'on';
+        $twitterApiKey = $twitterSettings['api_key'] ?? '';
+        $twitterApiSecret = $twitterSettings['api_secret'] ?? '';
+        $twitterAccessToken = $twitterSettings['access_token'] ?? '';
+        $twitterAccessSecret = $twitterSettings['access_secret'] ?? '';
         $mailingSettings = $settings['mailing'] ?? [];
         $mailingGmail = $mailingSettings['gmail_address'] ?? '';
         $mailingClientId = $mailingSettings['client_id'] ?? '';
@@ -200,6 +204,30 @@
             <?php endif; ?>
         </form>
 
+        <form method="post" class="mt-4" id="twitter-media">
+            <h4 class="mt-2">Twitter / X (imágenes en podcasts)</h4>
+            <p class="text-muted mb-3">Estas credenciales se usan para subir imágenes cuando compartes un podcast. <a href="#" data-toggle="modal" data-target="#twitterMediaHelpModal">Ver guía rápida</a></p>
+            <div class="form-group">
+                <label for="twitter_api_key">API Key (Consumer Key)</label>
+                <input type="text" name="twitter_api_key" id="twitter_api_key" class="form-control" value="<?= htmlspecialchars($twitterApiKey, ENT_QUOTES, 'UTF-8') ?>" placeholder="API Key">
+            </div>
+            <div class="form-group">
+                <label for="twitter_api_secret">API Secret (Consumer Secret)</label>
+                <input type="text" name="twitter_api_secret" id="twitter_api_secret" class="form-control" value="<?= htmlspecialchars($twitterApiSecret, ENT_QUOTES, 'UTF-8') ?>" placeholder="API Secret">
+            </div>
+            <div class="form-group">
+                <label for="twitter_access_token">Access Token (Read/Write)</label>
+                <input type="text" name="twitter_access_token" id="twitter_access_token" class="form-control" value="<?= htmlspecialchars($twitterAccessToken, ENT_QUOTES, 'UTF-8') ?>" placeholder="Access Token">
+            </div>
+            <div class="form-group">
+                <label for="twitter_access_secret">Access Token Secret</label>
+                <input type="text" name="twitter_access_secret" id="twitter_access_secret" class="form-control" value="<?= htmlspecialchars($twitterAccessSecret, ENT_QUOTES, 'UTF-8') ?>" placeholder="Access Token Secret">
+            </div>
+            <div class="text-right mb-4">
+                <button type="submit" name="save_twitter_media" class="btn btn-outline-primary">Guardar Twitter / X (media)</button>
+            </div>
+        </form>
+
         <div class="modal fade" id="googleFontsHelpModal" tabindex="-1" role="dialog" aria-labelledby="googleFontsHelpModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
@@ -275,6 +303,32 @@
                             <li>Pega también la propiedad, el Client ID y el Client Secret.</li>
                         </ol>
                         <p class="mb-0 text-muted">El proyecto debe tener acceso a la propiedad en Search Console.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="twitterMediaHelpModal" tabindex="-1" role="dialog" aria-labelledby="twitterMediaHelpModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="twitterMediaHelpModalLabel">Guía rápida: credenciales para subir imágenes en X</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <ol class="mb-3">
+                            <li>Entra en <strong>X Developer Portal</strong> y crea un proyecto + app.</li>
+                            <li>En la app, activa el acceso <strong>OAuth 1.0a</strong> y permisos <strong>Read and Write</strong>.</li>
+                            <li>Genera y copia <strong>API Key</strong> y <strong>API Secret</strong>.</li>
+                            <li>Genera <strong>Access Token</strong> y <strong>Access Token Secret</strong> (usuario propietario).</li>
+                            <li>Pega esos cuatro valores aquí y guarda.</li>
+                        </ol>
+                        <p class="mb-0 text-muted">Estas credenciales se usan únicamente para subir imágenes cuando compartes podcasts.</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>

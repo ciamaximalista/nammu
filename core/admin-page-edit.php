@@ -351,19 +351,18 @@ if ($editFeedback !== null) {
             </div>
 
             <div class="form-group">
-
-                <label for="type">Tipo</label>
-
-                <select name="type" id="type" class="form-control">
-
-                    <option value="Entrada" <?= $currentTypeValue === 'Entrada' ? 'selected' : '' ?>>Entrada</option>
-
-                    <option value="Página" <?= $currentTypeValue === 'Página' ? 'selected' : '' ?>>Página</option>
-
-                    <option value="Podcast" <?= $currentTypeValue === 'Podcast' ? 'selected' : '' ?>>Podcast</option>
-
-                </select>
-
+                <label>Tipo</label>
+                <div class="btn-group btn-group-toggle d-flex flex-wrap" data-toggle="buttons" data-type-toggle>
+                    <label class="btn btn-outline-secondary <?= $currentTypeValue === 'Entrada' ? 'active' : '' ?>">
+                        <input type="radio" name="type" value="Entrada" autocomplete="off" <?= $currentTypeValue === 'Entrada' ? 'checked' : '' ?>> Entrada
+                    </label>
+                    <label class="btn btn-outline-secondary <?= $currentTypeValue === 'Página' ? 'active' : '' ?>">
+                        <input type="radio" name="type" value="Página" autocomplete="off" <?= $currentTypeValue === 'Página' ? 'checked' : '' ?>> Página
+                    </label>
+                    <label class="btn btn-outline-secondary <?= $currentTypeValue === 'Podcast' ? 'active' : '' ?>">
+                        <input type="radio" name="type" value="Podcast" autocomplete="off" <?= $currentTypeValue === 'Podcast' ? 'checked' : '' ?>> Podcast
+                    </label>
+                </div>
             </div>
 
             <div class="form-group post-only">
@@ -526,8 +525,8 @@ if ($editFeedback !== null) {
 
             <script>
             document.addEventListener('DOMContentLoaded', function() {
-                var typeSelect = document.getElementById('type');
-                if (!typeSelect) {
+                var typeToggle = document.querySelector('[data-type-toggle]');
+                if (!typeToggle) {
                     return;
                 }
                 var podcastOnly = document.querySelectorAll('.podcast-only');
@@ -601,7 +600,8 @@ if ($editFeedback !== null) {
                 }
 
                 function togglePodcastFields() {
-                    var isPodcast = typeSelect.value === 'Podcast';
+                    var selected = typeToggle.querySelector('input[name="type"]:checked');
+                    var isPodcast = selected && selected.value === 'Podcast';
                     podcastOnly.forEach(function(el) {
                         el.classList.toggle('d-none', !isPodcast);
                     });
@@ -631,7 +631,7 @@ if ($editFeedback !== null) {
                     }
                 }
 
-                typeSelect.addEventListener('change', togglePodcastFields);
+                typeToggle.addEventListener('change', togglePodcastFields);
                 if (audioInput) {
                     audioInput.addEventListener('change', updateAudioMetadata);
                 }

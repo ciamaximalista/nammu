@@ -204,8 +204,8 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
 
 <section class="category-detail-hero">
     <div>
-        <p class="category-label">Podcast</p>
-        <h1>Podcast</h1>
+        <p class="category-label"><?= htmlspecialchars((string) ($theme['author'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
+        <h1><?= htmlspecialchars((string) ($theme['blog'] ?? $siteTitle ?? 'Nammu Blog'), ENT_QUOTES, 'UTF-8') ?> · Podcast</h1>
         <p class="category-count"><?= htmlspecialchars((string) $count, ENT_QUOTES, 'UTF-8') ?> <?= $count === 1 ? 'episodio publicado' : 'episodios publicados' ?></p>
     </div>
 </section>
@@ -425,7 +425,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
         gap: 1.5rem;
     }
     .post-grid.columns-1 {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
     .post-grid.columns-2 {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -433,117 +433,241 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     .post-grid.columns-3 {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
-    @media (max-width: 1100px) {
+    @media (max-width: 900px) {
         .post-grid.columns-3 {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
     }
-    @media (max-width: 860px) {
+    @media (max-width: 640px) {
         .post-grid.columns-2,
         .post-grid.columns-3 {
-            grid-template-columns: 1fr;
-        }
-        .site-search-form {
-            flex-wrap: wrap;
+            grid-template-columns: minmax(0, 1fr);
         }
     }
     .post-card {
+        border: 1px solid rgba(0,0,0,0.05);
+        border-radius: var(--nammu-radius-md);
+        padding: 1.15rem;
+        background: <?= $highlight ?>;
+        color: <?= $textColor ?>;
         position: relative;
-        background: <?= $blocksMode === 'boxed' ? '#fff' : 'transparent' ?>;
-        border-radius: var(--nammu-radius-lg);
-        box-shadow: <?= $blocksMode === 'boxed' ? '0 8px 20px rgba(0,0,0,0.06)' : 'none' ?>;
         overflow: hidden;
-        border: <?= $blocksMode === 'boxed' ? '1px solid rgba(0,0,0,0.06)' : 'none' ?>;
-        display: grid;
-        grid-template-columns: 1fr;
+        box-sizing: border-box;
     }
     .post-card::after {
         content: '';
-        position: absolute;
-        inset: 0;
-        border-radius: var(--nammu-radius-lg);
-        border: 1px solid rgba(0,0,0,0.06);
-        opacity: <?= $blocksMode === 'boxed' ? '0' : '1' ?>;
-        pointer-events: none;
+        display: table;
+        clear: both;
+    }
+    .post-card .post-thumb {
+        display: block;
     }
     .post-card .post-thumb img {
+        width: 100%;
+        display: block;
+        object-fit: cover;
+        border-radius: var(--nammu-radius-md);
+    }
+    .post-card .post-body {
+        display: block;
+    }
+    .post-card .post-body > *:not(:last-child) {
+        margin-bottom: 0.6rem;
+    }
+    .post-card.style-media-right .post-thumb {
+        float: right;
+        width: clamp(110px, 34%, 170px);
+        aspect-ratio: 1 / 1;
+        margin-left: 1.25rem;
+        margin-bottom: 0.5rem;
+        shape-outside: inset(0 round var(--nammu-radius-lg));
+        -webkit-shape-outside: inset(0 round var(--nammu-radius-lg));
+        overflow: hidden;
+        border-radius: var(--nammu-radius-lg);
+    }
+    .post-card.style-media-right .post-thumb img {
         width: 100%;
         height: 100%;
         object-fit: cover;
         display: block;
-    }
-    .post-card .post-body {
-        padding: 1.4rem 1.6rem 1.6rem;
-        display: flex;
-        flex-direction: column;
-        gap: 0.65rem;
-    }
-    .post-card.style-media-right {
-        grid-template-columns: 1fr 160px;
-    }
-    .post-card.style-media-right .post-thumb {
-        order: 2;
-    }
-    .post-card.style-media-right .post-body {
-        order: 1;
+        border-radius: inherit;
     }
     .post-card.style-square-tall-right {
-        grid-template-columns: 1fr 200px;
+        display: grid;
+        grid-template-columns: 1fr clamp(110px, 34%, 170px);
+        grid-template-rows: 1fr;
+        gap: 1rem;
+        align-items: stretch;
+        min-height: 220px;
+    }
+    .post-card.style-square-tall-right .post-thumb {
+        grid-column: 2;
+        grid-row: 1;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        border-radius: var(--nammu-radius-lg);
+        align-self: stretch;
+        justify-self: center;
     }
     .post-card.style-square-tall-right .post-thumb img {
+        width: 100%;
         height: 100%;
+        object-fit: cover;
+        display: block;
+        border-radius: inherit;
+    }
+    .post-card.style-square-tall-right .post-body {
+        grid-column: 1;
+        grid-row: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.6rem;
+    }
+    .post-card.style-circle-right .post-thumb {
+        border-radius: 50%;
+        shape-outside: circle();
+        -webkit-shape-outside: circle();
+    }
+    @media (max-width: 720px) {
+        .post-card.style-media-right {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .post-card.style-media-right .post-body {
+            width: 100%;
+            text-align: left;
+        }
+        .post-card.style-media-right .post-thumb {
+            float: none;
+            width: min(240px, 75vw);
+            margin: 0 auto 0.85rem auto;
+            shape-outside: none;
+            -webkit-shape-outside: none;
+        }
+        .post-card.style-media-right .post-thumb img {
+            border-radius: var(--nammu-radius-md);
+        }
+        .post-card.style-square-tall-right {
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr;
+            min-height: 220px;
+        }
+        .post-card.style-square-tall-right .post-thumb {
+            grid-column: 1;
+            width: 100%;
+            height: 100%;
+        }
+        .post-card.style-square-tall-right .post-thumb img {
+            height: 100%;
+        }
+        .post-card.style-circle-right .post-thumb {
+            width: min(200px, 60vw);
+        }
+        .post-grid.columns-1 .post-card.style-media-right {
+            display: block;
+        }
+        .post-grid.columns-1 .post-card.style-media-right .post-thumb {
+            float: none;
+            width: 100%;
+            margin: 0 0 0.85rem 0;
+            shape-outside: none;
+            -webkit-shape-outside: none;
+            border-radius: var(--nammu-radius-lg);
+        }
+        .post-grid.columns-1 .post-card.style-media-right .post-thumb img {
+            border-radius: inherit;
+        }
+        .post-grid.columns-1 .post-card.style-circle-right .post-thumb {
+            width: 100%;
+            border-radius: 50%;
+        }
+        .post-grid.columns-1 .post-card.style-media-right {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .post-grid.columns-1 .post-card.style-media-right .post-thumb {
+            float: none;
+            width: min(240px, 70%);
+            margin: 0 auto 0.85rem auto;
+            shape-outside: none;
+            -webkit-shape-outside: none;
+        }
+        .post-grid.columns-1 .post-card.style-circle-right .post-thumb {
+            width: min(200px, 55%);
+        }
     }
     .post-card.style-full .post-thumb {
-        height: 210px;
+        width: 100%;
+        overflow: hidden;
+    }
+    .post-card.style-full .post-thumb img {
+        border-radius: var(--nammu-radius-md);
     }
     .post-card.style-full.full-mode-natural .post-thumb img {
-        object-fit: contain;
-        background: <?= $highlight ?>;
+        height: auto;
+        width: 100%;
+    }
+    .post-card.style-full.full-mode-crop .post-thumb {
+        aspect-ratio: 16 / 9;
     }
     .post-card.style-full.full-mode-crop .post-thumb img {
+        width: 100%;
+        height: 100%;
         object-fit: cover;
     }
+    .post-card.style-full .post-body {
+        margin-top: 0.9rem;
+    }
     .post-card h2 {
-        font-size: 1.4rem;
         margin: 0;
+        font-size: 1.6rem;
         color: <?= $headingSecondaryColor ?>;
+        word-break: break-word;
+        hyphens: auto;
+        overflow-wrap: anywhere;
     }
     .post-card h2 a {
         color: inherit;
-        text-decoration: none;
     }
     .post-card .post-meta {
+        margin: 0;
+        display: block;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+        letter-spacing: 0.012em;
+        background: <?= htmlspecialchars($accentBackground, ENT_QUOTES, 'UTF-8') ?>;
+        border: 1px solid <?= htmlspecialchars($accentBorder, ENT_QUOTES, 'UTF-8') ?>;
         color: <?= $accentColor ?>;
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+        border-radius: var(--nammu-radius-sm);
     }
     .post-card .post-description {
         margin: 0;
-        color: <?= $textColor ?>;
+    }
+    .post-grid.blocks-flat {
+        gap: 2.25rem 1.75rem;
     }
     .post-grid.blocks-flat .post-card {
-        border-radius: 0;
-        box-shadow: none;
-        border-bottom: 1px solid rgba(0,0,0,0.08);
+        background: transparent;
+        border: none;
+        padding: 0;
     }
-    .post-grid.blocks-flat .post-card:last-child {
-        border-bottom: none;
+    @media (min-width: 721px) {
+        .post-grid.blocks-flat:not(.columns-1) .post-card.style-media-right .post-thumb {
+            margin-left: clamp(1rem, 3vw, 1.5rem);
+        }
+    }
+    .post-grid.blocks-flat .post-card.style-full .post-body {
+        margin-top: 1.15rem;
     }
     .podcast-player {
         width: 100%;
         margin-top: 0.6rem;
         border-radius: 999px;
         background: <?= $highlight ?>;
-    }
-    @media (max-width: 720px) {
-        .post-card.style-media-right,
-        .post-card.style-square-tall-right {
-            grid-template-columns: 1fr;
-        }
-        .post-card.style-media-right .post-thumb,
-        .post-card.style-square-tall-right .post-thumb {
-            order: 1;
-        }
     }
 </style>

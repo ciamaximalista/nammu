@@ -576,8 +576,12 @@ if (preg_match('#^/podcast/?$#i', $routePath)) {
             'image' => $episode['image'] ?? null,
             'audio' => (string) ($episode['audio'] ?? ''),
             'duration' => (string) ($episode['audio_duration'] ?? ''),
+            'timestamp' => $timestamp,
         ];
     }
+    usort($episodes, static function (array $a, array $b): int {
+        return ($b['timestamp'] ?? 0) <=> ($a['timestamp'] ?? 0);
+    });
     $count = count($episodes);
     $content = $renderer->render('podcast', [
         'episodes' => $episodes,

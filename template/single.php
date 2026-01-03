@@ -38,6 +38,8 @@ $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') .
 $subscriptionAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/subscribe.php';
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/itinerarios' : '/itinerarios');
+$podcastIndexUrl = $podcastIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/podcast' : '/podcast');
+$hasPodcast = !empty($hasPodcast);
 $hasItineraries = !empty($hasItineraries);
 $hasCategories = !empty($hasCategories);
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
@@ -58,7 +60,7 @@ $postalUrl = $postalUrl ?? '/correos.php';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $autoTocHtml = isset($autoTocHtml) ? trim((string) $autoTocHtml) : '';
 $customMetaBand = isset($customMetaBand) ? trim((string) $customMetaBand) : '';
-$renderSearchBox = static function (string $variant) use ($searchAction, $colorHighlight, $colorAccent, $colorText, $searchActionBase, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories): string {
+$renderSearchBox = static function (string $variant) use ($searchAction, $colorHighlight, $colorAccent, $colorText, $searchActionBase, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories, $hasPodcast, $podcastIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
         <form class="site-search-form" method="get" action="<?= htmlspecialchars($searchAction, ENT_QUOTES, 'UTF-8') ?>">
@@ -98,6 +100,16 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $colorH
                         <path d="M4 5H10C11.1046 5 12 5.89543 12 7V19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linejoin="round"/>
                         <path d="M20 5H14C12.8954 5 12 5.89543 12 7V19H20C21.1046 19 22 18.1046 22 17V7C22 5.89543 21.1046 5 20 5Z" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linejoin="round"/>
                         <line x1="12" y1="7" x2="12" y2="19" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </a>
+            <?php endif; ?>
+            <?php if (!empty($hasPodcast) && !empty($podcastIndexUrl)): ?>
+                <a class="search-podcast-link" href="<?= htmlspecialchars($podcastIndexUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Podcast">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="9" y="3" width="6" height="10" rx="3" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                        <path d="M5 11C5 14.866 8.134 18 12 18C15.866 18 19 14.866 19 11" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="12" y1="18" x2="12" y2="22" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="8" y1="22" x2="16" y2="22" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                 </a>
             <?php endif; ?>
@@ -375,7 +387,8 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .site-search-form input[type="text"],
     .site-search-form input[type="email"] {
-        flex: 1;
+        flex: 1 1 180px;
+        min-width: 0;
         padding: 0.6rem 0.8rem;
         border-radius: var(--nammu-radius-md);
         border: 1px solid rgba(0,0,0,0.1);
@@ -468,7 +481,8 @@ if ($isPageTemplate && $formattedDate !== '') {
         }
         .post-brand .search-categories-link,
         .post-brand .search-letters-link,
-        .post-brand .search-itineraries-link {
+        .post-brand .search-itineraries-link,
+        .post-brand .search-podcast-link {
             width: 32px;
             height: 32px;
             border-radius: 10px;
@@ -484,6 +498,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         .search-categories-link,
         .search-letters-link,
         .search-itineraries-link,
+        .search-podcast-link,
         .subscription-postal-link,
         .subscription-avisos-link {
             width: 32px;
@@ -528,7 +543,8 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .search-categories-link,
     .search-letters-link,
-    .search-itineraries-link {
+    .search-itineraries-link,
+    .search-podcast-link {
         width: 38px;
         height: 38px;
         border-radius: 10px;
@@ -541,7 +557,8 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .search-categories-link:hover,
     .search-letters-link:hover,
-    .search-itineraries-link:hover {
+    .search-itineraries-link:hover,
+    .search-podcast-link:hover {
         background: rgba(0,0,0,0.1);
     }
     .post {
@@ -669,7 +686,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         }
         .site-search-form input[type="text"],
         .site-search-form input[type="email"] {
-            flex: 1 1 auto;
+            flex: 1 1 140px;
             width: auto;
             min-width: 0;
             padding: 0.25rem 0.35rem;
@@ -679,6 +696,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         .search-categories-link,
         .search-letters-link,
         .search-itineraries-link,
+        .search-podcast-link,
         .subscription-postal-link,
         .subscription-avisos-link {
             width: 22px;
@@ -706,7 +724,8 @@ if ($isPageTemplate && $formattedDate !== '') {
         .post-brand .site-search-form button,
         .post-brand .search-categories-link,
         .post-brand .search-letters-link,
-        .post-brand .search-itineraries-link {
+        .post-brand .search-itineraries-link,
+        .post-brand .search-podcast-link {
             width: 22px;
             height: 22px;
             border-radius: 6px;

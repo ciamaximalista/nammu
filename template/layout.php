@@ -59,6 +59,8 @@ $postalLogoSvg = $postalLogoSvg ?? '';
 $hasCategories = !empty($hasCategories);
 $hasItineraries = $hasItineraries ?? false;
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? ($searchBaseNormalized === '' ? '/itinerarios' : $searchBaseNormalized . '/itinerarios');
+$hasPodcast = !empty($hasPodcast);
+$podcastIndexUrl = $podcastIndexUrl ?? ($searchBaseNormalized === '' ? '/podcast' : $searchBaseNormalized . '/podcast');
 if ($postalLogoSvg === '' && function_exists('nammu_postal_icon_svg')) {
     $postalLogoSvg = nammu_postal_icon_svg();
 }
@@ -594,7 +596,7 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
         }
         .floating-search-form input[type="text"],
         .floating-search-form input[type="email"] {
-            flex: 1 1 auto;
+            flex: 1 1 120px;
             min-width: 0;
             border: none;
             border-bottom: 1px solid rgba(0,0,0,0.12);
@@ -653,7 +655,8 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             display: block;
         }
         .floating-search-categories,
-        .floating-search-itineraries {
+        .floating-search-itineraries,
+        .floating-search-podcast {
             width: 26px;
             height: 26px;
             border-radius: 9px;
@@ -667,7 +670,8 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             flex: 0 0 auto;
         }
         .floating-search-categories:hover,
-        .floating-search-itineraries:hover {
+        .floating-search-itineraries:hover,
+        .floating-search-podcast:hover {
             background: rgba(0,0,0,0.08);
             border-color: rgba(0,0,0,0.12);
         }
@@ -1253,6 +1257,16 @@ if (!empty($baseUrl)) {
                                     <path d="M4 5H10C11.1046 5 12 5.89543 12 7V19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linejoin="round"/>
                                     <path d="M20 5H14C12.8954 5 12 5.89543 12 7V19H20C21.1046 19 22 18.1046 22 17V7C22 5.89543 21.1046 5 20 5Z" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linejoin="round"/>
                                     <line x1="12" y1="7" x2="12" y2="19" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                            </a>
+                        <?php endif; ?>
+                        <?php if (!empty($hasPodcast) && !empty($podcastIndexUrl)): ?>
+                            <a class="floating-search-podcast" href="<?= htmlspecialchars($podcastIndexUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Podcast">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <rect x="9" y="3" width="6" height="10" rx="3" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
+                                    <path d="M5 11C5 14.866 8.134 18 12 18C15.866 18 19 14.866 19 11" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                                    <line x1="12" y1="18" x2="12" y2="22" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
+                                    <line x1="8" y1="22" x2="16" y2="22" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round"/>
                                 </svg>
                             </a>
                         <?php endif; ?>

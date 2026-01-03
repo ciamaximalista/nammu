@@ -340,7 +340,7 @@ if ($isPageTemplate && $formattedDate !== '') {
 <style>
     .site-search-block {
         margin: 1.5rem auto;
-        max-width: min(720px, 100%);
+        max-width: min(680px, 100%);
     }
     .site-search-block.placement-top {
         margin: 0.75rem auto 1rem;
@@ -360,7 +360,7 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .site-search-box {
         border-radius: var(--nammu-radius-lg);
-        padding: 1rem 1.25rem;
+        padding: 0.85rem 1rem;
         border: 1px solid rgba(0,0,0,0.05);
         background: <?= $colorHighlight ?>;
         box-sizing: border-box;
@@ -661,7 +661,7 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     @media (max-width: 1100px) {
         .site-search-box {
-            padding: 0.35rem 0.4rem;
+            padding: 0.25rem 0.35rem;
             max-width: 100%;
         }
         .site-search-block {
@@ -686,7 +686,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         }
         .site-search-form input[type="text"],
         .site-search-form input[type="email"] {
-            flex: 1 1 100px;
+            flex: 1 1 80px;
             width: auto;
             min-width: 0;
             padding: 0.25rem 0.35rem;

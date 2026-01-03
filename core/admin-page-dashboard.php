@@ -885,6 +885,7 @@
 
     $avisosPostsCount = 0;
     $avisosItinerariesCount = 0;
+    $avisosPodcastCount = 0;
     $newsletterSubscriberCount = 0;
     if (function_exists('admin_load_mailing_subscriber_entries')) {
         try {
@@ -897,6 +898,9 @@
                 if (!empty($prefs['itineraries'])) {
                     $avisosItinerariesCount++;
                 }
+                if (!empty($prefs['podcast'])) {
+                    $avisosPodcastCount++;
+                }
                 if (!empty($prefs['newsletter'])) {
                     $newsletterSubscriberCount++;
                 }
@@ -904,6 +908,7 @@
         } catch (Throwable $e) {
             $avisosPostsCount = 0;
             $avisosItinerariesCount = 0;
+            $avisosPodcastCount = 0;
             $newsletterSubscriberCount = 0;
         }
     }
@@ -1094,6 +1099,9 @@
                         <?php endif; ?>
                         <?php if ($avisosItinerariesCount > 0): ?>
                             <p class="mb-2"><strong>Avisos itinerarios:</strong> <?= (int) $avisosItinerariesCount ?></p>
+                        <?php endif; ?>
+                        <?php if ($avisosPodcastCount > 0): ?>
+                            <p class="mb-2"><strong>Avisos podcast:</strong> <?= (int) $avisosPodcastCount ?></p>
                         <?php endif; ?>
                         <?php if ($newsletterSubscriberCount > 0): ?>
                             <p class="mb-2"><strong>Newsletter:</strong> <?= (int) $newsletterSubscriberCount ?></p>

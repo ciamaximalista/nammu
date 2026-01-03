@@ -1939,6 +1939,7 @@ function nammu_publish_scheduled_posts(string $contentDir): int
                 'title' => $meta['Title'] ?? $slug,
                 'description' => $meta['Description'] ?? '',
                 'image' => $meta['Image'] ?? '',
+                'audio' => $meta['Audio'] ?? '',
                 'template' => $template,
                 'published_at' => date('Y-m-d H:i', $publishTimestamp),
             ];
@@ -2010,7 +2011,8 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
         && function_exists('admin_mailing_recipients_for_type')
         && function_exists('admin_prepare_mailing_payload')
         && function_exists('admin_send_mailing_broadcast')
-        && function_exists('admin_public_post_url');
+        && function_exists('admin_public_post_url')
+        && function_exists('admin_public_asset_url');
     if (!$requiredAdmin) {
         return false;
     }
@@ -2020,28 +2022,51 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
     $title = (string) ($payload['title'] ?? $slug);
     $description = (string) ($payload['description'] ?? '');
     $image = (string) ($payload['image'] ?? '');
+    $audio = (string) ($payload['audio'] ?? '');
 
     if ($filename !== '') {
-        admin_maybe_auto_post_to_social_networks($filename, $title, $description, $image);
+        if ($template === 'podcast') {
+            $audioUrl = admin_public_asset_url($audio);
+            $imageUrl = admin_public_asset_url($image);
+            if ($audioUrl !== '') {
+                admin_maybe_auto_post_to_social_networks($filename, $title, $description, $image, $audioUrl, $imageUrl);
+            }
+        } else {
+            admin_maybe_auto_post_to_social_networks($filename, $title, $description, $image);
+        }
     }
 
     $settings = get_settings();
     $mailing = $settings['mailing'] ?? [];
-    $link = $slug !== '' ? admin_public_post_url($slug) : '';
-    if (($mailing['auto_posts'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
-        $subscribers = admin_mailing_recipients_for_type('posts', $settings);
-        if (!empty($subscribers) && $link !== '') {
-            $payloadMail = admin_prepare_mailing_payload('single', $settings, $title, $description, $link, $image);
-            try {
-                admin_send_mailing_broadcast($payloadMail['subject'], '', '', $subscribers, $payloadMail['mailingConfig'], $payloadMail['bodyBuilder'], $payloadMail['fromName']);
-            } catch (Throwable $e) {
-                // ignore mailing errors on scheduled publish
+    if ($template === 'podcast') {
+        $audioUrl = admin_public_asset_url($audio);
+        if (($mailing['auto_podcast'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
+            $subscribers = admin_mailing_recipients_for_type('podcast', $settings);
+            if (!empty($subscribers) && $audioUrl !== '') {
+                $payloadMail = admin_prepare_mailing_payload('podcast', $settings, $title, $description, $audioUrl, $image);
+                try {
+                    admin_send_mailing_broadcast($payloadMail['subject'], '', '', $subscribers, $payloadMail['mailingConfig'], $payloadMail['bodyBuilder'], $payloadMail['fromName']);
+                } catch (Throwable $e) {
+                    // ignore mailing errors on scheduled publish
+                }
             }
         }
-    }
-
-    if ($link !== '') {
-        admin_maybe_enqueue_push_notification('post', $title, $description, $link, $image);
+    } else {
+        $link = $slug !== '' ? admin_public_post_url($slug) : '';
+        if (($mailing['auto_posts'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
+            $subscribers = admin_mailing_recipients_for_type('posts', $settings);
+            if (!empty($subscribers) && $link !== '') {
+                $payloadMail = admin_prepare_mailing_payload('single', $settings, $title, $description, $link, $image);
+                try {
+                    admin_send_mailing_broadcast($payloadMail['subject'], '', '', $subscribers, $payloadMail['mailingConfig'], $payloadMail['bodyBuilder'], $payloadMail['fromName']);
+                } catch (Throwable $e) {
+                    // ignore mailing errors on scheduled publish
+                }
+            }
+        }
+        if ($link !== '') {
+            admin_maybe_enqueue_push_notification('post', $title, $description, $link, $image);
+        }
     }
 
     return true;

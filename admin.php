@@ -1023,6 +1023,7 @@ function get_settings() {
         'status' => 'disconnected',
         'auto_posts' => 'off',
         'auto_itineraries' => 'off',
+        'auto_podcast' => 'off',
         'auto_newsletter' => 'off',
         'format' => 'html',
     ];
@@ -2303,6 +2304,7 @@ function admin_mailing_default_prefs(): array {
     return [
         'posts' => true,
         'itineraries' => true,
+        'podcast' => true,
         'newsletter' => true,
     ];
 }
@@ -2310,6 +2312,7 @@ function admin_mailing_default_prefs(): array {
 function admin_mailing_normalize_prefs(array $prefs): array {
     $defaults = admin_mailing_default_prefs();
     $normalized = [];
+    $hasPodcastKey = array_key_exists('podcast', $prefs);
     foreach ($defaults as $key => $default) {
         $value = $prefs[$key] ?? $default;
         if (is_string($value)) {
@@ -2318,6 +2321,9 @@ function admin_mailing_normalize_prefs(array $prefs): array {
             $value = (bool) $value;
         }
         $normalized[$key] = $value;
+    }
+    if (!$hasPodcastKey) {
+        $normalized['podcast'] = !empty($normalized['posts']) || !empty($normalized['itineraries']);
     }
     return $normalized;
 }
@@ -2437,7 +2443,7 @@ function admin_save_mailing_subscribers(array $subscribers): void {
 
 function admin_mailing_recipients_for_type(string $type, array $settings): array {
     $type = strtolower(trim($type));
-    $allowed = ['posts', 'itineraries', 'newsletter'];
+    $allowed = ['posts', 'itineraries', 'podcast', 'newsletter'];
     if (!in_array($type, $allowed, true)) {
         return [];
     }
@@ -2456,6 +2462,9 @@ function admin_mailing_type_for_template(string $template): string {
     $template = strtolower(trim($template));
     if ($template === 'itinerario') {
         return 'itineraries';
+    }
+    if ($template === 'podcast') {
+        return 'podcast';
     }
     if ($template === 'newsletter') {
         return 'newsletter';
@@ -2802,10 +2811,15 @@ function admin_prepare_mailing_payload(string $template, array $settings, string
     }
     $titleFontCss = htmlspecialchars($titleFont, ENT_QUOTES, 'UTF-8');
     $bodyFontCss = htmlspecialchars($bodyFont, ENT_QUOTES, 'UTF-8');
-    $ctaLabel = $template === 'itinerario' ? 'Comienza este itinerario' : ($template === 'page' ? 'Ver esta página' : 'Sigue leyendo');
+    $ctaLabel = $template === 'itinerario'
+        ? 'Comienza este itinerario'
+        : ($template === 'page'
+            ? 'Ver esta página'
+            : ($template === 'podcast' ? 'Escuchar el episodio' : 'Sigue leyendo'));
+    $ctaText = $ctaLabel;
     $fromName = $authorName !== '' ? $authorName : $blogName;
 
-    $buildText = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link) {
+    $buildText = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link, $ctaText) {
         $lines = [];
         $lines[] = '**** ' . ($authorName !== '' ? $authorName : $blogName) . ' ****';
         $lines[] = '**** ' . $blogName . ' ****';
@@ -2816,7 +2830,7 @@ function admin_prepare_mailing_payload(string $template, array $settings, string
             $lines[] = $description;
             $lines[] = '';
         }
-        $lines[] = 'Sigue leyendo: ' . $link;
+        $lines[] = $ctaText . ': ' . $link;
         $lines[] = '';
         $lines[] = '-----------';
         $lines[] = 'Recibes este email porque estás suscrito a las comunicaciones de ' . $blogName . '. Puedes darte de baja pulsando aquí: ' . admin_mailing_unsubscribe_link($recipientEmail);
@@ -3646,6 +3660,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if ($audioUrl !== '') {
                             admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image, $audioUrl, $imageUrl);
                         }
+                        $settings = get_settings();
+                        $mailing = $settings['mailing'] ?? [];
+                        if (($mailing['auto_podcast'] ?? 'off') === 'on' && admin_is_mailing_ready($settings) && $audioUrl !== '') {
+                            $subscribers = admin_mailing_recipients_for_type('podcast', $settings);
+                            if (!empty($subscribers)) {
+                                $payload = admin_prepare_mailing_payload('podcast', $settings, $title, $description, $audioUrl, $image);
+                                try {
+                                    admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                                } catch (Throwable $e) {
+                                    // ignore mailing errors on publish
+                                }
+                            }
+                        }
                     }
                     if ($type === 'Podcast') {
                         admin_regenerate_podcast_feed();
@@ -3998,6 +4025,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $imageUrl = admin_public_asset_url($image);
                         if ($audioUrl !== '') {
                             admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image, $audioUrl, $imageUrl);
+                        }
+                        $settings = get_settings();
+                        $mailing = $settings['mailing'] ?? [];
+                        if (($mailing['auto_podcast'] ?? 'off') === 'on' && admin_is_mailing_ready($settings) && $audioUrl !== '') {
+                            $subscribers = admin_mailing_recipients_for_type('podcast', $settings);
+                            if (!empty($subscribers)) {
+                                $payload = admin_prepare_mailing_payload('podcast', $settings, $title, $description, $audioUrl, $image);
+                                try {
+                                    admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                                } catch (Throwable $e) {
+                                    // ignore mailing errors on publish
+                                }
+                            }
                         }
                     }
                     if ($shouldAutoShare) {
@@ -5337,6 +5377,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['save_mailing_flags'])) {
         $autoPosts = isset($_POST['mailing_auto_posts']) ? 'on' : 'off';
         $autoItineraries = isset($_POST['mailing_auto_itineraries']) ? 'on' : 'off';
+        $autoPodcast = isset($_POST['mailing_auto_podcast']) ? 'on' : 'off';
         $autoNewsletter = isset($_POST['mailing_auto_newsletter']) ? 'on' : 'off';
         $format = $_POST['mailing_format'] ?? 'html';
         $format = $format === 'text' ? 'text' : 'html';
@@ -5347,6 +5388,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $config['mailing']['auto_posts'] = $autoPosts;
             $config['mailing']['auto_itineraries'] = $autoItineraries;
+            $config['mailing']['auto_podcast'] = $autoPodcast;
             $config['mailing']['auto_newsletter'] = $autoNewsletter;
             $config['mailing']['format'] = $format;
             save_config_file($config);
@@ -5654,8 +5696,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $title = $metadata['Title'] ?? pathinfo($filename, PATHINFO_FILENAME);
         $description = $metadata['Description'] ?? '';
         $slug = pathinfo($filename, PATHINFO_FILENAME);
-        $link = admin_public_post_url($slug);
         $imagePath = $metadata['Image'] ?? ($metadata['image'] ?? '');
+        if ($template === 'podcast') {
+            $audioPath = (string) ($metadata['Audio'] ?? '');
+            $link = admin_public_asset_url($audioPath);
+            if ($link === '') {
+                $_SESSION['mailing_feedback'] = [
+                    'type' => 'danger',
+                    'message' => 'No se encontró el mp3 del podcast para enviar.',
+                ];
+                header('Location: ' . $redirect);
+                exit;
+            }
+        } else {
+            $link = admin_public_post_url($slug);
+        }
         $payload = admin_prepare_mailing_payload($template, $settings, $title, $description, $link, $imagePath);
         try {
             $result = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);

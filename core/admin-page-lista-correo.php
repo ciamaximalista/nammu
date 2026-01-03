@@ -12,6 +12,7 @@
         $mailingClientSecret = $mailingSettings['client_secret'] ?? '';
         $mailingAutoPosts = ($mailingSettings['auto_posts'] ?? 'off') === 'on';
         $mailingAutoItineraries = ($mailingSettings['auto_itineraries'] ?? 'off') === 'on';
+        $mailingAutoPodcast = ($mailingSettings['auto_podcast'] ?? 'off') === 'on';
         $mailingAutoNewsletter = ($mailingSettings['auto_newsletter'] ?? 'off') === 'on';
         $mailingFormat = $mailingSettings['format'] ?? 'html';
         $mailingEntries = admin_load_mailing_subscriber_entries();
@@ -111,14 +112,29 @@
                                     <?php foreach ($mailingEntriesPage as $subscriber): ?>
                                         <?php
                                         $prefs = $subscriber['prefs'] ?? admin_mailing_default_prefs();
-                                        $hasAvisos = !empty($prefs['posts']) || !empty($prefs['itineraries']);
+                                        $hasPosts = !empty($prefs['posts']);
+                                        $hasItineraries = !empty($prefs['itineraries']);
+                                        $hasPodcast = !empty($prefs['podcast']);
                                         $hasNewsletter = !empty($prefs['newsletter']);
-                                        if ($hasAvisos && $hasNewsletter) {
+                                        $labels = [];
+                                        if ($hasPosts) {
+                                            $labels[] = 'Entradas';
+                                        }
+                                        if ($hasItineraries) {
+                                            $labels[] = 'Itinerarios';
+                                        }
+                                        if ($hasPodcast) {
+                                            $labels[] = 'Podcast';
+                                        }
+                                        if ($hasNewsletter) {
+                                            $labels[] = 'Newsletter';
+                                        }
+                                        if (count($labels) === 4) {
                                             $label = 'Todo';
-                                        } elseif ($hasNewsletter) {
-                                            $label = 'Newsletter';
+                                        } elseif (!empty($labels)) {
+                                            $label = implode(' + ', $labels);
                                         } else {
-                                            $label = 'Avisos';
+                                            $label = '—';
                                         }
                                         ?>
                                         <tr>
@@ -168,6 +184,10 @@
                         <div class="form-check mb-3">
                             <input type="checkbox" class="form-check-input" name="mailing_auto_itineraries" id="mailing_auto_itineraries" value="1" <?= $mailingAutoItineraries ? 'checked' : '' ?>>
                             <label class="form-check-label" for="mailing_auto_itineraries">Enviar aviso de cada nuevo itinerario publicado</label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" name="mailing_auto_podcast" id="mailing_auto_podcast" value="1" <?= $mailingAutoPodcast ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="mailing_auto_podcast">Enviar aviso de cada nuevo episodio de podcast</label>
                         </div>
                         <div class="form-check mb-3">
                             <input type="checkbox" class="form-check-input" name="mailing_auto_newsletter" id="mailing_auto_newsletter" value="1" <?= $mailingAutoNewsletter ? 'checked' : '' ?>>

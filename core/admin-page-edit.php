@@ -200,7 +200,7 @@ if ($editFeedback !== null) {
                                 }
                             }
                             ?>
-                            <?php if (!empty($availableNetworks) && in_array($templateFilter, ['single', 'draft', 'podcast'], true)): ?>
+                            <?php if (in_array($templateFilter, ['single', 'draft', 'podcast'], true)): ?>
                                 <?php foreach ($availableNetworks as $networkKey): ?>
                                     <form method="post" class="d-inline-block mb-1">
                                         <input type="hidden" name="social_network" value="<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>">
@@ -211,12 +211,15 @@ if ($editFeedback !== null) {
                                         </button>
                                     </form>
                                 <?php endforeach; ?>
-                                <?php if ($mailingReady && in_array($templateFilter, ['single', 'draft'], true)): ?>
+                                <?php if ($mailingReady): ?>
                                     <form method="post" class="d-inline-block mb-1">
                                         <input type="hidden" name="mailing_filename" value="<?= htmlspecialchars($post['filename'], ENT_QUOTES, 'UTF-8') ?>">
                                         <input type="hidden" name="mailing_template" value="<?= htmlspecialchars($templateFilter, ENT_QUOTES, 'UTF-8') ?>">
                                         <button type="submit" name="send_mailing_post" class="btn btn-sm btn-outline-success">Lista</button>
                                     </form>
+                                <?php endif; ?>
+                                <?php if (empty($availableNetworks) && !$mailingReady): ?>
+                                    <span class="text-muted">—</span>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <span class="text-muted">—</span>

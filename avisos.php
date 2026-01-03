@@ -33,6 +33,7 @@ function mailing_available_prefs(array $config): array
     return [
         'posts' => ($mailing['auto_posts'] ?? 'off') === 'on',
         'itineraries' => ($mailing['auto_itineraries'] ?? 'off') === 'on',
+        'podcast' => ($mailing['auto_podcast'] ?? 'off') === 'on',
         'newsletter' => ($mailing['auto_newsletter'] ?? 'off') === 'on',
     ];
 }
@@ -43,6 +44,7 @@ function mailing_default_prefs(array $available): array
     $prefs = [
         'posts' => false,
         'itineraries' => false,
+        'podcast' => false,
         'newsletter' => false,
     ];
     foreach ($prefs as $key => $value) {
@@ -55,6 +57,7 @@ function mailing_default_prefs(array $available): array
         return [
             'posts' => true,
             'itineraries' => true,
+            'podcast' => true,
             'newsletter' => true,
         ];
     }
@@ -66,15 +69,20 @@ function mailing_prefs_from_selection(array $selected, array $available): array
     $prefs = [
         'posts' => false,
         'itineraries' => false,
+        'podcast' => false,
         'newsletter' => false,
     ];
     $wantsAvisos = in_array('avisos', $selected, true);
+    $wantsPodcast = in_array('podcast', $selected, true);
     $wantsNewsletter = in_array('newsletter', $selected, true);
     if (!empty($available['posts']) && $wantsAvisos) {
         $prefs['posts'] = true;
     }
     if (!empty($available['itineraries']) && $wantsAvisos) {
         $prefs['itineraries'] = true;
+    }
+    if (!empty($available['podcast']) && $wantsPodcast) {
+        $prefs['podcast'] = true;
     }
     if (!empty($available['newsletter']) && $wantsNewsletter) {
         $prefs['newsletter'] = true;
@@ -345,21 +353,42 @@ if (!is_string($siteLang) || $siteLang === '') {
 }
 $prefsDefault = mailing_default_prefs($availablePrefs);
 $prefsAvailableKeys = [];
-if (!empty($availablePrefs['posts']) || !empty($availablePrefs['itineraries'])) {
+$hasBlogAlerts = !empty($availablePrefs['posts']) || !empty($availablePrefs['itineraries']);
+$hasPodcastAlerts = !empty($availablePrefs['podcast']);
+$hasAlerts = $hasBlogAlerts || $hasPodcastAlerts;
+if ($hasBlogAlerts) {
     $prefsAvailableKeys[] = 'avisos';
+}
+if ($hasPodcastAlerts) {
+    $prefsAvailableKeys[] = 'podcast';
 }
 if (!empty($availablePrefs['newsletter'])) {
     $prefsAvailableKeys[] = 'newsletter';
 }
-$hasAvisos = in_array('avisos', $prefsAvailableKeys, true);
+$hasAvisos = $hasAlerts;
 $hasNewsletter = in_array('newsletter', $prefsAvailableKeys, true);
 $hasAnySubscription = $hasAvisos || $hasNewsletter;
+$alertsLabel = '';
+if ($hasAlerts) {
+    $alertsParts = [];
+    if ($hasBlogAlerts) {
+        $alertsParts[] = 'nuevas publicaciones';
+    }
+    if ($hasPodcastAlerts) {
+        $alertsParts[] = 'nuevos episodios de podcast';
+    }
+    $alertsLabel = implode(' y ', $alertsParts);
+}
 $pageLabel = $hasAvisos && $hasNewsletter ? 'Avisos por email y newsletters' : ($hasNewsletter ? 'Newsletter' : 'Avisos');
-$pageIntro = $hasAvisos && $hasNewsletter
-    ? 'Suscribete para recibir avisos y newsletters o confirma la baja si ya no quieres recibirlos.'
-    : ($hasNewsletter
-        ? 'Suscribete para recibir la newsletter o confirma la baja si ya no quieres recibirla.'
-        : 'Suscribete para recibir avisos de nuevas publicaciones o confirma la baja si ya no quieres recibirlos.');
+if (!$hasAnySubscription) {
+    $pageIntro = 'El administrador del blog no ha configurado todavia ni el sistema de avisos ni las newsletters ni los avisos de podcast.';
+} else {
+    $pageIntro = $hasAvisos && $hasNewsletter
+        ? 'Suscribete para recibir avisos de ' . $alertsLabel . ' y newsletters o confirma la baja si ya no quieres recibirlos.'
+        : ($hasNewsletter
+            ? 'Suscribete para recibir la newsletter o confirma la baja si ya no quieres recibirla.'
+            : 'Suscribete para recibir avisos de ' . $alertsLabel . ' o confirma la baja si ya no quieres recibirlos.');
+}
 $badgeLabel = $hasAvisos && $hasNewsletter ? 'Avisos y newsletters' : ($hasNewsletter ? 'Newsletter' : 'Avisos por email');
 $subscribeTitle = $hasAvisos && $hasNewsletter ? 'Alta en avisos y newsletters' : ($hasNewsletter ? 'Alta en newsletter' : 'Alta en avisos');
 $subscribeCopy = $hasAvisos && $hasNewsletter
@@ -523,6 +552,7 @@ $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseU
 
 $prefsOptions = [
     'avisos' => 'Avisos',
+    'podcast' => 'Podcast',
     'newsletter' => 'Newsletter',
 ];
 
@@ -566,7 +596,7 @@ ob_start();
                                     <?php
                                     $isChecked = $key === 'avisos'
                                         ? (!empty($prefsDefault['posts']) || !empty($prefsDefault['itineraries']))
-                                        : !empty($prefsDefault['newsletter']);
+                                        : ($key === 'podcast' ? !empty($prefsDefault['podcast']) : !empty($prefsDefault['newsletter']));
                                     ?>
                                     <label class="postal-check">
                                         <input type="checkbox" name="subscription_prefs[]" value="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>" <?= $isChecked ? 'checked' : '' ?>>
@@ -595,7 +625,7 @@ ob_start();
                                     <?php
                                     $isChecked = $key === 'avisos'
                                         ? (!empty($prefsDefault['posts']) || !empty($prefsDefault['itineraries']))
-                                        : !empty($prefsDefault['newsletter']);
+                                        : ($key === 'podcast' ? !empty($prefsDefault['podcast']) : !empty($prefsDefault['newsletter']));
                                     ?>
                                     <label class="postal-check">
                                         <input type="checkbox" name="subscription_prefs[]" value="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>" <?= $isChecked ? 'checked' : '' ?>>
@@ -624,7 +654,7 @@ ob_start();
     <?php else: ?>
         <div class="postal-card">
             <h2>Avisos y newsletters no configurados</h2>
-            <p>El administrador del blog no ha configurado todavia ni el sistema de avisos ni las newsletters.</p>
+            <p>El administrador del blog no ha configurado todavia ni el sistema de avisos ni las newsletters ni los avisos de podcast.</p>
         </div>
     <?php endif; ?>
 </section>

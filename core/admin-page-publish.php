@@ -34,6 +34,17 @@
 
         </div>
 
+        <div class="form-group">
+            <label>Tipo</label>
+            <input type="hidden" name="type" id="type" value="Entrada" data-type-value>
+            <div class="btn-group d-flex flex-wrap" role="group" data-type-toggle>
+                <button type="button" class="btn btn-primary active" data-type-option="Entrada" aria-pressed="true">Entrada</button>
+                <button type="button" class="btn btn-outline-primary" data-type-option="Página" aria-pressed="false">Página</button>
+                <button type="button" class="btn btn-outline-primary" data-type-option="Newsletter" aria-pressed="false">Newsletter</button>
+                <button type="button" class="btn btn-outline-primary" data-type-option="Podcast" aria-pressed="false">Podcast</button>
+            </div>
+        </div>
+
         <div class="form-group podcast-only d-none">
             <label for="audio">Archivo de audio (mp3)</label>
             <div class="input-group">
@@ -53,17 +64,6 @@
         <div class="form-group podcast-only d-none">
             <label for="audio_duration">Duración (hh:mm:ss)</label>
             <input type="text" name="audio_duration" id="audio_duration" class="form-control" placeholder="00:45:00">
-        </div>
-
-        <div class="form-group">
-            <label>Tipo</label>
-            <input type="hidden" name="type" id="type" value="Entrada" data-type-value>
-            <div class="btn-group d-flex flex-wrap" role="group" data-type-toggle>
-                <button type="button" class="btn btn-primary active" data-type-option="Entrada" aria-pressed="true">Entrada</button>
-                <button type="button" class="btn btn-outline-primary" data-type-option="Página" aria-pressed="false">Página</button>
-                <button type="button" class="btn btn-outline-primary" data-type-option="Newsletter" aria-pressed="false">Newsletter</button>
-                <button type="button" class="btn btn-outline-primary" data-type-option="Podcast" aria-pressed="false">Podcast</button>
-            </div>
         </div>
 
         <div class="form-group entry-only">

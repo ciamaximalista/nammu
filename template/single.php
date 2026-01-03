@@ -387,7 +387,7 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .site-search-form input[type="text"],
     .site-search-form input[type="email"] {
-        flex: 1 1 180px;
+        flex: 1 1 150px;
         min-width: 0;
         padding: 0.6rem 0.8rem;
         border-radius: var(--nammu-radius-md);
@@ -686,7 +686,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         }
         .site-search-form input[type="text"],
         .site-search-form input[type="email"] {
-            flex: 1 1 140px;
+            flex: 1 1 120px;
             width: auto;
             min-width: 0;
             padding: 0.25rem 0.35rem;

@@ -313,7 +313,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    typeToggle.addEventListener('change', togglePodcastFields);
+    var typeInputs = typeToggle.querySelectorAll('input[name="type"]');
+    typeInputs.forEach(function(input) {
+        input.addEventListener('change', togglePodcastFields);
+    });
     if (audioInput) {
         audioInput.addEventListener('change', updateAudioMetadata);
     }

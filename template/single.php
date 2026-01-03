@@ -489,7 +489,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         }
         .site-search-form input[type="text"],
         .site-search-form input[type="email"] {
-            flex: 1 1 auto;
+            flex: 1 1 90px;
             min-width: 0;
             padding: 0.5rem 0.6rem;
             font-size: 0.9rem;

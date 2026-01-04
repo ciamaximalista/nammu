@@ -163,7 +163,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="social_home_image">Imagen de la portada para redes sociales</label>
+                        <label for="social_home_image">Imagen de la portada para redes sociales y plataformas de podcast</label>
                         <div class="input-group">
                             <input type="text" name="social_home_image" id="social_home_image" class="form-control" value="<?= htmlspecialchars($socialHomeImage, ENT_QUOTES, 'UTF-8') ?>" placeholder="assets/imagen-portada.jpg" readonly>
                             <div class="input-group-append">

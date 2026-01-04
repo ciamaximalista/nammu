@@ -1148,7 +1148,7 @@
                 </div>
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Usuarios unicos</h4>
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Usuarios únicos humanos</h4>
                         <p class="mb-3"><strong>Hoy:</strong> <?= (int) $todayCount ?></p>
 
                         <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Ultimos 7 dias</p>

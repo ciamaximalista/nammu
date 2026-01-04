@@ -7,6 +7,10 @@
     $newsletterCount = 0;
     $podcastCount = 0;
     foreach ($postsMetadata as $item) {
+        $status = strtolower((string) ($item['metadata']['Status'] ?? 'published'));
+        if ($status === 'draft') {
+            continue;
+        }
         $template = strtolower($item['metadata']['Template'] ?? 'post');
         if ($template === 'page') {
             $pageCount++;
@@ -55,6 +59,7 @@
     $pagesStats = $analytics['content']['pages'] ?? [];
     $platformDaily = $analytics['platform']['daily'] ?? [];
     $sourcesDaily = $analytics['sources']['daily'] ?? [];
+    $botsDaily = $analytics['bots']['daily'] ?? [];
     $gscSettings = $settings['search_console'] ?? [];
     $gscProperty = trim((string) ($gscSettings['property'] ?? ''));
     $gscClientId = trim((string) ($gscSettings['client_id'] ?? ''));
@@ -353,6 +358,28 @@
     }
     $desktopUids = $platformDevices['desktop'] ?? [];
     $desktopCount = count($desktopUids);
+
+    $botCounts = [];
+    $botTotal = 0;
+    foreach ($botsDaily as $day => $payload) {
+        if (!is_string($day) || $day < $startKey) {
+            continue;
+        }
+        if (!is_array($payload)) {
+            continue;
+        }
+        foreach ($payload as $botLabel => $botData) {
+            $count = is_array($botData) ? (int) ($botData['count'] ?? 0) : (int) $botData;
+            if ($count <= 0) {
+                continue;
+            }
+            $botCounts[$botLabel] = ($botCounts[$botLabel] ?? 0) + $count;
+            $botTotal += $count;
+        }
+    }
+    if (!empty($botCounts)) {
+        arsort($botCounts);
+    }
 
     $buildPercentTable = static function (array $map, array $labelMap): array {
         $counts = [];
@@ -1171,6 +1198,34 @@
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Bots y crawlers</h4>
+                        <?php if ($botTotal === 0): ?>
+                            <p class="text-muted mb-0">Sin visitas de bots registradas.</p>
+                        <?php else: ?>
+                            <p class="mb-2"><strong>Total:</strong> <?= (int) $botTotal ?></p>
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Bot</th>
+                                            <th class="text-right">Visitas</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($botCounts as $botLabel => $count): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars((string) $botLabel, ENT_QUOTES, 'UTF-8') ?></td>
+                                                <td class="text-right"><?= (int) $count ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>

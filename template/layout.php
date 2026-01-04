@@ -112,7 +112,11 @@ $serverDayExpires = date(DATE_RFC2822, strtotime('today 23:59:59'));
 $serverConsentDate = date('Y-m-d');
 $serverConsentExpires = gmdate('D, d M Y H:i:s T', time() + 31536000);
 $serverYearExpires = gmdate('D, d M Y H:i:s T', time() + 31536000);
-if (function_exists('nammu_record_visit')) {
+if ($isCrawler) {
+    if (function_exists('nammu_record_bot_visit')) {
+        nammu_record_bot_visit($userAgent);
+    }
+} elseif (function_exists('nammu_record_visit')) {
     nammu_record_visit();
 }
 if (!empty($theme['lang'])) {

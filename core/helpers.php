@@ -140,6 +140,7 @@ function nammu_load_analytics(): array
             'visitors' => ['daily' => []],
             'content' => ['posts' => [], 'pages' => []],
             'itineraries' => ['items' => []],
+            'bots' => ['daily' => []],
             'sources' => ['daily' => []],
             'updated_at' => 0,
         ];
@@ -150,6 +151,7 @@ function nammu_load_analytics(): array
             'visitors' => ['daily' => []],
             'content' => ['posts' => [], 'pages' => []],
             'itineraries' => ['items' => []],
+            'bots' => ['daily' => []],
             'updated_at' => 0,
         ];
     }
@@ -161,6 +163,7 @@ function nammu_load_analytics(): array
             'itineraries' => ['items' => []],
             'platform' => ['daily' => []],
             'sources' => ['daily' => []],
+            'bots' => ['daily' => []],
             'updated_at' => 0,
         ];
     }
@@ -169,6 +172,7 @@ function nammu_load_analytics(): array
     $decoded['itineraries'] = $decoded['itineraries'] ?? ['items' => []];
     $decoded['platform'] = $decoded['platform'] ?? ['daily' => []];
     $decoded['sources'] = $decoded['sources'] ?? ['daily' => []];
+    $decoded['bots'] = $decoded['bots'] ?? ['daily' => []];
     $decoded['updated_at'] = (int) ($decoded['updated_at'] ?? 0);
     return $decoded;
 }
@@ -247,6 +251,58 @@ function nammu_detect_user_agent_source(string $userAgent): array
         }
     }
     return ['bucket' => '', 'detail' => ''];
+}
+
+function nammu_detect_bot_name(string $userAgent): string
+{
+    $ua = strtolower(trim($userAgent));
+    if ($ua === '') {
+        return '';
+    }
+    $bots = [
+        'googlebot' => 'Googlebot',
+        'bingbot' => 'Bingbot',
+        'yandexbot' => 'YandexBot',
+        'duckduckbot' => 'DuckDuckBot',
+        'baiduspider' => 'Baiduspider',
+        'sogou' => 'Sogou',
+        'slurp' => 'Yahoo Slurp',
+        'facebookexternalhit' => 'Facebook',
+        'facebot' => 'Facebook',
+        'twitterbot' => 'Twitter/X',
+        'pinterest' => 'Pinterest',
+        'linkedinbot' => 'LinkedIn',
+        'whatsapp' => 'WhatsApp',
+        'telegram' => 'Telegram',
+        'bot' => 'Bot',
+        'crawl' => 'Crawler',
+        'spider' => 'Spider',
+    ];
+    foreach ($bots as $needle => $label) {
+        if (str_contains($ua, $needle)) {
+            return $label;
+        }
+    }
+    return '';
+}
+
+function nammu_record_bot_visit(string $userAgent): void
+{
+    $botName = nammu_detect_bot_name($userAgent);
+    if ($botName === '') {
+        return;
+    }
+    $data = nammu_load_analytics();
+    $date = date('Y-m-d');
+    if (!isset($data['bots']['daily'][$date])) {
+        $data['bots']['daily'][$date] = [];
+    }
+    if (!isset($data['bots']['daily'][$date][$botName])) {
+        $data['bots']['daily'][$date][$botName] = ['count' => 0];
+    }
+    $data['bots']['daily'][$date][$botName]['count'] = (int) ($data['bots']['daily'][$date][$botName]['count'] ?? 0) + 1;
+    $data['updated_at'] = time();
+    nammu_save_analytics($data);
 }
 
 function nammu_save_analytics(array $data): void

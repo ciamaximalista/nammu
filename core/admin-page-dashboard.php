@@ -1206,7 +1206,7 @@
                         <?php if ($botTotal === 0): ?>
                             <p class="text-muted mb-0">Sin visitas de bots registradas.</p>
                         <?php else: ?>
-                            <p class="mb-2"><strong>Total:</strong> <?= (int) $botTotal ?></p>
+                            <p class="mb-2"><strong>Total últimos 30 días:</strong> <?= (int) $botTotal ?></p>
                             <div class="table-responsive">
                                 <table class="table table-sm mb-0">
                                     <thead>

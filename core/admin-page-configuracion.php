@@ -161,73 +161,6 @@
             </div>
         </form>
 
-        <form method="post" class="mt-4" id="mailing">
-            <h4 class="mt-2">Correo de la lista (Gmail)</h4>
-            <p class="text-muted mb-3">Indica la dirección de Gmail que se usará para enviar correos a la lista. El envío utiliza el servidor de Gmail con autenticación OAuth2.</p>
-            <div class="form-group">
-                <label for="mailing_gmail">Dirección de Gmail</label>
-                <input type="email" name="mailing_gmail" id="mailing_gmail" class="form-control" value="<?= htmlspecialchars($mailingGmail, ENT_QUOTES, 'UTF-8') ?>" placeholder="tunombre@gmail.com">
-                <small class="form-text text-muted">Servidor: smtp.gmail.com · Puerto: 465 · Seguridad: SSL/TLS · Método: OAuth2.</small>
-            </div>
-            <div class="form-group">
-                <label for="mailing_client_id">Google Client ID</label>
-                <input type="text" name="mailing_client_id" id="mailing_client_id" class="form-control" value="<?= htmlspecialchars($mailingClientId, ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxx.apps.googleusercontent.com">
-                <small class="form-text text-muted">Credenciales OAuth 2.0 (tipo aplicación web) desde Google Cloud Console. <a href="#" data-toggle="modal" data-target="#gmailOAuthHelpModal">Ver guía rápida</a></small>
-            </div>
-            <div class="form-group">
-                <label for="mailing_client_secret">Google Client Secret</label>
-                <input type="text" name="mailing_client_secret" id="mailing_client_secret" class="form-control" value="<?= htmlspecialchars($mailingClientSecret, ENT_QUOTES, 'UTF-8') ?>" placeholder="********">
-            </div>
-            <div class="form-group">
-                <label>Estado</label>
-                <div>
-                    <?php if ($mailingStatus === 'connected'): ?>
-                        <span class="badge badge-success">Conectado</span>
-                    <?php elseif ($mailingStatus === 'pending' && $mailingGmail !== ''): ?>
-                        <span class="badge badge-warning">Pendiente de conectar</span>
-                    <?php else: ?>
-                        <span class="badge badge-secondary">Sin configurar</span>
-                    <?php endif; ?>
-                </div>
-                <small class="form-text text-muted">Necesitarás autorizar con Google desde la pestaña “Lista”.</small>
-            </div>
-            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-                <button type="submit" name="save_mailing" class="btn btn-outline-primary mr-2 mb-2">Guardar correo de la lista</button>
-                <a class="btn btn-outline-secondary mb-2 <?= $mailingGmail === '' || $mailingClientId === '' || $mailingClientSecret === '' ? 'disabled' : '' ?>" href="<?= $mailingGmail !== '' && $mailingClientId !== '' && $mailingClientSecret !== '' ? 'admin.php?page=lista-correo&gmail_auth=1' : '#' ?>">Conectar con Google</a>
-            </div>
-            <?php if (!empty($mailingGmail)): ?>
-                <div class="alert alert-info mb-0">
-                    <?= htmlspecialchars($mailingGmail, ENT_QUOTES, 'UTF-8') ?> está guardado. Conecta en la pestaña “Lista” para autorizar envíos con OAuth2.
-                </div>
-            <?php else: ?>
-                <div class="alert alert-warning mb-0">Aún no hay dirección configurada. Guárdala para habilitar la autenticación con Google.</div>
-            <?php endif; ?>
-        </form>
-
-        <form method="post" class="mt-4" id="twitter-media">
-            <h4 class="mt-2">Twitter / X (imágenes en podcasts)</h4>
-            <p class="text-muted mb-3">Estas credenciales se usan para subir imágenes cuando compartes un podcast. <a href="#" data-toggle="modal" data-target="#twitterMediaHelpModal">Ver guía rápida</a></p>
-            <div class="form-group">
-                <label for="twitter_api_key">API Key (Consumer Key)</label>
-                <input type="text" name="twitter_api_key" id="twitter_api_key" class="form-control" value="<?= htmlspecialchars($twitterApiKey, ENT_QUOTES, 'UTF-8') ?>" placeholder="API Key">
-            </div>
-            <div class="form-group">
-                <label for="twitter_api_secret">API Secret (Consumer Secret)</label>
-                <input type="text" name="twitter_api_secret" id="twitter_api_secret" class="form-control" value="<?= htmlspecialchars($twitterApiSecret, ENT_QUOTES, 'UTF-8') ?>" placeholder="API Secret">
-            </div>
-            <div class="form-group">
-                <label for="twitter_access_token">Access Token (Read/Write)</label>
-                <input type="text" name="twitter_access_token" id="twitter_access_token" class="form-control" value="<?= htmlspecialchars($twitterAccessToken, ENT_QUOTES, 'UTF-8') ?>" placeholder="Access Token">
-            </div>
-            <div class="form-group">
-                <label for="twitter_access_secret">Access Token Secret</label>
-                <input type="text" name="twitter_access_secret" id="twitter_access_secret" class="form-control" value="<?= htmlspecialchars($twitterAccessSecret, ENT_QUOTES, 'UTF-8') ?>" placeholder="Access Token Secret">
-            </div>
-            <div class="text-right mb-4">
-                <button type="submit" name="save_twitter_media" class="btn btn-outline-primary">Guardar Twitter / X (media)</button>
-            </div>
-        </form>
-
         <div class="modal fade" id="googleFontsHelpModal" tabindex="-1" role="dialog" aria-labelledby="googleFontsHelpModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
@@ -244,33 +177,6 @@
                             <li>En <strong>APIs y servicios &gt; Credenciales</strong> crea una <strong>Clave de API</strong>.</li>
                             <li>Copia la clave y pégala en este campo.</li>
                         </ol>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="modal fade" id="gmailOAuthHelpModal" tabindex="-1" role="dialog" aria-labelledby="gmailOAuthHelpModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-lg" role="document">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="gmailOAuthHelpModalLabel">Guía rápida: Client ID y Secret (Gmail)</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <ol class="mb-3">
-                            <li>En <strong>Google Cloud Console</strong>, crea o selecciona un proyecto.</li>
-                            <li>En <strong>APIs y servicios &gt; Biblioteca</strong>, habilita <strong>Gmail API</strong>.</li>
-                            <li>En <strong>APIs y servicios &gt; Pantalla de consentimiento OAuth</strong>, configura la app (tipo interno/público).</li>
-                            <li>En <strong>Credenciales</strong>, crea un <strong>ID de cliente de OAuth</strong> tipo <strong>Aplicación web</strong>.</li>
-                            <li>Añade como <strong>URI de redirección autorizada</strong>: <code>https://tu-dominio/admin.php?page=lista-correo&amp;gmail_callback=1</code></li>
-                            <li>Copia el <strong>Client ID</strong> y el <strong>Client Secret</strong> y pégalos aquí.</li>
-                        </ol>
-                        <p class="mb-0 text-muted">Después conecta desde la pestaña <strong>Lista</strong> para autorizar el envío.</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
@@ -303,32 +209,6 @@
                             <li>Pega también la propiedad, el Client ID y el Client Secret.</li>
                         </ol>
                         <p class="mb-0 text-muted">El proyecto debe tener acceso a la propiedad en Search Console.</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="modal fade" id="twitterMediaHelpModal" tabindex="-1" role="dialog" aria-labelledby="twitterMediaHelpModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-lg" role="document">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="twitterMediaHelpModalLabel">Guía rápida: credenciales para subir imágenes en X</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <ol class="mb-3">
-                            <li>Entra en <strong>X Developer Portal</strong> y crea un proyecto + app.</li>
-                            <li>En la app, activa el acceso <strong>OAuth 1.0a</strong> y permisos <strong>Read and Write</strong>.</li>
-                            <li>Genera y copia <strong>API Key</strong> y <strong>API Secret</strong>.</li>
-                            <li>Genera <strong>Access Token</strong> y <strong>Access Token Secret</strong> (usuario propietario).</li>
-                            <li>Pega esos cuatro valores aquí y guarda.</li>
-                        </ol>
-                        <p class="mb-0 text-muted">Estas credenciales se usan únicamente para subir imágenes cuando compartes podcasts.</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>

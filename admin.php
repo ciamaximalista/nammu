@@ -5159,7 +5159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Throwable $e) {
             $error = "Error guardando Twitter / X: " . $e->getMessage();
         }
-        header('Location: admin.php?page=configuracion#twitter-media');
+        header('Location: admin.php?page=anuncios#twitter-media');
         exit;
     } elseif (isset($_POST['save_social'])) {
         $social_default_description = trim($_POST['social_default_description'] ?? '');
@@ -5303,7 +5303,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Throwable $e) {
             $error = "Error guardando la configuración de correo: " . $e->getMessage();
         }
-        header('Location: admin.php?page=configuracion#mailing');
+        header('Location: admin.php?page=lista-correo#mailing');
         exit;
     } elseif (isset($_POST['add_subscriber'])) {
         $email = admin_normalize_email($_POST['subscriber_email'] ?? '');

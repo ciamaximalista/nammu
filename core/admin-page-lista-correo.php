@@ -35,13 +35,60 @@
 
         <p class="text-muted">Configura y consulta aquí la futura lista de correo. Usaremos tu cuenta de Gmail (SMTP con OAuth2 sobre SSL/TLS, puerto 465) para enviar mensajes cuando el módulo esté activo.</p>
 
+        <div class="card mb-3" id="mailing">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Correo de la lista (Gmail)</h5>
+                <p class="text-muted mb-3">Indica la dirección de Gmail que se usará para enviar correos a la lista. El envío utiliza el servidor de Gmail con autenticación OAuth2.</p>
+                <form method="post">
+                    <div class="form-group">
+                        <label for="mailing_gmail">Dirección de Gmail</label>
+                        <input type="email" name="mailing_gmail" id="mailing_gmail" class="form-control" value="<?= htmlspecialchars($mailingGmail, ENT_QUOTES, 'UTF-8') ?>" placeholder="tunombre@gmail.com">
+                        <small class="form-text text-muted">Servidor: smtp.gmail.com · Puerto: 465 · Seguridad: SSL/TLS · Método: OAuth2.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="mailing_client_id">Google Client ID</label>
+                        <input type="text" name="mailing_client_id" id="mailing_client_id" class="form-control" value="<?= htmlspecialchars($mailingClientId, ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxx.apps.googleusercontent.com">
+                        <small class="form-text text-muted">Credenciales OAuth 2.0 (tipo aplicación web) desde Google Cloud Console. <a href="#" data-toggle="modal" data-target="#gmailOAuthHelpModal">Ver guía rápida</a></small>
+                    </div>
+                    <div class="form-group">
+                        <label for="mailing_client_secret">Google Client Secret</label>
+                        <input type="text" name="mailing_client_secret" id="mailing_client_secret" class="form-control" value="<?= htmlspecialchars($mailingClientSecret, ENT_QUOTES, 'UTF-8') ?>" placeholder="********">
+                    </div>
+                    <div class="form-group">
+                        <label>Estado</label>
+                        <div>
+                            <?php if ($mailingStatus === 'connected'): ?>
+                                <span class="badge badge-success">Conectado</span>
+                            <?php elseif ($mailingStatus === 'pending' && $mailingGmail !== ''): ?>
+                                <span class="badge badge-warning">Pendiente de conectar</span>
+                            <?php else: ?>
+                                <span class="badge badge-secondary">Sin configurar</span>
+                            <?php endif; ?>
+                        </div>
+                        <small class="form-text text-muted">Necesitarás autorizar con Google desde esta misma pestaña.</small>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                        <button type="submit" name="save_mailing" class="btn btn-outline-primary mr-2 mb-2">Guardar correo de la lista</button>
+                        <a class="btn btn-outline-secondary mb-2 <?= $mailingGmail === '' || $mailingClientId === '' || $mailingClientSecret === '' ? 'disabled' : '' ?>" href="<?= $mailingGmail !== '' && $mailingClientId !== '' && $mailingClientSecret !== '' ? 'admin.php?page=lista-correo&gmail_auth=1' : '#' ?>">Conectar con Google</a>
+                    </div>
+                    <?php if (!empty($mailingGmail)): ?>
+                        <div class="alert alert-info mb-0">
+                            <?= htmlspecialchars($mailingGmail, ENT_QUOTES, 'UTF-8') ?> está guardado. Conecta aquí para autorizar envíos con OAuth2.
+                        </div>
+                    <?php else: ?>
+                        <div class="alert alert-warning mb-0">Aún no hay dirección configurada. Guárdala para habilitar la autenticación con Google.</div>
+                    <?php endif; ?>
+                </form>
+            </div>
+        </div>
+
         <?php if ($mailingFeedback !== null): ?>
             <div class="alert alert-<?= htmlspecialchars($mailingFeedback['type'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($mailingFeedback['message'], ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
 
         <?php if ($mailingGmail === ''): ?>
             <div class="alert alert-warning">
-                Aún no has configurado una dirección de Gmail. Ve a <a href="?page=configuracion#mailing" class="alert-link">Configuración &gt; Correo de la lista</a> y guárdala para continuar.
+                Aún no has configurado una dirección de Gmail. Completa el bloque <a href="#mailing" class="alert-link">Correo de la lista</a> para continuar.
             </div>
         <?php else: ?>
             <div class="card mb-3">
@@ -206,7 +253,32 @@
             </div>
         <?php endif; ?>
 
-        <a class="btn btn-outline-primary" href="?page=configuracion#mailing">Editar correo de la lista</a>
+        <div class="modal fade" id="gmailOAuthHelpModal" tabindex="-1" role="dialog" aria-labelledby="gmailOAuthHelpModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="gmailOAuthHelpModalLabel">Guía rápida: Client ID y Secret (Gmail)</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <ol class="mb-3">
+                            <li>En <strong>Google Cloud Console</strong>, crea o selecciona un proyecto.</li>
+                            <li>En <strong>APIs y servicios &gt; Biblioteca</strong>, habilita <strong>Gmail API</strong>.</li>
+                            <li>En <strong>APIs y servicios &gt; Pantalla de consentimiento OAuth</strong>, configura la app (tipo interno/público).</li>
+                            <li>En <strong>Credenciales</strong>, crea un <strong>ID de cliente de OAuth</strong> tipo <strong>Aplicación web</strong>.</li>
+                            <li>Añade como <strong>URI de redirección autorizada</strong>: <code>https://tu-dominio/admin.php?page=lista-correo&amp;gmail_callback=1</code></li>
+                            <li>Copia el <strong>Client ID</strong> y el <strong>Client Secret</strong> y pégalos aquí.</li>
+                        </ol>
+                        <p class="mb-0 text-muted">Después conecta con Google desde esta misma pestaña para autorizar el envío.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
     </div>
 

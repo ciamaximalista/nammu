@@ -1015,7 +1015,7 @@
             <div class="col-lg-6">
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3">Usuarios únicos (últimos 30 días)</h4>
+                        <h4 class="h6 text-uppercase text-muted mb-3">Usuarios únicos humanos (últimos 30 días)</h4>
                         <?php if ($last30Line['points'] === ''): ?>
                             <p class="text-muted mb-0">Sin datos todavia.</p>
                         <?php else: ?>
@@ -1041,7 +1041,7 @@
             <div class="col-lg-6">
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3">Usuarios unicos (ultimo ano)</h4>
+                        <h4 class="h6 text-uppercase text-muted mb-3">Usuarios unicos humanos (ultimo ano)</h4>
                         <?php if ($last12Line['points'] === ''): ?>
                             <p class="text-muted mb-0">Sin datos todavia.</p>
                         <?php else: ?>

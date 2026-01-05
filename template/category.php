@@ -31,6 +31,9 @@ if (is_string($accentRaw)) {
 }
 $brandColor = htmlspecialchars($colors['brand'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8');
 $headingSecondaryColor = htmlspecialchars($colors['h2'] ?? '#ea2f28', ENT_QUOTES, 'UTF-8');
+$blogName = (string) ($theme['blog'] ?? ($siteTitle ?? 'Nammu Blog'));
+$authorName = (string) ($theme['author'] ?? '');
+$categoryLabel = $authorName !== '' ? ($blogName . ' por ' . $authorName) : $blogName;
 $homeSettings = $theme['home'] ?? [];
 $columns = (int) ($homeSettings['columns'] ?? 2);
 if ($columns < 1 || $columns > 3) {
@@ -206,7 +209,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
 ?>
 <section class="category-detail-hero">
     <div>
-        <p class="category-label">Categoría</p>
+        <p class="category-label"><?= htmlspecialchars($categoryLabel, ENT_QUOTES, 'UTF-8') ?></p>
         <h1><?= htmlspecialchars($category, ENT_QUOTES, 'UTF-8') ?></h1>
         <p class="category-count"><?= htmlspecialchars((string) $count, ENT_QUOTES, 'UTF-8') ?> <?= $count === 1 ? 'entrada publicada' : 'entradas publicadas' ?></p>
     </div>

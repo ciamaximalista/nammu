@@ -506,7 +506,17 @@ function nammu_record_visit(): void
         $changed = true;
     }
     $referrer = $_SERVER['HTTP_REFERER'] ?? '';
-    if ($referrer === '' && isset($_COOKIE['nammu_stats_referrer'])) {
+    $host = $_SERVER['HTTP_HOST'] ?? '';
+    $isSelfReferrer = false;
+    if ($referrer !== '') {
+        $refHost = parse_url($referrer, PHP_URL_HOST);
+        $refHost = $refHost ? strtolower($refHost) : '';
+        $hostLower = strtolower($host);
+        if ($refHost !== '' && $hostLower !== '' && ($refHost === $hostLower || str_ends_with($refHost, '.' . $hostLower))) {
+            $isSelfReferrer = true;
+        }
+    }
+    if (($referrer === '' || $isSelfReferrer) && isset($_COOKIE['nammu_stats_referrer'])) {
         $storedRef = trim((string) $_COOKIE['nammu_stats_referrer']);
         if ($storedRef !== '') {
             $decodedRef = urldecode($storedRef);
@@ -517,7 +527,6 @@ function nammu_record_visit(): void
         setcookie('nammu_stats_referrer', '', time() - 3600, '/');
         unset($_COOKIE['nammu_stats_referrer']);
     }
-    $host = $_SERVER['HTTP_HOST'] ?? '';
     $source = nammu_detect_referrer_source($referrer, $host);
     if (($source['bucket'] ?? '') === 'direct') {
         $utmSource = strtolower(trim((string) ($_GET['utm_source'] ?? '')));

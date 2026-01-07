@@ -233,6 +233,17 @@
         }
         return $total;
     };
+    $sumAllViews = static function (array $daily): int {
+        $total = 0;
+        foreach ($daily as $count) {
+            if (is_array($count)) {
+                $total += (int) ($count['views'] ?? 0);
+            } else {
+                $total += (int) $count;
+            }
+        }
+        return $total;
+    };
 
     $uniqueRange = static function (array $daily, DateTimeImmutable $start, DateTimeImmutable $end): int {
         $uids = [];
@@ -731,7 +742,12 @@
 
     $allPosts = [];
     foreach ($postsStats as $slug => $item) {
+        $daily = $item['daily'] ?? [];
         $total = (int) ($item['total'] ?? 0);
+        $totalFromDaily = $sumAllViews(is_array($daily) ? $daily : []);
+        if ($totalFromDaily > $total) {
+            $total = $totalFromDaily;
+        }
         if ($total <= 0) {
             continue;
         }
@@ -739,7 +755,7 @@
             'slug' => $slug,
             'title' => $item['title'] ?? $slug,
             'count' => $total,
-            'unique' => $uniqueAll($item['daily'] ?? []),
+            'unique' => $uniqueAll(is_array($daily) ? $daily : []),
         ];
     }
     $topPosts = $allPosts;
@@ -805,7 +821,12 @@
 
     $allPages = [];
     foreach ($pagesStats as $slug => $item) {
+        $daily = $item['daily'] ?? [];
         $total = (int) ($item['total'] ?? 0);
+        $totalFromDaily = $sumAllViews(is_array($daily) ? $daily : []);
+        if ($totalFromDaily > $total) {
+            $total = $totalFromDaily;
+        }
         if ($total <= 0) {
             continue;
         }
@@ -813,7 +834,7 @@
             'slug' => $slug,
             'title' => $item['title'] ?? $slug,
             'count' => $total,
-            'unique' => $uniqueAll($item['daily'] ?? []),
+            'unique' => $uniqueAll(is_array($daily) ? $daily : []),
         ];
     }
     $topPages = $allPages;

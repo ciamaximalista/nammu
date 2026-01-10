@@ -823,8 +823,7 @@
         if ($slug === 'podcast' || $slug === 'categorias' || $slug === 'letras' || $slug === 'itinerarios') {
             return true;
         }
-        return str_starts_with($slug, 'itinerarios/')
-            || str_starts_with($slug, 'categoria/')
+        return str_starts_with($slug, 'categoria/')
             || str_starts_with($slug, 'letra/');
     };
     $allPages = [];
@@ -935,25 +934,47 @@
         if ($slug === 'letras') {
             return '/letras';
         }
-        if ($slug === 'itinerarios') {
-            return '/itinerarios';
-        }
         if (str_starts_with($slug, 'categoria/')) {
             return '/' . $slug;
         }
         if (str_starts_with($slug, 'letra/')) {
             return '/' . $slug;
         }
-        if (str_starts_with($slug, 'itinerarios/')) {
-            return '/' . $slug;
+        if ($slug === 'itinerarios') {
+            return '/itinerarios';
         }
         return '/' . $slug;
     };
 
+    $itineraryPageUniques = [];
+    foreach ($pagesStats as $slug => $item) {
+        if (!str_starts_with($slug, 'itinerarios/')) {
+            continue;
+        }
+        $parts = explode('/', $slug);
+        if (count($parts) !== 2 || $parts[1] === '') {
+            continue;
+        }
+        $daily = is_array($item['daily'] ?? null) ? $item['daily'] : [];
+        $unique = $uniqueAll($daily);
+        if ($unique > 0) {
+            $itineraryPageUniques[$parts[1]] = max($itineraryPageUniques[$parts[1]] ?? 0, $unique);
+        }
+    }
+
+    $topItineraryViews = [];
     $topItineraryStarts = [];
     $topItineraryCompletes = [];
     foreach ($itineraries ?? [] as $itineraryItem) {
         $slug = $itineraryItem->getSlug();
+        $viewCount = $itineraryPageUniques[$slug] ?? 0;
+        if ($viewCount > 0) {
+            $topItineraryViews[] = [
+                'slug' => $slug,
+                'title' => $itineraryTitleMap[$slug] ?? $slug,
+                'count' => $viewCount,
+            ];
+        }
         $rawStats = admin_get_itinerary_stats($itineraryItem);
         $topicStatsList = array_values($rawStats['topics'] ?? []);
         usort($topicStatsList, static function (array $a, array $b): int {
@@ -997,6 +1018,10 @@
     usort($topItineraryCompletes, static function (array $a, array $b): int {
         return $b['count'] <=> $a['count'];
     });
+    usort($topItineraryViews, static function (array $a, array $b): int {
+        return $b['count'] <=> $a['count'];
+    });
+    $topItineraryViews = array_slice($topItineraryViews, 0, 10);
     $topItineraryStarts = array_slice($topItineraryStarts, 0, 10);
     $topItineraryCompletes = array_slice($topItineraryCompletes, 0, 10);
 
@@ -1454,7 +1479,7 @@
                 <div class="card mb-4 dashboard-stat-block">
                     <div class="card-body">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                            <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Itinerarios y páginas sistémicas más leídas</h4>
+                            <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Páginas sistémicas más leídas</h4>
                             <div class="d-flex flex-column align-items-start">
                                 <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle my-2" role="group" data-stat-toggle="system-pages" data-stat-toggle-type="mode">
                                     <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
@@ -1546,14 +1571,26 @@
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                                 <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Itinerarios (usuarios únicos)</h4>
                                 <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="itineraries" data-stat-toggle-type="mode">
-                                    <button type="button" class="btn btn-outline-primary active" data-stat-mode="starts">Comenzaron</button>
+                                    <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vieron</button>
+                                    <button type="button" class="btn btn-outline-primary" data-stat-mode="starts">Comenzaron</button>
                                     <button type="button" class="btn btn-outline-primary" data-stat-mode="completes">Completaron</button>
                                 </div>
                             </div>
-                            <?php if (empty($topItineraryStarts) && empty($topItineraryCompletes)): ?>
+                            <?php if (empty($topItineraryViews) && empty($topItineraryStarts) && empty($topItineraryCompletes)): ?>
                                 <p class="text-muted mb-0">Sin datos todavía.</p>
                             <?php else: ?>
-                                <ol class="mb-0 dashboard-links" data-stat-list="itineraries" data-stat-mode="starts">
+                                <ol class="mb-0 dashboard-links" data-stat-list="itineraries" data-stat-mode="views">
+                                    <?php foreach ($topItineraryViews as $item): ?>
+                                        <li>
+                                            <?php $url = admin_public_itinerary_url($item['slug']); ?>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                                <ol class="mb-0 dashboard-links d-none" data-stat-list="itineraries" data-stat-mode="starts">
                                     <?php foreach ($topItineraryStarts as $item): ?>
                                         <li>
                                             <?php $url = admin_public_itinerary_url($item['slug']); ?>

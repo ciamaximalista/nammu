@@ -829,6 +829,9 @@
     $allPages = [];
     $allSystemPages = [];
     foreach ($pagesStats as $slug => $item) {
+        if (str_starts_with($slug, 'itinerarios/')) {
+            continue;
+        }
         $daily = $item['daily'] ?? [];
         $total = (int) ($item['total'] ?? 0);
         $totalFromDaily = $sumAllViews(is_array($daily) ? $daily : []);

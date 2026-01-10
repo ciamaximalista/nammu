@@ -844,6 +844,7 @@
             'title' => $item['title'] ?? $slug,
             'count' => $total,
             'unique' => $uniqueAll(is_array($daily) ? $daily : []),
+            'daily' => is_array($daily) ? $daily : [],
         ];
         if ($isSystemPageSlug($slug)) {
             $allSystemPages[] = $entry;
@@ -876,6 +877,53 @@
         return $b['unique'] <=> $a['unique'];
     });
     $topSystemPagesByUnique = array_slice($topSystemPagesByUnique, 0, 10);
+    $topSystemPagesWeek = [];
+    $topSystemPagesMonth = [];
+    foreach ($allSystemPages as $item) {
+        $daily = $item['daily'] ?? [];
+        $countWeek = $sumRange($daily, $last7Start, $today);
+        $countMonth = $sumRange($daily, $last30Start, $today);
+        if ($countWeek > 0) {
+            $topSystemPagesWeek[] = [
+                'slug' => $item['slug'],
+                'title' => $item['title'],
+                'count' => $countWeek,
+                'unique' => $uniqueRange($daily, $last7Start, $today),
+            ];
+        }
+        if ($countMonth > 0) {
+            $topSystemPagesMonth[] = [
+                'slug' => $item['slug'],
+                'title' => $item['title'],
+                'count' => $countMonth,
+                'unique' => $uniqueRange($daily, $last30Start, $today),
+            ];
+        }
+    }
+    $topSystemPagesWeekByUnique = $topSystemPagesWeek;
+    usort($topSystemPagesWeekByUnique, static function (array $a, array $b): int {
+        return $b['unique'] <=> $a['unique'];
+    });
+    $topSystemPagesWeekByUnique = array_values(array_filter($topSystemPagesWeekByUnique, static function (array $item): bool {
+        return (int) ($item['unique'] ?? 0) > 0;
+    }));
+    $topSystemPagesWeekByUnique = array_slice($topSystemPagesWeekByUnique, 0, 10);
+    $topSystemPagesMonthByUnique = $topSystemPagesMonth;
+    usort($topSystemPagesMonthByUnique, static function (array $a, array $b): int {
+        return $b['unique'] <=> $a['unique'];
+    });
+    $topSystemPagesMonthByUnique = array_values(array_filter($topSystemPagesMonthByUnique, static function (array $item): bool {
+        return (int) ($item['unique'] ?? 0) > 0;
+    }));
+    $topSystemPagesMonthByUnique = array_slice($topSystemPagesMonthByUnique, 0, 10);
+    usort($topSystemPagesWeek, static function (array $a, array $b): int {
+        return $b['count'] <=> $a['count'];
+    });
+    usort($topSystemPagesMonth, static function (array $a, array $b): int {
+        return $b['count'] <=> $a['count'];
+    });
+    $topSystemPagesWeek = array_slice($topSystemPagesWeek, 0, 10);
+    $topSystemPagesMonth = array_slice($topSystemPagesMonth, 0, 10);
 
     $buildSystemPageUrl = static function (string $slug): string {
         if ($slug === 'podcast') {
@@ -1090,7 +1138,7 @@
                     <div class="card-body">
                         <h4 class="h6 text-uppercase text-muted mb-3">Usuarios únicos humanos (últimos 30 días)</h4>
                         <?php if ($last30Line['points'] === ''): ?>
-                            <p class="text-muted mb-0">Sin datos todavia.</p>
+                            <p class="text-muted mb-0">Sin datos todavía.</p>
                         <?php else: ?>
                             <svg width="100%" height="170" viewBox="0 0 320 170" preserveAspectRatio="none" aria-hidden="true">
                                 <line x1="30" y1="<?= (int) $chartTop ?>" x2="30" y2="<?= (int) $chartBottom ?>" stroke="#ccd6e0" stroke-width="1"></line>
@@ -1116,7 +1164,7 @@
                     <div class="card-body">
                         <h4 class="h6 text-uppercase text-muted mb-3">Usuarios únicos humanos (último año)</h4>
                         <?php if ($last12Line['points'] === ''): ?>
-                            <p class="text-muted mb-0">Sin datos todavia.</p>
+                            <p class="text-muted mb-0">Sin datos todavía.</p>
                         <?php else: ?>
                             <svg width="100%" height="170" viewBox="0 0 320 170" preserveAspectRatio="none" aria-hidden="true">
                                 <line x1="30" y1="<?= (int) $chartTop ?>" x2="30" y2="<?= (int) $chartBottom ?>" stroke="#ccd6e0" stroke-width="1"></line>
@@ -1258,7 +1306,7 @@
                                 <tbody>
                                     <?php if (empty($yearList)): ?>
                                         <tr>
-                                            <td colspan="2" class="text-muted">Sin datos todavia.</td>
+                                            <td colspan="2" class="text-muted">Sin datos todavía.</td>
                                         </tr>
                                     <?php else: ?>
                                         <?php foreach ($yearList as $item): ?>
@@ -1326,7 +1374,7 @@
                             </div>
                         </div>
                         <?php if (!$hasPostStats): ?>
-                            <p class="text-muted mb-0">Sin datos todavia.</p>
+                            <p class="text-muted mb-0">Sin datos todavía.</p>
                         <?php else: ?>
                             <ol class="mb-0 dashboard-links" data-stat-list="posts" data-stat-mode="views" data-stat-period="all">
                                 <?php foreach ($topPosts as $item): ?>
@@ -1398,6 +1446,100 @@
                     </div>
                 </div>
 
+                <?php
+                $hasSystemPageStats = !empty($topSystemPages) || !empty($topSystemPagesByUnique)
+                    || !empty($topSystemPagesWeek) || !empty($topSystemPagesWeekByUnique)
+                    || !empty($topSystemPagesMonth) || !empty($topSystemPagesMonthByUnique);
+                ?>
+                <div class="card mb-4 dashboard-stat-block">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                            <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Itinerarios y páginas sistémicas más leídas</h4>
+                            <div class="d-flex flex-column align-items-start">
+                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle my-2" role="group" data-stat-toggle="system-pages" data-stat-toggle-type="mode">
+                                    <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
+                                    <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
+                                </div>
+                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle my-2" role="group" data-stat-toggle="system-pages" data-stat-toggle-type="period">
+                                    <button type="button" class="btn btn-outline-primary" data-stat-period="week">Últimos 7 días</button>
+                                    <button type="button" class="btn btn-outline-primary" data-stat-period="month">Últimos 30 días</button>
+                                    <button type="button" class="btn btn-outline-primary active" data-stat-period="all">Desde el comienzo del blog</button>
+                                </div>
+                            </div>
+                        </div>
+                        <?php if (!$hasSystemPageStats): ?>
+                            <p class="text-muted mb-0">Sin datos todavía.</p>
+                        <?php else: ?>
+                            <ol class="mb-0 dashboard-links" data-stat-list="system-pages" data-stat-mode="views" data-stat-period="all">
+                                <?php foreach ($topSystemPages as $item): ?>
+                                    <?php $url = $buildSystemPageUrl($item['slug']); ?>
+                                    <li>
+                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
+                            <ol class="mb-0 dashboard-links d-none" data-stat-list="system-pages" data-stat-mode="users" data-stat-period="all">
+                                <?php foreach ($topSystemPagesByUnique as $item): ?>
+                                    <?php $url = $buildSystemPageUrl($item['slug']); ?>
+                                    <li>
+                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <span class="text-muted">(<?= (int) $item['unique'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
+                            <ol class="mb-0 dashboard-links d-none" data-stat-list="system-pages" data-stat-mode="views" data-stat-period="week">
+                                <?php foreach ($topSystemPagesWeek as $item): ?>
+                                    <?php $url = $buildSystemPageUrl($item['slug']); ?>
+                                    <li>
+                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
+                            <ol class="mb-0 dashboard-links d-none" data-stat-list="system-pages" data-stat-mode="users" data-stat-period="week">
+                                <?php foreach ($topSystemPagesWeekByUnique as $item): ?>
+                                    <?php $url = $buildSystemPageUrl($item['slug']); ?>
+                                    <li>
+                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <span class="text-muted">(<?= (int) $item['unique'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
+                            <ol class="mb-0 dashboard-links d-none" data-stat-list="system-pages" data-stat-mode="views" data-stat-period="month">
+                                <?php foreach ($topSystemPagesMonth as $item): ?>
+                                    <?php $url = $buildSystemPageUrl($item['slug']); ?>
+                                    <li>
+                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
+                            <ol class="mb-0 dashboard-links d-none" data-stat-list="system-pages" data-stat-mode="users" data-stat-period="month">
+                                <?php foreach ($topSystemPagesMonthByUnique as $item): ?>
+                                    <?php $url = $buildSystemPageUrl($item['slug']); ?>
+                                    <li>
+                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <span class="text-muted">(<?= (int) $item['unique'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
                 <?php if ($pageCount > 0): ?>
                     <div class="card mb-4 dashboard-stat-block">
                         <div class="card-body">
@@ -1409,7 +1551,7 @@
                                 </div>
                             </div>
                             <?php if (empty($topPages) && empty($topPagesByUnique)): ?>
-                                <p class="text-muted mb-0">Sin datos todavia.</p>
+                                <p class="text-muted mb-0">Sin datos todavía.</p>
                             <?php else: ?>
                                 <ol class="mb-0 dashboard-links" data-stat-list="pages-all" data-stat-mode="views">
                                     <?php foreach ($topPages as $item): ?>
@@ -1438,46 +1580,6 @@
                     </div>
                 <?php endif; ?>
 
-                <?php if (!empty($topSystemPages) || !empty($topSystemPagesByUnique)): ?>
-                    <div class="card mb-4 dashboard-stat-block">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Itinerarios y páginas sistémicas más leídas</h4>
-                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="system-pages" data-stat-toggle-type="mode">
-                                    <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
-                                    <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
-                                </div>
-                            </div>
-                            <?php if (empty($topSystemPages) && empty($topSystemPagesByUnique)): ?>
-                                <p class="text-muted mb-0">Sin datos todavia.</p>
-                            <?php else: ?>
-                                <ol class="mb-0 dashboard-links" data-stat-list="system-pages" data-stat-mode="views">
-                                    <?php foreach ($topSystemPages as $item): ?>
-                                        <?php $url = $buildSystemPageUrl($item['slug']); ?>
-                                        <li>
-                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
-                                            </a>
-                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ol>
-                                <ol class="mb-0 dashboard-links d-none" data-stat-list="system-pages" data-stat-mode="users">
-                                    <?php foreach ($topSystemPagesByUnique as $item): ?>
-                                        <?php $url = $buildSystemPageUrl($item['slug']); ?>
-                                        <li>
-                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
-                                            </a>
-                                            <span class="text-muted">(<?= (int) $item['unique'] ?>)</span>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ol>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endif; ?>
-
                 <?php if ($itineraryCount > 0): ?>
                     <div class="card mb-4 dashboard-stat-block">
                         <div class="card-body">
@@ -1489,7 +1591,7 @@
                                 </div>
                             </div>
                             <?php if (empty($topItineraryStarts) && empty($topItineraryCompletes)): ?>
-                                <p class="text-muted mb-0">Sin datos todavia.</p>
+                                <p class="text-muted mb-0">Sin datos todavía.</p>
                             <?php else: ?>
                                 <ol class="mb-0 dashboard-links" data-stat-list="itineraries" data-stat-mode="starts">
                                     <?php foreach ($topItineraryStarts as $item): ?>
@@ -1520,9 +1622,9 @@
 
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Plataforma (ultimos 30 dias)</h4>
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Plataforma (últimos 30 días)</h4>
                         <?php if (empty($deviceList) && empty($browserList) && empty($systemList) && empty($languageList)): ?>
-                            <p class="text-muted mb-0">Sin datos todavia.</p>
+                            <p class="text-muted mb-0">Sin datos todavía.</p>
                         <?php else: ?>
                             <?php if (!empty($deviceList)): ?>
                                 <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Dispositivo</p>

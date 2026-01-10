@@ -590,6 +590,9 @@ if (preg_match('#^/podcast/?$#i', $routePath)) {
     ]);
     $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/podcast' : '/podcast';
     $description = 'Episodios de nuestro podcast.';
+    if (function_exists('nammu_record_pageview')) {
+        nammu_record_pageview('pages', 'podcast', 'Podcast');
+    }
     $podcastMeta = nammu_build_social_meta([
         'type' => 'website',
         'title' => 'Podcast — ' . $siteNameForMeta,
@@ -636,6 +639,9 @@ if ($isLettersIndex) {
     ]);
 
     $canonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/letras';
+    if (function_exists('nammu_record_pageview')) {
+        nammu_record_pageview('pages', 'letras', 'Índice alfabético');
+    }
     $socialMeta = nammu_build_social_meta([
         'type' => 'website',
         'title' => 'Índice alfabético — ' . $siteNameForMeta,
@@ -682,6 +688,9 @@ if ($letterSlugRequest !== null) {
     ]);
 
     $canonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/letra/' . rawurlencode(nammu_letter_slug($targetLetter));
+    if (function_exists('nammu_record_pageview')) {
+        nammu_record_pageview('pages', 'letra/' . nammu_letter_slug($targetLetter), 'Letra: ' . $letterDisplay);
+    }
     $socialMeta = nammu_build_social_meta([
         'type' => 'website',
         'title' => 'Entradas que empiezan por ' . $letterDisplay . ' — ' . $siteNameForMeta,
@@ -728,6 +737,9 @@ if ($isCategoriesIndex) {
     ]);
 
     $canonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/categorias';
+    if (function_exists('nammu_record_pageview')) {
+        nammu_record_pageview('pages', 'categorias', 'Categorías');
+    }
     $socialMeta = nammu_build_social_meta([
         'type' => 'website',
         'title' => 'Categorías — ' . $siteNameForMeta,
@@ -797,6 +809,9 @@ if ($categorySlugRequest !== null) {
     ]);
 
     $canonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/categoria/' . rawurlencode($slugKey);
+    if (function_exists('nammu_record_pageview')) {
+        nammu_record_pageview('pages', 'categoria/' . $slugKey, 'Categoría: ' . $categoryTitle);
+    }
     $socialMeta = nammu_build_social_meta([
         'type' => 'website',
         'title' => 'Categoría: ' . $categoryTitle . ' — ' . $siteNameForMeta,
@@ -902,6 +917,9 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
         $topicDescription = nammu_excerpt_text($topicHtml, 200);
     }
     $topicCanonical = $buildItineraryTopicUrl($itinerary, $topic);
+    if (function_exists('nammu_record_pageview')) {
+        nammu_record_pageview('pages', 'itinerarios/' . $itinerarySlug . '/' . $topicSlug, $topic->getTitle());
+    }
     $entryTocConfig = $theme['entry']['toc'] ?? ['auto' => 'off', 'min_headings' => 3];
     $autoTocEnabled = ($entryTocConfig['auto'] ?? 'off') === 'on';
     $entryMinHeadings = (int) ($entryTocConfig['min_headings'] ?? 3);
@@ -1029,6 +1047,9 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
     $itineraryImage = nammu_resolve_asset($itinerary->getImage(), $publicBaseUrl) ?? $homeImage;
     $itineraryDescription = $itinerary->getDescription() !== '' ? $itinerary->getDescription() : nammu_excerpt_text($itineraryHtml, 220);
     $canonical = $buildItineraryUrl($itinerary);
+    if (function_exists('nammu_record_pageview')) {
+        nammu_record_pageview('pages', 'itinerarios/' . $itinerarySlug, $itinerary->getTitle());
+    }
     $itinerariesIndexUrlLocal = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios';
     $itinerarySocialMeta = nammu_build_social_meta([
         'type' => 'website',
@@ -1245,6 +1266,9 @@ if (preg_match('#^/itinerarios/?$#i', $routePath)) {
     ]);
     $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios';
     $description = 'Selección de itinerarios temáticos para seguir paso a paso.';
+    if (function_exists('nammu_record_pageview')) {
+        nammu_record_pageview('pages', 'itinerarios', 'Itinerarios');
+    }
     $itineraryIndexMeta = nammu_build_social_meta([
         'type' => 'website',
         'title' => 'Itinerarios — ' . $siteNameForMeta,

@@ -333,7 +333,7 @@ if ($isPageTemplate && $formattedDate !== '') {
             <?= $renderSubscriptionBox('variant-panel') ?>
         </div>
     <?php endif; ?>
-    <?php if (!$singleSubscriptionTop && !$singleSubscriptionBottom && $postalEnabled): ?>
+    <?php if (!$singleSubscriptionTop && !$singleSubscriptionBottom && $postalEnabled && !$suppressSingleSubscriptionTop && !$suppressSingleSubscriptionBottom): ?>
         <div class="site-search-block placement-bottom site-subscription-block">
             <?= $renderPostalBox('variant-panel') ?>
         </div>

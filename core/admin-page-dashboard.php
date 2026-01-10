@@ -1540,46 +1540,6 @@
                     </div>
                 </div>
 
-                <?php if ($pageCount > 0): ?>
-                    <div class="card mb-4 dashboard-stat-block">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Páginas más leídas</h4>
-                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="mode">
-                                    <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
-                                    <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
-                                </div>
-                            </div>
-                            <?php if (empty($topPages) && empty($topPagesByUnique)): ?>
-                                <p class="text-muted mb-0">Sin datos todavía.</p>
-                            <?php else: ?>
-                                <ol class="mb-0 dashboard-links" data-stat-list="pages-all" data-stat-mode="views">
-                                    <?php foreach ($topPages as $item): ?>
-                                        <li>
-                                            <?php $url = admin_public_post_url($item['slug']); ?>
-                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
-                                            </a>
-                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ol>
-                                <ol class="mb-0 dashboard-links d-none" data-stat-list="pages-all" data-stat-mode="users">
-                                    <?php foreach ($topPagesByUnique as $item): ?>
-                                        <li>
-                                            <?php $url = admin_public_post_url($item['slug']); ?>
-                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
-                                            </a>
-                                            <span class="text-muted">(<?= (int) $item['unique'] ?>)</span>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ol>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endif; ?>
-
                 <?php if ($itineraryCount > 0): ?>
                     <div class="card mb-4 dashboard-stat-block">
                         <div class="card-body">
@@ -1612,6 +1572,46 @@
                                                 <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
                                             </a>
                                             <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($pageCount > 0): ?>
+                    <div class="card mb-4 dashboard-stat-block">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Páginas más leídas</h4>
+                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="mode">
+                                    <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
+                                    <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
+                                </div>
+                            </div>
+                            <?php if (empty($topPages) && empty($topPagesByUnique)): ?>
+                                <p class="text-muted mb-0">Sin datos todavía.</p>
+                            <?php else: ?>
+                                <ol class="mb-0 dashboard-links" data-stat-list="pages-all" data-stat-mode="views">
+                                    <?php foreach ($topPages as $item): ?>
+                                        <li>
+                                            <?php $url = admin_public_post_url($item['slug']); ?>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                                <ol class="mb-0 dashboard-links d-none" data-stat-list="pages-all" data-stat-mode="users">
+                                    <?php foreach ($topPagesByUnique as $item): ?>
+                                        <li>
+                                            <?php $url = admin_public_post_url($item['slug']); ?>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['unique'] ?>)</span>
                                         </li>
                                     <?php endforeach; ?>
                                 </ol>

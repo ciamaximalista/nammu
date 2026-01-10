@@ -18,7 +18,7 @@ $accentColor = htmlspecialchars($colors['accent'] ?? '#0a4c8a', ENT_QUOTES, 'UTF
 $searchSettings = $theme['search'] ?? [];
 $searchMode = in_array($searchSettings['mode'] ?? 'none', ['none', 'home', 'single', 'both'], true) ? $searchSettings['mode'] : 'none';
 $searchPositionSetting = in_array($searchSettings['position'] ?? 'title', ['title', 'footer'], true) ? $searchSettings['position'] : 'title';
-$shouldShowSearch = in_array($searchMode, ['single', 'both'], true);
+$shouldShowSearch = in_array($searchMode, ['home', 'single', 'both'], true);
 $searchTop = $shouldShowSearch && $searchPositionSetting === 'title';
 $searchBottom = $shouldShowSearch && $searchPositionSetting === 'footer';
 $subscriptionSettings = is_array($theme['subscription'] ?? null) ? $theme['subscription'] : [];
@@ -26,7 +26,7 @@ $subscriptionModeValue = $subscriptionSettings['mode'] ?? 'none';
 $subscriptionPositionValue = $subscriptionSettings['position'] ?? 'footer';
 $subscriptionMode = in_array($subscriptionModeValue, ['none', 'home', 'single', 'both'], true) ? $subscriptionModeValue : 'none';
 $subscriptionPositionSetting = in_array($subscriptionPositionValue, ['title', 'footer'], true) ? $subscriptionPositionValue : 'footer';
-$shouldShowSubscription = in_array($subscriptionMode, ['single', 'both'], true);
+$shouldShowSubscription = in_array($subscriptionMode, ['home', 'single', 'both'], true);
 $subscriptionTop = $shouldShowSubscription && $subscriptionPositionSetting === 'title';
 $subscriptionBottom = $shouldShowSubscription && $subscriptionPositionSetting === 'footer';
 $searchActionBase = $baseUrl ?? '/';

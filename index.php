@@ -991,6 +991,11 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
         '',
         $topicMainContent
     ) ?? $topicMainContent;
+    $topicMainContent = preg_replace(
+        '#<(?:div|section)\s+class="site-search-block placement-top"[^>]*>.*?</(?:div|section)>#si',
+        '',
+        $topicMainContent
+    ) ?? $topicMainContent;
     $topicMainContent = '<div class="itinerary-single-content">' . $topicMainContent . '</div>';
     $topicExtras = $renderer->render('itinerary-topic', [
         'itinerary' => $itinerary,

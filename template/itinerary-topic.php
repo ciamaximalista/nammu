@@ -322,11 +322,6 @@ if ($quizAvailable) {
         <?= $renderSubscriptionBox('variant-panel') ?>
     </section>
 <?php endif; ?>
-<?php if (!$subscriptionTop && !$subscriptionBottom && $postalEnabled): ?>
-    <section class="site-search-block placement-bottom site-subscription-block">
-        <?= $renderPostalBox('variant-panel') ?>
-    </section>
-<?php endif; ?>
 <?php if ($searchBottom): ?>
     <section class="site-search-block placement-bottom">
         <?= $renderSearchBox('variant-panel') ?>

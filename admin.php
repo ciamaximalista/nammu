@@ -4188,6 +4188,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['social_feedback'] = $feedback;
         header('Location: admin.php?page=edit&template=' . $redirectTemplate);
         exit;
+    } elseif (isset($_POST['send_social_itinerary'])) {
+        $networkKey = $_POST['social_network'] ?? '';
+        $itinerarySlug = ItineraryRepository::normalizeSlug($_POST['itinerary_slug'] ?? '');
+        $networkLabels = [
+            'telegram' => 'Telegram',
+            'whatsapp' => 'WhatsApp',
+            'facebook' => 'Facebook',
+            'twitter' => 'X',
+            'instagram' => 'Instagram',
+        ];
+        $feedback = [
+            'type' => 'danger',
+            'message' => 'No se pudo encontrar el itinerario solicitado.',
+        ];
+        if (!isset($networkLabels[$networkKey])) {
+            $feedback = ['type' => 'danger', 'message' => 'Red social no válida.'];
+        } elseif ($itinerarySlug !== '') {
+            $itinerary = admin_load_itinerary($itinerarySlug);
+            if ($itinerary) {
+                $title = $itinerary->getTitle();
+                $description = $itinerary->getDescription();
+                $image = $itinerary->getImage() ?? '';
+                $customUrl = admin_public_itinerary_url($itinerary->getSlug());
+                $imageUrl = admin_public_asset_url($image);
+                $allSocialSettings = admin_cached_social_settings();
+                $networkSettings = $allSocialSettings[$networkKey] ?? [];
+                if (!admin_is_social_network_configured($networkKey, $networkSettings)) {
+                    $feedback['message'] = 'Configura correctamente ' . $networkLabels[$networkKey] . ' en la pestaña Difusión antes de enviar.';
+                } else {
+                    $sent = false;
+                    $customError = null;
+                    switch ($networkKey) {
+                        case 'telegram':
+                            $sent = admin_send_post_to_telegram($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
+                            break;
+                        case 'whatsapp':
+                            $sent = admin_send_whatsapp_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
+                            break;
+                        case 'facebook':
+                            $sent = admin_send_facebook_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
+                            break;
+                        case 'twitter':
+                            $sent = admin_send_twitter_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
+                            break;
+                        case 'instagram':
+                            if (trim($image) === '') {
+                                $customError = 'Instagram requiere una imagen destacada para enviar la publicación.';
+                                break;
+                            }
+                            $sent = admin_send_instagram_post($itinerarySlug, $title, $image, $networkSettings, $description, $customUrl);
+                            break;
+                    }
+                    if ($sent) {
+                        $feedback = [
+                            'type' => 'success',
+                            'message' => 'El itinerario se envió correctamente a ' . $networkLabels[$networkKey] . '.',
+                        ];
+                    } elseif ($customError !== null) {
+                        $feedback['message'] = $customError;
+                    } else {
+                        $feedback['message'] = 'No se pudo enviar el itinerario a ' . $networkLabels[$networkKey] . '. Comprueba las credenciales.';
+                    }
+                }
+            }
+        }
+        $_SESSION['itinerary_feedback'] = $feedback;
+        header('Location: admin.php?page=itinerarios');
+        exit;
     } elseif (isset($_POST['save_itinerary'])) {
         $title = trim($_POST['itinerary_title'] ?? '');
         $description = trim($_POST['itinerary_description'] ?? '');
@@ -4296,6 +4364,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $link = admin_public_itinerary_url($saved->getSlug());
                 admin_maybe_enqueue_push_notification('itinerary', $title, $description, $link, $image);
+                $imageUrl = admin_public_asset_url($image);
+                admin_maybe_auto_post_to_social_networks($saved->getSlug(), $title, $description, $image, $link, $imageUrl);
             }
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario guardado correctamente.'];
             header('Location: admin.php?page=itinerario&itinerary=' . urlencode($saved->getSlug()));

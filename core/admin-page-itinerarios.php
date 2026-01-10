@@ -18,6 +18,28 @@
         <div class="card mb-4">
             <div class="card-body">
                 <h3 class="h5 mb-3">Listado de itinerarios</h3>
+                <?php
+                    $networkConfigs = [
+                        'telegram' => $settings['telegram'] ?? [],
+                        'whatsapp' => $settings['whatsapp'] ?? [],
+                        'facebook' => $settings['facebook'] ?? [],
+                        'twitter' => $settings['twitter'] ?? [],
+                        'instagram' => $settings['instagram'] ?? [],
+                    ];
+                    $networkLabels = [
+                        'telegram' => 'Telegram',
+                        'whatsapp' => 'WhatsApp',
+                        'facebook' => 'Facebook',
+                        'twitter' => 'X',
+                        'instagram' => 'Instagram',
+                    ];
+                    $availableNetworks = [];
+                    foreach ($networkConfigs as $key => $cfg) {
+                        if (function_exists('admin_is_social_network_configured') && admin_is_social_network_configured($key, $cfg)) {
+                            $availableNetworks[] = $key;
+                        }
+                    }
+                ?>
                 <?php if (empty($itinerariesList)): ?>
                     <p class="text-muted mb-0">Todavía no hay itinerarios registrados.</p>
                 <?php else: ?>
@@ -117,6 +139,17 @@
                                                         data-itinerary-stats="<?= $statsJson ?>"
                                                     >Estadísticas</button>
                                                 </div>
+                                                <?php if (!empty($availableNetworks)): ?>
+                                                    <?php foreach ($availableNetworks as $networkKey): ?>
+                                                        <form method="post" class="d-inline-block mb-2">
+                                                            <input type="hidden" name="social_network" value="<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="itinerary_slug" value="<?= htmlspecialchars($itineraryItem->getSlug(), ENT_QUOTES, 'UTF-8') ?>">
+                                                            <button type="submit" name="send_social_itinerary" class="btn btn-sm btn-outline-primary">
+                                                                <?= htmlspecialchars($networkLabels[$networkKey] ?? ucfirst($networkKey), ENT_QUOTES, 'UTF-8') ?>
+                                                            </button>
+                                                        </form>
+                                                    <?php endforeach; ?>
+                                                <?php endif; ?>
                                                 <div class="mb-2">
                                                     <a class="btn btn-sm btn-outline-primary" href="?page=itinerario&itinerary=<?= urlencode($itineraryItem->getSlug()) ?>#itinerary-form">Editar</a>
                                                 </div>

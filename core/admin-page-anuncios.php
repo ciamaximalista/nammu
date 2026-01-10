@@ -200,7 +200,7 @@
                     </div>
                     <div class="form-check mb-3">
                         <input type="checkbox" class="form-check-input" name="telegram_auto" id="telegram_auto" value="1" <?= $telegramAutoEnabled ? 'checked' : '' ?>>
-                        <label for="telegram_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
+                        <label for="telegram_auto" class="form-check-label">Enviar automáticamente cada nueva entrada o itinerario publicado</label>
                     </div>
                     <div class="modal fade" id="telegramHelpModal" tabindex="-1" role="dialog" aria-labelledby="telegramHelpModalLabel" aria-hidden="true">
                         <div class="modal-dialog modal-lg" role="document">
@@ -245,7 +245,7 @@
                     </div>
                     <div class="form-check mb-3">
                         <input type="checkbox" class="form-check-input" name="whatsapp_auto" id="whatsapp_auto" value="1" <?= $whatsappAutoEnabled ? 'checked' : '' ?>>
-                        <label for="whatsapp_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
+                        <label for="whatsapp_auto" class="form-check-label">Enviar automáticamente cada nueva entrada o itinerario publicado</label>
                     </div>
                     <div class="modal fade" id="whatsappHelpModal" tabindex="-1" role="dialog" aria-labelledby="whatsappHelpModalLabel" aria-hidden="true">
                         <div class="modal-dialog modal-lg" role="document">
@@ -285,7 +285,7 @@
                     </div>
                     <div class="form-check mb-3">
                         <input type="checkbox" class="form-check-input" name="facebook_auto" id="facebook_auto" value="1" <?= $facebookAutoEnabled ? 'checked' : '' ?>>
-                        <label for="facebook_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
+                        <label for="facebook_auto" class="form-check-label">Enviar automáticamente cada nueva entrada o itinerario publicado</label>
                     </div>
                     <div class="modal fade" id="facebookHelpModal" tabindex="-1" role="dialog" aria-labelledby="facebookHelpModalLabel" aria-hidden="true">
                         <div class="modal-dialog modal-lg" role="document">
@@ -325,7 +325,7 @@
                     </div>
                     <div class="form-check mb-3">
                         <input type="checkbox" class="form-check-input" name="twitter_auto" id="twitter_auto" value="1" <?= $twitterAutoEnabled ? 'checked' : '' ?>>
-                        <label for="twitter_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
+                        <label for="twitter_auto" class="form-check-label">Enviar automáticamente cada nueva entrada o itinerario publicado</label>
                     </div>
                     <div class="modal fade" id="twitterHelpModal" tabindex="-1" role="dialog" aria-labelledby="twitterHelpModalLabel" aria-hidden="true">
                         <div class="modal-dialog modal-lg" role="document">
@@ -365,7 +365,7 @@
                     </div>
                     <div class="form-check mb-3">
                         <input type="checkbox" class="form-check-input" name="instagram_auto" id="instagram_auto" value="1" <?= $instagramAutoEnabled ? 'checked' : '' ?>>
-                        <label for="instagram_auto" class="form-check-label">Enviar automáticamente cada nueva entrada publicada</label>
+                        <label for="instagram_auto" class="form-check-label">Enviar automáticamente cada nueva entrada o itinerario publicado</label>
                     </div>
 
                     <div class="modal fade" id="instagramHelpModal" tabindex="-1" role="dialog" aria-labelledby="instagramHelpModalLabel" aria-hidden="true">

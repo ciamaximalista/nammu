@@ -819,7 +819,16 @@
     $topPostsWeek = array_slice($topPostsWeek, 0, 10);
     $topPostsMonth = array_slice($topPostsMonth, 0, 10);
 
+    $isSystemPageSlug = static function (string $slug): bool {
+        if ($slug === 'podcast' || $slug === 'categorias' || $slug === 'letras' || $slug === 'itinerarios') {
+            return true;
+        }
+        return str_starts_with($slug, 'itinerarios/')
+            || str_starts_with($slug, 'categoria/')
+            || str_starts_with($slug, 'letra/');
+    };
     $allPages = [];
+    $allSystemPages = [];
     foreach ($pagesStats as $slug => $item) {
         $daily = $item['daily'] ?? [];
         $total = (int) ($item['total'] ?? 0);
@@ -830,12 +839,17 @@
         if ($total <= 0) {
             continue;
         }
-        $allPages[] = [
+        $entry = [
             'slug' => $slug,
             'title' => $item['title'] ?? $slug,
             'count' => $total,
             'unique' => $uniqueAll(is_array($daily) ? $daily : []),
         ];
+        if ($isSystemPageSlug($slug)) {
+            $allSystemPages[] = $entry;
+        } else {
+            $allPages[] = $entry;
+        }
     }
     $topPages = $allPages;
     usort($topPages, static function (array $a, array $b): int {
@@ -849,6 +863,44 @@
         return $b['unique'] <=> $a['unique'];
     });
     $topPagesByUnique = array_slice($topPagesByUnique, 0, 10);
+
+    $topSystemPages = $allSystemPages;
+    usort($topSystemPages, static function (array $a, array $b): int {
+        return $b['count'] <=> $a['count'];
+    });
+    $topSystemPages = array_slice($topSystemPages, 0, 10);
+    $topSystemPagesByUnique = array_values(array_filter($allSystemPages, static function (array $item): bool {
+        return (int) ($item['unique'] ?? 0) > 0;
+    }));
+    usort($topSystemPagesByUnique, static function (array $a, array $b): int {
+        return $b['unique'] <=> $a['unique'];
+    });
+    $topSystemPagesByUnique = array_slice($topSystemPagesByUnique, 0, 10);
+
+    $buildSystemPageUrl = static function (string $slug): string {
+        if ($slug === 'podcast') {
+            return '/podcast';
+        }
+        if ($slug === 'categorias') {
+            return '/categorias';
+        }
+        if ($slug === 'letras') {
+            return '/letras';
+        }
+        if ($slug === 'itinerarios') {
+            return '/itinerarios';
+        }
+        if (str_starts_with($slug, 'categoria/')) {
+            return '/' . $slug;
+        }
+        if (str_starts_with($slug, 'letra/')) {
+            return '/' . $slug;
+        }
+        if (str_starts_with($slug, 'itinerarios/')) {
+            return '/' . $slug;
+        }
+        return '/' . $slug;
+    };
 
     $topItineraryStarts = [];
     $topItineraryCompletes = [];
@@ -1028,7 +1080,7 @@
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-2">
             <div>
                 <h2 class="mb-1">Escritorio Nammu</h2>
-                <p class="text-muted mb-0">Resumen general de publicaciones y estadisticas del sitio.</p>
+                <p class="text-muted mb-0">Resumen general de publicaciones y estadísticas del sitio.</p>
             </div>
         </div>
 
@@ -1062,7 +1114,7 @@
             <div class="col-lg-6">
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3">Usuarios unicos humanos (ultimo ano)</h4>
+                        <h4 class="h6 text-uppercase text-muted mb-3">Usuarios únicos humanos (último año)</h4>
                         <?php if ($last12Line['points'] === ''): ?>
                             <p class="text-muted mb-0">Sin datos todavia.</p>
                         <?php else: ?>
@@ -1107,7 +1159,7 @@
                                 </table>
                             </div>
                         <?php endif; ?>
-                        <p class="mb-2"><strong>Paginas:</strong> <?= (int) $pageCount ?></p>
+                        <p class="mb-2"><strong>Páginas:</strong> <?= (int) $pageCount ?></p>
                         <p class="mb-2"><strong>Newsletters:</strong> <?= (int) $newsletterCount ?></p>
                         <p class="mb-2"><strong>Podcast:</strong> <?= (int) $podcastCount ?></p>
                         <p class="mb-0"><strong>Itinerarios:</strong> <?= (int) $itineraryCount ?></p>
@@ -1172,7 +1224,7 @@
                         <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Usuarios únicos humanos</h4>
                         <p class="mb-3"><strong>Hoy:</strong> <?= (int) $todayCount ?></p>
 
-                        <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Ultimos 7 dias</p>
+                        <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Últimos 7 días</p>
                         <div class="table-responsive mb-3">
                             <table class="table table-sm mb-0">
                                 <tbody>
@@ -1186,7 +1238,7 @@
                             </table>
                         </div>
 
-                        <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Ultimos 12 meses</p>
+                        <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Últimos 12 meses</p>
                         <div class="table-responsive mb-3">
                             <table class="table table-sm mb-0">
                                 <tbody>
@@ -1260,15 +1312,15 @@
                 <div class="card mb-4 dashboard-stat-block">
                     <div class="card-body">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                            <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Entradas mas leidas</h4>
+                            <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Entradas más leídas</h4>
                             <div class="d-flex flex-column align-items-start">
                                 <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle my-2" role="group" data-stat-toggle="posts" data-stat-toggle-type="mode">
                                     <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
                                     <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
                                 </div>
                                 <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle my-2" role="group" data-stat-toggle="posts" data-stat-toggle-type="period">
-                                    <button type="button" class="btn btn-outline-primary" data-stat-period="week">Ultimos 7 dias</button>
-                                    <button type="button" class="btn btn-outline-primary" data-stat-period="month">Ultimos 30 dias</button>
+                                    <button type="button" class="btn btn-outline-primary" data-stat-period="week">Últimos 7 días</button>
+                                    <button type="button" class="btn btn-outline-primary" data-stat-period="month">Últimos 30 días</button>
                                     <button type="button" class="btn btn-outline-primary active" data-stat-period="all">Desde el comienzo del blog</button>
                                 </div>
                             </div>
@@ -1350,7 +1402,7 @@
                     <div class="card mb-4 dashboard-stat-block">
                         <div class="card-body">
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Paginas mas leidas</h4>
+                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Páginas más leídas</h4>
                                 <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="mode">
                                     <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
                                     <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
@@ -1386,11 +1438,51 @@
                     </div>
                 <?php endif; ?>
 
+                <?php if (!empty($topSystemPages) || !empty($topSystemPagesByUnique)): ?>
+                    <div class="card mb-4 dashboard-stat-block">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Itinerarios y páginas sistémicas más leídas</h4>
+                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="system-pages" data-stat-toggle-type="mode">
+                                    <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
+                                    <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
+                                </div>
+                            </div>
+                            <?php if (empty($topSystemPages) && empty($topSystemPagesByUnique)): ?>
+                                <p class="text-muted mb-0">Sin datos todavia.</p>
+                            <?php else: ?>
+                                <ol class="mb-0 dashboard-links" data-stat-list="system-pages" data-stat-mode="views">
+                                    <?php foreach ($topSystemPages as $item): ?>
+                                        <?php $url = $buildSystemPageUrl($item['slug']); ?>
+                                        <li>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                                <ol class="mb-0 dashboard-links d-none" data-stat-list="system-pages" data-stat-mode="users">
+                                    <?php foreach ($topSystemPagesByUnique as $item): ?>
+                                        <?php $url = $buildSystemPageUrl($item['slug']); ?>
+                                        <li>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['unique'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
                 <?php if ($itineraryCount > 0): ?>
                     <div class="card mb-4 dashboard-stat-block">
                         <div class="card-body">
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Itinerarios (usuarios unicos)</h4>
+                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Itinerarios (usuarios únicos)</h4>
                                 <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="itineraries" data-stat-toggle-type="mode">
                                     <button type="button" class="btn btn-outline-primary active" data-stat-mode="starts">Comenzaron</button>
                                     <button type="button" class="btn btn-outline-primary" data-stat-mode="completes">Completaron</button>

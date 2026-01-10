@@ -1106,6 +1106,11 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
         '',
         $itineraryBody
     ) ?? $itineraryBody;
+    $itineraryBody = preg_replace(
+        '#<(?:div|section)\s+class="site-search-block placement-top"[^>]*>.*?</(?:div|section)>#si',
+        '',
+        $itineraryBody
+    ) ?? $itineraryBody;
     $itineraryBody = '<div class="itinerary-single-content">' . $itineraryBody . '</div>';
     $usageLogic = $itinerary->getUsageLogic();
     $usageNotice = '';

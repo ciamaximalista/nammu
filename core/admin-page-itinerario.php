@@ -190,9 +190,14 @@
                                                 <?php if ($topicItem->getDescription() !== ''): ?>
                                                     <p class="mb-2 text-muted"><?= htmlspecialchars($topicItem->getDescription(), ENT_QUOTES, 'UTF-8') ?></p>
                                                 <?php endif; ?>
-                                                <a href="<?= htmlspecialchars(admin_public_itinerary_url($selectedItinerary->getSlug()) . '/' . rawurlencode($topicItem->getSlug()), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Ver tema</a>
                                             </div>
                                             <div class="text-right">
+                                                <div class="mb-2">
+                                                    <?php
+                                                    $topicPreviewUrl = admin_public_itinerary_url($selectedItinerary->getSlug()) . '/' . rawurlencode($topicItem->getSlug()) . '?preview=1';
+                                                    ?>
+                                                    <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($topicPreviewUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Ver</a>
+                                                </div>
                                                 <div class="mb-2">
                                                     <a class="btn btn-sm btn-outline-primary" href="?page=itinerario-tema&itinerary=<?= urlencode($selectedItinerary->getSlug()) ?>&topic=<?= urlencode($topicItem->getSlug()) ?>#topic-form">Editar</a>
                                                 </div>

@@ -821,6 +821,7 @@ if ($categorySlugRequest !== null) {
 if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItineraryTopic)) {
     $itinerarySlug = ItineraryRepository::normalizeSlug(rawurldecode($matchItineraryTopic[1]));
     $topicSlug = ItineraryRepository::normalizeSlug(rawurldecode($matchItineraryTopic[2]));
+    $previewMode = isset($_GET['preview']) && $_GET['preview'] === '1';
     $itinerary = $itineraryRepository->find($itinerarySlug);
     if ($itinerary === null) {
         $renderNotFound('Itinerario no encontrado', 'El itinerario solicitado no se encuentra disponible.', $routePath);
@@ -831,31 +832,36 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
         $renderNotFound('Tema no encontrado', 'Este tema no se encuentra disponible dentro del itinerario.', $routePath);
     }
     $usageLogic = $itinerary->getUsageLogic();
-    $progressData = nammu_get_itinerary_progress($itinerary->getSlug());
-    $hadPresentation = in_array('__presentation', $progressData['visited'], true);
-    $alreadyVisited = in_array($topic->getSlug(), $progressData['visited'], true);
-    if (!$alreadyVisited) {
-        $progressData['visited'][] = $topic->getSlug();
-        nammu_set_itinerary_progress($itinerary->getSlug(), $progressData);
+    if ($previewMode) {
+        $progressData = ['visited' => [], 'passed' => []];
+        $usageLogic = Itinerary::USAGE_LOGIC_FREE;
+    } else {
+        $progressData = nammu_get_itinerary_progress($itinerary->getSlug());
+        $hadPresentation = in_array('__presentation', $progressData['visited'], true);
+        $alreadyVisited = in_array($topic->getSlug(), $progressData['visited'], true);
+        if (!$alreadyVisited) {
+            $progressData['visited'][] = $topic->getSlug();
+            nammu_set_itinerary_progress($itinerary->getSlug(), $progressData);
+            if ($hadPresentation) {
+                $incrementStart = $topic->getNumber() === 1;
+                try {
+                    $itineraryRepository->recordTopicStat($itinerary->getSlug(), $topic, $incrementStart);
+                } catch (Throwable $e) {
+                    // Ignore write failures to keep navigation smooth
+                }
+            }
+        }
         if ($hadPresentation) {
-            $incrementStart = $topic->getNumber() === 1;
-            try {
-                $itineraryRepository->recordTopicStat($itinerary->getSlug(), $topic, $incrementStart);
-            } catch (Throwable $e) {
-                // Ignore write failures to keep navigation smooth
+            $allVisited = true;
+            foreach ($itinerary->getTopics() as $topicItem) {
+                if (!in_array($topicItem->getSlug(), $progressData['visited'], true)) {
+                    $allVisited = false;
+                    break;
+                }
             }
-        }
-    }
-    if ($hadPresentation) {
-        $allVisited = true;
-        foreach ($itinerary->getTopics() as $topicItem) {
-            if (!in_array($topicItem->getSlug(), $progressData['visited'], true)) {
-                $allVisited = false;
-                break;
+            if ($allVisited) {
+                nammu_record_itinerary_event($itinerary->getSlug(), 'complete');
             }
-        }
-        if ($allVisited) {
-            nammu_record_itinerary_event($itinerary->getSlug(), 'complete');
         }
     }
     $documentData = $markdown->convertDocument($topic->getContent());
@@ -971,7 +977,7 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
     $topicExtras = $renderer->render('itinerary-topic', [
         'itinerary' => $itinerary,
         'topic' => $topic,
-        'quiz' => $topic->getQuiz(),
+        'quiz' => $previewMode ? [] : $topic->getQuiz(),
         'usageLogic' => $usageLogic,
         'progress' => $progressData,
         'nextStep' => $nextStep,

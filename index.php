@@ -985,6 +985,8 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
         'customMetaBand' => 'Tema ' . $topic->getNumber() . ' del itinerario «' . $itinerary->getTitle() . '»',
         'suppressSingleSearchTop' => true,
         'suppressSingleSearchBottom' => true,
+        'suppressSingleSubscriptionTop' => true,
+        'suppressSingleSubscriptionBottom' => true,
     ]);
     $topicMainContent = preg_replace(
         '#<(?:div|section)\s+class="site-search-block placement-bottom"[^>]*>.*?</(?:div|section)>#si',
@@ -1105,6 +1107,8 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
         'customMetaBand' => $itinerary->getClassLabel(),
         'suppressSingleSearchTop' => true,
         'suppressSingleSearchBottom' => true,
+        'suppressSingleSubscriptionTop' => true,
+        'suppressSingleSubscriptionBottom' => true,
     ]);
     $itineraryBody = preg_replace(
         '#<(?:div|section)\s+class="site-search-block placement-bottom"[^>]*>.*?</(?:div|section)>#si',

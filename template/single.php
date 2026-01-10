@@ -27,11 +27,19 @@ $singleSubscriptionTop = $showSingleSubscription && $subscriptionPositionSetting
 $singleSubscriptionBottom = $showSingleSubscription && $subscriptionPositionSetting === 'footer';
 $suppressSingleSearchTop = !empty($suppressSingleSearchTop);
 $suppressSingleSearchBottom = !empty($suppressSingleSearchBottom);
+$suppressSingleSubscriptionTop = !empty($suppressSingleSubscriptionTop);
+$suppressSingleSubscriptionBottom = !empty($suppressSingleSubscriptionBottom);
 if ($suppressSingleSearchTop) {
     $singleSearchTop = false;
 }
 if ($suppressSingleSearchBottom) {
     $singleSearchBottom = false;
+}
+if ($suppressSingleSubscriptionTop) {
+    $singleSubscriptionTop = false;
+}
+if ($suppressSingleSubscriptionBottom) {
+    $singleSubscriptionBottom = false;
 }
 $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';

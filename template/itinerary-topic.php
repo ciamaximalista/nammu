@@ -200,16 +200,6 @@ if ($quizAvailable) {
 }
 ?>
 
-<?php if ($subscriptionTop): ?>
-    <section class="site-search-block placement-top site-subscription-block">
-        <?= $renderSubscriptionBox('variant-inline minimal') ?>
-    </section>
-<?php endif; ?>
-<?php if ($searchTop): ?>
-    <section class="site-search-block placement-top">
-        <?= $renderSearchBox('variant-inline minimal') ?>
-    </section>
-<?php endif; ?>
 
 <?php if ($quizAvailable): ?>
     <section

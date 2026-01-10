@@ -1260,7 +1260,122 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
         <?php
         $topicsHtml = (string) ob_get_clean();
     }
-    $content = $itineraryBody . $presentationQuizHtml . $topicsHtml;
+    $bottomBoxes = '';
+    $searchSettings = $theme['search'] ?? [];
+    $searchMode = in_array($searchSettings['mode'] ?? 'none', ['none', 'home', 'single', 'both'], true) ? $searchSettings['mode'] : 'none';
+    $searchPositionSetting = in_array($searchSettings['position'] ?? 'title', ['title', 'footer'], true) ? $searchSettings['position'] : 'title';
+    $shouldShowSearch = in_array($searchMode, ['home', 'single', 'both'], true);
+    $searchBottom = $shouldShowSearch && $searchPositionSetting === 'footer';
+    $subscriptionSettings = is_array($theme['subscription'] ?? null) ? $theme['subscription'] : [];
+    $subscriptionModeValue = $subscriptionSettings['mode'] ?? 'none';
+    $subscriptionPositionValue = $subscriptionSettings['position'] ?? 'footer';
+    $subscriptionMode = in_array($subscriptionModeValue, ['none', 'home', 'single', 'both'], true) ? $subscriptionModeValue : 'none';
+    $subscriptionPositionSetting = in_array($subscriptionPositionValue, ['title', 'footer'], true) ? $subscriptionPositionValue : 'footer';
+    $shouldShowSubscription = in_array($subscriptionMode, ['home', 'single', 'both'], true);
+    $subscriptionBottom = $shouldShowSubscription && $subscriptionPositionSetting === 'footer';
+    $searchActionBase = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '';
+    $searchAction = ($searchActionBase !== '' ? $searchActionBase : '') . '/buscar.php';
+    $subscriptionAction = ($searchActionBase !== '' ? $searchActionBase : '') . '/subscribe.php';
+    $avisosUrl = ($searchActionBase !== '' ? $searchActionBase : '') . '/avisos.php';
+    $currentUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . ($_SERVER['REQUEST_URI'] ?? '/');
+    $accentColor = htmlspecialchars($theme['colors']['accent'] ?? '#0a4c8a', ENT_QUOTES, 'UTF-8');
+    if ($subscriptionBottom) {
+        ob_start(); ?>
+        <section class="site-search-block placement-bottom site-subscription-block">
+            <div class="site-search-box variant-panel site-subscription-box">
+                <form class="site-search-form subscription-form" method="post" action="<?= htmlspecialchars($subscriptionAction, ENT_QUOTES, 'UTF-8') ?>">
+                    <span class="search-icon subscription-icon" aria-hidden="true">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="3" y="5" width="18" height="14" rx="2" stroke="<?= $accentColor ?>" stroke-width="2"/>
+                            <polyline points="3,7 12,13 21,7" fill="none" stroke="<?= $accentColor ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </span>
+                    <input type="hidden" name="back" value="<?= htmlspecialchars($currentUrl, ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="force_all" value="1">
+                    <input type="email" name="subscriber_email" placeholder="Suscríbete" required>
+                    <button type="submit" aria-label="Enviar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= $accentColor ?>" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M21 4L9 16L4 11" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <a class="subscription-avisos-link" href="<?= htmlspecialchars($avisosUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Avisos por email">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= $accentColor ?>" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                            <polyline points="4,8 12,14 20,8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </a>
+                    <?php if ($postalEnabled && $postalLogoSvg !== ''): ?>
+                        <a class="subscription-postal-link" href="<?= htmlspecialchars($postalUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Suscripción postal">
+                            <?= $postalLogoSvg ?>
+                        </a>
+                    <?php endif; ?>
+                </form>
+            </div>
+        </section>
+        <?php
+        $bottomBoxes .= (string) ob_get_clean();
+    }
+    if ($searchBottom) {
+        ob_start(); ?>
+        <section class="site-search-block placement-bottom">
+            <div class="site-search-box variant-panel">
+                <form class="site-search-form" method="get" action="<?= htmlspecialchars($searchAction, ENT_QUOTES, 'UTF-8') ?>">
+                    <span class="search-icon" aria-hidden="true">
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="8" cy="8" r="6" stroke="<?= $accentColor ?>" stroke-width="2"/>
+                            <line x1="12.5" y1="12.5" x2="17" y2="17" stroke="<?= $accentColor ?>" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </span>
+                    <input type="text" name="q" placeholder="Busca en este sitio..." required>
+                    <button type="submit" aria-label="Buscar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= $accentColor ?>" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M21 4L9 16L4 11" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <?php if (!empty($hasCategories)): ?>
+                        <a class="search-categories-link" href="<?= htmlspecialchars(($searchActionBase !== '' ? $searchActionBase : '') . '/categorias', ENT_QUOTES, 'UTF-8') ?>" aria-label="Índice de categorías">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="<?= $accentColor ?>" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="<?= $accentColor ?>" stroke-width="2"/>
+                                <line x1="8" y1="9" x2="16" y2="9" stroke="<?= $accentColor ?>" stroke-width="2"/>
+                                <line x1="8" y1="13" x2="16" y2="13" stroke="<?= $accentColor ?>" stroke-width="2"/>
+                            </svg>
+                        </a>
+                    <?php endif; ?>
+                    <?php if (!empty($isAlphabeticalOrder) && !empty($lettersIndexUrl)): ?>
+                        <a class="search-letters-link" href="<?= htmlspecialchars($lettersIndexUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Índice alfabético">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M5 18L9 6L13 18" stroke="<?= $accentColor ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <line x1="6.5" y1="13" x2="11.5" y2="13" stroke="<?= $accentColor ?>" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M15 6H20L15 18H20" stroke="<?= $accentColor ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </a>
+                    <?php endif; ?>
+                    <?php if (!empty($hasItineraries)): ?>
+                        <a class="search-itineraries-link" href="<?= htmlspecialchars($itinerariesIndexUrlLocal, ENT_QUOTES, 'UTF-8') ?>" aria-label="Itinerarios">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M4 5H10C11.1046 5 12 5.89543 12 7V19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="<?= $accentColor ?>" stroke-width="2" stroke-linejoin="round"/>
+                                <path d="M20 5H14C12.8954 5 12 5.89543 12 7V19H20C21.1046 19 22 18.1046 22 17V7C22 5.89543 21.1046 5 20 5Z" stroke="<?= $accentColor ?>" stroke-width="2" stroke-linejoin="round"/>
+                                <line x1="12" y1="7" x2="12" y2="19" stroke="<?= $accentColor ?>" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </a>
+                    <?php endif; ?>
+                    <?php if (!empty($hasPodcast)): ?>
+                        <a class="search-podcast-link" href="<?= htmlspecialchars(($searchActionBase !== '' ? $searchActionBase : '') . '/podcast', ENT_QUOTES, 'UTF-8') ?>" aria-label="Podcast">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="9" y="3" width="6" height="10" rx="3" stroke="<?= $accentColor ?>" stroke-width="2"/>
+                                <path d="M5 11C5 14.866 8.134 18 12 18C15.866 18 19 14.866 19 11" stroke="<?= $accentColor ?>" stroke-width="2" stroke-linecap="round"/>
+                                <line x1="12" y1="18" x2="12" y2="22" stroke="<?= $accentColor ?>" stroke-width="2" stroke-linecap="round"/>
+                                <line x1="8" y1="22" x2="16" y2="22" stroke="<?= $accentColor ?>" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </a>
+                    <?php endif; ?>
+                </form>
+            </div>
+        </section>
+        <?php
+        $bottomBoxes .= (string) ob_get_clean();
+    }
+    $content = $itineraryBody . $presentationQuizHtml . $topicsHtml . $bottomBoxes;
     echo $renderer->render('layout', [
         'pageTitle' => $itinerary->getTitle(),
         'metaDescription' => $itineraryDescription,

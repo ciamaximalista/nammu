@@ -1071,6 +1071,8 @@ function nammu_ads_settings(): array
         'scope' => 'home',
         'text' => '',
         'image' => '',
+        'link' => '',
+        'link_label' => '',
         'push_enabled' => 'off',
         'push_posts' => 'off',
         'push_itineraries' => 'off',

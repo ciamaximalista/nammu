@@ -1045,6 +1045,8 @@ function get_settings() {
         'scope' => 'home',
         'text' => '',
         'image' => '',
+        'link' => '',
+        'link_label' => '',
         'push_enabled' => 'off',
         'push_posts' => 'off',
         'push_itineraries' => 'off',
@@ -5567,6 +5569,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $text = trim((string) ($_POST['ads_text'] ?? ''));
         $image = trim((string) ($_POST['ads_image'] ?? ''));
+        $link = trim((string) ($_POST['ads_link'] ?? ''));
+        $linkLabel = trim((string) ($_POST['ads_link_label'] ?? ''));
         try {
             $config = load_config_file();
             if (!isset($config['ads'])) {
@@ -5576,6 +5580,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $config['ads']['scope'] = $scope;
             $config['ads']['text'] = $text;
             $config['ads']['image'] = $image;
+            $config['ads']['link'] = $link;
+            $config['ads']['link_label'] = $linkLabel;
             save_config_file($config);
             $_SESSION['ads_feedback'] = [
                 'type' => 'success',

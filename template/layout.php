@@ -86,6 +86,8 @@ $adsEnabled = ($adsSettings['enabled'] ?? 'off') === 'on';
 $adsScope = $adsSettings['scope'] ?? 'home';
 $adsText = trim((string) ($adsSettings['text'] ?? ''));
 $adsImage = trim((string) ($adsSettings['image'] ?? ''));
+$adsLink = trim((string) ($adsSettings['link'] ?? ''));
+$adsLinkLabel = trim((string) ($adsSettings['link_label'] ?? ''));
 $adsImageUrl = $adsImage !== '' && function_exists('nammu_resolve_asset')
     ? (nammu_resolve_asset($adsImage, $baseHref) ?? '')
     : '';
@@ -96,6 +98,14 @@ if ($adsText !== '') {
     } else {
         $adsHtml = htmlspecialchars($adsText, ENT_QUOTES, 'UTF-8');
     }
+}
+$adsTitleHtml = '';
+$adsFooterLinkHtml = '';
+$adsLinkHref = '';
+if ($adsLink !== '' && $adsLinkLabel !== '') {
+    $adsLinkHref = htmlspecialchars($adsLink, ENT_QUOTES, 'UTF-8');
+    $adsTitleHtml = '<a href="' . $adsLinkHref . '" class="nammu-ad-link" data-ad-link>' . htmlspecialchars($adsLinkLabel, ENT_QUOTES, 'UTF-8') . '</a>';
+    $adsFooterLinkHtml = '<a href="' . $adsLinkHref . '" class="nammu-ad-link" data-ad-link>Visita ' . htmlspecialchars($adsLinkLabel, ENT_QUOTES, 'UTF-8') . '</a>';
 }
 $adsClosedToday = ($_COOKIE['nammu_ad_closed'] ?? '') === date('Y-m-d');
 $showAdsBanner = $adsEnabled && $adsHtml !== '' && !$adsClosedToday && !$isCrawler && $statsConsentGiven;
@@ -780,6 +790,20 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             color: <?= $colorText ?>;
             line-height: 1.5;
         }
+        .nammu-ad-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: <?= $colorText ?>;
+        }
+        .nammu-ad-cta {
+            font-weight: 600;
+            color: <?= $colorText ?>;
+        }
+        .nammu-ad-title a,
+        .nammu-ad-cta a {
+            color: inherit;
+            text-decoration: underline;
+        }
         .nammu-ad-text p {
             margin: 0;
         }
@@ -1286,14 +1310,20 @@ if (!empty($baseUrl)) {
         </div>
     <?php endif; ?>
     <?php if ($showAdsBanner && !$isCrawler): ?>
-        <div class="nammu-ad-banner" data-ad-banner data-server-date="<?= htmlspecialchars($serverDay, ENT_QUOTES, 'UTF-8') ?>" data-server-expires="<?= htmlspecialchars($serverDayExpires, ENT_QUOTES, 'UTF-8') ?>">
+        <div class="nammu-ad-banner" data-ad-banner data-server-date="<?= htmlspecialchars($serverDay, ENT_QUOTES, 'UTF-8') ?>" data-server-expires="<?= htmlspecialchars($serverDayExpires, ENT_QUOTES, 'UTF-8') ?>"<?= $adsLinkHref !== '' ? ' data-ad-link-target="' . $adsLinkHref . '"' : '' ?>>
             <button class="nammu-ad-close" type="button" aria-label="Cerrar anuncio" data-ad-close>
                 <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
             </button>
             <div class="nammu-ad-content">
+                <?php if ($adsTitleHtml !== ''): ?>
+                    <div class="nammu-ad-title"><?= $adsTitleHtml ?></div>
+                <?php endif; ?>
                 <div class="nammu-ad-text"><?= $adsHtml ?></div>
+                <?php if ($adsFooterLinkHtml !== ''): ?>
+                    <div class="nammu-ad-cta"><?= $adsFooterLinkHtml ?></div>
+                <?php endif; ?>
             </div>
             <?php if ($adsImageUrl !== ''): ?>
                 <div class="nammu-ad-image">
@@ -1365,12 +1395,13 @@ if (!empty($baseUrl)) {
         }
         var serverDate = banner.getAttribute('data-server-date') || '';
         var serverExpires = banner.getAttribute('data-server-expires') || '';
+        var adLinkTarget = banner.getAttribute('data-ad-link-target') || '';
         function hasConsent() {
             return document.cookie.split(';').some(function(part) {
                 return part.trim().indexOf('nammu_stats_consent=1') === 0;
             });
         }
-        closeBtn.addEventListener('click', function() {
+        function closeBanner() {
             banner.style.display = 'none';
             if (!hasConsent()) {
                 return;
@@ -1390,7 +1421,34 @@ if (!empty($baseUrl)) {
                 expiry = localExpiry.toUTCString();
             }
             document.cookie = 'nammu_ad_closed=' + value + ';path=/;expires=' + expiry + ';samesite=lax';
+        }
+        closeBtn.addEventListener('click', function() {
+            closeBanner();
         });
+        banner.querySelectorAll('[data-ad-link]').forEach(function(link) {
+            link.addEventListener('click', function() {
+                closeBanner();
+            });
+        });
+        if (adLinkTarget !== '') {
+            try {
+                var targetUrl = new URL(adLinkTarget, window.location.href);
+                var currentUrl = new URL(window.location.href);
+                var normalizePath = function(path) {
+                    if (path.length > 1 && path.endsWith('/')) {
+                        return path.slice(0, -1);
+                    }
+                    return path;
+                };
+                var targetKey = targetUrl.origin + normalizePath(targetUrl.pathname);
+                var currentKey = currentUrl.origin + normalizePath(currentUrl.pathname);
+                if (targetKey === currentKey) {
+                    closeBanner();
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
     })();
     </script>
     <script>

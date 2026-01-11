@@ -6,6 +6,8 @@
     $adsScope = $ads['scope'] ?? 'home';
     $adsText = trim((string) ($ads['text'] ?? ''));
     $adsImage = trim((string) ($ads['image'] ?? ''));
+    $adsLink = trim((string) ($ads['link'] ?? ''));
+    $adsLinkLabel = trim((string) ($ads['link_label'] ?? ''));
     $pushEnabled = ($ads['push_enabled'] ?? 'off') === 'on';
     $pushPosts = ($ads['push_posts'] ?? 'off') === 'on';
     $pushItineraries = ($ads['push_itineraries'] ?? 'off') === 'on';
@@ -96,6 +98,16 @@
                     <div class="form-group">
                         <label for="ads_text">Texto del anuncio</label>
                         <textarea class="form-control" name="ads_text" id="ads_text" rows="4" placeholder="Escribe aqui el texto del anuncio (html)"><?= htmlspecialchars($adsText, ENT_QUOTES, 'UTF-8') ?></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ads_link">Enlace</label>
+                        <input type="url" name="ads_link" id="ads_link" class="form-control" value="<?= htmlspecialchars($adsLink, ENT_QUOTES, 'UTF-8') ?>" placeholder="https://ejemplo.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ads_link_label">Nombre de la página enlazada</label>
+                        <input type="text" name="ads_link_label" id="ads_link_label" class="form-control" value="<?= htmlspecialchars($adsLinkLabel, ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej: Nuestra tienda">
                     </div>
 
                     <div class="form-group">

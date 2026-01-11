@@ -4964,6 +4964,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $normalizedTarget = normalize_media_tag_key($targetRelative);
         $redirectPage = isset($_POST['redirect_p']) ? max(1, (int) $_POST['redirect_p']) : 1;
         $redirectSearch = isset($_POST['redirect_search']) ? trim((string) $_POST['redirect_search']) : '';
+        $redirectTarget = 'admin.php?page=resources';
+        $redirectUrlRaw = trim((string) ($_POST['redirect_url'] ?? ''));
+        $redirectPageRaw = trim((string) ($_POST['redirect_page'] ?? ''));
+        $redirectAnchorRaw = trim((string) ($_POST['redirect_anchor'] ?? ''));
+        $redirectAnchor = '';
+        if ($redirectAnchorRaw !== '' && preg_match('/^[A-Za-z0-9_-]+$/', $redirectAnchorRaw)) {
+            $redirectAnchor = '#' . $redirectAnchorRaw;
+        }
+        $pattern = '/^page=[a-z0-9._%\-\/&=]+$/i';
+        if ($redirectUrlRaw !== '' && preg_match($pattern, $redirectUrlRaw)) {
+            $redirectTarget = 'admin.php?' . $redirectUrlRaw;
+        } else {
+            $allowedPages = ['resources','publish','edit','edit-post','template','itinerarios','itinerario','configuracion','correo-postal','anuncios'];
+            if (in_array($redirectPageRaw, $allowedPages, true)) {
+                $redirectTarget = 'admin.php?page=' . $redirectPageRaw;
+                if ($redirectPageRaw === 'edit-post') {
+                    $redirectFileRaw = trim((string) ($_POST['redirect_file'] ?? ''));
+                    $safeRedirectFile = nammu_normalize_filename($redirectFileRaw);
+                    if ($safeRedirectFile !== '') {
+                        $redirectTarget .= '&file=' . urlencode($safeRedirectFile);
+                    }
+                }
+            }
+        }
+        if ($redirectAnchor !== '') {
+            $redirectTarget .= $redirectAnchor;
+        }
         if ($normalizedTarget !== '') {
             update_media_tags_entry($normalizedTarget, parse_media_tags_input($_POST['image_tags'] ?? ''));
             $_SESSION['asset_feedback'] = [
@@ -4975,6 +5002,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'type' => 'warning',
                 'message' => 'No se pudo actualizar las etiquetas del recurso seleccionado.',
             ];
+        }
+        $returnToModal = isset($_POST['return_to_modal']) && $_POST['return_to_modal'] === '1';
+        if ($returnToModal) {
+            $selection = [
+                'start' => isset($_POST['target_selection_start']) ? (int) $_POST['target_selection_start'] : null,
+                'end' => isset($_POST['target_selection_end']) ? (int) $_POST['target_selection_end'] : null,
+                'scrollTop' => isset($_POST['target_selection_scroll']) ? (int) $_POST['target_selection_scroll'] : null,
+            ];
+            $_SESSION['asset_apply'] = [
+                'mode' => trim((string) ($_POST['target_type'] ?? '')),
+                'input' => trim((string) ($_POST['target_input'] ?? '')),
+                'editor' => trim((string) ($_POST['target_editor'] ?? '')),
+                'prefix' => trim((string) ($_POST['target_prefix'] ?? '')),
+                'anchor' => $redirectAnchor,
+                'selection' => $selection,
+                'return_to_modal' => true,
+                'files' => [],
+                'restore_payload' => '',
+            ];
+            header('Location: ' . $redirectTarget);
+            exit;
         }
         $redirectParams = 'page=resources';
         if ($redirectPage > 1) {
@@ -8336,6 +8384,18 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                             <input type="hidden" name="original_image" id="tagsModalTarget" value="">
                             <input type="hidden" name="redirect_p" id="tagsModalRedirect" value="<?= isset($current_page) ? (int) $current_page : 1 ?>">
                             <input type="hidden" name="redirect_search" id="tagsModalRedirectSearch" value="<?= htmlspecialchars($resourceSearchTerm, ENT_QUOTES, 'UTF-8') ?>">
+                            <input type="hidden" name="redirect_page" id="tagsModalRedirectPage" value="">
+                            <input type="hidden" name="redirect_url" id="tagsModalRedirectUrl" value="">
+                            <input type="hidden" name="redirect_file" id="tagsModalRedirectFile" value="">
+                            <input type="hidden" name="redirect_anchor" id="tagsModalRedirectAnchor" value="">
+                            <input type="hidden" name="return_to_modal" id="tagsModalReturnToModal" value="">
+                            <input type="hidden" name="target_type" id="tagsModalTargetType" value="">
+                            <input type="hidden" name="target_input" id="tagsModalTargetInput" value="">
+                            <input type="hidden" name="target_editor" id="tagsModalTargetEditor" value="">
+                            <input type="hidden" name="target_prefix" id="tagsModalTargetPrefix" value="">
+                            <input type="hidden" name="target_selection_start" id="tagsModalSelectionStart" value="">
+                            <input type="hidden" name="target_selection_end" id="tagsModalSelectionEnd" value="">
+                            <input type="hidden" name="target_selection_scroll" id="tagsModalSelectionScroll" value="">
                             <div class="form-group">
                                 <label for="tagsModalInput">Etiquetas</label>
                                 <input type="text" class="form-control" name="image_tags" id="tagsModalInput" placeholder="Ej. portada, dossier, pdf">
@@ -9973,6 +10033,33 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                 var target = $(this).data('tag-target') || '';
                 tagsModalInput.val(currentTags);
                 tagsModalTarget.val(target);
+                var isModalContext = $('#imageModal').hasClass('show');
+                var searchParams = new URLSearchParams(window.location.search || '');
+                var currentPageParam = searchParams.get('page') || '';
+                var currentFileParam = searchParams.get('file') || '';
+                var queryString = (window.location.search || '').replace(/^\?/, '');
+                var anchorVal = '';
+                if (lastImageTrigger && typeof lastImageTrigger.getAttribute === 'function') {
+                    anchorVal = lastImageTrigger.getAttribute('data-redirect-anchor') || '';
+                }
+                $('#tagsModalRedirectPage').val(currentPageParam);
+                $('#tagsModalRedirectUrl').val(queryString);
+                $('#tagsModalRedirectFile').val(currentFileParam);
+                $('#tagsModalRedirectAnchor').val(anchorVal);
+                $('#tagsModalReturnToModal').val(isModalContext ? '1' : '');
+                $('#tagsModalTargetType').val(imageTargetMode || '');
+                $('#tagsModalTargetInput').val(imageTargetInput || '');
+                $('#tagsModalTargetEditor').val(imageTargetEditor || '');
+                $('#tagsModalTargetPrefix').val(imageTargetPrefix || '');
+                if (imageTargetSelection) {
+                    $('#tagsModalSelectionStart').val(imageTargetSelection.start || '');
+                    $('#tagsModalSelectionEnd').val(imageTargetSelection.end || '');
+                    $('#tagsModalSelectionScroll').val(imageTargetSelection.scrollTop || '');
+                } else {
+                    $('#tagsModalSelectionStart').val('');
+                    $('#tagsModalSelectionEnd').val('');
+                    $('#tagsModalSelectionScroll').val('');
+                }
                 tagsModal.modal('show');
             });
 
@@ -10175,9 +10262,6 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                         // ignore restore errors
                     }
                 }
-                if (!assetApply.files || !assetApply.files.length) {
-                    return;
-                }
                 if (assetApply.return_to_modal) {
                     imageTargetMode = assetApply.mode || '';
                     imageTargetInput = assetApply.input || '';
@@ -10193,7 +10277,7 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     if (assetApply.selection) {
                         imageTargetSelection = assetApply.selection;
                     }
-                    if (modalSearchInput.length) {
+                    if (modalSearchInput.length && assetApply.files && assetApply.files.length) {
                         var filterName = assetApply.files[0] && assetApply.files[0].name ? assetApply.files[0].name : '';
                         if (filterName) {
                             modalSearchInput.val(filterName);
@@ -10206,6 +10290,9 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     skipImageModalSelectionCapture = true;
                     $('#imageModal').modal('show');
                     window.nammuAssetApply = null;
+                    return;
+                }
+                if (!assetApply.files || !assetApply.files.length) {
                     return;
                 }
                 var firstFile = assetApply.files[0];

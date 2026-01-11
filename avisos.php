@@ -845,6 +845,10 @@ $pageContent = $renderer->render('single', [
     'autoTocHtml' => '',
 ]);
 
+if (function_exists('nammu_record_pageview')) {
+    nammu_record_pageview('pages', 'avisos', 'Avisos');
+}
+
 echo $renderer->render('layout', [
     'pageTitle' => $pageLabel,
     'metaDescription' => $pageIntro,

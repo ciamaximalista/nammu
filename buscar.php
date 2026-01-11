@@ -166,6 +166,9 @@ $queryRaw = trim($_GET['q'] ?? '');
 $typeFilterRaw = trim($_GET['tipo'] ?? 'todo');
 $typeFilter = nammu_normalize_search_type($typeFilterRaw);
 $performSearch = mb_strlen($queryRaw) >= 2;
+if ($performSearch && function_exists('nammu_record_internal_search')) {
+    nammu_record_internal_search($queryRaw);
+}
 
 $searchSummary = [
     'query' => $queryRaw,
@@ -264,6 +267,10 @@ $socialMeta = nammu_build_social_meta([
     'image' => $homeImage,
     'site_name' => $siteNameForMeta,
 ], $socialConfig);
+
+if (function_exists('nammu_record_pageview')) {
+    nammu_record_pageview('pages', 'buscar', 'Buscador');
+}
 
 echo $renderer->render('layout', [
     'pageTitle' => $pageTitle,

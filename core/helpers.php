@@ -142,6 +142,7 @@ function nammu_load_analytics(): array
             'itineraries' => ['items' => []],
             'bots' => ['daily' => []],
             'sources' => ['daily' => []],
+            'searches' => ['daily' => []],
             'updated_at' => 0,
         ];
     }
@@ -152,6 +153,7 @@ function nammu_load_analytics(): array
             'content' => ['posts' => [], 'pages' => []],
             'itineraries' => ['items' => []],
             'bots' => ['daily' => []],
+            'searches' => ['daily' => []],
             'updated_at' => 0,
         ];
     }
@@ -164,6 +166,7 @@ function nammu_load_analytics(): array
             'platform' => ['daily' => []],
             'sources' => ['daily' => []],
             'bots' => ['daily' => []],
+            'searches' => ['daily' => []],
             'updated_at' => 0,
         ];
     }
@@ -173,6 +176,7 @@ function nammu_load_analytics(): array
     $decoded['platform'] = $decoded['platform'] ?? ['daily' => []];
     $decoded['sources'] = $decoded['sources'] ?? ['daily' => []];
     $decoded['bots'] = $decoded['bots'] ?? ['daily' => []];
+    $decoded['searches'] = $decoded['searches'] ?? ['daily' => []];
     $decoded['updated_at'] = (int) ($decoded['updated_at'] ?? 0);
     return $decoded;
 }
@@ -678,6 +682,60 @@ function nammu_record_pageview(string $type, string $slug, string $title = ''): 
     $data['content'][$bucket][$slug]['daily'][$date] = $dailyEntry;
     $data['updated_at'] = time();
     nammu_save_analytics($data);
+    $GLOBALS['nammu_analytics_visit_recorded'] = true;
+}
+
+function nammu_record_internal_search(string $query): void
+{
+    if (!nammu_has_stats_consent()) {
+        return;
+    }
+    $uid = nammu_stats_uid();
+    if ($uid === null) {
+        return;
+    }
+    $query = trim($query);
+    if ($query === '') {
+        return;
+    }
+    if (function_exists('mb_strtolower')) {
+        $query = mb_strtolower($query, 'UTF-8');
+    } else {
+        $query = strtolower($query);
+    }
+    $query = preg_replace('/\s+/u', ' ', $query) ?? $query;
+    if ($query === '') {
+        return;
+    }
+    if (function_exists('mb_substr')) {
+        $query = mb_substr($query, 0, 120, 'UTF-8');
+    } else {
+        $query = substr($query, 0, 120);
+    }
+    $data = nammu_load_analytics();
+    $date = date('Y-m-d');
+    $changed = nammu_analytics_touch_visit($data, $uid, $date);
+    if (!isset($data['searches']['daily'][$date])) {
+        $data['searches']['daily'][$date] = [];
+    }
+    if (!isset($data['searches']['daily'][$date][$query])) {
+        $data['searches']['daily'][$date][$query] = [
+            'count' => 0,
+            'uids' => [],
+        ];
+    }
+    $data['searches']['daily'][$date][$query]['count'] = (int) ($data['searches']['daily'][$date][$query]['count'] ?? 0) + 1;
+    if (!isset($data['searches']['daily'][$date][$query]['uids']) || !is_array($data['searches']['daily'][$date][$query]['uids'])) {
+        $data['searches']['daily'][$date][$query]['uids'] = [];
+    }
+    if (!isset($data['searches']['daily'][$date][$query]['uids'][$uid])) {
+        $data['searches']['daily'][$date][$query]['uids'][$uid] = 1;
+        $changed = true;
+    }
+    if ($changed) {
+        $data['updated_at'] = time();
+        nammu_save_analytics($data);
+    }
     $GLOBALS['nammu_analytics_visit_recorded'] = true;
 }
 

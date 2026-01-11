@@ -961,6 +961,10 @@ $pageContent = $renderer->render('single', [
     'autoTocHtml' => '',
 ]);
 
+if (function_exists('nammu_record_pageview')) {
+    nammu_record_pageview('pages', 'correos', 'Correo postal');
+}
+
 echo $renderer->render('layout', [
     'pageTitle' => 'Correo Postal',
     'metaDescription' => 'Suscripción postal y gestión de direcciones.',

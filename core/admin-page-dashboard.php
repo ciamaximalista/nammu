@@ -59,6 +59,7 @@
     $pagesStats = $analytics['content']['pages'] ?? [];
     $platformDaily = $analytics['platform']['daily'] ?? [];
     $sourcesDaily = $analytics['sources']['daily'] ?? [];
+    $searchesDaily = $analytics['searches']['daily'] ?? [];
     $botsDaily = $analytics['bots']['daily'] ?? [];
     $gscSettings = $settings['search_console'] ?? [];
     $gscProperty = trim((string) ($gscSettings['property'] ?? ''));
@@ -532,6 +533,62 @@
     $socialDetailRows = $buildPercentTable($collectSourceUids('social'), []);
     $otherDetailRows = $buildPercentTable($collectSourceUids('other'), []);
 
+    $searchTermCounts = [];
+    $searchTermUids = [];
+    foreach ($searchesDaily as $day => $payload) {
+        if (!is_string($day) || $day < $startKey) {
+            continue;
+        }
+        if (!is_array($payload)) {
+            continue;
+        }
+        foreach ($payload as $term => $termData) {
+            $termKey = trim((string) $term);
+            if ($termKey === '') {
+                continue;
+            }
+            $count = 0;
+            $uids = [];
+            if (is_array($termData)) {
+                $count = (int) ($termData['count'] ?? 0);
+                $uids = is_array($termData['uids'] ?? null) ? $termData['uids'] : [];
+            } else {
+                $count = (int) $termData;
+            }
+            if ($count > 0) {
+                $searchTermCounts[$termKey] = ($searchTermCounts[$termKey] ?? 0) + $count;
+            }
+            if (!empty($uids)) {
+                if (!isset($searchTermUids[$termKey])) {
+                    $searchTermUids[$termKey] = [];
+                }
+                foreach ($uids as $uid => $flag) {
+                    $searchTermUids[$termKey][$uid] = true;
+                }
+            }
+        }
+    }
+    $searchCountsList = [];
+    foreach ($searchTermCounts as $term => $count) {
+        $searchCountsList[] = ['term' => $term, 'count' => (int) $count];
+    }
+    usort($searchCountsList, static function (array $a, array $b): int {
+        return $b['count'] <=> $a['count'];
+    });
+    $searchCountsList = array_slice($searchCountsList, 0, 10);
+
+    $searchUsersList = [];
+    foreach ($searchTermUids as $term => $uids) {
+        $uniqueCount = is_array($uids) ? count($uids) : 0;
+        if ($uniqueCount > 0) {
+            $searchUsersList[] = ['term' => $term, 'count' => $uniqueCount];
+        }
+    }
+    usort($searchUsersList, static function (array $a, array $b): int {
+        return $b['count'] <=> $a['count'];
+    });
+    $searchUsersList = array_slice($searchUsersList, 0, 10);
+
     $monthlyUids = [];
     $monthlyTotals = [];
     foreach ($visitorsDaily as $day => $payload) {
@@ -820,7 +877,7 @@
     $topPostsMonth = array_slice($topPostsMonth, 0, 10);
 
     $isSystemPageSlug = static function (string $slug): bool {
-        if ($slug === 'index' || $slug === 'podcast' || $slug === 'categorias' || $slug === 'letras' || $slug === 'itinerarios') {
+        if ($slug === 'index' || $slug === 'podcast' || $slug === 'categorias' || $slug === 'letras' || $slug === 'itinerarios' || $slug === 'buscar' || $slug === 'avisos' || $slug === 'correos') {
             return true;
         }
         if (preg_match('#^pagina/([1-9][0-9]*)$#', $slug)) {
@@ -939,6 +996,15 @@
     $buildSystemPageUrl = static function (string $slug): string {
         if ($slug === 'index') {
             return '/';
+        }
+        if ($slug === 'buscar') {
+            return '/buscar.php';
+        }
+        if ($slug === 'avisos') {
+            return '/avisos.php';
+        }
+        if ($slug === 'correos') {
+            return '/correos.php';
         }
         if ($slug === 'podcast') {
             return '/podcast';
@@ -1389,6 +1455,37 @@
                                     </tbody>
                                 </table>
                             </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                            <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Búsquedas internas más frecuentes (últimos 30 días)</h4>
+                            <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="internal-search" data-stat-toggle-type="mode">
+                                <button type="button" class="btn btn-outline-primary active" data-stat-mode="searches">Búsquedas</button>
+                                <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
+                            </div>
+                        </div>
+                        <?php if (empty($searchCountsList) && empty($searchUsersList)): ?>
+                            <p class="text-muted mb-0">Sin datos todavía.</p>
+                        <?php else: ?>
+                            <ol class="mb-0 dashboard-links" data-stat-list="internal-search" data-stat-mode="searches">
+                                <?php foreach ($searchCountsList as $item): ?>
+                                    <li>
+                                        <span><?= htmlspecialchars($item['term'], ENT_QUOTES, 'UTF-8') ?></span>
+                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
+                            <ol class="mb-0 dashboard-links d-none" data-stat-list="internal-search" data-stat-mode="users">
+                                <?php foreach ($searchUsersList as $item): ?>
+                                    <li>
+                                        <span><?= htmlspecialchars($item['term'], ENT_QUOTES, 'UTF-8') ?></span>
+                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
                         <?php endif; ?>
                     </div>
                 </div>

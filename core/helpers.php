@@ -725,6 +725,7 @@ function nammu_record_internal_search(string $query): void
         ];
     }
     $data['searches']['daily'][$date][$query]['count'] = (int) ($data['searches']['daily'][$date][$query]['count'] ?? 0) + 1;
+    $changed = true;
     if (!isset($data['searches']['daily'][$date][$query]['uids']) || !is_array($data['searches']['daily'][$date][$query]['uids'])) {
         $data['searches']['daily'][$date][$query]['uids'] = [];
     }

@@ -334,7 +334,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
         text-decoration: underline;
     }
     .category-label__by {
-        color: <?= $headingSecondaryColor ?>;
+        color: <?= $brandColor ?>;
         font-weight: 700;
         margin: 0 0.25rem;
     }

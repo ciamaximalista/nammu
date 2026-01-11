@@ -1269,7 +1269,7 @@
                 </div>
             </div>
             <div class="col-lg-6">
-                <div class="card mb-4">
+                <div class="card mb-4 dashboard-stat-block">
                     <div class="card-body">
                         <h4 class="h6 text-uppercase text-muted mb-3">Usuarios únicos humanos (último año)</h4>
                         <?php if ($last12Line['points'] === ''): ?>

@@ -1298,7 +1298,7 @@
 
         <div class="row">
             <div class="col-lg-4">
-                <div class="card mb-4">
+                <div class="card mb-4 dashboard-stat-block">
                     <div class="card-body">
                         <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Publicaciones</h4>
                         <p class="mb-2"><strong>Entradas:</strong> <?= (int) $postCount ?></p>
@@ -1458,7 +1458,7 @@
                         <?php endif; ?>
                     </div>
                 </div>
-                <div class="card mb-4">
+                <div class="card mb-4 dashboard-stat-block">
                     <div class="card-body">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                             <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Búsquedas internas más frecuentes (últimos 30 días)</h4>

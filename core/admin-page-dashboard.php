@@ -820,7 +820,10 @@
     $topPostsMonth = array_slice($topPostsMonth, 0, 10);
 
     $isSystemPageSlug = static function (string $slug): bool {
-        if ($slug === 'podcast' || $slug === 'categorias' || $slug === 'letras' || $slug === 'itinerarios') {
+        if ($slug === 'index' || $slug === 'podcast' || $slug === 'categorias' || $slug === 'letras' || $slug === 'itinerarios') {
+            return true;
+        }
+        if (preg_match('#^pagina/([1-9][0-9]*)$#', $slug)) {
             return true;
         }
         return str_starts_with($slug, 'categoria/')
@@ -841,9 +844,15 @@
         if ($total <= 0) {
             continue;
         }
+        $title = $item['title'] ?? $slug;
+        if ($slug === 'index') {
+            $title = 'Portada';
+        } elseif (preg_match('#^pagina/([1-9][0-9]*)$#', $slug, $pageMatch)) {
+            $title = 'Página ' . $pageMatch[1];
+        }
         $entry = [
             'slug' => $slug,
-            'title' => $item['title'] ?? $slug,
+            'title' => $title,
             'count' => $total,
             'unique' => $uniqueAll(is_array($daily) ? $daily : []),
             'daily' => is_array($daily) ? $daily : [],
@@ -928,6 +937,9 @@
     $topSystemPagesMonth = array_slice($topSystemPagesMonth, 0, 10);
 
     $buildSystemPageUrl = static function (string $slug): string {
+        if ($slug === 'index') {
+            return '/';
+        }
         if ($slug === 'podcast') {
             return '/podcast';
         }
@@ -937,14 +949,17 @@
         if ($slug === 'letras') {
             return '/letras';
         }
+        if ($slug === 'itinerarios') {
+            return '/itinerarios';
+        }
+        if (preg_match('#^pagina/([1-9][0-9]*)$#', $slug, $pageMatch)) {
+            return '/pagina/' . $pageMatch[1];
+        }
         if (str_starts_with($slug, 'categoria/')) {
             return '/' . $slug;
         }
         if (str_starts_with($slug, 'letra/')) {
             return '/' . $slug;
-        }
-        if ($slug === 'itinerarios') {
-            return '/itinerarios';
         }
         return '/' . $slug;
     };

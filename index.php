@@ -1669,6 +1669,11 @@ $homePageTitle = $displaySiteTitle . ' por ' . $blogOwner;
 if ($perPage !== null && $currentPage > 1) {
     $homePageTitle .= ' - Página ' . $currentPage;
 }
+if (function_exists('nammu_record_pageview')) {
+    $pageSlug = $currentPage > 1 ? 'pagina/' . $currentPage : 'index';
+    $pageLabel = $currentPage > 1 ? ('Página ' . $currentPage) : 'Portada';
+    nammu_record_pageview('pages', $pageSlug, $pageLabel);
+}
 
 $content = $renderer->render('home', [
     'posts' => $postsForView,

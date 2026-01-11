@@ -533,6 +533,10 @@ function nammu_record_visit(): void
         $utmMedium = strtolower(trim((string) ($_GET['utm_medium'] ?? '')));
         if ($utmSource !== '' || $utmMedium !== '') {
             $sourceMap = [
+                'email' => 'Lista de correo',
+                'correo' => 'Lista de correo',
+                'mail' => 'Lista de correo',
+                'newsletter' => 'Newsletter',
                 'telegram' => 'Telegram',
                 't.me' => 'Telegram',
                 'tg' => 'Telegram',
@@ -579,9 +583,12 @@ function nammu_record_visit(): void
                 }
             }
             if ($detail !== '') {
-                $bucket = in_array($detail, ['Google Search', 'Bing', 'DuckDuckGo', 'Yahoo', 'Yandex'], true)
-                    ? 'search'
-                    : 'social';
+                $bucket = 'other';
+                if (in_array($detail, ['Google Search', 'Bing', 'DuckDuckGo', 'Yahoo', 'Yandex', 'Baidu', 'Ecosia', 'Startpage'], true)) {
+                    $bucket = 'search';
+                } elseif (in_array($detail, ['Telegram', 'WhatsApp', 'Instagram', 'Facebook', 'Twitter/X', 'LinkedIn', 'Pinterest', 'Reddit', 'TikTok', 'YouTube'], true)) {
+                    $bucket = 'social';
+                }
                 $source = ['bucket' => $bucket, 'detail' => $detail];
             }
         }

@@ -1429,7 +1429,12 @@ function admin_send_post_to_telegram(string $slug, string $title, string $descri
     if ($token === '' || $channel === '') {
         return false;
     }
-    $message = admin_build_telegram_message($slug, $title, $description, $urlOverride);
+    $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
+    $trackedUrl = admin_add_utm_params($targetUrl, [
+        'utm_source' => 'telegram',
+        'utm_medium' => 'social',
+    ]);
+    $message = admin_build_telegram_message($slug, $title, $description, $trackedUrl);
     $imageUrl = trim($imageUrl);
     if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
         return admin_send_telegram_photo($token, $channel, $imageUrl, $message);
@@ -1492,6 +1497,11 @@ function admin_send_whatsapp_post(string $slug, string $title, string $descripti
     if ($token === '' || $phoneId === '' || $recipient === '') {
         return false;
     }
+    $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
+    $trackedUrl = admin_add_utm_params($targetUrl, [
+        'utm_source' => 'whatsapp',
+        'utm_medium' => 'social',
+    ]);
     $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($phoneId) . '/messages';
     $imageUrl = trim($imageUrl);
     if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
@@ -1501,7 +1511,7 @@ function admin_send_whatsapp_post(string $slug, string $title, string $descripti
             'type' => 'image',
             'image' => [
                 'link' => $imageUrl,
-                'caption' => admin_build_post_message($slug, $title, $description, $urlOverride),
+                'caption' => admin_build_post_message($slug, $title, $description, $trackedUrl),
             ],
         ];
         return admin_http_post_json($endpoint, $payload, [
@@ -1514,7 +1524,7 @@ function admin_send_whatsapp_post(string $slug, string $title, string $descripti
         'to' => $recipient,
         'type' => 'text',
         'text' => [
-            'body' => admin_build_post_message($slug, $title, $description, $urlOverride, $imageUrl),
+            'body' => admin_build_post_message($slug, $title, $description, $trackedUrl, $imageUrl),
         ],
     ];
     return admin_http_post_json($endpoint, $payload, [
@@ -1529,19 +1539,24 @@ function admin_send_facebook_post(string $slug, string $title, string $descripti
     if ($token === '' || $pageId === '') {
         return false;
     }
+    $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
+    $trackedUrl = admin_add_utm_params($targetUrl, [
+        'utm_source' => 'facebook',
+        'utm_medium' => 'social',
+    ]);
     $imageUrl = trim($imageUrl);
     if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
         $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($pageId) . '/photos';
         $params = [
             'url' => $imageUrl,
-            'caption' => admin_build_post_message($slug, $title, $description, $urlOverride),
+            'caption' => admin_build_post_message($slug, $title, $description, $trackedUrl),
             'access_token' => $token,
         ];
         return admin_http_post_form($endpoint, $params);
     }
     $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($pageId) . '/feed';
     $params = [
-        'message' => admin_build_post_message($slug, $title, $description, $urlOverride, $imageUrl),
+        'message' => admin_build_post_message($slug, $title, $description, $trackedUrl, $imageUrl),
         'access_token' => $token,
     ];
     return admin_http_post_form($endpoint, $params);
@@ -1550,11 +1565,16 @@ function admin_send_facebook_post(string $slug, string $title, string $descripti
 function admin_send_twitter_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = ''): bool {
     $token = $settings['token'] ?? '';
     $imageUrl = trim($imageUrl);
+    $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
+    $trackedUrl = admin_add_utm_params($targetUrl, [
+        'utm_source' => 'twitter',
+        'utm_medium' => 'social',
+    ]);
     if ($imageUrl !== '' && admin_twitter_has_media_credentials($settings)) {
         $mediaId = admin_twitter_upload_media($imageUrl, $settings);
         if ($mediaId !== '') {
             $endpoint = 'https://api.twitter.com/2/tweets';
-            $text = admin_build_post_message($slug, $title, $description, $urlOverride);
+            $text = admin_build_post_message($slug, $title, $description, $trackedUrl);
             if (function_exists('mb_strlen')) {
                 if (mb_strlen($text, 'UTF-8') > 280) {
                     $text = mb_substr($text, 0, 275, 'UTF-8') . '…';
@@ -1576,7 +1596,7 @@ function admin_send_twitter_post(string $slug, string $title, string $descriptio
         return false;
     }
     $endpoint = 'https://api.twitter.com/2/tweets';
-    $text = admin_build_post_message($slug, $title, $description, $urlOverride, $imageUrl);
+    $text = admin_build_post_message($slug, $title, $description, $trackedUrl, $imageUrl);
     if (function_exists('mb_strlen')) {
         if (mb_strlen($text, 'UTF-8') > 280) {
             $text = mb_substr($text, 0, 275, 'UTF-8') . '…';
@@ -1731,7 +1751,12 @@ function admin_send_instagram_post(string $slug, string $title, string $image, a
     if ($imageUrl === null || $imageUrl === '') {
         return false;
     }
-    $caption = admin_build_instagram_caption($slug, $title, $description, $urlOverride);
+    $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
+    $trackedUrl = admin_add_utm_params($targetUrl, [
+        'utm_source' => 'instagram',
+        'utm_medium' => 'social',
+    ]);
+    $caption = admin_build_instagram_caption($slug, $title, $description, $trackedUrl);
     $createEndpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($accountId) . '/media';
     $createResponse = admin_http_post_form_json($createEndpoint, [
         'image_url' => $imageUrl,
@@ -2740,6 +2765,57 @@ function admin_google_exchange_code(string $code, string $clientId, string $clie
     return $decoded;
 }
 
+function admin_add_utm_params(string $url, array $params): string {
+    if ($url === '') {
+        return $url;
+    }
+    $parts = parse_url($url);
+    if (!is_array($parts)) {
+        return $url;
+    }
+    $query = [];
+    if (isset($parts['query'])) {
+        parse_str($parts['query'], $query);
+    }
+    foreach ($params as $key => $value) {
+        $key = (string) $key;
+        $value = (string) $value;
+        if ($key === '' || $value === '' || isset($query[$key])) {
+            continue;
+        }
+        $query[$key] = $value;
+    }
+    $userInfo = '';
+    if (!empty($parts['user'])) {
+        $userInfo = $parts['user'];
+        if (!empty($parts['pass'])) {
+            $userInfo .= ':' . $parts['pass'];
+        }
+        $userInfo .= '@';
+    }
+    $base = '';
+    if (!empty($parts['scheme'])) {
+        $base .= $parts['scheme'] . '://';
+    }
+    if (!empty($parts['host'])) {
+        $base .= $userInfo . $parts['host'];
+        if (!empty($parts['port'])) {
+            $base .= ':' . $parts['port'];
+        }
+    }
+    $base .= $parts['path'] ?? '';
+    $queryString = http_build_query($query);
+    $fragment = $parts['fragment'] ?? '';
+    $rebuilt = $base;
+    if ($queryString !== '') {
+        $rebuilt .= '?' . $queryString;
+    }
+    if ($fragment !== '') {
+        $rebuilt .= '#' . $fragment;
+    }
+    return $rebuilt !== '' ? $rebuilt : $url;
+}
+
 function admin_prepare_mailing_payload(string $template, array $settings, string $title, string $description, string $link, string $imagePath): array {
     $mailingConfig = $settings['mailing'] ?? [];
     $format = $mailingConfig['format'] ?? 'html';
@@ -2823,7 +2899,12 @@ function admin_prepare_mailing_payload(string $template, array $settings, string
     $ctaText = $ctaLabel;
     $fromName = $authorName !== '' ? $authorName : $blogName;
 
-    $buildText = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link, $ctaText) {
+    $trackedLink = admin_add_utm_params($link, [
+        'utm_source' => 'email',
+        'utm_medium' => 'avisos',
+        'utm_campaign' => $template,
+    ]);
+    $buildText = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $trackedLink, $ctaText) {
         $lines = [];
         $lines[] = '**** ' . ($authorName !== '' ? $authorName : $blogName) . ' ****';
         $lines[] = '**** ' . $blogName . ' ****';
@@ -2834,14 +2915,14 @@ function admin_prepare_mailing_payload(string $template, array $settings, string
             $lines[] = $description;
             $lines[] = '';
         }
-        $lines[] = $ctaText . ': ' . $link;
+        $lines[] = $ctaText . ': ' . $trackedLink;
         $lines[] = '';
         $lines[] = '-----------';
         $lines[] = 'Recibes este email porque estás suscrito a las comunicaciones de ' . $blogName . '. Puedes darte de baja pulsando aquí: ' . admin_mailing_unsubscribe_link($recipientEmail);
         return implode("\n", $lines);
     };
 
-    $buildHtml = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $link, $imageUrl, $logoUrl, $headerBg, $headerText, $ctaColor, $ctaText, $outerBg, $cardBg, $colorText, $colorH2, $footerBg, $footerText, $border, $ctaLabel, $fontsUrl, $titleFontCss, $bodyFontCss) {
+    $buildHtml = function (string $recipientEmail) use ($authorName, $blogName, $title, $description, $trackedLink, $imageUrl, $logoUrl, $headerBg, $headerText, $ctaColor, $ctaText, $outerBg, $cardBg, $colorText, $colorH2, $footerBg, $footerText, $border, $ctaLabel, $fontsUrl, $titleFontCss, $bodyFontCss) {
         $safeUnsub = htmlspecialchars(admin_mailing_unsubscribe_link($recipientEmail), ENT_QUOTES, 'UTF-8');
         $html = [];
         if ($fontsUrl !== '') {
@@ -2866,7 +2947,7 @@ function admin_prepare_mailing_payload(string $template, array $settings, string
             $html[] = '      <p style="margin:0 0 20px 0; line-height:1.75; font-size:20px; color:' . htmlspecialchars($colorText, ENT_QUOTES, 'UTF-8') . '; font-family:' . $bodyFontCss . ', Arial, sans-serif;">' . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')) . '</p>';
         }
         $html[] = '      <p style="margin:0 0 16px 0;">';
-        $html[] = '        <a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block; background:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . '; color:' . htmlspecialchars($ctaText, ENT_QUOTES, 'UTF-8') . '; padding:14px 18px; border-radius:10px; text-decoration:none; font-weight:600;">' . htmlspecialchars($ctaLabel, ENT_QUOTES, 'UTF-8') . '</a>';
+        $html[] = '        <a href="' . htmlspecialchars($trackedLink, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block; background:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . '; color:' . htmlspecialchars($ctaText, ENT_QUOTES, 'UTF-8') . '; padding:14px 18px; border-radius:10px; text-decoration:none; font-weight:600;">' . htmlspecialchars($ctaLabel, ENT_QUOTES, 'UTF-8') . '</a>';
         $html[] = '      </p>';
         $html[] = '    </div>';
         $html[] = '    <div style="padding:16px 22px; background:' . htmlspecialchars($footerBg, ENT_QUOTES, 'UTF-8') . '; border-top:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33; font-size:13px; color:' . htmlspecialchars($footerText, ENT_QUOTES, 'UTF-8') . '; opacity:0.8;">';

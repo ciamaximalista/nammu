@@ -793,11 +793,11 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
         .nammu-ad-title {
             font-size: 1.05rem;
             font-weight: 700;
-            color: <?= $colorText ?>;
+            color: <?= $colorAccent ?>;
         }
         .nammu-ad-cta {
             font-weight: 600;
-            color: <?= $colorText ?>;
+            color: <?= $colorAccent ?>;
         }
         .nammu-ad-title a,
         .nammu-ad-cta a {

@@ -2846,8 +2846,8 @@
                                     <button type="submit" class="btn btn-outline-primary btn-sm">Actualizar datos ahora</button>
                                 </form>
                                 <div class="btn-group btn-group-sm mb-3 dashboard-toggle bing-toggle bing-buttons" role="group" data-stat-toggle="bing-period" data-stat-scope="bing-period" data-stat-toggle-type="period">
-                                    <button type="button" class="btn btn-outline-secondary bing-period-label active" data-stat-period="28" onclick="nammuSetBingPeriod('28')">Últimos 28 días</button>
-                                    <button type="button" class="btn btn-outline-secondary bing-period-label" data-stat-period="7" onclick="nammuSetBingPeriod('7')">Últimos 7 días</button>
+                                    <button type="button" class="btn btn-outline-secondary bing-period-label active" data-stat-period="28">Últimos 28 días</button>
+                                    <button type="button" class="btn btn-outline-secondary bing-period-label" data-stat-period="7">Últimos 7 días</button>
                                 </div>
                                 <div class="bing-content">
                                 <div class="table-responsive mb-3">
@@ -3143,25 +3143,6 @@
                     }
                 }
             });
-            var bingDashboard = document.getElementById('bing-dashboard');
-            if (bingDashboard) {
-                var setBingPeriod = function(period) {
-                    if (!period) {
-                        return;
-                    }
-                    bingDashboard.querySelectorAll('.bing-period-7').forEach(function(item) {
-                        item.classList.toggle('d-none', period !== '7');
-                    });
-                    bingDashboard.querySelectorAll('.bing-period-28').forEach(function(item) {
-                        item.classList.toggle('d-none', period !== '28');
-                    });
-                    bingDashboard.querySelectorAll('[data-stat-toggle="bing-period"] [data-stat-period]').forEach(function(btn) {
-                        btn.classList.toggle('active', btn.getAttribute('data-stat-period') === period);
-                    });
-                };
-                window.nammuSetBingPeriod = setBingPeriod;
-                setBingPeriod('28');
-            }
             // GSC toggle uses CSS radios.
         })();
     </script>

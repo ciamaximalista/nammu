@@ -1876,32 +1876,6 @@
             #gsc-period-28:checked ~ .gsc-content .gsc-period-7 {
                 display: none;
             }
-            #bing-period-28:checked ~ .bing-buttons label[for="bing-period-28"],
-            #bing-period-7:checked ~ .bing-buttons label[for="bing-period-7"] {
-                background: #1b8eed;
-                color: #ffffff;
-                border-color: #1b8eed;
-            }
-            .bing-period-input {
-                position: absolute;
-                opacity: 0;
-                pointer-events: none;
-            }
-            .bing-period-7 {
-                display: none;
-            }
-            #bing-period-7:checked ~ .bing-content .bing-period-7 {
-                display: block;
-            }
-            #bing-period-7:checked ~ .bing-content .bing-period-28 {
-                display: none;
-            }
-            #bing-period-28:checked ~ .bing-content .bing-period-28 {
-                display: block;
-            }
-            #bing-period-28:checked ~ .bing-content .bing-period-7 {
-                display: none;
-            }
         </style>
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-2">
             <div>
@@ -2919,8 +2893,6 @@
                                     <input type="hidden" name="bing_refresh" value="1">
                                     <button type="submit" class="btn btn-outline-primary btn-sm">Actualizar datos ahora</button>
                                 </form>
-                                <input type="radio" name="bing-period" id="bing-period-28" class="bing-period-input" checked>
-                                <input type="radio" name="bing-period" id="bing-period-7" class="bing-period-input">
                                 <div class="btn-group btn-group-sm mb-3 dashboard-toggle bing-toggle bing-buttons" role="group" data-stat-toggle="bing-period" data-stat-scope="bing-period" data-stat-toggle-type="period">
                                     <label class="btn btn-outline-secondary bing-period-label active" for="bing-period-28" data-stat-period="28">Últimos 28 días</label>
                                     <label class="btn btn-outline-secondary bing-period-label" for="bing-period-7" data-stat-period="7">Últimos 7 días</label>
@@ -2941,13 +2913,9 @@
                                                 <td>CTR medio</td>
                                                 <td class="text-right"><?= number_format($bingTotals28['ctr'] * 100, 2, ',', '.') ?>%</td>
                                             </tr>
-                                            <tr>
-                                                <td>Posición media</td>
-                                                <td class="text-right"><?= number_format($bingTotals28['position'], 1, ',', '.') ?></td>
-                                            </tr>
                                         </tbody>
                                     </table>
-                                    <table class="table table-sm mb-0 bing-period-7" data-bing-period="7" data-stat-list data-stat-scope="bing-period" data-stat-period="7">
+                                    <table class="table table-sm mb-0 bing-period-7 d-none" data-bing-period="7" data-stat-list data-stat-scope="bing-period" data-stat-period="7">
                                         <tbody>
                                             <tr>
                                                 <td>Clicks totales</td>
@@ -2960,20 +2928,6 @@
                                             <tr>
                                                 <td>CTR medio</td>
                                                 <td class="text-right"><?= number_format($bingTotals7['ctr'] * 100, 2, ',', '.') ?>%</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Posición media</td>
-                                                <td class="text-right"><?= number_format($bingTotals7['position'], 1, ',', '.') ?></td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div class="table-responsive mb-3">
-                                    <table class="table table-sm mb-0">
-                                        <tbody>
-                                            <tr>
-                                                <td>Última consulta al sitemap</td>
-                                                <td class="text-right"><?= $bingSitemapInfo['last_crawl'] !== '' ? htmlspecialchars($bingSitemapInfo['last_crawl'], ENT_QUOTES, 'UTF-8') : '—' ?></td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -3004,7 +2958,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($bingQueries7)): ?>
-                                    <div class="table-responsive bing-period-7" data-stat-list data-stat-scope="bing-period" data-stat-period="7">
+                                    <div class="table-responsive bing-period-7 d-none" data-stat-list data-stat-scope="bing-period" data-stat-period="7">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -3029,7 +2983,7 @@
                                     <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Páginas más clicadas</p>
                                 <?php endif; ?>
                                 <?php if (!empty($bingPages7)): ?>
-                                    <div class="table-responsive mb-3 bing-period-7" data-stat-list data-stat-scope="bing-period" data-stat-period="7">
+                                    <div class="table-responsive mb-3 bing-period-7 d-none" data-stat-list data-stat-scope="bing-period" data-stat-period="7">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -3100,53 +3054,6 @@
                                                                 <?= htmlspecialchars($slugValue, ENT_QUOTES, 'UTF-8') ?>
                                                             <?php endif; ?>
                                                         </td>
-                                                        <td class="text-right"><?= (int) $row['clicks'] ?></td>
-                                                        <td class="text-right"><?= (int) $row['impressions'] ?></td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                <?php endif; ?>
-                                <?php if (!empty($bingCountries7) || !empty($bingCountries28)): ?>
-                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Principales países</p>
-                                <?php endif; ?>
-                                <?php if (!empty($bingCountries7)): ?>
-                                    <div class="table-responsive mb-3 bing-period-7" data-stat-list data-stat-scope="bing-period" data-stat-period="7">
-                                        <table class="table table-sm mb-0">
-                                            <thead>
-                                                <tr>
-                                                    <th>País</th>
-                                                    <th class="text-right">Clicks</th>
-                                                    <th class="text-right">Impresiones</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($bingCountries7 as $row): ?>
-                                                    <tr>
-                                                        <td><?= htmlspecialchars($gscResolveCountry((string) ($row['country'] ?? '')), ENT_QUOTES, 'UTF-8') ?></td>
-                                                        <td class="text-right"><?= (int) $row['clicks'] ?></td>
-                                                        <td class="text-right"><?= (int) $row['impressions'] ?></td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                <?php endif; ?>
-                                <?php if (!empty($bingCountries28)): ?>
-                                    <div class="table-responsive bing-period-28" data-stat-list data-stat-scope="bing-period" data-stat-period="28">
-                                        <table class="table table-sm mb-0">
-                                            <thead>
-                                                <tr>
-                                                    <th>País</th>
-                                                    <th class="text-right">Clicks</th>
-                                                    <th class="text-right">Impresiones</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($bingCountries28 as $row): ?>
-                                                    <tr>
-                                                        <td><?= htmlspecialchars($gscResolveCountry((string) ($row['country'] ?? '')), ENT_QUOTES, 'UTF-8') ?></td>
                                                         <td class="text-right"><?= (int) $row['clicks'] ?></td>
                                                         <td class="text-right"><?= (int) $row['impressions'] ?></td>
                                                     </tr>

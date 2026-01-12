@@ -1254,9 +1254,35 @@ function admin_bing_api_get(string $method, array $params): array {
         ],
     ];
     $resp = @file_get_contents($url, false, stream_context_create($opts));
-    $decoded = json_decode((string) $resp, true);
+    $respText = is_string($resp) ? trim($resp) : '';
+    $decoded = json_decode($respText, true);
     if (!is_array($decoded)) {
-        throw new RuntimeException('Respuesta inválida de Bing Webmaster Tools.');
+        if ($respText !== '' && str_starts_with($respText, '<')) {
+            $xml = @simplexml_load_string($respText);
+            if ($xml !== false) {
+                $json = json_encode($xml);
+                $decoded = is_string($json) ? json_decode($json, true) : null;
+            }
+        }
+    }
+    if (!is_array($decoded)) {
+        $status = '';
+        if (!empty($http_response_header) && is_array($http_response_header)) {
+            $statusLine = $http_response_header[0] ?? '';
+            if (is_string($statusLine) && preg_match('/\\s(\\d{3})\\s/', $statusLine, $match)) {
+                $status = $match[1];
+            }
+        }
+        $snippet = $respText !== '' ? mb_substr($respText, 0, 160, 'UTF-8') : '';
+        $details = [];
+        if ($status !== '') {
+            $details[] = 'HTTP ' . $status;
+        }
+        if ($snippet !== '') {
+            $details[] = $snippet;
+        }
+        $detailText = !empty($details) ? ' (' . implode(' — ', $details) . ')' : '';
+        throw new RuntimeException('Respuesta inválida de Bing Webmaster Tools' . $detailText . '.');
     }
     $payload = $decoded['d'] ?? $decoded;
     if (is_array($payload)) {

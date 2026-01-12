@@ -1252,18 +1252,48 @@ function admin_bing_api_get(string $method, array $params): array {
     $lastError = null;
     foreach ($bases as $base) {
         $url = $base . $method . '?' . http_build_query($params);
-        $opts = [
-            'http' => [
-                'method' => 'GET',
-                'timeout' => 12,
-                'ignore_errors' => true,
-                'follow_location' => 1,
-                'max_redirects' => 3,
-                'header' => "Accept: application/json\r\nUser-Agent: Nammu/1.0\r\n",
-            ],
-        ];
-        $resp = @file_get_contents($url, false, stream_context_create($opts));
-        $respText = is_string($resp) ? trim($resp) : '';
+        $redirects = 0;
+        $respText = '';
+        $status = '';
+        $finalUrl = $url;
+        while ($redirects <= 3) {
+            $opts = [
+                'http' => [
+                    'method' => 'GET',
+                    'timeout' => 12,
+                    'ignore_errors' => true,
+                    'header' => "Accept: application/json\r\nUser-Agent: Nammu/1.0\r\n",
+                ],
+            ];
+            $resp = @file_get_contents($finalUrl, false, stream_context_create($opts));
+            $respText = is_string($resp) ? trim($resp) : '';
+            $status = '';
+            $location = '';
+            if (!empty($http_response_header) && is_array($http_response_header)) {
+                $statusLine = $http_response_header[0] ?? '';
+                if (is_string($statusLine) && preg_match('/\\s(\\d{3})\\s/', $statusLine, $match)) {
+                    $status = $match[1];
+                }
+                foreach ($http_response_header as $headerLine) {
+                    if (stripos((string) $headerLine, 'Location:') === 0) {
+                        $location = trim(substr((string) $headerLine, strlen('Location:')));
+                        break;
+                    }
+                }
+            }
+            if ($status !== '' && preg_match('/^3\\d\\d$/', $status) && $location !== '') {
+                $redirects++;
+                if (str_starts_with($location, '/')) {
+                    $parts = parse_url($finalUrl);
+                    $scheme = $parts['scheme'] ?? 'https';
+                    $host = $parts['host'] ?? '';
+                    $location = $host !== '' ? $scheme . '://' . $host . $location : $location;
+                }
+                $finalUrl = $location;
+                continue;
+            }
+            break;
+        }
         $decoded = json_decode($respText, true);
         if (!is_array($decoded)) {
             if ($respText !== '' && str_starts_with($respText, '<')) {
@@ -1275,13 +1305,6 @@ function admin_bing_api_get(string $method, array $params): array {
             }
         }
         if (!is_array($decoded)) {
-            $status = '';
-            if (!empty($http_response_header) && is_array($http_response_header)) {
-                $statusLine = $http_response_header[0] ?? '';
-                if (is_string($statusLine) && preg_match('/\\s(\\d{3})\\s/', $statusLine, $match)) {
-                    $status = $match[1];
-                }
-            }
             $snippet = $respText !== '' ? mb_substr($respText, 0, 160, 'UTF-8') : '';
             $details = [];
             if ($status !== '') {

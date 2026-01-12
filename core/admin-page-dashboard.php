@@ -2595,6 +2595,7 @@
                                         </table>
                                     </div>
                                 <?php endif; ?>
+                                </div>
                             <?php endif; ?>
                         </div>
                     </div>

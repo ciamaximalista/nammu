@@ -83,6 +83,225 @@
     $gscCache = null;
     $gscUpdatedAtLabel = '';
     $gscForceRefresh = isset($_GET['gsc_refresh']) && $_GET['gsc_refresh'] === '1';
+    $gscCountryNames = [
+        'AD' => 'Andorra',
+        'AE' => 'Emiratos Árabes Unidos',
+        'AF' => 'Afganistán',
+        'AG' => 'Antigua y Barbuda',
+        'AI' => 'Anguila',
+        'AL' => 'Albania',
+        'AM' => 'Armenia',
+        'AO' => 'Angola',
+        'AR' => 'Argentina',
+        'AS' => 'Samoa Americana',
+        'AT' => 'Austria',
+        'AU' => 'Australia',
+        'AW' => 'Aruba',
+        'AZ' => 'Azerbaiyán',
+        'BA' => 'Bosnia y Herzegovina',
+        'BB' => 'Barbados',
+        'BD' => 'Bangladés',
+        'BE' => 'Bélgica',
+        'BF' => 'Burkina Faso',
+        'BG' => 'Bulgaria',
+        'BH' => 'Barein',
+        'BI' => 'Burundi',
+        'BJ' => 'Benín',
+        'BM' => 'Bermudas',
+        'BN' => 'Brunei',
+        'BO' => 'Bolivia',
+        'BR' => 'Brasil',
+        'BS' => 'Bahamas',
+        'BT' => 'Bután',
+        'BW' => 'Botsuana',
+        'BY' => 'Bielorrusia',
+        'BZ' => 'Belice',
+        'CA' => 'Canadá',
+        'CD' => 'República Democrática del Congo',
+        'CF' => 'República Centroafricana',
+        'CG' => 'República del Congo',
+        'CH' => 'Suiza',
+        'CI' => 'Costa de Marfil',
+        'CL' => 'Chile',
+        'CM' => 'Camerún',
+        'CN' => 'China',
+        'CO' => 'Colombia',
+        'CR' => 'Costa Rica',
+        'CU' => 'Cuba',
+        'CV' => 'Cabo Verde',
+        'CY' => 'Chipre',
+        'CZ' => 'República Checa',
+        'DE' => 'Alemania',
+        'DJ' => 'Yibuti',
+        'DK' => 'Dinamarca',
+        'DM' => 'Dominica',
+        'DO' => 'República Dominicana',
+        'DZ' => 'Argelia',
+        'EC' => 'Ecuador',
+        'EE' => 'Estonia',
+        'EG' => 'Egipto',
+        'ER' => 'Eritrea',
+        'ES' => 'España',
+        'ET' => 'Etiopía',
+        'FI' => 'Finlandia',
+        'FJ' => 'Fiyi',
+        'FM' => 'Micronesia',
+        'FR' => 'Francia',
+        'GA' => 'Gabón',
+        'GB' => 'Reino Unido',
+        'GD' => 'Granada',
+        'GE' => 'Georgia',
+        'GF' => 'Guayana Francesa',
+        'GH' => 'Ghana',
+        'GI' => 'Gibraltar',
+        'GL' => 'Groenlandia',
+        'GM' => 'Gambia',
+        'GN' => 'Guinea',
+        'GP' => 'Guadalupe',
+        'GQ' => 'Guinea Ecuatorial',
+        'GR' => 'Grecia',
+        'GT' => 'Guatemala',
+        'GU' => 'Guam',
+        'GY' => 'Guyana',
+        'HK' => 'Hong Kong',
+        'HN' => 'Honduras',
+        'HR' => 'Croacia',
+        'HT' => 'Haití',
+        'HU' => 'Hungría',
+        'ID' => 'Indonesia',
+        'IE' => 'Irlanda',
+        'IL' => 'Israel',
+        'IN' => 'India',
+        'IQ' => 'Irak',
+        'IR' => 'Irán',
+        'IS' => 'Islandia',
+        'IT' => 'Italia',
+        'JM' => 'Jamaica',
+        'JO' => 'Jordania',
+        'JP' => 'Japón',
+        'KE' => 'Kenia',
+        'KG' => 'Kirguistán',
+        'KH' => 'Camboya',
+        'KI' => 'Kiribati',
+        'KM' => 'Comoras',
+        'KN' => 'San Cristobal y Nieves',
+        'KP' => 'Corea del Norte',
+        'KR' => 'Corea del Sur',
+        'KW' => 'Kuwait',
+        'KZ' => 'Kazajistán',
+        'LA' => 'Laos',
+        'LB' => 'Líbano',
+        'LC' => 'Santa Lucia',
+        'LI' => 'Liechtenstein',
+        'LK' => 'Sri Lanka',
+        'LR' => 'Liberia',
+        'LS' => 'Lesoto',
+        'LT' => 'Lituania',
+        'LU' => 'Luxemburgo',
+        'LV' => 'Letonia',
+        'LY' => 'Libia',
+        'MA' => 'Marruecos',
+        'MC' => 'Mónaco',
+        'MD' => 'Moldavia',
+        'ME' => 'Montenegro',
+        'MG' => 'Madagascar',
+        'MH' => 'Islas Marshall',
+        'MK' => 'Macedonia del Norte',
+        'ML' => 'Mali',
+        'MM' => 'Birmania',
+        'MN' => 'Mongolia',
+        'MO' => 'Macao',
+        'MQ' => 'Martinica',
+        'MR' => 'Mauritania',
+        'MT' => 'Malta',
+        'MU' => 'Mauricio',
+        'MV' => 'Maldivas',
+        'MW' => 'Malaui',
+        'MX' => 'México',
+        'MY' => 'Malasia',
+        'MZ' => 'Mozambique',
+        'NA' => 'Namibia',
+        'NC' => 'Nueva Caledonia',
+        'NE' => 'Níger',
+        'NG' => 'Nigeria',
+        'NI' => 'Nicaragua',
+        'NL' => 'Países Bajos',
+        'NO' => 'Noruega',
+        'NP' => 'Nepal',
+        'NR' => 'Nauru',
+        'NZ' => 'Nueva Zelanda',
+        'OM' => 'Omán',
+        'PA' => 'Panamá',
+        'PE' => 'Perú',
+        'PF' => 'Polinesia Francesa',
+        'PG' => 'Papúa Nueva Guinea',
+        'PH' => 'Filipinas',
+        'PK' => 'Pakistán',
+        'PL' => 'Polonia',
+        'PR' => 'Puerto Rico',
+        'PT' => 'Portugal',
+        'PY' => 'Paraguay',
+        'QA' => 'Catar',
+        'RE' => 'Reunión',
+        'RO' => 'Rumanía',
+        'RS' => 'Serbia',
+        'RU' => 'Rusia',
+        'RW' => 'Ruanda',
+        'SA' => 'Arabia Saudí',
+        'SB' => 'Islas Salomon',
+        'SC' => 'Seychelles',
+        'SD' => 'Sudán',
+        'SE' => 'Suecia',
+        'SG' => 'Singapur',
+        'SI' => 'Eslovenia',
+        'SK' => 'Eslovaquia',
+        'SL' => 'Sierra Leona',
+        'SM' => 'San Marino',
+        'SN' => 'Senegal',
+        'SO' => 'Somalia',
+        'SR' => 'Surinam',
+        'ST' => 'Santo Tome y Principe',
+        'SV' => 'El Salvador',
+        'SY' => 'Siria',
+        'SZ' => 'Suazilandia',
+        'TD' => 'Chad',
+        'TG' => 'Togo',
+        'TH' => 'Tailandia',
+        'TJ' => 'Tayikistán',
+        'TL' => 'Timor Oriental',
+        'TM' => 'Turkmenistán',
+        'TN' => 'Túnez',
+        'TO' => 'Tonga',
+        'TR' => 'Turquía',
+        'TT' => 'Trinidad y Tobago',
+        'TW' => 'Taiwan',
+        'TZ' => 'Tanzania',
+        'UA' => 'Ucrania',
+        'UG' => 'Uganda',
+        'US' => 'Estados Unidos',
+        'UY' => 'Uruguay',
+        'UZ' => 'Uzbekistán',
+        'VA' => 'Vaticano',
+        'VE' => 'Venezuela',
+        'VG' => 'Islas Virgenes Britanicas',
+        'VI' => 'Islas Virgenes de Estados Unidos',
+        'VN' => 'Vietnam',
+        'WS' => 'Samoa',
+        'YE' => 'Yemen',
+        'ZA' => 'Sudáfrica',
+        'ZM' => 'Zambia',
+        'ZW' => 'Zimbabue',
+    ];
+    $gscResolveCountry = static function (string $value) use ($gscCountryNames): string {
+        $code = strtoupper(trim($value));
+        if ($code === '') {
+            return '';
+        }
+        if (strlen($code) === 2) {
+            return $gscCountryNames[$code] ?? '';
+        }
+        return $value;
+    };
     if (is_file($gscCachePath)) {
         $rawCache = @file_get_contents($gscCachePath);
         $decodedCache = is_string($rawCache) && $rawCache !== '' ? json_decode($rawCache, true) : null;
@@ -171,222 +390,6 @@
                 });
                 return array_slice($output, 0, 10);
             };
-            $countryNames = [
-                'AD' => 'Andorra',
-                'AE' => 'Emiratos Arabes Unidos',
-                'AF' => 'Afganistan',
-                'AG' => 'Antigua y Barbuda',
-                'AI' => 'Anguila',
-                'AL' => 'Albania',
-                'AM' => 'Armenia',
-                'AO' => 'Angola',
-                'AR' => 'Argentina',
-                'AS' => 'Samoa Americana',
-                'AT' => 'Austria',
-                'AU' => 'Australia',
-                'AW' => 'Aruba',
-                'AZ' => 'Azerbaiyan',
-                'BA' => 'Bosnia y Herzegovina',
-                'BB' => 'Barbados',
-                'BD' => 'Banglades',
-                'BE' => 'Belgica',
-                'BF' => 'Burkina Faso',
-                'BG' => 'Bulgaria',
-                'BH' => 'Barein',
-                'BI' => 'Burundi',
-                'BJ' => 'Benin',
-                'BM' => 'Bermudas',
-                'BN' => 'Brunei',
-                'BO' => 'Bolivia',
-                'BR' => 'Brasil',
-                'BS' => 'Bahamas',
-                'BT' => 'Butan',
-                'BW' => 'Botsuana',
-                'BY' => 'Bielorrusia',
-                'BZ' => 'Belice',
-                'CA' => 'Canada',
-                'CD' => 'Republica Democratica del Congo',
-                'CF' => 'Republica Centroafricana',
-                'CG' => 'Republica del Congo',
-                'CH' => 'Suiza',
-                'CI' => 'Costa de Marfil',
-                'CL' => 'Chile',
-                'CM' => 'Camerun',
-                'CN' => 'China',
-                'CO' => 'Colombia',
-                'CR' => 'Costa Rica',
-                'CU' => 'Cuba',
-                'CV' => 'Cabo Verde',
-                'CY' => 'Chipre',
-                'CZ' => 'Republica Checa',
-                'DE' => 'Alemania',
-                'DJ' => 'Yibuti',
-                'DK' => 'Dinamarca',
-                'DM' => 'Dominica',
-                'DO' => 'Republica Dominicana',
-                'DZ' => 'Argelia',
-                'EC' => 'Ecuador',
-                'EE' => 'Estonia',
-                'EG' => 'Egipto',
-                'ER' => 'Eritrea',
-                'ES' => 'Espana',
-                'ET' => 'Etiopia',
-                'FI' => 'Finlandia',
-                'FJ' => 'Fiyi',
-                'FM' => 'Micronesia',
-                'FR' => 'Francia',
-                'GA' => 'Gabon',
-                'GB' => 'Reino Unido',
-                'GD' => 'Granada',
-                'GE' => 'Georgia',
-                'GF' => 'Guayana Francesa',
-                'GH' => 'Ghana',
-                'GI' => 'Gibraltar',
-                'GL' => 'Groenlandia',
-                'GM' => 'Gambia',
-                'GN' => 'Guinea',
-                'GP' => 'Guadalupe',
-                'GQ' => 'Guinea Ecuatorial',
-                'GR' => 'Grecia',
-                'GT' => 'Guatemala',
-                'GU' => 'Guam',
-                'GY' => 'Guyana',
-                'HK' => 'Hong Kong',
-                'HN' => 'Honduras',
-                'HR' => 'Croacia',
-                'HT' => 'Haiti',
-                'HU' => 'Hungria',
-                'ID' => 'Indonesia',
-                'IE' => 'Irlanda',
-                'IL' => 'Israel',
-                'IN' => 'India',
-                'IQ' => 'Irak',
-                'IR' => 'Iran',
-                'IS' => 'Islandia',
-                'IT' => 'Italia',
-                'JM' => 'Jamaica',
-                'JO' => 'Jordania',
-                'JP' => 'Japon',
-                'KE' => 'Kenia',
-                'KG' => 'Kirguistan',
-                'KH' => 'Camboya',
-                'KI' => 'Kiribati',
-                'KM' => 'Comoras',
-                'KN' => 'San Cristobal y Nieves',
-                'KP' => 'Corea del Norte',
-                'KR' => 'Corea del Sur',
-                'KW' => 'Kuwait',
-                'KZ' => 'Kazajistan',
-                'LA' => 'Laos',
-                'LB' => 'Libano',
-                'LC' => 'Santa Lucia',
-                'LI' => 'Liechtenstein',
-                'LK' => 'Sri Lanka',
-                'LR' => 'Liberia',
-                'LS' => 'Lesoto',
-                'LT' => 'Lituania',
-                'LU' => 'Luxemburgo',
-                'LV' => 'Letonia',
-                'LY' => 'Libia',
-                'MA' => 'Marruecos',
-                'MC' => 'Monaco',
-                'MD' => 'Moldavia',
-                'ME' => 'Montenegro',
-                'MG' => 'Madagascar',
-                'MH' => 'Islas Marshall',
-                'MK' => 'Macedonia del Norte',
-                'ML' => 'Mali',
-                'MM' => 'Birmania',
-                'MN' => 'Mongolia',
-                'MO' => 'Macao',
-                'MQ' => 'Martinica',
-                'MR' => 'Mauritania',
-                'MT' => 'Malta',
-                'MU' => 'Mauricio',
-                'MV' => 'Maldivas',
-                'MW' => 'Malaui',
-                'MX' => 'Mexico',
-                'MY' => 'Malasia',
-                'MZ' => 'Mozambique',
-                'NA' => 'Namibia',
-                'NC' => 'Nueva Caledonia',
-                'NE' => 'Niger',
-                'NG' => 'Nigeria',
-                'NI' => 'Nicaragua',
-                'NL' => 'Paises Bajos',
-                'NO' => 'Noruega',
-                'NP' => 'Nepal',
-                'NR' => 'Nauru',
-                'NZ' => 'Nueva Zelanda',
-                'OM' => 'Oman',
-                'PA' => 'Panama',
-                'PE' => 'Peru',
-                'PF' => 'Polinesia Francesa',
-                'PG' => 'Papua Nueva Guinea',
-                'PH' => 'Filipinas',
-                'PK' => 'Pakistan',
-                'PL' => 'Polonia',
-                'PR' => 'Puerto Rico',
-                'PT' => 'Portugal',
-                'PY' => 'Paraguay',
-                'QA' => 'Catar',
-                'RE' => 'Reunion',
-                'RO' => 'Rumania',
-                'RS' => 'Serbia',
-                'RU' => 'Rusia',
-                'RW' => 'Ruanda',
-                'SA' => 'Arabia Saudita',
-                'SB' => 'Islas Salomon',
-                'SC' => 'Seychelles',
-                'SD' => 'Sudan',
-                'SE' => 'Suecia',
-                'SG' => 'Singapur',
-                'SI' => 'Eslovenia',
-                'SK' => 'Eslovaquia',
-                'SL' => 'Sierra Leona',
-                'SM' => 'San Marino',
-                'SN' => 'Senegal',
-                'SO' => 'Somalia',
-                'SR' => 'Surinam',
-                'ST' => 'Santo Tome y Principe',
-                'SV' => 'El Salvador',
-                'SY' => 'Siria',
-                'SZ' => 'Suazilandia',
-                'TD' => 'Chad',
-                'TG' => 'Togo',
-                'TH' => 'Tailandia',
-                'TJ' => 'Tayikistan',
-                'TL' => 'Timor Oriental',
-                'TM' => 'Turkmenistan',
-                'TN' => 'Tunez',
-                'TO' => 'Tonga',
-                'TR' => 'Turquia',
-                'TT' => 'Trinidad y Tobago',
-                'TW' => 'Taiwan',
-                'TZ' => 'Tanzania',
-                'UA' => 'Ucrania',
-                'UG' => 'Uganda',
-                'US' => 'Estados Unidos',
-                'UY' => 'Uruguay',
-                'UZ' => 'Uzbekistan',
-                'VA' => 'Vaticano',
-                'VE' => 'Venezuela',
-                'VG' => 'Islas Virgenes Britanicas',
-                'VI' => 'Islas Virgenes de Estados Unidos',
-                'VN' => 'Vietnam',
-                'WS' => 'Samoa',
-                'YE' => 'Yemen',
-                'ZA' => 'Sudafrica',
-                'ZM' => 'Zambia',
-                'ZW' => 'Zimbabue',
-            ];
-            $mapCountryName = static function (string $code) use ($countryNames): string {
-                $code = strtoupper(trim($code));
-                if ($code === '' || strlen($code) !== 2) {
-                    return '';
-                }
-                return $countryNames[$code] ?? '';
-            };
             $queries28Resp = admin_gsc_query($accessToken, $gscProperty, $start28, $endDate, ['query'], 50);
             $queries7Resp = admin_gsc_query($accessToken, $gscProperty, $start7, $endDate, ['query'], 50);
             $gscQueries28 = $normalizeQueries($queries28Resp);
@@ -427,26 +430,8 @@
             $countries28Resp = admin_gsc_query($accessToken, $gscProperty, $start28, $endDate, ['country'], 50);
             $gscPages7 = $normalizeDimensions($pages7Resp, 'page');
             $gscPages28 = $normalizeDimensions($pages28Resp, 'page');
-            $rawCountries7 = $normalizeDimensions($countries7Resp, 'country');
-            $rawCountries28 = $normalizeDimensions($countries28Resp, 'country');
-            $gscCountries7 = [];
-            foreach ($rawCountries7 as $row) {
-                $name = $mapCountryName($row['country']);
-                if ($name === '') {
-                    continue;
-                }
-                $row['country'] = $name;
-                $gscCountries7[] = $row;
-            }
-            $gscCountries28 = [];
-            foreach ($rawCountries28 as $row) {
-                $name = $mapCountryName($row['country']);
-                if ($name === '') {
-                    continue;
-                }
-                $row['country'] = $name;
-                $gscCountries28[] = $row;
-            }
+            $gscCountries7 = $normalizeDimensions($countries7Resp, 'country');
+            $gscCountries28 = $normalizeDimensions($countries28Resp, 'country');
             $sitemapUrl = '';
             $baseUrlValue = $settings['site_url'] ?? '';
             if (!is_string($baseUrlValue)) {
@@ -509,6 +494,31 @@
                 $gscError = $e->getMessage();
             }
         }
+    }
+
+    if (!empty($gscCountries7)) {
+        $normalizedCountries7 = [];
+        foreach ($gscCountries7 as $row) {
+            $name = $gscResolveCountry((string) ($row['country'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $row['country'] = $name;
+            $normalizedCountries7[] = $row;
+        }
+        $gscCountries7 = $normalizedCountries7;
+    }
+    if (!empty($gscCountries28)) {
+        $normalizedCountries28 = [];
+        foreach ($gscCountries28 as $row) {
+            $name = $gscResolveCountry((string) ($row['country'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $row['country'] = $name;
+            $normalizedCountries28[] = $row;
+        }
+        $gscCountries28 = $normalizedCountries28;
     }
 
     $sumRange = static function (array $daily, DateTimeImmutable $start, DateTimeImmutable $end): int {
@@ -2464,15 +2474,15 @@
         </div>
     </div>
     <script>
-        document.querySelectorAll('.dashboard-stat-block').forEach(function(block) {
-            function updateLists() {
+        (function() {
+            function updateBlock(block) {
                 var periodByScope = {};
                 var modeByScope = {};
 
                 block.querySelectorAll('[data-stat-toggle]').forEach(function(group) {
                     var scope = group.getAttribute('data-stat-scope') || '';
-                    var modeBtn = group.querySelector('[data-stat-toggle-type="mode"] .active, [data-stat-mode].active');
-                    var periodBtn = group.querySelector('[data-stat-toggle-type="period"] .active, [data-stat-period].active');
+                    var modeBtn = group.querySelector('[data-stat-mode].active');
+                    var periodBtn = group.querySelector('[data-stat-period].active');
                     if (modeBtn) {
                         modeByScope[scope] = modeBtn.getAttribute('data-stat-mode');
                     }
@@ -2486,30 +2496,38 @@
                     var mode = modeByScope[scope] || null;
                     var period = periodByScope[scope] || null;
                     var match = true;
-                    if (mode && list.getAttribute('data-stat-mode') !== mode) {
+                    if (mode && list.hasAttribute('data-stat-mode') && list.getAttribute('data-stat-mode') !== mode) {
                         match = false;
                     }
-                    if (period && list.getAttribute('data-stat-period') !== period) {
+                    if (period && list.hasAttribute('data-stat-period') && list.getAttribute('data-stat-period') !== period) {
                         match = false;
                     }
                     list.classList.toggle('d-none', !match);
                 });
             }
 
-            block.querySelectorAll('[data-stat-toggle]').forEach(function(group) {
-                group.addEventListener('click', function(event) {
-                    var btn = event.target.closest('[data-stat-mode], [data-stat-period]');
-                    if (!btn) {
-                        return;
-                    }
-                    group.querySelectorAll('[data-stat-mode], [data-stat-period]').forEach(function(item) {
-                        item.classList.toggle('active', item === btn);
-                    });
-                    updateLists();
-                });
+            document.querySelectorAll('.dashboard-stat-block').forEach(function(block) {
+                updateBlock(block);
             });
 
-            updateLists();
-        });
+            document.addEventListener('click', function(event) {
+                var btn = event.target.closest('[data-stat-mode], [data-stat-period]');
+                if (!btn) {
+                    return;
+                }
+                var group = btn.closest('[data-stat-toggle]');
+                if (!group) {
+                    return;
+                }
+                event.preventDefault();
+                group.querySelectorAll('[data-stat-mode], [data-stat-period]').forEach(function(item) {
+                    item.classList.toggle('active', item === btn);
+                });
+                var block = group.closest('.dashboard-stat-block');
+                if (block) {
+                    updateBlock(block);
+                }
+            });
+        })();
     </script>
 <?php endif; ?>

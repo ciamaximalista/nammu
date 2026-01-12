@@ -2272,7 +2272,7 @@
                                     <button type="button" class="btn btn-outline-secondary" data-stat-period="7">Últimos 7 días</button>
                                 </div>
                                 <div class="table-responsive mb-3">
-                                    <table class="table table-sm mb-0" data-stat-list data-stat-period="28" data-stat-scope="gsc-main">
+                                    <table class="table table-sm mb-0" data-stat-list data-stat-period="28" data-stat-scope="gsc-main" data-stat-kind="table">
                                         <tbody>
                                             <tr>
                                                 <td>Clicks totales</td>
@@ -2292,7 +2292,7 @@
                                             </tr>
                                         </tbody>
                                     </table>
-                                    <table class="table table-sm mb-0 d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-main">
+                                    <table class="table table-sm mb-0 d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-main" data-stat-kind="table">
                                         <tbody>
                                             <tr>
                                                 <td>Clicks totales</td>
@@ -2331,7 +2331,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscQueries28)): ?>
-                                    <div class="table-responsive" data-stat-list data-stat-period="28" data-stat-scope="gsc-terms">
+                                    <div class="table-responsive" data-stat-list data-stat-period="28" data-stat-scope="gsc-terms" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2353,7 +2353,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscQueries7)): ?>
-                                    <div class="table-responsive d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-terms">
+                                    <div class="table-responsive d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-terms" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2382,7 +2382,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscPages7)): ?>
-                                    <div class="table-responsive mb-3 d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-pages">
+                                    <div class="table-responsive mb-3 d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-pages" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2422,7 +2422,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscPages28)): ?>
-                                    <div class="table-responsive mb-3" data-stat-list data-stat-period="28" data-stat-scope="gsc-pages">
+                                    <div class="table-responsive mb-3" data-stat-list data-stat-period="28" data-stat-scope="gsc-pages" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2469,7 +2469,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscCountries7)): ?>
-                                    <div class="table-responsive mb-3 d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-countries">
+                                    <div class="table-responsive mb-3 d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-countries" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2491,7 +2491,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscCountries28)): ?>
-                                    <div class="table-responsive" data-stat-list data-stat-period="28" data-stat-scope="gsc-countries">
+                                    <div class="table-responsive" data-stat-list data-stat-period="28" data-stat-scope="gsc-countries" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2549,6 +2549,20 @@
                         match = false;
                     }
                     list.classList.toggle('d-none', !match);
+                });
+
+                block.querySelectorAll('table[data-stat-list]').forEach(function(table) {
+                    var wrapper = table.closest('.table-responsive');
+                    if (!wrapper) {
+                        return;
+                    }
+                    var hasVisibleTable = false;
+                    wrapper.querySelectorAll('table[data-stat-list]').forEach(function(item) {
+                        if (!item.classList.contains('d-none')) {
+                            hasVisibleTable = true;
+                        }
+                    });
+                    wrapper.classList.toggle('d-none', !hasVisibleTable);
                 });
             }
 

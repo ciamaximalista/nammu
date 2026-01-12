@@ -80,6 +80,13 @@ if ($normalizedBase === '') {
 if ($normalizedRequest === '') {
     $normalizedRequest = '/';
 }
+$canonicalHref = '';
+if (!empty($socialMeta['canonical'])) {
+    $canonicalHref = (string) $socialMeta['canonical'];
+} else {
+    $baseForCanonical = $baseHref !== '' ? rtrim($baseHref, '/') : '';
+    $canonicalHref = $baseForCanonical . $requestPath;
+}
 $isHome = ($normalizedRequest === $normalizedBase) || ($normalizedRequest === $normalizedBase . '/index.php');
 $adsSettings = is_array($adsSettings ?? null) ? $adsSettings : (function_exists('nammu_ads_settings') ? nammu_ads_settings() : []);
 $adsEnabled = ($adsSettings['enabled'] ?? 'off') === 'on';
@@ -159,8 +166,8 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
     <?php if ($faviconUrl): ?>
         <link rel="icon" href="<?= htmlspecialchars($faviconUrl, ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
-    <?php if (!empty($socialMeta['canonical'])): ?>
-        <link rel="canonical" href="<?= htmlspecialchars($socialMeta['canonical'], ENT_QUOTES, 'UTF-8') ?>">
+    <?php if ($canonicalHref !== ''): ?>
+        <link rel="canonical" href="<?= htmlspecialchars($canonicalHref, ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
     <?php foreach (($socialMeta['properties'] ?? []) as $property => $value): ?>
         <?php if ($value !== '' && $value !== null): ?>

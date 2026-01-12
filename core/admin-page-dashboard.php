@@ -1605,6 +1605,31 @@
                 color: #ffffff;
                 border-color: #1b8eed;
             }
+            .gsc-period-input {
+                position: absolute;
+                opacity: 0;
+                pointer-events: none;
+            }
+            .gsc-period-input:checked + .gsc-period-label {
+                background: #1b8eed;
+                color: #ffffff;
+                border-color: #1b8eed;
+            }
+            .gsc-period-7 {
+                display: none;
+            }
+            #gsc-period-7:checked ~ .gsc-content .gsc-period-7 {
+                display: block;
+            }
+            #gsc-period-7:checked ~ .gsc-content .gsc-period-28 {
+                display: none;
+            }
+            #gsc-period-28:checked ~ .gsc-content .gsc-period-28 {
+                display: block;
+            }
+            #gsc-period-28:checked ~ .gsc-content .gsc-period-7 {
+                display: none;
+            }
         </style>
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-2">
             <div>
@@ -2156,6 +2181,7 @@
                                     <?php endforeach; ?>
                                 </ol>
                             <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                 <?php endif; ?>
@@ -2313,11 +2339,14 @@
                                     <button type="submit" class="btn btn-outline-primary btn-sm">Actualizar datos ahora</button>
                                 </form>
                                 <div class="btn-group btn-group-sm mb-3 dashboard-toggle gsc-toggle" role="group">
-                                    <button type="button" class="btn btn-outline-secondary gsc-period-toggle active" data-gsc-period="28">Últimos 28 días</button>
-                                    <button type="button" class="btn btn-outline-secondary gsc-period-toggle" data-gsc-period="7">Últimos 7 días</button>
+                                    <input type="radio" name="gsc-period" id="gsc-period-28" class="gsc-period-input" checked>
+                                    <label class="btn btn-outline-secondary gsc-period-label" for="gsc-period-28">Últimos 28 días</label>
+                                    <input type="radio" name="gsc-period" id="gsc-period-7" class="gsc-period-input">
+                                    <label class="btn btn-outline-secondary gsc-period-label" for="gsc-period-7">Últimos 7 días</label>
                                 </div>
+                                <div class="gsc-content">
                                 <div class="table-responsive mb-3">
-                                    <table class="table table-sm mb-0" data-gsc-period="28" data-stat-list data-stat-period="28" data-stat-scope="gsc-main" data-stat-kind="table">
+                                    <table class="table table-sm mb-0 gsc-period-28" data-gsc-period="28" data-stat-list data-stat-period="28" data-stat-scope="gsc-main" data-stat-kind="table">
                                         <tbody>
                                             <tr>
                                                 <td>Clicks totales</td>
@@ -2337,7 +2366,7 @@
                                             </tr>
                                         </tbody>
                                     </table>
-                                    <table class="table table-sm mb-0 d-none" data-gsc-period="7" data-stat-list data-stat-period="7" data-stat-scope="gsc-main" data-stat-kind="table">
+                                    <table class="table table-sm mb-0 gsc-period-7" data-gsc-period="7" data-stat-list data-stat-period="7" data-stat-scope="gsc-main" data-stat-kind="table">
                                         <tbody>
                                             <tr>
                                                 <td>Clicks totales</td>
@@ -2372,7 +2401,7 @@
                                     <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Términos más clicados</p>
                                 <?php endif; ?>
                                 <?php if (!empty($gscQueries28)): ?>
-                                    <div class="table-responsive" data-gsc-period="28" data-stat-list data-stat-period="28" data-stat-scope="gsc-terms" data-stat-kind="block">
+                                    <div class="table-responsive gsc-period-28" data-gsc-period="28" data-stat-list data-stat-period="28" data-stat-scope="gsc-terms" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2394,7 +2423,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscQueries7)): ?>
-                                    <div class="table-responsive d-none" data-gsc-period="7" data-stat-list data-stat-period="7" data-stat-scope="gsc-terms" data-stat-kind="block">
+                                    <div class="table-responsive gsc-period-7" data-gsc-period="7" data-stat-list data-stat-period="7" data-stat-scope="gsc-terms" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2419,7 +2448,7 @@
                                     <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Páginas más clicadas</p>
                                 <?php endif; ?>
                                 <?php if (!empty($gscPages7)): ?>
-                                    <div class="table-responsive mb-3 d-none" data-gsc-period="7" data-stat-list data-stat-period="7" data-stat-scope="gsc-pages" data-stat-kind="block">
+                                    <div class="table-responsive mb-3 gsc-period-7" data-gsc-period="7" data-stat-list data-stat-period="7" data-stat-scope="gsc-pages" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2459,7 +2488,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscPages28)): ?>
-                                    <div class="table-responsive mb-3" data-gsc-period="28" data-stat-list data-stat-period="28" data-stat-scope="gsc-pages" data-stat-kind="block">
+                                    <div class="table-responsive mb-3 gsc-period-28" data-gsc-period="28" data-stat-list data-stat-period="28" data-stat-scope="gsc-pages" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2502,7 +2531,7 @@
                                     <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Principales países</p>
                                 <?php endif; ?>
                                 <?php if (!empty($gscCountries7)): ?>
-                                    <div class="table-responsive mb-3 d-none" data-gsc-period="7" data-stat-list data-stat-period="7" data-stat-scope="gsc-countries" data-stat-kind="block">
+                                    <div class="table-responsive mb-3 gsc-period-7" data-gsc-period="7" data-stat-list data-stat-period="7" data-stat-scope="gsc-countries" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2534,7 +2563,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscCountries28)): ?>
-                                    <div class="table-responsive" data-gsc-period="28" data-stat-list data-stat-period="28" data-stat-scope="gsc-countries" data-stat-kind="block">
+                                    <div class="table-responsive gsc-period-28" data-gsc-period="28" data-stat-list data-stat-period="28" data-stat-scope="gsc-countries" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2682,29 +2711,7 @@
                     }
                 }
             });
-            document.addEventListener('click', function(event) {
-                var btn = event.target.closest('#gsc-dashboard .gsc-period-toggle');
-                if (!btn) {
-                    return;
-                }
-                var gscCard = btn.closest('#gsc-dashboard');
-                if (!gscCard) {
-                    return;
-                }
-                event.preventDefault();
-                var period = btn.getAttribute('data-gsc-period');
-                gscCard.querySelectorAll('.gsc-period-toggle').forEach(function(item) {
-                    var isActive = item.getAttribute('data-gsc-period') === period;
-                    item.classList.toggle('active', isActive);
-                    item.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-                });
-                gscCard.querySelectorAll('[data-gsc-period]').forEach(function(item) {
-                    if (item.classList.contains('gsc-period-toggle')) {
-                        return;
-                    }
-                    item.classList.toggle('d-none', item.getAttribute('data-gsc-period') !== period);
-                });
-            });
+            // GSC toggle uses CSS radios.
         })();
     </script>
 <?php endif; ?>

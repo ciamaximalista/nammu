@@ -1255,44 +1255,73 @@ function admin_bing_api_get(string $method, array $params): array {
         $redirects = 0;
         $respText = '';
         $status = '';
+        $location = '';
         $finalUrl = $url;
-        while ($redirects <= 3) {
-            $opts = [
-                'http' => [
-                    'method' => 'GET',
-                    'timeout' => 12,
-                    'ignore_errors' => true,
-                    'header' => "Accept: application/json\r\nUser-Agent: Nammu/1.0\r\n",
-                ],
-            ];
-            $resp = @file_get_contents($finalUrl, false, stream_context_create($opts));
-            $respText = is_string($resp) ? trim($resp) : '';
-            $status = '';
-            $location = '';
-            if (!empty($http_response_header) && is_array($http_response_header)) {
-                $statusLine = $http_response_header[0] ?? '';
-                if (is_string($statusLine) && preg_match('/\\s(\\d{3})\\s/', $statusLine, $match)) {
-                    $status = $match[1];
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($finalUrl);
+            if ($ch !== false) {
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 12);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'Accept: application/json',
+                    'User-Agent: Nammu/1.0',
+                ]);
+                $resp = curl_exec($ch);
+                $respText = is_string($resp) ? trim($resp) : '';
+                $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                if (is_int($statusCode) && $statusCode > 0) {
+                    $status = (string) $statusCode;
                 }
-                foreach ($http_response_header as $headerLine) {
-                    if (stripos((string) $headerLine, 'Location:') === 0) {
-                        $location = trim(substr((string) $headerLine, strlen('Location:')));
-                        break;
+                $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+                if (is_string($effectiveUrl) && $effectiveUrl !== '') {
+                    $finalUrl = $effectiveUrl;
+                }
+                curl_close($ch);
+            }
+        }
+
+        if ($respText === '') {
+            while ($redirects <= 3) {
+                $opts = [
+                    'http' => [
+                        'method' => 'GET',
+                        'timeout' => 12,
+                        'ignore_errors' => true,
+                        'header' => "Accept: application/json\r\nUser-Agent: Nammu/1.0\r\n",
+                    ],
+                ];
+                $resp = @file_get_contents($finalUrl, false, stream_context_create($opts));
+                $respText = is_string($resp) ? trim($resp) : '';
+                $status = '';
+                $location = '';
+                if (!empty($http_response_header) && is_array($http_response_header)) {
+                    $statusLine = $http_response_header[0] ?? '';
+                    if (is_string($statusLine) && preg_match('/\\s(\\d{3})\\s/', $statusLine, $match)) {
+                        $status = $match[1];
+                    }
+                    foreach ($http_response_header as $headerLine) {
+                        if (stripos((string) $headerLine, 'Location:') === 0) {
+                            $location = trim(substr((string) $headerLine, strlen('Location:')));
+                            break;
+                        }
                     }
                 }
-            }
-            if ($status !== '' && preg_match('/^3\\d\\d$/', $status) && $location !== '') {
-                $redirects++;
-                if (str_starts_with($location, '/')) {
-                    $parts = parse_url($finalUrl);
-                    $scheme = $parts['scheme'] ?? 'https';
-                    $host = $parts['host'] ?? '';
-                    $location = $host !== '' ? $scheme . '://' . $host . $location : $location;
+                if ($status !== '' && preg_match('/^3\\d\\d$/', $status) && $location !== '') {
+                    $redirects++;
+                    if (str_starts_with($location, '/')) {
+                        $parts = parse_url($finalUrl);
+                        $scheme = $parts['scheme'] ?? 'https';
+                        $host = $parts['host'] ?? '';
+                        $location = $host !== '' ? $scheme . '://' . $host . $location : $location;
+                    }
+                    $finalUrl = $location;
+                    continue;
                 }
-                $finalUrl = $location;
-                continue;
+                break;
             }
-            break;
         }
         $decoded = json_decode($respText, true);
         if (!is_array($decoded)) {
@@ -1309,6 +1338,9 @@ function admin_bing_api_get(string $method, array $params): array {
             $details = [];
             if ($status !== '') {
                 $details[] = 'HTTP ' . $status;
+            }
+            if ($location !== '') {
+                $details[] = 'Location: ' . $location;
             }
             if ($snippet !== '') {
                 $details[] = $snippet;

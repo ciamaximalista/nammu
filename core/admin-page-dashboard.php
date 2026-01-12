@@ -2922,8 +2922,8 @@
                                 <input type="radio" name="bing-period" id="bing-period-28" class="bing-period-input" checked>
                                 <input type="radio" name="bing-period" id="bing-period-7" class="bing-period-input">
                                 <div class="btn-group btn-group-sm mb-3 dashboard-toggle bing-toggle bing-buttons" role="group" data-stat-toggle="bing-period" data-stat-scope="bing-period" data-stat-toggle-type="period">
-                                    <label class="btn btn-outline-secondary bing-period-label" for="bing-period-28">Últimos 28 días</label>
-                                    <label class="btn btn-outline-secondary bing-period-label" for="bing-period-7">Últimos 7 días</label>
+                                    <label class="btn btn-outline-secondary bing-period-label active" for="bing-period-28" data-stat-period="28">Últimos 28 días</label>
+                                    <label class="btn btn-outline-secondary bing-period-label" for="bing-period-7" data-stat-period="7">Últimos 7 días</label>
                                 </div>
                                 <div class="bing-content">
                                 <div class="table-responsive mb-3">

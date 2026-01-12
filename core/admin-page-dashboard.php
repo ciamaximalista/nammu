@@ -434,7 +434,7 @@
                 throw new RuntimeException('No se pudo obtener el access token.');
             }
             $endDate = $today->format('Y-m-d');
-            $start28 = $today->modify('-27 days')->format('Y-m-d');
+            $start30 = $today->modify('-29 days')->format('Y-m-d');
             $start7 = $today->modify('-6 days')->format('Y-m-d');
             $normalizeTotals = static function (array $response): array {
                 $row = [];
@@ -702,7 +702,7 @@
             ];
         };
         $bingNormalizeDimension = static function (array $rows, array $labelKeys, string $labelKey) use ($bingValue): array {
-            $output = [];
+            $bucket = [];
             foreach ($rows as $row) {
                 if (!is_array($row)) {
                     continue;
@@ -717,12 +717,18 @@
                 if ($label === '') {
                     continue;
                 }
-                $output[] = [
-                    $labelKey => $label,
-                    'clicks' => (int) round($bingValue($row, ['Clicks', 'clicks'])),
-                    'impressions' => (int) round($bingValue($row, ['Impressions', 'impressions'])),
-                ];
+                $key = $label;
+                if (!isset($bucket[$key])) {
+                    $bucket[$key] = [
+                        $labelKey => $label,
+                        'clicks' => 0,
+                        'impressions' => 0,
+                    ];
+                }
+                $bucket[$key]['clicks'] += (int) round($bingValue($row, ['Clicks', 'clicks']));
+                $bucket[$key]['impressions'] += (int) round($bingValue($row, ['Impressions', 'impressions']));
             }
+            $output = array_values($bucket);
             usort($output, static function (array $a, array $b): int {
                 if ($a['clicks'] === $b['clicks']) {
                     return $b['impressions'] <=> $a['impressions'];
@@ -739,18 +745,18 @@
                 'apikey' => $bingApiKey,
                 'siteUrl' => $bingSiteUrl,
             ];
-            $totals28Resp = admin_bing_request_with_dates_multi(['GetRankAndTrafficStats', 'GetSiteStats'], $baseParams, $start28, $endDate);
+            $totals28Resp = admin_bing_request_with_dates_multi(['GetRankAndTrafficStats', 'GetSiteStats'], $baseParams, $start30, $endDate);
             $totals7Resp = admin_bing_request_with_dates_multi(['GetRankAndTrafficStats', 'GetSiteStats'], $baseParams, $start7, $endDate);
             $bingTotals28 = $bingNormalizeTotals($bingExtractRows($totals28Resp, ['SiteStats', 'siteStats']));
             $bingTotals7 = $bingNormalizeTotals($bingExtractRows($totals7Resp, ['SiteStats', 'siteStats']));
 
-            $queries28Resp = admin_bing_request_with_dates_multi(['GetPageQueryStats', 'GetQueryStats'], $baseParams, $start28, $endDate);
-            $queries7Resp = admin_bing_request_with_dates_multi(['GetPageQueryStats', 'GetQueryStats'], $baseParams, $start7, $endDate);
+            $queries28Resp = admin_bing_request_with_dates_multi(['GetQueryStats', 'GetPageQueryStats'], $baseParams, $start30, $endDate);
+            $queries7Resp = admin_bing_request_with_dates_multi(['GetQueryStats', 'GetPageQueryStats'], $baseParams, $start7, $endDate);
             $bingQueries28 = $bingNormalizeDimension($bingExtractRows($queries28Resp, ['QueryStats', 'queryStats', 'PageQueryStats', 'pageQueryStats']), ['Query', 'query'], 'term');
             $bingQueries7 = $bingNormalizeDimension($bingExtractRows($queries7Resp, ['QueryStats', 'queryStats', 'PageQueryStats', 'pageQueryStats']), ['Query', 'query'], 'term');
 
-            $pages28Resp = admin_bing_request_with_dates_multi(['GetPageQueryStats', 'GetPageStats'], $baseParams, $start28, $endDate);
-            $pages7Resp = admin_bing_request_with_dates_multi(['GetPageQueryStats', 'GetPageStats'], $baseParams, $start7, $endDate);
+            $pages28Resp = admin_bing_request_with_dates_multi(['GetPageStats', 'GetPageQueryStats'], $baseParams, $start30, $endDate);
+            $pages7Resp = admin_bing_request_with_dates_multi(['GetPageStats', 'GetPageQueryStats'], $baseParams, $start7, $endDate);
             $bingPages28 = $bingNormalizeDimension($bingExtractRows($pages28Resp, ['PageStats', 'pageStats', 'PageQueryStats', 'pageQueryStats']), ['Page', 'Url', 'url'], 'page');
             $bingPages7 = $bingNormalizeDimension($bingExtractRows($pages7Resp, ['PageStats', 'pageStats', 'PageQueryStats', 'pageQueryStats']), ['Page', 'Url', 'url'], 'page');
 
@@ -2846,7 +2852,7 @@
                                     <button type="submit" class="btn btn-outline-primary btn-sm">Actualizar datos ahora</button>
                                 </form>
                                 <div class="btn-group btn-group-sm mb-3 dashboard-toggle bing-toggle bing-buttons" role="group" data-stat-toggle="bing-period" data-stat-scope="bing-period" data-stat-toggle-type="period">
-                                    <button type="button" class="btn btn-outline-secondary bing-period-label active" data-stat-period="28">Últimos 28 días</button>
+                                    <button type="button" class="btn btn-outline-secondary bing-period-label active" data-stat-period="28">Últimos 30 días</button>
                                     <button type="button" class="btn btn-outline-secondary bing-period-label" data-stat-period="7">Últimos 7 días</button>
                                 </div>
                                 <div class="bing-content">
@@ -2935,7 +2941,7 @@
                                     <p class="text-muted mb-0 bing-period-7 d-none" data-stat-list data-stat-scope="bing-period" data-stat-period="7">Sin términos en los últimos 7 días.</p>
                                 <?php endif; ?>
                                 <?php if (empty($bingQueries28) && !empty($bingQueries7)): ?>
-                                    <p class="text-muted mb-0 bing-period-28" data-stat-list data-stat-scope="bing-period" data-stat-period="28">Sin términos en los últimos 28 días.</p>
+                                    <p class="text-muted mb-0 bing-period-28" data-stat-list data-stat-scope="bing-period" data-stat-period="28">Sin términos en los últimos 30 días.</p>
                                 <?php endif; ?>
                                 <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Páginas más clicadas</p>
                                 <?php if (!empty($bingPages7)): ?>
@@ -3023,7 +3029,7 @@
                                 <?php elseif (empty($bingPages7)): ?>
                                     <p class="text-muted mb-0 bing-period-7 d-none" data-stat-list data-stat-scope="bing-period" data-stat-period="7">Sin páginas clicadas en los últimos 7 días.</p>
                                 <?php elseif (empty($bingPages28)): ?>
-                                    <p class="text-muted mb-0 bing-period-28" data-stat-list data-stat-scope="bing-period" data-stat-period="28">Sin páginas clicadas en los últimos 28 días.</p>
+                                    <p class="text-muted mb-0 bing-period-28" data-stat-list data-stat-scope="bing-period" data-stat-period="28">Sin páginas clicadas en los últimos 30 días.</p>
                                 <?php endif; ?>
                                 </div>
                             <?php endif; ?>

@@ -2931,6 +2931,12 @@
                                         </table>
                                     </div>
                                 <?php endif; ?>
+                                <?php if (empty($bingQueries7) && !empty($bingQueries28)): ?>
+                                    <p class="text-muted mb-0 bing-period-7 d-none" data-stat-list data-stat-scope="bing-period" data-stat-period="7">Sin términos en los últimos 7 días.</p>
+                                <?php endif; ?>
+                                <?php if (empty($bingQueries28) && !empty($bingQueries7)): ?>
+                                    <p class="text-muted mb-0 bing-period-28" data-stat-list data-stat-scope="bing-period" data-stat-period="28">Sin términos en los últimos 28 días.</p>
+                                <?php endif; ?>
                                 <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Páginas más clicadas</p>
                                 <?php if (!empty($bingPages7)): ?>
                                     <div class="table-responsive mb-3 bing-period-7 d-none" data-stat-list data-stat-scope="bing-period" data-stat-period="7">
@@ -3014,6 +3020,10 @@
                                 <?php endif; ?>
                                 <?php if (empty($bingPages7) && empty($bingPages28)): ?>
                                     <p class="text-muted mb-0">Sin datos de páginas todavía.</p>
+                                <?php elseif (empty($bingPages7)): ?>
+                                    <p class="text-muted mb-0 bing-period-7 d-none" data-stat-list data-stat-scope="bing-period" data-stat-period="7">Sin páginas clicadas en los últimos 7 días.</p>
+                                <?php elseif (empty($bingPages28)): ?>
+                                    <p class="text-muted mb-0 bing-period-28" data-stat-list data-stat-scope="bing-period" data-stat-period="28">Sin páginas clicadas en los últimos 28 días.</p>
                                 <?php endif; ?>
                                 </div>
                             <?php endif; ?>

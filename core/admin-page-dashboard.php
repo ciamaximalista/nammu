@@ -2481,7 +2481,9 @@
                                             <tbody>
                                                 <?php foreach ($gscCountries7 as $row): ?>
                                                     <tr>
-                                                        <td><?= htmlspecialchars($row['country'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                        <?php $countryLabel = $gscResolveCountry((string) ($row['country'] ?? '')); ?>
+                                                        <?php if ($countryLabel === '') { continue; } ?>
+                                                        <td><?= htmlspecialchars($countryLabel, ENT_QUOTES, 'UTF-8') ?></td>
                                                         <td class="text-right"><?= (int) $row['clicks'] ?></td>
                                                         <td class="text-right"><?= (int) $row['impressions'] ?></td>
                                                     </tr>
@@ -2503,7 +2505,9 @@
                                             <tbody>
                                                 <?php foreach ($gscCountries28 as $row): ?>
                                                     <tr>
-                                                        <td><?= htmlspecialchars($row['country'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                        <?php $countryLabel = $gscResolveCountry((string) ($row['country'] ?? '')); ?>
+                                                        <?php if ($countryLabel === '') { continue; } ?>
+                                                        <td><?= htmlspecialchars($countryLabel, ENT_QUOTES, 'UTF-8') ?></td>
                                                         <td class="text-right"><?= (int) $row['clicks'] ?></td>
                                                         <td class="text-right"><?= (int) $row['impressions'] ?></td>
                                                     </tr>
@@ -2527,13 +2531,15 @@
 
                 block.querySelectorAll('[data-stat-toggle]').forEach(function(group) {
                     var scope = group.getAttribute('data-stat-scope') || '';
+                    var modeOverride = group.getAttribute('data-stat-mode-current');
+                    var periodOverride = group.getAttribute('data-stat-period-current');
                     var modeBtn = group.querySelector('[data-stat-mode].active');
                     var periodBtn = group.querySelector('[data-stat-period].active');
                     if (modeBtn) {
-                        modeByScope[scope] = modeBtn.getAttribute('data-stat-mode');
+                        modeByScope[scope] = modeOverride || modeBtn.getAttribute('data-stat-mode');
                     }
                     if (periodBtn) {
-                        periodByScope[scope] = periodBtn.getAttribute('data-stat-period');
+                        periodByScope[scope] = periodOverride || periodBtn.getAttribute('data-stat-period');
                     }
                 });
 
@@ -2583,6 +2589,12 @@
                 group.querySelectorAll('[data-stat-mode], [data-stat-period]').forEach(function(item) {
                     item.classList.toggle('active', item === btn);
                 });
+                if (btn.hasAttribute('data-stat-period')) {
+                    group.setAttribute('data-stat-period-current', btn.getAttribute('data-stat-period'));
+                }
+                if (btn.hasAttribute('data-stat-mode')) {
+                    group.setAttribute('data-stat-mode-current', btn.getAttribute('data-stat-mode'));
+                }
                 var block = group.closest('.dashboard-stat-block');
                 if (block) {
                     updateBlock(block);

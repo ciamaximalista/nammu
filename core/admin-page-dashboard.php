@@ -79,7 +79,7 @@
     ];
     $gscError = '';
     $gscCachePath = dirname(__DIR__) . '/config/gsc-cache.json';
-    $gscCacheTtl = 2 * 24 * 60 * 60;
+    $gscCacheTtl = 24 * 60 * 60;
     $gscCache = null;
     $gscUpdatedAtLabel = '';
     $gscForceRefresh = isset($_GET['gsc_refresh']) && $_GET['gsc_refresh'] === '1';
@@ -342,7 +342,7 @@
         if (strlen($code) === 3) {
             return $gscCountryNames3[$code] ?? '';
         }
-        return '';
+        return $value;
     };
     if (is_file($gscCachePath)) {
         $rawCache = @file_get_contents($gscCachePath);
@@ -360,8 +360,16 @@
         && isset($gscCache['updated_at']);
     $gscCacheHasNew = $gscCacheValid
         && isset($gscCache['totals7'], $gscCache['totals28'], $gscCache['queries7'], $gscCache['queries28']);
+    $now = new DateTimeImmutable('now');
+    $refreshAnchor = (new DateTimeImmutable('today'))->setTime(6, 0);
+    if ($now < $refreshAnchor) {
+        $refreshAnchor = $refreshAnchor->modify('-1 day');
+    }
+    $cacheUpdatedAt = $gscCacheValid ? (int) $gscCache['updated_at'] : 0;
+    $cacheIsDailyFresh = $cacheUpdatedAt >= $refreshAnchor->getTimestamp();
     $gscCacheFresh = $gscCacheHasNew
-        && (time() - (int) $gscCache['updated_at']) < $gscCacheTtl
+        && $cacheIsDailyFresh
+        && (time() - $cacheUpdatedAt) < $gscCacheTtl
         && !$gscForceRefresh;
     if ($gscCacheFresh) {
         $gscTotals28 = $gscCache['totals28'] ?? null;
@@ -2481,8 +2489,16 @@
                                             <tbody>
                                                 <?php foreach ($gscCountries7 as $row): ?>
                                                     <tr>
-                                                        <?php $countryLabel = $gscResolveCountry((string) ($row['country'] ?? '')); ?>
-                                                        <?php if ($countryLabel === '') { continue; } ?>
+                                                        <?php
+                                                        $rawCountry = trim((string) ($row['country'] ?? ''));
+                                                        $countryLabel = $gscResolveCountry($rawCountry);
+                                                        if ($countryLabel === '') {
+                                                            $countryLabel = $rawCountry;
+                                                        }
+                                                        if ($countryLabel === '') {
+                                                            continue;
+                                                        }
+                                                        ?>
                                                         <td><?= htmlspecialchars($countryLabel, ENT_QUOTES, 'UTF-8') ?></td>
                                                         <td class="text-right"><?= (int) $row['clicks'] ?></td>
                                                         <td class="text-right"><?= (int) $row['impressions'] ?></td>
@@ -2505,8 +2521,16 @@
                                             <tbody>
                                                 <?php foreach ($gscCountries28 as $row): ?>
                                                     <tr>
-                                                        <?php $countryLabel = $gscResolveCountry((string) ($row['country'] ?? '')); ?>
-                                                        <?php if ($countryLabel === '') { continue; } ?>
+                                                        <?php
+                                                        $rawCountry = trim((string) ($row['country'] ?? ''));
+                                                        $countryLabel = $gscResolveCountry($rawCountry);
+                                                        if ($countryLabel === '') {
+                                                            $countryLabel = $rawCountry;
+                                                        }
+                                                        if ($countryLabel === '') {
+                                                            continue;
+                                                        }
+                                                        ?>
                                                         <td><?= htmlspecialchars($countryLabel, ENT_QUOTES, 'UTF-8') ?></td>
                                                         <td class="text-right"><?= (int) $row['clicks'] ?></td>
                                                         <td class="text-right"><?= (int) $row['impressions'] ?></td>
@@ -2598,6 +2622,16 @@
                 var block = group.closest('.dashboard-stat-block');
                 if (block) {
                     updateBlock(block);
+                    var scope = group.getAttribute('data-stat-scope') || '';
+                    if (scope && btn.hasAttribute('data-stat-period')) {
+                        var period = btn.getAttribute('data-stat-period');
+                        block.querySelectorAll('[data-stat-list][data-stat-scope="' + scope + '"]').forEach(function(list) {
+                            if (!list.hasAttribute('data-stat-period')) {
+                                return;
+                            }
+                            list.classList.toggle('d-none', list.getAttribute('data-stat-period') !== period);
+                        });
+                    }
                 }
             });
         })();

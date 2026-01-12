@@ -263,7 +263,7 @@ $letterSlugRequest = null;
 if (!$isLettersIndex && preg_match('#^/letra/([^/]+)/?$#i', $routePath, $matchLetter)) {
     $letterSlugRequest = strtolower($matchLetter[1]);
 }
-$buildSitemapEntries = static function (array $posts, array $theme, string $publicBaseUrl) use ($itineraryListing, $buildItineraryUrl, $buildItineraryTopicUrl, $isAlphabeticalOrder): array {
+$buildSitemapEntries = static function (array $posts, array $theme, string $publicBaseUrl) use ($itineraryListing, $buildItineraryUrl, $buildItineraryTopicUrl, $isAlphabeticalOrder, $hasPodcast, $podcastItems): array {
     $entries = [];
     $timestampFromPost = static function (Post $post): ?int {
         $date = $post->getDate();
@@ -405,6 +405,93 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
             'changefreq' => 'weekly',
             'priority' => 0.7,
         ];
+    }
+
+    if ($hasPodcast) {
+        $latestPodcastTimestamp = null;
+        foreach ($podcastItems as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $ts = isset($item['timestamp']) ? (int) $item['timestamp'] : null;
+            if ($ts !== null && $ts > 0) {
+                $latestPodcastTimestamp = $latestPodcastTimestamp === null ? $ts : max($latestPodcastTimestamp, $ts);
+            }
+        }
+        $entries[] = [
+            'loc' => '/podcast',
+            'lastmod' => $latestPodcastTimestamp !== null ? gmdate('c', $latestPodcastTimestamp) : ($latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null),
+            'changefreq' => 'weekly',
+            'priority' => 0.7,
+        ];
+    }
+
+    $analytics = function_exists('nammu_load_analytics') ? nammu_load_analytics() : [];
+    $searchesDaily = $analytics['searches']['daily'] ?? [];
+    $searchPageLastMod = $analytics['updated_at'] ?? null;
+    if (is_int($searchPageLastMod) && $searchPageLastMod > 0) {
+        $searchPageLastMod = gmdate('c', $searchPageLastMod);
+    } else {
+        $searchPageLastMod = $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null;
+    }
+    $entries[] = [
+        'loc' => '/buscar.php',
+        'lastmod' => $searchPageLastMod,
+        'changefreq' => 'weekly',
+        'priority' => 0.6,
+    ];
+
+    $searchTermCounts = [];
+    $searchTermLatest = [];
+    $today = new DateTimeImmutable('now');
+    $startKey = $today->modify('-29 days')->format('Y-m-d');
+    foreach ($searchesDaily as $day => $payload) {
+        if (!is_string($day) || $day < $startKey) {
+            continue;
+        }
+        if (!is_array($payload)) {
+            continue;
+        }
+        foreach ($payload as $term => $termData) {
+            $termKey = trim((string) $term);
+            if ($termKey === '') {
+                continue;
+            }
+            $count = 0;
+            if (is_array($termData)) {
+                $count = (int) ($termData['count'] ?? 0);
+            } else {
+                $count = (int) $termData;
+            }
+            if ($count <= 0) {
+                continue;
+            }
+            $searchTermCounts[$termKey] = ($searchTermCounts[$termKey] ?? 0) + $count;
+            $dayTs = strtotime($day);
+            if ($dayTs !== false) {
+                $searchTermLatest[$termKey] = isset($searchTermLatest[$termKey])
+                    ? max($searchTermLatest[$termKey], $dayTs)
+                    : $dayTs;
+            }
+        }
+    }
+    if (!empty($searchTermCounts)) {
+        $searchList = [];
+        foreach ($searchTermCounts as $term => $count) {
+            $searchList[] = ['term' => $term, 'count' => $count];
+        }
+        usort($searchList, static fn(array $a, array $b): int => $b['count'] <=> $a['count']);
+        $searchList = array_slice($searchList, 0, 10);
+        foreach ($searchList as $item) {
+            $term = $item['term'];
+            $termLast = $searchTermLatest[$term] ?? null;
+            $entries[] = [
+                'loc' => '/buscar.php?q=' . rawurlencode($term),
+                'lastmod' => $termLast !== null ? gmdate('c', $termLast) : $searchPageLastMod,
+                'changefreq' => 'weekly',
+                'priority' => 0.5,
+            ];
+        }
     }
 
     if ($isAlphabeticalOrder) {

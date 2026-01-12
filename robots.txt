@@ -1,0 +1,9 @@
+User-agent: *
+Disallow: /admin.php
+Disallow: /admin/
+Disallow: /config/
+Disallow: /content/
+Disallow: /core/
+Disallow: /vendor/
+
+Sitemap: /sitemap.xml

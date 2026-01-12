@@ -36,6 +36,12 @@
     $podcastApple = trim((string) ($podcastServices['apple'] ?? ''));
     $podcastGoogle = trim((string) ($podcastServices['google'] ?? ''));
     $podcastYouTube = trim((string) ($podcastServices['youtube_music'] ?? ''));
+    $indexnowSettings = $settings['indexnow'] ?? [];
+    $indexnowEnabled = ($indexnowSettings['enabled'] ?? 'off') === 'on';
+    $indexnowStatus = function_exists('admin_indexnow_status') ? admin_indexnow_status() : [];
+    $indexnowKey = trim((string) ($indexnowStatus['key'] ?? ''));
+    $indexnowKeyUrl = trim((string) ($indexnowStatus['key_url'] ?? ''));
+    $indexnowFileOk = (bool) ($indexnowStatus['file_ok'] ?? false);
     $siteBaseUrl = function_exists('nammu_base_url') ? nammu_base_url() : '';
     $podcastFeedUrl = $siteBaseUrl !== '' ? rtrim($siteBaseUrl, '/') . '/podcast.xml' : '/podcast.xml';
     if ($adsImage !== '') {
@@ -488,6 +494,28 @@
                 </div>
             </div>
         </div>
+
+        <form method="post" class="mt-4">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="h5 mb-3">IndexNow</h3>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="indexnow_enabled" id="indexnow_enabled" value="1" <?= $indexnowEnabled ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="indexnow_enabled">Enviar nuevos contenidos a IndexNow</label>
+                    </div>
+                    <p class="text-muted mb-3">Se enviarán automáticamente nuevas entradas, páginas, itinerarios y temas a IndexNow, Bing, Naver, etc.</p>
+                    <div class="border rounded p-3 bg-light">
+                        <p class="text-muted text-uppercase small mb-2">Estado del sistema</p>
+                        <p class="mb-1"><strong>Clave:</strong> <?= $indexnowKey !== '' ? 'Generada' : 'Pendiente' ?></p>
+                        <?php if ($indexnowKeyUrl !== ''): ?>
+                            <p class="mb-1"><strong>Archivo de verificación:</strong> <a href="<?= htmlspecialchars($indexnowKeyUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($indexnowKeyUrl, ENT_QUOTES, 'UTF-8') ?></a></p>
+                        <?php endif; ?>
+                        <p class="mb-0"><strong>Archivo activo:</strong> <?= $indexnowFileOk ? 'Sí' : 'No' ?></p>
+                    </div>
+                    <button type="submit" name="save_indexnow_settings" class="btn btn-outline-primary mt-3">Guardar IndexNow</button>
+                </div>
+            </div>
+        </form>
 
         <script>
             (function() {

@@ -177,6 +177,38 @@ $buildItineraryTopicUrl = static function (Itinerary|string $itinerary, Itinerar
     $path = '/itinerarios/' . rawurlencode($itinerarySlug) . '/' . rawurlencode($topicSlug);
     return $publicBaseUrl !== '' ? $publicBaseUrl . $path : $path;
 };
+$buildBreadcrumbJsonLd = static function (array $items) use ($homeUrl): array {
+    $crumbs = [];
+    $position = 1;
+    $homeLink = $homeUrl !== '' ? $homeUrl : '/';
+    $crumbs[] = [
+        '@type' => 'ListItem',
+        'position' => $position++,
+        'name' => 'Inicio',
+        'item' => $homeLink,
+    ];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $name = trim((string) ($item['name'] ?? ''));
+        $url = trim((string) ($item['url'] ?? ''));
+        if ($name === '' || $url === '') {
+            continue;
+        }
+        $crumbs[] = [
+            '@type' => 'ListItem',
+            'position' => $position++,
+            'name' => $name,
+            'item' => $url,
+        ];
+    }
+    return [
+        '@context' => 'https://schema.org',
+        '@type' => 'BreadcrumbList',
+        'itemListElement' => $crumbs,
+    ];
+};
 
 $renderer->setGlobal('postUrl', function (Post|string $post) use ($publicBaseUrl): string {
     $slug = $post instanceof Post ? $post->getSlug() : (string) $post;
@@ -748,13 +780,16 @@ if ($isCategoriesIndex) {
         'image' => $homeImage,
         'site_name' => $siteNameForMeta,
     ], $socialConfig);
+    $breadcrumbJsonLd = $buildBreadcrumbJsonLd([
+        ['name' => 'Categorías', 'url' => $canonical],
+    ]);
 
     echo $renderer->render('layout', [
         'pageTitle' => 'Categorías',
         'metaDescription' => 'Listado completo de categorías disponibles en el sitio.',
         'content' => $content,
         'socialMeta' => $socialMeta,
-        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'jsonLd' => [$siteJsonLd, $orgJsonLd, $breadcrumbJsonLd],
         'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
@@ -820,13 +855,18 @@ if ($categorySlugRequest !== null) {
         'image' => $homeImage,
         'site_name' => $siteNameForMeta,
     ], $socialConfig);
+    $categoriesIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/categorias';
+    $breadcrumbJsonLd = $buildBreadcrumbJsonLd([
+        ['name' => 'Categorías', 'url' => $categoriesIndexUrl],
+        ['name' => $categoryTitle, 'url' => $canonical],
+    ]);
 
     echo $renderer->render('layout', [
         'pageTitle' => 'Categoría: ' . $categoryTitle,
         'metaDescription' => 'Listado de artículos publicados en la categoría ' . $categoryTitle,
         'content' => $content,
         'socialMeta' => $socialMeta,
-        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'jsonLd' => [$siteJsonLd, $orgJsonLd, $breadcrumbJsonLd],
         'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
@@ -1009,12 +1049,20 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
         'previousStep' => $previousStep,
     ]);
     $content = $topicMainContent . $topicExtras;
+    $itinerariesIndexUrlLocal = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios';
+    $itineraryUrl = $buildItineraryUrl($itinerary);
+    $topicUrl = $buildItineraryTopicUrl($itinerary, $topic);
+    $breadcrumbJsonLd = $buildBreadcrumbJsonLd([
+        ['name' => 'Itinerarios', 'url' => $itinerariesIndexUrlLocal],
+        ['name' => $itinerary->getTitle(), 'url' => $itineraryUrl],
+        ['name' => $topic->getTitle(), 'url' => $topicUrl],
+    ]);
     echo $renderer->render('layout', [
         'pageTitle' => $topic->getTitle() . ' — ' . $itinerary->getTitle(),
         'metaDescription' => $topicDescription,
         'content' => $content,
         'socialMeta' => $topicSocialMeta,
-        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'jsonLd' => [$siteJsonLd, $orgJsonLd, $breadcrumbJsonLd],
         'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
@@ -1066,6 +1114,10 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
         'image' => $itineraryImage,
         'site_name' => $siteNameForMeta,
     ], $socialConfig);
+    $breadcrumbJsonLd = $buildBreadcrumbJsonLd([
+        ['name' => 'Itinerarios', 'url' => $itinerariesIndexUrlLocal],
+        ['name' => $itinerary->getTitle(), 'url' => $canonical],
+    ]);
     $entryTocConfig = $theme['entry']['toc'] ?? ['auto' => 'off', 'min_headings' => 3];
     $autoTocEnabled = ($entryTocConfig['auto'] ?? 'off') === 'on';
     $entryMinHeadings = (int) ($entryTocConfig['min_headings'] ?? 3);
@@ -1381,7 +1433,7 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
         'metaDescription' => $itineraryDescription,
         'content' => $content,
         'socialMeta' => $itinerarySocialMeta,
-        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'jsonLd' => [$siteJsonLd, $orgJsonLd, $breadcrumbJsonLd],
         'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
@@ -1406,12 +1458,15 @@ if (preg_match('#^/itinerarios/?$#i', $routePath)) {
         'image' => $homeImage,
         'site_name' => $siteNameForMeta,
     ], $socialConfig);
+    $breadcrumbJsonLd = $buildBreadcrumbJsonLd([
+        ['name' => 'Itinerarios', 'url' => $canon],
+    ]);
     echo $renderer->render('layout', [
         'pageTitle' => 'Itinerarios',
         'metaDescription' => $description,
         'content' => $content,
         'socialMeta' => $itineraryIndexMeta,
-        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'jsonLd' => [$siteJsonLd, $orgJsonLd, $breadcrumbJsonLd],
         'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
@@ -1510,7 +1565,7 @@ if ($slug !== null && $slug !== '') {
     $authorName = trim((string) ($configData['site_author'] ?? $siteNameForMeta));
     $postJsonLd = [
         '@context' => 'https://schema.org',
-        '@type' => 'BlogPosting',
+        '@type' => 'Article',
         'headline' => $post->getTitle(),
         'description' => $postDescription,
         'mainEntityOfPage' => $postCanonical,

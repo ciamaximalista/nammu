@@ -1056,6 +1056,12 @@ function get_settings() {
         $ads['scope'] = $adsDefaults['scope'];
     }
     $searchConsole = $config['search_console'] ?? [];
+    $indexnowDefaults = [
+        'enabled' => 'off',
+        'key' => '',
+        'key_file' => '',
+    ];
+    $indexnow = array_merge($indexnowDefaults, $config['indexnow'] ?? []);
 
     return [
         'sort_order' => $sort_order,
@@ -1087,6 +1093,7 @@ function get_settings() {
         'mailing' => $mailing,
         'postal' => $postal,
         'ads' => $ads,
+        'indexnow' => $indexnow,
         'entry' => $entry,
     ];
 }
@@ -1265,6 +1272,220 @@ function admin_public_itinerary_url(string $slug): string {
     $base = admin_base_url();
     $path = '/itinerarios/' . rawurlencode($slug);
     return $base === '' ? $path : $base . $path;
+}
+
+function admin_indexnow_endpoints(): array {
+    return [
+        'https://api.indexnow.org/indexnow',
+        'https://indexnow.amazonbot.amazon/indexnow',
+        'https://www.bing.com/indexnow',
+        'https://searchadvisor.naver.com/indexnow',
+        'https://search.seznam.cz/indexnow',
+        'https://yandex.com/indexnow',
+        'https://indexnow.yep.com/indexnow',
+    ];
+}
+
+function admin_indexnow_key_filename(string $key): string {
+    return 'indexnow-' . $key . '.txt';
+}
+
+function admin_indexnow_key_path(string $key, string $filename = ''): string {
+    $filename = $filename !== '' ? $filename : admin_indexnow_key_filename($key);
+    return __DIR__ . '/' . $filename;
+}
+
+function admin_indexnow_key_url(string $filename): string {
+    $base = admin_base_url();
+    $path = '/' . ltrim($filename, '/');
+    return $base === '' ? $path : $base . $path;
+}
+
+function admin_indexnow_log_path(): string {
+    return __DIR__ . '/config/indexnow-log.json';
+}
+
+function admin_indexnow_load_log(): array {
+    $path = admin_indexnow_log_path();
+    if (!is_file($path)) {
+        return [];
+    }
+    $raw = file_get_contents($path);
+    if ($raw === false) {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function admin_indexnow_save_log(array $payload): void {
+    $path = admin_indexnow_log_path();
+    nammu_ensure_directory(dirname($path));
+    file_put_contents($path, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+}
+
+function admin_indexnow_prepare_config(array &$config): array {
+    if (!isset($config['indexnow']) || !is_array($config['indexnow'])) {
+        $config['indexnow'] = [];
+    }
+    $indexnow = $config['indexnow'];
+    $updated = false;
+
+    $key = trim((string) ($indexnow['key'] ?? ''));
+    if ($key === '') {
+        try {
+            $key = bin2hex(random_bytes(16));
+        } catch (Throwable $e) {
+            $key = '';
+        }
+        if ($key !== '') {
+            $indexnow['key'] = $key;
+            $updated = true;
+        }
+    }
+
+    $keyFile = trim((string) ($indexnow['key_file'] ?? ''));
+    if ($keyFile === '' && $key !== '') {
+        $keyFile = admin_indexnow_key_filename($key);
+        $indexnow['key_file'] = $keyFile;
+        $updated = true;
+    }
+
+    $config['indexnow'] = $indexnow;
+
+    $keyPath = $key !== '' && $keyFile !== '' ? admin_indexnow_key_path($key, $keyFile) : '';
+    $fileOk = false;
+    if ($key !== '' && $keyFile !== '') {
+        $current = is_file($keyPath) ? trim((string) file_get_contents($keyPath)) : '';
+        if ($current === $key) {
+            $fileOk = true;
+        } elseif (@file_put_contents($keyPath, $key) !== false) {
+            $fileOk = true;
+        }
+    }
+
+    $keyUrl = $keyFile !== '' ? admin_indexnow_key_url($keyFile) : '';
+
+    return [
+        'key' => $key,
+        'key_file' => $keyFile,
+        'key_path' => $keyPath,
+        'key_url' => $keyUrl,
+        'file_ok' => $fileOk,
+        'updated' => $updated,
+    ];
+}
+
+function admin_indexnow_status(): array {
+    $config = load_config_file();
+    $enabled = (($config['indexnow']['enabled'] ?? 'off') === 'on');
+    $key = trim((string) ($config['indexnow']['key'] ?? ''));
+    $keyFile = trim((string) ($config['indexnow']['key_file'] ?? ''));
+    if ($keyFile === '' && $key !== '') {
+        $keyFile = admin_indexnow_key_filename($key);
+    }
+    $keyPath = $key !== '' && $keyFile !== '' ? admin_indexnow_key_path($key, $keyFile) : '';
+    $fileOk = $key !== '' && $keyFile !== '' && is_file($keyPath)
+        && trim((string) file_get_contents($keyPath)) === $key;
+    $keyUrl = $keyFile !== '' ? admin_indexnow_key_url($keyFile) : '';
+
+    return [
+        'enabled' => $enabled,
+        'key' => $key,
+        'key_file' => $keyFile,
+        'key_path' => $keyPath,
+        'key_url' => $keyUrl,
+        'file_ok' => $fileOk,
+    ];
+}
+
+function admin_maybe_send_indexnow(array $urls): void {
+    $urls = array_values(array_unique(array_filter(array_map(static function ($url) {
+        $url = trim((string) $url);
+        return preg_match('#^https?://#i', $url) ? $url : '';
+    }, $urls))));
+    if (empty($urls)) {
+        return;
+    }
+
+    $config = load_config_file();
+    if (($config['indexnow']['enabled'] ?? 'off') !== 'on') {
+        return;
+    }
+
+    $status = admin_indexnow_prepare_config($config);
+    if (!empty($status['updated'])) {
+        save_config_file($config);
+    }
+
+    $key = $status['key'] ?? '';
+    $keyUrl = $status['key_url'] ?? '';
+    if ($key === '') {
+        return;
+    }
+
+    $host = '';
+    $base = admin_base_url();
+    if ($base !== '') {
+        $host = parse_url($base, PHP_URL_HOST) ?: '';
+    }
+    if ($host === '' && !empty($urls[0])) {
+        $host = parse_url($urls[0], PHP_URL_HOST) ?: '';
+    }
+    if ($host === '') {
+        return;
+    }
+
+    $payload = [
+        'host' => $host,
+        'key' => $key,
+        'keyLocation' => $keyUrl,
+        'urlList' => $urls,
+    ];
+    $body = json_encode($payload);
+    if ($body === false) {
+        return;
+    }
+
+    $headers = ['Content-Type: application/json; charset=UTF-8'];
+    $errors = [];
+    foreach (admin_indexnow_endpoints() as $endpoint) {
+        $httpCode = 0;
+        $responseBody = admin_http_post_body_response($endpoint, $body, $headers, $httpCode);
+        $responseText = is_string($responseBody) ? trim($responseBody) : '';
+        $responseSnippet = $responseText !== '' ? mb_substr($responseText, 0, 240, 'UTF-8') : '';
+        $decoded = null;
+        if ($responseText !== '') {
+            $decoded = json_decode($responseText, true);
+        }
+        $hasErrorPayload = is_array($decoded) && (isset($decoded['error']) || isset($decoded['errors']));
+        $ok = $httpCode >= 200 && $httpCode < 300 && !$hasErrorPayload;
+        if (!$ok) {
+            $message = '';
+            if (is_array($decoded)) {
+                if (isset($decoded['error'])) {
+                    $message = is_array($decoded['error']) ? (string) ($decoded['error']['message'] ?? '') : (string) $decoded['error'];
+                } elseif (isset($decoded['errors']) && is_array($decoded['errors'])) {
+                    $firstError = $decoded['errors'][0] ?? null;
+                    if (is_array($firstError)) {
+                        $message = (string) ($firstError['message'] ?? '');
+                    }
+                }
+            }
+            if ($message === '' && $responseSnippet !== '') {
+                $message = $responseSnippet;
+            }
+            $errors[] = [
+                'endpoint' => $endpoint,
+                'status' => (int) $httpCode,
+                'message' => $message,
+            ];
+        }
+    }
+    admin_indexnow_save_log([
+        'timestamp' => time(),
+        'errors' => $errors,
+    ]);
 }
 
 function admin_extract_social_settings(string $key, array $defaults, ?array $config = null): array {
@@ -3635,6 +3856,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $content = $_POST['content'] ?? '';
         $audioLength = '';
+        $audioUrl = '';
         if ($type === 'Podcast') {
             if ($audio === '') {
                 $error = 'El archivo mp3 del podcast es obligatorio.';
@@ -3763,6 +3985,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     if ($type === 'Podcast') {
                         admin_regenerate_podcast_feed();
+                    }
+                    if (!$isDraft) {
+                        $indexnowUrls = [];
+                        $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
+                        if (in_array($type, ['Entrada', 'Página'], true) && $slug !== '') {
+                            $indexnowUrls[] = admin_public_post_url($slug);
+                        } elseif ($type === 'Podcast' && $audioUrl !== '') {
+                            $indexnowUrls[] = $audioUrl;
+                        }
+                        if (!empty($indexnowUrls)) {
+                            admin_maybe_send_indexnow($indexnowUrls);
+                        }
                     }
                     $redirectTemplate = $isDraft ? 'draft' : ($type === 'Página' ? 'page' : ($type === 'Podcast' ? 'podcast' : ($type === 'Newsletter' ? 'newsletter' : 'single')));
                     header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&created=' . urlencode($targetFilename));
@@ -4154,6 +4388,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($template === 'podcast') {
                         admin_regenerate_podcast_feed();
                     }
+                    if ($status === 'published') {
+                        $shouldIndexnow = $previousStatus === 'draft' || $publishDraftAsEntry || $publishDraftAsPage || $publishDraftAsPodcast || $renameRequested;
+                        if ($shouldIndexnow) {
+                            $indexnowUrls = [];
+                            $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
+                            if (in_array($template, ['post', 'page'], true) && $slug !== '') {
+                                $indexnowUrls[] = admin_public_post_url($slug);
+                            } elseif ($template === 'podcast') {
+                                $audioUrl = admin_public_asset_url($audio);
+                                if ($audioUrl !== '') {
+                                    $indexnowUrls[] = $audioUrl;
+                                }
+                            }
+                            if (!empty($indexnowUrls)) {
+                                admin_maybe_send_indexnow($indexnowUrls);
+                            }
+                        }
+                    }
                     $redirectTemplate = $status === 'draft' ? 'draft' : ($template === 'page' ? 'page' : ($template === 'podcast' ? 'podcast' : ($template === 'newsletter' ? 'newsletter' : 'single')));
                     $feedbackMessage = 'Contenido actualizado correctamente.';
                     if ($publishDraftAsEntry) {
@@ -4449,6 +4701,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 admin_maybe_enqueue_push_notification('itinerary', $title, $description, $link, $image);
                 $imageUrl = admin_public_asset_url($image);
                 admin_maybe_auto_post_to_social_networks($saved->getSlug(), $title, $description, $image, $link, $imageUrl);
+                admin_maybe_send_indexnow([$link]);
             }
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario guardado correctamente.'];
             header('Location: admin.php?page=itinerario&itinerary=' . urlencode($saved->getSlug()));
@@ -4583,6 +4836,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $existingTopic->getQuiz()
                     );
                 }
+            }
+            if ($itinerary->isPublished()) {
+                $topicUrl = admin_public_itinerary_url($itinerarySlug) . '/' . rawurlencode($topicSlug);
+                admin_maybe_send_indexnow([$topicUrl]);
             }
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Tema guardado correctamente.'];
             if ($redirectToNewForm) {
@@ -5664,6 +5921,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['ads_feedback'] = [
                 'type' => 'danger',
                 'message' => 'No se pudieron guardar las preferencias: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: admin.php?page=anuncios');
+        exit;
+    } elseif (isset($_POST['save_indexnow_settings'])) {
+        $indexnowEnabled = isset($_POST['indexnow_enabled']) ? 'on' : 'off';
+        try {
+            $config = load_config_file();
+            if (!isset($config['indexnow'])) {
+                $config['indexnow'] = [];
+            }
+            $config['indexnow']['enabled'] = $indexnowEnabled;
+            if ($indexnowEnabled === 'on') {
+                admin_indexnow_prepare_config($config);
+            }
+            save_config_file($config);
+            $_SESSION['ads_feedback'] = [
+                'type' => 'success',
+                'message' => 'Preferencias de IndexNow guardadas.',
+            ];
+        } catch (Throwable $e) {
+            $_SESSION['ads_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudieron guardar las preferencias de IndexNow: ' . $e->getMessage(),
             ];
         }
         header('Location: admin.php?page=anuncios');

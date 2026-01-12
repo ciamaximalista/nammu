@@ -2134,9 +2134,6 @@ function nammu_handle_scheduled_post_notifications(array $payload): void
 function nammu_try_send_scheduled_post_notifications(array $payload): bool
 {
     $template = strtolower((string) ($payload['template'] ?? 'post'));
-    if ($template === 'page') {
-        return true;
-    }
     $requiredAdmin = function_exists('admin_maybe_auto_post_to_social_networks')
         && function_exists('admin_maybe_enqueue_push_notification')
         && function_exists('get_settings')
@@ -2156,6 +2153,24 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
     $description = (string) ($payload['description'] ?? '');
     $image = (string) ($payload['image'] ?? '');
     $audio = (string) ($payload['audio'] ?? '');
+    $indexnowUrls = [];
+    if ($template === 'podcast') {
+        $audioUrl = admin_public_asset_url($audio);
+        if ($audioUrl !== '') {
+            $indexnowUrls[] = $audioUrl;
+        }
+    } else {
+        $link = $slug !== '' ? admin_public_post_url($slug) : '';
+        if ($link !== '') {
+            $indexnowUrls[] = $link;
+        }
+    }
+    if (!empty($indexnowUrls) && function_exists('admin_maybe_send_indexnow')) {
+        admin_maybe_send_indexnow($indexnowUrls);
+    }
+    if ($template === 'page') {
+        return true;
+    }
 
     if ($filename !== '') {
         if ($template === 'podcast') {

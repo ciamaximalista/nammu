@@ -23,4 +23,5 @@ config/push-subscriptions.json
 config/push-queue.json
 config/postal-reset.json
 config/scheduled-*.json
+indexnow-*.txt
 vendor/

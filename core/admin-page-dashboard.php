@@ -61,6 +61,15 @@
     $sourcesDaily = $analytics['sources']['daily'] ?? [];
     $searchesDaily = $analytics['searches']['daily'] ?? [];
     $botsDaily = $analytics['bots']['daily'] ?? [];
+    $indexnowLog = function_exists('admin_indexnow_load_log') ? admin_indexnow_load_log() : [];
+    $indexnowErrors = [];
+    if (is_array($indexnowLog['errors'] ?? null)) {
+        $indexnowErrors = array_values(array_filter($indexnowLog['errors'], static function ($item) {
+            return is_array($item) && !empty($item['endpoint']);
+        }));
+    }
+    $indexnowTimestamp = isset($indexnowLog['timestamp']) ? (int) $indexnowLog['timestamp'] : 0;
+    $indexnowHasErrors = !empty($indexnowErrors);
     $gscSettings = $settings['search_console'] ?? [];
     $gscProperty = trim((string) ($gscSettings['property'] ?? ''));
     $gscClientId = trim((string) ($gscSettings['client_id'] ?? ''));
@@ -1638,6 +1647,32 @@
                 <p class="text-muted mb-0">Resumen general de publicaciones y estadísticas del sitio.</p>
             </div>
         </div>
+        <?php if ($indexnowHasErrors): ?>
+            <div class="mb-4" style="border:1px solid #ea2f28;background:#fff5f5;border-radius:12px;padding:16px;">
+                <h3 class="h6 text-uppercase mb-2" style="color:#ea2f28;">Errores al enviar IndexNow</h3>
+                <?php if ($indexnowTimestamp > 0): ?>
+                    <p class="text-muted mb-2">Último intento: <?= htmlspecialchars(date('d/m/y H:i', $indexnowTimestamp), ENT_QUOTES, 'UTF-8') ?></p>
+                <?php endif; ?>
+                <ul class="mb-0 pl-3">
+                    <?php foreach ($indexnowErrors as $error): ?>
+                        <?php
+                        $endpoint = (string) ($error['endpoint'] ?? '');
+                        $status = (int) ($error['status'] ?? 0);
+                        $message = trim((string) ($error['message'] ?? ''));
+                        ?>
+                        <li>
+                            <strong><?= htmlspecialchars($endpoint, ENT_QUOTES, 'UTF-8') ?></strong>
+                            <?php if ($status > 0): ?>
+                                (HTTP <?= $status ?>)
+                            <?php endif; ?>
+                            <?php if ($message !== ''): ?>
+                                — <?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?>
+                            <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php endif; ?>
 
         <div class="row">
             <div class="col-lg-6">
@@ -2189,13 +2224,13 @@
                 <?php if ($pageCount > 0): ?>
                     <div class="card mb-4 dashboard-stat-block">
                         <div class="card-body">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                            <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Páginas más leídas</h4>
-                            <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle mt-2" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="mode">
-                                <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
-                                <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
+                            <div class="d-flex flex-column gap-2 mb-3">
+                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Páginas más leídas</h4>
+                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="mode">
+                                    <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
+                                    <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
+                                </div>
                             </div>
-                        </div>
                             <?php if (empty($topPages) && empty($topPagesByUnique)): ?>
                                 <p class="text-muted mb-0">Sin datos todavía.</p>
                             <?php else: ?>
@@ -2228,9 +2263,9 @@
 
                 <div class="card mb-4 dashboard-stat-block">
                     <div class="card-body">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                        <div class="d-flex flex-column gap-2 mb-3">
                             <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Búsquedas internas más frecuentes (últimos 30 días)</h4>
-                            <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle mt-2" role="group" data-stat-toggle="internal-search" data-stat-toggle-type="mode">
+                            <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="internal-search" data-stat-toggle-type="mode">
                                 <button type="button" class="btn btn-outline-primary active" data-stat-mode="searches">Búsquedas</button>
                                 <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
                             </div>
@@ -2321,6 +2356,7 @@
                         </div>
                     </div>
                 <?php endif; ?>
+
             </div>
         </div>
 

@@ -346,15 +346,21 @@
                     return $localized;
                 }
             }
-            return '';
+            return 'País desconocido';
         }
         if (strlen($code) === 3) {
             if (isset($gscCountryNames3[$code])) {
                 return $gscCountryNames3[$code];
             }
-            return '';
+            if (function_exists('locale_get_display_region')) {
+                $localized = locale_get_display_region('es_' . $code);
+                if (is_string($localized) && $localized !== '' && $localized !== $code) {
+                    return $localized;
+                }
+            }
+            return 'País desconocido';
         }
-        return $value;
+        return $value !== '' ? $value : 'País desconocido';
     };
     if (is_file($gscCachePath)) {
         $rawCache = @file_get_contents($gscCachePath);
@@ -1614,6 +1620,10 @@
                         <?php if ($last30Line['points'] === ''): ?>
                             <p class="text-muted mb-0">Sin datos todavía.</p>
                         <?php else: ?>
+                            <?php
+                            $last30CoordCount = count($last30Line['coords']);
+                            $last30TodayPoint = $last30CoordCount > 0 ? $last30Line['coords'][$last30CoordCount - 1] : null;
+                            ?>
                             <svg width="100%" height="170" viewBox="0 0 320 170" preserveAspectRatio="none" aria-hidden="true">
                                 <line x1="30" y1="<?= (int) $chartTop ?>" x2="30" y2="<?= (int) $chartBottom ?>" stroke="#ccd6e0" stroke-width="1"></line>
                                 <line x1="30" y1="<?= (int) $chartBottom ?>" x2="300" y2="<?= (int) $chartBottom ?>" stroke="#ccd6e0" stroke-width="1"></line>
@@ -1627,6 +1637,11 @@
                                     <?php foreach ($last30Line['coords'] as $point): ?>
                                         <circle cx="<?= htmlspecialchars((string) $point['x'], ENT_QUOTES, 'UTF-8') ?>" cy="<?= htmlspecialchars((string) $point['y'], ENT_QUOTES, 'UTF-8') ?>" r="2.5" fill="#1b8eed"></circle>
                                     <?php endforeach; ?>
+                                    <?php if ($last30TodayPoint): ?>
+                                        <text x="<?= htmlspecialchars((string) $last30TodayPoint['x'], ENT_QUOTES, 'UTF-8') ?>" y="<?= (int) max(12, $last30TodayPoint['y'] - 6) ?>" font-size="10" text-anchor="middle" fill="#1b8eed">
+                                            <?= (int) $last30TodayPoint['value'] ?>
+                                        </text>
+                                    <?php endif; ?>
                                 </g>
                             </svg>
                         <?php endif; ?>
@@ -1640,6 +1655,10 @@
                         <?php if ($last12Line['points'] === ''): ?>
                             <p class="text-muted mb-0">Sin datos todavía.</p>
                         <?php else: ?>
+                            <?php
+                            $last12CoordCount = count($last12Line['coords']);
+                            $last12CurrentPoint = $last12CoordCount > 0 ? $last12Line['coords'][$last12CoordCount - 1] : null;
+                            ?>
                             <svg width="100%" height="170" viewBox="0 0 320 170" preserveAspectRatio="none" aria-hidden="true">
                                 <line x1="30" y1="<?= (int) $chartTop ?>" x2="30" y2="<?= (int) $chartBottom ?>" stroke="#ccd6e0" stroke-width="1"></line>
                                 <line x1="30" y1="<?= (int) $chartBottom ?>" x2="300" y2="<?= (int) $chartBottom ?>" stroke="#ccd6e0" stroke-width="1"></line>
@@ -1653,6 +1672,11 @@
                                     <?php foreach ($last12Line['coords'] as $point): ?>
                                         <circle cx="<?= htmlspecialchars((string) $point['x'], ENT_QUOTES, 'UTF-8') ?>" cy="<?= htmlspecialchars((string) $point['y'], ENT_QUOTES, 'UTF-8') ?>" r="2.5" fill="#0a4c8a"></circle>
                                     <?php endforeach; ?>
+                                    <?php if ($last12CurrentPoint): ?>
+                                        <text x="<?= htmlspecialchars((string) $last12CurrentPoint['x'], ENT_QUOTES, 'UTF-8') ?>" y="<?= (int) max(12, $last12CurrentPoint['y'] - 6) ?>" font-size="10" text-anchor="middle" fill="#0a4c8a">
+                                            <?= (int) $last12CurrentPoint['value'] ?>
+                                        </text>
+                                    <?php endif; ?>
                                 </g>
                             </svg>
                         <?php endif; ?>
@@ -1823,34 +1847,72 @@
                         <?php endif; ?>
                     </div>
                 </div>
-                <div class="card mb-4 dashboard-stat-block">
+                <div class="card mb-4">
                     <div class="card-body">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                            <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Búsquedas internas más frecuentes (últimos 30 días)</h4>
-                            <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="internal-search" data-stat-toggle-type="mode">
-                                <button type="button" class="btn btn-outline-primary active" data-stat-mode="searches">Búsquedas</button>
-                                <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
-                            </div>
-                        </div>
-                        <?php if (empty($searchCountsList) && empty($searchUsersList)): ?>
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Plataforma (últimos 30 días)</h4>
+                        <?php if (empty($deviceList) && empty($browserList) && empty($systemList) && empty($languageList)): ?>
                             <p class="text-muted mb-0">Sin datos todavía.</p>
                         <?php else: ?>
-                            <ol class="mb-0 dashboard-links" data-stat-list="internal-search" data-stat-mode="searches">
-                                <?php foreach ($searchCountsList as $item): ?>
-                                    <li>
-                                        <span><?= htmlspecialchars($item['term'], ENT_QUOTES, 'UTF-8') ?></span>
-                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ol>
-                            <ol class="mb-0 dashboard-links d-none" data-stat-list="internal-search" data-stat-mode="users">
-                                <?php foreach ($searchUsersList as $item): ?>
-                                    <li>
-                                        <span><?= htmlspecialchars($item['term'], ENT_QUOTES, 'UTF-8') ?></span>
-                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ol>
+                            <?php if (!empty($deviceList)): ?>
+                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Dispositivo</p>
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <?php foreach ($deviceList as $item): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                    <td class="text-right"><?= (int) $item['percent'] ?>% (<?= (int) $item['count'] ?>)</td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($browserList)): ?>
+                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Navegador</p>
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <?php foreach ($browserList as $item): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                    <td class="text-right"><?= (int) $item['percent'] ?>% (<?= (int) $item['count'] ?>)</td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($systemList)): ?>
+                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Sistema (escritorio)</p>
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <?php foreach ($systemList as $item): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                    <td class="text-right"><?= (int) $item['percent'] ?>% (<?= (int) $item['count'] ?>)</td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($languageList)): ?>
+                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Lengua</p>
+                                <div class="table-responsive">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <?php foreach ($languageList as $item): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                    <td class="text-right"><?= (int) $item['percent'] ?>% (<?= (int) $item['count'] ?>)</td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -2137,72 +2199,34 @@
                     </div>
                 <?php endif; ?>
 
-                <div class="card mb-4">
+                <div class="card mb-4 dashboard-stat-block">
                     <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Plataforma (últimos 30 días)</h4>
-                        <?php if (empty($deviceList) && empty($browserList) && empty($systemList) && empty($languageList)): ?>
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                            <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Búsquedas internas más frecuentes (últimos 30 días)</h4>
+                            <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="internal-search" data-stat-toggle-type="mode">
+                                <button type="button" class="btn btn-outline-primary active" data-stat-mode="searches">Búsquedas</button>
+                                <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
+                            </div>
+                        </div>
+                        <?php if (empty($searchCountsList) && empty($searchUsersList)): ?>
                             <p class="text-muted mb-0">Sin datos todavía.</p>
                         <?php else: ?>
-                            <?php if (!empty($deviceList)): ?>
-                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Dispositivo</p>
-                                <div class="table-responsive mb-3">
-                                    <table class="table table-sm mb-0">
-                                        <tbody>
-                                            <?php foreach ($deviceList as $item): ?>
-                                                <tr>
-                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
-                                                    <td class="text-right"><?= (int) $item['percent'] ?>% (<?= (int) $item['count'] ?>)</td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (!empty($browserList)): ?>
-                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Navegador</p>
-                                <div class="table-responsive mb-3">
-                                    <table class="table table-sm mb-0">
-                                        <tbody>
-                                            <?php foreach ($browserList as $item): ?>
-                                                <tr>
-                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
-                                                    <td class="text-right"><?= (int) $item['percent'] ?>% (<?= (int) $item['count'] ?>)</td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (!empty($systemList)): ?>
-                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Sistema (escritorio)</p>
-                                <div class="table-responsive mb-3">
-                                    <table class="table table-sm mb-0">
-                                        <tbody>
-                                            <?php foreach ($systemList as $item): ?>
-                                                <tr>
-                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
-                                                    <td class="text-right"><?= (int) $item['percent'] ?>% (<?= (int) $item['count'] ?>)</td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (!empty($languageList)): ?>
-                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Lengua</p>
-                                <div class="table-responsive">
-                                    <table class="table table-sm mb-0">
-                                        <tbody>
-                                            <?php foreach ($languageList as $item): ?>
-                                                <tr>
-                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
-                                                    <td class="text-right"><?= (int) $item['percent'] ?>% (<?= (int) $item['count'] ?>)</td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            <?php endif; ?>
+                            <ol class="mb-0 dashboard-links" data-stat-list="internal-search" data-stat-mode="searches">
+                                <?php foreach ($searchCountsList as $item): ?>
+                                    <li>
+                                        <span><?= htmlspecialchars($item['term'], ENT_QUOTES, 'UTF-8') ?></span>
+                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
+                            <ol class="mb-0 dashboard-links d-none" data-stat-list="internal-search" data-stat-mode="users">
+                                <?php foreach ($searchUsersList as $item): ?>
+                                    <li>
+                                        <span><?= htmlspecialchars($item['term'], ENT_QUOTES, 'UTF-8') ?></span>
+                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -2621,8 +2645,24 @@
                 });
             }
 
+            function applyScopePeriod(block, scope, period) {
+                if (!scope || !period) {
+                    return;
+                }
+                block.querySelectorAll('[data-stat-list][data-stat-scope="' + scope + '"][data-stat-period]').forEach(function(list) {
+                    list.classList.toggle('d-none', list.getAttribute('data-stat-period') !== period);
+                });
+            }
+
             document.querySelectorAll('.dashboard-stat-block').forEach(function(block) {
                 updateBlock(block);
+                block.querySelectorAll('[data-stat-toggle][data-stat-scope]').forEach(function(group) {
+                    var scope = group.getAttribute('data-stat-scope') || '';
+                    var periodBtn = group.querySelector('[data-stat-period].active');
+                    if (periodBtn) {
+                        applyScopePeriod(block, scope, periodBtn.getAttribute('data-stat-period'));
+                    }
+                });
             });
 
             document.addEventListener('click', function(event) {
@@ -2647,6 +2687,10 @@
                 var block = group.closest('.dashboard-stat-block');
                 if (block) {
                     updateBlock(block);
+                    var scope = group.getAttribute('data-stat-scope') || '';
+                    if (scope && btn.hasAttribute('data-stat-period')) {
+                        applyScopePeriod(block, scope, btn.getAttribute('data-stat-period'));
+                    }
                 }
             });
         })();

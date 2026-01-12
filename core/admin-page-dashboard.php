@@ -292,7 +292,46 @@
         'ZM' => 'Zambia',
         'ZW' => 'Zimbabue',
     ];
-    $gscResolveCountry = static function (string $value) use ($gscCountryNames): string {
+    $gscCountryNames3 = [
+        'ARE' => 'Emiratos Árabes Unidos',
+        'ARG' => 'Argentina',
+        'AUS' => 'Australia',
+        'AUT' => 'Austria',
+        'BEL' => 'Bélgica',
+        'BOL' => 'Bolivia',
+        'BRA' => 'Brasil',
+        'CAN' => 'Canadá',
+        'CHE' => 'Suiza',
+        'CHL' => 'Chile',
+        'CHN' => 'China',
+        'COL' => 'Colombia',
+        'CUB' => 'Cuba',
+        'DEU' => 'Alemania',
+        'DOM' => 'República Dominicana',
+        'ECU' => 'Ecuador',
+        'ESP' => 'España',
+        'FRA' => 'Francia',
+        'GBR' => 'Reino Unido',
+        'GTM' => 'Guatemala',
+        'HND' => 'Honduras',
+        'IRL' => 'Irlanda',
+        'ITA' => 'Italia',
+        'MEX' => 'México',
+        'NIC' => 'Nicaragua',
+        'NLD' => 'Países Bajos',
+        'NOR' => 'Noruega',
+        'PAN' => 'Panamá',
+        'PER' => 'Perú',
+        'PRT' => 'Portugal',
+        'PRY' => 'Paraguay',
+        'ROU' => 'Uruguay',
+        'RUS' => 'Rusia',
+        'SLV' => 'El Salvador',
+        'SWE' => 'Suecia',
+        'USA' => 'Estados Unidos',
+        'VEN' => 'Venezuela',
+    ];
+    $gscResolveCountry = static function (string $value) use ($gscCountryNames, $gscCountryNames3): string {
         $code = strtoupper(trim($value));
         if ($code === '') {
             return '';
@@ -300,7 +339,10 @@
         if (strlen($code) === 2) {
             return $gscCountryNames[$code] ?? '';
         }
-        return $value;
+        if (strlen($code) === 3) {
+            return $gscCountryNames3[$code] ?? '';
+        }
+        return '';
     };
     if (is_file($gscCachePath)) {
         $rawCache = @file_get_contents($gscCachePath);
@@ -2421,9 +2463,13 @@
                                 <?php endif; ?>
                                 <?php if (!empty($gscCountries7) || !empty($gscCountries28)): ?>
                                     <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Principales países</p>
+                                    <div class="btn-group btn-group-sm mb-3" role="group" data-stat-toggle data-stat-toggle-type="period" data-stat-scope="gsc-countries">
+                                        <button type="button" class="btn btn-outline-secondary active" data-stat-period="28">Últimos 28 días</button>
+                                        <button type="button" class="btn btn-outline-secondary" data-stat-period="7">Últimos 7 días</button>
+                                    </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscCountries7)): ?>
-                                    <div class="table-responsive mb-3 d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-main">
+                                    <div class="table-responsive mb-3 d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-countries">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2445,7 +2491,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscCountries28)): ?>
-                                    <div class="table-responsive" data-stat-list data-stat-period="28" data-stat-scope="gsc-main">
+                                    <div class="table-responsive" data-stat-list data-stat-period="28" data-stat-scope="gsc-countries">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>

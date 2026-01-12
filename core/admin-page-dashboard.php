@@ -82,6 +82,7 @@
     $gscCacheTtl = 2 * 24 * 60 * 60;
     $gscCache = null;
     $gscUpdatedAtLabel = '';
+    $gscForceRefresh = isset($_GET['gsc_refresh']) && $_GET['gsc_refresh'] === '1';
     if (is_file($gscCachePath)) {
         $rawCache = @file_get_contents($gscCachePath);
         $decodedCache = is_string($rawCache) && $rawCache !== '' ? json_decode($rawCache, true) : null;
@@ -96,7 +97,11 @@
     $gscCacheValid = is_array($gscCache)
         && ($gscCache['property'] ?? '') === $gscProperty
         && isset($gscCache['updated_at']);
-    $gscCacheFresh = $gscCacheValid && (time() - (int) $gscCache['updated_at']) < $gscCacheTtl;
+    $gscCacheHasNew = $gscCacheValid
+        && isset($gscCache['totals7'], $gscCache['totals28'], $gscCache['queries7'], $gscCache['queries28']);
+    $gscCacheFresh = $gscCacheHasNew
+        && (time() - (int) $gscCache['updated_at']) < $gscCacheTtl
+        && !$gscForceRefresh;
     if ($gscCacheFresh) {
         $gscTotals28 = $gscCache['totals28'] ?? null;
         $gscTotals7 = $gscCache['totals7'] ?? null;
@@ -253,7 +258,7 @@
             }
             $gscUpdatedAtLabel = (new DateTimeImmutable('now'))->format('d/m/y');
         } catch (Throwable $e) {
-            if ($gscCacheValid) {
+            if ($gscCacheHasNew) {
                 $gscTotals28 = $gscCache['totals28'] ?? null;
                 $gscTotals7 = $gscCache['totals7'] ?? null;
                 $gscQueries28 = $gscCache['queries28'] ?? [];
@@ -1971,6 +1976,11 @@
                                 <?php if ($gscUpdatedAtLabel !== ''): ?>
                                     <p class="text-muted mb-2">Datos servidos por Google Search Console API el <?= htmlspecialchars($gscUpdatedAtLabel, ENT_QUOTES, 'UTF-8') ?></p>
                                 <?php endif; ?>
+                                <form method="get" class="mb-2">
+                                    <input type="hidden" name="page" value="dashboard">
+                                    <input type="hidden" name="gsc_refresh" value="1">
+                                    <button type="submit" class="btn btn-outline-primary btn-sm">Actualizar datos ahora</button>
+                                </form>
                                 <div class="btn-group btn-group-sm mb-3" role="group" data-stat-toggle data-stat-toggle-type="period">
                                     <button type="button" class="btn btn-outline-secondary active" data-stat-period="28">Últimos 28 días</button>
                                     <button type="button" class="btn btn-outline-secondary" data-stat-period="7">Últimos 7 días</button>

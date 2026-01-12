@@ -747,24 +747,24 @@
                 'apikey' => $bingApiKey,
                 'siteUrl' => $bingSiteUrl,
             ];
-            $totals28Resp = admin_bing_request_with_dates('GetSiteStats', $baseParams, $start28, $endDate);
-            $totals7Resp = admin_bing_request_with_dates('GetSiteStats', $baseParams, $start7, $endDate);
+            $totals28Resp = admin_bing_request_with_dates_multi(['GetRankAndTrafficStats', 'GetSiteStats'], $baseParams, $start28, $endDate);
+            $totals7Resp = admin_bing_request_with_dates_multi(['GetRankAndTrafficStats', 'GetSiteStats'], $baseParams, $start7, $endDate);
             $bingTotals28 = $bingNormalizeTotals($bingExtractRows($totals28Resp, ['SiteStats', 'siteStats']));
             $bingTotals7 = $bingNormalizeTotals($bingExtractRows($totals7Resp, ['SiteStats', 'siteStats']));
 
-            $queries28Resp = admin_bing_request_with_dates('GetQueryStats', $baseParams, $start28, $endDate);
-            $queries7Resp = admin_bing_request_with_dates('GetQueryStats', $baseParams, $start7, $endDate);
-            $bingQueries28 = $bingNormalizeDimension($bingExtractRows($queries28Resp, ['QueryStats', 'queryStats']), ['Query', 'query'], 'term');
-            $bingQueries7 = $bingNormalizeDimension($bingExtractRows($queries7Resp, ['QueryStats', 'queryStats']), ['Query', 'query'], 'term');
+            $queries28Resp = admin_bing_request_with_dates_multi(['GetPageQueryStats', 'GetQueryStats'], $baseParams, $start28, $endDate);
+            $queries7Resp = admin_bing_request_with_dates_multi(['GetPageQueryStats', 'GetQueryStats'], $baseParams, $start7, $endDate);
+            $bingQueries28 = $bingNormalizeDimension($bingExtractRows($queries28Resp, ['QueryStats', 'queryStats', 'PageQueryStats', 'pageQueryStats']), ['Query', 'query'], 'term');
+            $bingQueries7 = $bingNormalizeDimension($bingExtractRows($queries7Resp, ['QueryStats', 'queryStats', 'PageQueryStats', 'pageQueryStats']), ['Query', 'query'], 'term');
 
-            $pages28Resp = admin_bing_request_with_dates('GetPageStats', $baseParams, $start28, $endDate);
-            $pages7Resp = admin_bing_request_with_dates('GetPageStats', $baseParams, $start7, $endDate);
-            $bingPages28 = $bingNormalizeDimension($bingExtractRows($pages28Resp, ['PageStats', 'pageStats']), ['Page', 'Url', 'url'], 'page');
-            $bingPages7 = $bingNormalizeDimension($bingExtractRows($pages7Resp, ['PageStats', 'pageStats']), ['Page', 'Url', 'url'], 'page');
+            $pages28Resp = admin_bing_request_with_dates_multi(['GetPageQueryStats', 'GetPageStats'], $baseParams, $start28, $endDate);
+            $pages7Resp = admin_bing_request_with_dates_multi(['GetPageQueryStats', 'GetPageStats'], $baseParams, $start7, $endDate);
+            $bingPages28 = $bingNormalizeDimension($bingExtractRows($pages28Resp, ['PageStats', 'pageStats', 'PageQueryStats', 'pageQueryStats']), ['Page', 'Url', 'url'], 'page');
+            $bingPages7 = $bingNormalizeDimension($bingExtractRows($pages7Resp, ['PageStats', 'pageStats', 'PageQueryStats', 'pageQueryStats']), ['Page', 'Url', 'url'], 'page');
 
             try {
-                $countries28Resp = admin_bing_request_with_dates('GetCountryStats', $baseParams, $start28, $endDate);
-                $countries7Resp = admin_bing_request_with_dates('GetCountryStats', $baseParams, $start7, $endDate);
+                $countries28Resp = admin_bing_request_with_dates_multi(['GetCountryStats'], $baseParams, $start28, $endDate);
+                $countries7Resp = admin_bing_request_with_dates_multi(['GetCountryStats'], $baseParams, $start7, $endDate);
                 $bingCountries28 = $bingNormalizeDimension($bingExtractRows($countries28Resp, ['CountryStats', 'countryStats']), ['Country', 'country', 'CountryCode', 'countryCode'], 'country');
                 $bingCountries7 = $bingNormalizeDimension($bingExtractRows($countries7Resp, ['CountryStats', 'countryStats']), ['Country', 'country', 'CountryCode', 'countryCode'], 'country');
             } catch (Throwable $e) {

@@ -1243,57 +1243,70 @@ function admin_gsc_get(string $accessToken, string $url): array {
 }
 
 function admin_bing_api_get(string $method, array $params): array {
-    $base = 'https://www.bing.com/webmasters/api.svc/json/';
-    $method = ltrim($method, '/');
-    $url = $base . $method . '?' . http_build_query($params);
-    $opts = [
-        'http' => [
-            'method' => 'GET',
-            'timeout' => 12,
-            'ignore_errors' => true,
-        ],
+    $bases = [
+        'https://ssl.bing.com/webmaster/api.svc/json/',
+        'https://www.bing.com/webmaster/api.svc/json/',
+        'https://www.bing.com/webmasters/api.svc/json/',
     ];
-    $resp = @file_get_contents($url, false, stream_context_create($opts));
-    $respText = is_string($resp) ? trim($resp) : '';
-    $decoded = json_decode($respText, true);
-    if (!is_array($decoded)) {
-        if ($respText !== '' && str_starts_with($respText, '<')) {
-            $xml = @simplexml_load_string($respText);
-            if ($xml !== false) {
-                $json = json_encode($xml);
-                $decoded = is_string($json) ? json_decode($json, true) : null;
+    $method = ltrim($method, '/');
+    $lastError = null;
+    foreach ($bases as $base) {
+        $url = $base . $method . '?' . http_build_query($params);
+        $opts = [
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 12,
+                'ignore_errors' => true,
+                'follow_location' => 1,
+                'max_redirects' => 3,
+                'header' => "Accept: application/json\r\nUser-Agent: Nammu/1.0\r\n",
+            ],
+        ];
+        $resp = @file_get_contents($url, false, stream_context_create($opts));
+        $respText = is_string($resp) ? trim($resp) : '';
+        $decoded = json_decode($respText, true);
+        if (!is_array($decoded)) {
+            if ($respText !== '' && str_starts_with($respText, '<')) {
+                $xml = @simplexml_load_string($respText);
+                if ($xml !== false) {
+                    $json = json_encode($xml);
+                    $decoded = is_string($json) ? json_decode($json, true) : null;
+                }
             }
         }
-    }
-    if (!is_array($decoded)) {
-        $status = '';
-        if (!empty($http_response_header) && is_array($http_response_header)) {
-            $statusLine = $http_response_header[0] ?? '';
-            if (is_string($statusLine) && preg_match('/\\s(\\d{3})\\s/', $statusLine, $match)) {
-                $status = $match[1];
+        if (!is_array($decoded)) {
+            $status = '';
+            if (!empty($http_response_header) && is_array($http_response_header)) {
+                $statusLine = $http_response_header[0] ?? '';
+                if (is_string($statusLine) && preg_match('/\\s(\\d{3})\\s/', $statusLine, $match)) {
+                    $status = $match[1];
+                }
+            }
+            $snippet = $respText !== '' ? mb_substr($respText, 0, 160, 'UTF-8') : '';
+            $details = [];
+            if ($status !== '') {
+                $details[] = 'HTTP ' . $status;
+            }
+            if ($snippet !== '') {
+                $details[] = $snippet;
+            }
+            $detailText = !empty($details) ? ' (' . implode(' — ', $details) . ')' : '';
+            $lastError = new RuntimeException('Respuesta inválida de Bing Webmaster Tools' . $detailText . '.');
+            continue;
+        }
+        $payload = $decoded['d'] ?? $decoded;
+        if (is_array($payload)) {
+            $errorCode = $payload['ErrorCode'] ?? $payload['errorCode'] ?? null;
+            $errorMessage = $payload['ErrorMessage'] ?? $payload['message'] ?? $payload['Message'] ?? '';
+            if ($errorCode !== null && (int) $errorCode !== 0) {
+                $message = trim((string) $errorMessage);
+                $lastError = new RuntimeException($message !== '' ? $message : 'Error en Bing Webmaster Tools.');
+                continue;
             }
         }
-        $snippet = $respText !== '' ? mb_substr($respText, 0, 160, 'UTF-8') : '';
-        $details = [];
-        if ($status !== '') {
-            $details[] = 'HTTP ' . $status;
-        }
-        if ($snippet !== '') {
-            $details[] = $snippet;
-        }
-        $detailText = !empty($details) ? ' (' . implode(' — ', $details) . ')' : '';
-        throw new RuntimeException('Respuesta inválida de Bing Webmaster Tools' . $detailText . '.');
+        return $payload;
     }
-    $payload = $decoded['d'] ?? $decoded;
-    if (is_array($payload)) {
-        $errorCode = $payload['ErrorCode'] ?? $payload['errorCode'] ?? null;
-        $errorMessage = $payload['ErrorMessage'] ?? $payload['message'] ?? $payload['Message'] ?? '';
-        if ($errorCode !== null && (int) $errorCode !== 0) {
-            $message = trim((string) $errorMessage);
-            throw new RuntimeException($message !== '' ? $message : 'Error en Bing Webmaster Tools.');
-        }
-    }
-    return $payload;
+    throw $lastError ?? new RuntimeException('No se pudo conectar con Bing Webmaster Tools.');
 }
 
 function admin_bing_request_with_dates(string $method, array $baseParams, string $startDate, string $endDate): array {
@@ -1310,6 +1323,18 @@ function admin_bing_request_with_dates(string $method, array $baseParams, string
         $params['endDate'] = date($format, $endTs);
         try {
             return admin_bing_api_get($method, $params);
+        } catch (Throwable $e) {
+            $lastError = $e;
+        }
+    }
+    throw $lastError ?? new RuntimeException('No se pudo conectar con Bing Webmaster Tools.');
+}
+
+function admin_bing_request_with_dates_multi(array $methods, array $baseParams, string $startDate, string $endDate): array {
+    $lastError = null;
+    foreach ($methods as $method) {
+        try {
+            return admin_bing_request_with_dates($method, $baseParams, $startDate, $endDate);
         } catch (Throwable $e) {
             $lastError = $e;
         }
@@ -5634,12 +5659,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
         if ($bing_site_url !== '' && $bing_api_key !== '') {
             try {
-                $endDate = (new DateTimeImmutable('yesterday'))->format('Y-m-d');
-                $startDate = (new DateTimeImmutable('yesterday'))->modify('-7 days')->format('Y-m-d');
-                admin_bing_request_with_dates('GetSiteStats', [
+                $params = [
                     'apikey' => $bing_api_key,
                     'siteUrl' => $bing_site_url,
-                ], $startDate, $endDate);
+                ];
+                $tested = false;
+                try {
+                    admin_bing_api_get('GetWebmasterWidgetData', $params);
+                    $tested = true;
+                } catch (Throwable $e) {
+                    $tested = false;
+                }
+                if (!$tested) {
+                    $sitesPayload = admin_bing_api_get('GetSites', ['apikey' => $bing_api_key]);
+                    $sites = $sitesPayload['Sites'] ?? $sitesPayload['sites'] ?? [];
+                    $normalizedTarget = rtrim($bing_site_url, '/');
+                    $hasSite = false;
+                    if (is_array($sites)) {
+                        foreach ($sites as $siteItem) {
+                            $siteValue = is_array($siteItem) ? ($siteItem['Url'] ?? $siteItem['url'] ?? '') : '';
+                            if ($siteValue === '') {
+                                $siteValue = is_string($siteItem) ? $siteItem : '';
+                            }
+                            if ($siteValue !== '' && rtrim($siteValue, '/') === $normalizedTarget) {
+                                $hasSite = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!$hasSite) {
+                        throw new RuntimeException('La clave no tiene acceso al sitio indicado en Bing.');
+                    }
+                }
                 $feedback = [
                     'type' => 'success',
                     'message' => 'Conexión correcta con Bing Webmaster Tools.',

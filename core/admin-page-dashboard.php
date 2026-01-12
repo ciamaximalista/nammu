@@ -2259,7 +2259,7 @@
                     </div>
                 </div>
                 <?php if (!empty($sourceMainRows)): ?>
-                    <div class="card mb-4" id="gsc-dashboard">
+                    <div class="card mb-4">
                         <div class="card-body dashboard-stat-block">
                             <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Origen de los usuarios únicos (últimos 30 días)</h4>
                             <div class="table-responsive mb-3">
@@ -2322,8 +2322,13 @@
                         </div>
                     </div>
                 <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
                 <?php if ($gscProperty !== '' && $gscClientId !== '' && $gscClientSecret !== '' && $gscRefreshToken !== ''): ?>
-                    <div class="card mb-4">
+                    <div class="card mb-4" id="gsc-dashboard">
                         <div class="card-body">
                             <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Google Search Console</h4>
                             <?php if ($gscError !== ''): ?>

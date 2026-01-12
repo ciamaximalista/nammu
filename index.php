@@ -600,6 +600,46 @@ if ($routePath === '/podcast.xml') {
     exit;
 }
 
+if ($routePath === '/llms.txt') {
+    $base = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '';
+    $lines = [];
+    $lines[] = '# ' . ($siteNameForMeta !== '' ? $siteNameForMeta : $siteTitle);
+    if ($homeDescription !== '') {
+        $lines[] = '';
+        $lines[] = '## Resumen';
+        $lines[] = $homeDescription;
+    }
+    $lines[] = '';
+    $lines[] = '## Enlaces principales';
+    $lines[] = '- Portada: ' . ($base !== '' ? $base . '/' : '/');
+    $lines[] = '- Sitemap: ' . ($base !== '' ? $base . '/sitemap.xml' : '/sitemap.xml');
+    $lines[] = '- RSS: ' . ($base !== '' ? $base . '/rss.xml' : '/rss.xml');
+    $lines[] = '- Buscador: ' . ($base !== '' ? $base . '/buscar.php?q={termino}' : '/buscar.php?q={termino}');
+    if (!empty($itineraryListing)) {
+        $lines[] = '- Itinerarios: ' . ($base !== '' ? $base . '/itinerarios' : '/itinerarios');
+        $lines[] = '- RSS itinerarios: ' . ($base !== '' ? $base . '/itinerarios.xml' : '/itinerarios.xml');
+    }
+    if (!empty($hasPodcast)) {
+        $lines[] = '- Podcast: ' . ($base !== '' ? $base . '/podcast' : '/podcast');
+        $lines[] = '- RSS podcast: ' . ($base !== '' ? $base . '/podcast.xml' : '/podcast.xml');
+    }
+    $lines[] = '';
+    $lines[] = '## Notas para LLMs';
+    $lines[] = '- Usa las URLs canónicas del sitemap.';
+    $lines[] = '- Evita rutas de administración y archivos internos.';
+    $lines[] = '- Prefiere el RSS para contenidos recientes.';
+    $lines[] = '';
+    $lines[] = '## Actualización';
+    $lines[] = date('d/m/y');
+    $llmsText = implode("\n", $lines) . "\n";
+    header('Content-Type: text/plain; charset=UTF-8');
+    echo $llmsText;
+    if ($publicBaseUrl !== '') {
+        @file_put_contents(__DIR__ . '/llms.txt', $llmsText);
+    }
+    exit;
+}
+
 if ($routePath === '/sitemap.xml') {
     $posts = $contentRepository->all();
     $sitemapGenerator = new SitemapGenerator($publicBaseUrl);

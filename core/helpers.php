@@ -1648,6 +1648,9 @@ function nammu_build_social_meta(array $data, array $socialConfig): array
 
     if ($image !== '') {
         $properties['og:image'] = $image;
+        if ($title !== '') {
+            $properties['og:image:alt'] = $title;
+        }
     }
     if ($siteName !== '') {
         $properties['og:site_name'] = $siteName;
@@ -1678,6 +1681,9 @@ function nammu_build_social_meta(array $data, array $socialConfig): array
     }
     if ($image !== '') {
         $names['twitter:image'] = $image;
+        if ($title !== '') {
+            $names['twitter:image:alt'] = $title;
+        }
     }
     if (!empty($socialConfig['twitter'])) {
         $handle = $socialConfig['twitter'];

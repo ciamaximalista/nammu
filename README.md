@@ -28,6 +28,10 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 - Página “Plantilla” para elegir tipografías Google Fonts, colores, estilo de tarjetas, cabeceras de portada (texto, gráfico, mixtas) y comportamiento del TOC.
 - Footer editable con HTML libre, logotipos posicionables (arriba, abajo o ninguno) y radio global de esquinas.
 - `rss.xml` y `sitemap.xml` regenerados automáticamente desde `index.php`, con limpieza de `[toc]`, conversión de embeds a enlaces y `<enclosure>` para imágenes.
+- Tarjetas Open Graph y Twitter completas con imagen, títulos, descripciones y `alt` para mejorar la previsualización en redes.
+- Archivo `llms.txt` con enlaces y contexto para facilitar el uso del contenido por modelos de lenguaje.
+- Integración IndexNow para notificar nuevas entradas, páginas e itinerarios a buscadores compatibles.
+- Optimización SEO técnica con canónicos, datos estructurados y enlaces internos consistentes.
 - Botones contextuales en todas las cajas de búsqueda: índice de categorías, índice alfabético (modo diccionario) y, si hay cursos, acceso directo a `/itinerarios` con un icono de libro.
 
 ### Buscador avanzado e índices

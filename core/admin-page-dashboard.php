@@ -1610,7 +1610,8 @@
                 opacity: 0;
                 pointer-events: none;
             }
-            .gsc-period-input:checked + .gsc-period-label {
+            #gsc-period-28:checked ~ .gsc-buttons label[for="gsc-period-28"],
+            #gsc-period-7:checked ~ .gsc-buttons label[for="gsc-period-7"] {
                 background: #1b8eed;
                 color: #ffffff;
                 border-color: #1b8eed;
@@ -2338,10 +2339,10 @@
                                     <input type="hidden" name="gsc_refresh" value="1">
                                     <button type="submit" class="btn btn-outline-primary btn-sm">Actualizar datos ahora</button>
                                 </form>
-                                <div class="btn-group btn-group-sm mb-3 dashboard-toggle gsc-toggle" role="group">
-                                    <input type="radio" name="gsc-period" id="gsc-period-28" class="gsc-period-input" checked>
+                                <input type="radio" name="gsc-period" id="gsc-period-28" class="gsc-period-input" checked>
+                                <input type="radio" name="gsc-period" id="gsc-period-7" class="gsc-period-input">
+                                <div class="btn-group btn-group-sm mb-3 dashboard-toggle gsc-toggle gsc-buttons" role="group">
                                     <label class="btn btn-outline-secondary gsc-period-label" for="gsc-period-28">Últimos 28 días</label>
-                                    <input type="radio" name="gsc-period" id="gsc-period-7" class="gsc-period-input">
                                     <label class="btn btn-outline-secondary gsc-period-label" for="gsc-period-7">Últimos 7 días</label>
                                 </div>
                                 <div class="gsc-content">

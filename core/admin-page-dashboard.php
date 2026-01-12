@@ -101,11 +101,6 @@
     $bingQueries7 = [];
     $bingPages28 = [];
     $bingPages7 = [];
-    $bingCountries28 = [];
-    $bingCountries7 = [];
-    $bingSitemapInfo = [
-        'last_crawl' => '',
-    ];
     $bingError = '';
     $bingCachePath = dirname(__DIR__) . '/config/bing-cache.json';
     $bingCacheTtl = 24 * 60 * 60;
@@ -644,9 +639,6 @@
         $bingQueries7 = $bingCache['queries7'] ?? [];
         $bingPages28 = $bingCache['pages28'] ?? [];
         $bingPages7 = $bingCache['pages7'] ?? [];
-        $bingCountries28 = $bingCache['countries28'] ?? [];
-        $bingCountries7 = $bingCache['countries7'] ?? [];
-        $bingSitemapInfo = $bingCache['sitemap'] ?? ['last_crawl' => ''];
         $bingUpdatedAtLabel = !empty($bingCache['updated_at'])
             ? (new DateTimeImmutable('@' . (int) $bingCache['updated_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('d/m/y')
             : '';
@@ -762,40 +754,6 @@
             $bingPages28 = $bingNormalizeDimension($bingExtractRows($pages28Resp, ['PageStats', 'pageStats', 'PageQueryStats', 'pageQueryStats']), ['Page', 'Url', 'url'], 'page');
             $bingPages7 = $bingNormalizeDimension($bingExtractRows($pages7Resp, ['PageStats', 'pageStats', 'PageQueryStats', 'pageQueryStats']), ['Page', 'Url', 'url'], 'page');
 
-            try {
-                $countries28Resp = admin_bing_request_with_dates_multi(['GetCountryStats'], $baseParams, $start28, $endDate);
-                $countries7Resp = admin_bing_request_with_dates_multi(['GetCountryStats'], $baseParams, $start7, $endDate);
-                $bingCountries28 = $bingNormalizeDimension($bingExtractRows($countries28Resp, ['CountryStats', 'countryStats']), ['Country', 'country', 'CountryCode', 'countryCode'], 'country');
-                $bingCountries7 = $bingNormalizeDimension($bingExtractRows($countries7Resp, ['CountryStats', 'countryStats']), ['Country', 'country', 'CountryCode', 'countryCode'], 'country');
-            } catch (Throwable $e) {
-                $bingCountries28 = [];
-                $bingCountries7 = [];
-            }
-
-            try {
-                $sitemapsResp = admin_bing_api_get('GetSitemaps', $baseParams);
-                $rows = $bingExtractRows($sitemapsResp, ['Sitemaps', 'sitemaps', 'SitemapList', 'sitemapList']);
-                $latest = null;
-                foreach ($rows as $row) {
-                    if (!is_array($row)) {
-                        continue;
-                    }
-                    $dateValue = $row['LastDownloaded'] ?? $row['LastDownload'] ?? $row['LastCrawlDate'] ?? $row['DownloadDate'] ?? '';
-                    if ($dateValue === '') {
-                        continue;
-                    }
-                    $ts = strtotime((string) $dateValue);
-                    if ($ts !== false) {
-                        $latest = $latest === null ? $ts : max($latest, $ts);
-                    }
-                }
-                if ($latest !== null) {
-                    $bingSitemapInfo['last_crawl'] = date('d/m/y', $latest);
-                }
-            } catch (Throwable $e) {
-                $bingSitemapInfo['last_crawl'] = '';
-            }
-
             $cachePayload = [
                 'site_url' => $bingSiteUrl,
                 'updated_at' => time(),
@@ -805,9 +763,6 @@
                 'queries7' => $bingQueries7,
                 'pages28' => $bingPages28,
                 'pages7' => $bingPages7,
-                'countries28' => $bingCountries28,
-                'countries7' => $bingCountries7,
-                'sitemap' => $bingSitemapInfo,
             ];
             $cacheJson = json_encode($cachePayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
             if ($cacheJson !== false) {
@@ -822,9 +777,6 @@
                 $bingQueries7 = $bingCache['queries7'] ?? [];
                 $bingPages28 = $bingCache['pages28'] ?? [];
                 $bingPages7 = $bingCache['pages7'] ?? [];
-                $bingCountries28 = $bingCache['countries28'] ?? [];
-                $bingCountries7 = $bingCache['countries7'] ?? [];
-                $bingSitemapInfo = $bingCache['sitemap'] ?? ['last_crawl' => ''];
                 $bingUpdatedAtLabel = !empty($bingCache['updated_at'])
                     ? (new DateTimeImmutable('@' . (int) $bingCache['updated_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('d/m/y')
                     : '';
@@ -2894,12 +2846,12 @@
                                     <button type="submit" class="btn btn-outline-primary btn-sm">Actualizar datos ahora</button>
                                 </form>
                                 <div class="btn-group btn-group-sm mb-3 dashboard-toggle bing-toggle bing-buttons" role="group" data-stat-toggle="bing-period" data-stat-scope="bing-period" data-stat-toggle-type="period">
-                                    <label class="btn btn-outline-secondary bing-period-label active" for="bing-period-28" data-stat-period="28">Últimos 28 días</label>
-                                    <label class="btn btn-outline-secondary bing-period-label" for="bing-period-7" data-stat-period="7">Últimos 7 días</label>
+                                    <button type="button" class="btn btn-outline-secondary bing-period-label active" data-stat-period="28">Últimos 28 días</button>
+                                    <button type="button" class="btn btn-outline-secondary bing-period-label" data-stat-period="7">Últimos 7 días</button>
                                 </div>
                                 <div class="bing-content">
                                 <div class="table-responsive mb-3">
-                                    <table class="table table-sm mb-0 bing-period-28" data-bing-period="28" data-stat-list data-stat-scope="bing-period" data-stat-period="28">
+                                    <table class="table table-sm mb-0 bing-period-28" data-stat-list data-stat-scope="bing-period" data-stat-period="28">
                                         <tbody>
                                             <tr>
                                                 <td>Clicks totales</td>
@@ -2915,7 +2867,7 @@
                                             </tr>
                                         </tbody>
                                     </table>
-                                    <table class="table table-sm mb-0 bing-period-7 d-none" data-bing-period="7" data-stat-list data-stat-scope="bing-period" data-stat-period="7">
+                                    <table class="table table-sm mb-0 bing-period-7 d-none" data-stat-list data-stat-scope="bing-period" data-stat-period="7">
                                         <tbody>
                                             <tr>
                                                 <td>Clicks totales</td>
@@ -2979,9 +2931,7 @@
                                         </table>
                                     </div>
                                 <?php endif; ?>
-                                <?php if (!empty($bingPages7) || !empty($bingPages28)): ?>
-                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Páginas más clicadas</p>
-                                <?php endif; ?>
+                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Páginas más clicadas</p>
                                 <?php if (!empty($bingPages7)): ?>
                                     <div class="table-responsive mb-3 bing-period-7 d-none" data-stat-list data-stat-scope="bing-period" data-stat-period="7">
                                         <table class="table table-sm mb-0">
@@ -3061,6 +3011,9 @@
                                             </tbody>
                                         </table>
                                     </div>
+                                <?php endif; ?>
+                                <?php if (empty($bingPages7) && empty($bingPages28)): ?>
+                                    <p class="text-muted mb-0">Sin datos de páginas todavía.</p>
                                 <?php endif; ?>
                                 </div>
                             <?php endif; ?>

@@ -3150,8 +3150,11 @@
                     if (!period) {
                         return;
                     }
-                    bingDashboard.querySelectorAll('[data-stat-list][data-stat-scope="bing-period"]').forEach(function(list) {
-                        list.classList.toggle('d-none', list.getAttribute('data-stat-period') !== period);
+                    bingDashboard.querySelectorAll('.bing-period-7').forEach(function(item) {
+                        item.classList.toggle('d-none', period !== '7');
+                    });
+                    bingDashboard.querySelectorAll('.bing-period-28').forEach(function(item) {
+                        item.classList.toggle('d-none', period !== '28');
                     });
                 };
                 bingButtons.forEach(function(button) {

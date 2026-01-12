@@ -1686,7 +1686,35 @@
         </div>
 
         <div class="row">
-            <div class="col-lg-4">
+            <div class="col-lg-4 order-lg-2">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Suscriptores</h4>
+                        <?php if ($avisosPostsCount > 0): ?>
+                            <p class="mb-2"><strong>Avisos entradas:</strong> <?= (int) $avisosPostsCount ?></p>
+                        <?php endif; ?>
+                        <?php if ($avisosItinerariesCount > 0): ?>
+                            <p class="mb-2"><strong>Avisos itinerarios:</strong> <?= (int) $avisosItinerariesCount ?></p>
+                        <?php endif; ?>
+                        <?php if ($avisosPodcastCount > 0): ?>
+                            <p class="mb-2"><strong>Avisos podcast:</strong> <?= (int) $avisosPodcastCount ?></p>
+                        <?php endif; ?>
+                        <?php if ($newsletterSubscriberCount > 0): ?>
+                            <p class="mb-2"><strong>Newsletter:</strong> <?= (int) $newsletterSubscriberCount ?></p>
+                        <?php endif; ?>
+                        <?php if ($postalSubscriberCount > 0): ?>
+                            <p class="mb-2"><strong>Correo postal:</strong> <?= (int) $postalSubscriberCount ?></p>
+                        <?php endif; ?>
+                        <?php if ($pushEnabled && $pushSubscriberCount > 0): ?>
+                            <p class="mb-2"><strong>Notificaciones Push:</strong> <?= (int) $pushSubscriberCount ?></p>
+                        <?php endif; ?>
+                        <?php if (!empty($socialCounts)): ?>
+                            <?php foreach ($socialCounts as $label => $count): ?>
+                                <p class="mb-2"><strong><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>:</strong> <?= (int) $count ?></p>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
                 <div class="card mb-4 dashboard-stat-block">
                     <div class="card-body">
                         <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Publicaciones</h4>
@@ -1735,88 +1763,6 @@
                         <?php if ($resourceCounts['others'] > 0): ?>
                             <p class="mb-0"><strong>Otros:</strong> <?= (int) $resourceCounts['others'] ?></p>
                         <?php endif; ?>
-                    </div>
-                </div>
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Suscriptores</h4>
-                        <?php if ($avisosPostsCount > 0): ?>
-                            <p class="mb-2"><strong>Avisos entradas:</strong> <?= (int) $avisosPostsCount ?></p>
-                        <?php endif; ?>
-                        <?php if ($avisosItinerariesCount > 0): ?>
-                            <p class="mb-2"><strong>Avisos itinerarios:</strong> <?= (int) $avisosItinerariesCount ?></p>
-                        <?php endif; ?>
-                        <?php if ($avisosPodcastCount > 0): ?>
-                            <p class="mb-2"><strong>Avisos podcast:</strong> <?= (int) $avisosPodcastCount ?></p>
-                        <?php endif; ?>
-                        <?php if ($newsletterSubscriberCount > 0): ?>
-                            <p class="mb-2"><strong>Newsletter:</strong> <?= (int) $newsletterSubscriberCount ?></p>
-                        <?php endif; ?>
-                        <?php if ($postalSubscriberCount > 0): ?>
-                            <p class="mb-2"><strong>Correo postal:</strong> <?= (int) $postalSubscriberCount ?></p>
-                        <?php endif; ?>
-                        <?php if ($pushEnabled && $pushSubscriberCount > 0): ?>
-                            <p class="mb-2"><strong>Notificaciones Push:</strong> <?= (int) $pushSubscriberCount ?></p>
-                        <?php endif; ?>
-                        <?php if (!empty($socialCounts)): ?>
-                            <?php foreach ($socialCounts as $label => $count): ?>
-                                <p class="mb-2"><strong><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>:</strong> <?= (int) $count ?></p>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
-                </div>
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Usuarios únicos humanos</h4>
-                        <p class="mb-3"><strong>Hoy:</strong> <?= (int) $todayCount ?></p>
-
-                        <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Últimos 7 días</p>
-                        <div class="table-responsive mb-3">
-                            <table class="table table-sm mb-0">
-                                <tbody>
-                                    <?php foreach ($last7DailyList as $item): ?>
-                                        <tr>
-                                            <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
-                                            <td class="text-right"><?= (int) $item['count'] ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Últimos 12 meses</p>
-                        <div class="table-responsive mb-3">
-                            <table class="table table-sm mb-0">
-                                <tbody>
-                                    <?php foreach ($last12MonthsList as $item): ?>
-                                        <tr>
-                                            <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
-                                            <td class="text-right"><?= (int) $item['count'] ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Años</p>
-                        <div class="table-responsive">
-                            <table class="table table-sm mb-0">
-                                <tbody>
-                                    <?php if (empty($yearList)): ?>
-                                        <tr>
-                                            <td colspan="2" class="text-muted">Sin datos todavía.</td>
-                                        </tr>
-                                    <?php else: ?>
-                                        <?php foreach ($yearList as $item): ?>
-                                            <tr>
-                                                <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
-                                                <td class="text-right"><?= (int) $item['count'] ?></td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
                     </div>
                 </div>
                 <div class="card mb-4">
@@ -1918,7 +1864,61 @@
                 </div>
             </div>
 
-            <div class="col-lg-8">
+            <div class="col-lg-8 order-lg-1">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Usuarios únicos humanos</h4>
+                        <p class="mb-3"><strong>Hoy:</strong> <?= (int) $todayCount ?></p>
+
+                        <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Últimos 7 días</p>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm mb-0">
+                                <tbody>
+                                    <?php foreach ($last7DailyList as $item): ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td class="text-right"><?= (int) $item['count'] ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Últimos 12 meses</p>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm mb-0">
+                                <tbody>
+                                    <?php foreach ($last12MonthsList as $item): ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td class="text-right"><?= (int) $item['count'] ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Años</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <tbody>
+                                    <?php if (empty($yearList)): ?>
+                                        <tr>
+                                            <td colspan="2" class="text-muted">Sin datos todavía.</td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <?php foreach ($yearList as $item): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                <td class="text-right"><?= (int) $item['count'] ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
                 <?php
                 $hasPostStats = !empty($topPosts) || !empty($topPostsByUnique)
                     || !empty($topPostsWeek) || !empty($topPostsWeekByUnique)
@@ -2311,7 +2311,7 @@
                                     <input type="hidden" name="gsc_refresh" value="1">
                                     <button type="submit" class="btn btn-outline-primary btn-sm">Actualizar datos ahora</button>
                                 </form>
-                                <div class="btn-group btn-group-sm mb-3" role="group" data-gsc-toggle>
+                                <div class="btn-group btn-group-sm mb-3 dashboard-toggle" role="group" data-gsc-toggle>
                                     <button type="button" class="btn btn-outline-secondary active" data-gsc-period="28">Últimos 28 días</button>
                                     <button type="button" class="btn btn-outline-secondary" data-gsc-period="7">Últimos 7 días</button>
                                 </div>
@@ -2369,7 +2369,7 @@
                                 </div>
                                 <?php if (!empty($gscQueries28) || !empty($gscQueries7)): ?>
                                     <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Términos más clicados</p>
-                                    <div class="btn-group btn-group-sm mb-3" role="group" data-gsc-toggle>
+                                    <div class="btn-group btn-group-sm mb-3 dashboard-toggle" role="group" data-gsc-toggle>
                                         <button type="button" class="btn btn-outline-secondary active" data-gsc-period="28">Últimos 28 días</button>
                                         <button type="button" class="btn btn-outline-secondary" data-gsc-period="7">Últimos 7 días</button>
                                     </div>
@@ -2420,7 +2420,7 @@
                                 <?php endif; ?>
                                 <?php if (!empty($gscPages7) || !empty($gscPages28)): ?>
                                     <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Páginas más clicadas</p>
-                                    <div class="btn-group btn-group-sm mb-3" role="group" data-gsc-toggle>
+                                    <div class="btn-group btn-group-sm mb-3 dashboard-toggle" role="group" data-gsc-toggle>
                                         <button type="button" class="btn btn-outline-secondary active" data-gsc-period="28">Últimos 28 días</button>
                                         <button type="button" class="btn btn-outline-secondary" data-gsc-period="7">Últimos 7 días</button>
                                     </div>
@@ -2507,7 +2507,7 @@
                                 <?php endif; ?>
                                 <?php if (!empty($gscCountries7) || !empty($gscCountries28)): ?>
                                     <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Principales países</p>
-                                    <div class="btn-group btn-group-sm mb-3" role="group" data-gsc-toggle>
+                                    <div class="btn-group btn-group-sm mb-3 dashboard-toggle" role="group" data-gsc-toggle>
                                         <button type="button" class="btn btn-outline-secondary active" data-gsc-period="28">Últimos 28 días</button>
                                         <button type="button" class="btn btn-outline-secondary" data-gsc-period="7">Últimos 7 días</button>
                                     </div>

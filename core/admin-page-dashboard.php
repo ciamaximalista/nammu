@@ -3143,6 +3143,25 @@
                     }
                 }
             });
+            var bingDashboard = document.getElementById('bing-dashboard');
+            if (bingDashboard) {
+                var bingButtons = bingDashboard.querySelectorAll('[data-stat-toggle="bing-period"] [data-stat-period]');
+                var setBingPeriod = function(period) {
+                    if (!period) {
+                        return;
+                    }
+                    bingDashboard.querySelectorAll('[data-stat-list][data-stat-scope="bing-period"]').forEach(function(list) {
+                        list.classList.toggle('d-none', list.getAttribute('data-stat-period') !== period);
+                    });
+                };
+                bingButtons.forEach(function(button) {
+                    button.addEventListener('click', function() {
+                        var period = button.getAttribute('data-stat-period');
+                        setBingPeriod(period);
+                    });
+                });
+                setBingPeriod('28');
+            }
             // GSC toggle uses CSS radios.
         })();
     </script>

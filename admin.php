@@ -1243,7 +1243,7 @@ function admin_gsc_get(string $accessToken, string $url): array {
 }
 
 function admin_bing_api_get(string $method, array $params): array {
-    $base = 'https://ssl.bing.com/webmaster/api.svc/json/';
+    $base = 'https://www.bing.com/webmasters/api.svc/json/';
     $method = ltrim($method, '/');
     $url = $base . $method . '?' . http_build_query($params);
     $opts = [

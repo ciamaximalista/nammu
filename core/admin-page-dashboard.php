@@ -337,10 +337,22 @@
             return '';
         }
         if (strlen($code) === 2) {
-            return $gscCountryNames[$code] ?? '';
+            if (isset($gscCountryNames[$code])) {
+                return $gscCountryNames[$code];
+            }
+            if (function_exists('locale_get_display_region')) {
+                $localized = locale_get_display_region('es_' . $code);
+                if (is_string($localized) && $localized !== '' && $localized !== $code) {
+                    return $localized;
+                }
+            }
+            return '';
         }
         if (strlen($code) === 3) {
-            return $gscCountryNames3[$code] ?? '';
+            if (isset($gscCountryNames3[$code])) {
+                return $gscCountryNames3[$code];
+            }
+            return '';
         }
         return $value;
     };
@@ -2550,6 +2562,15 @@
     <script>
         (function() {
             function updateBlock(block) {
+                function applyScopePeriod(scope, period) {
+                    if (!scope || !period) {
+                        return;
+                    }
+                    block.querySelectorAll('[data-stat-list][data-stat-scope="' + scope + '"][data-stat-period]').forEach(function(list) {
+                        list.classList.toggle('d-none', list.getAttribute('data-stat-period') !== period);
+                    });
+                }
+
                 var periodByScope = {};
                 var modeByScope = {};
 
@@ -2579,6 +2600,10 @@
                         match = false;
                     }
                     list.classList.toggle('d-none', !match);
+                });
+
+                Object.keys(periodByScope).forEach(function(scope) {
+                    applyScopePeriod(scope, periodByScope[scope]);
                 });
 
                 block.querySelectorAll('table[data-stat-list]').forEach(function(table) {
@@ -2622,16 +2647,6 @@
                 var block = group.closest('.dashboard-stat-block');
                 if (block) {
                     updateBlock(block);
-                    var scope = group.getAttribute('data-stat-scope') || '';
-                    if (scope && btn.hasAttribute('data-stat-period')) {
-                        var period = btn.getAttribute('data-stat-period');
-                        block.querySelectorAll('[data-stat-list][data-stat-scope="' + scope + '"]').forEach(function(list) {
-                            if (!list.hasAttribute('data-stat-period')) {
-                                return;
-                            }
-                            list.classList.toggle('d-none', list.getAttribute('data-stat-period') !== period);
-                        });
-                    }
                 }
             });
         })();

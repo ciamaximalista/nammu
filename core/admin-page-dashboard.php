@@ -66,10 +66,14 @@
     $gscClientId = trim((string) ($gscSettings['client_id'] ?? ''));
     $gscClientSecret = trim((string) ($gscSettings['client_secret'] ?? ''));
     $gscRefreshToken = trim((string) ($gscSettings['refresh_token'] ?? ''));
-    $gscTotals3m = null;
     $gscTotals28 = null;
-    $gscQueries3m = [];
+    $gscTotals7 = null;
     $gscQueries28 = [];
+    $gscQueries7 = [];
+    $gscPages28 = [];
+    $gscPages7 = [];
+    $gscCountries28 = [];
+    $gscCountries7 = [];
     $gscSitemapInfo = [
         'last_crawl' => '',
     ];
@@ -94,10 +98,14 @@
         && isset($gscCache['updated_at']);
     $gscCacheFresh = $gscCacheValid && (time() - (int) $gscCache['updated_at']) < $gscCacheTtl;
     if ($gscCacheFresh) {
-        $gscTotals3m = $gscCache['totals3m'] ?? null;
         $gscTotals28 = $gscCache['totals28'] ?? null;
-        $gscQueries3m = $gscCache['queries3m'] ?? [];
+        $gscTotals7 = $gscCache['totals7'] ?? null;
         $gscQueries28 = $gscCache['queries28'] ?? [];
+        $gscQueries7 = $gscCache['queries7'] ?? [];
+        $gscPages28 = $gscCache['pages28'] ?? [];
+        $gscPages7 = $gscCache['pages7'] ?? [];
+        $gscCountries28 = $gscCache['countries28'] ?? [];
+        $gscCountries7 = $gscCache['countries7'] ?? [];
         $gscSitemapInfo = $gscCache['sitemap'] ?? ['last_crawl' => ''];
         $gscUpdatedAtLabel = !empty($gscCache['updated_at'])
             ? (new DateTimeImmutable('@' . (int) $gscCache['updated_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('d/m/y')
@@ -111,7 +119,7 @@
             }
             $endDate = $today->format('Y-m-d');
             $start28 = $today->modify('-27 days')->format('Y-m-d');
-            $start3m = $today->modify('-3 months')->format('Y-m-d');
+            $start7 = $today->modify('-6 days')->format('Y-m-d');
             $normalizeTotals = static function (array $response): array {
                 $row = [];
                 if (isset($response['rows'][0]) && is_array($response['rows'][0])) {
@@ -124,10 +132,10 @@
                     'position' => (float) ($row['position'] ?? 0),
                 ];
             };
-            $totals3mResp = admin_gsc_query($accessToken, $gscProperty, $start3m, $endDate, [], 1);
             $totals28Resp = admin_gsc_query($accessToken, $gscProperty, $start28, $endDate, [], 1);
-            $gscTotals3m = $normalizeTotals($totals3mResp);
+            $totals7Resp = admin_gsc_query($accessToken, $gscProperty, $start7, $endDate, [], 1);
             $gscTotals28 = $normalizeTotals($totals28Resp);
+            $gscTotals7 = $normalizeTotals($totals7Resp);
             $normalizeQueries = static function (array $response): array {
                 $rows = $response['rows'] ?? [];
                 if (!is_array($rows)) {
@@ -158,10 +166,48 @@
                 });
                 return array_slice($output, 0, 10);
             };
-            $queries3mResp = admin_gsc_query($accessToken, $gscProperty, $start3m, $endDate, ['query'], 50);
             $queries28Resp = admin_gsc_query($accessToken, $gscProperty, $start28, $endDate, ['query'], 50);
-            $gscQueries3m = $normalizeQueries($queries3mResp);
+            $queries7Resp = admin_gsc_query($accessToken, $gscProperty, $start7, $endDate, ['query'], 50);
             $gscQueries28 = $normalizeQueries($queries28Resp);
+            $gscQueries7 = $normalizeQueries($queries7Resp);
+            $normalizeDimensions = static function (array $response, string $labelKey): array {
+                $rows = $response['rows'] ?? [];
+                if (!is_array($rows)) {
+                    return [];
+                }
+                $output = [];
+                foreach ($rows as $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    $keys = $row['keys'] ?? [];
+                    $label = is_array($keys) ? (string) ($keys[0] ?? '') : '';
+                    $label = trim($label);
+                    if ($label === '') {
+                        continue;
+                    }
+                    $output[] = [
+                        $labelKey => $label,
+                        'clicks' => (int) round((float) ($row['clicks'] ?? 0)),
+                        'impressions' => (int) round((float) ($row['impressions'] ?? 0)),
+                    ];
+                }
+                usort($output, static function (array $a, array $b): int {
+                    if ($a['clicks'] === $b['clicks']) {
+                        return $b['impressions'] <=> $a['impressions'];
+                    }
+                    return $b['clicks'] <=> $a['clicks'];
+                });
+                return array_slice($output, 0, 10);
+            };
+            $pages7Resp = admin_gsc_query($accessToken, $gscProperty, $start7, $endDate, ['page'], 50);
+            $pages28Resp = admin_gsc_query($accessToken, $gscProperty, $start28, $endDate, ['page'], 50);
+            $countries7Resp = admin_gsc_query($accessToken, $gscProperty, $start7, $endDate, ['country'], 50);
+            $countries28Resp = admin_gsc_query($accessToken, $gscProperty, $start28, $endDate, ['country'], 50);
+            $gscPages7 = $normalizeDimensions($pages7Resp, 'page');
+            $gscPages28 = $normalizeDimensions($pages28Resp, 'page');
+            $gscCountries7 = $normalizeDimensions($countries7Resp, 'country');
+            $gscCountries28 = $normalizeDimensions($countries28Resp, 'country');
             $sitemapUrl = '';
             $baseUrlValue = $settings['site_url'] ?? '';
             if (!is_string($baseUrlValue)) {
@@ -191,10 +237,14 @@
             $cachePayload = [
                 'property' => $gscProperty,
                 'updated_at' => time(),
-                'totals3m' => $gscTotals3m,
                 'totals28' => $gscTotals28,
-                'queries3m' => $gscQueries3m,
+                'totals7' => $gscTotals7,
                 'queries28' => $gscQueries28,
+                'queries7' => $gscQueries7,
+                'pages28' => $gscPages28,
+                'pages7' => $gscPages7,
+                'countries28' => $gscCountries28,
+                'countries7' => $gscCountries7,
                 'sitemap' => $gscSitemapInfo,
             ];
             $cacheJson = json_encode($cachePayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
@@ -204,10 +254,14 @@
             $gscUpdatedAtLabel = (new DateTimeImmutable('now'))->format('d/m/y');
         } catch (Throwable $e) {
             if ($gscCacheValid) {
-                $gscTotals3m = $gscCache['totals3m'] ?? null;
                 $gscTotals28 = $gscCache['totals28'] ?? null;
-                $gscQueries3m = $gscCache['queries3m'] ?? [];
+                $gscTotals7 = $gscCache['totals7'] ?? null;
                 $gscQueries28 = $gscCache['queries28'] ?? [];
+                $gscQueries7 = $gscCache['queries7'] ?? [];
+                $gscPages28 = $gscCache['pages28'] ?? [];
+                $gscPages7 = $gscCache['pages7'] ?? [];
+                $gscCountries28 = $gscCache['countries28'] ?? [];
+                $gscCountries7 = $gscCache['countries7'] ?? [];
                 $gscSitemapInfo = $gscCache['sitemap'] ?? ['last_crawl' => ''];
                 $gscUpdatedAtLabel = !empty($gscCache['updated_at'])
                     ? (new DateTimeImmutable('@' . (int) $gscCache['updated_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('d/m/y')
@@ -1843,7 +1897,7 @@
                 </div>
                 <?php if (!empty($sourceMainRows)): ?>
                     <div class="card mb-4">
-                        <div class="card-body">
+                        <div class="card-body dashboard-stat-block">
                             <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Origen de los usuarios únicos (últimos 30 días)</h4>
                             <div class="table-responsive mb-3">
                                 <table class="table table-sm mb-0">
@@ -1911,41 +1965,54 @@
                             <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Google Search Console</h4>
                             <?php if ($gscError !== ''): ?>
                                 <p class="text-muted mb-0"><?= htmlspecialchars($gscError, ENT_QUOTES, 'UTF-8') ?></p>
-                            <?php elseif ($gscTotals3m === null || $gscTotals28 === null): ?>
+                            <?php elseif ($gscTotals7 === null || $gscTotals28 === null): ?>
                                 <p class="text-muted mb-0">Sin datos disponibles.</p>
                             <?php else: ?>
                                 <?php if ($gscUpdatedAtLabel !== ''): ?>
                                     <p class="text-muted mb-2">Datos servidos por Google Search Console API el <?= htmlspecialchars($gscUpdatedAtLabel, ENT_QUOTES, 'UTF-8') ?></p>
                                 <?php endif; ?>
+                                <div class="btn-group btn-group-sm mb-3" role="group" data-stat-toggle data-stat-toggle-type="period">
+                                    <button type="button" class="btn btn-outline-secondary active" data-stat-period="28">Últimos 28 días</button>
+                                    <button type="button" class="btn btn-outline-secondary" data-stat-period="7">Últimos 7 días</button>
+                                </div>
                                 <div class="table-responsive mb-3">
-                                    <table class="table table-sm mb-0">
-                                        <thead>
-                                            <tr>
-                                                <th></th>
-                                                <th class="text-right">Últimos 3 meses</th>
-                                                <th class="text-right">Últimos 28 días</th>
-                                            </tr>
-                                        </thead>
+                                    <table class="table table-sm mb-0" data-stat-list data-stat-period="28">
                                         <tbody>
                                             <tr>
                                                 <td>Clicks totales</td>
-                                                <td class="text-right"><?= (int) $gscTotals3m['clicks'] ?></td>
                                                 <td class="text-right"><?= (int) $gscTotals28['clicks'] ?></td>
                                             </tr>
                                             <tr>
                                                 <td>Impresiones totales</td>
-                                                <td class="text-right"><?= (int) $gscTotals3m['impressions'] ?></td>
                                                 <td class="text-right"><?= (int) $gscTotals28['impressions'] ?></td>
                                             </tr>
                                             <tr>
                                                 <td>CTR medio</td>
-                                                <td class="text-right"><?= number_format($gscTotals3m['ctr'] * 100, 2, ',', '.') ?>%</td>
                                                 <td class="text-right"><?= number_format($gscTotals28['ctr'] * 100, 2, ',', '.') ?>%</td>
                                             </tr>
                                             <tr>
                                                 <td>Posición media</td>
-                                                <td class="text-right"><?= number_format($gscTotals3m['position'], 1, ',', '.') ?></td>
                                                 <td class="text-right"><?= number_format($gscTotals28['position'], 1, ',', '.') ?></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <table class="table table-sm mb-0 d-none" data-stat-list data-stat-period="7">
+                                        <tbody>
+                                            <tr>
+                                                <td>Clicks totales</td>
+                                                <td class="text-right"><?= (int) $gscTotals7['clicks'] ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td>Impresiones totales</td>
+                                                <td class="text-right"><?= (int) $gscTotals7['impressions'] ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td>CTR medio</td>
+                                                <td class="text-right"><?= number_format($gscTotals7['ctr'] * 100, 2, ',', '.') ?>%</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Posición media</td>
+                                                <td class="text-right"><?= number_format($gscTotals7['position'], 1, ',', '.') ?></td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -1960,32 +2027,9 @@
                                         </tbody>
                                     </table>
                                 </div>
-                                <?php if (!empty($gscQueries3m)): ?>
-                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Términos más clicados (últimos 3 meses)</p>
-                                    <div class="table-responsive mb-3">
-                                        <table class="table table-sm mb-0">
-                                            <thead>
-                                                <tr>
-                                                    <th>Término</th>
-                                                    <th class="text-right">Clicks</th>
-                                                    <th class="text-right">Impresiones</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($gscQueries3m as $row): ?>
-                                                    <tr>
-                                                        <td><?= htmlspecialchars($row['term'], ENT_QUOTES, 'UTF-8') ?></td>
-                                                        <td class="text-right"><?= (int) $row['clicks'] ?></td>
-                                                        <td class="text-right"><?= (int) $row['impressions'] ?></td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                <?php endif; ?>
                                 <?php if (!empty($gscQueries28)): ?>
-                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Términos más clicados (últimos 28 días)</p>
-                                    <div class="table-responsive">
+                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title" data-stat-list data-stat-period="28">Términos más clicados (últimos 28 días)</p>
+                                    <div class="table-responsive" data-stat-list data-stat-period="28">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -1998,6 +2042,121 @@
                                                 <?php foreach ($gscQueries28 as $row): ?>
                                                     <tr>
                                                         <td><?= htmlspecialchars($row['term'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                        <td class="text-right"><?= (int) $row['clicks'] ?></td>
+                                                        <td class="text-right"><?= (int) $row['impressions'] ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($gscQueries7)): ?>
+                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title d-none" data-stat-list data-stat-period="7">Términos más clicados (últimos 7 días)</p>
+                                    <div class="table-responsive d-none" data-stat-list data-stat-period="7">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Término</th>
+                                                    <th class="text-right">Clicks</th>
+                                                    <th class="text-right">Impresiones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($gscQueries7 as $row): ?>
+                                                    <tr>
+                                                        <td><?= htmlspecialchars($row['term'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                        <td class="text-right"><?= (int) $row['clicks'] ?></td>
+                                                        <td class="text-right"><?= (int) $row['impressions'] ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($gscPages7)): ?>
+                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title d-none" data-stat-list data-stat-period="7">Páginas más clicadas (últimos 7 días)</p>
+                                    <div class="table-responsive mb-3 d-none" data-stat-list data-stat-period="7">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Página</th>
+                                                    <th class="text-right">Clicks</th>
+                                                    <th class="text-right">Impresiones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($gscPages7 as $row): ?>
+                                                    <tr>
+                                                        <td class="text-truncate"><?= htmlspecialchars($row['page'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                        <td class="text-right"><?= (int) $row['clicks'] ?></td>
+                                                        <td class="text-right"><?= (int) $row['impressions'] ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($gscPages28)): ?>
+                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title" data-stat-list data-stat-period="28">Páginas más clicadas (últimos 28 días)</p>
+                                    <div class="table-responsive mb-3" data-stat-list data-stat-period="28">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Página</th>
+                                                    <th class="text-right">Clicks</th>
+                                                    <th class="text-right">Impresiones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($gscPages28 as $row): ?>
+                                                    <tr>
+                                                        <td class="text-truncate"><?= htmlspecialchars($row['page'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                        <td class="text-right"><?= (int) $row['clicks'] ?></td>
+                                                        <td class="text-right"><?= (int) $row['impressions'] ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($gscCountries7)): ?>
+                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title d-none" data-stat-list data-stat-period="7">Principales países (últimos 7 días)</p>
+                                    <div class="table-responsive mb-3 d-none" data-stat-list data-stat-period="7">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>País</th>
+                                                    <th class="text-right">Clicks</th>
+                                                    <th class="text-right">Impresiones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($gscCountries7 as $row): ?>
+                                                    <tr>
+                                                        <td><?= htmlspecialchars($row['country'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                        <td class="text-right"><?= (int) $row['clicks'] ?></td>
+                                                        <td class="text-right"><?= (int) $row['impressions'] ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($gscCountries28)): ?>
+                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title" data-stat-list data-stat-period="28">Principales países (últimos 28 días)</p>
+                                    <div class="table-responsive" data-stat-list data-stat-period="28">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>País</th>
+                                                    <th class="text-right">Clicks</th>
+                                                    <th class="text-right">Impresiones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($gscCountries28 as $row): ?>
+                                                    <tr>
+                                                        <td><?= htmlspecialchars($row['country'], ENT_QUOTES, 'UTF-8') ?></td>
                                                         <td class="text-right"><?= (int) $row['clicks'] ?></td>
                                                         <td class="text-right"><?= (int) $row['impressions'] ?></td>
                                                     </tr>

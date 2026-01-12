@@ -2182,7 +2182,6 @@
                                     <?php endforeach; ?>
                                 </ol>
                             <?php endif; ?>
-                            </div>
                         </div>
                     </div>
                 <?php endif; ?>
@@ -2190,13 +2189,13 @@
                 <?php if ($pageCount > 0): ?>
                     <div class="card mb-4 dashboard-stat-block">
                         <div class="card-body">
-                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Páginas más leídas</h4>
-                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="mode">
-                                    <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
-                                    <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
-                                </div>
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                            <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Páginas más leídas</h4>
+                            <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle mt-2" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="mode">
+                                <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
+                                <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
                             </div>
+                        </div>
                             <?php if (empty($topPages) && empty($topPagesByUnique)): ?>
                                 <p class="text-muted mb-0">Sin datos todavía.</p>
                             <?php else: ?>
@@ -2231,7 +2230,7 @@
                     <div class="card-body">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                             <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Búsquedas internas más frecuentes (últimos 30 días)</h4>
-                            <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="internal-search" data-stat-toggle-type="mode">
+                            <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle mt-2" role="group" data-stat-toggle="internal-search" data-stat-toggle-type="mode">
                                 <button type="button" class="btn btn-outline-primary active" data-stat-mode="searches">Búsquedas</button>
                                 <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
                             </div>

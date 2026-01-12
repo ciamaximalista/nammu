@@ -171,6 +171,222 @@
                 });
                 return array_slice($output, 0, 10);
             };
+            $countryNames = [
+                'AD' => 'Andorra',
+                'AE' => 'Emiratos Arabes Unidos',
+                'AF' => 'Afganistan',
+                'AG' => 'Antigua y Barbuda',
+                'AI' => 'Anguila',
+                'AL' => 'Albania',
+                'AM' => 'Armenia',
+                'AO' => 'Angola',
+                'AR' => 'Argentina',
+                'AS' => 'Samoa Americana',
+                'AT' => 'Austria',
+                'AU' => 'Australia',
+                'AW' => 'Aruba',
+                'AZ' => 'Azerbaiyan',
+                'BA' => 'Bosnia y Herzegovina',
+                'BB' => 'Barbados',
+                'BD' => 'Banglades',
+                'BE' => 'Belgica',
+                'BF' => 'Burkina Faso',
+                'BG' => 'Bulgaria',
+                'BH' => 'Barein',
+                'BI' => 'Burundi',
+                'BJ' => 'Benin',
+                'BM' => 'Bermudas',
+                'BN' => 'Brunei',
+                'BO' => 'Bolivia',
+                'BR' => 'Brasil',
+                'BS' => 'Bahamas',
+                'BT' => 'Butan',
+                'BW' => 'Botsuana',
+                'BY' => 'Bielorrusia',
+                'BZ' => 'Belice',
+                'CA' => 'Canada',
+                'CD' => 'Republica Democratica del Congo',
+                'CF' => 'Republica Centroafricana',
+                'CG' => 'Republica del Congo',
+                'CH' => 'Suiza',
+                'CI' => 'Costa de Marfil',
+                'CL' => 'Chile',
+                'CM' => 'Camerun',
+                'CN' => 'China',
+                'CO' => 'Colombia',
+                'CR' => 'Costa Rica',
+                'CU' => 'Cuba',
+                'CV' => 'Cabo Verde',
+                'CY' => 'Chipre',
+                'CZ' => 'Republica Checa',
+                'DE' => 'Alemania',
+                'DJ' => 'Yibuti',
+                'DK' => 'Dinamarca',
+                'DM' => 'Dominica',
+                'DO' => 'Republica Dominicana',
+                'DZ' => 'Argelia',
+                'EC' => 'Ecuador',
+                'EE' => 'Estonia',
+                'EG' => 'Egipto',
+                'ER' => 'Eritrea',
+                'ES' => 'Espana',
+                'ET' => 'Etiopia',
+                'FI' => 'Finlandia',
+                'FJ' => 'Fiyi',
+                'FM' => 'Micronesia',
+                'FR' => 'Francia',
+                'GA' => 'Gabon',
+                'GB' => 'Reino Unido',
+                'GD' => 'Granada',
+                'GE' => 'Georgia',
+                'GF' => 'Guayana Francesa',
+                'GH' => 'Ghana',
+                'GI' => 'Gibraltar',
+                'GL' => 'Groenlandia',
+                'GM' => 'Gambia',
+                'GN' => 'Guinea',
+                'GP' => 'Guadalupe',
+                'GQ' => 'Guinea Ecuatorial',
+                'GR' => 'Grecia',
+                'GT' => 'Guatemala',
+                'GU' => 'Guam',
+                'GY' => 'Guyana',
+                'HK' => 'Hong Kong',
+                'HN' => 'Honduras',
+                'HR' => 'Croacia',
+                'HT' => 'Haiti',
+                'HU' => 'Hungria',
+                'ID' => 'Indonesia',
+                'IE' => 'Irlanda',
+                'IL' => 'Israel',
+                'IN' => 'India',
+                'IQ' => 'Irak',
+                'IR' => 'Iran',
+                'IS' => 'Islandia',
+                'IT' => 'Italia',
+                'JM' => 'Jamaica',
+                'JO' => 'Jordania',
+                'JP' => 'Japon',
+                'KE' => 'Kenia',
+                'KG' => 'Kirguistan',
+                'KH' => 'Camboya',
+                'KI' => 'Kiribati',
+                'KM' => 'Comoras',
+                'KN' => 'San Cristobal y Nieves',
+                'KP' => 'Corea del Norte',
+                'KR' => 'Corea del Sur',
+                'KW' => 'Kuwait',
+                'KZ' => 'Kazajistan',
+                'LA' => 'Laos',
+                'LB' => 'Libano',
+                'LC' => 'Santa Lucia',
+                'LI' => 'Liechtenstein',
+                'LK' => 'Sri Lanka',
+                'LR' => 'Liberia',
+                'LS' => 'Lesoto',
+                'LT' => 'Lituania',
+                'LU' => 'Luxemburgo',
+                'LV' => 'Letonia',
+                'LY' => 'Libia',
+                'MA' => 'Marruecos',
+                'MC' => 'Monaco',
+                'MD' => 'Moldavia',
+                'ME' => 'Montenegro',
+                'MG' => 'Madagascar',
+                'MH' => 'Islas Marshall',
+                'MK' => 'Macedonia del Norte',
+                'ML' => 'Mali',
+                'MM' => 'Birmania',
+                'MN' => 'Mongolia',
+                'MO' => 'Macao',
+                'MQ' => 'Martinica',
+                'MR' => 'Mauritania',
+                'MT' => 'Malta',
+                'MU' => 'Mauricio',
+                'MV' => 'Maldivas',
+                'MW' => 'Malaui',
+                'MX' => 'Mexico',
+                'MY' => 'Malasia',
+                'MZ' => 'Mozambique',
+                'NA' => 'Namibia',
+                'NC' => 'Nueva Caledonia',
+                'NE' => 'Niger',
+                'NG' => 'Nigeria',
+                'NI' => 'Nicaragua',
+                'NL' => 'Paises Bajos',
+                'NO' => 'Noruega',
+                'NP' => 'Nepal',
+                'NR' => 'Nauru',
+                'NZ' => 'Nueva Zelanda',
+                'OM' => 'Oman',
+                'PA' => 'Panama',
+                'PE' => 'Peru',
+                'PF' => 'Polinesia Francesa',
+                'PG' => 'Papua Nueva Guinea',
+                'PH' => 'Filipinas',
+                'PK' => 'Pakistan',
+                'PL' => 'Polonia',
+                'PR' => 'Puerto Rico',
+                'PT' => 'Portugal',
+                'PY' => 'Paraguay',
+                'QA' => 'Catar',
+                'RE' => 'Reunion',
+                'RO' => 'Rumania',
+                'RS' => 'Serbia',
+                'RU' => 'Rusia',
+                'RW' => 'Ruanda',
+                'SA' => 'Arabia Saudita',
+                'SB' => 'Islas Salomon',
+                'SC' => 'Seychelles',
+                'SD' => 'Sudan',
+                'SE' => 'Suecia',
+                'SG' => 'Singapur',
+                'SI' => 'Eslovenia',
+                'SK' => 'Eslovaquia',
+                'SL' => 'Sierra Leona',
+                'SM' => 'San Marino',
+                'SN' => 'Senegal',
+                'SO' => 'Somalia',
+                'SR' => 'Surinam',
+                'ST' => 'Santo Tome y Principe',
+                'SV' => 'El Salvador',
+                'SY' => 'Siria',
+                'SZ' => 'Suazilandia',
+                'TD' => 'Chad',
+                'TG' => 'Togo',
+                'TH' => 'Tailandia',
+                'TJ' => 'Tayikistan',
+                'TL' => 'Timor Oriental',
+                'TM' => 'Turkmenistan',
+                'TN' => 'Tunez',
+                'TO' => 'Tonga',
+                'TR' => 'Turquia',
+                'TT' => 'Trinidad y Tobago',
+                'TW' => 'Taiwan',
+                'TZ' => 'Tanzania',
+                'UA' => 'Ucrania',
+                'UG' => 'Uganda',
+                'US' => 'Estados Unidos',
+                'UY' => 'Uruguay',
+                'UZ' => 'Uzbekistan',
+                'VA' => 'Vaticano',
+                'VE' => 'Venezuela',
+                'VG' => 'Islas Virgenes Britanicas',
+                'VI' => 'Islas Virgenes de Estados Unidos',
+                'VN' => 'Vietnam',
+                'WS' => 'Samoa',
+                'YE' => 'Yemen',
+                'ZA' => 'Sudafrica',
+                'ZM' => 'Zambia',
+                'ZW' => 'Zimbabue',
+            ];
+            $mapCountryName = static function (string $code) use ($countryNames): string {
+                $code = strtoupper(trim($code));
+                if ($code === '' || strlen($code) !== 2) {
+                    return '';
+                }
+                return $countryNames[$code] ?? '';
+            };
             $queries28Resp = admin_gsc_query($accessToken, $gscProperty, $start28, $endDate, ['query'], 50);
             $queries7Resp = admin_gsc_query($accessToken, $gscProperty, $start7, $endDate, ['query'], 50);
             $gscQueries28 = $normalizeQueries($queries28Resp);
@@ -211,8 +427,26 @@
             $countries28Resp = admin_gsc_query($accessToken, $gscProperty, $start28, $endDate, ['country'], 50);
             $gscPages7 = $normalizeDimensions($pages7Resp, 'page');
             $gscPages28 = $normalizeDimensions($pages28Resp, 'page');
-            $gscCountries7 = $normalizeDimensions($countries7Resp, 'country');
-            $gscCountries28 = $normalizeDimensions($countries28Resp, 'country');
+            $rawCountries7 = $normalizeDimensions($countries7Resp, 'country');
+            $rawCountries28 = $normalizeDimensions($countries28Resp, 'country');
+            $gscCountries7 = [];
+            foreach ($rawCountries7 as $row) {
+                $name = $mapCountryName($row['country']);
+                if ($name === '') {
+                    continue;
+                }
+                $row['country'] = $name;
+                $gscCountries7[] = $row;
+            }
+            $gscCountries28 = [];
+            foreach ($rawCountries28 as $row) {
+                $name = $mapCountryName($row['country']);
+                if ($name === '') {
+                    continue;
+                }
+                $row['country'] = $name;
+                $gscCountries28[] = $row;
+            }
             $sitemapUrl = '';
             $baseUrlValue = $settings['site_url'] ?? '';
             if (!is_string($baseUrlValue)) {
@@ -1981,12 +2215,12 @@
                                     <input type="hidden" name="gsc_refresh" value="1">
                                     <button type="submit" class="btn btn-outline-primary btn-sm">Actualizar datos ahora</button>
                                 </form>
-                                <div class="btn-group btn-group-sm mb-3" role="group" data-stat-toggle data-stat-toggle-type="period">
+                                <div class="btn-group btn-group-sm mb-3" role="group" data-stat-toggle data-stat-toggle-type="period" data-stat-scope="gsc-main">
                                     <button type="button" class="btn btn-outline-secondary active" data-stat-period="28">Últimos 28 días</button>
                                     <button type="button" class="btn btn-outline-secondary" data-stat-period="7">Últimos 7 días</button>
                                 </div>
                                 <div class="table-responsive mb-3">
-                                    <table class="table table-sm mb-0" data-stat-list data-stat-period="28">
+                                    <table class="table table-sm mb-0" data-stat-list data-stat-period="28" data-stat-scope="gsc-main">
                                         <tbody>
                                             <tr>
                                                 <td>Clicks totales</td>
@@ -2006,7 +2240,7 @@
                                             </tr>
                                         </tbody>
                                     </table>
-                                    <table class="table table-sm mb-0 d-none" data-stat-list data-stat-period="7">
+                                    <table class="table table-sm mb-0 d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-main">
                                         <tbody>
                                             <tr>
                                                 <td>Clicks totales</td>
@@ -2037,9 +2271,15 @@
                                         </tbody>
                                     </table>
                                 </div>
+                                <?php if (!empty($gscQueries28) || !empty($gscQueries7)): ?>
+                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Términos más clicados</p>
+                                    <div class="btn-group btn-group-sm mb-3" role="group" data-stat-toggle data-stat-toggle-type="period" data-stat-scope="gsc-terms">
+                                        <button type="button" class="btn btn-outline-secondary active" data-stat-period="28">Últimos 28 días</button>
+                                        <button type="button" class="btn btn-outline-secondary" data-stat-period="7">Últimos 7 días</button>
+                                    </div>
+                                <?php endif; ?>
                                 <?php if (!empty($gscQueries28)): ?>
-                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title" data-stat-list data-stat-period="28">Términos más clicados (últimos 28 días)</p>
-                                    <div class="table-responsive" data-stat-list data-stat-period="28">
+                                    <div class="table-responsive" data-stat-list data-stat-period="28" data-stat-scope="gsc-terms">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2061,8 +2301,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscQueries7)): ?>
-                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title d-none" data-stat-list data-stat-period="7">Términos más clicados (últimos 7 días)</p>
-                                    <div class="table-responsive d-none" data-stat-list data-stat-period="7">
+                                    <div class="table-responsive d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-terms">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2083,9 +2322,15 @@
                                         </table>
                                     </div>
                                 <?php endif; ?>
+                                <?php if (!empty($gscPages7) || !empty($gscPages28)): ?>
+                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Páginas más clicadas</p>
+                                    <div class="btn-group btn-group-sm mb-3" role="group" data-stat-toggle data-stat-toggle-type="period" data-stat-scope="gsc-pages">
+                                        <button type="button" class="btn btn-outline-secondary active" data-stat-period="28">Últimos 28 días</button>
+                                        <button type="button" class="btn btn-outline-secondary" data-stat-period="7">Últimos 7 días</button>
+                                    </div>
+                                <?php endif; ?>
                                 <?php if (!empty($gscPages7)): ?>
-                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title d-none" data-stat-list data-stat-period="7">Páginas más clicadas (últimos 7 días)</p>
-                                    <div class="table-responsive mb-3 d-none" data-stat-list data-stat-period="7">
+                                    <div class="table-responsive mb-3 d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-pages">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2097,7 +2342,25 @@
                                             <tbody>
                                                 <?php foreach ($gscPages7 as $row): ?>
                                                     <tr>
-                                                        <td class="text-truncate"><?= htmlspecialchars($row['page'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                        <?php
+                                                        $pageUrl = (string) $row['page'];
+                                                        $slugValue = $pageUrl;
+                                                        if ($pageUrl !== '') {
+                                                            $parsed = parse_url($pageUrl);
+                                                            if (is_array($parsed) && isset($parsed['path'])) {
+                                                                $slugValue = trim((string) $parsed['path'], '/');
+                                                            }
+                                                        }
+                                                        ?>
+                                                        <td class="text-truncate">
+                                                            <?php if ($pageUrl !== ''): ?>
+                                                                <a href="<?= htmlspecialchars($pageUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                                    <?= htmlspecialchars($slugValue, ENT_QUOTES, 'UTF-8') ?>
+                                                                </a>
+                                                            <?php else: ?>
+                                                                <?= htmlspecialchars($slugValue, ENT_QUOTES, 'UTF-8') ?>
+                                                            <?php endif; ?>
+                                                        </td>
                                                         <td class="text-right"><?= (int) $row['clicks'] ?></td>
                                                         <td class="text-right"><?= (int) $row['impressions'] ?></td>
                                                     </tr>
@@ -2107,8 +2370,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscPages28)): ?>
-                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title" data-stat-list data-stat-period="28">Páginas más clicadas (últimos 28 días)</p>
-                                    <div class="table-responsive mb-3" data-stat-list data-stat-period="28">
+                                    <div class="table-responsive mb-3" data-stat-list data-stat-period="28" data-stat-scope="gsc-pages">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2120,7 +2382,25 @@
                                             <tbody>
                                                 <?php foreach ($gscPages28 as $row): ?>
                                                     <tr>
-                                                        <td class="text-truncate"><?= htmlspecialchars($row['page'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                        <?php
+                                                        $pageUrl = (string) $row['page'];
+                                                        $slugValue = $pageUrl;
+                                                        if ($pageUrl !== '') {
+                                                            $parsed = parse_url($pageUrl);
+                                                            if (is_array($parsed) && isset($parsed['path'])) {
+                                                                $slugValue = trim((string) $parsed['path'], '/');
+                                                            }
+                                                        }
+                                                        ?>
+                                                        <td class="text-truncate">
+                                                            <?php if ($pageUrl !== ''): ?>
+                                                                <a href="<?= htmlspecialchars($pageUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                                    <?= htmlspecialchars($slugValue, ENT_QUOTES, 'UTF-8') ?>
+                                                                </a>
+                                                            <?php else: ?>
+                                                                <?= htmlspecialchars($slugValue, ENT_QUOTES, 'UTF-8') ?>
+                                                            <?php endif; ?>
+                                                        </td>
                                                         <td class="text-right"><?= (int) $row['clicks'] ?></td>
                                                         <td class="text-right"><?= (int) $row['impressions'] ?></td>
                                                     </tr>
@@ -2129,9 +2409,11 @@
                                         </table>
                                     </div>
                                 <?php endif; ?>
+                                <?php if (!empty($gscCountries7) || !empty($gscCountries28)): ?>
+                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Principales países</p>
+                                <?php endif; ?>
                                 <?php if (!empty($gscCountries7)): ?>
-                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title d-none" data-stat-list data-stat-period="7">Principales países (últimos 7 días)</p>
-                                    <div class="table-responsive mb-3 d-none" data-stat-list data-stat-period="7">
+                                    <div class="table-responsive mb-3 d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-main">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2153,8 +2435,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscCountries28)): ?>
-                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title" data-stat-list data-stat-period="28">Principales países (últimos 28 días)</p>
-                                    <div class="table-responsive" data-stat-list data-stat-period="28">
+                                    <div class="table-responsive" data-stat-list data-stat-period="28" data-stat-scope="gsc-main">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2185,12 +2466,25 @@
     <script>
         document.querySelectorAll('.dashboard-stat-block').forEach(function(block) {
             function updateLists() {
-                var modeBtn = block.querySelector('[data-stat-toggle-type="mode"] .active');
-                var periodBtn = block.querySelector('[data-stat-toggle-type="period"] .active');
-                var mode = modeBtn ? modeBtn.getAttribute('data-stat-mode') : null;
-                var period = periodBtn ? periodBtn.getAttribute('data-stat-period') : null;
+                var periodByScope = {};
+                var modeByScope = {};
+
+                block.querySelectorAll('[data-stat-toggle]').forEach(function(group) {
+                    var scope = group.getAttribute('data-stat-scope') || '';
+                    var modeBtn = group.querySelector('[data-stat-toggle-type="mode"] .active, [data-stat-mode].active');
+                    var periodBtn = group.querySelector('[data-stat-toggle-type="period"] .active, [data-stat-period].active');
+                    if (modeBtn) {
+                        modeByScope[scope] = modeBtn.getAttribute('data-stat-mode');
+                    }
+                    if (periodBtn) {
+                        periodByScope[scope] = periodBtn.getAttribute('data-stat-period');
+                    }
+                });
 
                 block.querySelectorAll('[data-stat-list]').forEach(function(list) {
+                    var scope = list.getAttribute('data-stat-scope') || '';
+                    var mode = modeByScope[scope] || null;
+                    var period = periodByScope[scope] || null;
                     var match = true;
                     if (mode && list.getAttribute('data-stat-mode') !== mode) {
                         match = false;

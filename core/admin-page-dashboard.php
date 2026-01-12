@@ -1599,7 +1599,8 @@
                 color: #1b8eed;
                 border-color: #1b8eed;
             }
-            .dashboard-toggle .btn.active {
+            .dashboard-toggle .btn.active,
+            .gsc-toggle .btn.active {
                 background: #1b8eed;
                 color: #ffffff;
                 border-color: #1b8eed;
@@ -2311,7 +2312,7 @@
                                     <input type="hidden" name="gsc_refresh" value="1">
                                     <button type="submit" class="btn btn-outline-primary btn-sm">Actualizar datos ahora</button>
                                 </form>
-                                <div class="btn-group btn-group-sm mb-3 dashboard-toggle" role="group" data-gsc-toggle>
+                                <div class="btn-group btn-group-sm mb-3 dashboard-toggle gsc-toggle" role="group" data-gsc-toggle>
                                     <button type="button" class="btn btn-outline-secondary active" data-gsc-period="28">Últimos 28 días</button>
                                     <button type="button" class="btn btn-outline-secondary" data-gsc-period="7">Últimos 7 días</button>
                                 </div>
@@ -2369,7 +2370,7 @@
                                 </div>
                                 <?php if (!empty($gscQueries28) || !empty($gscQueries7)): ?>
                                     <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Términos más clicados</p>
-                                    <div class="btn-group btn-group-sm mb-3 dashboard-toggle" role="group" data-gsc-toggle>
+                                    <div class="btn-group btn-group-sm mb-3 dashboard-toggle gsc-toggle" role="group" data-gsc-toggle>
                                         <button type="button" class="btn btn-outline-secondary active" data-gsc-period="28">Últimos 28 días</button>
                                         <button type="button" class="btn btn-outline-secondary" data-gsc-period="7">Últimos 7 días</button>
                                     </div>
@@ -2420,7 +2421,7 @@
                                 <?php endif; ?>
                                 <?php if (!empty($gscPages7) || !empty($gscPages28)): ?>
                                     <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Páginas más clicadas</p>
-                                    <div class="btn-group btn-group-sm mb-3 dashboard-toggle" role="group" data-gsc-toggle>
+                                    <div class="btn-group btn-group-sm mb-3 dashboard-toggle gsc-toggle" role="group" data-gsc-toggle>
                                         <button type="button" class="btn btn-outline-secondary active" data-gsc-period="28">Últimos 28 días</button>
                                         <button type="button" class="btn btn-outline-secondary" data-gsc-period="7">Últimos 7 días</button>
                                     </div>
@@ -2507,7 +2508,7 @@
                                 <?php endif; ?>
                                 <?php if (!empty($gscCountries7) || !empty($gscCountries28)): ?>
                                     <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Principales países</p>
-                                    <div class="btn-group btn-group-sm mb-3 dashboard-toggle" role="group" data-gsc-toggle>
+                                    <div class="btn-group btn-group-sm mb-3 dashboard-toggle gsc-toggle" role="group" data-gsc-toggle>
                                         <button type="button" class="btn btn-outline-secondary active" data-gsc-period="28">Últimos 28 días</button>
                                         <button type="button" class="btn btn-outline-secondary" data-gsc-period="7">Últimos 7 días</button>
                                     </div>
@@ -2706,7 +2707,9 @@
                 var period = btn.getAttribute('data-gsc-period');
                 gscCard.querySelectorAll('[data-gsc-toggle]').forEach(function(group) {
                     group.querySelectorAll('[data-gsc-period]').forEach(function(item) {
-                        item.classList.toggle('active', item.getAttribute('data-gsc-period') === period);
+                        var isActive = item.getAttribute('data-gsc-period') === period;
+                        item.classList.toggle('active', isActive);
+                        item.setAttribute('aria-pressed', isActive ? 'true' : 'false');
                     });
                 });
                 gscCard.querySelectorAll('[data-gsc-period]').forEach(function(item) {

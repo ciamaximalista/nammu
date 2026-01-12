@@ -2903,7 +2903,7 @@
                     </div>
                 <?php endif; ?>
                 <?php if ($bingSiteUrl !== '' && $bingApiKey !== ''): ?>
-                    <div class="card mb-4" id="bing-dashboard">
+                    <div class="card mb-4 dashboard-stat-block" id="bing-dashboard">
                         <div class="card-body">
                             <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Microsoft Bing Webmaster Tools</h4>
                             <?php if ($bingError !== ''): ?>

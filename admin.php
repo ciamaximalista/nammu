@@ -1056,6 +1056,11 @@ function get_settings() {
         $ads['scope'] = $adsDefaults['scope'];
     }
     $searchConsole = $config['search_console'] ?? [];
+    $bingDefaults = [
+        'site_url' => '',
+        'api_key' => '',
+    ];
+    $bingWebmaster = array_merge($bingDefaults, $config['bing_webmaster'] ?? []);
     $indexnowDefaults = [
         'enabled' => 'off',
         'key' => '',
@@ -1071,6 +1076,7 @@ function get_settings() {
         'site_url' => $siteUrl,
         'site_lang' => $siteLang,
         'search_console' => $searchConsole,
+        'bing_webmaster' => $bingWebmaster,
         'template' => [
             'fonts' => $fonts,
             'colors' => $colors,
@@ -1234,6 +1240,55 @@ function admin_gsc_get(string $accessToken, string $url): array {
         throw new RuntimeException($message);
     }
     return $decoded;
+}
+
+function admin_bing_api_get(string $method, array $params): array {
+    $base = 'https://www.bing.com/webmaster/api.svc/json/';
+    $method = ltrim($method, '/');
+    $url = $base . $method . '?' . http_build_query($params);
+    $opts = [
+        'http' => [
+            'method' => 'GET',
+            'timeout' => 12,
+            'ignore_errors' => true,
+        ],
+    ];
+    $resp = @file_get_contents($url, false, stream_context_create($opts));
+    $decoded = json_decode((string) $resp, true);
+    if (!is_array($decoded)) {
+        throw new RuntimeException('Respuesta inválida de Bing Webmaster Tools.');
+    }
+    $payload = $decoded['d'] ?? $decoded;
+    if (is_array($payload)) {
+        $errorCode = $payload['ErrorCode'] ?? $payload['errorCode'] ?? null;
+        $errorMessage = $payload['ErrorMessage'] ?? $payload['message'] ?? $payload['Message'] ?? '';
+        if ($errorCode !== null && (int) $errorCode !== 0) {
+            $message = trim((string) $errorMessage);
+            throw new RuntimeException($message !== '' ? $message : 'Error en Bing Webmaster Tools.');
+        }
+    }
+    return $payload;
+}
+
+function admin_bing_request_with_dates(string $method, array $baseParams, string $startDate, string $endDate): array {
+    $startTs = strtotime($startDate);
+    $endTs = strtotime($endDate);
+    if ($startTs === false || $endTs === false) {
+        throw new RuntimeException('Fechas no válidas para Bing Webmaster Tools.');
+    }
+    $formats = ['Y-m-d', 'm/d/Y'];
+    $lastError = null;
+    foreach ($formats as $format) {
+        $params = $baseParams;
+        $params['startDate'] = date($format, $startTs);
+        $params['endDate'] = date($format, $endTs);
+        try {
+            return admin_bing_api_get($method, $params);
+        } catch (Throwable $e) {
+            $lastError = $e;
+        }
+    }
+    throw $lastError ?? new RuntimeException('No se pudo conectar con Bing Webmaster Tools.');
 }
 
 function admin_public_post_url(string $slug): string {
@@ -3646,6 +3701,12 @@ if (!is_array($searchConsoleFeedback) || !isset($searchConsoleFeedback['message'
 } else {
     unset($_SESSION['search_console_feedback']);
 }
+$bingWebmasterFeedback = $_SESSION['bing_webmaster_feedback'] ?? null;
+if (!is_array($bingWebmasterFeedback) || !isset($bingWebmasterFeedback['message'], $bingWebmasterFeedback['type'])) {
+    $bingWebmasterFeedback = null;
+} else {
+    unset($_SESSION['bing_webmaster_feedback']);
+}
 $postalFeedback = $_SESSION['postal_feedback'] ?? null;
 if (!is_array($postalFeedback) || !isset($postalFeedback['message'], $postalFeedback['type'])) {
     $postalFeedback = null;
@@ -5517,6 +5578,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         $_SESSION['search_console_feedback'] = $feedback;
+        header('Location: admin.php?page=configuracion');
+        exit;
+    } elseif (isset($_POST['test_bing'])) {
+        $bing_site_url = trim($_POST['bing_site_url'] ?? '');
+        $bing_api_key = trim($_POST['bing_api_key'] ?? '');
+        try {
+            $config = load_config_file();
+            if ($bing_site_url !== '' || $bing_api_key !== '') {
+                $config['bing_webmaster'] = [
+                    'site_url' => $bing_site_url,
+                    'api_key' => $bing_api_key,
+                ];
+            } else {
+                unset($config['bing_webmaster']);
+            }
+            save_config_file($config);
+        } catch (Throwable $e) {
+            $_SESSION['bing_webmaster_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Error guardando Bing Webmaster Tools: ' . $e->getMessage(),
+            ];
+            header('Location: admin.php?page=configuracion');
+            exit;
+        }
+        $feedback = [
+            'type' => 'danger',
+            'message' => 'Faltan datos para conectar con Bing Webmaster Tools.',
+        ];
+        if ($bing_site_url !== '' && $bing_api_key !== '') {
+            try {
+                $endDate = (new DateTimeImmutable('yesterday'))->format('Y-m-d');
+                $startDate = (new DateTimeImmutable('yesterday'))->modify('-7 days')->format('Y-m-d');
+                admin_bing_request_with_dates('GetSiteStats', [
+                    'apikey' => $bing_api_key,
+                    'siteUrl' => $bing_site_url,
+                ], $startDate, $endDate);
+                $feedback = [
+                    'type' => 'success',
+                    'message' => 'Conexión correcta con Bing Webmaster Tools.',
+                ];
+            } catch (Throwable $e) {
+                $feedback = [
+                    'type' => 'danger',
+                    'message' => 'Error al conectar con Bing Webmaster Tools: ' . $e->getMessage(),
+                ];
+            }
+        }
+        $_SESSION['bing_webmaster_feedback'] = $feedback;
         header('Location: admin.php?page=configuracion');
         exit;
     } elseif (isset($_POST['save_settings'])) {

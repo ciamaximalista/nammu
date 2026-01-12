@@ -92,6 +92,26 @@
     $gscCache = null;
     $gscUpdatedAtLabel = '';
     $gscForceRefresh = isset($_GET['gsc_refresh']) && $_GET['gsc_refresh'] === '1';
+    $bingSettings = $settings['bing_webmaster'] ?? [];
+    $bingSiteUrl = trim((string) ($bingSettings['site_url'] ?? ''));
+    $bingApiKey = trim((string) ($bingSettings['api_key'] ?? ''));
+    $bingTotals28 = null;
+    $bingTotals7 = null;
+    $bingQueries28 = [];
+    $bingQueries7 = [];
+    $bingPages28 = [];
+    $bingPages7 = [];
+    $bingCountries28 = [];
+    $bingCountries7 = [];
+    $bingSitemapInfo = [
+        'last_crawl' => '',
+    ];
+    $bingError = '';
+    $bingCachePath = dirname(__DIR__) . '/config/bing-cache.json';
+    $bingCacheTtl = 24 * 60 * 60;
+    $bingCache = null;
+    $bingUpdatedAtLabel = '';
+    $bingForceRefresh = isset($_GET['bing_refresh']) && $_GET['bing_refresh'] === '1';
     $gscCountryNames = [
         'AD' => 'Andorra',
         'AE' => 'Emiratos Árabes Unidos',
@@ -596,6 +616,222 @@
             $normalizedCountries28[] = $row;
         }
         $gscCountries28 = $normalizedCountries28;
+    }
+
+    if (is_file($bingCachePath)) {
+        $rawCache = @file_get_contents($bingCachePath);
+        $decodedCache = is_string($rawCache) && $rawCache !== '' ? json_decode($rawCache, true) : null;
+        if (is_array($decodedCache)) {
+            $bingCache = $decodedCache;
+        }
+    }
+
+    $bingCacheValid = is_array($bingCache)
+        && ($bingCache['site_url'] ?? '') === $bingSiteUrl
+        && isset($bingCache['updated_at']);
+    $bingCacheHasNew = $bingCacheValid
+        && isset($bingCache['totals7'], $bingCache['totals28'], $bingCache['queries7'], $bingCache['queries28']);
+    $bingCacheUpdatedAt = $bingCacheValid ? (int) $bingCache['updated_at'] : 0;
+    $bingCacheIsDailyFresh = $bingCacheUpdatedAt >= $refreshAnchor->getTimestamp();
+    $bingCacheFresh = $bingCacheHasNew
+        && $bingCacheIsDailyFresh
+        && (time() - $bingCacheUpdatedAt) < $bingCacheTtl
+        && !$bingForceRefresh;
+    if ($bingCacheFresh) {
+        $bingTotals28 = $bingCache['totals28'] ?? null;
+        $bingTotals7 = $bingCache['totals7'] ?? null;
+        $bingQueries28 = $bingCache['queries28'] ?? [];
+        $bingQueries7 = $bingCache['queries7'] ?? [];
+        $bingPages28 = $bingCache['pages28'] ?? [];
+        $bingPages7 = $bingCache['pages7'] ?? [];
+        $bingCountries28 = $bingCache['countries28'] ?? [];
+        $bingCountries7 = $bingCache['countries7'] ?? [];
+        $bingSitemapInfo = $bingCache['sitemap'] ?? ['last_crawl' => ''];
+        $bingUpdatedAtLabel = !empty($bingCache['updated_at'])
+            ? (new DateTimeImmutable('@' . (int) $bingCache['updated_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('d/m/y')
+            : '';
+    } elseif ($bingSiteUrl !== '' && $bingApiKey !== '' && function_exists('admin_bing_request_with_dates')) {
+        $bingExtractRows = static function ($payload, array $keys): array {
+            if (!is_array($payload)) {
+                return [];
+            }
+            $data = $payload;
+            if (isset($data['d']) && is_array($data['d'])) {
+                $data = $data['d'];
+            }
+            foreach ($keys as $key) {
+                if (isset($data[$key]) && is_array($data[$key])) {
+                    return array_values($data[$key]);
+                }
+            }
+            if (array_values($data) === $data) {
+                return $data;
+            }
+            return [];
+        };
+        $bingValue = static function (array $row, array $keys, float $default = 0.0): float {
+            foreach ($keys as $key) {
+                if (isset($row[$key]) && $row[$key] !== '') {
+                    return (float) $row[$key];
+                }
+                $lower = strtolower($key);
+                foreach ($row as $rowKey => $value) {
+                    if (strtolower((string) $rowKey) === $lower && $value !== '') {
+                        return (float) $value;
+                    }
+                }
+            }
+            return $default;
+        };
+        $bingNormalizeTotals = static function (array $rows) use ($bingValue): array {
+            $totalClicks = 0;
+            $totalImpressions = 0;
+            $weightedPosition = 0.0;
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $clicks = $bingValue($row, ['Clicks', 'clicks']);
+                $impressions = $bingValue($row, ['Impressions', 'impressions']);
+                $position = $bingValue($row, ['AvgPosition', 'AveragePosition', 'position', 'avgPosition']);
+                $totalClicks += (int) round($clicks);
+                $totalImpressions += (int) round($impressions);
+                if ($impressions > 0) {
+                    $weightedPosition += $position * $impressions;
+                }
+            }
+            $ctr = $totalImpressions > 0 ? $totalClicks / $totalImpressions : 0.0;
+            $avgPosition = $totalImpressions > 0 ? $weightedPosition / $totalImpressions : 0.0;
+            return [
+                'clicks' => $totalClicks,
+                'impressions' => $totalImpressions,
+                'ctr' => $ctr,
+                'position' => $avgPosition,
+            ];
+        };
+        $bingNormalizeDimension = static function (array $rows, array $labelKeys, string $labelKey) use ($bingValue): array {
+            $output = [];
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $label = '';
+                foreach ($labelKeys as $key) {
+                    if (isset($row[$key]) && trim((string) $row[$key]) !== '') {
+                        $label = trim((string) $row[$key]);
+                        break;
+                    }
+                }
+                if ($label === '') {
+                    continue;
+                }
+                $output[] = [
+                    $labelKey => $label,
+                    'clicks' => (int) round($bingValue($row, ['Clicks', 'clicks'])),
+                    'impressions' => (int) round($bingValue($row, ['Impressions', 'impressions'])),
+                ];
+            }
+            usort($output, static function (array $a, array $b): int {
+                if ($a['clicks'] === $b['clicks']) {
+                    return $b['impressions'] <=> $a['impressions'];
+                }
+                return $b['clicks'] <=> $a['clicks'];
+            });
+            return array_slice($output, 0, 10);
+        };
+        try {
+            $endDate = $today->format('Y-m-d');
+            $start28 = $today->modify('-27 days')->format('Y-m-d');
+            $start7 = $today->modify('-6 days')->format('Y-m-d');
+            $baseParams = [
+                'apikey' => $bingApiKey,
+                'siteUrl' => $bingSiteUrl,
+            ];
+            $totals28Resp = admin_bing_request_with_dates('GetSiteStats', $baseParams, $start28, $endDate);
+            $totals7Resp = admin_bing_request_with_dates('GetSiteStats', $baseParams, $start7, $endDate);
+            $bingTotals28 = $bingNormalizeTotals($bingExtractRows($totals28Resp, ['SiteStats', 'siteStats']));
+            $bingTotals7 = $bingNormalizeTotals($bingExtractRows($totals7Resp, ['SiteStats', 'siteStats']));
+
+            $queries28Resp = admin_bing_request_with_dates('GetQueryStats', $baseParams, $start28, $endDate);
+            $queries7Resp = admin_bing_request_with_dates('GetQueryStats', $baseParams, $start7, $endDate);
+            $bingQueries28 = $bingNormalizeDimension($bingExtractRows($queries28Resp, ['QueryStats', 'queryStats']), ['Query', 'query'], 'term');
+            $bingQueries7 = $bingNormalizeDimension($bingExtractRows($queries7Resp, ['QueryStats', 'queryStats']), ['Query', 'query'], 'term');
+
+            $pages28Resp = admin_bing_request_with_dates('GetPageStats', $baseParams, $start28, $endDate);
+            $pages7Resp = admin_bing_request_with_dates('GetPageStats', $baseParams, $start7, $endDate);
+            $bingPages28 = $bingNormalizeDimension($bingExtractRows($pages28Resp, ['PageStats', 'pageStats']), ['Page', 'Url', 'url'], 'page');
+            $bingPages7 = $bingNormalizeDimension($bingExtractRows($pages7Resp, ['PageStats', 'pageStats']), ['Page', 'Url', 'url'], 'page');
+
+            try {
+                $countries28Resp = admin_bing_request_with_dates('GetCountryStats', $baseParams, $start28, $endDate);
+                $countries7Resp = admin_bing_request_with_dates('GetCountryStats', $baseParams, $start7, $endDate);
+                $bingCountries28 = $bingNormalizeDimension($bingExtractRows($countries28Resp, ['CountryStats', 'countryStats']), ['Country', 'country', 'CountryCode', 'countryCode'], 'country');
+                $bingCountries7 = $bingNormalizeDimension($bingExtractRows($countries7Resp, ['CountryStats', 'countryStats']), ['Country', 'country', 'CountryCode', 'countryCode'], 'country');
+            } catch (Throwable $e) {
+                $bingCountries28 = [];
+                $bingCountries7 = [];
+            }
+
+            try {
+                $sitemapsResp = admin_bing_api_get('GetSitemaps', $baseParams);
+                $rows = $bingExtractRows($sitemapsResp, ['Sitemaps', 'sitemaps', 'SitemapList', 'sitemapList']);
+                $latest = null;
+                foreach ($rows as $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    $dateValue = $row['LastDownloaded'] ?? $row['LastDownload'] ?? $row['LastCrawlDate'] ?? $row['DownloadDate'] ?? '';
+                    if ($dateValue === '') {
+                        continue;
+                    }
+                    $ts = strtotime((string) $dateValue);
+                    if ($ts !== false) {
+                        $latest = $latest === null ? $ts : max($latest, $ts);
+                    }
+                }
+                if ($latest !== null) {
+                    $bingSitemapInfo['last_crawl'] = date('d/m/y', $latest);
+                }
+            } catch (Throwable $e) {
+                $bingSitemapInfo['last_crawl'] = '';
+            }
+
+            $cachePayload = [
+                'site_url' => $bingSiteUrl,
+                'updated_at' => time(),
+                'totals28' => $bingTotals28,
+                'totals7' => $bingTotals7,
+                'queries28' => $bingQueries28,
+                'queries7' => $bingQueries7,
+                'pages28' => $bingPages28,
+                'pages7' => $bingPages7,
+                'countries28' => $bingCountries28,
+                'countries7' => $bingCountries7,
+                'sitemap' => $bingSitemapInfo,
+            ];
+            $cacheJson = json_encode($cachePayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            if ($cacheJson !== false) {
+                @file_put_contents($bingCachePath, $cacheJson, LOCK_EX);
+            }
+            $bingUpdatedAtLabel = (new DateTimeImmutable('now'))->format('d/m/y');
+        } catch (Throwable $e) {
+            if ($bingCacheHasNew) {
+                $bingTotals28 = $bingCache['totals28'] ?? null;
+                $bingTotals7 = $bingCache['totals7'] ?? null;
+                $bingQueries28 = $bingCache['queries28'] ?? [];
+                $bingQueries7 = $bingCache['queries7'] ?? [];
+                $bingPages28 = $bingCache['pages28'] ?? [];
+                $bingPages7 = $bingCache['pages7'] ?? [];
+                $bingCountries28 = $bingCache['countries28'] ?? [];
+                $bingCountries7 = $bingCache['countries7'] ?? [];
+                $bingSitemapInfo = $bingCache['sitemap'] ?? ['last_crawl' => ''];
+                $bingUpdatedAtLabel = !empty($bingCache['updated_at'])
+                    ? (new DateTimeImmutable('@' . (int) $bingCache['updated_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('d/m/y')
+                    : '';
+            } else {
+                $bingError = $e->getMessage();
+            }
+        }
     }
 
     $sumRange = static function (array $daily, DateTimeImmutable $start, DateTimeImmutable $end): int {
@@ -1640,6 +1876,32 @@
             #gsc-period-28:checked ~ .gsc-content .gsc-period-7 {
                 display: none;
             }
+            #bing-period-28:checked ~ .bing-buttons label[for="bing-period-28"],
+            #bing-period-7:checked ~ .bing-buttons label[for="bing-period-7"] {
+                background: #1b8eed;
+                color: #ffffff;
+                border-color: #1b8eed;
+            }
+            .bing-period-input {
+                position: absolute;
+                opacity: 0;
+                pointer-events: none;
+            }
+            .bing-period-7 {
+                display: none;
+            }
+            #bing-period-7:checked ~ .bing-content .bing-period-7 {
+                display: block;
+            }
+            #bing-period-7:checked ~ .bing-content .bing-period-28 {
+                display: none;
+            }
+            #bing-period-28:checked ~ .bing-content .bing-period-28 {
+                display: block;
+            }
+            #bing-period-28:checked ~ .bing-content .bing-period-7 {
+                display: none;
+            }
         </style>
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-2">
             <div>
@@ -2627,6 +2889,264 @@
                                                         }
                                                         ?>
                                                         <td><?= htmlspecialchars($countryLabel, ENT_QUOTES, 'UTF-8') ?></td>
+                                                        <td class="text-right"><?= (int) $row['clicks'] ?></td>
+                                                        <td class="text-right"><?= (int) $row['impressions'] ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                <?php if ($bingSiteUrl !== '' && $bingApiKey !== ''): ?>
+                    <div class="card mb-4" id="bing-dashboard">
+                        <div class="card-body">
+                            <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Microsoft Bing Webmaster Tools</h4>
+                            <?php if ($bingError !== ''): ?>
+                                <p class="text-muted mb-0"><?= htmlspecialchars($bingError, ENT_QUOTES, 'UTF-8') ?></p>
+                            <?php elseif ($bingTotals7 === null || $bingTotals28 === null): ?>
+                                <p class="text-muted mb-0">Sin datos disponibles.</p>
+                            <?php else: ?>
+                                <?php if ($bingUpdatedAtLabel !== ''): ?>
+                                    <p class="text-muted mb-2">Datos servidos por Bing Webmaster Tools API el <?= htmlspecialchars($bingUpdatedAtLabel, ENT_QUOTES, 'UTF-8') ?></p>
+                                <?php endif; ?>
+                                <form method="get" class="mb-2">
+                                    <input type="hidden" name="page" value="dashboard">
+                                    <input type="hidden" name="bing_refresh" value="1">
+                                    <button type="submit" class="btn btn-outline-primary btn-sm">Actualizar datos ahora</button>
+                                </form>
+                                <input type="radio" name="bing-period" id="bing-period-28" class="bing-period-input" checked>
+                                <input type="radio" name="bing-period" id="bing-period-7" class="bing-period-input">
+                                <div class="btn-group btn-group-sm mb-3 dashboard-toggle bing-toggle bing-buttons" role="group">
+                                    <label class="btn btn-outline-secondary bing-period-label" for="bing-period-28">Últimos 28 días</label>
+                                    <label class="btn btn-outline-secondary bing-period-label" for="bing-period-7">Últimos 7 días</label>
+                                </div>
+                                <div class="bing-content">
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-sm mb-0 bing-period-28" data-bing-period="28">
+                                        <tbody>
+                                            <tr>
+                                                <td>Clicks totales</td>
+                                                <td class="text-right"><?= (int) $bingTotals28['clicks'] ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td>Impresiones totales</td>
+                                                <td class="text-right"><?= (int) $bingTotals28['impressions'] ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td>CTR medio</td>
+                                                <td class="text-right"><?= number_format($bingTotals28['ctr'] * 100, 2, ',', '.') ?>%</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Posición media</td>
+                                                <td class="text-right"><?= number_format($bingTotals28['position'], 1, ',', '.') ?></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <table class="table table-sm mb-0 bing-period-7" data-bing-period="7">
+                                        <tbody>
+                                            <tr>
+                                                <td>Clicks totales</td>
+                                                <td class="text-right"><?= (int) $bingTotals7['clicks'] ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td>Impresiones totales</td>
+                                                <td class="text-right"><?= (int) $bingTotals7['impressions'] ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td>CTR medio</td>
+                                                <td class="text-right"><?= number_format($bingTotals7['ctr'] * 100, 2, ',', '.') ?>%</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Posición media</td>
+                                                <td class="text-right"><?= number_format($bingTotals7['position'], 1, ',', '.') ?></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <tr>
+                                                <td>Última consulta al sitemap</td>
+                                                <td class="text-right"><?= $bingSitemapInfo['last_crawl'] !== '' ? htmlspecialchars($bingSitemapInfo['last_crawl'], ENT_QUOTES, 'UTF-8') : '—' ?></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <?php if (!empty($bingQueries28) || !empty($bingQueries7)): ?>
+                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Términos más clicados</p>
+                                <?php endif; ?>
+                                <?php if (!empty($bingQueries28)): ?>
+                                    <div class="table-responsive bing-period-28">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Término</th>
+                                                    <th class="text-right">Clicks</th>
+                                                    <th class="text-right">Impresiones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($bingQueries28 as $row): ?>
+                                                    <tr>
+                                                        <td><?= htmlspecialchars($row['term'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                        <td class="text-right"><?= (int) $row['clicks'] ?></td>
+                                                        <td class="text-right"><?= (int) $row['impressions'] ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($bingQueries7)): ?>
+                                    <div class="table-responsive bing-period-7">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Término</th>
+                                                    <th class="text-right">Clicks</th>
+                                                    <th class="text-right">Impresiones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($bingQueries7 as $row): ?>
+                                                    <tr>
+                                                        <td><?= htmlspecialchars($row['term'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                        <td class="text-right"><?= (int) $row['clicks'] ?></td>
+                                                        <td class="text-right"><?= (int) $row['impressions'] ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($bingPages7) || !empty($bingPages28)): ?>
+                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Páginas más clicadas</p>
+                                <?php endif; ?>
+                                <?php if (!empty($bingPages7)): ?>
+                                    <div class="table-responsive mb-3 bing-period-7">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Página</th>
+                                                    <th class="text-right">Clicks</th>
+                                                    <th class="text-right">Impresiones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($bingPages7 as $row): ?>
+                                                    <tr>
+                                                        <?php
+                                                        $pageUrl = (string) $row['page'];
+                                                        $slugValue = $pageUrl;
+                                                        if ($pageUrl !== '') {
+                                                            $parsed = parse_url($pageUrl);
+                                                            if (is_array($parsed) && isset($parsed['path'])) {
+                                                                $slugValue = trim((string) $parsed['path'], '/');
+                                                            }
+                                                        }
+                                                        ?>
+                                                        <td class="text-truncate">
+                                                            <?php if ($pageUrl !== ''): ?>
+                                                                <a href="<?= htmlspecialchars($pageUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                                    <?= htmlspecialchars($slugValue, ENT_QUOTES, 'UTF-8') ?>
+                                                                </a>
+                                                            <?php else: ?>
+                                                                <?= htmlspecialchars($slugValue, ENT_QUOTES, 'UTF-8') ?>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                        <td class="text-right"><?= (int) $row['clicks'] ?></td>
+                                                        <td class="text-right"><?= (int) $row['impressions'] ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($bingPages28)): ?>
+                                    <div class="table-responsive mb-3 bing-period-28">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Página</th>
+                                                    <th class="text-right">Clicks</th>
+                                                    <th class="text-right">Impresiones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($bingPages28 as $row): ?>
+                                                    <tr>
+                                                        <?php
+                                                        $pageUrl = (string) $row['page'];
+                                                        $slugValue = $pageUrl;
+                                                        if ($pageUrl !== '') {
+                                                            $parsed = parse_url($pageUrl);
+                                                            if (is_array($parsed) && isset($parsed['path'])) {
+                                                                $slugValue = trim((string) $parsed['path'], '/');
+                                                            }
+                                                        }
+                                                        ?>
+                                                        <td class="text-truncate">
+                                                            <?php if ($pageUrl !== ''): ?>
+                                                                <a href="<?= htmlspecialchars($pageUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                                    <?= htmlspecialchars($slugValue, ENT_QUOTES, 'UTF-8') ?>
+                                                                </a>
+                                                            <?php else: ?>
+                                                                <?= htmlspecialchars($slugValue, ENT_QUOTES, 'UTF-8') ?>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                        <td class="text-right"><?= (int) $row['clicks'] ?></td>
+                                                        <td class="text-right"><?= (int) $row['impressions'] ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($bingCountries7) || !empty($bingCountries28)): ?>
+                                    <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Principales países</p>
+                                <?php endif; ?>
+                                <?php if (!empty($bingCountries7)): ?>
+                                    <div class="table-responsive mb-3 bing-period-7">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>País</th>
+                                                    <th class="text-right">Clicks</th>
+                                                    <th class="text-right">Impresiones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($bingCountries7 as $row): ?>
+                                                    <tr>
+                                                        <td><?= htmlspecialchars($gscResolveCountry((string) ($row['country'] ?? '')), ENT_QUOTES, 'UTF-8') ?></td>
+                                                        <td class="text-right"><?= (int) $row['clicks'] ?></td>
+                                                        <td class="text-right"><?= (int) $row['impressions'] ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($bingCountries28)): ?>
+                                    <div class="table-responsive bing-period-28">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>País</th>
+                                                    <th class="text-right">Clicks</th>
+                                                    <th class="text-right">Impresiones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($bingCountries28 as $row): ?>
+                                                    <tr>
+                                                        <td><?= htmlspecialchars($gscResolveCountry((string) ($row['country'] ?? '')), ENT_QUOTES, 'UTF-8') ?></td>
                                                         <td class="text-right"><?= (int) $row['clicks'] ?></td>
                                                         <td class="text-right"><?= (int) $row['impressions'] ?></td>
                                                     </tr>

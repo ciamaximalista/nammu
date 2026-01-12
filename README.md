@@ -51,7 +51,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 ### Escritorio y cumplimiento RGPD
 
 - Escritorio Nammu con estadísticas del sitio: resumen de publicaciones, usuarios únicos, top de entradas/páginas, itinerarios iniciados/completados y suscriptores.
-- Integración opcional con Google Search Console: si el usuario configura el API, el escritorio muestra métricas de rendimiento en Google Search.
+- Integración opcional con Google Search Console y Microsoft Bing Webmaster Tools: si el usuario configura el API, el escritorio muestra métricas de rendimiento en Google Search y Bing.
 - Aviso de cookies RGPD con consentimiento obligatorio para continuar, uso exclusivo de estadísticas y sin compartir datos con terceros.
 - Anuncios flotantes configurables desde el admin: activación, alcance (portada o todo el sitio), texto/HTML e imagen para campañas puntuales.
 - Notificaciones push opcionales para avisar de nuevas entradas o itinerarios, con control desde la pestaña **Difusión**.
@@ -199,6 +199,7 @@ Ejemplo rápido:
 - `sitemap.xml`: inventario de entradas, páginas e itinerarios para buscadores.
 - `itinerarios.xml`: feed específico de cursos/libros para reutilizar el contenido en otras plataformas.
 - `podcast.xml`: feed RSS de podcast con metadatos iTunes, duración y archivo mp3.
+- `llms.txt`: resumen y enlaces clave para facilitar el consumo por modelos de lenguaje.
 
 ## Licencia y soporte
 

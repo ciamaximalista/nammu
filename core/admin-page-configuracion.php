@@ -14,6 +14,11 @@
                 <?= htmlspecialchars($searchConsoleFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
             </div>
         <?php endif; ?>
+        <?php if (isset($bingWebmasterFeedback) && $bingWebmasterFeedback !== null): ?>
+            <div class="alert alert-<?= $bingWebmasterFeedback['type'] === 'success' ? 'success' : 'danger' ?>">
+                <?= htmlspecialchars($bingWebmasterFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
         <?php
         $telegramSettings = $settings['telegram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
         $telegramAutoEnabled = ($telegramSettings['auto_post'] ?? 'off') === 'on';
@@ -38,6 +43,9 @@
         $gscClientId = $searchConsoleSettings['client_id'] ?? '';
         $gscClientSecret = $searchConsoleSettings['client_secret'] ?? '';
         $gscRefreshToken = $searchConsoleSettings['refresh_token'] ?? '';
+        $bingWebmasterSettings = $settings['bing_webmaster'] ?? [];
+        $bingSiteUrl = $bingWebmasterSettings['site_url'] ?? '';
+        $bingApiKey = $bingWebmasterSettings['api_key'] ?? '';
         $languageOptions = [
             'es' => 'Español',
             'ca' => 'Català',
@@ -161,6 +169,24 @@
             </div>
         </form>
 
+        <form method="post" class="mt-4">
+            <h4 class="mt-2">Microsoft Bing Webmaster Tools</h4>
+            <p class="text-muted mb-3">Conecta Bing Webmaster Tools para acceder a datos de búsquedas.</p>
+            <div class="form-group">
+                <label for="bing_site_url">Bing Webmaster Tools (sitio)</label>
+                <input type="url" name="bing_site_url" id="bing_site_url" class="form-control" value="<?= htmlspecialchars($bingSiteUrl, ENT_QUOTES, 'UTF-8') ?>" placeholder="https://tusitio.com/">
+                <small class="form-text text-muted">Introduce la URL exacta verificada en Bing Webmaster Tools. <a href="#" data-toggle="modal" data-target="#bingHelpModal">Ver guía rápida</a></small>
+            </div>
+            <div class="form-group">
+                <label for="bing_api_key">API Key (Bing Webmaster Tools)</label>
+                <input type="text" name="bing_api_key" id="bing_api_key" class="form-control" value="<?= htmlspecialchars($bingApiKey, ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxxxxxxxxxxxxxx">
+                <small class="form-text text-muted">Se genera en el panel de Bing Webmaster Tools.</small>
+            </div>
+            <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 mb-4">
+                <button type="submit" name="test_bing" class="btn btn-outline-primary mb-2">Guardar y probar</button>
+            </div>
+        </form>
+
         <div class="modal fade" id="googleFontsHelpModal" tabindex="-1" role="dialog" aria-labelledby="googleFontsHelpModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
@@ -209,6 +235,31 @@
                             <li>Pega también la propiedad, el Client ID y el Client Secret.</li>
                         </ol>
                         <p class="mb-0 text-muted">El proyecto debe tener acceso a la propiedad en Search Console.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="bingHelpModal" tabindex="-1" role="dialog" aria-labelledby="bingHelpModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="bingHelpModalLabel">Guía rápida: Bing Webmaster Tools API</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <ol class="mb-3">
+                            <li>Verifica tu sitio en <strong>Bing Webmaster Tools</strong>.</li>
+                            <li>Entra en <strong>Settings &gt; API Access</strong> y genera una <strong>API Key</strong>.</li>
+                            <li>Copia la URL del sitio verificado tal como aparece en Bing.</li>
+                            <li>Pega la URL y la API Key en este formulario y pulsa <strong>Guardar y probar</strong>.</li>
+                        </ol>
+                        <p class="mb-0 text-muted">La API Key debe tener acceso al sitio indicado.</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>

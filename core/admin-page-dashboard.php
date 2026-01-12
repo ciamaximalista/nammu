@@ -2706,15 +2706,14 @@
                 var period = btn.getAttribute('data-gsc-period');
                 gscCard.querySelectorAll('[data-gsc-toggle]').forEach(function(group) {
                     group.querySelectorAll('[data-gsc-period]').forEach(function(item) {
-                        item.classList.toggle('active', item === btn);
+                        item.classList.toggle('active', item.getAttribute('data-gsc-period') === period);
                     });
                 });
                 gscCard.querySelectorAll('[data-gsc-period]').forEach(function(item) {
-                    var target = item.getAttribute('data-gsc-period');
-                    if (item.hasAttribute('data-gsc-toggle')) {
+                    if (item.closest('[data-gsc-toggle]')) {
                         return;
                     }
-                    item.classList.toggle('d-none', target !== period);
+                    item.classList.toggle('d-none', item.getAttribute('data-gsc-period') !== period);
                 });
             });
         })();

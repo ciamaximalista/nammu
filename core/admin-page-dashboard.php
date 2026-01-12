@@ -2312,9 +2312,9 @@
                                     <input type="hidden" name="gsc_refresh" value="1">
                                     <button type="submit" class="btn btn-outline-primary btn-sm">Actualizar datos ahora</button>
                                 </form>
-                                <div class="btn-group btn-group-sm mb-3 dashboard-toggle gsc-toggle" role="group" data-gsc-toggle>
-                                    <button type="button" class="btn btn-outline-secondary active" data-gsc-period="28">Últimos 28 días</button>
-                                    <button type="button" class="btn btn-outline-secondary" data-gsc-period="7">Últimos 7 días</button>
+                                <div class="btn-group btn-group-sm mb-3 dashboard-toggle gsc-toggle" role="group">
+                                    <button type="button" class="btn btn-outline-secondary gsc-period-toggle active" data-gsc-period="28">Últimos 28 días</button>
+                                    <button type="button" class="btn btn-outline-secondary gsc-period-toggle" data-gsc-period="7">Últimos 7 días</button>
                                 </div>
                                 <div class="table-responsive mb-3">
                                     <table class="table table-sm mb-0" data-gsc-period="28" data-stat-list data-stat-period="28" data-stat-scope="gsc-main" data-stat-kind="table">
@@ -2683,7 +2683,7 @@
                 }
             });
             document.addEventListener('click', function(event) {
-                var btn = event.target.closest('#gsc-dashboard [data-gsc-toggle] [data-gsc-period]');
+                var btn = event.target.closest('#gsc-dashboard .gsc-period-toggle');
                 if (!btn) {
                     return;
                 }
@@ -2693,13 +2693,13 @@
                 }
                 event.preventDefault();
                 var period = btn.getAttribute('data-gsc-period');
-                gscCard.querySelectorAll('[data-gsc-toggle] [data-gsc-period]').forEach(function(item) {
+                gscCard.querySelectorAll('.gsc-period-toggle').forEach(function(item) {
                     var isActive = item.getAttribute('data-gsc-period') === period;
                     item.classList.toggle('active', isActive);
                     item.setAttribute('aria-pressed', isActive ? 'true' : 'false');
                 });
                 gscCard.querySelectorAll('[data-gsc-period]').forEach(function(item) {
-                    if (item.closest('[data-gsc-toggle]')) {
+                    if (item.classList.contains('gsc-period-toggle')) {
                         return;
                     }
                     item.classList.toggle('d-none', item.getAttribute('data-gsc-period') !== period);

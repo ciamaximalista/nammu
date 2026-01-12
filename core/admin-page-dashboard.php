@@ -2231,7 +2231,7 @@
                     </div>
                 </div>
                 <?php if (!empty($sourceMainRows)): ?>
-                    <div class="card mb-4">
+                    <div class="card mb-4" id="gsc-dashboard">
                         <div class="card-body dashboard-stat-block">
                             <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Origen de los usuarios únicos (últimos 30 días)</h4>
                             <div class="table-responsive mb-3">
@@ -2311,12 +2311,12 @@
                                     <input type="hidden" name="gsc_refresh" value="1">
                                     <button type="submit" class="btn btn-outline-primary btn-sm">Actualizar datos ahora</button>
                                 </form>
-                                <div class="btn-group btn-group-sm mb-3" role="group" data-stat-toggle data-stat-toggle-type="period" data-stat-scope="gsc-main">
-                                    <button type="button" class="btn btn-outline-secondary active" data-stat-period="28">Últimos 28 días</button>
-                                    <button type="button" class="btn btn-outline-secondary" data-stat-period="7">Últimos 7 días</button>
+                                <div class="btn-group btn-group-sm mb-3" role="group" data-gsc-toggle>
+                                    <button type="button" class="btn btn-outline-secondary active" data-gsc-period="28">Últimos 28 días</button>
+                                    <button type="button" class="btn btn-outline-secondary" data-gsc-period="7">Últimos 7 días</button>
                                 </div>
                                 <div class="table-responsive mb-3">
-                                    <table class="table table-sm mb-0" data-stat-list data-stat-period="28" data-stat-scope="gsc-main" data-stat-kind="table">
+                                    <table class="table table-sm mb-0" data-gsc-period="28" data-stat-list data-stat-period="28" data-stat-scope="gsc-main" data-stat-kind="table">
                                         <tbody>
                                             <tr>
                                                 <td>Clicks totales</td>
@@ -2336,7 +2336,7 @@
                                             </tr>
                                         </tbody>
                                     </table>
-                                    <table class="table table-sm mb-0 d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-main" data-stat-kind="table">
+                                    <table class="table table-sm mb-0 d-none" data-gsc-period="7" data-stat-list data-stat-period="7" data-stat-scope="gsc-main" data-stat-kind="table">
                                         <tbody>
                                             <tr>
                                                 <td>Clicks totales</td>
@@ -2369,13 +2369,13 @@
                                 </div>
                                 <?php if (!empty($gscQueries28) || !empty($gscQueries7)): ?>
                                     <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Términos más clicados</p>
-                                    <div class="btn-group btn-group-sm mb-3" role="group" data-stat-toggle data-stat-toggle-type="period" data-stat-scope="gsc-terms">
-                                        <button type="button" class="btn btn-outline-secondary active" data-stat-period="28">Últimos 28 días</button>
-                                        <button type="button" class="btn btn-outline-secondary" data-stat-period="7">Últimos 7 días</button>
+                                    <div class="btn-group btn-group-sm mb-3" role="group" data-gsc-toggle>
+                                        <button type="button" class="btn btn-outline-secondary active" data-gsc-period="28">Últimos 28 días</button>
+                                        <button type="button" class="btn btn-outline-secondary" data-gsc-period="7">Últimos 7 días</button>
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscQueries28)): ?>
-                                    <div class="table-responsive" data-stat-list data-stat-period="28" data-stat-scope="gsc-terms" data-stat-kind="block">
+                                    <div class="table-responsive" data-gsc-period="28" data-stat-list data-stat-period="28" data-stat-scope="gsc-terms" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2397,7 +2397,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscQueries7)): ?>
-                                    <div class="table-responsive d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-terms" data-stat-kind="block">
+                                    <div class="table-responsive d-none" data-gsc-period="7" data-stat-list data-stat-period="7" data-stat-scope="gsc-terms" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2420,13 +2420,13 @@
                                 <?php endif; ?>
                                 <?php if (!empty($gscPages7) || !empty($gscPages28)): ?>
                                     <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Páginas más clicadas</p>
-                                    <div class="btn-group btn-group-sm mb-3" role="group" data-stat-toggle data-stat-toggle-type="period" data-stat-scope="gsc-pages">
-                                        <button type="button" class="btn btn-outline-secondary active" data-stat-period="28">Últimos 28 días</button>
-                                        <button type="button" class="btn btn-outline-secondary" data-stat-period="7">Últimos 7 días</button>
+                                    <div class="btn-group btn-group-sm mb-3" role="group" data-gsc-toggle>
+                                        <button type="button" class="btn btn-outline-secondary active" data-gsc-period="28">Últimos 28 días</button>
+                                        <button type="button" class="btn btn-outline-secondary" data-gsc-period="7">Últimos 7 días</button>
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscPages7)): ?>
-                                    <div class="table-responsive mb-3 d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-pages" data-stat-kind="block">
+                                    <div class="table-responsive mb-3 d-none" data-gsc-period="7" data-stat-list data-stat-period="7" data-stat-scope="gsc-pages" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2466,7 +2466,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscPages28)): ?>
-                                    <div class="table-responsive mb-3" data-stat-list data-stat-period="28" data-stat-scope="gsc-pages" data-stat-kind="block">
+                                    <div class="table-responsive mb-3" data-gsc-period="28" data-stat-list data-stat-period="28" data-stat-scope="gsc-pages" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2507,13 +2507,13 @@
                                 <?php endif; ?>
                                 <?php if (!empty($gscCountries7) || !empty($gscCountries28)): ?>
                                     <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Principales países</p>
-                                    <div class="btn-group btn-group-sm mb-3" role="group" data-stat-toggle data-stat-toggle-type="period" data-stat-scope="gsc-countries">
-                                        <button type="button" class="btn btn-outline-secondary active" data-stat-period="28">Últimos 28 días</button>
-                                        <button type="button" class="btn btn-outline-secondary" data-stat-period="7">Últimos 7 días</button>
+                                    <div class="btn-group btn-group-sm mb-3" role="group" data-gsc-toggle>
+                                        <button type="button" class="btn btn-outline-secondary active" data-gsc-period="28">Últimos 28 días</button>
+                                        <button type="button" class="btn btn-outline-secondary" data-gsc-period="7">Últimos 7 días</button>
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscCountries7)): ?>
-                                    <div class="table-responsive mb-3 d-none" data-stat-list data-stat-period="7" data-stat-scope="gsc-countries" data-stat-kind="block">
+                                    <div class="table-responsive mb-3 d-none" data-gsc-period="7" data-stat-list data-stat-period="7" data-stat-scope="gsc-countries" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2545,7 +2545,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <?php if (!empty($gscCountries28)): ?>
-                                    <div class="table-responsive" data-stat-list data-stat-period="28" data-stat-scope="gsc-countries" data-stat-kind="block">
+                                    <div class="table-responsive" data-gsc-period="28" data-stat-list data-stat-period="28" data-stat-scope="gsc-countries" data-stat-kind="block">
                                         <table class="table table-sm mb-0">
                                             <thead>
                                                 <tr>
@@ -2692,6 +2692,30 @@
                         applyScopePeriod(block, scope, btn.getAttribute('data-stat-period'));
                     }
                 }
+            });
+            document.addEventListener('click', function(event) {
+                var btn = event.target.closest('[data-gsc-period]');
+                if (!btn) {
+                    return;
+                }
+                var gscCard = btn.closest('#gsc-dashboard');
+                if (!gscCard) {
+                    return;
+                }
+                event.preventDefault();
+                var period = btn.getAttribute('data-gsc-period');
+                gscCard.querySelectorAll('[data-gsc-toggle]').forEach(function(group) {
+                    group.querySelectorAll('[data-gsc-period]').forEach(function(item) {
+                        item.classList.toggle('active', item === btn);
+                    });
+                });
+                gscCard.querySelectorAll('[data-gsc-period]').forEach(function(item) {
+                    var target = item.getAttribute('data-gsc-period');
+                    if (item.hasAttribute('data-gsc-toggle')) {
+                        return;
+                    }
+                    item.classList.toggle('d-none', target !== period);
+                });
             });
         })();
     </script>

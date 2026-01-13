@@ -168,7 +168,7 @@ $renderPostCards = static function (array $subset, bool $hideMeta = false) use (
         <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
             <?php if ($imageUrl): ?>
                 <a class="<?= htmlspecialchars($thumbClass, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($link, ENT_QUOTES, 'UTF-8') ?>">
-                    <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?>">
+                    <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
                 </a>
             <?php endif; ?>
             <div class="post-body">

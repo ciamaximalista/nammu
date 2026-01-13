@@ -223,7 +223,7 @@
                 <article class="itinerary-topic-card">
                     <?php if ($topicImageUrl): ?>
                         <figure class="itinerary-topic-card__media">
-                            <img src="<?= htmlspecialchars($topicImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($topic['title'], ENT_QUOTES, 'UTF-8') ?>">
+                            <img src="<?= htmlspecialchars($topicImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($topic['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
                         </figure>
                     <?php endif; ?>
                     <div class="itinerary-topic-card__number">

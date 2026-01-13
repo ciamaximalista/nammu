@@ -262,7 +262,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
             <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
                 <?php if ($imageUrl): ?>
                     <a class="<?= htmlspecialchars($thumbClass, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($audioLink, ENT_QUOTES, 'UTF-8') ?>">
-                        <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($episode['title'], ENT_QUOTES, 'UTF-8') ?>">
+                        <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($episode['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
                     </a>
                 <?php endif; ?>
                 <div class="post-body">

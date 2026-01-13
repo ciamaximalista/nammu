@@ -308,7 +308,7 @@ if ($isPageTemplate && $formattedDate !== '') {
     if ($imageUrl):
     ?>
         <figure class="post-hero">
-            <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($post->getTitle(), ENT_QUOTES, 'UTF-8') ?>">
+            <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($post->getTitle(), ENT_QUOTES, 'UTF-8') ?>" decoding="async" fetchpriority="high">
         </figure>
     <?php endif; ?>
     <div class="post-body">

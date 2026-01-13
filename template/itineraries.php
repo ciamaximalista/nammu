@@ -99,7 +99,7 @@ if (!in_array($blocksMode, ['boxed', 'flat'], true)) {
             <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
                 <?php if ($cover): ?>
                     <a class="<?= htmlspecialchars($thumbClass, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>">
-                        <img src="<?= htmlspecialchars($cover, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($itinerary->getTitle(), ENT_QUOTES, 'UTF-8') ?>">
+                        <img src="<?= htmlspecialchars($cover, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($itinerary->getTitle(), ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
                     </a>
                 <?php endif; ?>
                 <div class="itinerary-card__body">

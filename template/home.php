@@ -281,7 +281,7 @@ $renderPostCards = static function (array $subset, bool $hideMeta = false) use (
         <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
             <?php if ($imageUrl): ?>
                 <a class="<?= htmlspecialchars($thumbClass, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($link, ENT_QUOTES, 'UTF-8') ?>">
-                    <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?>">
+                    <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
                 </a>
             <?php endif; ?>
             <div class="post-body">
@@ -384,7 +384,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
 ?>
 <?php if ($headerType === 'graphic' && $headerImageUrl): ?>
     <section class="home-hero home-hero-graphic mode-<?= htmlspecialchars($headerMode, ENT_QUOTES, 'UTF-8') ?>">
-        <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio">
+        <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio" decoding="async" fetchpriority="high">
     </section>
 <?php elseif ($headerType === 'mixed'): ?>
     <?php
@@ -414,7 +414,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
                     }
                     ?>
                     <div class="<?= htmlspecialchars($insideGraphicClass, ENT_QUOTES, 'UTF-8') ?>">
-                        <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio">
+                        <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio" decoding="async" fetchpriority="high">
                     </div>
                 <?php endif; ?>
                 <?php $renderHomeHeroText(); ?>
@@ -426,14 +426,14 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
                     }
                     ?>
                     <div class="<?= htmlspecialchars($insideGraphicClass, ENT_QUOTES, 'UTF-8') ?>">
-                        <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio">
+                        <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio" decoding="async" fetchpriority="high">
                     </div>
                 <?php endif; ?>
             </div>
         <?php else: ?>
             <?php if ($headerOrder === 'image-text' && $hasHeaderImage): ?>
                 <div class="home-hero-graphic mode-<?= htmlspecialchars($headerMode, ENT_QUOTES, 'UTF-8') ?> full">
-                    <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio">
+                    <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio" decoding="async" fetchpriority="high">
                 </div>
             <?php endif; ?>
             <div class="<?= htmlspecialchars($textClasses, ENT_QUOTES, 'UTF-8') ?>">
@@ -441,7 +441,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
             </div>
             <?php if ($headerOrder === 'text-image' && $hasHeaderImage): ?>
                 <div class="home-hero-graphic mode-<?= htmlspecialchars($headerMode, ENT_QUOTES, 'UTF-8') ?> full">
-                    <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio">
+                    <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio" decoding="async" fetchpriority="high">
                 </div>
             <?php endif; ?>
         <?php endif; ?>

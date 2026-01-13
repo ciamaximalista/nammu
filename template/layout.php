@@ -1351,7 +1351,7 @@ if (!empty($baseUrl)) {
             </div>
             <?php if ($adsImageUrl !== ''): ?>
                 <div class="nammu-ad-image">
-                    <img src="<?= htmlspecialchars($adsImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Imagen del anuncio">
+                    <img src="<?= htmlspecialchars($adsImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Imagen del anuncio" loading="lazy" decoding="async">
                 </div>
             <?php endif; ?>
         </div>

@@ -107,7 +107,7 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
             <article class="category-card">
                 <?php if ($coverUrl): ?>
                     <div class="category-cover">
-                        <img src="<?= htmlspecialchars($coverUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($category['name'], ENT_QUOTES, 'UTF-8') ?>">
+                        <img src="<?= htmlspecialchars($coverUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($category['name'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
                     </div>
                 <?php endif; ?>
                 <header>

@@ -1271,16 +1271,28 @@ function admin_bing_api_get(string $method, array $params): array {
     if (isset($params['siteUrl']) && !isset($params['siteurl'])) {
         $params['siteurl'] = $params['siteUrl'];
     }
-    $bases = [
-        'https://ssl.bing.com/webmaster/api.svc/json/',
-        'https://www.bing.com/webmaster/api.svc/json/',
-        'https://ssl.bing.com/webmasters/api.svc/json/',
-        'https://www.bing.com/webmasters/api.svc/json/',
+    $targets = [
+        ['base' => 'https://ssl.bing.com/webmaster/api.svc/json/', 'style' => 'path'],
+        ['base' => 'https://www.bing.com/webmaster/api.svc/json/', 'style' => 'path'],
+        ['base' => 'https://ssl.bing.com/webmasters/api.svc/json/', 'style' => 'path'],
+        ['base' => 'https://www.bing.com/webmasters/api.svc/json/', 'style' => 'path'],
+        ['base' => 'https://ssl.bing.com/webmaster/api.svc/json', 'style' => 'query'],
+        ['base' => 'https://www.bing.com/webmaster/api.svc/json', 'style' => 'query'],
+        ['base' => 'https://ssl.bing.com/', 'style' => 'root'],
+        ['base' => 'https://www.bing.com/', 'style' => 'root'],
     ];
     $method = ltrim($method, '/');
     $lastError = null;
-    foreach ($bases as $base) {
-        $url = $base . $method . '?' . http_build_query($params);
+    foreach ($targets as $target) {
+        $base = $target['base'];
+        $style = $target['style'];
+        if ($style === 'query') {
+            $url = $base . '?method=' . urlencode($method) . '&' . http_build_query($params);
+        } elseif ($style === 'root') {
+            $url = $base . $method . '?' . http_build_query($params);
+        } else {
+            $url = $base . $method . '?' . http_build_query($params);
+        }
         $redirects = 0;
         $respText = '';
         $status = '';

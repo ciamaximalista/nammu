@@ -5736,22 +5736,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (is_array($sites) && array_key_exists('Site', $sites)) {
                         $sites = $sites['Site'];
                     }
-                    $normalizedTarget = rtrim($bing_site_url, '/');
+                    $normalizeBingSite = static function (string $value): string {
+                        $value = trim($value);
+                        if ($value === '') {
+                            return '';
+                        }
+                        $parts = parse_url($value);
+                        if ($parts === false) {
+                            return rtrim(strtolower($value), '/');
+                        }
+                        $host = strtolower($parts['host'] ?? '');
+                        if (str_starts_with($host, 'www.')) {
+                            $host = substr($host, 4);
+                        }
+                        $path = rtrim($parts['path'] ?? '', '/');
+                        return $host . $path;
+                    };
+                    $normalizedTarget = $normalizeBingSite($bing_site_url);
                     $hasSite = false;
+                    $knownSites = [];
                     if (is_array($sites)) {
                         foreach ($sites as $siteItem) {
                             $siteValue = is_array($siteItem) ? ($siteItem['Url'] ?? $siteItem['url'] ?? '') : '';
                             if ($siteValue === '') {
                                 $siteValue = is_string($siteItem) ? $siteItem : '';
                             }
-                            if ($siteValue !== '' && rtrim($siteValue, '/') === $normalizedTarget) {
-                                $hasSite = true;
-                                break;
+                            if ($siteValue !== '') {
+                                $knownSites[] = $siteValue;
+                                if ($normalizeBingSite($siteValue) === $normalizedTarget) {
+                                    $hasSite = true;
+                                    break;
+                                }
                             }
                         }
                     }
                     if (!$hasSite) {
-                        throw new RuntimeException('La clave no tiene acceso al sitio indicado en Bing.');
+                        if (empty($knownSites)) {
+                            throw new RuntimeException('La clave no tiene acceso al sitio indicado en Bing.');
+                        }
+                        $feedback = [
+                            'type' => 'success',
+                            'message' => 'Conexión correcta con Bing Webmaster Tools. El sitio no coincide con los registrados: ' . implode(', ', $knownSites),
+                        ];
+                        $_SESSION['bing_webmaster_feedback'] = $feedback;
+                        header('Location: admin.php?page=configuracion');
+                        exit;
                     }
                 }
                 $feedback = [

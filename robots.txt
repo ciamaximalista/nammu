@@ -6,4 +6,4 @@ Disallow: /content/
 Disallow: /core/
 Disallow: /vendor/
 
-Sitemap: /sitemap.xml
+Sitemap: https://memoria.repoblacion.ong/sitemap.xml

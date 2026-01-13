@@ -755,9 +755,35 @@
                 }
                 $label = '';
                 foreach ($labelKeys as $key) {
-                    if (isset($row[$key]) && trim((string) $row[$key]) !== '') {
-                        $label = trim((string) $row[$key]);
+                    if (!isset($row[$key])) {
+                        continue;
+                    }
+                    $raw = $row[$key];
+                    if (is_array($raw)) {
+                        foreach ($raw as $rawValue) {
+                            if (is_scalar($rawValue) && trim((string) $rawValue) !== '') {
+                                $label = trim((string) $rawValue);
+                                break 2;
+                            }
+                        }
+                    } elseif (is_scalar($raw) && trim((string) $raw) !== '') {
+                        $label = trim((string) $raw);
                         break;
+                    }
+                }
+                if ($label === '') {
+                    foreach ($row as $rawValue) {
+                        if (!is_scalar($rawValue)) {
+                            continue;
+                        }
+                        $candidate = trim((string) $rawValue);
+                        if ($candidate === '') {
+                            continue;
+                        }
+                        if (strpos($candidate, '://') !== false || str_starts_with($candidate, '/') || strpos($candidate, '.blog') !== false || strpos($candidate, '.com') !== false) {
+                            $label = $candidate;
+                            break;
+                        }
                     }
                 }
                 if ($label === '') {
@@ -814,8 +840,8 @@
             $pages7Resp = admin_bing_request_with_dates_multi(['GetPageStats', 'GetPageQueryStats'], $baseParams, $start7, $endDate);
             $pages28Rows = $bingFilterRowsByDate($bingExtractRows($pages28Resp, ['PageStats', 'pageStats', 'PageQueryStats', 'pageQueryStats']), $start30, $endDate);
             $pages7Rows = $bingFilterRowsByDate($bingExtractRows($pages7Resp, ['PageStats', 'pageStats', 'PageQueryStats', 'pageQueryStats']), $start7, $endDate);
-            $bingPages28 = $bingNormalizeDimension($pages28Rows, ['Page', 'Url', 'url'], 'page');
-            $bingPages7 = $bingNormalizeDimension($pages7Rows, ['Page', 'Url', 'url'], 'page');
+            $bingPages28 = $bingNormalizeDimension($pages28Rows, ['Page', 'page', 'Url', 'url', 'PageUrl', 'pageUrl', 'Uri', 'uri', 'Query', 'query'], 'page');
+            $bingPages7 = $bingNormalizeDimension($pages7Rows, ['Page', 'page', 'Url', 'url', 'PageUrl', 'pageUrl', 'Uri', 'uri', 'Query', 'query'], 'page');
 
             if (($bingTotals28['clicks'] ?? 0) === 0 && ($bingTotals28['impressions'] ?? 0) === 0) {
                 $alternateSiteUrl = $bingSiteUrl;
@@ -844,8 +870,8 @@
                     $bingTotals7 = $bingNormalizeTotals($fallbackTotals7Rows);
                     $bingQueries28 = $bingNormalizeDimension($fallbackQueries28Rows, ['Query', 'query'], 'term');
                     $bingQueries7 = $bingNormalizeDimension($fallbackQueries7Rows, ['Query', 'query'], 'term');
-                    $bingPages28 = $bingNormalizeDimension($fallbackPages28Rows, ['Page', 'Url', 'url'], 'page');
-                    $bingPages7 = $bingNormalizeDimension($fallbackPages7Rows, ['Page', 'Url', 'url'], 'page');
+                    $bingPages28 = $bingNormalizeDimension($fallbackPages28Rows, ['Page', 'page', 'Url', 'url', 'PageUrl', 'pageUrl', 'Uri', 'uri', 'Query', 'query'], 'page');
+                    $bingPages7 = $bingNormalizeDimension($fallbackPages7Rows, ['Page', 'page', 'Url', 'url', 'PageUrl', 'pageUrl', 'Uri', 'uri', 'Query', 'query'], 'page');
                 }
             }
 

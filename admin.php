@@ -1740,12 +1740,30 @@ function admin_indexnow_key_path(string $key, string $filename = ''): string {
     return __DIR__ . '/' . $filename;
 }
 
+function admin_indexnow_normalize_site_base(string $base): string {
+    $base = trim($base);
+    if ($base === '') {
+        return '';
+    }
+    $parts = parse_url($base);
+    if (!is_array($parts)) {
+        return rtrim($base, '/');
+    }
+    $scheme = $parts['scheme'] ?? '';
+    $host = $parts['host'] ?? '';
+    if ($scheme === '' || $host === '') {
+        return rtrim($base, '/');
+    }
+    $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+    return rtrim($scheme . '://' . $host . $port, '/');
+}
+
 function admin_indexnow_key_url(string $filename, string $baseOverride = ''): string {
     $base = trim($baseOverride);
     if ($base === '') {
         $base = admin_base_url();
     }
-    $base = rtrim($base, '/');
+    $base = admin_indexnow_normalize_site_base($base);
     $path = '/' . ltrim($filename, '/');
     return $base === '' ? $path : $base . $path;
 }
@@ -1817,7 +1835,7 @@ function admin_indexnow_prepare_config(array &$config): array {
         }
     }
 
-    $siteBase = trim((string) ($config['site_url'] ?? ''));
+    $siteBase = admin_indexnow_normalize_site_base(trim((string) ($config['site_url'] ?? '')));
     $keyUrl = $keyFile !== '' ? admin_indexnow_key_url($keyFile, $siteBase) : '';
 
     return [
@@ -1841,7 +1859,7 @@ function admin_indexnow_status(): array {
     $keyPath = $key !== '' && $keyFile !== '' ? admin_indexnow_key_path($key, $keyFile) : '';
     $fileOk = $key !== '' && $keyFile !== '' && is_file($keyPath)
         && trim((string) file_get_contents($keyPath)) === $key;
-    $siteBase = trim((string) ($config['site_url'] ?? ''));
+    $siteBase = admin_indexnow_normalize_site_base(trim((string) ($config['site_url'] ?? '')));
     $keyUrl = $keyFile !== '' ? admin_indexnow_key_url($keyFile, $siteBase) : '';
 
     return [
@@ -1880,7 +1898,7 @@ function admin_maybe_send_indexnow(array $urls): void {
     }
 
     $host = '';
-    $siteBase = trim((string) ($config['site_url'] ?? ''));
+    $siteBase = admin_indexnow_normalize_site_base(trim((string) ($config['site_url'] ?? '')));
     $base = $siteBase !== '' ? rtrim($siteBase, '/') : admin_base_url();
     if ($base !== '') {
         $host = parse_url($base, PHP_URL_HOST) ?: '';

@@ -1,10 +1,10 @@
 ![Nammu Logo](nammu-banner.png)
 
-# Nammu — CMS ligero para periodistas, editoriales y escuelas
+# Nammu — CMS y CRM ligero para proyectos
 
-Nammu condensa todo lo que esperas de un gestor contemporáneo —edición Markdown, plantillas vivas, itinerarios interactivos y automatización social— en un paquete PHP 8 sin dependencias caprichosas. Es ligero, portable y lo bastante flexible como para lanzar un blog personal, un diccionario multimedia o un curso con estadísticas por tema.
+Nammu condensa todo lo que esperas de un gestor contemporáneo —edición Markdown, plantillas vivas, itinerarios interactivos y automatización social— en un paquete PHP 8 sin dependencias caprichosas. Es ligero, portable y lo bastante flexible como para lanzar un blog personal, un diccionario multimedia, un podcast, una newsletter, sistemas de avisos o un curso y generar tus propias estadísticas sin compartirlas con ninguna empresa.
 
-La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting que ofrezca PHP 8+ y escritura en disco.
+La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting que ofrezca PHP 8+.
 
 ## Qué puedes construir con Nammu
 

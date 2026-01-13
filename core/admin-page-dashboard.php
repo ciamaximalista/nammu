@@ -2919,8 +2919,8 @@
                                 </form>
                                 <?php if ($bingDebug && !empty($GLOBALS['bing_debug_log'])): ?>
                                     <div class="alert alert-warning mb-3">
-                                        <div class="small text-muted mb-1">Depuración Bing (primeros 3 registros)</div>
-                                        <pre class="mb-0 small"><?= htmlspecialchars(json_encode(array_slice($GLOBALS['bing_debug_log'], 0, 3), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?></pre>
+                                        <div class="small text-muted mb-1">Depuración Bing</div>
+                                        <pre class="mb-0 small"><?= htmlspecialchars(json_encode($GLOBALS['bing_debug_log'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?></pre>
                                     </div>
                                 <?php endif; ?>
                                 <div class="btn-group btn-group-sm mb-3 dashboard-toggle bing-toggle bing-buttons" role="group" data-stat-toggle="bing-period" data-stat-scope="bing-period" data-stat-toggle-type="period">

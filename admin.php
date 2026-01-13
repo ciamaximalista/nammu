@@ -1439,6 +1439,15 @@ function admin_bing_api_get(string $method, array $params): array {
         try {
             $soapPayload = admin_bing_api_soap($method, $params);
             if (is_array($soapPayload)) {
+                if (isset($GLOBALS['bing_debug_log']) && is_array($GLOBALS['bing_debug_log'])) {
+                    $GLOBALS['bing_debug_log'][] = [
+                        'method' => $method,
+                        'url' => 'soap:' . $method,
+                        'status' => '200',
+                        'location' => '',
+                        'snippet' => 'SOAP ok',
+                    ];
+                }
                 return $soapPayload;
             }
         } catch (Throwable $e) {

@@ -1375,12 +1375,24 @@ function admin_bing_request_with_dates(string $method, array $baseParams, string
     if ($startTs === false || $endTs === false) {
         throw new RuntimeException('Fechas no válidas para Bing Webmaster Tools.');
     }
+    if (isset($baseParams['siteUrl']) && !isset($baseParams['SiteUrl'])) {
+        $baseParams['SiteUrl'] = $baseParams['siteUrl'];
+    }
+    if (isset($baseParams['apikey']) && !isset($baseParams['ApiKey'])) {
+        $baseParams['ApiKey'] = $baseParams['apikey'];
+    }
     $formats = ['Y-m-d', 'm/d/Y'];
     $lastError = null;
     foreach ($formats as $format) {
         $params = $baseParams;
-        $params['startDate'] = date($format, $startTs);
-        $params['endDate'] = date($format, $endTs);
+        $startValue = date($format, $startTs);
+        $endValue = date($format, $endTs);
+        $params['startDate'] = $startValue;
+        $params['endDate'] = $endValue;
+        $params['startdate'] = $startValue;
+        $params['enddate'] = $endValue;
+        $params['StartDate'] = $startValue;
+        $params['EndDate'] = $endValue;
         try {
             return admin_bing_api_get($method, $params);
         } catch (Throwable $e) {

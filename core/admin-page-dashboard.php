@@ -739,7 +739,7 @@
         };
         try {
             $endDate = $today->format('Y-m-d');
-            $start28 = $today->modify('-27 days')->format('Y-m-d');
+            $start30 = $today->modify('-29 days')->format('Y-m-d');
             $start7 = $today->modify('-6 days')->format('Y-m-d');
             $baseParams = [
                 'apikey' => $bingApiKey,

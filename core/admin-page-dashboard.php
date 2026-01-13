@@ -97,7 +97,7 @@
     $gscForceRefresh = isset($_GET['gsc_refresh']) && $_GET['gsc_refresh'] === '1';
     $bingSettings = $settings['bing_webmaster'] ?? [];
     $bingSiteUrl = trim((string) ($bingSettings['site_url'] ?? ''));
-    $bingSiteUrlNormalized = $bingSiteUrl !== '' ? rtrim($bingSiteUrl, '/') : '';
+    $bingSiteUrlNormalized = $bingSiteUrl !== '' ? rtrim($bingSiteUrl, '/') . '/' : '';
     $bingApiKey = trim((string) ($bingSettings['api_key'] ?? ''));
     $bingHasOauth = !empty($bingSettings['refresh_token']) || !empty($bingSettings['access_token']);
     $bingTotals28 = null;

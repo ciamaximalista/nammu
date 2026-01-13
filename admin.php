@@ -1740,8 +1740,12 @@ function admin_indexnow_key_path(string $key, string $filename = ''): string {
     return __DIR__ . '/' . $filename;
 }
 
-function admin_indexnow_key_url(string $filename): string {
-    $base = admin_base_url();
+function admin_indexnow_key_url(string $filename, string $baseOverride = ''): string {
+    $base = trim($baseOverride);
+    if ($base === '') {
+        $base = admin_base_url();
+    }
+    $base = rtrim($base, '/');
     $path = '/' . ltrim($filename, '/');
     return $base === '' ? $path : $base . $path;
 }
@@ -1813,7 +1817,8 @@ function admin_indexnow_prepare_config(array &$config): array {
         }
     }
 
-    $keyUrl = $keyFile !== '' ? admin_indexnow_key_url($keyFile) : '';
+    $siteBase = trim((string) ($config['site_url'] ?? ''));
+    $keyUrl = $keyFile !== '' ? admin_indexnow_key_url($keyFile, $siteBase) : '';
 
     return [
         'key' => $key,
@@ -1836,7 +1841,8 @@ function admin_indexnow_status(): array {
     $keyPath = $key !== '' && $keyFile !== '' ? admin_indexnow_key_path($key, $keyFile) : '';
     $fileOk = $key !== '' && $keyFile !== '' && is_file($keyPath)
         && trim((string) file_get_contents($keyPath)) === $key;
-    $keyUrl = $keyFile !== '' ? admin_indexnow_key_url($keyFile) : '';
+    $siteBase = trim((string) ($config['site_url'] ?? ''));
+    $keyUrl = $keyFile !== '' ? admin_indexnow_key_url($keyFile, $siteBase) : '';
 
     return [
         'enabled' => $enabled,
@@ -1874,7 +1880,8 @@ function admin_maybe_send_indexnow(array $urls): void {
     }
 
     $host = '';
-    $base = admin_base_url();
+    $siteBase = trim((string) ($config['site_url'] ?? ''));
+    $base = $siteBase !== '' ? rtrim($siteBase, '/') : admin_base_url();
     if ($base !== '') {
         $host = parse_url($base, PHP_URL_HOST) ?: '';
     }
@@ -1883,6 +1890,30 @@ function admin_maybe_send_indexnow(array $urls): void {
     }
     if ($host === '') {
         return;
+    }
+    if ($siteBase !== '' && $status['key_file'] ?? '' !== '') {
+        $keyUrl = admin_indexnow_key_url($status['key_file'], $siteBase);
+    }
+
+    $siteHost = $host !== '' ? strtolower($host) : '';
+    $normalizedUrls = [];
+    foreach ($urls as $url) {
+        $parsed = parse_url($url);
+        if (!is_array($parsed)) {
+            continue;
+        }
+        $urlHost = strtolower((string) ($parsed['host'] ?? ''));
+        $path = $parsed['path'] ?? '';
+        $query = isset($parsed['query']) ? '?' . $parsed['query'] : '';
+        if ($siteHost !== '' && $urlHost !== '' && $urlHost !== $siteHost) {
+            $url = rtrim($base, '/') . $path . $query;
+        } elseif ($siteHost !== '' && $urlHost === '') {
+            $url = rtrim($base, '/') . $path . $query;
+        }
+        $normalizedUrls[] = $url;
+    }
+    if (!empty($normalizedUrls)) {
+        $urls = $normalizedUrls;
     }
 
     $payload = [

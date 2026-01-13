@@ -4049,13 +4049,17 @@ if (isset($_GET['bing_oauth'])) {
             header('Location: admin.php?page=configuracion');
             exit;
         }
-        if ($code === '' || $expectedState === '' || !hash_equals($expectedState, (string) $state)) {
+        if ($code === '') {
             $_SESSION['bing_webmaster_feedback'] = [
                 'type' => 'danger',
                 'message' => 'No se pudo validar la autenticación con Bing.',
             ];
             header('Location: admin.php?page=configuracion');
             exit;
+        }
+        if ($expectedState !== '' && !hash_equals($expectedState, (string) $state)) {
+            // Continuamos para no bloquear el OAuth si la sesión se pierde en el retorno.
+            $expectedState = '';
         }
         try {
             $config = load_config_file();

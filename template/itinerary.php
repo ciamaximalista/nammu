@@ -212,6 +212,7 @@
     <section class="itinerary-topics">
         <h2>Temas del itinerario</h2>
         <div class="itinerary-topics__list">
+            <?php $imageIndex = 0; ?>
             <?php foreach ($topicSummaries as $topic): ?>
                 <?php
                     $topicImage = $topic['image'] ?? null;
@@ -223,7 +224,9 @@
                 <article class="itinerary-topic-card">
                     <?php if ($topicImageUrl): ?>
                         <figure class="itinerary-topic-card__media">
-                            <img src="<?= htmlspecialchars($topicImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($topic['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
+                            <?php $priorityAttrs = $imageIndex === 0 ? ' decoding="async" fetchpriority="high"' : ' loading="lazy" decoding="async"'; ?>
+                            <?php $imageIndex++; ?>
+                            <img src="<?= htmlspecialchars($topicImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($topic['title'], ENT_QUOTES, 'UTF-8') ?>"<?= $priorityAttrs ?>>
                         </figure>
                     <?php endif; ?>
                     <div class="itinerary-topic-card__number">

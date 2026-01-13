@@ -125,6 +125,7 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
 $renderPostCards = static function (array $subset, bool $hideMeta = false) use ($postUrl, $resolveImage, $cardStyle, $fullImageMode, $blocksMode, $searchActionBase, $headingSecondaryColor, $accentColor, $accentBackground, $accentBorder): string {
     ob_start();
     $baseHref = $searchActionBase === '' ? '/' : $searchActionBase;
+    $imageIndex = 0;
     foreach ($subset as $post) {
         $link = $postUrl($post['slug']);
         $imageUrl = $resolveImage($post['image']);
@@ -168,7 +169,9 @@ $renderPostCards = static function (array $subset, bool $hideMeta = false) use (
         <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
             <?php if ($imageUrl): ?>
                 <a class="<?= htmlspecialchars($thumbClass, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($link, ENT_QUOTES, 'UTF-8') ?>">
-                    <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
+                    <?php $priorityAttrs = $imageIndex === 0 ? ' decoding="async" fetchpriority="high"' : ' loading="lazy" decoding="async"'; ?>
+                    <?php $imageIndex++; ?>
+                    <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?>"<?= $priorityAttrs ?>>
                 </a>
             <?php endif; ?>
             <div class="post-body">

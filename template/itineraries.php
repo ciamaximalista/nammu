@@ -64,7 +64,8 @@ if (!in_array($blocksMode, ['boxed', 'flat'], true)) {
     <p>No hay itinerarios publicados todavía.</p>
 <?php else: ?>
     <section class="itinerary-grid columns-<?= $columns ?> blocks-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?>">
-        <?php foreach ($itineraries as $itinerary): ?>
+<?php $imageIndex = 0; ?>
+<?php foreach ($itineraries as $itinerary): ?>
             <?php
             $url = $itineraryUrl($itinerary);
             $cover = $resolveImage($itinerary->getImage());
@@ -99,7 +100,9 @@ if (!in_array($blocksMode, ['boxed', 'flat'], true)) {
             <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
                 <?php if ($cover): ?>
                     <a class="<?= htmlspecialchars($thumbClass, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>">
-                        <img src="<?= htmlspecialchars($cover, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($itinerary->getTitle(), ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
+                        <?php $priorityAttrs = $imageIndex === 0 ? ' decoding="async" fetchpriority="high"' : ' loading="lazy" decoding="async"'; ?>
+                        <?php $imageIndex++; ?>
+                        <img src="<?= htmlspecialchars($cover, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($itinerary->getTitle(), ENT_QUOTES, 'UTF-8') ?>"<?= $priorityAttrs ?>>
                     </a>
                 <?php endif; ?>
                 <div class="itinerary-card__body">

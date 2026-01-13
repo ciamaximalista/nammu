@@ -102,12 +102,15 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
     </section>
 <?php else: ?>
     <section class="category-grid">
-        <?php foreach ($categories as $category): ?>
+<?php $imageIndex = 0; ?>
+<?php foreach ($categories as $category): ?>
             <?php $coverUrl = $resolveImage($category['image'] ?? null); ?>
             <article class="category-card">
                 <?php if ($coverUrl): ?>
                     <div class="category-cover">
-                        <img src="<?= htmlspecialchars($coverUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($category['name'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
+                        <?php $priorityAttrs = $imageIndex === 0 ? ' decoding="async" fetchpriority="high"' : ' loading="lazy" decoding="async"'; ?>
+                        <?php $imageIndex++; ?>
+                        <img src="<?= htmlspecialchars($coverUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($category['name'], ENT_QUOTES, 'UTF-8') ?>"<?= $priorityAttrs ?>>
                     </div>
                 <?php endif; ?>
                 <header>

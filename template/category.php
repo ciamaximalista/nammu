@@ -237,6 +237,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     <p>No hay publicaciones en esta categoría todavía.</p>
 <?php else: ?>
     <section class="post-grid columns-<?= $columns ?> blocks-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?>">
+        <?php $imageIndex = 0; ?>
         <?php foreach ($posts as $post): ?>
             <?php
             $link = $postUrl($post['slug']);
@@ -278,7 +279,9 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
             <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
                 <?php if ($imageUrl): ?>
                     <a class="<?= htmlspecialchars($thumbClass, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($link, ENT_QUOTES, 'UTF-8') ?>">
-                        <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
+                        <?php $priorityAttrs = $imageIndex === 0 ? ' decoding="async" fetchpriority="high"' : ' loading="lazy" decoding="async"'; ?>
+                        <?php $imageIndex++; ?>
+                        <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?>"<?= $priorityAttrs ?>>
                     </a>
                 <?php endif; ?>
                 <div class="post-body">

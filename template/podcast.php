@@ -225,6 +225,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     <p>No hay episodios publicados todavía.</p>
 <?php else: ?>
     <section class="post-grid columns-<?= $columns ?> blocks-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?>">
+        <?php $imageIndex = 0; ?>
         <?php foreach ($episodes as $episode): ?>
             <?php
             $audioLink = $episode['audio'] ?? '';
@@ -262,7 +263,9 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
             <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
                 <?php if ($imageUrl): ?>
                     <a class="<?= htmlspecialchars($thumbClass, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($audioLink, ENT_QUOTES, 'UTF-8') ?>">
-                        <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($episode['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
+                        <?php $priorityAttrs = $imageIndex === 0 ? ' decoding="async" fetchpriority="high"' : ' loading="lazy" decoding="async"'; ?>
+                        <?php $imageIndex++; ?>
+                        <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($episode['title'], ENT_QUOTES, 'UTF-8') ?>"<?= $priorityAttrs ?>>
                     </a>
                 <?php endif; ?>
                 <div class="post-body">

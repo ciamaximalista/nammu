@@ -1256,6 +1256,7 @@ function admin_bing_api_get(string $method, array $params): array {
             $bingAccessToken = null;
         }
     }
+    $useApiKey = isset($params['apikey']) && trim((string) $params['apikey']) !== '';
     if (isset($params['apikey']) && !isset($params['apiKey'])) {
         $params['apiKey'] = $params['apikey'];
     }
@@ -1312,7 +1313,7 @@ function admin_bing_api_get(string $method, array $params): array {
                     'Accept: application/json',
                     'User-Agent: Nammu/1.0',
                 ];
-                if (is_string($bingAccessToken) && $bingAccessToken !== '') {
+                if (!$useApiKey && is_string($bingAccessToken) && $bingAccessToken !== '') {
                     $headers[] = 'Authorization: Bearer ' . $bingAccessToken;
                 }
                 curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
@@ -1333,7 +1334,7 @@ function admin_bing_api_get(string $method, array $params): array {
         if ($respText === '') {
             while ($redirects <= 3) {
                 $headers = "Accept: application/json\r\nUser-Agent: Nammu/1.0\r\n";
-                if (is_string($bingAccessToken) && $bingAccessToken !== '') {
+                if (!$useApiKey && is_string($bingAccessToken) && $bingAccessToken !== '') {
                     $headers .= "Authorization: Bearer " . $bingAccessToken . "\r\n";
                 }
                 $opts = [
@@ -1512,30 +1513,24 @@ function admin_bing_request_with_dates(string $method, array $baseParams, string
     foreach ($formats as $format) {
         $startValue = date($format, $startTs);
         $endValue = date($format, $endTs);
-        $paramSets = [
-            [
-                'apikey' => $apiKey,
-                'siteUrl' => $siteUrl,
-                'startDate' => $startValue,
-                'endDate' => $endValue,
-            ],
-            [
-                'ApiKey' => $apiKey,
-                'SiteUrl' => $siteUrl,
-                'StartDate' => $startValue,
-                'EndDate' => $endValue,
-            ],
-            [
-                'apikey' => $apiKey,
-                'siteUrl' => $siteUrl,
-                'startdate' => $startValue,
-                'enddate' => $endValue,
-            ],
+        $params = [
+            'siteUrl' => $siteUrl,
+            'startDate' => $startValue,
+            'endDate' => $endValue,
         ];
-        foreach ($paramSets as $params) {
-            $params = array_filter($params, static fn($value) => $value !== '' && $value !== null);
+        if ($apiKey !== '') {
+            $params['apikey'] = $apiKey;
+        }
+        try {
+            return admin_bing_api_get($method, array_filter($params, static fn($value) => $value !== '' && $value !== null));
+        } catch (Throwable $e) {
+            $lastError = $e;
+        }
+        if ($apiKey !== '') {
+            $params['ApiKey'] = $apiKey;
+            unset($params['apikey']);
             try {
-                return admin_bing_api_get($method, $params);
+                return admin_bing_api_get($method, array_filter($params, static fn($value) => $value !== '' && $value !== null));
             } catch (Throwable $e) {
                 $lastError = $e;
             }

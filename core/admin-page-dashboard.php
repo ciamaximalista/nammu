@@ -745,8 +745,8 @@
                 'apikey' => $bingApiKey,
                 'siteUrl' => $bingSiteUrl,
             ];
-            $totals28Resp = admin_bing_request_with_dates_multi(['GetRankAndTrafficStats', 'GetSiteStats'], $baseParams, $start30, $endDate);
-            $totals7Resp = admin_bing_request_with_dates_multi(['GetRankAndTrafficStats', 'GetSiteStats'], $baseParams, $start7, $endDate);
+            $totals28Resp = admin_bing_request_with_dates_multi(['GetSiteStats', 'GetRankAndTrafficStats'], $baseParams, $start30, $endDate);
+            $totals7Resp = admin_bing_request_with_dates_multi(['GetSiteStats', 'GetRankAndTrafficStats'], $baseParams, $start7, $endDate);
             $bingTotals28 = $bingNormalizeTotals($bingExtractRows($totals28Resp, ['SiteStats', 'siteStats']));
             $bingTotals7 = $bingNormalizeTotals($bingExtractRows($totals7Resp, ['SiteStats', 'siteStats']));
 

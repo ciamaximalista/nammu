@@ -1326,10 +1326,15 @@ function admin_bing_api_get(string $method, array $params): array {
         $decoded = json_decode($respText, true);
         if (!is_array($decoded)) {
             if ($respText !== '' && str_starts_with($respText, '<')) {
-                $xml = @simplexml_load_string($respText);
-                if ($xml !== false) {
-                    $json = json_encode($xml);
-                    $decoded = is_string($json) ? json_decode($json, true) : null;
+                $lower = strtolower($respText);
+                if (strpos($lower, '<html') !== false || strpos($lower, '<!doctype html') !== false) {
+                    $decoded = null;
+                } else {
+                    $xml = @simplexml_load_string($respText);
+                    if ($xml !== false) {
+                        $json = json_encode($xml);
+                        $decoded = is_string($json) ? json_decode($json, true) : null;
+                    }
                 }
             }
         }
@@ -5726,8 +5731,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $tested = false;
                 }
                 if (!$tested) {
-                    $sitesPayload = admin_bing_api_get('GetSites', ['apikey' => $bing_api_key]);
-                    $sites = $sitesPayload['Sites'] ?? $sitesPayload['sites'] ?? [];
+                    $sitesPayload = admin_bing_api_get('GetUserSites', ['apikey' => $bing_api_key]);
+                    $sites = $sitesPayload['Sites'] ?? $sitesPayload['sites'] ?? $sitesPayload['UserSites'] ?? $sitesPayload['userSites'] ?? [];
+                    if (is_array($sites) && array_key_exists('Site', $sites)) {
+                        $sites = $sites['Site'];
+                    }
                     $normalizedTarget = rtrim($bing_site_url, '/');
                     $hasSite = false;
                     if (is_array($sites)) {

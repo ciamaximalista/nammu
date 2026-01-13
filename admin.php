@@ -1272,8 +1272,10 @@ function admin_bing_api_get(string $method, array $params): array {
         $params['siteurl'] = $params['siteUrl'];
     }
     $bases = [
-        'https://www.bing.com/webmasters/api.svc/json/',
+        'https://ssl.bing.com/webmaster/api.svc/json/',
+        'https://www.bing.com/webmaster/api.svc/json/',
         'https://ssl.bing.com/webmasters/api.svc/json/',
+        'https://www.bing.com/webmasters/api.svc/json/',
     ];
     $method = ltrim($method, '/');
     $lastError = null;

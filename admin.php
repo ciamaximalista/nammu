@@ -4867,7 +4867,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         admin_regenerate_podcast_feed();
                     }
                     if ($status === 'published') {
-                        $shouldIndexnow = $previousStatus === 'draft' || $publishDraftAsEntry || $publishDraftAsPage || $publishDraftAsPodcast || $renameRequested;
+                        $shouldIndexnow = $previousStatus === 'published' || $previousStatus === 'draft' || $publishDraftAsEntry || $publishDraftAsPage || $publishDraftAsPodcast || $renameRequested;
                         if ($shouldIndexnow) {
                             $indexnowUrls = [];
                             $slug = pathinfo($targetFilename, PATHINFO_FILENAME);

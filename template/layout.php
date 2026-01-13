@@ -147,8 +147,14 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= htmlspecialchars($pageTitle !== '' ? "{$pageTitle} — {$siteTitle}" : $siteTitle, ENT_QUOTES, 'UTF-8') ?></title>
-    <?php if (($metaDescription ?? '') !== ''): ?>
-        <meta name="description" content="<?= htmlspecialchars($metaDescription, ENT_QUOTES, 'UTF-8') ?>">
+    <?php
+        $finalMetaDescription = $siteDescription ?? '';
+        if ($finalMetaDescription === '') {
+            $finalMetaDescription = $metaDescription ?? '';
+        }
+    ?>
+    <?php if ($finalMetaDescription !== ''): ?>
+        <meta name="description" content="<?= htmlspecialchars($finalMetaDescription, ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
     <?php if ($metaRobots !== ''): ?>
         <meta name="robots" content="<?= htmlspecialchars($metaRobots, ENT_QUOTES, 'UTF-8') ?>">

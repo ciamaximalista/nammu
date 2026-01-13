@@ -1256,21 +1256,30 @@ function admin_bing_api_get(string $method, array $params): array {
             $bingAccessToken = null;
         }
     }
-    $useApiKey = isset($params['apikey']) && trim((string) $params['apikey']) !== '';
-    if (isset($params['apikey']) && !isset($params['apiKey'])) {
-        $params['apiKey'] = $params['apikey'];
+    $cleanParams = [];
+    foreach ($params as $key => $value) {
+        $lower = strtolower((string) $key);
+        if ($lower === '') {
+            continue;
+        }
+        if (!array_key_exists($lower, $cleanParams)) {
+            $cleanParams[$lower] = ['key' => $key, 'value' => $value];
+            continue;
+        }
+        if (in_array($key, ['ApiKey', 'SiteUrl', 'StartDate', 'EndDate'], true)) {
+            $cleanParams[$lower] = ['key' => $key, 'value' => $value];
+        }
     }
-    if (isset($params['apiKey']) && !isset($params['apikey'])) {
-        $params['apikey'] = $params['apiKey'];
+    $params = [];
+    foreach ($cleanParams as $entry) {
+        $params[$entry['key']] = $entry['value'];
     }
-    if (isset($params['siteUrl']) && !isset($params['SiteUrl'])) {
-        $params['SiteUrl'] = $params['siteUrl'];
-    }
-    if (isset($params['SiteUrl']) && !isset($params['siteUrl'])) {
-        $params['siteUrl'] = $params['SiteUrl'];
-    }
-    if (isset($params['siteUrl']) && !isset($params['siteurl'])) {
-        $params['siteurl'] = $params['siteUrl'];
+    $useApiKey = false;
+    foreach (['apikey', 'apiKey', 'ApiKey'] as $key) {
+        if (isset($params[$key]) && trim((string) $params[$key]) !== '') {
+            $useApiKey = true;
+            break;
+        }
     }
     $targets = [
         ['base' => 'https://ssl.bing.com/webmaster/api.svc/json/', 'style' => 'path'],
@@ -1508,8 +1517,14 @@ function admin_bing_request_with_dates(string $method, array $baseParams, string
     }
     $formats = ['Y-m-d', 'm/d/Y'];
     $lastError = null;
-    $apiKey = $baseParams['apikey'] ?? $baseParams['ApiKey'] ?? '';
+    $apiKey = $baseParams['apikey'] ?? $baseParams['apiKey'] ?? $baseParams['ApiKey'] ?? '';
     $siteUrl = $baseParams['siteUrl'] ?? $baseParams['SiteUrl'] ?? '';
+    if (is_string($siteUrl)) {
+        $siteUrl = trim($siteUrl);
+        if ($siteUrl !== '' && str_starts_with($siteUrl, 'http') && !str_ends_with($siteUrl, '/')) {
+            $siteUrl .= '/';
+        }
+    }
     foreach ($formats as $format) {
         $startValue = date($format, $startTs);
         $endValue = date($format, $endTs);
@@ -1519,20 +1534,23 @@ function admin_bing_request_with_dates(string $method, array $baseParams, string
             'endDate' => $endValue,
         ];
         if ($apiKey !== '') {
-            $params['apikey'] = $apiKey;
+            $params['ApiKey'] = $apiKey;
         }
         try {
             return admin_bing_api_get($method, array_filter($params, static fn($value) => $value !== '' && $value !== null));
         } catch (Throwable $e) {
             $lastError = $e;
         }
-        if ($apiKey !== '') {
-            $params['ApiKey'] = $apiKey;
-            unset($params['apikey']);
-            try {
-                return admin_bing_api_get($method, array_filter($params, static fn($value) => $value !== '' && $value !== null));
-            } catch (Throwable $e) {
-                $lastError = $e;
+        if ($apiKey !== '' && $lastError instanceof Throwable) {
+            $errorText = $lastError->getMessage();
+            if (stripos($errorText, 'invalidapikey') !== false || stripos($errorText, 'invalid api key') !== false) {
+                $params['apikey'] = $apiKey;
+                unset($params['ApiKey']);
+                try {
+                    return admin_bing_api_get($method, array_filter($params, static fn($value) => $value !== '' && $value !== null));
+                } catch (Throwable $e) {
+                    $lastError = $e;
+                }
             }
         }
     }

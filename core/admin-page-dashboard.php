@@ -2692,6 +2692,12 @@
 
         <div class="row">
             <div class="col-12">
+                <?php if (
+                    ($gscProperty !== '' && $gscClientId !== '' && $gscClientSecret !== '' && $gscRefreshToken !== '')
+                    || ($bingSiteUrl !== '' || $bingApiKey !== '' || $bingHasOauth)
+                ): ?>
+                    <h3 class="h6 text-uppercase text-muted mb-3">Integración con buscadores</h3>
+                <?php endif; ?>
                 <?php if ($gscProperty !== '' && $gscClientId !== '' && $gscClientSecret !== '' && $gscRefreshToken !== ''): ?>
                     <div class="card mb-4" id="gsc-dashboard">
                         <div class="card-body">

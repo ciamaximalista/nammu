@@ -1873,14 +1873,14 @@ function nammu_generate_podcast_feed(string $baseUrl, array $config): string
 
     $itemsXml = [];
     foreach ($items as $item) {
-        $itemTitle = htmlspecialchars($item['title'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $itemDescription = htmlspecialchars($item['description'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $itemTitle = htmlspecialchars((string) ($item['title'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $itemDescription = htmlspecialchars((string) ($item['description'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $pubDate = gmdate(DATE_RSS, (int) $item['timestamp']);
         $guid = 'podcast:' . md5((string) ($item['filename'] ?? $item['audio']));
-        $audioUrl = htmlspecialchars($item['audio'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $audioUrl = htmlspecialchars((string) ($item['audio'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $audioLength = htmlspecialchars((string) ($item['audio_length'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $durationEsc = htmlspecialchars($item['audio_duration'] ?? '00:00:00', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $imageUrl = htmlspecialchars($item['image'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $durationEsc = htmlspecialchars((string) ($item['audio_duration'] ?? '00:00:00'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $imageUrl = htmlspecialchars((string) ($item['image'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $imageTag = $imageUrl !== '' ? "\n      <itunes:image href=\"{$imageUrl}\" />" : '';
         $itemsXml[] = <<<XML
     <item>
@@ -1895,7 +1895,7 @@ function nammu_generate_podcast_feed(string $baseUrl, array $config): string
 XML;
     }
     $itemsBlock = implode("\n", $itemsXml);
-    $itunesImageTag = $homeImage !== '' ? "\n    <itunes:image href=\"" . htmlspecialchars($homeImage, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "\" />" : '';
+    $itunesImageTag = $homeImage !== '' ? "\n    <itunes:image href=\"" . htmlspecialchars((string) $homeImage, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "\" />" : '';
     $ownerEmailTag = $ownerEmailEsc !== '' ? "<itunes:email>{$ownerEmailEsc}</itunes:email>" : "<itunes:email></itunes:email>";
 
     return <<<XML

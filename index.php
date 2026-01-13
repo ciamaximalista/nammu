@@ -613,6 +613,12 @@ if ($routePath === '/rss.xml') {
 }
 
 if ($routePath === '/podcast.xml') {
+    if (empty($hasPodcast)) {
+        header('HTTP/1.1 404 Not Found');
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo 'No hay episodios de podcast publicados.';
+        exit;
+    }
     $podcastFeed = nammu_generate_podcast_feed($publicBaseUrl, $config);
     header('Content-Type: application/rss+xml; charset=UTF-8');
     echo $podcastFeed;
@@ -1995,7 +2001,9 @@ if ($publicBaseUrl !== '') {
         false
     );
     @file_put_contents(__DIR__ . '/itinerarios.xml', $itineraryFeedContent);
-    @file_put_contents(__DIR__ . '/podcast.xml', nammu_generate_podcast_feed($publicBaseUrl, $config));
+    if (!empty($hasPodcast)) {
+        @file_put_contents(__DIR__ . '/podcast.xml', nammu_generate_podcast_feed($publicBaseUrl, $config));
+    }
 }
 $sitemapGenerator = new SitemapGenerator($publicBaseUrl);
 $sitemapXml = $sitemapGenerator->generate($buildSitemapEntries($posts, $theme, $publicBaseUrl));

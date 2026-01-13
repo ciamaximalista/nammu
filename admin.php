@@ -1375,28 +1375,40 @@ function admin_bing_request_with_dates(string $method, array $baseParams, string
     if ($startTs === false || $endTs === false) {
         throw new RuntimeException('Fechas no válidas para Bing Webmaster Tools.');
     }
-    if (isset($baseParams['siteUrl']) && !isset($baseParams['SiteUrl'])) {
-        $baseParams['SiteUrl'] = $baseParams['siteUrl'];
-    }
-    if (isset($baseParams['apikey']) && !isset($baseParams['ApiKey'])) {
-        $baseParams['ApiKey'] = $baseParams['apikey'];
-    }
     $formats = ['Y-m-d', 'm/d/Y'];
     $lastError = null;
+    $apiKey = $baseParams['apikey'] ?? $baseParams['ApiKey'] ?? '';
+    $siteUrl = $baseParams['siteUrl'] ?? $baseParams['SiteUrl'] ?? '';
     foreach ($formats as $format) {
-        $params = $baseParams;
         $startValue = date($format, $startTs);
         $endValue = date($format, $endTs);
-        $params['startDate'] = $startValue;
-        $params['endDate'] = $endValue;
-        $params['startdate'] = $startValue;
-        $params['enddate'] = $endValue;
-        $params['StartDate'] = $startValue;
-        $params['EndDate'] = $endValue;
-        try {
-            return admin_bing_api_get($method, $params);
-        } catch (Throwable $e) {
-            $lastError = $e;
+        $paramSets = [
+            [
+                'apikey' => $apiKey,
+                'siteUrl' => $siteUrl,
+                'startDate' => $startValue,
+                'endDate' => $endValue,
+            ],
+            [
+                'ApiKey' => $apiKey,
+                'SiteUrl' => $siteUrl,
+                'StartDate' => $startValue,
+                'EndDate' => $endValue,
+            ],
+            [
+                'apikey' => $apiKey,
+                'siteUrl' => $siteUrl,
+                'startdate' => $startValue,
+                'enddate' => $endValue,
+            ],
+        ];
+        foreach ($paramSets as $params) {
+            $params = array_filter($params, static fn($value) => $value !== '' && $value !== null);
+            try {
+                return admin_bing_api_get($method, $params);
+            } catch (Throwable $e) {
+                $lastError = $e;
+            }
         }
     }
     throw $lastError ?? new RuntimeException('No se pudo conectar con Bing Webmaster Tools.');

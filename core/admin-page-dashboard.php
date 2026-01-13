@@ -2420,7 +2420,7 @@
                         <div class="card-body">
                             <div class="d-flex flex-column gap-2 mb-3">
                                 <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Páginas más leídas</h4>
-                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="mode">
+                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle align-self-start" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="mode">
                                     <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
                                     <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
                                 </div>
@@ -2459,7 +2459,7 @@
                     <div class="card-body">
                         <div class="d-flex flex-column gap-2 mb-3">
                             <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Búsquedas internas más frecuentes (últimos 30 días)</h4>
-                            <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle" role="group" data-stat-toggle="internal-search" data-stat-toggle-type="mode">
+                            <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle align-self-start" role="group" data-stat-toggle="internal-search" data-stat-toggle-type="mode">
                                 <button type="button" class="btn btn-outline-primary active" data-stat-mode="searches">Búsquedas</button>
                                 <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
                             </div>

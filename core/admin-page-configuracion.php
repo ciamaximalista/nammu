@@ -279,7 +279,7 @@
                             <li>Copia el <strong>Client ID</strong> y el <strong>Client Secret</strong>.</li>
                             <li>Pega esos datos aquí y pulsa <strong>Conectar con Bing</strong> para autorizar la cuenta.</li>
                         </ol>
-                        <p class="mb-0 text-muted">Una vez autorizado, vuelve al Escritorio y pulsa <strong>Actualizar datos ahora</strong>.</p>
+                        <p class="mb-0 text-muted">El scope necesario es <strong>webmaster.manage</strong> y los refresh tokens se rotan en cada uso. Si falla la conexión, vuelve a autorizar para generar un token nuevo.</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>

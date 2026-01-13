@@ -1471,59 +1471,68 @@ function admin_bing_oauth_redirect_uri(): string {
 }
 
 function admin_bing_fetch_token(array $payload): array {
-    $url = 'https://www.bing.com/webmasters/oauth/token';
+    $urls = [
+        'https://www.bing.com/webmasters/oauth/token',
+        'https://ssl.bing.com/webmasters/oauth/token',
+    ];
     $body = http_build_query($payload);
     $headers = [
         'Content-Type: application/x-www-form-urlencoded',
         'Accept: application/json',
         'User-Agent: Nammu/1.0',
     ];
-    $response = '';
-    $status = 0;
-    if (function_exists('curl_init')) {
-        $ch = curl_init($url);
-        if ($ch !== false) {
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-            $resp = curl_exec($ch);
-            $response = is_string($resp) ? $resp : '';
-            $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-        }
-    }
-    if ($response === '') {
-        $opts = [
-            'http' => [
-                'method' => 'POST',
-                'timeout' => 15,
-                'ignore_errors' => true,
-                'header' => implode("\r\n", $headers) . "\r\n",
-                'content' => $body,
-            ],
-        ];
-        $resp = @file_get_contents($url, false, stream_context_create($opts));
-        $response = is_string($resp) ? $resp : '';
-        if (!empty($http_response_header) && is_array($http_response_header)) {
-            $statusLine = $http_response_header[0] ?? '';
-            if (is_string($statusLine) && preg_match('/\\s(\\d{3})\\s/', $statusLine, $match)) {
-                $status = (int) $match[1];
+    $lastError = null;
+    foreach ($urls as $url) {
+        $response = '';
+        $status = 0;
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            if ($ch !== false) {
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+                $resp = curl_exec($ch);
+                $response = is_string($resp) ? $resp : '';
+                $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
             }
         }
+        if ($response === '') {
+            $opts = [
+                'http' => [
+                    'method' => 'POST',
+                    'timeout' => 15,
+                    'ignore_errors' => true,
+                    'header' => implode("\r\n", $headers) . "\r\n",
+                    'content' => $body,
+                ],
+            ];
+            $resp = @file_get_contents($url, false, stream_context_create($opts));
+            $response = is_string($resp) ? $resp : '';
+            if (!empty($http_response_header) && is_array($http_response_header)) {
+                $statusLine = $http_response_header[0] ?? '';
+                if (is_string($statusLine) && preg_match('/\\s(\\d{3})\\s/', $statusLine, $match)) {
+                    $status = (int) $match[1];
+                }
+            }
+        }
+        $decoded = json_decode(trim($response), true);
+        if (!is_array($decoded)) {
+            $snippet = $response !== '' ? mb_substr(trim($response), 0, 160, 'UTF-8') : '';
+            $detail = $snippet !== '' ? ' (' . $snippet . ')' : '';
+            $lastError = new RuntimeException('Respuesta inválida del token OAuth de Bing' . $detail . '.');
+            continue;
+        }
+        if ($status >= 400) {
+            $message = $decoded['error_description'] ?? $decoded['error'] ?? 'Error en el token OAuth de Bing.';
+            $lastError = new RuntimeException($message);
+            continue;
+        }
+        return $decoded;
     }
-    $decoded = json_decode(trim($response), true);
-    if (!is_array($decoded)) {
-        $snippet = $response !== '' ? mb_substr(trim($response), 0, 160, 'UTF-8') : '';
-        $detail = $snippet !== '' ? ' (' . $snippet . ')' : '';
-        throw new RuntimeException('Respuesta inválida del token OAuth de Bing' . $detail . '.');
-    }
-    if ($status >= 400) {
-        $message = $decoded['error_description'] ?? $decoded['error'] ?? 'Error en el token OAuth de Bing.';
-        throw new RuntimeException($message);
-    }
-    return $decoded;
+    throw $lastError ?? new RuntimeException('No se pudo obtener el token OAuth de Bing.');
 }
 
 function admin_bing_get_access_token(bool $forceRefresh = false): ?string {
@@ -4028,8 +4037,9 @@ if (isset($_GET['bing_oauth'])) {
             'client_id' => $clientId,
             'redirect_uri' => $redirectUri,
             'response_type' => 'code',
-            'scope' => 'webmaster',
+            'scope' => 'webmaster.manage offline_access',
             'state' => $state,
+            'prompt' => 'consent',
         ]);
         header('Location: ' . $authUrl);
         exit;

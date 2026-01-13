@@ -662,6 +662,28 @@ if ($routePath === '/llms.txt') {
     exit;
 }
 
+if ($routePath === '/robots.txt') {
+    $base = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '';
+    $sitemapUrl = $base !== '' ? $base . '/sitemap.xml' : '/sitemap.xml';
+    $lines = [
+        'User-agent: *',
+        'Disallow: /admin.php',
+        'Disallow: /admin/',
+        'Disallow: /config/',
+        'Disallow: /core/',
+        'Disallow: /template/',
+        'Disallow: /private/',
+        'Sitemap: ' . $sitemapUrl,
+    ];
+    $robotsText = implode("\n", $lines) . "\n";
+    header('Content-Type: text/plain; charset=UTF-8');
+    echo $robotsText;
+    if ($base !== '') {
+        @file_put_contents(__DIR__ . '/robots.txt', $robotsText);
+    }
+    exit;
+}
+
 if ($routePath === '/sitemap.xml') {
     $posts = $contentRepository->all();
     $sitemapGenerator = new SitemapGenerator($publicBaseUrl);

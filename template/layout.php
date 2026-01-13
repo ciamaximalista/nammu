@@ -73,7 +73,7 @@ if (function_exists('nammu_social_settings')) {
     $defaultMetaDescription = trim((string) ($socialSettings['default_description'] ?? ''));
 }
 $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-$isCrawler = $userAgent !== '' && preg_match('/(bot|crawl|spider|slurp|bingpreview|facebookexternalhit|facebot|linkedinbot|twitterbot|pinterest|whatsapp|telegram|yandex|baiduspider|duckduckbot|sogou|ia_archiver)/i', $userAgent);
+$isCrawler = $userAgent !== '' && preg_match('/(bot|crawl|spider|slurp|bingpreview|facebookexternalhit|facebot|linkedinbot|twitterbot|pinterest|whatsapp|telegram|yandex|baiduspider|duckduckbot|sogou|ia_archiver|pagespeed|lighthouse|chrome-lighthouse|google-page-speed|adsbot-google|gtmetrix|pingdom)/i', $userAgent);
 $statsConsentGiven = $isCrawler || (function_exists('nammu_has_stats_consent') ? nammu_has_stats_consent() : false);
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
 $basePath = parse_url($baseHref, PHP_URL_PATH) ?? '/';
@@ -172,7 +172,13 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
         <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Podcast" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/podcast.xml' : $searchBaseNormalized . '/podcast.xml', ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
     <?php if ($fontLink): ?>
-        <link rel="stylesheet" href="<?= htmlspecialchars($fontLink, ENT_QUOTES, 'UTF-8') ?>">
+        <?php if (strpos($fontLink, 'fonts.googleapis.com') !== false): ?>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <?php endif; ?>
+        <link rel="preload" as="style" href="<?= htmlspecialchars($fontLink, ENT_QUOTES, 'UTF-8') ?>">
+        <link rel="stylesheet" href="<?= htmlspecialchars($fontLink, ENT_QUOTES, 'UTF-8') ?>" media="print" onload="this.media='all'">
+        <noscript><link rel="stylesheet" href="<?= htmlspecialchars($fontLink, ENT_QUOTES, 'UTF-8') ?>"></noscript>
     <?php endif; ?>
     <?php if ($faviconUrl): ?>
         <link rel="icon" href="<?= htmlspecialchars($faviconUrl, ENT_QUOTES, 'UTF-8') ?>">
@@ -2049,9 +2055,10 @@ if (!empty($baseUrl)) {
             var isMobile = window.matchMedia('(max-width: 720px)').matches;
             var offset = isMobile ? 16 : (parseInt(getComputedStyle(document.documentElement).fontSize, 10) * 2.5);
             var gap = isMobile ? 12 : 14;
-            stack.forEach(function(el) {
+            var heights = stack.map(function(el) { return el.offsetHeight; });
+            stack.forEach(function(el, index) {
                 el.style.bottom = offset + 'px';
-                offset += el.offsetHeight + gap;
+                offset += (heights[index] || 0) + gap;
             });
         }
         window.addEventListener('resize', restack);

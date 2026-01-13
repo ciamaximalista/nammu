@@ -1388,7 +1388,25 @@ function admin_bing_api_get(string $method, array $params): array {
             }
             $detailText = !empty($details) ? ' (' . implode(' — ', $details) . ')' : '';
             $lastError = new RuntimeException('Respuesta inválida de Bing Webmaster Tools' . $detailText . '.');
+            if (isset($GLOBALS['bing_debug_log']) && is_array($GLOBALS['bing_debug_log'])) {
+                $GLOBALS['bing_debug_log'][] = [
+                    'method' => $method,
+                    'url' => $finalUrl,
+                    'status' => $status,
+                    'location' => $location,
+                    'snippet' => $snippet,
+                ];
+            }
             continue;
+        }
+        if (isset($GLOBALS['bing_debug_log']) && is_array($GLOBALS['bing_debug_log'])) {
+            $GLOBALS['bing_debug_log'][] = [
+                'method' => $method,
+                'url' => $finalUrl,
+                'status' => $status,
+                'location' => $location,
+                'snippet' => $respText !== '' ? mb_substr($respText, 0, 160, 'UTF-8') : '',
+            ];
         }
         $payload = $decoded['d'] ?? $decoded;
         if (is_array($payload)) {

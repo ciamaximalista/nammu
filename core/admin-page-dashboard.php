@@ -108,6 +108,10 @@
     $bingCache = null;
     $bingUpdatedAtLabel = '';
     $bingForceRefresh = isset($_GET['bing_refresh']) && $_GET['bing_refresh'] === '1';
+    $bingDebug = isset($_GET['bing_debug']) && $_GET['bing_debug'] === '1';
+    if ($bingDebug) {
+        $GLOBALS['bing_debug_log'] = [];
+    }
     $gscCountryNames = [
         'AD' => 'Andorra',
         'AE' => 'Emiratos Árabes Unidos',
@@ -822,6 +826,18 @@
                     : '';
             } else {
                 $bingError = $e->getMessage();
+            }
+        }
+        if ($bingDebug && isset($GLOBALS['bing_debug_log']) && is_array($GLOBALS['bing_debug_log'])) {
+            $debugPayload = [
+                'timestamp' => time(),
+                'site_url' => $bingSiteUrl,
+                'entries' => $GLOBALS['bing_debug_log'],
+            ];
+            $debugPath = dirname(__DIR__) . '/config/bing-debug.json';
+            $debugJson = json_encode($debugPayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            if (is_string($debugJson)) {
+                @file_put_contents($debugPath, $debugJson, LOCK_EX);
             }
         }
     }
@@ -2885,8 +2901,17 @@
                                 <form method="get" class="mb-2">
                                     <input type="hidden" name="page" value="dashboard">
                                     <input type="hidden" name="bing_refresh" value="1">
+                                    <?php if ($bingDebug): ?>
+                                        <input type="hidden" name="bing_debug" value="1">
+                                    <?php endif; ?>
                                     <button type="submit" class="btn btn-outline-primary btn-sm">Actualizar datos ahora</button>
                                 </form>
+                                <?php if ($bingDebug && !empty($GLOBALS['bing_debug_log'])): ?>
+                                    <div class="alert alert-warning mb-3">
+                                        <div class="small text-muted mb-1">Depuración Bing (primeros 3 registros)</div>
+                                        <pre class="mb-0 small"><?= htmlspecialchars(json_encode(array_slice($GLOBALS['bing_debug_log'], 0, 3), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?></pre>
+                                    </div>
+                                <?php endif; ?>
                                 <div class="btn-group btn-group-sm mb-3 dashboard-toggle bing-toggle bing-buttons" role="group" data-stat-toggle="bing-period" data-stat-scope="bing-period" data-stat-toggle-type="period">
                                     <button type="button" class="btn btn-outline-secondary bing-period-label active" data-stat-period="28">Últimos 30 días</button>
                                     <button type="button" class="btn btn-outline-secondary bing-period-label" data-stat-period="7">Últimos 7 días</button>

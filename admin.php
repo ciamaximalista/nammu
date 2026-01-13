@@ -5772,12 +5772,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     if (!$hasSite) {
                         if (empty($knownSites)) {
-                            throw new RuntimeException('La clave no tiene acceso al sitio indicado en Bing.');
+                            $feedback = [
+                                'type' => 'success',
+                                'message' => 'Conexión correcta con Bing Webmaster Tools. No se pudieron validar sitios desde la API; revisa que la URL coincida con la propiedad registrada.',
+                            ];
+                        } else {
+                            $feedback = [
+                                'type' => 'success',
+                                'message' => 'Conexión correcta con Bing Webmaster Tools. El sitio no coincide con los registrados: ' . implode(', ', $knownSites),
+                            ];
                         }
-                        $feedback = [
-                            'type' => 'success',
-                            'message' => 'Conexión correcta con Bing Webmaster Tools. El sitio no coincide con los registrados: ' . implode(', ', $knownSites),
-                        ];
                         $_SESSION['bing_webmaster_feedback'] = $feedback;
                         header('Location: admin.php?page=configuracion');
                         exit;

@@ -2837,11 +2837,13 @@
                         </div>
                     </div>
                 <?php endif; ?>
-                <?php if ($bingSiteUrl !== '' && ($bingApiKey !== '' || $bingHasOauth)): ?>
+                <?php if ($bingSiteUrl !== '' || $bingApiKey !== '' || $bingHasOauth): ?>
                     <div class="card mb-4 dashboard-stat-block" id="bing-dashboard">
                         <div class="card-body">
                             <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Microsoft Bing Webmaster Tools</h4>
-                            <?php if ($bingError !== ''): ?>
+                            <?php if ($bingSiteUrl === ''): ?>
+                                <p class="text-muted mb-0">Define la URL del sitio en Configuración para mostrar los datos de Bing.</p>
+                            <?php elseif ($bingError !== ''): ?>
                                 <p class="text-muted mb-0"><?= htmlspecialchars($bingError, ENT_QUOTES, 'UTF-8') ?></p>
                             <?php elseif ($bingTotals7 === null || $bingTotals28 === null): ?>
                                 <p class="text-muted mb-0">Sin datos disponibles.</p>

@@ -1243,6 +1243,21 @@ function admin_gsc_get(string $accessToken, string $url): array {
 }
 
 function admin_bing_api_get(string $method, array $params): array {
+    if (isset($params['apikey']) && !isset($params['apiKey'])) {
+        $params['apiKey'] = $params['apikey'];
+    }
+    if (isset($params['apiKey']) && !isset($params['apikey'])) {
+        $params['apikey'] = $params['apiKey'];
+    }
+    if (isset($params['siteUrl']) && !isset($params['SiteUrl'])) {
+        $params['SiteUrl'] = $params['siteUrl'];
+    }
+    if (isset($params['SiteUrl']) && !isset($params['siteUrl'])) {
+        $params['siteUrl'] = $params['SiteUrl'];
+    }
+    if (isset($params['siteUrl']) && !isset($params['siteurl'])) {
+        $params['siteurl'] = $params['siteUrl'];
+    }
     $bases = [
         'https://ssl.bing.com/webmaster/api.svc/json/',
         'https://www.bing.com/webmaster/api.svc/json/',

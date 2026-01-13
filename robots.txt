@@ -1,9 +1,0 @@
-User-agent: *
-Disallow: /admin.php
-Disallow: /admin/
-Disallow: /config/
-Disallow: /content/
-Disallow: /core/
-Disallow: /vendor/
-
-Sitemap: https://memoria.repoblacion.ong/sitemap.xml

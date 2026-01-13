@@ -663,7 +663,14 @@ if ($routePath === '/llms.txt') {
 }
 
 if ($routePath === '/robots.txt') {
-    $base = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '';
+    $configBase = '';
+    if (isset($config) && is_array($config)) {
+        $configBase = trim((string) ($config['site_url'] ?? ''));
+    }
+    if ($configBase !== '') {
+        $configBase = rtrim($configBase, '/');
+    }
+    $base = $configBase !== '' ? $configBase : ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '');
     $sitemapUrl = $base !== '' ? $base . '/sitemap.xml' : '/sitemap.xml';
     $lines = [
         'User-agent: *',

@@ -767,6 +767,33 @@
             $bingPages28 = $bingNormalizeDimension($bingExtractRows($pages28Resp, ['PageStats', 'pageStats', 'PageQueryStats', 'pageQueryStats']), ['Page', 'Url', 'url'], 'page');
             $bingPages7 = $bingNormalizeDimension($bingExtractRows($pages7Resp, ['PageStats', 'pageStats', 'PageQueryStats', 'pageQueryStats']), ['Page', 'Url', 'url'], 'page');
 
+            if (($bingTotals28['clicks'] ?? 0) === 0 && ($bingTotals28['impressions'] ?? 0) === 0) {
+                $normalizedSiteUrl = $bingSiteUrl;
+                $normalizedSiteUrl = preg_replace('#^https?://#i', '', $normalizedSiteUrl ?? '');
+                $normalizedSiteUrl = rtrim((string) $normalizedSiteUrl, '/');
+                if ($normalizedSiteUrl !== '') {
+                    $fallbackParams = [
+                        'siteUrl' => $normalizedSiteUrl,
+                    ];
+                    if ($bingApiKey !== '') {
+                        $fallbackParams['apikey'] = $bingApiKey;
+                    }
+                    $fallbackTotals28 = admin_bing_request_with_dates_multi(['GetSiteStats', 'GetRankAndTrafficStats'], $fallbackParams, $start30, $endDate);
+                    $fallbackTotals7 = admin_bing_request_with_dates_multi(['GetSiteStats', 'GetRankAndTrafficStats'], $fallbackParams, $start7, $endDate);
+                    $fallbackQueries28 = admin_bing_request_with_dates_multi(['GetQueryStats', 'GetPageQueryStats'], $fallbackParams, $start30, $endDate);
+                    $fallbackQueries7 = admin_bing_request_with_dates_multi(['GetQueryStats', 'GetPageQueryStats'], $fallbackParams, $start7, $endDate);
+                    $fallbackPages28 = admin_bing_request_with_dates_multi(['GetPageStats', 'GetPageQueryStats'], $fallbackParams, $start30, $endDate);
+                    $fallbackPages7 = admin_bing_request_with_dates_multi(['GetPageStats', 'GetPageQueryStats'], $fallbackParams, $start7, $endDate);
+
+                    $bingTotals28 = $bingNormalizeTotals($bingExtractRows($fallbackTotals28, ['SiteStats', 'siteStats']));
+                    $bingTotals7 = $bingNormalizeTotals($bingExtractRows($fallbackTotals7, ['SiteStats', 'siteStats']));
+                    $bingQueries28 = $bingNormalizeDimension($bingExtractRows($fallbackQueries28, ['QueryStats', 'queryStats', 'PageQueryStats', 'pageQueryStats']), ['Query', 'query'], 'term');
+                    $bingQueries7 = $bingNormalizeDimension($bingExtractRows($fallbackQueries7, ['QueryStats', 'queryStats', 'PageQueryStats', 'pageQueryStats']), ['Query', 'query'], 'term');
+                    $bingPages28 = $bingNormalizeDimension($bingExtractRows($fallbackPages28, ['PageStats', 'pageStats', 'PageQueryStats', 'pageQueryStats']), ['Page', 'Url', 'url'], 'page');
+                    $bingPages7 = $bingNormalizeDimension($bingExtractRows($fallbackPages7, ['PageStats', 'pageStats', 'PageQueryStats', 'pageQueryStats']), ['Page', 'Url', 'url'], 'page');
+                }
+            }
+
             $cachePayload = [
                 'site_url' => $bingSiteUrl,
                 'updated_at' => time(),

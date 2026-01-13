@@ -106,6 +106,8 @@
     $bingQueries7 = [];
     $bingPages28 = [];
     $bingPages7 = [];
+    $bingSitemapLast = '';
+    $bingBacklinks = [];
     $bingError = '';
     $bingCachePath = dirname(__DIR__) . '/config/bing-cache.json';
     $bingCacheTtl = 24 * 60 * 60;
@@ -649,6 +651,8 @@
         $bingQueries7 = $bingCache['queries7'] ?? [];
         $bingPages28 = $bingCache['pages28'] ?? [];
         $bingPages7 = $bingCache['pages7'] ?? [];
+        $bingSitemapLast = $bingCache['sitemap_last'] ?? '';
+        $bingBacklinks = $bingCache['backlinks'] ?? [];
         $bingUpdatedAtLabel = !empty($bingCache['updated_at'])
             ? (new DateTimeImmutable('@' . (int) $bingCache['updated_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('d/m/y')
             : '';
@@ -720,6 +724,62 @@
                 }
             }
             return $filtered;
+        };
+        $bingRequestSimple = static function (array $methods, array $params): array {
+            $lastError = null;
+            foreach ($methods as $method) {
+                try {
+                    return admin_bing_api_get($method, array_filter($params, static fn($value) => $value !== '' && $value !== null));
+                } catch (Throwable $e) {
+                    $lastError = $e;
+                }
+            }
+            if ($lastError instanceof Throwable) {
+                throw $lastError;
+            }
+            return [];
+        };
+        $bingFindBestDate = static function (array $rows) use ($bingParseDate): string {
+            $best = null;
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                foreach (['LastDownloaded', 'LastCrawl', 'LastCrawled', 'LastSubmitted', 'DateSubmitted', 'DateProcessed', 'LastAccessed', 'Date'] as $key) {
+                    if (!isset($row[$key])) {
+                        continue;
+                    }
+                    $ts = $bingParseDate($row[$key]);
+                    if ($ts !== null && ($best === null || $ts > $best)) {
+                        $best = $ts;
+                    }
+                }
+            }
+            return $best !== null ? date('d/m/y', $best) : '';
+        };
+        $bingExtractLinkLabel = static function (array $row): string {
+            foreach (['Url', 'url', 'SourceUrl', 'sourceUrl', 'Link', 'link', 'FromUrl', 'fromUrl', 'Domain', 'domain', 'Site', 'site'] as $key) {
+                if (!isset($row[$key])) {
+                    continue;
+                }
+                $value = $row[$key];
+                if (is_scalar($value)) {
+                    $label = trim((string) $value);
+                    if ($label !== '') {
+                        return $label;
+                    }
+                } elseif (is_array($value)) {
+                    foreach ($value as $item) {
+                        if (is_scalar($item)) {
+                            $label = trim((string) $item);
+                            if ($label !== '') {
+                                return $label;
+                            }
+                        }
+                    }
+                }
+            }
+            return '';
         };
         $bingNormalizeTotals = static function (array $rows) use ($bingValue): array {
             $totalClicks = 0;
@@ -843,6 +903,41 @@
             $bingPages28 = $bingNormalizeDimension($pages28Rows, ['Page', 'page', 'Url', 'url', 'PageUrl', 'pageUrl', 'Uri', 'uri', 'Query', 'query'], 'page');
             $bingPages7 = $bingNormalizeDimension($pages7Rows, ['Page', 'page', 'Url', 'url', 'PageUrl', 'pageUrl', 'Uri', 'uri', 'Query', 'query'], 'page');
 
+            $bingSitemapLast = '';
+            $bingBacklinks = [];
+            try {
+                $bingSitemapResp = $bingRequestSimple(['GetSitemaps', 'GetSitemap', 'GetSitemapFeed'], $baseParams);
+                $sitemapRows = $bingExtractRows($bingSitemapResp, ['Sitemaps', 'sitemaps', 'Sitemap', 'sitemap', 'SitemapInfo', 'sitemapInfo']);
+                $bingSitemapLast = $bingFindBestDate($sitemapRows);
+            } catch (Throwable $e) {
+                $bingSitemapLast = '';
+            }
+            try {
+                $bingBacklinkResp = $bingRequestSimple(['GetBackLinks', 'GetBackLinksByPage', 'GetLinkFromDomains', 'GetInboundLinks', 'GetLinks'], $baseParams);
+                $backlinkRows = $bingExtractRows($bingBacklinkResp, ['BackLinks', 'backLinks', 'InboundLinks', 'inboundLinks', 'Links', 'links', 'LinkFromDomains', 'linkFromDomains']);
+                $seen = [];
+                foreach ($backlinkRows as $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    $label = $bingExtractLinkLabel($row);
+                    if ($label === '') {
+                        continue;
+                    }
+                    $key = strtolower($label);
+                    if (isset($seen[$key])) {
+                        continue;
+                    }
+                    $seen[$key] = true;
+                    $bingBacklinks[] = $label;
+                    if (count($bingBacklinks) >= 10) {
+                        break;
+                    }
+                }
+            } catch (Throwable $e) {
+                $bingBacklinks = [];
+            }
+
             if (($bingTotals28['clicks'] ?? 0) === 0 && ($bingTotals28['impressions'] ?? 0) === 0) {
                 $alternateSiteUrl = $bingSiteUrl;
                 if ($alternateSiteUrl !== '' && $alternateSiteUrl !== ($baseParams['siteUrl'] ?? '')) {
@@ -884,6 +979,8 @@
                 'queries7' => $bingQueries7,
                 'pages28' => $bingPages28,
                 'pages7' => $bingPages7,
+                'sitemap_last' => $bingSitemapLast,
+                'backlinks' => $bingBacklinks,
             ];
             $cacheJson = json_encode($cachePayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
             if ($cacheJson !== false) {
@@ -898,6 +995,8 @@
                 $bingQueries7 = $bingCache['queries7'] ?? [];
                 $bingPages28 = $bingCache['pages28'] ?? [];
                 $bingPages7 = $bingCache['pages7'] ?? [];
+                $bingSitemapLast = $bingCache['sitemap_last'] ?? '';
+                $bingBacklinks = $bingCache['backlinks'] ?? [];
                 $bingUpdatedAtLabel = !empty($bingCache['updated_at'])
                     ? (new DateTimeImmutable('@' . (int) $bingCache['updated_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('d/m/y')
                     : '';
@@ -3176,6 +3275,37 @@
                                     <p class="text-muted mb-0 bing-period-7 d-none" data-stat-list data-stat-scope="bing-period" data-stat-period="7">Sin páginas clicadas en los últimos 7 días.</p>
                                 <?php elseif (empty($bingPages28)): ?>
                                     <p class="text-muted mb-0 bing-period-28" data-stat-list data-stat-scope="bing-period" data-stat-period="28">Sin páginas clicadas en los últimos 30 días.</p>
+                                <?php endif; ?>
+                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Sitemap</p>
+                                <?php if ($bingSitemapLast !== ''): ?>
+                                    <p class="mb-3">Última actualización detectada: <?= htmlspecialchars($bingSitemapLast, ENT_QUOTES, 'UTF-8') ?></p>
+                                <?php else: ?>
+                                    <p class="text-muted mb-3">Sin datos de sitemap todavía.</p>
+                                <?php endif; ?>
+                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Backlinks principales</p>
+                                <?php if (!empty($bingBacklinks)): ?>
+                                    <div class="table-responsive mb-0">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Enlace</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($bingBacklinks as $backlink): ?>
+                                                    <tr>
+                                                        <td class="text-truncate">
+                                                            <a href="<?= htmlspecialchars($backlink, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                                <?= htmlspecialchars($backlink, ENT_QUOTES, 'UTF-8') ?>
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php else: ?>
+                                    <p class="text-muted mb-0">Sin datos de backlinks todavía.</p>
                                 <?php endif; ?>
                                 </div>
                             <?php endif; ?>

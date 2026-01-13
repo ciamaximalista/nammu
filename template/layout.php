@@ -1995,6 +1995,7 @@ if (!empty($baseUrl)) {
                 block.appendChild(actions);
             }
 
+            var syncPending = false;
             function syncHeight() {
                 var styles = getComputedStyle(block);
                 var aspectValue = parseFloat(styles.getPropertyValue('--pdf-aspect')) || 1.414;
@@ -2007,15 +2008,25 @@ if (!empty($baseUrl)) {
                 var height = (availableWidth / aspectValue) * 1.02; // small buffer to avoid scrollbars
                 iframe.style.height = height + 'px';
             }
+            function scheduleSync() {
+                if (syncPending) {
+                    return;
+                }
+                syncPending = true;
+                requestAnimationFrame(function() {
+                    syncPending = false;
+                    syncHeight();
+                });
+            }
 
-            syncHeight();
+            scheduleSync();
             if (typeof ResizeObserver !== 'undefined') {
                 var resizeObserver = new ResizeObserver(function() {
-                    syncHeight();
+                    scheduleSync();
                 });
                 resizeObserver.observe(block);
             } else {
-                window.addEventListener('resize', syncHeight);
+                window.addEventListener('resize', scheduleSync);
             }
 
             block.dataset.pdfEnhanced = '1';
@@ -2051,6 +2062,7 @@ if (!empty($baseUrl)) {
     (function() {
         var stack = Array.prototype.slice.call(document.querySelectorAll('.floating-search'));
         if (!stack.length) return;
+        var pending = false;
         function restack() {
             var isMobile = window.matchMedia('(max-width: 720px)').matches;
             var offset = isMobile ? 16 : (parseInt(getComputedStyle(document.documentElement).fontSize, 10) * 2.5);
@@ -2061,8 +2073,18 @@ if (!empty($baseUrl)) {
                 offset += (heights[index] || 0) + gap;
             });
         }
-        window.addEventListener('resize', restack);
-        restack();
+        function scheduleRestack() {
+            if (pending) {
+                return;
+            }
+            pending = true;
+            requestAnimationFrame(function() {
+                pending = false;
+                restack();
+            });
+        }
+        window.addEventListener('resize', scheduleRestack);
+        scheduleRestack();
     })();
     </script>
 </body>

@@ -67,6 +67,11 @@ if ($postalLogoSvg === '' && function_exists('nammu_postal_icon_svg')) {
 $hasFooterLogo = $footerLogoPosition !== 'none' && !empty($logoUrl);
 $showFooterBlock = ($footerHtml !== '') || $hasFooterLogo || $footerNammuEnabled;
 $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
+$defaultMetaDescription = '';
+if (function_exists('nammu_social_settings')) {
+    $socialSettings = nammu_social_settings();
+    $defaultMetaDescription = trim((string) ($socialSettings['default_description'] ?? ''));
+}
 $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
 $isCrawler = $userAgent !== '' && preg_match('/(bot|crawl|spider|slurp|bingpreview|facebookexternalhit|facebot|linkedinbot|twitterbot|pinterest|whatsapp|telegram|yandex|baiduspider|duckduckbot|sogou|ia_archiver)/i', $userAgent);
 $statsConsentGiven = $isCrawler || (function_exists('nammu_has_stats_consent') ? nammu_has_stats_consent() : false);
@@ -148,7 +153,7 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= htmlspecialchars($pageTitle !== '' ? "{$pageTitle} — {$siteTitle}" : $siteTitle, ENT_QUOTES, 'UTF-8') ?></title>
     <?php
-        $finalMetaDescription = $siteDescription ?? '';
+        $finalMetaDescription = $defaultMetaDescription !== '' ? $defaultMetaDescription : ($siteDescription ?? '');
         if ($finalMetaDescription === '') {
             $finalMetaDescription = $metaDescription ?? '';
         }

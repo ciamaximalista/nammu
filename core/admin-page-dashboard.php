@@ -434,9 +434,10 @@
             if ($accessToken === '') {
                 throw new RuntimeException('No se pudo obtener el access token.');
             }
-            $endDate = $today->format('Y-m-d');
-            $start30 = $today->modify('-29 days')->format('Y-m-d');
-            $start7 = $today->modify('-6 days')->format('Y-m-d');
+            $bingEnd = $today->modify('-1 day');
+            $endDate = $bingEnd->format('Y-m-d');
+            $start30 = $bingEnd->modify('-29 days')->format('Y-m-d');
+            $start7 = $bingEnd->modify('-6 days')->format('Y-m-d');
             $normalizeTotals = static function (array $response): array {
                 $row = [];
                 if (isset($response['rows'][0]) && is_array($response['rows'][0])) {

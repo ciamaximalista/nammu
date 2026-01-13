@@ -643,7 +643,7 @@
         $bingUpdatedAtLabel = !empty($bingCache['updated_at'])
             ? (new DateTimeImmutable('@' . (int) $bingCache['updated_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('d/m/y')
             : '';
-    } elseif ($bingSiteUrl !== '' && $bingApiKey !== '' && function_exists('admin_bing_request_with_dates')) {
+    } elseif ($bingSiteUrl !== '' && ($bingApiKey !== '' || $bingHasOauth) && function_exists('admin_bing_request_with_dates')) {
         $bingExtractRows = static function ($payload, array $keys): array {
             if (!is_array($payload)) {
                 return [];

@@ -49,6 +49,7 @@
         $bingClientSecret = $bingWebmasterSettings['client_secret'] ?? '';
         $bingRefreshToken = $bingWebmasterSettings['refresh_token'] ?? '';
         $bingAccessToken = $bingWebmasterSettings['access_token'] ?? '';
+        $bingApiKey = $bingWebmasterSettings['api_key'] ?? '';
         $bingRedirectUri = function_exists('admin_bing_oauth_redirect_uri') ? admin_bing_oauth_redirect_uri() : '';
         $languageOptions = [
             'es' => 'Español',
@@ -190,6 +191,11 @@
                 <input type="text" name="bing_client_secret" id="bing_client_secret" class="form-control" value="<?= htmlspecialchars($bingClientSecret, ENT_QUOTES, 'UTF-8') ?>" placeholder="********">
             </div>
             <div class="form-group">
+                <label for="bing_api_key">API Key (Bing Webmaster Tools)</label>
+                <input type="text" name="bing_api_key" id="bing_api_key" class="form-control" value="<?= htmlspecialchars($bingApiKey, ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxxxxxxxxxxxxxx">
+                <small class="form-text text-muted">Algunos endpoints de estadísticas siguen requiriendo API Key.</small>
+            </div>
+            <div class="form-group">
                 <label for="bing_redirect_uri">Redirect URI (Bing OAuth)</label>
                 <input type="text" id="bing_redirect_uri" class="form-control" value="<?= htmlspecialchars($bingRedirectUri, ENT_QUOTES, 'UTF-8') ?>" readonly>
                 <small class="form-text text-muted">Copia esta URL como redirect URI en la app de Bing.</small>
@@ -279,7 +285,7 @@
                             <li>Copia el <strong>Client ID</strong> y el <strong>Client Secret</strong>.</li>
                             <li>Pega esos datos aquí y pulsa <strong>Conectar con Bing</strong> para autorizar la cuenta.</li>
                         </ol>
-                        <p class="mb-0 text-muted">El scope necesario es <strong>webmaster.manage</strong> y los refresh tokens se rotan en cada uso. Si falla la conexión, vuelve a autorizar para generar un token nuevo.</p>
+                        <p class="mb-0 text-muted">El scope necesario es <strong>webmaster.manage</strong> y los refresh tokens se rotan en cada uso. Si los datos no aparecen, añade también la <strong>API Key</strong> del panel (algunos endpoints la siguen exigiendo).</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>

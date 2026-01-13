@@ -5999,6 +5999,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $bing_site_url = trim($_POST['bing_site_url'] ?? '');
         $bing_client_id = trim($_POST['bing_client_id'] ?? '');
         $bing_client_secret = trim($_POST['bing_client_secret'] ?? '');
+        $bing_api_key = trim($_POST['bing_api_key'] ?? '');
         try {
             $config = load_config_file();
             if ($bing_site_url !== '' || $bing_client_id !== '' || $bing_client_secret !== '') {
@@ -6011,7 +6012,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'site_url' => $bing_site_url,
                     'client_id' => $bing_client_id,
                     'client_secret' => $bing_client_secret,
-                    'api_key' => '',
+                    'api_key' => $bing_api_key,
                 ]);
                 if ($clearTokens) {
                     $config['bing_webmaster']['refresh_token'] = '';
@@ -6034,7 +6035,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'type' => 'danger',
             'message' => 'Faltan datos para conectar con Bing Webmaster Tools.',
         ];
-        if ($bing_site_url !== '' && $bing_client_id !== '' && $bing_client_secret !== '') {
+        if ($bing_site_url !== '' && ($bing_client_id !== '' && $bing_client_secret !== '')) {
             try {
                 $token = admin_bing_get_access_token(true);
                 if ($token === null) {

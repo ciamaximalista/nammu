@@ -1276,6 +1276,8 @@ function admin_bing_api_get(string $method, array $params): array {
         ['base' => 'https://www.bing.com/webmaster/api.svc/json/', 'style' => 'path'],
         ['base' => 'https://ssl.bing.com/webmasters/api.svc/json/', 'style' => 'path'],
         ['base' => 'https://www.bing.com/webmasters/api.svc/json/', 'style' => 'path'],
+        ['base' => 'https://ssl.bing.com/webmaster/api.svc/', 'style' => 'path'],
+        ['base' => 'https://www.bing.com/webmaster/api.svc/', 'style' => 'path'],
         ['base' => 'https://ssl.bing.com/webmaster/api.svc/json', 'style' => 'query'],
         ['base' => 'https://www.bing.com/webmaster/api.svc/json', 'style' => 'query'],
         ['base' => 'https://ssl.bing.com/', 'style' => 'root'],

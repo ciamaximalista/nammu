@@ -45,7 +45,10 @@
         $gscRefreshToken = $searchConsoleSettings['refresh_token'] ?? '';
         $bingWebmasterSettings = $settings['bing_webmaster'] ?? [];
         $bingSiteUrl = $bingWebmasterSettings['site_url'] ?? '';
-        $bingApiKey = $bingWebmasterSettings['api_key'] ?? '';
+        $bingClientId = $bingWebmasterSettings['client_id'] ?? '';
+        $bingClientSecret = $bingWebmasterSettings['client_secret'] ?? '';
+        $bingRefreshToken = $bingWebmasterSettings['refresh_token'] ?? '';
+        $bingRedirectUri = function_exists('admin_bing_oauth_redirect_uri') ? admin_bing_oauth_redirect_uri() : '';
         $languageOptions = [
             'es' => 'Español',
             'ca' => 'Català',
@@ -171,19 +174,34 @@
 
         <form method="post" class="mt-4">
             <h4 class="mt-2">Microsoft Bing Webmaster Tools</h4>
-            <p class="text-muted mb-3">Conecta Bing Webmaster Tools para acceder a datos de búsquedas.</p>
+            <p class="text-muted mb-3">Conecta Bing Webmaster Tools con OAuth para acceder a datos de búsquedas.</p>
             <div class="form-group">
                 <label for="bing_site_url">Bing Webmaster Tools (sitio)</label>
                 <input type="url" name="bing_site_url" id="bing_site_url" class="form-control" value="<?= htmlspecialchars($bingSiteUrl, ENT_QUOTES, 'UTF-8') ?>" placeholder="https://tusitio.com/">
                 <small class="form-text text-muted">Introduce la URL exacta verificada en Bing Webmaster Tools. <a href="#" data-toggle="modal" data-target="#bingHelpModal">Ver guía rápida</a></small>
             </div>
             <div class="form-group">
-                <label for="bing_api_key">API Key (Bing Webmaster Tools)</label>
-                <input type="text" name="bing_api_key" id="bing_api_key" class="form-control" value="<?= htmlspecialchars($bingApiKey, ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxxxxxxxxxxxxxx">
-                <small class="form-text text-muted">Se genera en el panel de Bing Webmaster Tools.</small>
+                <label for="bing_client_id">Client ID (Bing OAuth)</label>
+                <input type="text" name="bing_client_id" id="bing_client_id" class="form-control" value="<?= htmlspecialchars($bingClientId, ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxxxxxxxxxxxxxx">
+            </div>
+            <div class="form-group">
+                <label for="bing_client_secret">Client Secret (Bing OAuth)</label>
+                <input type="text" name="bing_client_secret" id="bing_client_secret" class="form-control" value="<?= htmlspecialchars($bingClientSecret, ENT_QUOTES, 'UTF-8') ?>" placeholder="********">
+            </div>
+            <div class="form-group">
+                <label for="bing_redirect_uri">Redirect URI (Bing OAuth)</label>
+                <input type="text" id="bing_redirect_uri" class="form-control" value="<?= htmlspecialchars($bingRedirectUri, ENT_QUOTES, 'UTF-8') ?>" readonly>
+                <small class="form-text text-muted">Copia esta URL como redirect URI en la app de Bing.</small>
+            </div>
+            <div class="form-group">
+                <label>Estado OAuth</label>
+                <div class="form-control-plaintext text-muted">
+                    <?= $bingRefreshToken !== '' ? 'Conectado' : 'Sin conectar' ?>
+                </div>
             </div>
             <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 mb-4">
                 <button type="submit" name="test_bing" class="btn btn-outline-primary mb-2">Guardar y probar</button>
+                <a href="admin.php?bing_oauth=start" class="btn btn-outline-secondary mb-2">Conectar con Bing</a>
             </div>
         </form>
 
@@ -247,7 +265,7 @@
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="bingHelpModalLabel">Guía rápida: Bing Webmaster Tools API</h5>
+                        <h5 class="modal-title" id="bingHelpModalLabel">Guía rápida: Bing Webmaster Tools (OAuth)</h5>
                         <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
                             <span aria-hidden="true">&times;</span>
                         </button>
@@ -255,11 +273,12 @@
                     <div class="modal-body">
                         <ol class="mb-3">
                             <li>Verifica tu sitio en <strong>Bing Webmaster Tools</strong>.</li>
-                            <li>Entra en <strong>Settings &gt; API Access</strong> y genera una <strong>API Key</strong>.</li>
-                            <li>Copia la URL del sitio verificado tal como aparece en Bing.</li>
-                            <li>Pega la URL y la API Key en este formulario y pulsa <strong>Guardar y probar</strong>.</li>
+                            <li>Entra en <strong>Settings &gt; API Access</strong> y crea una aplicación OAuth.</li>
+                            <li>Configura el <strong>Redirect URI</strong> con este valor: <strong><?= htmlspecialchars($bingRedirectUri, ENT_QUOTES, 'UTF-8') ?></strong>.</li>
+                            <li>Copia el <strong>Client ID</strong> y el <strong>Client Secret</strong>.</li>
+                            <li>Pega esos datos aquí y pulsa <strong>Conectar con Bing</strong> para autorizar la cuenta.</li>
                         </ol>
-                        <p class="mb-0 text-muted">La API Key debe tener acceso al sitio indicado.</p>
+                        <p class="mb-0 text-muted">Una vez autorizado, vuelve al Escritorio y pulsa <strong>Actualizar datos ahora</strong>.</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>

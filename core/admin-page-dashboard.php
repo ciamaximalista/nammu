@@ -95,6 +95,7 @@
     $bingSettings = $settings['bing_webmaster'] ?? [];
     $bingSiteUrl = trim((string) ($bingSettings['site_url'] ?? ''));
     $bingApiKey = trim((string) ($bingSettings['api_key'] ?? ''));
+    $bingHasOauth = !empty($bingSettings['refresh_token']) || !empty($bingSettings['access_token']);
     $bingTotals28 = null;
     $bingTotals7 = null;
     $bingQueries28 = [];
@@ -742,9 +743,11 @@
             $start30 = $today->modify('-29 days')->format('Y-m-d');
             $start7 = $today->modify('-6 days')->format('Y-m-d');
             $baseParams = [
-                'apikey' => $bingApiKey,
                 'siteUrl' => $bingSiteUrl,
             ];
+            if ($bingApiKey !== '') {
+                $baseParams['apikey'] = $bingApiKey;
+            }
             $totals28Resp = admin_bing_request_with_dates_multi(['GetSiteStats', 'GetRankAndTrafficStats'], $baseParams, $start30, $endDate);
             $totals7Resp = admin_bing_request_with_dates_multi(['GetSiteStats', 'GetRankAndTrafficStats'], $baseParams, $start7, $endDate);
             $bingTotals28 = $bingNormalizeTotals($bingExtractRows($totals28Resp, ['SiteStats', 'siteStats']));
@@ -2834,7 +2837,7 @@
                         </div>
                     </div>
                 <?php endif; ?>
-                <?php if ($bingSiteUrl !== '' && $bingApiKey !== ''): ?>
+                <?php if ($bingSiteUrl !== '' && ($bingApiKey !== '' || $bingHasOauth)): ?>
                     <div class="card mb-4 dashboard-stat-block" id="bing-dashboard">
                         <div class="card-body">
                             <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Microsoft Bing Webmaster Tools</h4>

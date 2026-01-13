@@ -1058,6 +1058,11 @@ function get_settings() {
     $searchConsole = $config['search_console'] ?? [];
     $bingDefaults = [
         'site_url' => '',
+        'client_id' => '',
+        'client_secret' => '',
+        'refresh_token' => '',
+        'access_token' => '',
+        'access_expires_at' => 0,
         'api_key' => '',
     ];
     $bingWebmaster = array_merge($bingDefaults, $config['bing_webmaster'] ?? []);
@@ -1243,6 +1248,14 @@ function admin_gsc_get(string $accessToken, string $url): array {
 }
 
 function admin_bing_api_get(string $method, array $params): array {
+    $bingAccessToken = null;
+    if (function_exists('admin_bing_get_access_token')) {
+        try {
+            $bingAccessToken = admin_bing_get_access_token();
+        } catch (Throwable $e) {
+            $bingAccessToken = null;
+        }
+    }
     if (isset($params['apikey']) && !isset($params['apiKey'])) {
         $params['apiKey'] = $params['apikey'];
     }
@@ -1280,10 +1293,14 @@ function admin_bing_api_get(string $method, array $params): array {
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                 curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
                 curl_setopt($ch, CURLOPT_TIMEOUT, 12);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                $headers = [
                     'Accept: application/json',
                     'User-Agent: Nammu/1.0',
-                ]);
+                ];
+                if (is_string($bingAccessToken) && $bingAccessToken !== '') {
+                    $headers[] = 'Authorization: Bearer ' . $bingAccessToken;
+                }
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
                 $resp = curl_exec($ch);
                 $respText = is_string($resp) ? trim($resp) : '';
                 $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -1300,12 +1317,16 @@ function admin_bing_api_get(string $method, array $params): array {
 
         if ($respText === '') {
             while ($redirects <= 3) {
+                $headers = "Accept: application/json\r\nUser-Agent: Nammu/1.0\r\n";
+                if (is_string($bingAccessToken) && $bingAccessToken !== '') {
+                    $headers .= "Authorization: Bearer " . $bingAccessToken . "\r\n";
+                }
                 $opts = [
                     'http' => [
                         'method' => 'GET',
                         'timeout' => 12,
                         'ignore_errors' => true,
-                        'header' => "Accept: application/json\r\nUser-Agent: Nammu/1.0\r\n",
+                        'header' => $headers,
                     ],
                 ];
                 $resp = @file_get_contents($finalUrl, false, stream_context_create($opts));
@@ -1439,6 +1460,109 @@ function admin_bing_request_with_dates_multi(array $methods, array $baseParams, 
         }
     }
     throw $lastError ?? new RuntimeException('No se pudo conectar con Bing Webmaster Tools.');
+}
+
+function admin_bing_oauth_redirect_uri(): string {
+    $base = admin_base_url();
+    if ($base === '') {
+        return '/admin.php?bing_oauth=callback';
+    }
+    return $base . '/admin.php?bing_oauth=callback';
+}
+
+function admin_bing_fetch_token(array $payload): array {
+    $url = 'https://www.bing.com/webmasters/oauth/token';
+    $body = http_build_query($payload);
+    $headers = [
+        'Content-Type: application/x-www-form-urlencoded',
+        'Accept: application/json',
+        'User-Agent: Nammu/1.0',
+    ];
+    $response = '';
+    $status = 0;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        if ($ch !== false) {
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+            $resp = curl_exec($ch);
+            $response = is_string($resp) ? $resp : '';
+            $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+        }
+    }
+    if ($response === '') {
+        $opts = [
+            'http' => [
+                'method' => 'POST',
+                'timeout' => 15,
+                'ignore_errors' => true,
+                'header' => implode("\r\n", $headers) . "\r\n",
+                'content' => $body,
+            ],
+        ];
+        $resp = @file_get_contents($url, false, stream_context_create($opts));
+        $response = is_string($resp) ? $resp : '';
+        if (!empty($http_response_header) && is_array($http_response_header)) {
+            $statusLine = $http_response_header[0] ?? '';
+            if (is_string($statusLine) && preg_match('/\\s(\\d{3})\\s/', $statusLine, $match)) {
+                $status = (int) $match[1];
+            }
+        }
+    }
+    $decoded = json_decode(trim($response), true);
+    if (!is_array($decoded)) {
+        $snippet = $response !== '' ? mb_substr(trim($response), 0, 160, 'UTF-8') : '';
+        $detail = $snippet !== '' ? ' (' . $snippet . ')' : '';
+        throw new RuntimeException('Respuesta inválida del token OAuth de Bing' . $detail . '.');
+    }
+    if ($status >= 400) {
+        $message = $decoded['error_description'] ?? $decoded['error'] ?? 'Error en el token OAuth de Bing.';
+        throw new RuntimeException($message);
+    }
+    return $decoded;
+}
+
+function admin_bing_get_access_token(bool $forceRefresh = false): ?string {
+    $config = load_config_file();
+    $bing = $config['bing_webmaster'] ?? [];
+    $accessToken = $bing['access_token'] ?? '';
+    $expiresAt = (int) ($bing['access_expires_at'] ?? 0);
+    if ($accessToken !== '' && $expiresAt > time() + 60 && !$forceRefresh) {
+        return $accessToken;
+    }
+    $refreshToken = $bing['refresh_token'] ?? '';
+    $clientId = $bing['client_id'] ?? '';
+    $clientSecret = $bing['client_secret'] ?? '';
+    if ($refreshToken === '' || $clientId === '' || $clientSecret === '') {
+        return $accessToken !== '' ? $accessToken : null;
+    }
+    $payload = [
+        'client_id' => $clientId,
+        'client_secret' => $clientSecret,
+        'grant_type' => 'refresh_token',
+        'refresh_token' => $refreshToken,
+        'redirect_uri' => admin_bing_oauth_redirect_uri(),
+    ];
+    $token = admin_bing_fetch_token($payload);
+    $newAccess = (string) ($token['access_token'] ?? '');
+    if ($newAccess === '') {
+        return null;
+    }
+    $bing['access_token'] = $newAccess;
+    if (!empty($token['refresh_token'])) {
+        $bing['refresh_token'] = (string) $token['refresh_token'];
+    }
+    $expiresIn = (int) ($token['expires_in'] ?? 0);
+    if ($expiresIn > 0) {
+        $bing['access_expires_at'] = time() + $expiresIn;
+    }
+    $config['bing_webmaster'] = $bing;
+    save_config_file($config);
+    return $newAccess;
 }
 
 function admin_public_post_url(string $slug): string {
@@ -3882,6 +4006,102 @@ if (!is_array($itineraryFeedback) || !isset($itineraryFeedback['message'], $itin
     unset($_SESSION['itinerary_feedback']);
 }
 
+if (isset($_GET['bing_oauth'])) {
+    $action = (string) $_GET['bing_oauth'];
+    if ($action === 'start') {
+        $config = load_config_file();
+        $bing = $config['bing_webmaster'] ?? [];
+        $clientId = trim((string) ($bing['client_id'] ?? ''));
+        $clientSecret = trim((string) ($bing['client_secret'] ?? ''));
+        if ($clientId === '' || $clientSecret === '') {
+            $_SESSION['bing_webmaster_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Faltan el Client ID o el Client Secret de Bing Webmaster Tools.',
+            ];
+            header('Location: admin.php?page=configuracion');
+            exit;
+        }
+        $state = bin2hex(random_bytes(16));
+        $_SESSION['bing_oauth_state'] = $state;
+        $redirectUri = admin_bing_oauth_redirect_uri();
+        $authUrl = 'https://www.bing.com/webmasters/oauth/authorize?' . http_build_query([
+            'client_id' => $clientId,
+            'redirect_uri' => $redirectUri,
+            'response_type' => 'code',
+            'scope' => 'webmaster',
+            'state' => $state,
+        ]);
+        header('Location: ' . $authUrl);
+        exit;
+    }
+    if ($action === 'callback') {
+        $state = $_GET['state'] ?? '';
+        $code = $_GET['code'] ?? '';
+        $error = $_GET['error'] ?? '';
+        $errorDesc = $_GET['error_description'] ?? '';
+        $expectedState = $_SESSION['bing_oauth_state'] ?? '';
+        unset($_SESSION['bing_oauth_state']);
+        if ($error !== '') {
+            $_SESSION['bing_webmaster_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Bing OAuth rechazado: ' . $error . ' ' . $errorDesc,
+            ];
+            header('Location: admin.php?page=configuracion');
+            exit;
+        }
+        if ($code === '' || $expectedState === '' || !hash_equals($expectedState, (string) $state)) {
+            $_SESSION['bing_webmaster_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudo validar la autenticación con Bing.',
+            ];
+            header('Location: admin.php?page=configuracion');
+            exit;
+        }
+        try {
+            $config = load_config_file();
+            $bing = $config['bing_webmaster'] ?? [];
+            $clientId = trim((string) ($bing['client_id'] ?? ''));
+            $clientSecret = trim((string) ($bing['client_secret'] ?? ''));
+            if ($clientId === '' || $clientSecret === '') {
+                throw new RuntimeException('Faltan credenciales OAuth de Bing.');
+            }
+            $token = admin_bing_fetch_token([
+                'client_id' => $clientId,
+                'client_secret' => $clientSecret,
+                'grant_type' => 'authorization_code',
+                'code' => $code,
+                'redirect_uri' => admin_bing_oauth_redirect_uri(),
+            ]);
+            $accessToken = (string) ($token['access_token'] ?? '');
+            $refreshToken = (string) ($token['refresh_token'] ?? '');
+            if ($accessToken === '') {
+                throw new RuntimeException('Bing no devolvió un access token.');
+            }
+            $bing['access_token'] = $accessToken;
+            if ($refreshToken !== '') {
+                $bing['refresh_token'] = $refreshToken;
+            }
+            $expiresIn = (int) ($token['expires_in'] ?? 0);
+            if ($expiresIn > 0) {
+                $bing['access_expires_at'] = time() + $expiresIn;
+            }
+            $config['bing_webmaster'] = $bing;
+            save_config_file($config);
+            $_SESSION['bing_webmaster_feedback'] = [
+                'type' => 'success',
+                'message' => 'Conexión OAuth correcta con Bing Webmaster Tools.',
+            ];
+        } catch (Throwable $e) {
+            $_SESSION['bing_webmaster_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Error al conectar con Bing Webmaster Tools: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: admin.php?page=configuracion');
+        exit;
+    }
+}
+
 // Handle POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['register'])) {
@@ -5732,14 +5952,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     } elseif (isset($_POST['test_bing'])) {
         $bing_site_url = trim($_POST['bing_site_url'] ?? '');
-        $bing_api_key = trim($_POST['bing_api_key'] ?? '');
+        $bing_client_id = trim($_POST['bing_client_id'] ?? '');
+        $bing_client_secret = trim($_POST['bing_client_secret'] ?? '');
         try {
             $config = load_config_file();
-            if ($bing_site_url !== '' || $bing_api_key !== '') {
-                $config['bing_webmaster'] = [
+            if ($bing_site_url !== '' || $bing_client_id !== '' || $bing_client_secret !== '') {
+                $currentBing = $config['bing_webmaster'] ?? [];
+                $clearTokens = false;
+                if (($currentBing['client_id'] ?? '') !== $bing_client_id || ($currentBing['client_secret'] ?? '') !== $bing_client_secret) {
+                    $clearTokens = true;
+                }
+                $config['bing_webmaster'] = array_merge($currentBing, [
                     'site_url' => $bing_site_url,
-                    'api_key' => $bing_api_key,
-                ];
+                    'client_id' => $bing_client_id,
+                    'client_secret' => $bing_client_secret,
+                    'api_key' => '',
+                ]);
+                if ($clearTokens) {
+                    $config['bing_webmaster']['refresh_token'] = '';
+                    $config['bing_webmaster']['access_token'] = '';
+                    $config['bing_webmaster']['access_expires_at'] = 0;
+                }
             } else {
                 unset($config['bing_webmaster']);
             }
@@ -5756,80 +5989,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'type' => 'danger',
             'message' => 'Faltan datos para conectar con Bing Webmaster Tools.',
         ];
-        if ($bing_site_url !== '' && $bing_api_key !== '') {
+        if ($bing_site_url !== '' && $bing_client_id !== '' && $bing_client_secret !== '') {
             try {
-                $params = [
-                    'apikey' => $bing_api_key,
-                    'siteUrl' => $bing_site_url,
-                ];
-                $tested = false;
-                try {
-                    admin_bing_api_get('GetWebmasterWidgetData', $params);
-                    $tested = true;
-                } catch (Throwable $e) {
-                    $tested = false;
+                $token = admin_bing_get_access_token(true);
+                if ($token === null) {
+                    $feedback = [
+                        'type' => 'success',
+                        'message' => 'Credenciales guardadas. Pulsa "Conectar con Bing" para autorizar la cuenta.',
+                    ];
+                } else {
+                    $feedback = [
+                        'type' => 'success',
+                        'message' => 'Conexión OAuth correcta con Bing Webmaster Tools.',
+                    ];
                 }
-                if (!$tested) {
-                    $sitesPayload = admin_bing_api_get('GetUserSites', ['apikey' => $bing_api_key]);
-                    $sites = $sitesPayload['Sites'] ?? $sitesPayload['sites'] ?? $sitesPayload['UserSites'] ?? $sitesPayload['userSites'] ?? [];
-                    if (is_array($sites) && array_key_exists('Site', $sites)) {
-                        $sites = $sites['Site'];
-                    }
-                    $normalizeBingSite = static function (string $value): string {
-                        $value = trim($value);
-                        if ($value === '') {
-                            return '';
-                        }
-                        $parts = parse_url($value);
-                        if ($parts === false) {
-                            return rtrim(strtolower($value), '/');
-                        }
-                        $host = strtolower($parts['host'] ?? '');
-                        if (str_starts_with($host, 'www.')) {
-                            $host = substr($host, 4);
-                        }
-                        $path = rtrim($parts['path'] ?? '', '/');
-                        return $host . $path;
-                    };
-                    $normalizedTarget = $normalizeBingSite($bing_site_url);
-                    $hasSite = false;
-                    $knownSites = [];
-                    if (is_array($sites)) {
-                        foreach ($sites as $siteItem) {
-                            $siteValue = is_array($siteItem) ? ($siteItem['Url'] ?? $siteItem['url'] ?? '') : '';
-                            if ($siteValue === '') {
-                                $siteValue = is_string($siteItem) ? $siteItem : '';
-                            }
-                            if ($siteValue !== '') {
-                                $knownSites[] = $siteValue;
-                                if ($normalizeBingSite($siteValue) === $normalizedTarget) {
-                                    $hasSite = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    if (!$hasSite) {
-                        if (empty($knownSites)) {
-                            $feedback = [
-                                'type' => 'success',
-                                'message' => 'Conexión correcta con Bing Webmaster Tools. No se pudieron validar sitios desde la API; revisa que la URL coincida con la propiedad registrada.',
-                            ];
-                        } else {
-                            $feedback = [
-                                'type' => 'success',
-                                'message' => 'Conexión correcta con Bing Webmaster Tools. El sitio no coincide con los registrados: ' . implode(', ', $knownSites),
-                            ];
-                        }
-                        $_SESSION['bing_webmaster_feedback'] = $feedback;
-                        header('Location: admin.php?page=configuracion');
-                        exit;
-                    }
-                }
-                $feedback = [
-                    'type' => 'success',
-                    'message' => 'Conexión correcta con Bing Webmaster Tools.',
-                ];
             } catch (Throwable $e) {
                 $feedback = [
                     'type' => 'danger',

@@ -1725,7 +1725,6 @@ function admin_indexnow_endpoints(): array {
         'https://indexnow.amazonbot.amazon/indexnow',
         'https://www.bing.com/indexnow',
         'https://searchadvisor.naver.com/indexnow',
-        'https://search.seznam.cz/indexnow',
         'https://yandex.com/indexnow',
         'https://indexnow.yep.com/indexnow',
     ];
@@ -1934,21 +1933,23 @@ function admin_maybe_send_indexnow(array $urls): void {
         $urls = $normalizedUrls;
     }
 
-    $payload = [
-        'host' => $host,
+    $headers = ['Content-Type: application/json; charset=UTF-8'];
+    $errors = [];
+    $responses = [];
+    $keyLocationHost = $keyUrl !== '' ? parse_url($keyUrl, PHP_URL_HOST) : '';
+    $payloadHost = $keyLocationHost !== '' ? $keyLocationHost : $host;
+    $payloadBase = [
+        'host' => $payloadHost,
         'key' => $key,
         'keyLocation' => $keyUrl,
         'urlList' => $urls,
     ];
-    $body = json_encode($payload);
-    if ($body === false) {
-        return;
-    }
-
-    $headers = ['Content-Type: application/json; charset=UTF-8'];
-    $errors = [];
-    $responses = [];
     foreach (admin_indexnow_endpoints() as $endpoint) {
+        $payload = $payloadBase;
+        $body = json_encode($payload);
+        if ($body === false) {
+            continue;
+        }
         $httpCode = 0;
         $responseBody = admin_http_post_body_response($endpoint, $body, $headers, $httpCode);
         $responseText = is_string($responseBody) ? trim($responseBody) : '';
@@ -1959,6 +1960,60 @@ function admin_maybe_send_indexnow(array $urls): void {
         }
         $hasErrorPayload = is_array($decoded) && (isset($decoded['error']) || isset($decoded['errors']));
         $ok = $httpCode >= 200 && $httpCode < 300 && !$hasErrorPayload;
+
+        if (!$ok && $endpoint === 'https://indexnow.amazonbot.amazon/indexnow' && $keyUrl !== '') {
+            $altKeyUrl = $keyUrl;
+            if (str_starts_with($altKeyUrl, 'https://')) {
+                $altKeyUrl = 'http://' . substr($altKeyUrl, strlen('https://'));
+            } elseif (str_starts_with($altKeyUrl, 'http://')) {
+                $altKeyUrl = 'https://' . substr($altKeyUrl, strlen('http://'));
+            }
+            if ($altKeyUrl !== $keyUrl) {
+                $altHost = parse_url($altKeyUrl, PHP_URL_HOST) ?: $payloadHost;
+                $altPayload = [
+                    'host' => $altHost,
+                    'key' => $key,
+                    'keyLocation' => $altKeyUrl,
+                    'urlList' => $urls,
+                ];
+                $altBody = json_encode($altPayload);
+                if ($altBody !== false) {
+                    $altCode = 0;
+                    $altResp = admin_http_post_body_response($endpoint, $altBody, $headers, $altCode);
+                    $altText = is_string($altResp) ? trim($altResp) : '';
+                    $altDecoded = $altText !== '' ? json_decode($altText, true) : null;
+                    $altHasError = is_array($altDecoded) && (isset($altDecoded['error']) || isset($altDecoded['errors']));
+                    if ($altCode >= 200 && $altCode < 300 && !$altHasError) {
+                        $httpCode = $altCode;
+                        $responseText = $altText;
+                        $responseSnippet = $altText !== '' ? mb_substr($altText, 0, 240, 'UTF-8') : '';
+                        $decoded = $altDecoded;
+                        $hasErrorPayload = $altHasError;
+                        $ok = true;
+                    }
+                }
+            }
+        }
+        if (!$ok && $endpoint === 'https://indexnow.amazonbot.amazon/indexnow') {
+            $firstUrl = $urls[0] ?? '';
+            if ($firstUrl !== '' && $key !== '') {
+                $fallbackUrl = $endpoint . '?url=' . rawurlencode($firstUrl) . '&key=' . rawurlencode($key);
+                $fallbackCode = 0;
+                $fallbackResp = admin_http_post_body_response($fallbackUrl, '', [], $fallbackCode, 'GET');
+                $fallbackText = is_string($fallbackResp) ? trim($fallbackResp) : '';
+                $fallbackDecoded = $fallbackText !== '' ? json_decode($fallbackText, true) : null;
+                $fallbackHasError = is_array($fallbackDecoded) && (isset($fallbackDecoded['error']) || isset($fallbackDecoded['errors']));
+                if ($fallbackCode >= 200 && $fallbackCode < 300 && !$fallbackHasError) {
+                    $httpCode = $fallbackCode;
+                    $responseText = $fallbackText;
+                    $responseSnippet = $fallbackText !== '' ? mb_substr($fallbackText, 0, 240, 'UTF-8') : '';
+                    $decoded = $fallbackDecoded;
+                    $hasErrorPayload = $fallbackHasError;
+                    $ok = true;
+                }
+            }
+        }
+
         $responses[] = [
             'endpoint' => $endpoint,
             'status' => (int) $httpCode,

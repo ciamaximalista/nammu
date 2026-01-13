@@ -739,6 +739,9 @@
             return array_slice($output, 0, 10);
         };
         try {
+            if (!$bingHasOauth && $bingApiKey === '') {
+                throw new RuntimeException('Conecta Bing Webmaster Tools desde Configuración para ver los datos.');
+            }
             $endDate = $today->format('Y-m-d');
             $start30 = $today->modify('-29 days')->format('Y-m-d');
             $start7 = $today->modify('-6 days')->format('Y-m-d');

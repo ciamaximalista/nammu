@@ -48,6 +48,7 @@
         $bingClientId = $bingWebmasterSettings['client_id'] ?? '';
         $bingClientSecret = $bingWebmasterSettings['client_secret'] ?? '';
         $bingRefreshToken = $bingWebmasterSettings['refresh_token'] ?? '';
+        $bingAccessToken = $bingWebmasterSettings['access_token'] ?? '';
         $bingRedirectUri = function_exists('admin_bing_oauth_redirect_uri') ? admin_bing_oauth_redirect_uri() : '';
         $languageOptions = [
             'es' => 'Español',
@@ -196,7 +197,7 @@
             <div class="form-group">
                 <label>Estado OAuth</label>
                 <div class="form-control-plaintext text-muted">
-                    <?= $bingRefreshToken !== '' ? 'Conectado' : 'Sin conectar' ?>
+                    <?= ($bingRefreshToken !== '' || $bingAccessToken !== '') ? 'Conectado' : 'Sin conectar' ?>
                 </div>
             </div>
             <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 mb-4">

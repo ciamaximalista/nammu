@@ -19,6 +19,28 @@ use Nammu\Core\RssGenerator;
 use Nammu\Core\TemplateRenderer;
 use Nammu\Core\SitemapGenerator;
 
+// Serve IndexNow key file directly even when rewrites are enabled.
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+if (preg_match('/^\/indexnow-([a-f0-9]+)\.txt$/i', $requestPath, $match)) {
+    $keyFile = __DIR__ . $requestPath;
+    $key = '';
+    if (is_file($keyFile)) {
+        $key = trim((string) file_get_contents($keyFile));
+    } else {
+        $config = nammu_load_config();
+        $configKey = trim((string) ($config['indexnow']['key'] ?? ''));
+        $expectedFile = 'indexnow-' . $configKey . '.txt';
+        if ($configKey !== '' && basename($requestPath) === $expectedFile) {
+            $key = $configKey;
+        }
+    }
+    if ($key !== '') {
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo $key;
+        exit;
+    }
+}
+
 if (function_exists('nammu_publish_scheduled_posts')) {
     nammu_publish_scheduled_posts(__DIR__ . '/content');
 }

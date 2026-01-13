@@ -68,8 +68,11 @@
             return is_array($item) && !empty($item['endpoint']);
         }));
     }
+    $indexnowUrls = is_array($indexnowLog['urls'] ?? null) ? $indexnowLog['urls'] : [];
+    $indexnowResponses = is_array($indexnowLog['responses'] ?? null) ? $indexnowLog['responses'] : [];
     $indexnowTimestamp = isset($indexnowLog['timestamp']) ? (int) $indexnowLog['timestamp'] : 0;
     $indexnowHasErrors = !empty($indexnowErrors);
+    $indexnowHasLog = $indexnowTimestamp > 0;
     $gscSettings = $settings['search_console'] ?? [];
     $gscProperty = trim((string) ($gscSettings['property'] ?? ''));
     $gscClientId = trim((string) ($gscSettings['client_id'] ?? ''));
@@ -1915,6 +1918,14 @@
                         </li>
                     <?php endforeach; ?>
                 </ul>
+            </div>
+        <?php elseif ($indexnowHasLog): ?>
+            <div class="mb-4" style="border:1px solid #cce2ff;background:#f5f9ff;border-radius:12px;padding:16px;">
+                <h3 class="h6 text-uppercase mb-2" style="color:#1b8eed;">IndexNow enviado correctamente</h3>
+                <p class="text-muted mb-2">Último envío: <?= htmlspecialchars(date('d/m/y H:i', $indexnowTimestamp), ENT_QUOTES, 'UTF-8') ?></p>
+                <?php if (!empty($indexnowUrls)): ?>
+                    <p class="mb-0 text-muted">URLs enviadas: <?= htmlspecialchars(implode(', ', array_slice($indexnowUrls, 0, 3)), ENT_QUOTES, 'UTF-8') ?><?= count($indexnowUrls) > 3 ? '…' : '' ?></p>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
 

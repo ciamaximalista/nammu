@@ -1435,7 +1435,59 @@ function admin_bing_api_get(string $method, array $params): array {
         }
         return $payload;
     }
+    if (class_exists('SoapClient')) {
+        try {
+            $soapPayload = admin_bing_api_soap($method, $params);
+            if (is_array($soapPayload)) {
+                return $soapPayload;
+            }
+        } catch (Throwable $e) {
+            if (isset($GLOBALS['bing_debug_log']) && is_array($GLOBALS['bing_debug_log'])) {
+                $GLOBALS['bing_debug_log'][] = [
+                    'method' => $method,
+                    'url' => 'soap:' . $method,
+                    'status' => '',
+                    'location' => '',
+                    'snippet' => $e->getMessage(),
+                ];
+            }
+            $lastError = $e;
+        }
+    }
     throw $lastError ?? new RuntimeException('No se pudo conectar con Bing Webmaster Tools.');
+}
+
+function admin_bing_api_soap(string $method, array $params): array {
+    $wsdl = 'https://ssl.bing.com/webmaster/api.svc?wsdl';
+    $soapParams = [];
+    foreach ($params as $key => $value) {
+        $soapParams[$key] = $value;
+    }
+    if (isset($soapParams['apikey']) && !isset($soapParams['ApiKey'])) {
+        $soapParams['ApiKey'] = $soapParams['apikey'];
+    }
+    if (isset($soapParams['apiKey']) && !isset($soapParams['ApiKey'])) {
+        $soapParams['ApiKey'] = $soapParams['apiKey'];
+    }
+    if (isset($soapParams['siteUrl']) && !isset($soapParams['SiteUrl'])) {
+        $soapParams['SiteUrl'] = $soapParams['siteUrl'];
+    }
+    if (isset($soapParams['startDate']) && !isset($soapParams['StartDate'])) {
+        $soapParams['StartDate'] = $soapParams['startDate'];
+    }
+    if (isset($soapParams['endDate']) && !isset($soapParams['EndDate'])) {
+        $soapParams['EndDate'] = $soapParams['endDate'];
+    }
+    $client = new SoapClient($wsdl, [
+        'trace' => false,
+        'exceptions' => true,
+        'cache_wsdl' => WSDL_CACHE_BOTH,
+    ]);
+    $result = $client->__soapCall($method, [$soapParams]);
+    if (is_object($result) || is_array($result)) {
+        return json_decode(json_encode($result), true) ?? [];
+    }
+    return [];
 }
 
 function admin_bing_request_with_dates(string $method, array $baseParams, string $startDate, string $endDate): array {
@@ -1692,7 +1744,11 @@ function admin_indexnow_load_log(): array {
 function admin_indexnow_save_log(array $payload): void {
     $path = admin_indexnow_log_path();
     nammu_ensure_directory(dirname($path));
-    file_put_contents($path, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    if ($json === false) {
+        return;
+    }
+    file_put_contents($path, $json);
 }
 
 function admin_indexnow_prepare_config(array &$config): array {
@@ -1820,6 +1876,7 @@ function admin_maybe_send_indexnow(array $urls): void {
 
     $headers = ['Content-Type: application/json; charset=UTF-8'];
     $errors = [];
+    $responses = [];
     foreach (admin_indexnow_endpoints() as $endpoint) {
         $httpCode = 0;
         $responseBody = admin_http_post_body_response($endpoint, $body, $headers, $httpCode);
@@ -1831,6 +1888,11 @@ function admin_maybe_send_indexnow(array $urls): void {
         }
         $hasErrorPayload = is_array($decoded) && (isset($decoded['error']) || isset($decoded['errors']));
         $ok = $httpCode >= 200 && $httpCode < 300 && !$hasErrorPayload;
+        $responses[] = [
+            'endpoint' => $endpoint,
+            'status' => (int) $httpCode,
+            'ok' => $ok,
+        ];
         if (!$ok) {
             $message = '';
             if (is_array($decoded)) {
@@ -1856,6 +1918,8 @@ function admin_maybe_send_indexnow(array $urls): void {
     admin_indexnow_save_log([
         'timestamp' => time(),
         'errors' => $errors,
+        'urls' => $urls,
+        'responses' => $responses,
     ]);
 }
 

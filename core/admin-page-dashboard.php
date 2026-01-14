@@ -444,7 +444,7 @@
             }
             $bingEnd = $today->modify('-1 day');
             $endDate = $bingEnd->format('Y-m-d');
-            $start30 = $bingEnd->modify('-29 days')->format('Y-m-d');
+            $start28 = $bingEnd->modify('-27 days')->format('Y-m-d');
             $start7 = $bingEnd->modify('-6 days')->format('Y-m-d');
             $normalizeTotals = static function (array $response): array {
                 $row = [];

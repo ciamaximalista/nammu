@@ -10657,6 +10657,7 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                         content = content.replace(/&gt;|&#62;/gi, '>');
                         content = content.replace(/&laquo;/gi, '«').replace(/&raquo;/gi, '»');
                         content = nisabaNormalizeQuotes(content);
+                        content = content.replace(/&gt;|&#62;/gi, '>');
                         var safeTitle = escapeHtml(title);
                         var sourceLine = '';
                         if (link) {

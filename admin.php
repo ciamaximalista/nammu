@@ -10543,9 +10543,29 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                 if (!html) {
                     return '';
                 }
-                return html.replace(/<p>\s*«([\s\S]*?)»\s*<\/p>/g, function(match, inner) {
-                    return '<p>&gt; ' + inner + '</p>';
+                var wrapper = document.createElement('div');
+                wrapper.innerHTML = html;
+                wrapper.querySelectorAll('p').forEach(function(paragraph) {
+                    var text = (paragraph.textContent || '').trim();
+                    if (!text || text.charAt(0) !== '«' || text.charAt(text.length - 1) !== '»') {
+                        return;
+                    }
+                    var inner = paragraph.innerHTML || '';
+                    var first = inner.indexOf('«');
+                    var last = inner.lastIndexOf('»');
+                    if (first !== -1) {
+                        inner = inner.slice(0, first) + inner.slice(first + 1);
+                        if (last > first) {
+                            last = inner.lastIndexOf('»');
+                        }
+                    }
+                    if (last !== -1) {
+                        inner = inner.slice(0, last) + inner.slice(last + 1);
+                    }
+                    inner = inner.trim();
+                    paragraph.innerHTML = '&gt; ' + inner;
                 });
+                return wrapper.innerHTML;
             }
 
             function escapeHtml(value) {

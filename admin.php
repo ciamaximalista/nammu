@@ -10572,17 +10572,17 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                 }
 
                 function normalizeLines(value) {
-                    var lines = value.split(/\r?\n/);
+                    var withBreaks = value.replace(/<br\s*\/?>/gi, '\n');
+                    var normalizedEntities = withBreaks.replace(/&laquo;/gi, '«').replace(/&raquo;/gi, '»');
+                    if (!/<[^>]+>/.test(normalizedEntities)) {
+                        normalizedEntities = decodeEntities(normalizedEntities);
+                    }
                     var changed = false;
-                    lines = lines.map(function(line) {
-                        var trimmed = line.trim();
-                        if (trimmed.length >= 2 && trimmed.charAt(0) === '«' && trimmed.charAt(trimmed.length - 1) === '»') {
-                            changed = true;
-                            return line.replace('«', '> ').replace(/»\s*$/, '');
-                        }
-                        return line;
+                    var output = normalizedEntities.replace(/(^|\n)\s*«([^»]+)»\s*(?=\n|$)/g, function(match, prefix, inner) {
+                        changed = true;
+                        return prefix + '> ' + inner.trim();
                     });
-                    return { text: lines.join('\n'), changed: changed };
+                    return { text: output, changed: changed };
                 }
 
                 var wrapper = document.createElement('div');
@@ -10609,8 +10609,13 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                     }
                 }
 
+                var normalized = normalizeLines(html);
+                if (normalized.changed) {
+                    return normalized.text;
+                }
+
                 if (!didChange) {
-                    var normalized = normalizeLines(html);
+                    normalized = normalizeLines(wrapper.innerHTML);
                     if (normalized.changed) {
                         return normalized.text;
                     }

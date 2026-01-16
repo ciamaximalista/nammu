@@ -48,7 +48,7 @@ function admin_nisaba_prepare_insert_content(string $content): string {
         return "\n\n> " . $text . "\n";
     }, $decoded);
     $prepared = preg_replace("/\n{3,}/", "\n\n", $prepared);
-    return trim($prepared);
+    return htmlspecialchars_decode(trim($prepared), ENT_QUOTES);
 }
 
 function admin_nisaba_fetch_notes(string $baseUrl, int $days = 14): array {

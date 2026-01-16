@@ -10543,12 +10543,16 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                 if (!html) {
                     return '';
                 }
-                var wrapper = document.createElement('div');
-                wrapper.innerHTML = html;
-                wrapper.querySelectorAll('p').forEach(function(paragraph) {
+                function decodeEntities(value) {
+                    var textarea = document.createElement('textarea');
+                    textarea.innerHTML = value;
+                    return textarea.value;
+                }
+
+                function normalizeParagraph(paragraph) {
                     var text = (paragraph.textContent || '').trim();
                     if (!text || text.charAt(0) !== '«' || text.charAt(text.length - 1) !== '»') {
-                        return;
+                        return false;
                     }
                     var inner = paragraph.innerHTML || '';
                     var first = inner.indexOf('«');
@@ -10564,7 +10568,54 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                     }
                     inner = inner.trim();
                     paragraph.innerHTML = '&gt; ' + inner;
+                    return true;
+                }
+
+                function normalizeLines(value) {
+                    var lines = value.split(/\r?\n/);
+                    var changed = false;
+                    lines = lines.map(function(line) {
+                        var trimmed = line.trim();
+                        if (trimmed.length >= 2 && trimmed.charAt(0) === '«' && trimmed.charAt(trimmed.length - 1) === '»') {
+                            changed = true;
+                            return line.replace('«', '> ').replace(/»\s*$/, '');
+                        }
+                        return line;
+                    });
+                    return { text: lines.join('\n'), changed: changed };
+                }
+
+                var wrapper = document.createElement('div');
+                wrapper.innerHTML = html;
+                var paragraphs = wrapper.querySelectorAll('p');
+                var didChange = false;
+                paragraphs.forEach(function(paragraph) {
+                    if (normalizeParagraph(paragraph)) {
+                        didChange = true;
+                    }
                 });
+
+                if (!didChange && paragraphs.length === 0 && html.indexOf('&lt;') !== -1) {
+                    var decoded = decodeEntities(html);
+                    var decodedWrapper = document.createElement('div');
+                    decodedWrapper.innerHTML = decoded;
+                    decodedWrapper.querySelectorAll('p').forEach(function(paragraph) {
+                        if (normalizeParagraph(paragraph)) {
+                            didChange = true;
+                        }
+                    });
+                    if (didChange) {
+                        return decodedWrapper.innerHTML;
+                    }
+                }
+
+                if (!didChange) {
+                    var normalized = normalizeLines(html);
+                    if (normalized.changed) {
+                        return normalized.text;
+                    }
+                }
+
                 return wrapper.innerHTML;
             }
 

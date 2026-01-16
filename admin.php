@@ -9188,6 +9188,13 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                                     $noteContent = $note['insert_content'] ?? ($note['content'] ?? '');
                                     $noteDisplay = $note['display_content'] ?? '';
                                     $noteDateLabel = isset($note['timestamp']) ? date('d/m/y', (int) $note['timestamp']) : '';
+                                    $noteDomain = '';
+                                    if ($noteLink !== '') {
+                                        $host = parse_url($noteLink, PHP_URL_HOST);
+                                        if (is_string($host)) {
+                                            $noteDomain = preg_replace('/^www\\./i', '', $host);
+                                        }
+                                    }
                                     ?>
                                     <div class="border rounded p-3 mb-3">
                                         <div class="custom-control custom-checkbox">
@@ -9197,6 +9204,7 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                                                    data-nisaba-item="1"
                                                    data-note-title="<?= htmlspecialchars($noteTitle, ENT_QUOTES, 'UTF-8') ?>"
                                                    data-note-link="<?= htmlspecialchars($noteLink, ENT_QUOTES, 'UTF-8') ?>"
+                                                   data-note-domain="<?= htmlspecialchars($noteDomain, ENT_QUOTES, 'UTF-8') ?>"
                                                    data-note-content="<?= htmlspecialchars(base64_encode($noteContent), ENT_QUOTES, 'UTF-8') ?>">
                                             <label class="custom-control-label" for="<?= htmlspecialchars($noteId, ENT_QUOTES, 'UTF-8') ?>">
                                                 <?= htmlspecialchars($noteTitle, ENT_QUOTES, 'UTF-8') ?>
@@ -10652,6 +10660,7 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                         }
                         var title = input.getAttribute('data-note-title') || 'Nota de Nisaba';
                         var link = input.getAttribute('data-note-link') || '';
+                        var noteDomain = input.getAttribute('data-note-domain') || '';
                         var contentEncoded = input.getAttribute('data-note-content') || '';
                         var content = decodeBase64Utf8(contentEncoded);
                         content = content.replace(/&gt;|&#62;/gi, '>');
@@ -10662,11 +10671,13 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                         var sourceLine = '';
                         if (link) {
                             var safeLink = escapeHtml(link);
-                            var hostLabel = '';
-                            try {
-                                hostLabel = new URL(link).hostname || '';
-                            } catch (err) {
-                                hostLabel = link.replace(/^https?:\/\//i, '').split('/')[0];
+                            var hostLabel = noteDomain || '';
+                            if (!hostLabel) {
+                                try {
+                                    hostLabel = new URL(link).hostname || '';
+                                } catch (err) {
+                                    hostLabel = link.replace(/^https?:\/\//i, '').split('/')[0];
+                                }
                             }
                             hostLabel = hostLabel.replace(/^www\\./i, '');
                             sourceLine = '\n<p><strong>Fuente</strong>: <a href="' + safeLink + '" target="_blank" rel="noopener">' + escapeHtml(hostLabel) + '</a></p>';

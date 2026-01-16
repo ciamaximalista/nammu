@@ -1073,6 +1073,7 @@ function get_settings() {
         'key_file' => '',
     ];
     $indexnow = array_merge($indexnowDefaults, $config['indexnow'] ?? []);
+    $nisaba = $config['nisaba'] ?? [];
 
     return [
         'sort_order' => $sort_order,
@@ -1106,6 +1107,7 @@ function get_settings() {
         'postal' => $postal,
         'ads' => $ads,
         'indexnow' => $indexnow,
+        'nisaba' => $nisaba,
         'entry' => $entry,
     ];
 }

@@ -35,7 +35,7 @@ function admin_nisaba_display_content(string $html): string {
     return strip_tags($html, '<p><br><strong><em><ul><ol><li><blockquote><h2><h3><h4>');
 }
 
-function admin_nisaba_fetch_notes(string $baseUrl, int $days = 7): array {
+function admin_nisaba_fetch_notes(string $baseUrl, int $days = 14): array {
     $feedUrl = admin_nisaba_feed_url($baseUrl);
     if ($feedUrl === '') {
         return [];

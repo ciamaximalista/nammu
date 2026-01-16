@@ -7477,7 +7477,7 @@ $nisabaEnabled = $nisabaUrl !== '' && function_exists('admin_nisaba_fetch_notes'
 $nisabaFeedUrl = $nisabaEnabled ? admin_nisaba_feed_url($nisabaUrl) : '';
 $nisabaPages = ['publish', 'edit', 'edit-post', 'itinerario', 'itinerario-tema'];
 $nisabaModalEnabled = $nisabaEnabled && in_array($page, $nisabaPages, true);
-$nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 7) : [];
+$nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : [];
 
 ?>
 <!DOCTYPE html>
@@ -9179,7 +9179,7 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 7) : [
                         </div>
                         <div class="modal-body">
                             <?php if (!empty($nisabaNotes)): ?>
-                                <p class="text-muted mb-3">Selecciona las notas de los últimos 7 días que quieres insertar.</p>
+                                <p class="text-muted mb-3">Selecciona las notas de los últimos 14 días que quieres insertar.</p>
                                 <?php foreach ($nisabaNotes as $index => $note): ?>
                                     <?php
                                     $noteId = 'nisaba-note-' . $index;
@@ -10539,6 +10539,15 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 7) : [
                 }
             }
 
+            function nisabaNormalizeQuotes(html) {
+                if (!html) {
+                    return '';
+                }
+                return html.replace(/<p>\s*«([\s\S]*?)»\s*<\/p>/g, function(match, inner) {
+                    return '<p>&gt; ' + inner + '</p>';
+                });
+            }
+
             function escapeHtml(value) {
                 return (value || '').replace(/[&<>"]/g, function(char) {
                     switch (char) {
@@ -10569,13 +10578,14 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 7) : [
                         var link = input.getAttribute('data-note-link') || '';
                         var contentEncoded = input.getAttribute('data-note-content') || '';
                         var content = decodeBase64Utf8(contentEncoded);
+                        content = nisabaNormalizeQuotes(content);
                         var safeTitle = escapeHtml(title);
                         var sourceLine = '';
                         if (link) {
                             var safeLink = escapeHtml(link);
                             sourceLine = '\n<p><strong>Fuente:</strong> <a href="' + safeLink + '" target="_blank" rel="noopener">' + safeLink + '</a></p>';
                         }
-                        blocks.push('\n\n<h2>' + safeTitle + '</h2>\n' + content + sourceLine + '\n');
+                        blocks.push('\n\n<h3>' + safeTitle + '</h3>\n' + content + sourceLine + '\n');
                     });
                     if (!blocks.length) {
                         return;

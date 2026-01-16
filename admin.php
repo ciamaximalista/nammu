@@ -10567,7 +10567,7 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                         inner = inner.slice(0, last) + inner.slice(last + 1);
                     }
                     inner = inner.trim();
-                    paragraph.innerHTML = '&gt; ' + inner;
+                    paragraph.innerHTML = '> ' + inner;
                     return true;
                 }
 

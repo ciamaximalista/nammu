@@ -10663,6 +10663,7 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                         if (link) {
                             var safeLink = escapeHtml(link);
                             var hostLabel = safeLink.replace(/^https?:\/\//i, '').split('/')[0];
+                            hostLabel = hostLabel.replace(/^www\\./i, '');
                             sourceLine = '\n<p><strong>Fuente</strong>: <a href="' + safeLink + '" target="_blank" rel="noopener">' + hostLabel + '</a></p>';
                         }
                         blocks.push('\n\n<h3>' + safeTitle + '</h3>\n' + content + sourceLine + '\n');

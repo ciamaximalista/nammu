@@ -10654,6 +10654,11 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                         var link = input.getAttribute('data-note-link') || '';
                         var contentEncoded = input.getAttribute('data-note-content') || '';
                         var content = decodeBase64Utf8(contentEncoded);
+                        content = content.replace(/&laquo;/gi, '«').replace(/&raquo;/gi, '»');
+                        content = content.replace(/(^|>\\s*)«([\\s\\S]*?)»(?=\\s*<|\\s*$)/g, function(match, prefix, inner) {
+                            var clean = inner.replace(/\\s+$/g, '');
+                            return prefix + '&gt; ' + clean;
+                        });
                         content = nisabaNormalizeQuotes(content);
                         var safeTitle = escapeHtml(title);
                         var sourceLine = '';

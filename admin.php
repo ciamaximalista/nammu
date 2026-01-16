@@ -4,6 +4,7 @@ session_start();
 require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
 require_once __DIR__ . '/core/postal.php';
+require_once __DIR__ . '/core/admin-nisaba.php';
 
 // Load dependencies (optional)
 $autoload = __DIR__ . '/vendor/autoload.php';
@@ -4213,6 +4214,12 @@ if (!is_array($bingWebmasterFeedback) || !isset($bingWebmasterFeedback['message'
 } else {
     unset($_SESSION['bing_webmaster_feedback']);
 }
+$nisabaFeedback = $_SESSION['nisaba_feedback'] ?? null;
+if (!is_array($nisabaFeedback) || !isset($nisabaFeedback['message'], $nisabaFeedback['type'])) {
+    $nisabaFeedback = null;
+} else {
+    unset($_SESSION['nisaba_feedback']);
+}
 $postalFeedback = $_SESSION['postal_feedback'] ?? null;
 if (!is_array($postalFeedback) || !isset($postalFeedback['message'], $postalFeedback['type'])) {
     $postalFeedback = null;
@@ -6323,6 +6330,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         header('Location: admin.php?page=configuracion');
         exit;
+    } elseif (isset($_POST['save_nisaba'])) {
+        $nisaba_url = trim($_POST['nisaba_url'] ?? '');
+        try {
+            $config = load_config_file();
+            if ($nisaba_url !== '') {
+                $config['nisaba'] = [
+                    'url' => $nisaba_url,
+                ];
+                $_SESSION['nisaba_feedback'] = [
+                    'type' => 'success',
+                    'message' => 'Configuración de Nisaba guardada correctamente.',
+                ];
+            } else {
+                unset($config['nisaba']);
+                $_SESSION['nisaba_feedback'] = [
+                    'type' => 'success',
+                    'message' => 'Integración con Nisaba desactivada.',
+                ];
+            }
+            save_config_file($config);
+        } catch (Throwable $e) {
+            $_SESSION['nisaba_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Error guardando Nisaba: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: admin.php?page=configuracion');
+        exit;
     } elseif (isset($_POST['save_twitter_media'])) {
         $twitter_api_key = trim($_POST['twitter_api_key'] ?? '');
         $twitter_api_secret = trim($_POST['twitter_api_secret'] ?? '');
@@ -7434,6 +7469,13 @@ $socialDefaultDescription = $socialSettings['default_description'] ?? '';
 $socialHomeImage = $socialSettings['home_image'] ?? '';
 $socialTwitter = $socialSettings['twitter'] ?? '';
 $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
+$nisabaConfig = $settings['nisaba'] ?? [];
+$nisabaUrl = $nisabaConfig['url'] ?? '';
+$nisabaEnabled = $nisabaUrl !== '' && function_exists('admin_nisaba_fetch_notes');
+$nisabaFeedUrl = $nisabaEnabled ? admin_nisaba_feed_url($nisabaUrl) : '';
+$nisabaPages = ['publish', 'edit', 'edit-post', 'itinerario', 'itinerario-tema'];
+$nisabaModalEnabled = $nisabaEnabled && in_array($page, $nisabaPages, true);
+$nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 7) : [];
 
 ?>
 <!DOCTYPE html>
@@ -7457,6 +7499,11 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
         .navbar-brand { color: #1b8eed !important; }
         .nav-link h1 { font-size: 1.2rem; color: #1b8eed; }
         h2 { color: #ea2f28; }
+        .nisaba-icon {
+            width: 16px;
+            height: 16px;
+            display: block;
+        }
         .container {
             margin-top: 20px;
         }
@@ -9115,8 +9162,64 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
             <?php endif; ?>
 
         
-
+        
         </div>
+
+        <?php if (!empty($nisabaModalEnabled)): ?>
+            <div class="modal fade" id="nisabaModal" tabindex="-1" role="dialog" aria-labelledby="nisabaModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="nisabaModalLabel">Notas recientes de Nisaba</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <?php if (!empty($nisabaNotes)): ?>
+                                <p class="text-muted mb-3">Selecciona las notas de los últimos 7 días que quieres insertar.</p>
+                                <?php foreach ($nisabaNotes as $index => $note): ?>
+                                    <?php
+                                    $noteId = 'nisaba-note-' . $index;
+                                    $noteTitle = $note['title'] ?? '';
+                                    $noteLink = $note['link'] ?? '';
+                                    $noteContent = $note['content'] ?? '';
+                                    $noteDisplay = $note['display_content'] ?? '';
+                                    $noteDateLabel = isset($note['timestamp']) ? date('d/m/y', (int) $note['timestamp']) : '';
+                                    ?>
+                                    <div class="border rounded p-3 mb-3">
+                                        <div class="custom-control custom-checkbox">
+                                            <input type="checkbox"
+                                                   class="custom-control-input nisaba-note-toggle"
+                                                   id="<?= htmlspecialchars($noteId, ENT_QUOTES, 'UTF-8') ?>"
+                                                   data-nisaba-item="1"
+                                                   data-note-title="<?= htmlspecialchars($noteTitle, ENT_QUOTES, 'UTF-8') ?>"
+                                                   data-note-link="<?= htmlspecialchars($noteLink, ENT_QUOTES, 'UTF-8') ?>"
+                                                   data-note-content="<?= htmlspecialchars(base64_encode($noteContent), ENT_QUOTES, 'UTF-8') ?>">
+                                            <label class="custom-control-label" for="<?= htmlspecialchars($noteId, ENT_QUOTES, 'UTF-8') ?>">
+                                                <?= htmlspecialchars($noteTitle, ENT_QUOTES, 'UTF-8') ?>
+                                            </label>
+                                        </div>
+                                        <?php if ($noteDisplay !== ''): ?>
+                                            <div class="mt-2 text-muted nisaba-note-preview"><?= $noteDisplay ?></div>
+                                        <?php endif; ?>
+                                        <?php if ($noteDateLabel !== ''): ?>
+                                            <small class="text-muted d-block mt-2"><?= htmlspecialchars($noteDateLabel, ENT_QUOTES, 'UTF-8') ?></small>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <p class="text-muted mb-0">No hay notas recientes en <strong><?= htmlspecialchars($nisabaFeedUrl, ENT_QUOTES, 'UTF-8') ?></strong>.</p>
+                            <?php endif; ?>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-primary" id="nisabaInsert" <?= empty($nisabaNotes) ? 'disabled' : '' ?>>Insertar notas</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
 
         
 
@@ -10188,6 +10291,9 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     case 'callout':
                         openCalloutModal(textarea);
                         break;
+                    case 'nisaba':
+                        openNisabaModal(textarea);
+                        break;
                     default:
                         break;
                 }
@@ -10385,6 +10491,103 @@ $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
                     calloutTarget = null;
                     calloutTargetSelector = '';
                 }
+            }
+
+            var nisabaTarget = null;
+            function openNisabaModal(textarea) {
+                var modal = document.getElementById('nisabaModal');
+                if (!modal) {
+                    return;
+                }
+                var target = textarea;
+                if (!target || target.tagName !== 'TEXTAREA') {
+                    if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
+                        target = document.activeElement;
+                    } else if (lastFocusedTextarea && lastFocusedTextarea.tagName === 'TEXTAREA') {
+                        target = lastFocusedTextarea;
+                    } else {
+                        target = fallbackTextarea();
+                    }
+                }
+                if (target && target.id === 'calloutBody') {
+                    target = null;
+                }
+                nisabaTarget = target || fallbackTextarea();
+                if (window.jQuery && typeof window.jQuery.fn.modal === 'function') {
+                    window.jQuery(modal).modal('show');
+                } else {
+                    modal.classList.add('show');
+                    modal.style.display = 'block';
+                    modal.removeAttribute('aria-hidden');
+                }
+            }
+
+            function decodeBase64Utf8(value) {
+                if (!value) {
+                    return '';
+                }
+                try {
+                    return decodeURIComponent(escape(window.atob(value)));
+                } catch (err) {
+                    try {
+                        return window.atob(value);
+                    } catch (fallbackErr) {
+                        return '';
+                    }
+                }
+            }
+
+            function escapeHtml(value) {
+                return (value || '').replace(/[&<>"]/g, function(char) {
+                    switch (char) {
+                        case '&': return '&amp;';
+                        case '<': return '&lt;';
+                        case '>': return '&gt;';
+                        case '"': return '&quot;';
+                        default: return char;
+                    }
+                });
+            }
+
+            var nisabaInsertButton = document.getElementById('nisabaInsert');
+            if (nisabaInsertButton) {
+                nisabaInsertButton.addEventListener('click', function() {
+                    var modal = document.getElementById('nisabaModal');
+                    var target = nisabaTarget || fallbackTextarea();
+                    if (!modal || !target) {
+                        return;
+                    }
+                    var selections = modal.querySelectorAll('[data-nisaba-item]');
+                    var blocks = [];
+                    selections.forEach(function(input) {
+                        if (!input.checked) {
+                            return;
+                        }
+                        var title = input.getAttribute('data-note-title') || 'Nota de Nisaba';
+                        var link = input.getAttribute('data-note-link') || '';
+                        var contentEncoded = input.getAttribute('data-note-content') || '';
+                        var content = decodeBase64Utf8(contentEncoded);
+                        var safeTitle = escapeHtml(title);
+                        var sourceLine = '';
+                        if (link) {
+                            var safeLink = escapeHtml(link);
+                            sourceLine = '\n<p><strong>Fuente:</strong> <a href="' + safeLink + '" target="_blank" rel="noopener">' + safeLink + '</a></p>';
+                        }
+                        blocks.push('\n\n<h2>' + safeTitle + '</h2>\n' + content + sourceLine + '\n');
+                    });
+                    if (!blocks.length) {
+                        return;
+                    }
+                    var insertText = blocks.join('\n');
+                    replaceSelection(target, insertText, insertText.length, insertText.length);
+                    if (window.jQuery && typeof window.jQuery.fn.modal === 'function') {
+                        window.jQuery(modal).modal('hide');
+                    } else {
+                        modal.classList.remove('show');
+                        modal.style.display = 'none';
+                        modal.setAttribute('aria-hidden', 'true');
+                    }
+                });
             }
 
             function insertLink(textarea) {

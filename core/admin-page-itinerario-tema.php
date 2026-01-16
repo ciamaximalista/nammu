@@ -91,6 +91,11 @@
                                     <button type="button" class="btn btn-outline-secondary" data-md-action="hr">—</button>
                                     <button type="button" class="btn btn-outline-secondary" data-md-action="table">Tbl</button>
                                     <button type="button" class="btn btn-outline-secondary" data-md-action="callout" data-toggle="modal" data-target="#calloutModal">Aviso</button>
+                                    <?php if (!empty($nisabaEnabled)): ?>
+                                        <button type="button" class="btn btn-outline-secondary" data-md-action="nisaba" title="Nisaba" aria-label="Nisaba">
+                                            <img src="nisaba.png" alt="" class="nisaba-icon">
+                                        </button>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             <textarea name="topic_content" id="topic_content" class="form-control" rows="10" data-markdown-editor="itinerary-topic"><?= htmlspecialchars($topicFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>

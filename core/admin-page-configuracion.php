@@ -19,6 +19,11 @@
                 <?= htmlspecialchars($bingWebmasterFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
             </div>
         <?php endif; ?>
+        <?php if (isset($nisabaFeedback) && $nisabaFeedback !== null): ?>
+            <div class="alert alert-<?= $nisabaFeedback['type'] === 'success' ? 'success' : 'danger' ?>">
+                <?= htmlspecialchars($nisabaFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
         <?php
         $telegramSettings = $settings['telegram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
         $telegramAutoEnabled = ($telegramSettings['auto_post'] ?? 'off') === 'on';
@@ -51,6 +56,8 @@
         $bingAccessToken = $bingWebmasterSettings['access_token'] ?? '';
         $bingApiKey = $bingWebmasterSettings['api_key'] ?? '';
         $bingRedirectUri = function_exists('admin_bing_oauth_redirect_uri') ? admin_bing_oauth_redirect_uri() : '';
+        $nisabaSettings = $settings['nisaba'] ?? [];
+        $nisabaUrl = $nisabaSettings['url'] ?? '';
         $languageOptions = [
             'es' => 'Español',
             'ca' => 'Català',
@@ -209,6 +216,19 @@
             <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 mb-4">
                 <button type="submit" name="test_bing" class="btn btn-outline-primary mb-2">Guardar y probar</button>
                 <a href="admin.php?bing_oauth=start" class="btn btn-outline-secondary mb-2">Conectar con Bing</a>
+            </div>
+        </form>
+
+        <form method="post" class="mt-4">
+            <h4 class="mt-2">Integración con Nisaba</h4>
+            <p class="text-muted mb-3">Conecta tu instalación de Nisaba para insertar notas recientes desde notas.xml.</p>
+            <div class="form-group">
+                <label for="nisaba_url">URI de Nisaba</label>
+                <input type="url" name="nisaba_url" id="nisaba_url" class="form-control" value="<?= htmlspecialchars($nisabaUrl, ENT_QUOTES, 'UTF-8') ?>" placeholder="https://tunisaba.example">
+                <small class="form-text text-muted">Introduce la URL base de Nisaba. Se usará automáticamente <code>notas.xml</code>.</small>
+            </div>
+            <div class="text-right mb-4">
+                <button type="submit" name="save_nisaba" class="btn btn-outline-primary">Guardar Nisaba</button>
             </div>
         </form>
 

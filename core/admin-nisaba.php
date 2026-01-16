@@ -35,6 +35,22 @@ function admin_nisaba_display_content(string $html): string {
     return strip_tags($html, '<p><br><strong><em><ul><ol><li><blockquote><h2><h3><h4>');
 }
 
+function admin_nisaba_prepare_insert_content(string $content): string {
+    $decoded = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if (!preg_match('/«[^»]+»/u', $decoded)) {
+        return $content;
+    }
+    $prepared = preg_replace_callback('/«([^»]+)»/u', static function (array $matches): string {
+        $text = trim($matches[1]);
+        if ($text === '') {
+            return '';
+        }
+        return "\n\n> " . $text . "\n";
+    }, $decoded);
+    $prepared = preg_replace("/\n{3,}/", "\n\n", $prepared);
+    return trim($prepared);
+}
+
 function admin_nisaba_fetch_notes(string $baseUrl, int $days = 14): array {
     $feedUrl = admin_nisaba_feed_url($baseUrl);
     if ($feedUrl === '') {
@@ -83,6 +99,7 @@ function admin_nisaba_fetch_notes(string $baseUrl, int $days = 14): array {
         }
         $content = admin_nisaba_strip_scripts($content);
         $displayContent = admin_nisaba_display_content($content);
+        $insertContent = admin_nisaba_prepare_insert_content($content);
 
         $dateRaw = (string) ($item->pubDate ?? '');
         if ($dateRaw === '' && isset($item->updated)) {
@@ -103,6 +120,7 @@ function admin_nisaba_fetch_notes(string $baseUrl, int $days = 14): array {
         $notes[] = [
             'title' => $title !== '' ? $title : 'Nota de Nisaba',
             'content' => $content,
+            'insert_content' => $insertContent,
             'display_content' => $displayContent,
             'link' => $link,
             'timestamp' => $timestamp,

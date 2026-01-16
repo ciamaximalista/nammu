@@ -9185,7 +9185,7 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                                     $noteId = 'nisaba-note-' . $index;
                                     $noteTitle = $note['title'] ?? '';
                                     $noteLink = $note['link'] ?? '';
-                                    $noteContent = $note['content'] ?? '';
+                                    $noteContent = $note['insert_content'] ?? ($note['content'] ?? '');
                                     $noteDisplay = $note['display_content'] ?? '';
                                     $noteDateLabel = isset($note['timestamp']) ? date('d/m/y', (int) $note['timestamp']) : '';
                                     ?>
@@ -10655,9 +10655,6 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                         var contentEncoded = input.getAttribute('data-note-content') || '';
                         var content = decodeBase64Utf8(contentEncoded);
                         content = content.replace(/&laquo;/gi, '«').replace(/&raquo;/gi, '»');
-                        content = content.replace(/«([\\s\\S]*?)»/g, function(match, inner) {
-                            return '&gt; ' + inner.trim();
-                        });
                         content = nisabaNormalizeQuotes(content);
                         var safeTitle = escapeHtml(title);
                         var sourceLine = '';

@@ -2245,7 +2245,7 @@ function admin_build_post_message(string $slug, string $title, string $descripti
     }
     $url = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
     if ($url !== '') {
-        $parts[] = $url;
+        $parts[] = 'Lee el artículo: ' . $url;
     }
     $imageUrl = trim($imageUrl);
     if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
@@ -2519,7 +2519,7 @@ function admin_build_instagram_caption(string $slug, string $title, string $desc
     }
     $url = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
     if ($url !== '') {
-        $parts[] = $url;
+        $parts[] = 'Lee el artículo: ' . $url;
     }
     return implode("\n\n", $parts);
 }

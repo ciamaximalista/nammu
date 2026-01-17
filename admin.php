@@ -2269,7 +2269,8 @@ function admin_build_telegram_message(string $slug, string $title, string $descr
     }
     $url = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
     if ($url !== '') {
-        $parts[] = admin_telegram_escape($url);
+        $safeUrl = admin_telegram_escape($url);
+        $parts[] = '<a href="' . $safeUrl . '">Lee el artículo</a>';
     }
     if (empty($parts)) {
         $parts[] = admin_telegram_escape('Nueva publicación disponible');

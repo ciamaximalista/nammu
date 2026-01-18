@@ -1032,12 +1032,6 @@
             if (!is_array($bucket)) {
                 continue;
             }
-            $uids = $bucket['uids'] ?? [];
-            if (is_array($uids)) {
-                foreach ($uids as $uid => $flag) {
-                    $result[$category][$uid] = true;
-                }
-            }
             $details = $bucket['detail'] ?? [];
             if (is_array($details)) {
                 foreach ($details as $label => $detailPayload) {

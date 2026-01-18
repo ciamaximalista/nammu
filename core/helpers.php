@@ -531,71 +531,69 @@ function nammu_record_visit(): void
         setcookie('nammu_stats_referrer', '', time() - 3600, '/');
         unset($_COOKIE['nammu_stats_referrer']);
     }
-    $source = nammu_detect_referrer_source($referrer, $host);
-    if (($source['bucket'] ?? '') === 'direct') {
-        $utmSource = strtolower(trim((string) ($_GET['utm_source'] ?? '')));
-        $utmMedium = strtolower(trim((string) ($_GET['utm_medium'] ?? '')));
-        if ($utmSource !== '' || $utmMedium !== '') {
-            $sourceMap = [
-                'email' => 'Lista de correo',
-                'correo' => 'Lista de correo',
-                'mail' => 'Lista de correo',
-                'newsletter' => 'Newsletter',
-                'telegram' => 'Telegram',
-                't.me' => 'Telegram',
-                'tg' => 'Telegram',
-                'whatsapp' => 'WhatsApp',
-                'wa' => 'WhatsApp',
-                'instagram' => 'Instagram',
-                'ig' => 'Instagram',
-                'facebook' => 'Facebook',
-                'fb' => 'Facebook',
-                'facebook.com' => 'Facebook',
-                'twitter' => 'Twitter/X',
-                'x' => 'Twitter/X',
-                't.co' => 'Twitter/X',
-                'linkedin' => 'LinkedIn',
-                'lnkd' => 'LinkedIn',
-                'pinterest' => 'Pinterest',
-                'pin' => 'Pinterest',
-                'reddit' => 'Reddit',
-                'tiktok' => 'TikTok',
-                'yt' => 'YouTube',
-                'youtube' => 'YouTube',
-                'google' => 'Google Search',
-                'google_search' => 'Google Search',
-                'googleorganic' => 'Google Search',
-                'bing' => 'Bing',
-                'duckduckgo' => 'DuckDuckGo',
-                'ddg' => 'DuckDuckGo',
-                'yahoo' => 'Yahoo',
-                'yandex' => 'Yandex',
-                'baidu' => 'Baidu',
-                'ecosia' => 'Ecosia',
-                'startpage' => 'Startpage',
-                'search' => 'Google Search',
-                'organic' => 'Google Search',
-            ];
-            $detail = '';
-            foreach ([$utmSource, $utmMedium] as $utmValue) {
-                if ($utmValue === '') {
-                    continue;
-                }
-                if (isset($sourceMap[$utmValue])) {
-                    $detail = $sourceMap[$utmValue];
-                    break;
-                }
-            }
-            if ($detail !== '') {
-                $bucket = 'other';
-                if (in_array($detail, ['Google Search', 'Bing', 'DuckDuckGo', 'Yahoo', 'Yandex', 'Baidu', 'Ecosia', 'Startpage'], true)) {
-                    $bucket = 'search';
-                } elseif (in_array($detail, ['Telegram', 'WhatsApp', 'Instagram', 'Facebook', 'Twitter/X', 'LinkedIn', 'Pinterest', 'Reddit', 'TikTok', 'YouTube'], true)) {
-                    $bucket = 'social';
-                }
-                $source = ['bucket' => $bucket, 'detail' => $detail];
-            }
+    $utmSource = strtolower(trim((string) ($_GET['utm_source'] ?? '')));
+    $utmMedium = strtolower(trim((string) ($_GET['utm_medium'] ?? '')));
+    $sourceMap = [
+        'email' => 'Lista de correo',
+        'correo' => 'Lista de correo',
+        'mail' => 'Lista de correo',
+        'newsletter' => 'Newsletter',
+        'telegram' => 'Telegram',
+        't.me' => 'Telegram',
+        'tg' => 'Telegram',
+        'whatsapp' => 'WhatsApp',
+        'wa' => 'WhatsApp',
+        'instagram' => 'Instagram',
+        'ig' => 'Instagram',
+        'facebook' => 'Facebook',
+        'fb' => 'Facebook',
+        'facebook.com' => 'Facebook',
+        'twitter' => 'Twitter/X',
+        'x' => 'Twitter/X',
+        't.co' => 'Twitter/X',
+        'linkedin' => 'LinkedIn',
+        'lnkd' => 'LinkedIn',
+        'pinterest' => 'Pinterest',
+        'pin' => 'Pinterest',
+        'reddit' => 'Reddit',
+        'tiktok' => 'TikTok',
+        'yt' => 'YouTube',
+        'youtube' => 'YouTube',
+        'google' => 'Google Search',
+        'google_search' => 'Google Search',
+        'googleorganic' => 'Google Search',
+        'bing' => 'Bing',
+        'duckduckgo' => 'DuckDuckGo',
+        'ddg' => 'DuckDuckGo',
+        'yahoo' => 'Yahoo',
+        'yandex' => 'Yandex',
+        'baidu' => 'Baidu',
+        'ecosia' => 'Ecosia',
+        'startpage' => 'Startpage',
+        'search' => 'Google Search',
+        'organic' => 'Google Search',
+    ];
+    $utmDetail = '';
+    foreach ([$utmSource, $utmMedium] as $utmValue) {
+        if ($utmValue === '') {
+            continue;
         }
+        if (isset($sourceMap[$utmValue])) {
+            $utmDetail = $sourceMap[$utmValue];
+            break;
+        }
+    }
+
+    if ($utmDetail !== '') {
+        $bucket = 'other';
+        if (in_array($utmDetail, ['Google Search', 'Bing', 'DuckDuckGo', 'Yahoo', 'Yandex', 'Baidu', 'Ecosia', 'Startpage'], true)) {
+            $bucket = 'search';
+        } elseif (in_array($utmDetail, ['Telegram', 'WhatsApp', 'Instagram', 'Facebook', 'Twitter/X', 'LinkedIn', 'Pinterest', 'Reddit', 'TikTok', 'YouTube'], true)) {
+            $bucket = 'social';
+        }
+        $source = ['bucket' => $bucket, 'detail' => $utmDetail];
+    } else {
+        $source = nammu_detect_referrer_source($referrer, $host);
     }
     if (($source['bucket'] ?? '') === 'direct') {
         $uaSource = nammu_detect_user_agent_source($_SERVER['HTTP_USER_AGENT'] ?? '');

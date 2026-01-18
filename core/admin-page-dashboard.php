@@ -1478,7 +1478,7 @@
         if ($firstMonthKey !== '' && $monthKey < $firstMonthKey) {
             break;
         }
-        $count = $monthlyTotals[$monthKey] ?? 0;
+        $count = isset($monthlyUids[$monthKey]) ? count($monthlyUids[$monthKey]) : 0;
         $monthNum = (int) $month->format('n');
         $last12MonthsList[] = [
             'label' => ($monthNames[$monthNum] ?? $month->format('m')) . ' ' . $month->format('Y'),
@@ -1495,7 +1495,7 @@
         }
         $yearList[] = [
             'label' => $year,
-            'count' => $yearlyTotals[$year] ?? 0,
+            'count' => isset($yearlyUids[$year]) ? count($yearlyUids[$year]) : 0,
         ];
     }
 

@@ -680,7 +680,6 @@ function nammu_record_pageview(string $type, string $slug, string $title = ''): 
     $data['content'][$bucket][$slug]['daily'][$date] = $dailyEntry;
     $data['updated_at'] = time();
     nammu_save_analytics($data);
-    $GLOBALS['nammu_analytics_visit_recorded'] = true;
 }
 
 function nammu_record_internal_search(string $query): void
@@ -735,7 +734,6 @@ function nammu_record_internal_search(string $query): void
         $data['updated_at'] = time();
         nammu_save_analytics($data);
     }
-    $GLOBALS['nammu_analytics_visit_recorded'] = true;
 }
 
 function nammu_record_itinerary_event(string $slug, string $event): void
@@ -774,7 +772,6 @@ function nammu_record_itinerary_event(string $slug, string $event): void
         $data['updated_at'] = time();
         nammu_save_analytics($data);
     }
-    $GLOBALS['nammu_analytics_visit_recorded'] = true;
 }
 
 function nammu_template_settings(): array

@@ -148,6 +148,44 @@ function admin_ideas_top_searches(array $analytics, int $days = 30, int $limit =
     return array_slice(array_keys($counts), 0, $limit);
 }
 
+function admin_ideas_load_cache(string $path): ?array
+{
+    if (!is_file($path)) {
+        return null;
+    }
+    $raw = @file_get_contents($path);
+    if ($raw === false || $raw === '') {
+        return null;
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : null;
+}
+
+function admin_ideas_extract_terms(array $rows, int $limit = 3): array
+{
+    $terms = [];
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $term = trim((string) ($row['term'] ?? ''));
+        if ($term === '') {
+            continue;
+        }
+        $terms[] = $term;
+    }
+    if (empty($terms)) {
+        return [];
+    }
+    $unique = [];
+    foreach ($terms as $term) {
+        if (!in_array($term, $unique, true)) {
+            $unique[] = $term;
+        }
+    }
+    return array_slice($unique, 0, $limit);
+}
+
 function admin_ideas_days_since_last_post(array $posts): ?int
 {
     $latest = null;
@@ -176,6 +214,9 @@ function admin_ideas_days_since_last_post(array $posts): ?int
 function admin_ideas_build(string $contentDir, int $days = 30): array
 {
     $analytics = function_exists('nammu_load_analytics') ? nammu_load_analytics() : [];
+    $settings = function_exists('get_settings') ? get_settings() : [];
+    $gscSettings = is_array($settings['search_console'] ?? null) ? $settings['search_console'] : [];
+    $bingSettings = is_array($settings['bing_webmaster'] ?? null) ? $settings['bing_webmaster'] : [];
     $posts = [];
     if (class_exists(ContentRepository::class) && is_dir($contentDir)) {
         try {
@@ -211,6 +252,33 @@ function admin_ideas_build(string $contentDir, int $days = 30): array
     if (!empty($searches)) {
         $list = admin_ideas_join_list($searches);
         $suggestions[] = 'Las búsquedas internas más frecuentes del último mes fueron: ' . $list . '. Podrías profundizar en esos temas.';
+    }
+
+    $baseDir = dirname($contentDir);
+    $gscEnabled = trim((string) ($gscSettings['property'] ?? '')) !== ''
+        && trim((string) ($gscSettings['client_id'] ?? '')) !== ''
+        && trim((string) ($gscSettings['client_secret'] ?? '')) !== ''
+        && trim((string) ($gscSettings['refresh_token'] ?? '')) !== '';
+    if ($gscEnabled) {
+        $gscCache = admin_ideas_load_cache($baseDir . '/config/gsc-cache.json');
+        $gscTerms = is_array($gscCache['queries28'] ?? null) ? admin_ideas_extract_terms($gscCache['queries28'], 3) : [];
+        if (!empty($gscTerms)) {
+            $list = admin_ideas_join_list($gscTerms);
+            $suggestions[] = 'En Google Search los términos más buscados del último mes fueron: ' . $list . '. Podrías escribir una nueva entrega sobre esos temas.';
+        }
+    }
+
+    $bingEnabled = trim((string) ($bingSettings['site_url'] ?? '')) !== ''
+        && (trim((string) ($bingSettings['api_key'] ?? '')) !== ''
+            || trim((string) ($bingSettings['refresh_token'] ?? '')) !== ''
+            || trim((string) ($bingSettings['access_token'] ?? '')) !== '');
+    if ($bingEnabled) {
+        $bingCache = admin_ideas_load_cache($baseDir . '/config/bing-cache.json');
+        $bingTerms = is_array($bingCache['queries28'] ?? null) ? admin_ideas_extract_terms($bingCache['queries28'], 3) : [];
+        if (!empty($bingTerms)) {
+            $list = admin_ideas_join_list($bingTerms);
+            $suggestions[] = 'En Bing los términos más buscados del último mes fueron: ' . $list . '. Puede ser buen momento para ampliar esos contenidos.';
+        }
     }
 
     $daysSince = admin_ideas_days_since_last_post($posts);

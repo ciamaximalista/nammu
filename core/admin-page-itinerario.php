@@ -135,6 +135,9 @@
                                                 <img src="nisaba.png" alt="" class="nisaba-icon">
                                             </button>
                                         <?php endif; ?>
+                                        <?php if (!empty($ideasEnabled)): ?>
+                                            <button type="button" class="btn btn-outline-secondary" data-md-action="ideas" title="Ideas" aria-label="Ideas">Ideas</button>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                                 <textarea name="itinerary_content" id="itinerary_content" class="form-control" rows="10" data-markdown-editor="itinerary"><?= htmlspecialchars($itineraryFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>

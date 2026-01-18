@@ -72,6 +72,8 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 - Compatible con la estructura `content/` y `assets/` de PicoCMS, lo que simplifica migraciones.
 - Si está disponible Symfony Yaml, se usa para parsear `config/config.yml`; si no, existe un parser propio robusto.
 - Markdown enriquecido en el panel gracias a una barra de botones que aplica negrita, listas, enlaces, código, citas y atajos para imágenes/vídeos. Incluye atajos de teclado (Ctrl/Cmd+B, Ctrl/Cmd+I, Ctrl/Cmd+K) en el editor de contenidos.
+- Botón **Ideas** en el editor: sugiere temas basados en estadísticas (artículos más leídos, categorías inactivas y búsquedas internas).
+- Integración con Nisaba: inserta notas recientes desde su feed `notas.xml` directamente en el editor.
 
 ## Requisitos mínimos
 

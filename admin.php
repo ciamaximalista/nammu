@@ -5,6 +5,7 @@ require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
 require_once __DIR__ . '/core/postal.php';
 require_once __DIR__ . '/core/admin-nisaba.php';
+require_once __DIR__ . '/core/admin-ideas.php';
 
 // Load dependencies (optional)
 $autoload = __DIR__ . '/vendor/autoload.php';
@@ -7479,6 +7480,10 @@ $nisabaFeedUrl = $nisabaEnabled ? admin_nisaba_feed_url($nisabaUrl) : '';
 $nisabaPages = ['publish', 'edit', 'edit-post', 'itinerario', 'itinerario-tema'];
 $nisabaModalEnabled = $nisabaEnabled && in_array($page, $nisabaPages, true);
 $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : [];
+$ideasPages = ['publish', 'edit', 'edit-post', 'itinerario', 'itinerario-tema'];
+$ideasModalEnabled = in_array($page, $ideasPages, true) && function_exists('admin_ideas_build');
+$ideasEnabled = $ideasModalEnabled;
+$ideasSuggestions = $ideasModalEnabled ? admin_ideas_build(CONTENT_DIR, 30) : [];
 
 ?>
 <!DOCTYPE html>
@@ -9231,6 +9236,34 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                 </div>
             </div>
         <?php endif; ?>
+        <?php if (!empty($ideasModalEnabled)): ?>
+            <div class="modal fade" id="ideasModal" tabindex="-1" role="dialog" aria-labelledby="ideasModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="ideasModalLabel">Ideas para nuevas publicaciones</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <?php if (!empty($ideasSuggestions)): ?>
+                                <ul class="mb-0">
+                                    <?php foreach ($ideasSuggestions as $idea): ?>
+                                        <li><?= htmlspecialchars($idea, ENT_QUOTES, 'UTF-8') ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php else: ?>
+                                <p class="text-muted mb-0">Todavía no hay suficientes datos para generar sugerencias.</p>
+                            <?php endif; ?>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
 
         
 
@@ -10305,6 +10338,9 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                     case 'nisaba':
                         openNisabaModal(textarea);
                         break;
+                    case 'ideas':
+                        openIdeasModal();
+                        break;
                     default:
                         break;
                 }
@@ -10524,6 +10560,20 @@ $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : 
                     target = null;
                 }
                 nisabaTarget = target || fallbackTextarea();
+                if (window.jQuery && typeof window.jQuery.fn.modal === 'function') {
+                    window.jQuery(modal).modal('show');
+                } else {
+                    modal.classList.add('show');
+                    modal.style.display = 'block';
+                    modal.removeAttribute('aria-hidden');
+                }
+            }
+
+            function openIdeasModal() {
+                var modal = document.getElementById('ideasModal');
+                if (!modal) {
+                    return;
+                }
                 if (window.jQuery && typeof window.jQuery.fn.modal === 'function') {
                     window.jQuery(modal).modal('show');
                 } else {

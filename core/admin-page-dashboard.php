@@ -2632,7 +2632,7 @@
                                         <?php foreach ($sourceMainRows as $item): ?>
                                             <tr>
                                                 <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
-                                                <td class="text-right"><?= (int) $item['percent'] ?>%</td>
+                                                <td class="text-right"><?= (int) $item['percent'] ?>% <span class="text-muted">(<?= (int) $item['count'] ?>)</span></td>
                                             </tr>
                                         <?php endforeach; ?>
                                     </tbody>
@@ -2646,7 +2646,7 @@
                                             <?php foreach ($searchDetailRows as $item): ?>
                                                 <tr>
                                                     <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
-                                                    <td class="text-right"><?= (int) $item['percent'] ?>%</td>
+                                                    <td class="text-right"><?= (int) $item['percent'] ?>% <span class="text-muted">(<?= (int) $item['count'] ?>)</span></td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
@@ -2661,7 +2661,7 @@
                                             <?php foreach ($socialDetailRows as $item): ?>
                                                 <tr>
                                                     <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
-                                                    <td class="text-right"><?= (int) $item['percent'] ?>%</td>
+                                                    <td class="text-right"><?= (int) $item['percent'] ?>% <span class="text-muted">(<?= (int) $item['count'] ?>)</span></td>
                                                 </tr>
                                         <?php endforeach; ?>
                                     </tbody>
@@ -2676,7 +2676,7 @@
                                             <?php foreach ($otherDetailRows as $item): ?>
                                                 <tr>
                                                     <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
-                                                    <td class="text-right"><?= (int) $item['percent'] ?>%</td>
+                                                    <td class="text-right"><?= (int) $item['percent'] ?>% <span class="text-muted">(<?= (int) $item['count'] ?>)</span></td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>

@@ -11603,6 +11603,10 @@ $ideasSuggestions = $ideasModalEnabled ? admin_ideas_build(CONTENT_DIR, 30) : []
                         var pdfHref = pdfBase;
                         snippet = '\n\n<div class="embedded-pdf">\n    <iframe src="' + pdfSrc + '" title="Documento PDF" loading="lazy" allowfullscreen></iframe>\n    <div class="embedded-pdf__actions" aria-label="Acciones del PDF">\n        <a class="embedded-pdf__action" href="' + pdfHref + '" download>Descargar PDF</a>\n        <a class="embedded-pdf__action" href="' + pdfHref + '" target="_blank" rel="noopener">Ver a pantalla completa</a>\n    </div>\n</div>\n\n';
                     }
+                } else if (type === 'audio') {
+                    var audioSource = source;
+                    var audioTag = mime ? '        <source src="' + audioSource + '" type="' + mime + '">' : '        <source src="' + audioSource + '">';
+                    snippet = '\n\n<audio class="embedded-audio" controls preload="metadata">\n' + audioTag + '\n</audio>\n\n';
                 } else if (type === 'document') {
                     snippet = '[' + (source.split('/').pop() || 'Documento') + '](' + source + ')';
                 } else {

@@ -1241,7 +1241,7 @@
         'search' => 'Buscadores',
         'social' => 'Redes sociales',
         'email' => 'Lista de correo',
-        'other' => 'Otros',
+        'other' => 'Sitios web',
     ];
     $sourceMainRows = $buildPercentTable($sourceMain, $sourceMainLabels);
     $searchDetailRows = $buildPercentTable($collectSourceUids('search'), []);

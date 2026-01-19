@@ -1022,7 +1022,8 @@
     $platformSystems = $collectPlatformUids('os');
     $platformLanguages = $collectPlatformUids('language');
 
-    $collectSourceUids = static function (string $category) use ($sourcesDaily, $startKey): array {
+    $emailDetailLabels = ['Lista de correo', 'Newsletter'];
+    $collectSourceUids = static function (string $category) use ($sourcesDaily, $startKey, $emailDetailLabels): array {
         $result = [];
         foreach ($sourcesDaily as $day => $payload) {
             if (!is_string($day) || $day < $startKey) {
@@ -1035,6 +1036,9 @@
             $details = $bucket['detail'] ?? [];
             if (is_array($details)) {
                 foreach ($details as $label => $detailPayload) {
+                    if ($category === 'other' && in_array((string) $label, $emailDetailLabels, true)) {
+                        continue;
+                    }
                     $detailUids = is_array($detailPayload) ? ($detailPayload['uids'] ?? []) : [];
                     foreach ($detailUids as $uid => $flag) {
                         $result[$label][$uid] = true;
@@ -1215,6 +1219,20 @@
             $uids = is_array($bucketData) ? ($bucketData['uids'] ?? []) : [];
             foreach ($uids as $uid => $flag) {
                 $sourceMain[$bucket][$uid] = true;
+            }
+            if ($bucket === 'other') {
+                $details = is_array($bucketData) ? ($bucketData['detail'] ?? []) : [];
+                if (is_array($details)) {
+                    foreach ($details as $label => $detailPayload) {
+                        if (!in_array((string) $label, $emailDetailLabels, true)) {
+                            continue;
+                        }
+                        $detailUids = is_array($detailPayload) ? ($detailPayload['uids'] ?? []) : [];
+                        foreach ($detailUids as $uid => $flag) {
+                            $sourceMain['email'][$uid] = true;
+                        }
+                    }
+                }
             }
         }
     }

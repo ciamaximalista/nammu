@@ -230,7 +230,10 @@ function nammu_detect_referrer_source(string $referer, string $host): array
             return ['bucket' => 'social', 'detail' => $label];
         }
     }
-    return ['bucket' => 'other', 'detail' => 'Sitios web'];
+    if (str_starts_with($refHost, 'www.')) {
+        $refHost = substr($refHost, 4);
+    }
+    return ['bucket' => 'other', 'detail' => $refHost !== '' ? $refHost : 'Sitios web'];
 }
 
 function nammu_detect_user_agent_source(string $userAgent): array

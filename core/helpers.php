@@ -586,7 +586,9 @@ function nammu_record_visit(): void
 
     if ($utmDetail !== '') {
         $bucket = 'other';
-        if (in_array($utmDetail, ['Google Search', 'Bing', 'DuckDuckGo', 'Yahoo', 'Yandex', 'Baidu', 'Ecosia', 'Startpage'], true)) {
+        if (in_array($utmDetail, ['Lista de correo', 'Newsletter'], true)) {
+            $bucket = 'email';
+        } elseif (in_array($utmDetail, ['Google Search', 'Bing', 'DuckDuckGo', 'Yahoo', 'Yandex', 'Baidu', 'Ecosia', 'Startpage'], true)) {
             $bucket = 'search';
         } elseif (in_array($utmDetail, ['Telegram', 'WhatsApp', 'Instagram', 'Facebook', 'Twitter/X', 'LinkedIn', 'Pinterest', 'Reddit', 'TikTok', 'YouTube'], true)) {
             $bucket = 'social';

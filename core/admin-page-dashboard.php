@@ -1203,14 +1203,14 @@
     $languageList = $buildPercentTable($platformLanguages, $languageLabelMap);
 
     $sourceMain = [];
-    foreach (['direct', 'search', 'social', 'other'] as $bucket) {
+    foreach (['direct', 'search', 'social', 'email', 'other'] as $bucket) {
         $sourceMain[$bucket] = [];
     }
     foreach ($sourcesDaily as $day => $payload) {
         if (!is_string($day) || $day < $startKey) {
             continue;
         }
-        foreach (['direct', 'search', 'social', 'other'] as $bucket) {
+        foreach (['direct', 'search', 'social', 'email', 'other'] as $bucket) {
             $bucketData = is_array($payload) ? ($payload[$bucket] ?? []) : [];
             $uids = is_array($bucketData) ? ($bucketData['uids'] ?? []) : [];
             foreach ($uids as $uid => $flag) {
@@ -1222,6 +1222,7 @@
         'direct' => 'Entrada directa',
         'search' => 'Buscadores',
         'social' => 'Redes sociales',
+        'email' => 'Lista de correo',
         'other' => 'Otros',
     ];
     $sourceMainRows = $buildPercentTable($sourceMain, $sourceMainLabels);

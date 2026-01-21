@@ -541,6 +541,9 @@ function nammu_record_visit(): void
         'correo' => 'Lista de correo',
         'mail' => 'Lista de correo',
         'newsletter' => 'Newsletter',
+        'push' => 'Notificaciones push',
+        'webpush' => 'Notificaciones push',
+        'push_notification' => 'Notificaciones push',
         'telegram' => 'Telegram',
         't.me' => 'Telegram',
         'tg' => 'Telegram',
@@ -591,6 +594,8 @@ function nammu_record_visit(): void
         $bucket = 'other';
         if (in_array($utmDetail, ['Lista de correo', 'Newsletter'], true)) {
             $bucket = 'email';
+        } elseif ($utmDetail === 'Notificaciones push') {
+            $bucket = 'push';
         } elseif (in_array($utmDetail, ['Google Search', 'Bing', 'DuckDuckGo', 'Yahoo', 'Yandex', 'Baidu', 'Ecosia', 'Startpage'], true)) {
             $bucket = 'search';
         } elseif (in_array($utmDetail, ['Telegram', 'WhatsApp', 'Instagram', 'Facebook', 'Twitter/X', 'LinkedIn', 'Pinterest', 'Reddit', 'TikTok', 'YouTube'], true)) {

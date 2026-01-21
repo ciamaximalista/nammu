@@ -1207,14 +1207,14 @@
     $languageList = $buildPercentTable($platformLanguages, $languageLabelMap);
 
     $sourceMain = [];
-    foreach (['direct', 'search', 'social', 'email', 'other'] as $bucket) {
+    foreach (['direct', 'search', 'social', 'email', 'push', 'other'] as $bucket) {
         $sourceMain[$bucket] = [];
     }
     foreach ($sourcesDaily as $day => $payload) {
         if (!is_string($day) || $day < $startKey) {
             continue;
         }
-        foreach (['direct', 'search', 'social', 'email', 'other'] as $bucket) {
+        foreach (['direct', 'search', 'social', 'email', 'push', 'other'] as $bucket) {
             $bucketData = is_array($payload) ? ($payload[$bucket] ?? []) : [];
             $uids = is_array($bucketData) ? ($bucketData['uids'] ?? []) : [];
             foreach ($uids as $uid => $flag) {
@@ -1241,11 +1241,13 @@
         'search' => 'Buscadores',
         'social' => 'Redes sociales',
         'email' => 'Lista de correo',
+        'push' => 'Notificaciones push',
         'other' => 'Sitios web',
     ];
     $sourceMainRows = $buildPercentTable($sourceMain, $sourceMainLabels);
     $searchDetailRows = $buildPercentTable($collectSourceUids('search'), []);
     $socialDetailRows = $buildPercentTable($collectSourceUids('social'), []);
+    $pushDetailRows = $buildPercentTable($collectSourceUids('push'), []);
     $otherDetailRows = $buildPercentTable($collectSourceUids('other'), []);
 
     $searchTermCounts = [];
@@ -2677,10 +2679,25 @@
                                                     <td class="text-right"><?= (int) $item['percent'] ?>% <span class="text-muted">(<?= (int) $item['count'] ?>)</span></td>
                                                 </tr>
                                         <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($pushDetailRows)): ?>
+                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Notificaciones push</p>
+                                <div class="table-responsive">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <?php foreach ($pushDetailRows as $item): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                    <td class="text-right"><?= (int) $item['percent'] ?>% <span class="text-muted">(<?= (int) $item['count'] ?>)</span></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
                             <?php if (!empty($otherDetailRows)): ?>
                                 <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Sitios web</p>
                                 <div class="table-responsive">

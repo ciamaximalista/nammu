@@ -2798,10 +2798,16 @@ function admin_maybe_enqueue_push_notification(string $type, string $title, stri
     if ($type === 'itinerary' && ($push['push_itineraries'] ?? 'off') !== 'on') {
         return;
     }
+    $trackedUrl = function_exists('admin_add_utm_params')
+        ? admin_add_utm_params($url, [
+            'utm_source' => 'push',
+            'utm_medium' => 'push',
+        ])
+        : $url;
     $payload = [
         'title' => $title,
         'body' => $description,
-        'url' => $url,
+        'url' => $trackedUrl,
         'icon' => $image,
     ];
     $result = function_exists('nammu_send_push_notification') ? nammu_send_push_notification($payload) : ['skipped' => true];

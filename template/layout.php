@@ -1258,13 +1258,15 @@ if (!empty($baseUrl)) {
         <div class="floating-stack">
             <?php if ($showFloatingSubscription): ?>
                 <div class="floating-search floating-subscription" data-floating-subscription>
-                    <form class="floating-search-form subscription-form" method="get" action="<?= htmlspecialchars($avisosUrl, ENT_QUOTES, 'UTF-8') ?>">
+                    <form class="floating-search-form subscription-form" method="post" action="<?= htmlspecialchars($floatingSubscriptionAction, ENT_QUOTES, 'UTF-8') ?>">
                         <span class="floating-search-icon" aria-hidden="true">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <rect x="3" y="5" width="18" height="14" rx="2" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2"/>
                                 <polyline points="3,7 12,13 21,7" fill="none" stroke="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                         </span>
+                        <input type="hidden" name="back" value="<?= htmlspecialchars($currentUrl, ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="force_all" value="1">
                         <input type="email" name="subscriber_email" placeholder="Suscríbete" required>
                         <button type="submit" aria-label="Enviar">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">

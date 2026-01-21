@@ -1723,15 +1723,91 @@ function admin_public_itinerary_url(string $slug): string {
     return $base === '' ? $path : $base . $path;
 }
 
+function admin_indexnow_searchengines_cache_path(): string {
+    return __DIR__ . '/config/indexnow-searchengines.json';
+}
+
+function admin_indexnow_fetch_searchengines(): array {
+    $url = 'https://www.indexnow.org/searchengines.json';
+    $context = stream_context_create([
+        'http' => [
+            'timeout' => 2,
+        ],
+        'https' => [
+            'timeout' => 2,
+        ],
+    ]);
+    $raw = @file_get_contents($url, false, $context);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return [];
+    }
+    $endpoints = [];
+    foreach ($decoded as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        $endpoint = trim((string) ($entry['endpoint'] ?? ''));
+        if ($endpoint === '' || !str_starts_with($endpoint, 'https://')) {
+            continue;
+        }
+        $endpoints[] = $endpoint;
+    }
+    return array_values(array_unique($endpoints));
+}
+
+function admin_indexnow_load_searchengines_cache(): array {
+    $path = admin_indexnow_searchengines_cache_path();
+    if (!is_file($path)) {
+        return [];
+    }
+    $raw = @file_get_contents($path);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function admin_indexnow_refresh_searchengines_cache_if_needed(): array {
+    $cache = admin_indexnow_load_searchengines_cache();
+    $updatedAt = (int) ($cache['updated_at'] ?? 0);
+    $endpoints = is_array($cache['endpoints'] ?? null) ? $cache['endpoints'] : [];
+    $isFresh = $updatedAt > 0 && (time() - $updatedAt) < (30 * 24 * 60 * 60);
+    if ($isFresh && !empty($endpoints)) {
+        return $endpoints;
+    }
+    $fetched = admin_indexnow_fetch_searchengines();
+    if (!empty($fetched)) {
+        $payload = [
+            'updated_at' => time(),
+            'endpoints' => $fetched,
+        ];
+        @file_put_contents(admin_indexnow_searchengines_cache_path(), json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        return $fetched;
+    }
+    return $endpoints;
+}
+
 function admin_indexnow_endpoints(): array {
-    return [
+    $defaults = [
         'https://api.indexnow.org/indexnow',
         'https://indexnow.amazonbot.amazon/indexnow',
         'https://www.bing.com/indexnow',
         'https://searchadvisor.naver.com/indexnow',
+        'https://search.seznam.cz/indexnow',
         'https://yandex.com/indexnow',
         'https://indexnow.yep.com/indexnow',
     ];
+    $remote = admin_indexnow_refresh_searchengines_cache_if_needed();
+    if (empty($remote)) {
+        return $defaults;
+    }
+    $merged = array_values(array_unique(array_merge($defaults, $remote)));
+    return $merged;
 }
 
 function admin_indexnow_key_filename(string $key): string {

@@ -257,9 +257,20 @@
                                                         value="<?= htmlspecialchars($optionKey, ENT_QUOTES, 'UTF-8') ?>"
                                                         <?= $optionActive ? 'checked' : '' ?>>
                                                     <span class="home-header-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">
-                                                        <span class="header-dot"></span>
-                                                        <span class="header-dot"></span>
-                                                        <span class="header-dot"></span>
+                                                        <?php if ($optionKey === 'home'): ?>
+                                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                                                <path d="M4 11L12 4L20 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                                <path d="M6 10.5V20H18V10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                                <path d="M10 20V14H14V20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                            </svg>
+                                                        <?php elseif ($optionKey === 'both'): ?>
+                                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                                                <rect x="6" y="7" width="12" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+                                                                <rect x="3" y="3" width="12" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+                                                            </svg>
+                                                        <?php else: ?>
+                                                            <span class="home-header-zero" style="font-weight:700;font-size:1.2rem;line-height:1;color:currentColor;">0</span>
+                                                        <?php endif; ?>
                                                     </span>
                                                     <span class="card-style-text">
                                                         <strong><?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?></strong>

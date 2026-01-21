@@ -2933,6 +2933,7 @@ function get_default_template_settings(): array {
             'card_style' => 'full',
             'blocks' => 'boxed',
             'full_image_mode' => 'natural',
+            'header_buttons' => 'none',
             'header' => [
                 'type' => 'none',
                 'image' => '',
@@ -7184,6 +7185,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($homeBlocksModePosted, ['boxed', 'flat'], true)) {
             $homeBlocksModePosted = $defaults['home']['blocks'];
         }
+        $homeHeaderButtonsPosted = $_POST['home_header_buttons'] ?? ($defaults['home']['header_buttons'] ?? 'none');
+        if (!in_array($homeHeaderButtonsPosted, ['home', 'both', 'none'], true)) {
+            $homeHeaderButtonsPosted = $defaults['home']['header_buttons'] ?? 'none';
+        }
         $homeHeaderTypePosted = $_POST['home_header_type'] ?? $defaults['home']['header']['type'];
         $allowedHeaderTypes = ['none', 'graphic', 'text', 'mixed'];
         if (!in_array($homeHeaderTypePosted, $allowedHeaderTypes, true)) {
@@ -7287,6 +7292,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'card_style' => $homeCardStylePosted,
                 'full_image_mode' => $homeFullImageModePosted,
                 'blocks' => $homeBlocksModePosted,
+                'header_buttons' => $homeHeaderButtonsPosted,
                 'header' => [
                     'type' => $homeHeaderTypePosted,
                     'image' => $homeHeaderImagePosted,

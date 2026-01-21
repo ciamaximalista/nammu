@@ -62,6 +62,10 @@
                             if (!in_array($homeBlocksMode, ['boxed', 'flat'], true)) {
                                 $homeBlocksMode = $defaults['home']['blocks'];
                             }
+                            $homeHeaderButtons = $templateHome['header_buttons'] ?? ($defaults['home']['header_buttons'] ?? 'none');
+                            if (!in_array($homeHeaderButtons, ['home', 'both', 'none'], true)) {
+                                $homeHeaderButtons = $defaults['home']['header_buttons'] ?? 'none';
+                            }
                             $cardStylesAllowed = ['full', 'square-right', 'square-tall-right', 'circle-right'];
                             $homeCardStyle = $templateHome['card_style'] ?? $defaults['home']['card_style'];
                             if (!in_array($homeCardStyle, $cardStylesAllowed, true)) {
@@ -223,6 +227,14 @@
 
                                     <h4 class="mt-4">Portada</h4>
                                     <p class="text-muted">Configura la rejilla de la portada y cuántas entradas se muestran por página.</p>
+                                    <div class="form-group">
+                                        <label for="home_header_buttons">Botonera en la cabecera</label>
+                                        <select name="home_header_buttons" id="home_header_buttons" class="form-control">
+                                            <option value="home" <?= $homeHeaderButtons === 'home' ? 'selected' : '' ?>>Portada</option>
+                                            <option value="both" <?= $homeHeaderButtons === 'both' ? 'selected' : '' ?>>Portada y entradas</option>
+                                            <option value="none" <?= $homeHeaderButtons === 'none' ? 'selected' : '' ?>>No usar botonera</option>
+                                        </select>
+                                    </div>
                                     <div class="form-group">
                                         <label>Columnas de la rejilla</label>
                                         <div class="home-layout-options">

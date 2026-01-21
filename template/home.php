@@ -43,6 +43,11 @@ $columns = (int) ($homeSettings['columns'] ?? 2);
 if ($columns < 1 || $columns > 3) {
     $columns = 2;
 }
+$headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
+if (!in_array($headerButtonsMode, ['home', 'both', 'none'], true)) {
+    $headerButtonsMode = 'none';
+}
+$showHeaderButtonsHome = in_array($headerButtonsMode, ['home', 'both'], true);
 $homeFirstRowEnabled = (($homeSettings['first_row_enabled'] ?? 'off') === 'on');
 $homeFirstRowColumns = (int) ($homeSettings['first_row_columns'] ?? $columns);
 if ($homeFirstRowColumns < 1 || $homeFirstRowColumns > 3) {
@@ -120,6 +125,57 @@ $postalEnabled = $postalEnabled ?? false;
 $postalUrl = $postalUrl ?? '/correos.php';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $hasPaginationLeft = $subscriptionEnabled || ($postalEnabled && $postalLogoSvg !== '');
+$renderHeaderButtons = static function () use ($hasCategories, $categoriesIndexUrl, $hasItineraries, $itinerariesIndexUrl, $hasPodcast, $podcastIndexUrl, $subscriptionEnabled, $avisosUrl, $postalEnabled, $postalUrl, $postalLogoSvg, $accentColor, $highlight, $accentBorder): string {
+    $items = [];
+    if ($hasCategories) {
+        $items[] = [
+            'label' => 'Categorías',
+            'href' => $categoriesIndexUrl,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="#fff" stroke-width="2"/><line x1="8" y1="9" x2="16" y2="9" stroke="#fff" stroke-width="2"/><line x1="8" y1="13" x2="16" y2="13" stroke="#fff" stroke-width="2"/></svg>',
+        ];
+    }
+    if (!empty($hasItineraries) && !empty($itinerariesIndexUrl)) {
+        $items[] = [
+            'label' => 'Itinerarios',
+            'href' => $itinerariesIndexUrl,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 5H10C11.1046 5 12 5.89543 12 7V19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M20 5H14C12.8954 5 12 5.89543 12 7V19H20C21.1046 19 22 18.1046 22 17V7C22 5.89543 21.1046 5 20 5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><line x1="12" y1="7" x2="12" y2="19" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+        ];
+    }
+    if (!empty($hasPodcast) && !empty($podcastIndexUrl)) {
+        $items[] = [
+            'label' => 'Podcast',
+            'href' => $podcastIndexUrl,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="3" width="6" height="10" rx="3" stroke="#fff" stroke-width="2"/><path d="M5 11C5 14.866 8.134 18 12 18C15.866 18 19 14.866 19 11" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="18" x2="12" y2="22" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="22" x2="16" y2="22" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+        ];
+    }
+    if ($subscriptionEnabled) {
+        $items[] = [
+            'label' => 'Avisos por email',
+            'href' => $avisosUrl,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="14" rx="2" stroke="#fff" stroke-width="2"/><polyline points="3,7 12,13 21,7" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        ];
+    }
+    if ($postalEnabled && $postalLogoSvg !== '') {
+        $items[] = [
+            'label' => 'Correo postal',
+            'href' => $postalUrl,
+            'svg' => $postalLogoSvg,
+        ];
+    }
+    if (empty($items)) {
+        return '';
+    }
+    ob_start(); ?>
+    <div class="home-header-buttons">
+        <?php foreach ($items as $item): ?>
+            <a class="home-header-button-link" href="<?= htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>">
+                <?= $item['svg'] ?>
+            </a>
+        <?php endforeach; ?>
+    </div>
+    <?php
+    return (string) ob_get_clean();
+};
 $renderSearchBox = static function (string $variant) use ($searchAction, $accentColor, $highlight, $textColor, $searchActionBase, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories, $hasPodcast, $podcastIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
@@ -453,6 +509,10 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     <section class="home-hero home-hero-text variant-<?= htmlspecialchars($textHeaderStyle, ENT_QUOTES, 'UTF-8') ?>">
         <?php $renderHomeHeroText(); ?>
     </section>
+<?php endif; ?>
+
+<?php if ($showHeaderButtonsHome): ?>
+    <?= $renderHeaderButtons() ?>
 <?php endif; ?>
 
 <?php if ($homeSubscriptionTop): ?>
@@ -908,6 +968,33 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         max-width: 720px;
         margin-left: auto;
         margin-right: auto;
+    }
+    .home-header-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 6px 2px 18px;
+    }
+    .home-header-button-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: <?= $accentColor ?>;
+        border: 1px solid <?= $accentColor ?>;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .home-header-button-link:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+    }
+    .home-header-button-link svg {
+        width: 20px;
+        height: 20px;
     }
     .site-bio p {
         margin: 0 0 1rem 0;

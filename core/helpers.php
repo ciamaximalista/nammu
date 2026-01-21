@@ -998,6 +998,7 @@ function nammu_default_template_settings(): array
             'card_style' => 'full',
             'blocks' => 'boxed',
             'full_image_mode' => 'natural',
+            'header_buttons' => 'none',
             'header' => [
                 'type' => 'none',
                 'image' => '',

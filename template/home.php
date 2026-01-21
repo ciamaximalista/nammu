@@ -125,8 +125,13 @@ $postalEnabled = $postalEnabled ?? false;
 $postalUrl = $postalUrl ?? '/correos.php';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $hasPaginationLeft = $subscriptionEnabled || ($postalEnabled && $postalLogoSvg !== '');
-$renderHeaderButtons = static function () use ($hasCategories, $categoriesIndexUrl, $hasItineraries, $itinerariesIndexUrl, $hasPodcast, $podcastIndexUrl, $subscriptionEnabled, $avisosUrl, $postalEnabled, $postalUrl, $postalLogoSvg, $accentColor, $highlight, $accentBorder): string {
+$renderHeaderButtons = static function () use ($searchAction, $hasCategories, $categoriesIndexUrl, $hasItineraries, $itinerariesIndexUrl, $hasPodcast, $podcastIndexUrl, $subscriptionEnabled, $avisosUrl, $postalEnabled, $postalUrl, $postalLogoSvg, $accentColor, $highlight, $accentBorder): string {
     $items = [];
+    $items[] = [
+        'label' => 'Buscar',
+        'href' => $searchAction,
+        'svg' => '<svg width="20" height="20" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6" stroke="#fff" stroke-width="2"/><line x1="12.5" y1="12.5" x2="17" y2="17" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+    ];
     if ($hasCategories) {
         $items[] = [
             'label' => 'Categorías',
@@ -974,18 +979,19 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         flex-wrap: wrap;
         gap: 10px;
         align-items: center;
-        justify-content: flex-start;
+        justify-content: center;
         padding: 6px 2px 18px;
     }
     .home-header-button-link {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 42px;
-        height: 42px;
-        border-radius: 12px;
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
         background: <?= $accentColor ?>;
         border: 1px solid <?= $accentColor ?>;
+        color: #fff;
         transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     .home-header-button-link:hover {
@@ -993,8 +999,8 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
     }
     .home-header-button-link svg {
-        width: 20px;
-        height: 20px;
+        width: 18px;
+        height: 18px;
     }
     .site-bio p {
         margin: 0 0 1rem 0;

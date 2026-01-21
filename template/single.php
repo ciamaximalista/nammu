@@ -193,8 +193,13 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     <?php
     return (string) ob_get_clean();
 };
-$renderHeaderButtons = static function () use ($hasCategories, $categoriesIndexUrl, $hasItineraries, $itinerariesIndexUrl, $hasPodcast, $podcastIndexUrl, $subscriptionEnabled, $subscriptionAction, $postalEnabled, $postalUrl, $postalLogoSvg, $colorAccent, $colorHighlight): string {
+$renderHeaderButtons = static function () use ($searchAction, $hasCategories, $categoriesIndexUrl, $hasItineraries, $itinerariesIndexUrl, $hasPodcast, $podcastIndexUrl, $subscriptionEnabled, $subscriptionAction, $postalEnabled, $postalUrl, $postalLogoSvg, $colorAccent, $colorHighlight): string {
     $items = [];
+    $items[] = [
+        'label' => 'Buscar',
+        'href' => $searchAction,
+        'svg' => '<svg width="20" height="20" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6" stroke="#fff" stroke-width="2"/><line x1="12.5" y1="12.5" x2="17" y2="17" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+    ];
     if ($hasCategories) {
         $items[] = [
             'label' => 'Categorías',
@@ -697,11 +702,12 @@ if ($isPageTemplate && $formattedDate !== '') {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 40px;
-        height: 40px;
-        border-radius: 12px;
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
         background: <?= $colorAccent ?>;
         border: 1px solid <?= $colorAccent ?>;
+        color: #fff;
         transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     .post-header-button-link:hover {
@@ -709,8 +715,8 @@ if ($isPageTemplate && $formattedDate !== '') {
         box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
     }
     .post-header-button-link svg {
-        width: 20px;
-        height: 20px;
+        width: 18px;
+        height: 18px;
     }
     .post-intro {
         max-width: min(760px, 100%);

@@ -228,12 +228,46 @@
                                     <h4 class="mt-4">Portada</h4>
                                     <p class="text-muted">Configura la rejilla de la portada y cuántas entradas se muestran por página.</p>
                                     <div class="form-group">
-                                        <label for="home_header_buttons">Botonera en la cabecera</label>
-                                        <select name="home_header_buttons" id="home_header_buttons" class="form-control">
-                                            <option value="home" <?= $homeHeaderButtons === 'home' ? 'selected' : '' ?>>Portada</option>
-                                            <option value="both" <?= $homeHeaderButtons === 'both' ? 'selected' : '' ?>>Portada y entradas</option>
-                                            <option value="none" <?= $homeHeaderButtons === 'none' ? 'selected' : '' ?>>No usar botonera</option>
-                                        </select>
+                                        <label>Botonera en la cabecera</label>
+                                        <div class="home-card-style-options">
+                                            <?php
+                                            $headerButtonOptions = [
+                                                'home' => [
+                                                    'label' => 'Portada',
+                                                    'caption' => 'Sólo se ve en la portada',
+                                                    'figure' => 'header-buttons-home',
+                                                ],
+                                                'both' => [
+                                                    'label' => 'Portada y entradas',
+                                                    'caption' => 'Aparece también en las entradas',
+                                                    'figure' => 'header-buttons-both',
+                                                ],
+                                                'none' => [
+                                                    'label' => 'No usar botonera',
+                                                    'caption' => 'Oculta la botonera',
+                                                    'figure' => 'header-buttons-none',
+                                                ],
+                                            ];
+                                            ?>
+                                            <?php foreach ($headerButtonOptions as $optionKey => $info): ?>
+                                                <?php $optionActive = ($homeHeaderButtons === $optionKey); ?>
+                                                <label class="home-card-style-option <?= $optionActive ? 'active' : '' ?>">
+                                                    <input type="radio"
+                                                        name="home_header_buttons"
+                                                        value="<?= htmlspecialchars($optionKey, ENT_QUOTES, 'UTF-8') ?>"
+                                                        <?= $optionActive ? 'checked' : '' ?>>
+                                                    <span class="home-header-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">
+                                                        <span class="header-dot"></span>
+                                                        <span class="header-dot"></span>
+                                                        <span class="header-dot"></span>
+                                                    </span>
+                                                    <span class="card-style-text">
+                                                        <strong><?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                                        <small><?= htmlspecialchars($info['caption'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                    </span>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        </div>
                                     </div>
                                     <div class="form-group">
                                         <label>Columnas de la rejilla</label>

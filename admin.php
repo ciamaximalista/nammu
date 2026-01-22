@@ -10071,6 +10071,7 @@ $ideasSuggestions = $ideasModalEnabled ? admin_ideas_build(CONTENT_DIR, 30) : []
             var subscriptionPositionOptions = form.querySelectorAll('.home-card-style-option[data-subscription-position-option]');
             var subscriptionFloatingOptions = form.querySelectorAll('.home-card-style-option[data-subscription-floating-option]');
             var footerLogoOptions = form.querySelectorAll('.home-card-style-option[data-footer-logo-option]');
+            var headerButtonsOptions = form.querySelectorAll('.home-card-style-option[data-header-buttons-option]');
             var searchPositionContainer = form.querySelector('[data-search-position]');
             var subscriptionPositionContainer = form.querySelector('[data-subscription-position]');
             function refreshCardStyleSelection() {
@@ -10106,6 +10107,20 @@ $ideasSuggestions = $ideasModalEnabled ? admin_ideas_build(CONTENT_DIR, 30) : []
                 }
             });
             refreshFullImageModeSelection();
+
+            function refreshHeaderButtonsSelection() {
+                headerButtonsOptions.forEach(function(option) {
+                    var radio = option.querySelector('input[type="radio"]');
+                    option.classList.toggle('active', radio && radio.checked);
+                });
+            }
+            headerButtonsOptions.forEach(function(option) {
+                var radio = option.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.addEventListener('change', refreshHeaderButtonsSelection);
+                }
+            });
+            refreshHeaderButtonsSelection();
 
             function refreshSearchModeSelection() {
                 var activeMode = 'none';

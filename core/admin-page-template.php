@@ -251,7 +251,7 @@
                                             ?>
                                             <?php foreach ($headerButtonOptions as $optionKey => $info): ?>
                                                 <?php $optionActive = ($homeHeaderButtons === $optionKey); ?>
-                                                <label class="home-card-style-option <?= $optionActive ? 'active' : '' ?>">
+                                                <label class="home-card-style-option <?= $optionActive ? 'active' : '' ?>" data-header-buttons-option="1">
                                                     <input type="radio"
                                                         name="home_header_buttons"
                                                         value="<?= htmlspecialchars($optionKey, ENT_QUOTES, 'UTF-8') ?>"

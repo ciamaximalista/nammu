@@ -699,7 +699,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
 
 <style>
     .home-hero {
-        margin-bottom: 2rem;
+        margin-bottom: 0;
     }
     .site-search-block {
         margin: 1.5rem auto 2rem;

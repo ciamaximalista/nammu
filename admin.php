@@ -2551,9 +2551,6 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
     if ($title !== '') {
         $parts[] = $title;
     }
-    if ($trackedUrl !== '') {
-        $parts[] = $trackedUrl;
-    }
     $text = implode("\n\n", $parts);
     if (function_exists('mb_strlen')) {
         if (mb_strlen($text, 'UTF-8') > 300) {

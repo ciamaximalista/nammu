@@ -2500,7 +2500,7 @@ function admin_send_twitter_post(string $slug, string $title, string $descriptio
     ]);
 }
 
-function admin_send_bluesky_post(string $slug, string $title, string $description, array $settings, string $urlOverride = ''): bool {
+function admin_send_bluesky_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', ?string &$error = null): bool {
     $service = trim((string) ($settings['service'] ?? ''));
     if ($service === '') {
         $service = 'https://bsky.social';
@@ -2509,6 +2509,7 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
     $identifier = trim((string) ($settings['identifier'] ?? ''));
     $appPassword = trim((string) ($settings['app_password'] ?? ''));
     if ($identifier === '' || $appPassword === '') {
+        $error = 'Faltan credenciales de Bluesky.';
         return false;
     }
     $sessionEndpoint = $service . '/xrpc/com.atproto.server.createSession';
@@ -2523,10 +2524,18 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
     $sessionCode = null;
     $sessionResponse = admin_http_post_body_response($sessionEndpoint, (string) $sessionPayload, $sessionHeaders, $sessionCode);
     if ($sessionResponse === null || $sessionCode === null || $sessionCode < 200 || $sessionCode >= 300) {
+        $error = 'Error creando sesión en Bluesky.';
+        if ($sessionResponse !== null) {
+            $payload = json_decode($sessionResponse, true);
+            if (is_array($payload) && isset($payload['error'])) {
+                $error = 'Bluesky: ' . $payload['error'];
+            }
+        }
         return false;
     }
     $session = json_decode($sessionResponse, true);
     if (!is_array($session) || empty($session['accessJwt']) || empty($session['did'])) {
+        $error = 'Respuesta inválida de Bluesky.';
         return false;
     }
     $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
@@ -2558,8 +2567,18 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
         'Content-Length: ' . strlen((string) $payload),
     ];
     $httpCode = null;
-    admin_http_post_body_response($service . '/xrpc/com.atproto.repo.createRecord', (string) $payload, $headers, $httpCode);
-    return $httpCode !== null && $httpCode >= 200 && $httpCode < 300;
+    $postResponse = admin_http_post_body_response($service . '/xrpc/com.atproto.repo.createRecord', (string) $payload, $headers, $httpCode);
+    if ($httpCode !== null && $httpCode >= 200 && $httpCode < 300) {
+        return true;
+    }
+    $error = 'No se pudo crear el post en Bluesky.';
+    if ($postResponse !== null) {
+        $payload = json_decode($postResponse, true);
+        if (is_array($payload) && isset($payload['error'])) {
+            $error = 'Bluesky: ' . $payload['error'];
+        }
+    }
+    return false;
 }
 
 function admin_twitter_has_media_credentials(array $settings): bool {
@@ -5349,7 +5368,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $sent = admin_send_twitter_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
                                 break;
                             case 'bluesky':
-                                $sent = admin_send_bluesky_post($slug, $title, $description, $networkSettings, $customUrl);
+                                $sent = admin_send_bluesky_post($slug, $title, $description, $networkSettings, $customUrl, $customError);
                                 break;
                             case 'instagram':
                                 if (trim($image) === '') {
@@ -5424,7 +5443,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $sent = admin_send_twitter_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
                             break;
                         case 'bluesky':
-                            $sent = admin_send_bluesky_post($itinerarySlug, $title, $description, $networkSettings, $customUrl);
+                            $sent = admin_send_bluesky_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $customError);
                             break;
                         case 'instagram':
                             if (trim($image) === '') {

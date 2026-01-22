@@ -1593,6 +1593,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
     $blueskyHandle = trim((string) ($config['bluesky']['identifier'] ?? ''));
     if ($blueskyHandle !== '') {
         $handle = ltrim($blueskyHandle, '@');
+        $handle = preg_replace('/[\\p{Cf}\\p{Z}\\s]+/u', '', $handle);
         if ($handle !== '') {
             $links[] = [
                 'label' => 'Bluesky',

@@ -2551,9 +2551,6 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
     if ($title !== '') {
         $parts[] = $title;
     }
-    if ($trackedUrl !== '') {
-        $parts[] = 'Lee el artículo: ' . $trackedUrl;
-    }
     $text = implode("\n\n", $parts);
     if (function_exists('mb_strlen')) {
         if (mb_strlen($text, 'UTF-8') > 300) {
@@ -2567,6 +2564,16 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
         'text' => $text,
         'createdAt' => gmdate('Y-m-d\\TH:i:s\\Z'),
     ];
+    if ($trackedUrl !== '') {
+        $record['embed'] = [
+            '$type' => 'app.bsky.embed.external',
+            'external' => [
+                'uri' => $trackedUrl,
+                'title' => $title !== '' ? $title : $trackedUrl,
+                'description' => '',
+            ],
+        ];
+    }
     $payload = json_encode([
         'repo' => $session['did'],
         'collection' => 'app.bsky.feed.post',

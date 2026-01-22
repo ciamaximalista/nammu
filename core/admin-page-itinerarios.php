@@ -19,20 +19,22 @@
             <div class="card-body">
                 <h3 class="h5 mb-3">Listado de itinerarios</h3>
                 <?php
-                    $networkConfigs = [
-                        'telegram' => $settings['telegram'] ?? [],
-                        'whatsapp' => $settings['whatsapp'] ?? [],
-                        'facebook' => $settings['facebook'] ?? [],
-                        'twitter' => $settings['twitter'] ?? [],
-                        'instagram' => $settings['instagram'] ?? [],
-                    ];
-                    $networkLabels = [
-                        'telegram' => 'Telegram',
-                        'whatsapp' => 'WhatsApp',
-                        'facebook' => 'Facebook',
-                        'twitter' => 'X',
-                        'instagram' => 'Instagram',
-                    ];
+                        $networkConfigs = [
+                            'telegram' => $settings['telegram'] ?? [],
+                            'whatsapp' => $settings['whatsapp'] ?? [],
+                            'facebook' => $settings['facebook'] ?? [],
+                            'twitter' => $settings['twitter'] ?? [],
+                            'bluesky' => $settings['bluesky'] ?? [],
+                            'instagram' => $settings['instagram'] ?? [],
+                        ];
+                        $networkLabels = [
+                            'telegram' => 'Telegram',
+                            'whatsapp' => 'WhatsApp',
+                            'facebook' => 'Facebook',
+                            'twitter' => 'X',
+                            'bluesky' => 'Bluesky',
+                            'instagram' => 'Instagram',
+                        ];
                     $availableNetworks = [];
                     foreach ($networkConfigs as $key => $cfg) {
                         if (function_exists('admin_is_social_network_configured') && admin_is_social_network_configured($key, $cfg)) {

@@ -70,6 +70,7 @@ if ($editFeedback !== null) {
             'whatsapp' => $settings['whatsapp'] ?? [],
             'facebook' => $settings['facebook'] ?? [],
             'twitter' => $settings['twitter'] ?? [],
+            'bluesky' => $settings['bluesky'] ?? [],
             'instagram' => $settings['instagram'] ?? [],
         ];
         $networkLabels = [
@@ -77,6 +78,7 @@ if ($editFeedback !== null) {
             'whatsapp' => 'WhatsApp',
             'facebook' => 'Facebook',
             'twitter' => 'X',
+            'bluesky' => 'Bluesky',
             'instagram' => 'Instagram',
         ];
         $mailingReady = admin_is_mailing_ready($settings);

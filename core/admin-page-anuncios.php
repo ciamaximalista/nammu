@@ -28,6 +28,8 @@
     $twitterApiSecret = $twitterSettings['api_secret'] ?? '';
     $twitterAccessToken = $twitterSettings['access_token'] ?? '';
     $twitterAccessSecret = $twitterSettings['access_secret'] ?? '';
+    $blueskySettings = $settings['bluesky'] ?? ['service' => 'https://bsky.social', 'identifier' => '', 'app_password' => '', 'auto_post' => 'off'];
+    $blueskyAutoEnabled = ($blueskySettings['auto_post'] ?? 'off') === 'on';
     $instagramSettings = $settings['instagram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
     $instagramAutoEnabled = ($instagramSettings['auto_post'] ?? 'off') === 'on';
     $podcastServices = $settings['podcast_services'] ?? [];
@@ -321,6 +323,51 @@
                                         <li>Introduce el ID de la página y el token.</li>
                                     </ol>
                                     <p class="mb-0">Puedes obtener el ID de página en la configuración avanzada de Facebook.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h4 class="mt-4">Bluesky (opcional)</h4>
+                    <p class="text-muted">Publica en tu perfil de Bluesky usando una contraseña de aplicación. <a href="#" data-toggle="modal" data-target="#blueskyHelpModal">Ver guía rápida</a></p>
+                    <div class="form-group">
+                        <label for="bluesky_service">Servidor (service)</label>
+                        <input type="text" name="bluesky_service" id="bluesky_service" class="form-control" value="<?= htmlspecialchars($blueskySettings['service'] ?? 'https://bsky.social', ENT_QUOTES, 'UTF-8') ?>" placeholder="https://bsky.social">
+                        <small class="form-text text-muted">Si no sabes cuál usar, deja el valor por defecto.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="bluesky_identifier">Usuario / handle</label>
+                        <input type="text" name="bluesky_identifier" id="bluesky_identifier" class="form-control" value="<?= htmlspecialchars($blueskySettings['identifier'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="usuario.bsky.social">
+                        <small class="form-text text-muted">Tu handle de Bluesky (sin @). También puedes usar el email de la cuenta.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="bluesky_app_password">Contraseña de aplicación</label>
+                        <input type="text" name="bluesky_app_password" id="bluesky_app_password" class="form-control" value="<?= htmlspecialchars($blueskySettings['app_password'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxx-xxxx-xxxx-xxxx">
+                        <small class="form-text text-muted">Crea una contraseña de aplicación desde Bluesky y pégala aquí.</small>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" name="bluesky_auto" id="bluesky_auto" value="1" <?= $blueskyAutoEnabled ? 'checked' : '' ?>>
+                        <label for="bluesky_auto" class="form-check-label">Enviar automáticamente cada nueva entrada o itinerario publicado</label>
+                    </div>
+                    <div class="modal fade" id="blueskyHelpModal" tabindex="-1" role="dialog" aria-labelledby="blueskyHelpModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="blueskyHelpModalLabel">Guía rápida para Bluesky</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <ol class="mb-3">
+                                        <li>Entra en Bluesky &rarr; Settings &rarr; App Passwords.</li>
+                                        <li>Genera una nueva contraseña de aplicación y cópiala.</li>
+                                        <li>Introduce tu handle y la contraseña en este formulario.</li>
+                                    </ol>
+                                    <p class="mb-0">Las publicaciones se enviarán como texto con el enlace a la entrada.</p>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>

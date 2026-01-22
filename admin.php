@@ -1007,6 +1007,12 @@ function get_settings() {
         'recipient' => '',
         'auto_post' => 'off',
     ], $config);
+    $bluesky = admin_extract_social_settings('bluesky', [
+        'service' => 'https://bsky.social',
+        'identifier' => '',
+        'app_password' => '',
+        'auto_post' => 'off',
+    ], $config);
     $instagram = admin_extract_social_settings('instagram', [
         'token' => '',
         'channel' => '',
@@ -1103,6 +1109,7 @@ function get_settings() {
         'whatsapp' => $whatsapp,
         'facebook' => $facebook,
         'twitter' => $twitter,
+        'bluesky' => $bluesky,
         'instagram' => $instagram,
         'mailing' => $mailing,
         'postal' => $postal,
@@ -2153,6 +2160,15 @@ function admin_extract_social_settings(string $key, array $defaults, ?array $con
     if (isset($values['access_secret'])) {
         $values['access_secret'] = trim((string) $values['access_secret']);
     }
+    if (isset($values['identifier'])) {
+        $values['identifier'] = trim((string) $values['identifier']);
+    }
+    if (isset($values['app_password'])) {
+        $values['app_password'] = trim((string) $values['app_password']);
+    }
+    if (isset($values['service'])) {
+        $values['service'] = trim((string) $values['service']);
+    }
     $values['auto_post'] = ($values['auto_post'] ?? 'off') === 'on' ? 'on' : 'off';
     return $values;
 }
@@ -2199,6 +2215,12 @@ function admin_cached_social_settings(?string $key = null): array {
                 'access_token' => '',
                 'access_secret' => '',
             ], $config),
+            'bluesky' => admin_extract_social_settings('bluesky', [
+                'service' => 'https://bsky.social',
+                'identifier' => '',
+                'app_password' => '',
+                'auto_post' => 'off',
+            ], $config),
             'instagram' => admin_extract_social_settings('instagram', [
                 'token' => '',
                 'channel' => '',
@@ -2227,6 +2249,8 @@ function admin_is_social_network_configured(string $network, array $settings): b
             return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
         case 'twitter':
             return ($settings['token'] ?? '') !== '';
+        case 'bluesky':
+            return ($settings['identifier'] ?? '') !== '' && ($settings['app_password'] ?? '') !== '';
         case 'instagram':
             return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
         default:
@@ -2474,6 +2498,68 @@ function admin_send_twitter_post(string $slug, string $title, string $descriptio
         'Authorization: Bearer ' . $token,
         'Content-Type: application/json',
     ]);
+}
+
+function admin_send_bluesky_post(string $slug, string $title, string $description, array $settings, string $urlOverride = ''): bool {
+    $service = trim((string) ($settings['service'] ?? ''));
+    if ($service === '') {
+        $service = 'https://bsky.social';
+    }
+    $service = rtrim($service, '/');
+    $identifier = trim((string) ($settings['identifier'] ?? ''));
+    $appPassword = trim((string) ($settings['app_password'] ?? ''));
+    if ($identifier === '' || $appPassword === '') {
+        return false;
+    }
+    $sessionEndpoint = $service . '/xrpc/com.atproto.server.createSession';
+    $sessionPayload = json_encode([
+        'identifier' => $identifier,
+        'password' => $appPassword,
+    ]);
+    $sessionHeaders = [
+        'Content-Type: application/json',
+        'Content-Length: ' . strlen((string) $sessionPayload),
+    ];
+    $sessionCode = null;
+    $sessionResponse = admin_http_post_body_response($sessionEndpoint, (string) $sessionPayload, $sessionHeaders, $sessionCode);
+    if ($sessionResponse === null || $sessionCode === null || $sessionCode < 200 || $sessionCode >= 300) {
+        return false;
+    }
+    $session = json_decode($sessionResponse, true);
+    if (!is_array($session) || empty($session['accessJwt']) || empty($session['did'])) {
+        return false;
+    }
+    $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
+    $trackedUrl = admin_add_utm_params($targetUrl, [
+        'utm_source' => 'bluesky',
+        'utm_medium' => 'social',
+    ]);
+    $text = admin_build_post_message($slug, $title, $description, $trackedUrl);
+    if (function_exists('mb_strlen')) {
+        if (mb_strlen($text, 'UTF-8') > 300) {
+            $text = mb_substr($text, 0, 296, 'UTF-8') . '…';
+        }
+    } elseif (strlen($text) > 300) {
+        $text = substr($text, 0, 296) . '…';
+    }
+    $record = [
+        '$type' => 'app.bsky.feed.post',
+        'text' => $text,
+        'createdAt' => gmdate('Y-m-d\\TH:i:s\\Z'),
+    ];
+    $payload = json_encode([
+        'repo' => $session['did'],
+        'collection' => 'app.bsky.feed.post',
+        'record' => $record,
+    ]);
+    $headers = [
+        'Authorization: Bearer ' . $session['accessJwt'],
+        'Content-Type: application/json',
+        'Content-Length: ' . strlen((string) $payload),
+    ];
+    $httpCode = null;
+    admin_http_post_body_response($service . '/xrpc/com.atproto.repo.createRecord', (string) $payload, $headers, $httpCode);
+    return $httpCode !== null && $httpCode >= 200 && $httpCode < 300;
 }
 
 function admin_twitter_has_media_credentials(array $settings): bool {
@@ -2851,6 +2937,9 @@ function admin_maybe_auto_post_to_social_networks(string $filename, string $titl
     }
     if (($settings['twitter']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('twitter', $settings['twitter'])) {
         admin_send_twitter_post($slug, $title, $description, $settings['twitter'], $urlOverride, $imageUrl);
+    }
+    if (($settings['bluesky']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('bluesky', $settings['bluesky'])) {
+        admin_send_bluesky_post($slug, $title, $description, $settings['bluesky'], $urlOverride);
     }
     if (($settings['instagram']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('instagram', $settings['instagram'])) {
         if (trim($image) !== '') {
@@ -5201,6 +5290,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'whatsapp' => 'WhatsApp',
             'facebook' => 'Facebook',
             'twitter' => 'X',
+            'bluesky' => 'Bluesky',
             'instagram' => 'Instagram',
         ];
         if (!isset($networkLabels[$networkKey])) {
@@ -5258,6 +5348,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             case 'twitter':
                                 $sent = admin_send_twitter_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
                                 break;
+                            case 'bluesky':
+                                $sent = admin_send_bluesky_post($slug, $title, $description, $networkSettings, $customUrl);
+                                break;
                             case 'instagram':
                                 if (trim($image) === '') {
                                     $customError = 'Instagram requiere una imagen destacada para enviar la publicación.';
@@ -5293,6 +5386,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'whatsapp' => 'WhatsApp',
             'facebook' => 'Facebook',
             'twitter' => 'X',
+            'bluesky' => 'Bluesky',
             'instagram' => 'Instagram',
         ];
         $feedback = [
@@ -5328,6 +5422,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             break;
                         case 'twitter':
                             $sent = admin_send_twitter_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
+                            break;
+                        case 'bluesky':
+                            $sent = admin_send_bluesky_post($itinerarySlug, $title, $description, $networkSettings, $customUrl);
                             break;
                         case 'instagram':
                             if (trim($image) === '') {
@@ -6494,6 +6591,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $twitter_token = trim($_POST['twitter_token'] ?? '');
         $twitter_channel = trim($_POST['twitter_channel'] ?? '');
         $twitter_auto = isset($_POST['twitter_auto']) ? 'on' : 'off';
+        $bluesky_service = trim($_POST['bluesky_service'] ?? '');
+        $bluesky_identifier = trim($_POST['bluesky_identifier'] ?? '');
+        $bluesky_app_password = trim($_POST['bluesky_app_password'] ?? '');
+        $bluesky_auto = isset($_POST['bluesky_auto']) ? 'on' : 'off';
         $instagram_token = trim($_POST['instagram_token'] ?? '');
         $instagram_channel = trim($_POST['instagram_channel'] ?? '');
         $instagram_auto = isset($_POST['instagram_auto']) ? 'on' : 'off';
@@ -6556,6 +6657,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ];
             } else {
                 unset($config['twitter']);
+            }
+            if ($bluesky_service !== '' || $bluesky_identifier !== '' || $bluesky_app_password !== '' || $bluesky_auto === 'on') {
+                $service = $bluesky_service !== '' ? $bluesky_service : 'https://bsky.social';
+                $config['bluesky'] = [
+                    'service' => $service,
+                    'identifier' => $bluesky_identifier,
+                    'app_password' => $bluesky_app_password,
+                    'auto_post' => $bluesky_auto,
+                ];
+            } else {
+                unset($config['bluesky']);
             }
             if ($instagram_token !== '' || $instagram_channel !== '' || $instagram_auto === 'on') {
                 $config['instagram'] = [

@@ -2546,7 +2546,15 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
         'utm_source' => 'bluesky',
         'utm_medium' => 'social',
     ]);
-    $text = admin_build_post_message($slug, $title, $description, $trackedUrl);
+    $parts = [];
+    $title = trim($title);
+    if ($title !== '') {
+        $parts[] = $title;
+    }
+    if ($trackedUrl !== '') {
+        $parts[] = 'Lee el artículo: ' . $trackedUrl;
+    }
+    $text = implode("\n\n", $parts);
     if (function_exists('mb_strlen')) {
         if (mb_strlen($text, 'UTF-8') > 300) {
             $text = mb_substr($text, 0, 296, 'UTF-8') . '…';

@@ -2500,7 +2500,7 @@ function admin_send_twitter_post(string $slug, string $title, string $descriptio
     ]);
 }
 
-function admin_send_bluesky_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', ?string &$error = null): bool {
+function admin_send_bluesky_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = '', ?string &$error = null): bool {
     $service = trim((string) ($settings['service'] ?? ''));
     if ($service === '') {
         $service = 'https://bsky.social';
@@ -2551,6 +2551,9 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
     if ($title !== '') {
         $parts[] = $title;
     }
+    if ($trackedUrl !== '') {
+        $parts[] = $trackedUrl;
+    }
     $text = implode("\n\n", $parts);
     if (function_exists('mb_strlen')) {
         if (mb_strlen($text, 'UTF-8') > 300) {
@@ -2565,13 +2568,36 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
         'createdAt' => gmdate('Y-m-d\\TH:i:s\\Z'),
     ];
     if ($trackedUrl !== '') {
-        $record['embed'] = [
+        $embed = [
             '$type' => 'app.bsky.embed.external',
             'external' => [
                 'uri' => $trackedUrl,
                 'title' => $title !== '' ? $title : $trackedUrl,
                 'description' => '',
             ],
+        ];
+        $imageUrl = trim($imageUrl);
+        if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
+            $blob = admin_bluesky_upload_blob($service, $session['accessJwt'], $imageUrl);
+            if ($blob !== null) {
+                $embed['external']['thumb'] = $blob;
+            }
+        }
+        if ($description !== '') {
+            $desc = trim((string) $description);
+            $maxDesc = 200;
+            if (function_exists('mb_strlen')) {
+                if (mb_strlen($desc, 'UTF-8') > $maxDesc) {
+                    $desc = rtrim(mb_substr($desc, 0, $maxDesc - 1, 'UTF-8')) . '…';
+                }
+            } elseif (strlen($desc) > $maxDesc) {
+                $desc = rtrim(substr($desc, 0, $maxDesc - 1)) . '…';
+            }
+            $embed['external']['description'] = $desc;
+        }
+        $record['embed'] = [
+            '$type' => 'app.bsky.embed.external',
+            'external' => $embed['external'],
         ];
     }
     $payload = json_encode([
@@ -2597,6 +2623,43 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
         }
     }
     return false;
+}
+
+function admin_bluesky_upload_blob(string $service, string $accessToken, string $imageUrl): ?array {
+    $binary = admin_http_get_binary($imageUrl);
+    if ($binary === '') {
+        return null;
+    }
+    $mime = 'application/octet-stream';
+    if (class_exists('finfo')) {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $detected = $finfo->buffer($binary);
+        if (is_string($detected) && $detected !== '') {
+            $mime = $detected;
+        }
+    }
+    $headers = [
+        'Authorization: Bearer ' . $accessToken,
+        'Content-Type: ' . $mime,
+        'Content-Length: ' . strlen($binary),
+    ];
+    $httpCode = null;
+    $response = admin_http_post_body_response($service . '/xrpc/com.atproto.repo.uploadBlob', $binary, $headers, $httpCode);
+    if ($response === null || $httpCode === null || $httpCode < 200 || $httpCode >= 300) {
+        return null;
+    }
+    $payload = json_decode($response, true);
+    if (!is_array($payload) || empty($payload['blob']['ref']['$link']) || empty($payload['blob']['mimeType'])) {
+        return null;
+    }
+    return [
+        '$type' => 'blob',
+        'ref' => [
+            '$link' => $payload['blob']['ref']['$link'],
+        ],
+        'mimeType' => $payload['blob']['mimeType'],
+        'size' => (int) ($payload['blob']['size'] ?? 0),
+    ];
 }
 
 function admin_twitter_has_media_credentials(array $settings): bool {
@@ -2976,7 +3039,7 @@ function admin_maybe_auto_post_to_social_networks(string $filename, string $titl
         admin_send_twitter_post($slug, $title, $description, $settings['twitter'], $urlOverride, $imageUrl);
     }
     if (($settings['bluesky']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('bluesky', $settings['bluesky'])) {
-        admin_send_bluesky_post($slug, $title, $description, $settings['bluesky'], $urlOverride);
+        admin_send_bluesky_post($slug, $title, $description, $settings['bluesky'], $urlOverride, $imageUrl);
     }
     if (($settings['instagram']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('instagram', $settings['instagram'])) {
         if (trim($image) !== '') {
@@ -5351,8 +5414,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $title = $metadata['Title'] ?? $slug;
                     $description = $metadata['Description'] ?? '';
                     $image = $metadata['Image'] ?? '';
+                    $imageUrl = admin_public_asset_url((string) $image);
                     $customUrl = '';
-                    $imageUrl = '';
                     if ($template === 'podcast') {
                         $audioPath = (string) ($metadata['Audio'] ?? '');
                         $customUrl = admin_public_asset_url($audioPath);
@@ -5386,7 +5449,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $sent = admin_send_twitter_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
                                 break;
                             case 'bluesky':
-                                $sent = admin_send_bluesky_post($slug, $title, $description, $networkSettings, $customUrl, $customError);
+                                $sent = admin_send_bluesky_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
                                 break;
                             case 'instagram':
                                 if (trim($image) === '') {
@@ -5461,7 +5524,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $sent = admin_send_twitter_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
                             break;
                         case 'bluesky':
-                            $sent = admin_send_bluesky_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $customError);
+                            $sent = admin_send_bluesky_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
                             break;
                         case 'instagram':
                             if (trim($image) === '') {

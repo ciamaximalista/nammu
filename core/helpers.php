@@ -220,6 +220,9 @@ function nammu_detect_referrer_source(string $referer, string $host): array
         'twitter.com' => 'Twitter/X',
         'x.com' => 'Twitter/X',
         't.co' => 'Twitter/X',
+        'bsky.app' => 'Bluesky',
+        'go.bsky.app' => 'Bluesky',
+        'bsky.social' => 'Bluesky',
         'linkedin.com' => 'LinkedIn',
         'pinterest.' => 'Pinterest',
         'whatsapp.com' => 'WhatsApp',
@@ -251,6 +254,8 @@ function nammu_detect_user_agent_source(string $userAgent): array
         'fban' => 'Facebook',
         'twitter' => 'Twitter/X',
         'x.com' => 'Twitter/X',
+        'bluesky' => 'Bluesky',
+        'bsky' => 'Bluesky',
     ];
     foreach ($uaSocial as $needle => $label) {
         if (str_contains($userAgent, $needle)) {

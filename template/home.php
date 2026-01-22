@@ -921,6 +921,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     .home-hero-text.variant-plain {
         background: transparent;
         border: none;
+        padding: 1.25rem clamp(1.5rem, 4vw, 3rem);
     }
     .home-hero-text.variant-boxed .home-hero-graphic {
         border-radius: 0;

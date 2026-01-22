@@ -2507,7 +2507,10 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
     }
     $service = rtrim($service, '/');
     $identifier = trim((string) ($settings['identifier'] ?? ''));
+    $identifier = ltrim($identifier, '@');
+    $identifier = preg_replace('/[\\p{Cf}\\p{Z}\\s]+/u', '', $identifier);
     $appPassword = trim((string) ($settings['app_password'] ?? ''));
+    $appPassword = preg_replace('/\\s+/', '', $appPassword);
     if ($identifier === '' || $appPassword === '') {
         $error = 'Faltan credenciales de Bluesky.';
         return false;

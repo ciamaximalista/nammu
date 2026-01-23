@@ -590,21 +590,23 @@ $prefsOptions = [
 ob_start();
 ?>
 <section class="postal-page">
-    <div class="postal-hero">
-        <div class="postal-hero__content">
-            <span class="postal-hero__badge"><?= htmlspecialchars($badgeLabel, ENT_QUOTES, 'UTF-8') ?></span>
-            <h1><?= htmlspecialchars($pageLabel, ENT_QUOTES, 'UTF-8') ?></h1>
-            <div class="post-intro">
-                <p><?= htmlspecialchars($pageIntro, ENT_QUOTES, 'UTF-8') ?></p>
+    <div class="post-header">
+        <div class="postal-hero">
+            <div class="postal-hero__content">
+                <span class="postal-hero__badge"><?= htmlspecialchars($badgeLabel, ENT_QUOTES, 'UTF-8') ?></span>
+                <h1><?= htmlspecialchars($pageLabel, ENT_QUOTES, 'UTF-8') ?></h1>
+                <div class="post-intro">
+                    <p><?= htmlspecialchars($pageIntro, ENT_QUOTES, 'UTF-8') ?></p>
+                </div>
             </div>
-            <?= $headerButtonsHtml ?>
-        </div>
-        <div class="postal-hero__logo" aria-hidden="true">
-            <svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path fill="currentColor" d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2v.3l8 5.2 8-5.2V8H4z"/>
-            </svg>
+            <div class="postal-hero__logo" aria-hidden="true">
+                <svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path fill="currentColor" d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2v.3l8 5.2 8-5.2V8H4z"/>
+                </svg>
+            </div>
         </div>
     </div>
+    <?= $headerButtonsHtml ?>
 
     <?php if ($message !== ''): ?>
         <div class="postal-feedback postal-feedback--<?= htmlspecialchars($messageType, ENT_QUOTES, 'UTF-8') ?>">

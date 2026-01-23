@@ -627,19 +627,21 @@ $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseU
 ob_start();
 ?>
 <section class="postal-page">
-    <div class="postal-hero">
-        <div class="postal-hero__content">
-            <span class="postal-hero__badge">Correo postal</span>
-            <h1>Recibe envios fisicos en casa</h1>
-            <div class="post-intro">
-                <p>Suscribete para recibir correspondencia fisica y manten tus datos actualizados cuando lo necesites.</p>
+    <div class="post-header">
+        <div class="postal-hero">
+            <div class="postal-hero__content">
+                <span class="postal-hero__badge">Correo postal</span>
+                <h1>Recibe envios fisicos en casa</h1>
+                <div class="post-intro">
+                    <p>Suscribete para recibir correspondencia fisica y manten tus datos actualizados cuando lo necesites.</p>
+                </div>
             </div>
-            <?= $headerButtonsHtml ?>
-        </div>
-        <div class="postal-hero__logo" aria-hidden="true">
-            <?= $postalLogoSvg ?>
+            <div class="postal-hero__logo" aria-hidden="true">
+                <?= $postalLogoSvg ?>
+            </div>
         </div>
     </div>
+    <?= $headerButtonsHtml ?>
 
     <?php if ($message !== ''): ?>
         <div class="postal-feedback postal-feedback--<?= htmlspecialchars($messageType, ENT_QUOTES, 'UTF-8') ?>">

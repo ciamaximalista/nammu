@@ -627,21 +627,18 @@ $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseU
 ob_start();
 ?>
 <section class="postal-page">
+    <?= $headerButtonsHtml ?>
     <div class="post-header">
         <div class="postal-hero">
             <div class="postal-hero__content">
                 <span class="postal-hero__badge">Correo postal</span>
                 <h1>Recibe envios fisicos en casa</h1>
-                <div class="post-intro">
-                    <p>Suscribete para recibir correspondencia fisica y manten tus datos actualizados cuando lo necesites.</p>
-                </div>
             </div>
             <div class="postal-hero__logo" aria-hidden="true">
                 <?= $postalLogoSvg ?>
             </div>
         </div>
     </div>
-    <?= $headerButtonsHtml ?>
 
     <?php if ($message !== ''): ?>
         <div class="postal-feedback postal-feedback--<?= htmlspecialchars($messageType, ENT_QUOTES, 'UTF-8') ?>">
@@ -985,7 +982,7 @@ $content = ob_get_clean();
 
 $postalPost = new Nammu\Core\Post('correo-postal', [
     'Title' => 'Correo Postal',
-    'Description' => 'Suscríbete para recibir envíos físicos y actualiza tus datos cuando lo necesites.',
+    'Description' => '',
     'Template' => 'page',
 ], '');
 

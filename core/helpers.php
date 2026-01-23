@@ -2211,7 +2211,8 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
                 admin_maybe_auto_post_to_social_networks($filename, $title, $description, $image, $audioUrl, $imageUrl);
             }
         } else {
-            admin_maybe_auto_post_to_social_networks($filename, $title, $description, $image);
+            $imageUrl = admin_public_asset_url($image);
+            admin_maybe_auto_post_to_social_networks($filename, $title, $description, $image, '', $imageUrl);
         }
     }
 

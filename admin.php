@@ -4893,7 +4893,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = 'No se pudo guardar el contenido. Revisa los permisos de la carpeta content/.';
                 } else {
                     if (!$isDraft && $type === 'Entrada') {
-                        admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image);
+                        $imageUrl = admin_public_asset_url($image);
+                        admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image, '', $imageUrl);
                         $settings = get_settings();
                         $mailing = $settings['mailing'] ?? [];
                         $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
@@ -5287,7 +5288,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                     if ($shouldAutoShare) {
-                        admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image);
+                        $imageUrl = admin_public_asset_url($image);
+                        admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image, '', $imageUrl);
                     }
                     if ($shouldAutoSharePodcast) {
                         $audioUrl = admin_public_asset_url($audio);

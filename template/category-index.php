@@ -17,6 +17,7 @@ $searchTop = $shouldShowSearch && $searchPositionSetting === 'title';
 $searchBottom = $shouldShowSearch && $searchPositionSetting === 'footer';
 $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
+$categoriesIndexUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/categorias';
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/itinerarios' : '/itinerarios');
 $podcastIndexUrl = $podcastIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/podcast' : '/podcast');
@@ -24,6 +25,32 @@ $hasItineraries = !empty($hasItineraries);
 $hasPodcast = !empty($hasPodcast);
 $hasCategories = !empty($hasCategories);
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
+$homeSettings = $theme['home'] ?? [];
+$headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
+$showHeaderButtons = in_array($headerButtonsMode, ['home', 'both'], true);
+$subscriptionSettings = is_array($theme['subscription'] ?? null) ? $theme['subscription'] : [];
+$subscriptionModeForButtons = $subscriptionSettings['mode'] ?? 'none';
+$postalEnabled = $postalEnabled ?? false;
+$postalUrl = $postalUrl ?? '/correos.php';
+$postalLogoSvg = $postalLogoSvg ?? '';
+$headerButtonsHtml = '';
+if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
+    $headerButtonsHtml = nammu_render_header_buttons([
+        'accent' => $colors['accent'] ?? '#0a4c8a',
+        'search_url' => $searchAction,
+        'categories_url' => $categoriesIndexUrl,
+        'itineraries_url' => $itinerariesIndexUrl,
+        'podcast_url' => $podcastIndexUrl,
+        'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php',
+        'postal_url' => $postalUrl,
+        'postal_svg' => $postalLogoSvg,
+        'has_categories' => $hasCategories,
+        'has_itineraries' => $hasItineraries,
+        'has_podcast' => $hasPodcast,
+        'subscription_enabled' => $subscriptionModeForButtons !== 'none',
+        'postal_enabled' => $postalEnabled,
+    ]);
+}
 $renderSearchBox = static function (string $variant) use ($searchAction, $searchActionBase, $accentColor, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories, $hasPodcast, $podcastIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
@@ -87,6 +114,7 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
     <div class="category-hero-inner">
         <h1>Explora por categorías</h1>
         <p>Tenemos <?= htmlspecialchars((string) $total, ENT_QUOTES, 'UTF-8') ?> categoría<?= $total === 1 ? '' : 's' ?> activas. Elige un tema y navega por sus contenidos.</p>
+        <?= $headerButtonsHtml ?>
     </div>
 </section>
 

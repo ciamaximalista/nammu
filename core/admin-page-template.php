@@ -234,7 +234,7 @@
                                             $headerButtonOptions = [
                                                 'home' => [
                                                     'label' => 'Portada',
-                                                    'caption' => 'Sólo se ve en la portada',
+                                                    'caption' => 'Sólo se ve en la portada y las páginas sistémicas',
                                                     'figure' => 'header-buttons-home',
                                                 ],
                                                 'both' => [

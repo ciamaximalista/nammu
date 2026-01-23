@@ -418,6 +418,33 @@ $postalLogoSvg = nammu_postal_icon_svg();
 $itineraryItems = is_dir(__DIR__ . '/itinerarios') ? glob(__DIR__ . '/itinerarios/*') : [];
 $hasItineraries = !empty($itineraryItems);
 $hasPodcast = !empty(nammu_collect_podcast_items(__DIR__ . '/content', $publicBaseUrl));
+$postalEnabled = ($config['postal']['enabled'] ?? 'off') === 'on';
+$homeSettings = $theme['home'] ?? [];
+$headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
+$showHeaderButtons = in_array($headerButtonsMode, ['home', 'both'], true);
+$searchActionBase = $publicBaseUrl !== '' ? $publicBaseUrl : '/';
+$searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
+$categoriesIndexUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/categorias';
+$itinerariesIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/itinerarios';
+$podcastIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/podcast';
+$headerButtonsHtml = '';
+if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
+    $headerButtonsHtml = nammu_render_header_buttons([
+        'accent' => $theme['colors']['accent'] ?? '#0a4c8a',
+        'search_url' => $searchAction,
+        'categories_url' => $categoriesIndexUrl,
+        'itineraries_url' => $itinerariesIndexUrl,
+        'podcast_url' => $podcastIndexUrl,
+        'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php',
+        'postal_url' => $postalUrl,
+        'postal_svg' => $postalLogoSvg,
+        'has_categories' => !empty(nammu_collect_categories_from_posts($contentRepository->all())),
+        'has_itineraries' => $hasItineraries,
+        'has_podcast' => $hasPodcast,
+        'subscription_enabled' => $hasAnySubscription,
+        'postal_enabled' => $postalEnabled,
+    ]);
+}
 $footerLinks = nammu_build_footer_links($config, $theme, $homeUrl, $postalUrl, $hasItineraries, $hasPodcast);
 $logoForJsonLd = $theme['logo_url'] ?? '';
 $orgJsonLd = [
@@ -567,7 +594,10 @@ ob_start();
         <div class="postal-hero__content">
             <span class="postal-hero__badge"><?= htmlspecialchars($badgeLabel, ENT_QUOTES, 'UTF-8') ?></span>
             <h1><?= htmlspecialchars($pageLabel, ENT_QUOTES, 'UTF-8') ?></h1>
-            <p><?= htmlspecialchars($pageIntro, ENT_QUOTES, 'UTF-8') ?></p>
+            <div class="post-intro">
+                <p><?= htmlspecialchars($pageIntro, ENT_QUOTES, 'UTF-8') ?></p>
+            </div>
+            <?= $headerButtonsHtml ?>
         </div>
         <div class="postal-hero__logo" aria-hidden="true">
             <svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

@@ -241,6 +241,35 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             text-decoration: underline;
             color: <?= $colorAccent ?>;
         }
+        .site-header-buttons {
+            --nammu-header-button-accent: <?= $colorAccent ?>;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+            margin: 0.4rem auto 1rem;
+        }
+        .site-header-button-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: var(--nammu-header-button-accent);
+            border: 1px solid var(--nammu-header-button-accent);
+            color: #fff;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .site-header-button-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+        }
+        .site-header-button-link svg {
+            width: 18px;
+            height: 18px;
+        }
         table {
             width: 100%;
             border-collapse: collapse;

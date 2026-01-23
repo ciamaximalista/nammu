@@ -30,6 +30,8 @@ if (is_string($accentRaw)) {
 $brandColor = htmlspecialchars($colors['brand'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8');
 $headingSecondaryColor = htmlspecialchars($colors['h2'] ?? '#ea2f28', ENT_QUOTES, 'UTF-8');
 $homeSettings = $theme['home'] ?? [];
+$headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
+$showHeaderButtons = in_array($headerButtonsMode, ['home', 'both'], true);
 $columns = (int) ($homeSettings['columns'] ?? 2);
 if ($columns < 1 || $columns > 3) {
     $columns = 2;
@@ -60,6 +62,7 @@ $subscriptionTop = $shouldShowSubscription && $subscriptionPositionSetting === '
 $subscriptionBottom = $shouldShowSubscription && $subscriptionPositionSetting === 'footer';
 $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
+$categoriesIndexUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/categorias';
 $subscriptionAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/subscribe.php';
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl, '/') . '/itinerarios' : '/itinerarios');
@@ -83,6 +86,24 @@ if ($subscriptionSuccess) {
 $postalEnabled = $postalEnabled ?? false;
 $postalUrl = $postalUrl ?? '/correos.php';
 $postalLogoSvg = $postalLogoSvg ?? '';
+$headerButtonsHtml = '';
+if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
+    $headerButtonsHtml = nammu_render_header_buttons([
+        'accent' => $colors['accent'] ?? '#0a4c8a',
+        'search_url' => $searchAction,
+        'categories_url' => $categoriesIndexUrl,
+        'itineraries_url' => $itinerariesIndexUrl,
+        'podcast_url' => $podcastIndexUrl,
+        'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php',
+        'postal_url' => $postalUrl,
+        'postal_svg' => $postalLogoSvg,
+        'has_categories' => $hasCategories,
+        'has_itineraries' => $hasItineraries,
+        'has_podcast' => $hasPodcast,
+        'subscription_enabled' => $subscriptionMode !== 'none',
+        'postal_enabled' => $postalEnabled,
+    ]);
+}
 $renderSearchBox = static function (string $variant) use ($searchAction, $searchActionBase, $accentColor, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories, $hasPodcast, $podcastIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
@@ -207,6 +228,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
         <p class="category-label"><?= htmlspecialchars((string) ($theme['author'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
         <h1><?= htmlspecialchars((string) ($theme['blog'] ?? $siteTitle ?? 'Nammu Blog'), ENT_QUOTES, 'UTF-8') ?> · Podcast</h1>
         <p class="category-count"><?= htmlspecialchars((string) $count, ENT_QUOTES, 'UTF-8') ?> <?= $count === 1 ? 'episodio publicado' : 'episodios publicados' ?></p>
+        <?= $headerButtonsHtml ?>
     </div>
 </section>
 

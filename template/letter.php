@@ -34,6 +34,10 @@ if (is_string($accentRaw)) {
 $brandColor = htmlspecialchars($colors['brand'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8');
 $headingSecondaryColor = htmlspecialchars($colors['h2'] ?? '#ea2f28', ENT_QUOTES, 'UTF-8');
 $homeSettings = $theme['home'] ?? [];
+$headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
+$showHeaderButtons = in_array($headerButtonsMode, ['home', 'both'], true);
+$subscriptionSettings = is_array($theme['subscription'] ?? null) ? $theme['subscription'] : [];
+$subscriptionModeForButtons = $subscriptionSettings['mode'] ?? 'none';
 $columns = (int) ($homeSettings['columns'] ?? 2);
 if ($columns < 1 || $columns > 3) {
     $columns = 2;
@@ -56,6 +60,7 @@ $searchTop = $shouldShowSearch && $searchPositionSetting === 'title';
 $searchBottom = $shouldShowSearch && $searchPositionSetting === 'footer';
 $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
+$categoriesIndexUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/categorias';
 $hideMetaBand = !empty($hideMetaBand);
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/itinerarios' : '/itinerarios');
@@ -64,6 +69,27 @@ $hasItineraries = !empty($hasItineraries);
 $hasPodcast = !empty($hasPodcast);
 $hasCategories = !empty($hasCategories);
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
+$postalEnabled = $postalEnabled ?? false;
+$postalUrl = $postalUrl ?? '/correos.php';
+$postalLogoSvg = $postalLogoSvg ?? '';
+$headerButtonsHtml = '';
+if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
+    $headerButtonsHtml = nammu_render_header_buttons([
+        'accent' => $colors['accent'] ?? '#0a4c8a',
+        'search_url' => $searchAction,
+        'categories_url' => $categoriesIndexUrl,
+        'itineraries_url' => $itinerariesIndexUrl,
+        'podcast_url' => $podcastIndexUrl,
+        'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php',
+        'postal_url' => $postalUrl,
+        'postal_svg' => $postalLogoSvg,
+        'has_categories' => $hasCategories,
+        'has_itineraries' => $hasItineraries,
+        'has_podcast' => $hasPodcast,
+        'subscription_enabled' => $subscriptionModeForButtons !== 'none',
+        'postal_enabled' => $postalEnabled,
+    ]);
+}
 $renderSearchBox = static function (string $variant) use ($searchAction, $searchActionBase, $accentColor, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories, $hasPodcast, $podcastIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
@@ -194,6 +220,7 @@ $renderPostCards = static function (array $subset, bool $hideMeta = false) use (
         <p class="category-label">Letra</p>
         <h1><?= htmlspecialchars($letterDisplay, ENT_QUOTES, 'UTF-8') ?></h1>
         <p class="category-count"><?= htmlspecialchars((string) $count, ENT_QUOTES, 'UTF-8') ?> <?= $count === 1 ? 'entrada publicada' : 'entradas publicadas' ?></p>
+        <?= $headerButtonsHtml ?>
     </div>
 </section>
 

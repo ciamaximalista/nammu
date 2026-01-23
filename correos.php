@@ -358,6 +358,36 @@ $postalLogoSvg = nammu_postal_icon_svg();
 $itineraryItems = is_dir(__DIR__ . '/itinerarios') ? glob(__DIR__ . '/itinerarios/*') : [];
 $hasItineraries = !empty($itineraryItems);
 $hasPodcast = !empty(nammu_collect_podcast_items(__DIR__ . '/content', $publicBaseUrl));
+$postalEnabled = ($config['postal']['enabled'] ?? 'off') === 'on';
+$homeSettings = $theme['home'] ?? [];
+$headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
+$showHeaderButtons = in_array($headerButtonsMode, ['home', 'both'], true);
+$searchActionBase = $publicBaseUrl !== '' ? $publicBaseUrl : '/';
+$searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
+$categoriesIndexUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/categorias';
+$itinerariesIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/itinerarios';
+$podcastIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/podcast';
+$headerButtonsHtml = '';
+if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
+    $headerButtonsHtml = nammu_render_header_buttons([
+        'accent' => $theme['colors']['accent'] ?? '#0a4c8a',
+        'search_url' => $searchAction,
+        'categories_url' => $categoriesIndexUrl,
+        'itineraries_url' => $itinerariesIndexUrl,
+        'podcast_url' => $podcastIndexUrl,
+        'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php',
+        'postal_url' => $postalUrl,
+        'postal_svg' => $postalLogoSvg,
+        'has_categories' => !empty(nammu_collect_categories_from_posts($contentRepository->all())),
+        'has_itineraries' => $hasItineraries,
+        'has_podcast' => $hasPodcast,
+        'subscription_enabled' => ($config['mailing']['auto_posts'] ?? 'off') === 'on'
+            || ($config['mailing']['auto_itineraries'] ?? 'off') === 'on'
+            || ($config['mailing']['auto_newsletter'] ?? 'off') === 'on'
+            || (($config['mailing']['auto_podcast'] ?? 'on') === 'on'),
+        'postal_enabled' => $postalEnabled,
+    ]);
+}
 $footerLinks = nammu_build_footer_links($config, $theme, $homeUrl, $postalUrl, $hasItineraries, $hasPodcast);
 $logoForJsonLd = $theme['logo_url'] ?? '';
 $orgJsonLd = [
@@ -601,7 +631,10 @@ ob_start();
         <div class="postal-hero__content">
             <span class="postal-hero__badge">Correo postal</span>
             <h1>Recibe envios fisicos en casa</h1>
-            <p>Suscribete para recibir correspondencia fisica y manten tus datos actualizados cuando lo necesites.</p>
+            <div class="post-intro">
+                <p>Suscribete para recibir correspondencia fisica y manten tus datos actualizados cuando lo necesites.</p>
+            </div>
+            <?= $headerButtonsHtml ?>
         </div>
         <div class="postal-hero__logo" aria-hidden="true">
             <?= $postalLogoSvg ?>

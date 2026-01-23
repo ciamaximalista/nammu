@@ -2470,3 +2470,81 @@ function nammu_set_itinerary_progress(string $slug, array $progress): void
     setcookie($cookieName, $payload, time() + 31536000, '/', '', false, false);
     $_COOKIE[$cookieName] = $payload;
 }
+
+function nammu_render_header_buttons(array $options): string
+{
+    $accent = (string) ($options['accent'] ?? '#0a4c8a');
+    $searchUrl = (string) ($options['search_url'] ?? '/buscar.php');
+    $categoriesUrl = (string) ($options['categories_url'] ?? '/categorias');
+    $itinerariesUrl = (string) ($options['itineraries_url'] ?? '/itinerarios');
+    $podcastUrl = (string) ($options['podcast_url'] ?? '/podcast');
+    $avisosUrl = (string) ($options['avisos_url'] ?? '/avisos.php');
+    $postalUrl = (string) ($options['postal_url'] ?? '/correos.php');
+    $postalLogoSvg = (string) ($options['postal_svg'] ?? '');
+    $hasCategories = !empty($options['has_categories']);
+    $hasItineraries = !empty($options['has_itineraries']);
+    $hasPodcast = !empty($options['has_podcast']);
+    $subscriptionEnabled = !empty($options['subscription_enabled']);
+    $postalEnabled = !empty($options['postal_enabled']);
+
+    $items = [];
+    if ($searchUrl !== '') {
+        $items[] = [
+            'label' => 'Buscar',
+            'href' => $searchUrl,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6" stroke="#fff" stroke-width="2"/><line x1="12.5" y1="12.5" x2="17" y2="17" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+        ];
+    }
+    if ($hasCategories) {
+        $items[] = [
+            'label' => 'Categorías',
+            'href' => $categoriesUrl,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="#fff" stroke-width="2"/><line x1="8" y1="9" x2="16" y2="9" stroke="#fff" stroke-width="2"/><line x1="8" y1="13" x2="16" y2="13" stroke="#fff" stroke-width="2"/></svg>',
+        ];
+    }
+    if ($hasItineraries) {
+        $items[] = [
+            'label' => 'Itinerarios',
+            'href' => $itinerariesUrl,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 5H10C11.1046 5 12 5.89543 12 7V19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M20 5H14C12.8954 5 12 5.89543 12 7V19H20C21.1046 19 22 18.1046 22 17V7C22 5.89543 21.1046 5 20 5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><line x1="12" y1="7" x2="12" y2="19" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+        ];
+    }
+    if ($hasPodcast) {
+        $items[] = [
+            'label' => 'Podcast',
+            'href' => $podcastUrl,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="3" width="6" height="10" rx="3" stroke="#fff" stroke-width="2"/><path d="M5 11C5 14.866 8.134 18 12 18C15.866 18 19 14.866 19 11" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="18" x2="12" y2="22" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="22" x2="16" y2="22" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+        ];
+    }
+    if ($subscriptionEnabled) {
+        $items[] = [
+            'label' => 'Avisos por email',
+            'href' => $avisosUrl,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="14" rx="2" stroke="#fff" stroke-width="2"/><polyline points="3,7 12,13 21,7" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        ];
+    }
+    if ($postalEnabled && $postalLogoSvg !== '') {
+        $items[] = [
+            'label' => 'Correo postal',
+            'href' => $postalUrl,
+            'svg' => $postalLogoSvg,
+        ];
+    }
+    if (empty($items)) {
+        return '';
+    }
+    $style = '';
+    if ($accent !== '') {
+        $style = ' style="--nammu-header-button-accent: ' . htmlspecialchars($accent, ENT_QUOTES, 'UTF-8') . '"';
+    }
+    ob_start(); ?>
+    <div class="site-header-buttons"<?= $style ?>>
+        <?php foreach ($items as $item): ?>
+            <a class="site-header-button-link" href="<?= htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>">
+                <?= $item['svg'] ?>
+            </a>
+        <?php endforeach; ?>
+    </div>
+    <?php
+    return (string) ob_get_clean();
+}

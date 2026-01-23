@@ -18,6 +18,7 @@ $codeBg = htmlspecialchars($colors['code_background'] ?? '#000000', ENT_QUOTES, 
 $codeText = htmlspecialchars($colors['code_text'] ?? '#90ee90', ENT_QUOTES, 'UTF-8');
 $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
+$categoriesIndexUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/categorias';
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/itinerarios' : '/itinerarios');
@@ -25,6 +26,32 @@ $hasItineraries = !empty($hasItineraries);
 $podcastIndexUrl = $podcastIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/podcast' : '/podcast');
 $hasPodcast = !empty($hasPodcast);
 $hasCategories = !empty($hasCategories);
+$homeSettings = $theme['home'] ?? [];
+$headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
+$showHeaderButtons = in_array($headerButtonsMode, ['home', 'both'], true);
+$subscriptionSettings = is_array($theme['subscription'] ?? null) ? $theme['subscription'] : [];
+$subscriptionModeForButtons = $subscriptionSettings['mode'] ?? 'none';
+$postalEnabled = $postalEnabled ?? false;
+$postalUrl = $postalUrl ?? '/correos.php';
+$postalLogoSvg = $postalLogoSvg ?? '';
+$headerButtonsHtml = '';
+if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
+    $headerButtonsHtml = nammu_render_header_buttons([
+        'accent' => $colors['accent'] ?? '#0a4c8a',
+        'search_url' => $searchAction,
+        'categories_url' => $categoriesIndexUrl,
+        'itineraries_url' => $itinerariesIndexUrl,
+        'podcast_url' => $podcastIndexUrl,
+        'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php',
+        'postal_url' => $postalUrl,
+        'postal_svg' => $postalLogoSvg,
+        'has_categories' => $hasCategories,
+        'has_itineraries' => $hasItineraries,
+        'has_podcast' => $hasPodcast,
+        'subscription_enabled' => $subscriptionModeForButtons !== 'none',
+        'postal_enabled' => $postalEnabled,
+    ]);
+}
 $hasResults = !empty($results);
 $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
 ?>
@@ -32,6 +59,7 @@ $queryEscaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
     <div class="search-hero-inner">
         <h1>Buscar en <?= htmlspecialchars($theme['blog'] !== '' ? $theme['blog'] : $siteTitle, ENT_QUOTES, 'UTF-8') ?></h1>
         <p>Explora entradas, páginas y recursos usando filtros avanzados.</p>
+        <?= $headerButtonsHtml ?>
         <form method="get" action="<?= htmlspecialchars($searchAction, ENT_QUOTES, 'UTF-8') ?>" class="search-form">
             <div class="search-form-group">
                 <input type="text" name="q" value="<?= $queryEscaped ?>" placeholder="Palabra clave, frase exacta o filtros como title:bosque" autocomplete="off">

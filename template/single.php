@@ -155,7 +155,7 @@ $renderSubscriptionBox = static function (string $variant) use ($subscriptionAct
                     <path d="M21 4L9 16L4 11" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </button>
-            <a class="subscription-avisos-link" href="<?= htmlspecialchars($avisosUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Avisos por email">
+            <a class="subscription-avisos-link" href="<?= htmlspecialchars($avisosUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Suscripción a Avisos y Newsletter">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($colorAccent, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">
                     <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
                     <polyline points="4,8 12,14 20,8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -233,14 +233,14 @@ $renderHeaderButtons = static function () use ($searchAction, $hasCategories, $c
     if ($subscriptionEnabled) {
         $avisosUrl = $subscriptionAction !== '' ? str_replace('/subscribe.php', '/avisos.php', $subscriptionAction) : '/avisos.php';
         $items[] = [
-            'label' => 'Avisos por email',
+            'label' => 'Suscripción a Avisos y Newsletter',
             'href' => $avisosUrl,
             'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="14" rx="2" stroke="#fff" stroke-width="2"/><polyline points="3,7 12,13 21,7" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         ];
     }
     if ($postalEnabled && $postalLogoSvg !== '') {
         $items[] = [
-            'label' => 'Correo postal',
+            'label' => 'Suscripción a envíos postales',
             'href' => $postalUrl,
             'svg' => $postalLogoSvg,
         ];

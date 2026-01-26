@@ -1620,7 +1620,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
     $postalEnabled = ($config['postal']['enabled'] ?? 'off') === 'on';
     if ($postalEnabled) {
         $links[] = [
-            'label' => 'Correo postal',
+            'label' => 'Suscripción a envíos postales',
             'href' => $postalUrl !== '' ? $postalUrl : '/correos.php',
             'svg' => $icons['postal'],
         ];
@@ -2527,14 +2527,14 @@ function nammu_render_header_buttons(array $options): string
     }
     if ($subscriptionEnabled) {
         $items[] = [
-            'label' => 'Avisos por email',
+            'label' => 'Suscripción a Avisos y Newsletter',
             'href' => $avisosUrl,
             'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="14" rx="2" stroke="#fff" stroke-width="2"/><polyline points="3,7 12,13 21,7" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         ];
     }
     if ($postalEnabled && $postalLogoSvg !== '') {
         $items[] = [
-            'label' => 'Correo postal',
+            'label' => 'Suscripción a envíos postales',
             'href' => $postalUrl,
             'svg' => $postalLogoSvg,
         ];

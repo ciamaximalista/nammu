@@ -996,7 +996,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         gap: 6px;
         align-items: center;
         justify-content: center;
-        padding: 4px 2px 14px;
+        padding: 4px 2px 6px;
         max-width: 100%;
         overflow-x: auto;
     }

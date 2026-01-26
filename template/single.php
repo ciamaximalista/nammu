@@ -49,7 +49,9 @@ $categoriesIndexUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, 
 $letterIndexUrlValue = $lettersIndexUrl ?? null;
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/itinerarios' : '/itinerarios');
 $podcastIndexUrl = $podcastIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/podcast' : '/podcast');
+$newslettersIndexUrl = $newslettersIndexUrl ?? ($GLOBALS['newslettersIndexUrl'] ?? '/newsletters');
 $hasPodcast = !empty($hasPodcast);
+$hasNewsletters = !empty($hasNewsletters ?? ($GLOBALS['hasNewsletters'] ?? false));
 $hasItineraries = !empty($hasItineraries);
 $hasCategories = !empty($hasCategories);
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
@@ -193,7 +195,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     <?php
     return (string) ob_get_clean();
 };
-$renderHeaderButtons = static function () use ($searchAction, $hasCategories, $categoriesIndexUrl, $hasItineraries, $itinerariesIndexUrl, $hasPodcast, $podcastIndexUrl, $subscriptionEnabled, $subscriptionAction, $postalEnabled, $postalUrl, $postalLogoSvg, $colorAccent, $colorHighlight): string {
+$renderHeaderButtons = static function () use ($searchAction, $hasCategories, $categoriesIndexUrl, $hasItineraries, $itinerariesIndexUrl, $hasPodcast, $podcastIndexUrl, $hasNewsletters, $newslettersIndexUrl, $subscriptionEnabled, $subscriptionAction, $postalEnabled, $postalUrl, $postalLogoSvg, $colorAccent, $colorHighlight): string {
     $items = [];
     $items[] = [
         'label' => 'Buscar',
@@ -219,6 +221,13 @@ $renderHeaderButtons = static function () use ($searchAction, $hasCategories, $c
             'label' => 'Podcast',
             'href' => $podcastIndexUrl,
             'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="3" width="6" height="10" rx="3" stroke="#fff" stroke-width="2"/><path d="M5 11C5 14.866 8.134 18 12 18C15.866 18 19 14.866 19 11" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="18" x2="12" y2="22" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="22" x2="16" y2="22" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+        ];
+    }
+    if (!empty($hasNewsletters) && !empty($newslettersIndexUrl)) {
+        $items[] = [
+            'label' => 'Newsletters',
+            'href' => $newslettersIndexUrl,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" stroke="#fff" stroke-width="2"/><path d="M15 3v4h4" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="8" y1="11" x2="16" y2="11" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="15" x2="16" y2="15" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
         ];
     }
     if ($subscriptionEnabled) {
@@ -693,7 +702,7 @@ if ($isPageTemplate && $formattedDate !== '') {
     .post-header-buttons {
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 8px;
         align-items: center;
         justify-content: center;
         margin: 0.2rem auto 0.8rem;
@@ -702,9 +711,9 @@ if ($isPageTemplate && $formattedDate !== '') {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 34px;
-        height: 34px;
-        border-radius: 10px;
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
         background: <?= $colorAccent ?>;
         border: 1px solid <?= $colorAccent ?>;
         color: #fff;
@@ -715,8 +724,8 @@ if ($isPageTemplate && $formattedDate !== '') {
         box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
     }
     .post-header-button-link svg {
-        width: 18px;
-        height: 18px;
+        width: 16px;
+        height: 16px;
     }
     .post-intro {
         max-width: min(760px, 100%);

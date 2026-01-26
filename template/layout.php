@@ -245,18 +245,18 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             --nammu-header-button-accent: <?= $colorAccent ?>;
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 8px;
             align-items: center;
             justify-content: center;
-            margin: 0.4rem auto 1rem;
+            margin: 0.3rem auto 0.8rem;
         }
         .site-header-button-link {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 34px;
-            height: 34px;
-            border-radius: 10px;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
             background: var(--nammu-header-button-accent);
             border: 1px solid var(--nammu-header-button-accent);
             color: #fff;
@@ -267,8 +267,8 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
         }
         .site-header-button-link svg {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
         }
         table {
             width: 100%;

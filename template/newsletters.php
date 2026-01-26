@@ -61,6 +61,24 @@ $hasNewsletters = !empty($hasNewsletters);
 $postalEnabled = $postalEnabled ?? false;
 $postalUrl = $postalUrl ?? '/correos.php';
 $postalLogoSvg = $postalLogoSvg ?? '';
+$formatDateEs = static function (?string $date): string {
+    if ($date === null || $date === '') {
+        return '';
+    }
+    $date = str_replace('/', '-', $date);
+    $timestamp = strtotime($date);
+    if ($timestamp === false) {
+        return $date;
+    }
+    $meses = [
+        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+    ];
+    $dia = date('j', $timestamp);
+    $mes = (int) date('n', $timestamp);
+    $anio = date('Y', $timestamp);
+    return $dia . ' de ' . $meses[$mes - 1] . ' de ' . $anio;
+};
 $headerButtonsHtml = '';
 if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
     $headerButtonsHtml = nammu_render_header_buttons([
@@ -122,7 +140,7 @@ if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
             }
             $thumbClass = implode(' ', $thumbClassParts);
             $dateLabel = $newsletter['date'] ?? '';
-            $metaText = $dateLabel !== '' ? $dateLabel : '';
+            $metaText = $dateLabel !== '' ? ('Enviada el ' . $formatDateEs($dateLabel)) : '';
             ?>
             <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
                 <?php if ($cover): ?>
@@ -205,79 +223,224 @@ if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
         padding: 0.8rem 0 0 0;
     }
     .itinerary-card {
-        background: #fff;
-        border-radius: var(--nammu-radius-lg);
-        border: 1px solid rgba(0,0,0,0.08);
+        border: 1px solid rgba(0,0,0,0.05);
+        border-radius: var(--nammu-radius-md);
+        padding: 1.15rem;
+        background: <?= $highlight ?>;
+        color: <?= $textColor ?>;
+        position: relative;
         overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        min-height: 100%;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        box-sizing: border-box;
     }
-    .itinerary-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 14px 30px rgba(0,0,0,0.08);
+    .itinerary-card::after {
+        content: '';
+        display: table;
+        clear: both;
     }
     .itinerary-card.style-media-right {
-        flex-direction: row;
-        align-items: stretch;
-    }
-    .itinerary-card.style-media-right .itinerary-card__body {
-        flex: 1;
-    }
-    .itinerary-card.style-media-right .itinerary-thumb {
-        flex: 0 0 auto;
+        display: block;
     }
     .itinerary-thumb {
         display: block;
-        width: 100%;
-        background: <?= $accentBackground ?>;
     }
     .itinerary-thumb img {
+        width: 100%;
+        display: block;
+        object-fit: cover;
+        border-radius: var(--nammu-radius-md);
+    }
+    .itinerary-card__body {
+        display: block;
+    }
+    .itinerary-card__body > *:not(:last-child) {
+        margin-bottom: 0.6rem;
+    }
+    .itinerary-card.style-media-right .itinerary-thumb {
+        float: right;
+        width: clamp(110px, 34%, 170px);
+        aspect-ratio: 1 / 1;
+        margin-left: 1.25rem;
+        margin-bottom: 0.5rem;
+        shape-outside: inset(0 round var(--nammu-radius-lg));
+        -webkit-shape-outside: inset(0 round var(--nammu-radius-lg));
+        overflow: hidden;
+        border-radius: var(--nammu-radius-lg);
+    }
+    .itinerary-card.style-media-right .itinerary-thumb img {
         width: 100%;
         height: 100%;
         object-fit: cover;
         display: block;
+        border-radius: inherit;
     }
-    .itinerary-thumb.thumb-wide {
-        height: 200px;
+    .itinerary-card.style-square-tall-right {
+        display: grid;
+        grid-template-columns: 1fr clamp(110px, 34%, 170px);
+        grid-template-rows: 1fr;
+        gap: 1rem;
+        align-items: stretch;
+        min-height: 220px;
     }
-    .itinerary-thumb.thumb-right {
-        width: 38%;
+    .itinerary-card.style-square-tall-right .itinerary-thumb {
+        grid-column: 2;
+        grid-row: 1;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        border-radius: var(--nammu-radius-lg);
+        align-self: stretch;
+        justify-self: center;
     }
-    .itinerary-thumb.thumb-square img {
-        aspect-ratio: 1 / 1;
+    .itinerary-card.style-square-tall-right .itinerary-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        border-radius: inherit;
     }
-    .itinerary-thumb.thumb-vertical img {
-        aspect-ratio: 3 / 4;
+    .itinerary-card.style-square-tall-right .itinerary-card__body {
+        grid-column: 1;
+        grid-row: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.6rem;
     }
-    .itinerary-thumb.thumb-circle img {
-        aspect-ratio: 1 / 1;
-        border-radius: 0 0 0 0;
+    .itinerary-card.style-circle-right .itinerary-thumb {
+        border-radius: 50%;
+        shape-outside: circle();
+        -webkit-shape-outside: circle();
     }
-    .itinerary-card__body {
-        padding: 1.2rem 1.3rem 1.4rem 1.3rem;
+    @media (max-width: 720px) {
+        .itinerary-card.style-media-right {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .itinerary-card.style-media-right .itinerary-card__body {
+            width: 100%;
+            text-align: left;
+        }
+        .itinerary-card.style-media-right .itinerary-thumb {
+            float: none;
+            width: min(240px, 75vw);
+            margin: 0 auto 0.85rem auto;
+            shape-outside: none;
+            -webkit-shape-outside: none;
+        }
+        .itinerary-card.style-media-right .itinerary-thumb img {
+            border-radius: var(--nammu-radius-md);
+        }
+        .itinerary-card.style-square-tall-right {
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr;
+            min-height: 220px;
+        }
+        .itinerary-card.style-square-tall-right .itinerary-thumb {
+            grid-column: 1;
+            width: 100%;
+            height: 100%;
+        }
+        .itinerary-card.style-square-tall-right .itinerary-thumb img {
+            height: 100%;
+        }
+        .itinerary-card.style-circle-right .itinerary-thumb {
+            width: min(200px, 60vw);
+        }
+        .itinerary-grid.columns-1 .itinerary-card.style-media-right {
+            display: block;
+        }
+        .itinerary-grid.columns-1 .itinerary-card.style-media-right .itinerary-thumb {
+            float: none;
+            width: 100%;
+            margin: 0 0 0.85rem 0;
+            shape-outside: none;
+            -webkit-shape-outside: none;
+            border-radius: var(--nammu-radius-lg);
+        }
+        .itinerary-grid.columns-1 .itinerary-card.style-media-right .itinerary-thumb img {
+            border-radius: inherit;
+        }
+        .itinerary-grid.columns-1 .itinerary-card.style-circle-right .itinerary-thumb {
+            width: 100%;
+            border-radius: 50%;
+        }
+        .itinerary-grid.columns-1 .itinerary-card.style-media-right {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .itinerary-grid.columns-1 .itinerary-card.style-media-right .itinerary-thumb {
+            float: none;
+            width: min(240px, 70%);
+            margin: 0 auto 0.85rem auto;
+            shape-outside: none;
+            -webkit-shape-outside: none;
+        }
+        .itinerary-grid.columns-1 .itinerary-card.style-circle-right .itinerary-thumb {
+            width: min(200px, 55%);
+        }
     }
-    .itinerary-card__body h2 {
-        margin: 0 0 0.6rem 0;
-        font-size: 1.3rem;
+    .itinerary-card.style-full .itinerary-thumb {
+        width: 100%;
+        overflow: hidden;
+    }
+    .itinerary-card.style-full .itinerary-thumb img {
+        border-radius: var(--nammu-radius-md);
+    }
+    .itinerary-card.style-full.full-mode-natural .itinerary-thumb img {
+        height: auto;
+        width: 100%;
+    }
+    .itinerary-card.style-full.full-mode-crop .itinerary-thumb {
+        aspect-ratio: 16 / 9;
+    }
+    .itinerary-card.style-full.full-mode-crop .itinerary-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .itinerary-card.style-full .itinerary-card__body {
+        margin-top: 0.9rem;
+    }
+    .itinerary-card h2 {
+        margin: 0;
+        font-size: 1.6rem;
         color: <?= $headingSecondaryColor ?>;
+        word-break: break-word;
+        hyphens: auto;
+        overflow-wrap: anywhere;
     }
     .itinerary-card__body h2 a {
         color: inherit;
         text-decoration: none;
     }
     .itinerary-card__meta {
-        margin: 0 0 0.6rem 0;
-        font-size: 0.85rem;
+        margin: 0;
+        display: inline-flex;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+        letter-spacing: 0.012em;
+        background: <?= htmlspecialchars($accentBackground, ENT_QUOTES, 'UTF-8') ?>;
+        border: 1px solid <?= htmlspecialchars($accentBorder, ENT_QUOTES, 'UTF-8') ?>;
         color: <?= $accentColor ?>;
-        font-weight: 600;
+        border-radius: var(--nammu-radius-sm);
     }
     .itinerary-card__description {
         margin: 0;
-        color: <?= $brandColor ?>;
-        opacity: 0.8;
-        font-size: 0.95rem;
-        line-height: 1.6;
+    }
+    .itinerary-grid.blocks-flat {
+        gap: 2.25rem 1.75rem;
+    }
+    .itinerary-grid.blocks-flat .itinerary-card {
+        background: transparent;
+        border: none;
+        padding: 0;
+    }
+    @media (min-width: 721px) {
+        .itinerary-grid.blocks-flat:not(.columns-1) .itinerary-card.style-media-right .itinerary-thumb {
+            margin-left: clamp(1rem, 3vw, 1.5rem);
+        }
     }
 </style>

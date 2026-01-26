@@ -1720,7 +1720,7 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
         }
         $formHtml = '<section class="newsletter-access"><div class="newsletter-access-card">';
         $formHtml .= '<h1>Archivo de newsletters</h1>';
-        $formHtml .= '<p>Introduce tu email para acceder. Recibirás un enlace de acceso válido durante 1 hora.</p>';
+        $formHtml .= '<p>Sólo los suscriptores de la newsletter tienen acceso a este archivo. Introduce tu email para acceder. Recibirás un enlace de acceso válido durante 1 hora.</p>';
         if ($formMessage !== '') {
             $formHtml .= '<div class="newsletter-access-alert newsletter-access-alert-' . $formType . '">' . htmlspecialchars($formMessage, ENT_QUOTES, 'UTF-8') . '</div>';
         }
@@ -1824,7 +1824,7 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
         }
         $formHtml = '<section class="newsletter-access"><div class="newsletter-access-card">';
         $formHtml .= '<h1>Acceso a newsletter</h1>';
-        $formHtml .= '<p>Introduce tu email para acceder a esta newsletter. Recibirás un enlace de acceso válido durante 1 hora.</p>';
+        $formHtml .= '<p>Sólo los suscriptores de la newsletter tienen acceso a este archivo. Introduce tu email para acceder. Recibirás un enlace de acceso válido durante 1 hora.</p>';
         if ($formMessage !== '') {
             $formHtml .= '<div class="newsletter-access-alert newsletter-access-alert-' . $formType . '">' . htmlspecialchars($formMessage, ENT_QUOTES, 'UTF-8') . '</div>';
         }

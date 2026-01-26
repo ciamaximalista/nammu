@@ -4046,6 +4046,7 @@ function admin_prepare_newsletter_payload(array $settings, string $title, string
     $siteBase = rtrim($settings['site_url'] ?? '', '/');
     $baseForAssets = $siteBase !== '' ? $siteBase : rtrim(admin_base_url(), '/');
     $link = $siteBase !== '' ? $siteBase : rtrim(admin_base_url(), '/');
+    $contentHtml = admin_newsletter_expand_image_urls($contentHtml, $baseForAssets);
     $imageUrl = '';
     if ($imagePath !== '') {
         if (preg_match('#^https?://#i', $imagePath)) {
@@ -4190,6 +4191,57 @@ function admin_prepare_newsletter_payload(array $settings, string $title, string
         'fromName' => $fromName,
         'mailingConfig' => $mailingConfig,
     ];
+}
+
+function admin_newsletter_expand_image_urls(string $html, string $baseUrl): string {
+    if ($html === '' || $baseUrl === '') {
+        return $html;
+    }
+    $baseUrl = rtrim($baseUrl, '/');
+    $singleAttrCallback = static function (array $matches) use ($baseUrl): string {
+        $prefix = $matches[1] ?? '';
+        $quote = $matches[2] ?? '"';
+        $value = $matches[3] ?? '';
+        $suffix = $matches[4] ?? '';
+        $normalized = trim($value);
+        if ($normalized === '' || preg_match('#^(https?:)?//#i', $normalized) || str_starts_with($normalized, 'data:') || str_starts_with($normalized, 'mailto:') || str_starts_with($normalized, 'tel:')) {
+            return $matches[0];
+        }
+        $normalized = ltrim($normalized, '/');
+        return $prefix . $quote . $baseUrl . '/' . $normalized . $quote . $suffix;
+    };
+    $srcsetCallback = static function (array $matches) use ($baseUrl): string {
+        $prefix = $matches[1] ?? '';
+        $quote = $matches[2] ?? '"';
+        $value = $matches[3] ?? '';
+        $suffix = $matches[4] ?? '';
+        $parts = array_filter(array_map('trim', explode(',', $value)));
+        if (empty($parts)) {
+            return $matches[0];
+        }
+        $rebuilt = [];
+        foreach ($parts as $part) {
+            $segments = preg_split('/\\s+/', $part, 2);
+            $urlPart = $segments[0] ?? '';
+            $descriptor = $segments[1] ?? '';
+            $normalized = trim($urlPart);
+            if ($normalized !== '' && !preg_match('#^(https?:)?//#i', $normalized) && !str_starts_with($normalized, 'data:')) {
+                $normalized = ltrim($normalized, '/');
+                $normalized = $baseUrl . '/' . $normalized;
+            }
+            $rebuilt[] = trim($normalized . ($descriptor !== '' ? ' ' . $descriptor : ''));
+        }
+        return $prefix . $quote . implode(', ', $rebuilt) . $quote . $suffix;
+    };
+    $html = preg_replace_callback('/(<img\\b[^>]*\\bsrc\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $singleAttrCallback, $html) ?? $html;
+    $html = preg_replace_callback('/(<a\\b[^>]*\\bhref\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $singleAttrCallback, $html) ?? $html;
+    $html = preg_replace_callback('/(<img\\b[^>]*\\bsrcset\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $srcsetCallback, $html) ?? $html;
+    $html = preg_replace_callback('/(<source\\b[^>]*\\bsrc\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $singleAttrCallback, $html) ?? $html;
+    $html = preg_replace_callback('/(<source\\b[^>]*\\bsrcset\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $srcsetCallback, $html) ?? $html;
+    $html = preg_replace_callback('/(<video\\b[^>]*\\bposter\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $singleAttrCallback, $html) ?? $html;
+    $html = preg_replace_callback('/(<audio\\b[^>]*\\bsrc\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $singleAttrCallback, $html) ?? $html;
+    $html = preg_replace_callback('/(<video\\b[^>]*\\bsrc\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $singleAttrCallback, $html) ?? $html;
+    return $html;
 }
 
 function admin_gmail_update_display_name(string $sendAsEmail, string $displayName, string $accessToken): void {
@@ -4683,6 +4735,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($error === null && empty($subscribers)) {
             $error = 'No hay suscriptores en la lista de correo.';
         }
+        $newsletterSendResult = null;
         if ($error === null && $filename !== '') {
             $markdown = new MarkdownConverter();
             $contentHtml = $markdown->toHtml($content);
@@ -4690,6 +4743,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $payload = admin_prepare_newsletter_payload($settings, $title, $contentHtml, $contentText, $image);
             try {
                 $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                $newsletterSendResult = $sendResult;
                 if (($sendResult['sent'] ?? 0) === 0) {
                     $error = 'No se pudo enviar la newsletter. Revisa la configuración de correo.' . (!empty($sendResult['error']) ? ' Detalle: ' . $sendResult['error'] : '');
                 }
@@ -4740,10 +4794,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (file_put_contents($filepath, $file_content) === false) {
                     $error = 'No se pudo guardar la newsletter. Revisa los permisos de la carpeta content/.';
                 } else {
-                    $_SESSION['mailing_feedback'] = [
-                        'type' => 'success',
-                        'message' => 'Newsletter enviada correctamente.',
-                    ];
+                    if (is_array($newsletterSendResult)) {
+                        $sentCount = (int) ($newsletterSendResult['sent'] ?? 0);
+                        $failedCount = (int) ($newsletterSendResult['failed'] ?? 0);
+                        $_SESSION['mailing_feedback'] = [
+                            'type' => 'success',
+                            'message' => 'Newsletter enviada: ' . $sentCount . ' correos enviados' . ($failedCount > 0 ? ' y ' . $failedCount . ' fallidos' : '') . '.',
+                        ];
+                    } else {
+                        $_SESSION['mailing_feedback'] = [
+                            'type' => 'success',
+                            'message' => 'Newsletter enviada correctamente.',
+                        ];
+                    }
                     header('Location: admin.php?page=edit&template=newsletter&created=' . urlencode($targetFilename));
                     exit;
                 }
@@ -5010,9 +5073,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
             exit;
         }
+        $sentCount = (int) ($sendResult['sent'] ?? 0);
+        $failedCount = (int) ($sendResult['failed'] ?? 0);
         $_SESSION['mailing_feedback'] = [
             'type' => 'success',
-            'message' => 'Newsletter reenviada correctamente.',
+            'message' => 'Newsletter reenviada: ' . $sentCount . ' correos enviados' . ($failedCount > 0 ? ' y ' . $failedCount . ' fallidos' : '') . '.',
         ];
         header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
         exit;
@@ -5123,9 +5188,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $file_content .= $content;
             @file_put_contents($filepath, $file_content);
         }
+        $sentCount = (int) ($sendResult['sent'] ?? 0);
+        $failedCount = (int) ($sendResult['failed'] ?? 0);
         $_SESSION['mailing_feedback'] = [
             'type' => 'success',
-            'message' => 'Newsletter enviada correctamente.',
+            'message' => 'Newsletter enviada: ' . $sentCount . ' correos enviados' . ($failedCount > 0 ? ' y ' . $failedCount . ' fallidos' : '') . '.',
         ];
         header('Location: admin.php?page=edit&template=newsletter&created=' . urlencode($targetFilename));
         exit;

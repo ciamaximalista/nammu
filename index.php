@@ -1720,7 +1720,7 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
         }
         $formHtml = '<section class="newsletter-access"><div class="newsletter-access-card">';
         $formHtml .= '<h1>Archivo de newsletters</h1>';
-        $formHtml .= '<p>Sólo los suscriptores de la newsletter tienen acceso a este archivo. Introduce tu email para acceder. Recibirás un enlace de acceso válido durante 1 hora.</p>';
+        $formHtml .= '<p>Sólo los suscriptores de la newsletter tienen acceso a este archivo y sólo pueden leer los newsletters enviados después de haberse suscrito. Introduce tu email para acceder. Recibirás un enlace de acceso válido durante 1 hora.</p>';
         if ($formMessage !== '') {
             $formHtml .= '<div class="newsletter-access-alert newsletter-access-alert-' . $formType . '">' . htmlspecialchars($formMessage, ENT_QUOTES, 'UTF-8') . '</div>';
         }
@@ -1751,8 +1751,17 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
         ]);
         exit;
     }
+    $visibleNewsletters = $newsletterItems;
+    if (!$isAdmin && $accessEmail !== '') {
+        $since = function_exists('nammu_get_newsletter_since') ? nammu_get_newsletter_since($accessEmail) : null;
+        if ($since !== null && $since > 0) {
+            $visibleNewsletters = array_values(array_filter($visibleNewsletters, static function (array $item) use ($since): bool {
+                return (int) ($item['timestamp'] ?? 0) >= $since;
+            }));
+        }
+    }
     $content = $renderer->render('newsletters', [
-        'newsletters' => $newsletterItems,
+        'newsletters' => $visibleNewsletters,
         'hasItineraries' => !empty($itineraryListing),
     ]);
     $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/newsletters' : '/newsletters';
@@ -1824,7 +1833,7 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
         }
         $formHtml = '<section class="newsletter-access"><div class="newsletter-access-card">';
         $formHtml .= '<h1>Acceso a newsletter</h1>';
-        $formHtml .= '<p>Sólo los suscriptores de la newsletter tienen acceso a este archivo. Introduce tu email para acceder. Recibirás un enlace de acceso válido durante 1 hora.</p>';
+        $formHtml .= '<p>Sólo los suscriptores de la newsletter tienen acceso a este archivo y sólo pueden leer los newsletters enviados después de haberse suscrito. Introduce tu email para acceder. Recibirás un enlace de acceso válido durante 1 hora.</p>';
         if ($formMessage !== '') {
             $formHtml .= '<div class="newsletter-access-alert newsletter-access-alert-' . $formType . '">' . htmlspecialchars($formMessage, ENT_QUOTES, 'UTF-8') . '</div>';
         }
@@ -1867,6 +1876,20 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
     $newsletterTitle = (string) ($document['metadata']['Title'] ?? '');
     $newsletterImage = (string) ($document['metadata']['Image'] ?? '');
     $newsletterHtml = (new MarkdownConverter())->toHtml($document['content'] ?? '');
+    if (!$isAdmin && $accessEmail !== '') {
+        $since = function_exists('nammu_get_newsletter_since') ? nammu_get_newsletter_since($accessEmail) : null;
+        if ($since !== null && $since > 0) {
+            $metaDate = trim((string) ($document['metadata']['Date'] ?? ''));
+            $newsletterTimestamp = $metaDate !== '' ? strtotime($metaDate) : false;
+            if ($newsletterTimestamp === false && !empty($document['filename'])) {
+                $newsletterTimestamp = @filemtime($document['filename']) ?: false;
+            }
+            $newsletterTimestamp = $newsletterTimestamp === false ? 0 : (int) $newsletterTimestamp;
+            if ($newsletterTimestamp < $since) {
+                $renderNotFound('Newsletter no encontrada', 'La newsletter solicitada no está disponible.', $routePath);
+            }
+        }
+    }
     $recipientEmail = $accessEmail !== '' ? $accessEmail : (string) ($emailParam !== '' ? $emailParam : '');
     if ($recipientEmail === '') {
         $recipientEmail = 'suscriptor@' . ($_SERVER['HTTP_HOST'] ?? 'example.com');

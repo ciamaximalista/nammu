@@ -42,6 +42,7 @@ function subscription_normalize_entry($entry): ?array {
         return [
             'email' => $email,
             'prefs' => subscription_default_prefs(),
+            'newsletter_since' => null,
         ];
     }
     if (!is_array($entry)) {
@@ -53,9 +54,22 @@ function subscription_normalize_entry($entry): ?array {
     }
     $prefsRaw = $entry['prefs'] ?? [];
     $prefs = is_array($prefsRaw) ? subscription_normalize_prefs($prefsRaw) : subscription_default_prefs();
+    $newsletterSince = null;
+    if (array_key_exists('newsletter_since', $entry)) {
+        $rawSince = $entry['newsletter_since'];
+        if (is_numeric($rawSince)) {
+            $newsletterSince = (int) $rawSince;
+        } elseif (is_string($rawSince) && trim($rawSince) !== '') {
+            $parsed = strtotime($rawSince);
+            if ($parsed !== false) {
+                $newsletterSince = (int) $parsed;
+            }
+        }
+    }
     return [
         'email' => $email,
         'prefs' => $prefs,
+        'newsletter_since' => $newsletterSince,
     ];
 }
 
@@ -138,9 +152,21 @@ if ($email === '' || $token === '') {
         }
         $subscribersRaw = subscription_load([MAILING_SUBSCRIBERS_FILE, []]);
         $subscribers = subscription_normalize_subscribers($subscribersRaw);
+        $existing = $subscribers[$email] ?? null;
+        $newsletterSince = null;
+        if (!empty($prefs['newsletter'])) {
+            $existingPrefs = is_array($existing['prefs'] ?? null) ? $existing['prefs'] : [];
+            $existingSince = $existing['newsletter_since'] ?? null;
+            if (!empty($existingPrefs['newsletter']) && is_int($existingSince) && $existingSince > 0) {
+                $newsletterSince = $existingSince;
+            } else {
+                $newsletterSince = time();
+            }
+        }
         $subscribers[$email] = [
             'email' => $email,
             'prefs' => $prefs,
+            'newsletter_since' => $newsletterSince,
         ];
 
         try {

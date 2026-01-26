@@ -2702,6 +2702,7 @@ function nammu_mailing_normalize_entry($entry): ?array
         return [
             'email' => $email,
             'prefs' => nammu_mailing_default_prefs(),
+            'newsletter_since' => null,
         ];
     }
     if (!is_array($entry)) {
@@ -2724,9 +2725,22 @@ function nammu_mailing_normalize_entry($entry): ?array
             $prefs[$key] = $value;
         }
     }
+    $newsletterSince = null;
+    if (array_key_exists('newsletter_since', $entry)) {
+        $rawSince = $entry['newsletter_since'];
+        if (is_numeric($rawSince)) {
+            $newsletterSince = (int) $rawSince;
+        } elseif (is_string($rawSince) && trim($rawSince) !== '') {
+            $parsed = strtotime($rawSince);
+            if ($parsed !== false) {
+                $newsletterSince = (int) $parsed;
+            }
+        }
+    }
     return [
         'email' => $email,
         'prefs' => $prefs,
+        'newsletter_since' => $newsletterSince,
     ];
 }
 
@@ -2758,6 +2772,37 @@ function nammu_is_newsletter_subscriber(string $email): bool
         }
     }
     return false;
+}
+
+function nammu_get_newsletter_since(string $email): ?int
+{
+    $email = strtolower(trim($email));
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return null;
+    }
+    $file = __DIR__ . '/../config/mailing-subscribers.json';
+    if (!is_file($file)) {
+        return null;
+    }
+    $raw = file_get_contents($file);
+    if ($raw === false || $raw === '') {
+        return null;
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return null;
+    }
+    foreach ($decoded as $entry) {
+        $normalized = nammu_mailing_normalize_entry($entry);
+        if ($normalized === null) {
+            continue;
+        }
+        if (($normalized['email'] ?? '') === $email && !empty(($normalized['prefs'] ?? [])['newsletter'])) {
+            $since = $normalized['newsletter_since'] ?? null;
+            return is_int($since) && $since > 0 ? $since : null;
+        }
+    }
+    return null;
 }
 
 function nammu_newsletter_collect_items(string $contentDir, string $baseUrl = ''): array
@@ -3048,8 +3093,8 @@ function nammu_send_newsletter_access_email(array $settings, string $email, stri
         $link .= '&next=' . urlencode($nextPath);
     }
     $subject = 'Acceso al archivo de newsletters de ' . $siteLabel;
-    $textBody = "Confirma tu acceso al archivo de newsletters de {$siteLabel} haciendo clic en el enlace:\n{$link}\n\nEste enlace caduca en 1 hora.";
-    $htmlBody = '<p>Confirma tu acceso al archivo de newsletters de ' . htmlspecialchars($siteLabel, ENT_QUOTES, 'UTF-8') . ':</p><p><a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">Acceder al archivo</a></p><p>Este enlace caduca en 1 hora.</p>';
+    $textBody = "Confirma tu acceso al archivo de newsletters de {$siteLabel} haciendo clic en el enlace:\n{$link}\n\nSólo podrás leer los newsletters enviados después de haberte suscrito.\n\nEste enlace caduca en 1 hora.";
+    $htmlBody = '<p>Confirma tu acceso al archivo de newsletters de ' . htmlspecialchars($siteLabel, ENT_QUOTES, 'UTF-8') . ':</p><p><a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">Acceder al archivo</a></p><p>Sólo podrás leer los newsletters enviados después de haberte suscrito.</p><p>Este enlace caduca en 1 hora.</p>';
     if ($clientId !== '' && $clientSecret !== '' && $fromEmail !== '' && $refresh !== '') {
         $refreshed = nammu_google_refresh_access_token($clientId, $clientSecret, $refresh);
         $accessToken = $refreshed['access_token'] ?? '';

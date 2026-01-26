@@ -327,6 +327,13 @@ if (is_string($configBaseUrl)) {
 $publicBaseUrl = $configBaseUrl !== '' ? $configBaseUrl : nammu_base_url();
 $homeUrl = $publicBaseUrl !== '' ? $publicBaseUrl : '/';
 $rssUrl = ($publicBaseUrl !== '' ? $publicBaseUrl : '') . '/rss.xml';
+$newsletterItems = function_exists('nammu_newsletter_collect_items')
+    ? nammu_newsletter_collect_items(__DIR__ . '/content', $publicBaseUrl)
+    : [];
+$hasNewsletters = !empty($newsletterItems);
+$newslettersIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/newsletters';
+$GLOBALS['hasNewsletters'] = $hasNewsletters;
+$GLOBALS['newslettersIndexUrl'] = $newslettersIndexUrl;
 
 $theme = nammu_template_settings();
 $footerRaw = $theme['footer'] ?? '';
@@ -375,12 +382,14 @@ if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
         'categories_url' => $categoriesIndexUrl,
         'itineraries_url' => $itinerariesIndexUrl,
         'podcast_url' => $podcastIndexUrl,
+        'newsletters_url' => $newslettersIndexUrl,
         'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php',
         'postal_url' => $postalUrl,
         'postal_svg' => $postalLogoSvg,
         'has_categories' => !empty(nammu_collect_categories_from_posts($contentRepository->all())),
         'has_itineraries' => $hasItineraries,
         'has_podcast' => $hasPodcast,
+        'has_newsletters' => $hasNewsletters,
         'subscription_enabled' => ($config['mailing']['auto_posts'] ?? 'off') === 'on'
             || ($config['mailing']['auto_itineraries'] ?? 'off') === 'on'
             || ($config['mailing']['auto_newsletter'] ?? 'off') === 'on'

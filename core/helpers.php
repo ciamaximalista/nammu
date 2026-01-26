@@ -2478,12 +2478,14 @@ function nammu_render_header_buttons(array $options): string
     $categoriesUrl = (string) ($options['categories_url'] ?? '/categorias');
     $itinerariesUrl = (string) ($options['itineraries_url'] ?? '/itinerarios');
     $podcastUrl = (string) ($options['podcast_url'] ?? '/podcast');
+    $newslettersUrl = (string) ($options['newsletters_url'] ?? ($GLOBALS['newslettersIndexUrl'] ?? '/newsletters'));
     $avisosUrl = (string) ($options['avisos_url'] ?? '/avisos.php');
     $postalUrl = (string) ($options['postal_url'] ?? '/correos.php');
     $postalLogoSvg = (string) ($options['postal_svg'] ?? '');
     $hasCategories = !empty($options['has_categories']);
     $hasItineraries = !empty($options['has_itineraries']);
     $hasPodcast = !empty($options['has_podcast']);
+    $hasNewsletters = !empty($options['has_newsletters'] ?? ($GLOBALS['hasNewsletters'] ?? $GLOBALS['has_newsletters'] ?? false));
     $subscriptionEnabled = !empty($options['subscription_enabled']);
     $postalEnabled = !empty($options['postal_enabled']);
 
@@ -2514,6 +2516,13 @@ function nammu_render_header_buttons(array $options): string
             'label' => 'Podcast',
             'href' => $podcastUrl,
             'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="3" width="6" height="10" rx="3" stroke="#fff" stroke-width="2"/><path d="M5 11C5 14.866 8.134 18 12 18C15.866 18 19 14.866 19 11" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="18" x2="12" y2="22" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="22" x2="16" y2="22" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+        ];
+    }
+    if ($hasNewsletters) {
+        $items[] = [
+            'label' => 'Newsletters',
+            'href' => $newslettersUrl,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" stroke="#fff" stroke-width="2"/><path d="M15 3v4h4" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="8" y1="11" x2="16" y2="11" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="15" x2="16" y2="15" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
         ];
     }
     if ($subscriptionEnabled) {
@@ -2547,4 +2556,624 @@ function nammu_render_header_buttons(array $options): string
     </div>
     <?php
     return (string) ob_get_clean();
+}
+
+function nammu_newsletter_access_file(): string
+{
+    return __DIR__ . '/../config/newsletters-access.json';
+}
+
+function nammu_newsletter_load_access_entries(): array
+{
+    $file = nammu_newsletter_access_file();
+    if (!is_file($file)) {
+        return [];
+    }
+    $raw = file_get_contents($file);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function nammu_newsletter_save_access_entries(array $entries): void
+{
+    $file = nammu_newsletter_access_file();
+    nammu_ensure_directory(dirname($file));
+    $payload = json_encode(array_values($entries), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($payload === false) {
+        return;
+    }
+    file_put_contents($file, $payload, LOCK_EX);
+    @chmod($file, 0664);
+}
+
+function nammu_newsletter_purge_access_entries(array $entries): array
+{
+    $now = time();
+    $filtered = [];
+    foreach ($entries as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        $expires = (int) ($entry['expires_at'] ?? 0);
+        if ($expires > $now) {
+            $filtered[] = $entry;
+        }
+    }
+    return $filtered;
+}
+
+function nammu_newsletter_issue_access_token(string $email, int $ttlSeconds = 3600): array
+{
+    $token = bin2hex(random_bytes(16));
+    $expires = time() + $ttlSeconds;
+    $entries = nammu_newsletter_load_access_entries();
+    $entries = nammu_newsletter_purge_access_entries($entries);
+    $entries[] = [
+        'email' => strtolower(trim($email)),
+        'token' => $token,
+        'expires_at' => $expires,
+    ];
+    nammu_newsletter_save_access_entries($entries);
+    return ['token' => $token, 'expires_at' => $expires];
+}
+
+function nammu_newsletter_validate_access(string $email, string $token): bool
+{
+    $email = strtolower(trim($email));
+    if ($email === '' || $token === '') {
+        return false;
+    }
+    $entries = nammu_newsletter_load_access_entries();
+    $entries = nammu_newsletter_purge_access_entries($entries);
+    $valid = false;
+    foreach ($entries as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        if (($entry['email'] ?? '') === $email && ($entry['token'] ?? '') === $token) {
+            $valid = true;
+            break;
+        }
+    }
+    if (count($entries) !== count(nammu_newsletter_load_access_entries())) {
+        nammu_newsletter_save_access_entries($entries);
+    }
+    return $valid;
+}
+
+function nammu_newsletter_access_cookie_name(): string
+{
+    return 'nammu_newsletter_access';
+}
+
+function nammu_newsletter_set_access_cookie(string $email, string $token, int $expires): void
+{
+    $payload = json_encode(['email' => $email, 'token' => $token], JSON_UNESCAPED_SLASHES);
+    if ($payload === false) {
+        return;
+    }
+    $encoded = base64_encode($payload);
+    setcookie(nammu_newsletter_access_cookie_name(), $encoded, $expires, '/', '', false, true);
+    $_COOKIE[nammu_newsletter_access_cookie_name()] = $encoded;
+}
+
+function nammu_newsletter_get_access_cookie(): ?array
+{
+    $raw = $_COOKIE[nammu_newsletter_access_cookie_name()] ?? '';
+    if ($raw === '') {
+        return null;
+    }
+    $decoded = base64_decode((string) $raw, true);
+    if ($decoded === false) {
+        return null;
+    }
+    $data = json_decode($decoded, true);
+    if (!is_array($data)) {
+        return null;
+    }
+    $email = strtolower(trim((string) ($data['email'] ?? '')));
+    $token = trim((string) ($data['token'] ?? ''));
+    if ($email === '' || $token === '') {
+        return null;
+    }
+    return ['email' => $email, 'token' => $token];
+}
+
+function nammu_mailing_default_prefs(): array
+{
+    return [
+        'posts' => true,
+        'itineraries' => true,
+        'podcast' => true,
+        'newsletter' => true,
+    ];
+}
+
+function nammu_mailing_normalize_entry($entry): ?array
+{
+    if (is_string($entry)) {
+        $email = strtolower(trim($entry));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+        return [
+            'email' => $email,
+            'prefs' => nammu_mailing_default_prefs(),
+        ];
+    }
+    if (!is_array($entry)) {
+        return null;
+    }
+    $email = strtolower(trim((string) ($entry['email'] ?? '')));
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return null;
+    }
+    $prefsRaw = $entry['prefs'] ?? [];
+    $prefs = nammu_mailing_default_prefs();
+    if (is_array($prefsRaw)) {
+        foreach ($prefs as $key => $default) {
+            $value = $prefsRaw[$key] ?? $default;
+            if (is_string($value)) {
+                $value = strtolower($value) !== 'off' && $value !== '0' && $value !== '';
+            } else {
+                $value = (bool) $value;
+            }
+            $prefs[$key] = $value;
+        }
+    }
+    return [
+        'email' => $email,
+        'prefs' => $prefs,
+    ];
+}
+
+function nammu_is_newsletter_subscriber(string $email): bool
+{
+    $email = strtolower(trim($email));
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return false;
+    }
+    $file = __DIR__ . '/../config/mailing-subscribers.json';
+    if (!is_file($file)) {
+        return false;
+    }
+    $raw = file_get_contents($file);
+    if ($raw === false || $raw === '') {
+        return false;
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return false;
+    }
+    foreach ($decoded as $entry) {
+        $normalized = nammu_mailing_normalize_entry($entry);
+        if ($normalized === null) {
+            continue;
+        }
+        if (($normalized['email'] ?? '') === $email && !empty(($normalized['prefs'] ?? [])['newsletter'])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function nammu_newsletter_collect_items(string $contentDir, string $baseUrl = ''): array
+{
+    $items = [];
+    $files = glob(rtrim($contentDir, '/') . '/*.md') ?: [];
+    foreach ($files as $file) {
+        $raw = @file_get_contents($file);
+        if ($raw === false) {
+            continue;
+        }
+        if (!preg_match('/^---\\s*\\R(.*?)\\R---\\s*\\R?(.*)$/s', $raw, $matches)) {
+            continue;
+        }
+        $metaRaw = $matches[1];
+        $content = $matches[2] ?? '';
+        $metadata = [];
+        foreach (preg_split('/\\R/', $metaRaw) as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#') || !str_contains($line, ':')) {
+                continue;
+            }
+            [$key, $value] = explode(':', $line, 2);
+            $metadata[trim($key)] = trim($value);
+        }
+        $template = strtolower(trim((string) ($metadata['Template'] ?? '')));
+        if ($template !== 'newsletter') {
+            continue;
+        }
+        $status = strtolower(trim((string) ($metadata['Status'] ?? '')));
+        if ($status !== 'newsletter') {
+            continue;
+        }
+        $dateValue = trim((string) ($metadata['Date'] ?? ''));
+        $timestamp = $dateValue !== '' ? strtotime($dateValue) : false;
+        if ($timestamp === false) {
+            $timestamp = @filemtime($file) ?: time();
+        }
+        $image = nammu_resolve_asset((string) ($metadata['Image'] ?? ''), $baseUrl);
+        $items[] = [
+            'slug' => basename($file, '.md'),
+            'title' => (string) ($metadata['Title'] ?? ''),
+            'description' => (string) ($metadata['Description'] ?? ''),
+            'image' => $image,
+            'date' => $dateValue,
+            'timestamp' => $timestamp,
+            'content' => $content,
+        ];
+    }
+    usort($items, static function (array $a, array $b): int {
+        return ($b['timestamp'] ?? 0) <=> ($a['timestamp'] ?? 0);
+    });
+    return $items;
+}
+
+function nammu_parse_hex_color(string $hex, int &$r, int &$g, int &$b): bool
+{
+    $value = ltrim(trim($hex), '#');
+    if (strlen($value) === 3) {
+        $value = $value[0] . $value[0] . $value[1] . $value[1] . $value[2] . $value[2];
+    }
+    if (strlen($value) !== 6 || !ctype_xdigit($value)) {
+        return false;
+    }
+    $r = hexdec(substr($value, 0, 2));
+    $g = hexdec(substr($value, 2, 2));
+    $b = hexdec(substr($value, 4, 2));
+    return true;
+}
+
+function nammu_pick_contrast_color(string $backgroundHex, string $light = '#ffffff', string $dark = '#111111'): string
+{
+    $r = $g = $b = 0;
+    if (!nammu_parse_hex_color($backgroundHex, $r, $g, $b)) {
+        return $dark;
+    }
+    $yiq = (($r * 299) + ($g * 587) + ($b * 114)) / 1000;
+    return $yiq >= 160 ? $dark : $light;
+}
+
+function nammu_newsletter_expand_image_urls(string $html, string $baseUrl): string
+{
+    if ($html === '' || $baseUrl === '') {
+        return $html;
+    }
+    $baseUrl = rtrim($baseUrl, '/');
+    $singleAttrCallback = static function (array $matches) use ($baseUrl): string {
+        $prefix = $matches[1] ?? '';
+        $quote = $matches[2] ?? '"';
+        $value = $matches[3] ?? '';
+        $suffix = $matches[4] ?? '';
+        $normalized = trim($value);
+        if ($normalized === '' || preg_match('#^(https?:)?//#i', $normalized) || str_starts_with($normalized, 'data:') || str_starts_with($normalized, 'mailto:') || str_starts_with($normalized, 'tel:')) {
+            return $matches[0];
+        }
+        $normalized = ltrim($normalized, '/');
+        return $prefix . $quote . $baseUrl . '/' . $normalized . $quote . $suffix;
+    };
+    $srcsetCallback = static function (array $matches) use ($baseUrl): string {
+        $prefix = $matches[1] ?? '';
+        $quote = $matches[2] ?? '"';
+        $value = $matches[3] ?? '';
+        $suffix = $matches[4] ?? '';
+        $parts = array_filter(array_map('trim', explode(',', $value)));
+        if (empty($parts)) {
+            return $matches[0];
+        }
+        $rebuilt = [];
+        foreach ($parts as $part) {
+            $segments = preg_split('/\\s+/', $part, 2);
+            $urlPart = $segments[0] ?? '';
+            $descriptor = $segments[1] ?? '';
+            $normalized = trim($urlPart);
+            if ($normalized !== '' && !preg_match('#^(https?:)?//#i', $normalized) && !str_starts_with($normalized, 'data:')) {
+                $normalized = ltrim($normalized, '/');
+                $normalized = $baseUrl . '/' . $normalized;
+            }
+            $rebuilt[] = trim($normalized . ($descriptor !== '' ? ' ' . $descriptor : ''));
+        }
+        return $prefix . $quote . implode(', ', $rebuilt) . $quote . $suffix;
+    };
+    $html = preg_replace_callback('/(<img\\b[^>]*\\bsrc\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $singleAttrCallback, $html) ?? $html;
+    $html = preg_replace_callback('/(<a\\b[^>]*\\bhref\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $singleAttrCallback, $html) ?? $html;
+    $html = preg_replace_callback('/(<img\\b[^>]*\\bsrcset\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $srcsetCallback, $html) ?? $html;
+    $html = preg_replace_callback('/(<source\\b[^>]*\\bsrc\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $singleAttrCallback, $html) ?? $html;
+    $html = preg_replace_callback('/(<source\\b[^>]*\\bsrcset\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $srcsetCallback, $html) ?? $html;
+    $html = preg_replace_callback('/(<video\\b[^>]*\\bposter\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $singleAttrCallback, $html) ?? $html;
+    $html = preg_replace_callback('/(<audio\\b[^>]*\\bsrc\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $singleAttrCallback, $html) ?? $html;
+    $html = preg_replace_callback('/(<video\\b[^>]*\\bsrc\\s*=\\s*)([\"\'])([^\"\']+)(\\2[^>]*>)/i', $singleAttrCallback, $html) ?? $html;
+    return $html;
+}
+
+function nammu_mailing_secret(): string
+{
+    $file = __DIR__ . '/../config/mailing-secret.key';
+    if (!is_file($file)) {
+        nammu_ensure_directory(dirname($file));
+        $secret = bin2hex(random_bytes(32));
+        file_put_contents($file, $secret);
+        @chmod($file, 0640);
+        return $secret;
+    }
+    $secret = trim((string) file_get_contents($file));
+    if ($secret === '') {
+        $secret = bin2hex(random_bytes(32));
+        file_put_contents($file, $secret);
+    }
+    return $secret;
+}
+
+function nammu_mailing_unsubscribe_token(string $email): string
+{
+    $secret = nammu_mailing_secret();
+    return hash_hmac('sha256', strtolower(trim($email)), $secret);
+}
+
+function nammu_mailing_unsubscribe_link(string $email): string
+{
+    $token = nammu_mailing_unsubscribe_token($email);
+    $base = nammu_base_url();
+    $base = $base !== '' ? rtrim($base, '/') : '';
+    return $base . '/unsubscribe.php?email=' . urlencode($email) . '&token=' . urlencode($token);
+}
+
+function nammu_load_mailing_tokens(): array
+{
+    $file = __DIR__ . '/../config/mailing-tokens.json';
+    if (!is_file($file)) {
+        return [];
+    }
+    $raw = file_get_contents($file);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function nammu_google_refresh_access_token(string $clientId, string $clientSecret, string $refreshToken): array
+{
+    $postData = http_build_query([
+        'client_id' => $clientId,
+        'client_secret' => $clientSecret,
+        'refresh_token' => $refreshToken,
+        'grant_type' => 'refresh_token',
+    ]);
+    $opts = [
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
+            'content' => $postData,
+            'timeout' => 12,
+            'ignore_errors' => true,
+        ],
+    ];
+    $context = stream_context_create($opts);
+    $raw = @file_get_contents('https://oauth2.googleapis.com/token', false, $context);
+    if ($raw === false) {
+        throw new RuntimeException('No se pudo refrescar el token con Google.');
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        throw new RuntimeException('Respuesta inesperada al refrescar token.');
+    }
+    if (isset($decoded['error'])) {
+        $message = is_string($decoded['error']) ? $decoded['error'] : 'Error de OAuth';
+        $desc = isset($decoded['error_description']) ? ' (' . $decoded['error_description'] . ')' : '';
+        throw new RuntimeException($message . $desc);
+    }
+    return $decoded;
+}
+
+function nammu_gmail_send_message(string $from, string $to, string $subject, string $textBody, string $htmlBody, string $accessToken, ?string $fromName = null): array
+{
+    $boundary = '=_NammuMailer_' . bin2hex(random_bytes(8));
+    $displayName = $fromName && trim($fromName) !== '' ? trim($fromName) : '';
+    $displayName = str_replace(['"', "\r", "\n"], '', $displayName);
+    $encodedName = $displayName !== '' && function_exists('mb_encode_mimeheader')
+        ? mb_encode_mimeheader($displayName, 'UTF-8', 'Q', "\r\n")
+        : ($displayName !== '' ? '=?UTF-8?B?' . base64_encode($displayName) . '?=' : '');
+    $fromHeader = $encodedName !== '' ? $encodedName . ' <' . $from . '>' : $from;
+    $subjectHeader = function_exists('mb_encode_mimeheader')
+        ? mb_encode_mimeheader($subject, 'UTF-8', 'Q', "\r\n")
+        : '=?UTF-8?B?' . base64_encode($subject) . '?=';
+    $headers = [
+        'From: ' . $fromHeader,
+        'Reply-To: ' . $fromHeader,
+        'To: ' . $to,
+        'Subject: ' . $subjectHeader,
+        'MIME-Version: 1.0',
+        'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
+    ];
+    $body = [];
+    $body[] = '--' . $boundary;
+    $body[] = 'Content-Type: text/plain; charset=UTF-8';
+    $body[] = 'Content-Transfer-Encoding: 7bit';
+    $body[] = '';
+    $body[] = $textBody;
+    $body[] = '--' . $boundary;
+    $body[] = 'Content-Type: text/html; charset=UTF-8';
+    $body[] = 'Content-Transfer-Encoding: 7bit';
+    $body[] = '';
+    $body[] = $htmlBody;
+    $body[] = '--' . $boundary . '--';
+    $rawMessage = implode("\r\n", array_merge($headers, [''], $body));
+    $payload = json_encode(['raw' => rtrim(strtr(base64_encode($rawMessage), '+/', '-_'), '=')]);
+    if ($payload === false) {
+        throw new RuntimeException('No se pudo preparar el mensaje.');
+    }
+    $opts = [
+        'http' => [
+            'method' => 'POST',
+            'header' => "Authorization: Bearer {$accessToken}\r\nContent-Type: application/json\r\n",
+            'content' => $payload,
+            'timeout' => 12,
+            'ignore_errors' => true,
+        ],
+    ];
+    $context = stream_context_create($opts);
+    $response = @file_get_contents('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', false, $context);
+    if ($response === false) {
+        $status = isset($http_response_header[0]) ? $http_response_header[0] : 'sin respuesta';
+        return [false, 'HTTP ' . $status];
+    }
+    $decoded = json_decode($response, true);
+    if (!is_array($decoded) || !isset($decoded['id'])) {
+        if (isset($decoded['error']['message'])) {
+            return [false, 'Error Gmail: ' . $decoded['error']['message']];
+        }
+        return [false, 'Respuesta inesperada al enviar correo'];
+    }
+    return [true, null];
+}
+
+function nammu_send_newsletter_access_email(array $settings, string $email, string $token, string $nextPath = ''): void
+{
+    $mailing = $settings['mailing'] ?? [];
+    $clientId = $mailing['client_id'] ?? '';
+    $clientSecret = $mailing['client_secret'] ?? '';
+    $fromEmail = $mailing['gmail_address'] ?? '';
+    $tokens = nammu_load_mailing_tokens();
+    $refresh = $tokens['refresh_token'] ?? '';
+    $siteLabel = trim((string) ($settings['site_name'] ?? 'tu blog'));
+    $base = nammu_base_url();
+    $base = $base !== '' ? rtrim($base, '/') : '';
+    $link = $base . '/newsletters?email=' . urlencode($email) . '&token=' . urlencode($token);
+    if ($nextPath !== '') {
+        $link .= '&next=' . urlencode($nextPath);
+    }
+    $subject = 'Acceso al archivo de newsletters de ' . $siteLabel;
+    $textBody = "Confirma tu acceso al archivo de newsletters de {$siteLabel} haciendo clic en el enlace:\n{$link}\n\nEste enlace caduca en 1 hora.";
+    $htmlBody = '<p>Confirma tu acceso al archivo de newsletters de ' . htmlspecialchars($siteLabel, ENT_QUOTES, 'UTF-8') . ':</p><p><a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">Acceder al archivo</a></p><p>Este enlace caduca en 1 hora.</p>';
+    if ($clientId !== '' && $clientSecret !== '' && $fromEmail !== '' && $refresh !== '') {
+        $refreshed = nammu_google_refresh_access_token($clientId, $clientSecret, $refresh);
+        $accessToken = $refreshed['access_token'] ?? '';
+        if ($accessToken !== '') {
+            nammu_gmail_send_message($fromEmail, $email, $subject, $textBody, $htmlBody, $accessToken, $siteLabel);
+            return;
+        }
+    }
+    $headers = [];
+    $fromName = $siteLabel !== '' ? $siteLabel : 'Nammu';
+    $encodedName = '=?UTF-8?B?' . base64_encode($fromName) . '?=';
+    $headers[] = 'From: ' . $encodedName . ' <no-reply@' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '>';
+    $headers[] = 'Content-Type: text/plain; charset=UTF-8';
+    @mail($email, $subject, $textBody, implode("\r\n", $headers));
+}
+
+function nammu_build_newsletter_html(array $settings, string $title, string $contentHtml, string $imagePath, string $recipientEmail): string
+{
+    $mailingConfig = $settings['mailing'] ?? [];
+    $blogName = $settings['site_name'] ?? 'Tu blog';
+    $authorName = $settings['site_author'] ?? 'Autor';
+    $siteBase = rtrim($settings['site_url'] ?? '', '/');
+    $baseForAssets = $siteBase !== '' ? $siteBase : rtrim(nammu_base_url(), '/');
+    $link = $siteBase !== '' ? $siteBase : rtrim(nammu_base_url(), '/');
+    $imageUrl = '';
+    if ($imagePath !== '') {
+        if (preg_match('#^https?://#i', $imagePath)) {
+            $imageUrl = $imagePath;
+        } else {
+            $normalizedImage = ltrim($imagePath, '/');
+            $normalizedImage = str_replace(['../', '..\\', './', '.\\'], '', $normalizedImage);
+            $candidates = [];
+            $candidates[] = $normalizedImage;
+            if (!str_starts_with($normalizedImage, 'assets/')) {
+                $candidates[] = 'assets/' . $normalizedImage;
+            }
+            foreach ($candidates as $cand) {
+                $local = dirname(__DIR__) . '/' . $cand;
+                if (is_file($local) || is_file(dirname(__DIR__) . '/' . ltrim($cand, '/'))) {
+                    $imageUrl = $baseForAssets . '/' . $cand;
+                    break;
+                }
+            }
+            if ($imageUrl === '' && !empty($candidates)) {
+                $imageUrl = $baseForAssets . '/' . $candidates[0];
+            }
+        }
+    }
+    $logoPath = $settings['template']['images']['logo'] ?? '';
+    $logoUrl = '';
+    if ($logoPath !== '') {
+        if (preg_match('#^https?://#i', $logoPath)) {
+            $logoUrl = $logoPath;
+        } else {
+            $normalizedLogo = ltrim($logoPath, '/');
+            $normalizedLogo = str_replace(['../', '..\\', './', '.\\'], '', $normalizedLogo);
+            $logoUrl = $baseForAssets . '/' . $normalizedLogo;
+        }
+    }
+    $colors = $settings['template']['colors'] ?? [];
+    $colorBackground = $colors['background'] ?? '#ffffff';
+    $colorText = $colors['text'] ?? '#222222';
+    $colorHighlight = $colors['highlight'] ?? '#f3f6f9';
+    $colorAccent = $colors['accent'] ?? '#0a4c8a';
+    $colorH2 = $colors['h2'] ?? $colorText;
+    $headerBg = $colors['h1'] ?? $colorAccent;
+    $ctaColor = $colors['h1'] ?? $colorAccent;
+    $outerBg = $colorHighlight;
+    $cardBg = $colorBackground;
+    $footerBg = $colorHighlight;
+    $border = $colorAccent;
+    $headerText = nammu_pick_contrast_color($headerBg, '#ffffff', '#111111');
+    $ctaText = nammu_pick_contrast_color($ctaColor, '#ffffff', '#111111');
+    $footerText = nammu_pick_contrast_color($footerBg, '#ffffff', $colorText);
+    $titleFont = $settings['template']['fonts']['title'] ?? 'Arial';
+    $bodyFont = $settings['template']['fonts']['body'] ?? 'Arial';
+    $fontsUrl = '';
+    $fontFamilies = [];
+    foreach ([$titleFont, $bodyFont] as $fontCandidate) {
+        $clean = trim((string) $fontCandidate);
+        if ($clean !== '') {
+            $fontFamilies[] = str_replace(' ', '+', $clean) . ':wght@400;600;700';
+        }
+    }
+    if (!empty($fontFamilies)) {
+        $fontsUrl = 'https://fonts.googleapis.com/css2?family=' . implode('&family=', array_unique($fontFamilies)) . '&display=swap';
+    }
+    $titleFontCss = htmlspecialchars($titleFont, ENT_QUOTES, 'UTF-8');
+    $bodyFontCss = htmlspecialchars($bodyFont, ENT_QUOTES, 'UTF-8');
+    $safeUnsub = htmlspecialchars(nammu_mailing_unsubscribe_link($recipientEmail), ENT_QUOTES, 'UTF-8');
+    $contentHtml = nammu_newsletter_expand_image_urls($contentHtml, $baseForAssets);
+    $html = [];
+    if ($fontsUrl !== '') {
+        $html[] = '<link rel="stylesheet" href="' . htmlspecialchars($fontsUrl, ENT_QUOTES, 'UTF-8') . '">';
+    }
+    $html[] = '<style>h1,h2,h3,h4,h5,h6{font-family:' . $titleFontCss . ', Arial, sans-serif;} body,p,a,div,span{font-family:' . $bodyFontCss . ', Arial, sans-serif;} a{color:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . ';}</style>';
+    $html[] = '<div style="font-family:' . $bodyFontCss . ', Arial, sans-serif; background:' . htmlspecialchars($outerBg, ENT_QUOTES, 'UTF-8') . '; padding:24px; color:' . htmlspecialchars($colorText, ENT_QUOTES, 'UTF-8') . ';">';
+    $html[] = '  <div style="max-width:720px; margin:0 auto; background:' . htmlspecialchars($cardBg, ENT_QUOTES, 'UTF-8') . '; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33; border-radius:12px; overflow:hidden;">';
+    $html[] = '    <div style="background:' . htmlspecialchars($headerBg, ENT_QUOTES, 'UTF-8') . '; color:' . htmlspecialchars($headerText, ENT_QUOTES, 'UTF-8') . '; padding:18px 22px; text-align:center;">';
+    if ($logoUrl !== '') {
+        $html[] = '      <div style="margin-bottom:10px;"><img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:64px; height:64px; object-fit:cover; border-radius:50%; box-shadow:0 4px 12px rgba(0,0,0,0.15); background:' . htmlspecialchars($cardBg, ENT_QUOTES, 'UTF-8') . ';"></div>';
+    }
+    $html[] = '      <div style="font-size:14px; opacity:0.9; margin-bottom:4px;">' . htmlspecialchars($authorName, ENT_QUOTES, 'UTF-8') . '</div>';
+    $html[] = '      <div style="font-size:20px; font-weight:700;">' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '</div>';
+    $html[] = '    </div>';
+    $html[] = '    <div style="padding:22px;">';
+    $html[] = '      <h2 style="margin:0 0 20px 0; font-size:32px; line-height:1.15; color:' . htmlspecialchars($colorH2, ENT_QUOTES, 'UTF-8') . '; font-family:' . $titleFontCss . ', Arial, sans-serif;">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
+    if ($imageUrl !== '') {
+        $html[] = '      <div style="margin:0 0 14px 0;"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="" style="width:100%; display:block; border-radius:12px; border:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33;"></div>';
+    }
+    if ($contentHtml !== '') {
+        $html[] = '      <div style="margin:0; line-height:1.75; font-size:18px; color:' . htmlspecialchars($colorText, ENT_QUOTES, 'UTF-8') . '; font-family:' . $bodyFontCss . ', Arial, sans-serif;">' . $contentHtml . '</div>';
+    }
+    if ($link !== '') {
+        $html[] = '      <p style="margin:20px 0 0 0;">';
+        $html[] = '        <a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" style="display:inline-block; background:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . '; color:' . htmlspecialchars($ctaText, ENT_QUOTES, 'UTF-8') . '; padding:14px 18px; border-radius:10px; text-decoration:none; font-weight:600;">Visitar el sitio</a>';
+        $html[] = '      </p>';
+    }
+    $html[] = '    </div>';
+    $html[] = '    <div style="padding:16px 22px; background:' . htmlspecialchars($footerBg, ENT_QUOTES, 'UTF-8') . '; border-top:1px solid ' . htmlspecialchars($border, ENT_QUOTES, 'UTF-8') . '33; font-size:13px; color:' . htmlspecialchars($footerText, ENT_QUOTES, 'UTF-8') . '; opacity:0.8;">';
+    $html[] = '      <p style="margin:0 0 6px 0;">Recibes este email porque estás suscrito a las comunicaciones de ' . htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') . '.</p>';
+    $html[] = '      <p style="margin:0;"><a href="' . $safeUnsub . '" style="color:' . htmlspecialchars($ctaColor, ENT_QUOTES, 'UTF-8') . ';">Puedes darte de baja pulsando aquí</a>.</p>';
+    $html[] = '    </div>';
+    $html[] = '  </div>';
+    $html[] = '</div>';
+    return implode('', $html);
 }

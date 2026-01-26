@@ -169,6 +169,15 @@ $renderer->setGlobal('footerLinks', $footerLinks);
 $renderer->setGlobal('hasCategories', $hasCategories);
 $renderer->setGlobal('hasPodcast', $hasPodcast);
 $renderer->setGlobal('podcastIndexUrl', $podcastIndexUrl);
+$newsletterItems = function_exists('nammu_newsletter_collect_items')
+    ? nammu_newsletter_collect_items(__DIR__ . '/content', $publicBaseUrl)
+    : [];
+$hasNewsletters = !empty($newsletterItems);
+$newslettersIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/newsletters';
+$renderer->setGlobal('hasNewsletters', $hasNewsletters);
+$renderer->setGlobal('newslettersIndexUrl', $newslettersIndexUrl);
+$GLOBALS['hasNewsletters'] = $hasNewsletters;
+$GLOBALS['newslettersIndexUrl'] = $newslettersIndexUrl;
 $renderer->setGlobal('pageLang', $siteLang);
 
 $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseUrl): ?string {
@@ -686,6 +695,7 @@ if ($routePath === '/robots.txt') {
         'Disallow: /core/',
         'Disallow: /template/',
         'Disallow: /private/',
+        'Disallow: /newsletters',
         'Sitemap: ' . $sitemapUrl,
     ];
     $robotsText = implode("\n", $lines) . "\n";
@@ -1653,6 +1663,226 @@ if (preg_match('#^/itinerarios/?$#i', $routePath)) {
         'jsonLd' => [$siteJsonLd, $orgJsonLd, $breadcrumbJsonLd],
         'pageLang' => $siteLang,
         'showLogo' => true,
+    ]);
+    exit;
+}
+
+if (preg_match('#^/newsletters/?$#i', $routePath)) {
+    header('X-Robots-Tag: noindex, nofollow');
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        @session_start();
+    }
+    $isAdmin = !empty($_SESSION['loggedin']);
+    $accessEmail = '';
+    $accessGranted = $isAdmin;
+    if (!$accessGranted) {
+        $cookieAccess = function_exists('nammu_newsletter_get_access_cookie') ? nammu_newsletter_get_access_cookie() : null;
+        if (is_array($cookieAccess)) {
+            $cookieEmail = (string) ($cookieAccess['email'] ?? '');
+            $cookieToken = (string) ($cookieAccess['token'] ?? '');
+            if ($cookieEmail !== '' && $cookieToken !== '' && nammu_newsletter_validate_access($cookieEmail, $cookieToken)) {
+                $accessGranted = true;
+                $accessEmail = $cookieEmail;
+            }
+        }
+    }
+    $emailParam = trim((string) ($_GET['email'] ?? ''));
+    $tokenParam = trim((string) ($_GET['token'] ?? ''));
+    $nextParam = trim((string) ($_GET['next'] ?? ''));
+    if (!$accessGranted && $emailParam !== '' && $tokenParam !== '' && nammu_newsletter_validate_access($emailParam, $tokenParam)) {
+        $expires = time() + 3600;
+        nammu_newsletter_set_access_cookie($emailParam, $tokenParam, $expires);
+        $redirectTo = '/newsletters';
+        if ($nextParam !== '' && str_starts_with($nextParam, '/newsletters')) {
+            $redirectTo = $nextParam;
+        }
+        header('Location: ' . $redirectTo);
+        exit;
+    }
+    if (!$accessGranted) {
+        $formMessage = '';
+        $formType = 'info';
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $submitted = trim((string) ($_POST['newsletter_email'] ?? ''));
+            if ($submitted === '' || !filter_var($submitted, FILTER_VALIDATE_EMAIL)) {
+                $formMessage = 'Introduce un email válido.';
+                $formType = 'danger';
+            } elseif (!nammu_is_newsletter_subscriber($submitted)) {
+                $formMessage = 'Este email no está suscrito a la newsletter.';
+                $formType = 'danger';
+            } else {
+                $tokenInfo = nammu_newsletter_issue_access_token($submitted, 3600);
+                $token = (string) ($tokenInfo['token'] ?? '');
+                nammu_send_newsletter_access_email($config, $submitted, $token, '');
+                $formMessage = 'Te hemos enviado un email con el acceso. El enlace caduca en 1 hora.';
+                $formType = 'success';
+            }
+        }
+        $formHtml = '<section class="newsletter-access"><div class="newsletter-access-card">';
+        $formHtml .= '<h1>Archivo de newsletters</h1>';
+        $formHtml .= '<p>Introduce tu email para acceder. Recibirás un enlace de acceso válido durante 1 hora.</p>';
+        if ($formMessage !== '') {
+            $formHtml .= '<div class="newsletter-access-alert newsletter-access-alert-' . $formType . '">' . htmlspecialchars($formMessage, ENT_QUOTES, 'UTF-8') . '</div>';
+        }
+        $formHtml .= '<form method="post" class="newsletter-access-form">';
+        $formHtml .= '<label for="newsletter_email">Email</label>';
+        $formHtml .= '<input type="email" id="newsletter_email" name="newsletter_email" required>';
+        $formHtml .= '<button type="submit">Enviar enlace</button>';
+        $formHtml .= '</form></div></section>';
+        $formHtml .= '<style>.newsletter-access{max-width:520px;margin:0 auto;padding:2rem 1.5rem;}';
+        $formHtml .= '.newsletter-access-card{background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:16px;padding:1.8rem 2rem;box-shadow:0 12px 30px rgba(0,0,0,0.08);}';
+        $formHtml .= '.newsletter-access-card h1{margin-top:0;}';
+        $formHtml .= '.newsletter-access-form{display:flex;flex-direction:column;gap:0.8rem;margin-top:1rem;}';
+        $formHtml .= '.newsletter-access-form input{padding:0.6rem 0.8rem;border-radius:8px;border:1px solid #d0d7de;}';
+        $formHtml .= '.newsletter-access-form button{padding:0.65rem 1rem;border-radius:8px;border:none;background:#1b8eed;color:#fff;font-weight:600;cursor:pointer;}';
+        $formHtml .= '.newsletter-access-alert{margin:1rem 0;padding:0.6rem 0.8rem;border-radius:8px;font-size:0.95rem;}';
+        $formHtml .= '.newsletter-access-alert-info{background:#eef4ff;color:#1b4b7a;}';
+        $formHtml .= '.newsletter-access-alert-success{background:#e6f4ea;color:#1f6f3d;}';
+        $formHtml .= '.newsletter-access-alert-danger{background:#fdecea;color:#9b2c2c;}</style>';
+        echo $renderer->render('layout', [
+            'pageTitle' => 'Newsletters',
+            'metaDescription' => 'Archivo privado de newsletters.',
+            'content' => $formHtml,
+            'socialMeta' => [],
+            'jsonLd' => [$siteJsonLd, $orgJsonLd],
+            'pageLang' => $siteLang,
+            'showLogo' => true,
+            'metaRobots' => 'noindex, nofollow',
+        ]);
+        exit;
+    }
+    $content = $renderer->render('newsletters', [
+        'newsletters' => $newsletterItems,
+        'hasItineraries' => !empty($itineraryListing),
+    ]);
+    $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/newsletters' : '/newsletters';
+    echo $renderer->render('layout', [
+        'pageTitle' => 'Newsletters',
+        'metaDescription' => 'Archivo de newsletters.',
+        'content' => $content,
+        'socialMeta' => [],
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
+        'showLogo' => true,
+        'metaRobots' => 'noindex, nofollow',
+        'canonicalHref' => $canon,
+    ]);
+    exit;
+}
+
+if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
+    header('X-Robots-Tag: noindex, nofollow');
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        @session_start();
+    }
+    $isAdmin = !empty($_SESSION['loggedin']);
+    $accessEmail = '';
+    $accessGranted = $isAdmin;
+    if (!$accessGranted) {
+        $cookieAccess = function_exists('nammu_newsletter_get_access_cookie') ? nammu_newsletter_get_access_cookie() : null;
+        if (is_array($cookieAccess)) {
+            $cookieEmail = (string) ($cookieAccess['email'] ?? '');
+            $cookieToken = (string) ($cookieAccess['token'] ?? '');
+            if ($cookieEmail !== '' && $cookieToken !== '' && nammu_newsletter_validate_access($cookieEmail, $cookieToken)) {
+                $accessGranted = true;
+                $accessEmail = $cookieEmail;
+            }
+        }
+    }
+    $emailParam = trim((string) ($_GET['email'] ?? ''));
+    $tokenParam = trim((string) ($_GET['token'] ?? ''));
+    $nextParam = trim((string) ($_GET['next'] ?? ''));
+    if (!$accessGranted && $emailParam !== '' && $tokenParam !== '' && nammu_newsletter_validate_access($emailParam, $tokenParam)) {
+        $expires = time() + 3600;
+        nammu_newsletter_set_access_cookie($emailParam, $tokenParam, $expires);
+        $redirectTo = '/newsletters/' . rawurlencode($matchNewsletter[1]);
+        if ($nextParam !== '' && str_starts_with($nextParam, '/newsletters')) {
+            $redirectTo = $nextParam;
+        }
+        header('Location: ' . $redirectTo);
+        exit;
+    }
+    if (!$accessGranted) {
+        $formMessage = '';
+        $formType = 'info';
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $submitted = trim((string) ($_POST['newsletter_email'] ?? ''));
+            if ($submitted === '' || !filter_var($submitted, FILTER_VALIDATE_EMAIL)) {
+                $formMessage = 'Introduce un email válido.';
+                $formType = 'danger';
+            } elseif (!nammu_is_newsletter_subscriber($submitted)) {
+                $formMessage = 'Este email no está suscrito a la newsletter.';
+                $formType = 'danger';
+            } else {
+                $tokenInfo = nammu_newsletter_issue_access_token($submitted, 3600);
+                $token = (string) ($tokenInfo['token'] ?? '');
+                $nextPath = '/newsletters/' . rawurlencode($matchNewsletter[1]);
+                nammu_send_newsletter_access_email($config, $submitted, $token, $nextPath);
+                $formMessage = 'Te hemos enviado un email con el acceso. El enlace caduca en 1 hora.';
+                $formType = 'success';
+            }
+        }
+        $formHtml = '<section class="newsletter-access"><div class="newsletter-access-card">';
+        $formHtml .= '<h1>Acceso a newsletter</h1>';
+        $formHtml .= '<p>Introduce tu email para acceder a esta newsletter. Recibirás un enlace de acceso válido durante 1 hora.</p>';
+        if ($formMessage !== '') {
+            $formHtml .= '<div class="newsletter-access-alert newsletter-access-alert-' . $formType . '">' . htmlspecialchars($formMessage, ENT_QUOTES, 'UTF-8') . '</div>';
+        }
+        $formHtml .= '<form method="post" class="newsletter-access-form">';
+        $formHtml .= '<label for="newsletter_email">Email</label>';
+        $formHtml .= '<input type="email" id="newsletter_email" name="newsletter_email" required>';
+        $formHtml .= '<button type="submit">Enviar enlace</button>';
+        $formHtml .= '</form></div></section>';
+        $formHtml .= '<style>.newsletter-access{max-width:520px;margin:0 auto;padding:2rem 1.5rem;}';
+        $formHtml .= '.newsletter-access-card{background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:16px;padding:1.8rem 2rem;box-shadow:0 12px 30px rgba(0,0,0,0.08);}';
+        $formHtml .= '.newsletter-access-card h1{margin-top:0;}';
+        $formHtml .= '.newsletter-access-form{display:flex;flex-direction:column;gap:0.8rem;margin-top:1rem;}';
+        $formHtml .= '.newsletter-access-form input{padding:0.6rem 0.8rem;border-radius:8px;border:1px solid #d0d7de;}';
+        $formHtml .= '.newsletter-access-form button{padding:0.65rem 1rem;border-radius:8px;border:none;background:#1b8eed;color:#fff;font-weight:600;cursor:pointer;}';
+        $formHtml .= '.newsletter-access-alert{margin:1rem 0;padding:0.6rem 0.8rem;border-radius:8px;font-size:0.95rem;}';
+        $formHtml .= '.newsletter-access-alert-info{background:#eef4ff;color:#1b4b7a;}';
+        $formHtml .= '.newsletter-access-alert-success{background:#e6f4ea;color:#1f6f3d;}';
+        $formHtml .= '.newsletter-access-alert-danger{background:#fdecea;color:#9b2c2c;}</style>';
+        echo $renderer->render('layout', [
+            'pageTitle' => 'Newsletters',
+            'metaDescription' => 'Archivo privado de newsletters.',
+            'content' => $formHtml,
+            'socialMeta' => [],
+            'jsonLd' => [$siteJsonLd, $orgJsonLd],
+            'pageLang' => $siteLang,
+            'showLogo' => true,
+            'metaRobots' => 'noindex, nofollow',
+        ]);
+        exit;
+    }
+    $slug = $matchNewsletter[1];
+    $document = $contentRepository->getDocument($slug);
+    if (!$document || strtolower((string) ($document['metadata']['Template'] ?? '')) !== 'newsletter') {
+        $renderNotFound('Newsletter no encontrada', 'La newsletter solicitada no está disponible.', $routePath);
+    }
+    $status = strtolower((string) ($document['metadata']['Status'] ?? ''));
+    if ($status !== 'newsletter' && !$isAdmin) {
+        $renderNotFound('Newsletter no encontrada', 'La newsletter solicitada no está disponible.', $routePath);
+    }
+    $newsletterTitle = (string) ($document['metadata']['Title'] ?? '');
+    $newsletterImage = (string) ($document['metadata']['Image'] ?? '');
+    $newsletterHtml = (new MarkdownConverter())->toHtml($document['content'] ?? '');
+    $recipientEmail = $accessEmail !== '' ? $accessEmail : (string) ($emailParam !== '' ? $emailParam : '');
+    if ($recipientEmail === '') {
+        $recipientEmail = 'suscriptor@' . ($_SERVER['HTTP_HOST'] ?? 'example.com');
+    }
+    $newsletterContent = nammu_build_newsletter_html($config, $newsletterTitle, $newsletterHtml, $newsletterImage, $recipientEmail);
+    $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/newsletters/' . rawurlencode($slug) : '/newsletters/' . rawurlencode($slug);
+    echo $renderer->render('layout', [
+        'pageTitle' => $newsletterTitle,
+        'metaDescription' => 'Newsletter',
+        'content' => $newsletterContent,
+        'socialMeta' => [],
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
+        'showLogo' => true,
+        'metaRobots' => 'noindex, nofollow',
+        'canonicalHref' => $canon,
     ]);
     exit;
 }

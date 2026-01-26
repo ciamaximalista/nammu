@@ -1694,6 +1694,13 @@ function admin_bing_get_access_token(bool $forceRefresh = false): ?string {
 
 function admin_public_post_url(string $slug): string {
     $base = admin_base_url();
+    if ($base === '') {
+        $settings = get_settings();
+        $siteUrl = trim((string) ($settings['site_url'] ?? ''));
+        if ($siteUrl !== '') {
+            $base = rtrim($siteUrl, '/');
+        }
+    }
     $path = '/' . ltrim($slug, '/');
     if ($base === '') {
         return $path;
@@ -1710,6 +1717,13 @@ function admin_public_asset_url(string $path): string {
         return $path;
     }
     $base = admin_base_url();
+    if ($base === '') {
+        $settings = get_settings();
+        $siteUrl = trim((string) ($settings['site_url'] ?? ''));
+        if ($siteUrl !== '') {
+            $base = rtrim($siteUrl, '/');
+        }
+    }
     if (function_exists('nammu_resolve_asset')) {
         $resolved = nammu_resolve_asset($path, $base);
         if (is_string($resolved) && $resolved !== '') {

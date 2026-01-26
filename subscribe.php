@@ -13,9 +13,14 @@ function subscription_normalize_email(string $email): string {
 
 function subscription_available_prefs(array $config): array {
     $mailing = $config['mailing'] ?? [];
+    $autoPodcast = $mailing['auto_podcast'] ?? null;
+    if ($autoPodcast === null && !array_key_exists('auto_podcast', $mailing)) {
+        $autoPodcast = 'on';
+    }
     return [
         'posts' => ($mailing['auto_posts'] ?? 'off') === 'on',
         'itineraries' => ($mailing['auto_itineraries'] ?? 'off') === 'on',
+        'podcast' => $autoPodcast === 'on',
         'newsletter' => ($mailing['auto_newsletter'] ?? 'off') === 'on',
     ];
 }
@@ -25,6 +30,7 @@ function subscription_default_prefs(array $available): array {
     $prefs = [
         'posts' => false,
         'itineraries' => false,
+        'podcast' => false,
         'newsletter' => false,
     ];
     foreach ($prefs as $key => $value) {
@@ -37,6 +43,7 @@ function subscription_default_prefs(array $available): array {
         return [
             'posts' => true,
             'itineraries' => true,
+            'podcast' => true,
             'newsletter' => true,
         ];
     }
@@ -291,6 +298,7 @@ if ($forceAll) {
     $prefsDefault = [
         'posts' => true,
         'itineraries' => true,
+        'podcast' => true,
         'newsletter' => true,
     ];
 }
@@ -312,4 +320,10 @@ try {
     subscription_redirect($back, ['sub_error' => 1]);
 }
 
-subscription_redirect($back, ['sub_sent' => 1]);
+$successBase = subscription_base_url();
+$successPath = rtrim((string) parse_url($successBase, PHP_URL_PATH), '/');
+if ($successPath === '') {
+    $successPath = '';
+}
+$successUrl = $successPath . '/avisos.php';
+subscription_redirect($successUrl, ['sub_sent' => 1]);

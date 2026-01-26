@@ -936,7 +936,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     .home-hero-text.variant-plain {
         background: transparent;
         border: none;
-        padding: 0 clamp(1.5rem, 4vw, 3rem) 1.25rem;
+        padding: 0 clamp(1.5rem, 4vw, 3rem) 0.25rem;
     }
     .home-hero-text.variant-boxed .home-hero-graphic {
         border-radius: 0;
@@ -996,7 +996,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         gap: 6px;
         align-items: center;
         justify-content: center;
-        padding: 4px 2px 6px;
+        padding: 0 2px 14px;
         max-width: 100%;
         overflow-x: auto;
     }

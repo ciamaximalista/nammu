@@ -248,9 +248,11 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             gap: 6px;
             align-items: center;
             justify-content: center;
-            margin: 0.3rem auto 0.8rem;
+            margin: 0.5rem auto 0.9rem;
             max-width: 100%;
             overflow-x: auto;
+            overflow-y: visible;
+            padding: 8px 0;
         }
         .site-header-button-link {
             display: inline-flex;
@@ -267,6 +269,8 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
         .site-header-button-link:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+            color: #fff;
+            text-decoration: none;
         }
         .site-header-button-link svg {
             width: 14px;

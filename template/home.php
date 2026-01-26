@@ -996,9 +996,10 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         gap: 6px;
         align-items: center;
         justify-content: center;
-        padding: 0 2px 14px;
+        padding: 8px 2px 16px;
         max-width: 100%;
         overflow-x: auto;
+        overflow-y: visible;
     }
     .home-header-button-link {
         display: inline-flex;
@@ -1015,6 +1016,8 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     .home-header-button-link:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+        color: #fff;
+        text-decoration: none;
     }
     .home-header-button-link svg {
         width: 14px;

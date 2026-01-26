@@ -711,9 +711,11 @@ if ($isPageTemplate && $formattedDate !== '') {
         gap: 6px;
         align-items: center;
         justify-content: center;
-        margin: 0.2rem auto 0.8rem;
+        margin: 0.35rem auto 0.85rem;
         max-width: 100%;
         overflow-x: auto;
+        overflow-y: visible;
+        padding: 8px 0;
     }
     .post-header-button-link {
         display: inline-flex;
@@ -730,6 +732,8 @@ if ($isPageTemplate && $formattedDate !== '') {
     .post-header-button-link:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+        color: #fff;
+        text-decoration: none;
     }
     .post-header-button-link svg {
         width: 14px;

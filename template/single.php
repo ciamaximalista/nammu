@@ -195,12 +195,13 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     <?php
     return (string) ob_get_clean();
 };
-$renderHeaderButtons = static function () use ($searchAction, $hasCategories, $categoriesIndexUrl, $hasItineraries, $itinerariesIndexUrl, $hasPodcast, $podcastIndexUrl, $hasNewsletters, $newslettersIndexUrl, $subscriptionEnabled, $subscriptionAction, $postalEnabled, $postalUrl, $postalLogoSvg, $colorAccent, $colorHighlight): string {
+$homeUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/';
+$renderHeaderButtons = static function () use ($homeUrl, $searchAction, $hasCategories, $categoriesIndexUrl, $hasItineraries, $itinerariesIndexUrl, $hasPodcast, $podcastIndexUrl, $hasNewsletters, $newslettersIndexUrl, $subscriptionEnabled, $subscriptionAction, $postalEnabled, $postalUrl, $postalLogoSvg, $colorAccent, $colorHighlight): string {
     $items = [];
     $items[] = [
-        'label' => 'Buscar',
-        'href' => $searchAction,
-        'svg' => '<svg width="20" height="20" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6" stroke="#fff" stroke-width="2"/><line x1="12.5" y1="12.5" x2="17" y2="17" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+        'label' => 'Portada',
+        'href' => $homeUrl,
+        'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 11.5L12 4L21 11.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>',
     ];
     if ($hasCategories) {
         $items[] = [
@@ -209,18 +210,18 @@ $renderHeaderButtons = static function () use ($searchAction, $hasCategories, $c
             'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="#fff" stroke-width="2"/><line x1="8" y1="9" x2="16" y2="9" stroke="#fff" stroke-width="2"/><line x1="8" y1="13" x2="16" y2="13" stroke="#fff" stroke-width="2"/></svg>',
         ];
     }
-    if (!empty($hasItineraries) && !empty($itinerariesIndexUrl)) {
-        $items[] = [
-            'label' => 'Itinerarios',
-            'href' => $itinerariesIndexUrl,
-            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 5H10C11.1046 5 12 5.89543 12 7V19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M20 5H14C12.8954 5 12 5.89543 12 7V19H20C21.1046 19 22 18.1046 22 17V7C22 5.89543 21.1046 5 20 5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><line x1="12" y1="7" x2="12" y2="19" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
-        ];
-    }
     if (!empty($hasPodcast) && !empty($podcastIndexUrl)) {
         $items[] = [
             'label' => 'Podcast',
             'href' => $podcastIndexUrl,
             'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="3" width="6" height="10" rx="3" stroke="#fff" stroke-width="2"/><path d="M5 11C5 14.866 8.134 18 12 18C15.866 18 19 14.866 19 11" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="18" x2="12" y2="22" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="22" x2="16" y2="22" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+        ];
+    }
+    if (!empty($hasItineraries) && !empty($itinerariesIndexUrl)) {
+        $items[] = [
+            'label' => 'Itinerarios',
+            'href' => $itinerariesIndexUrl,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 5H10C11.1046 5 12 5.89543 12 7V19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M20 5H14C12.8954 5 12 5.89543 12 7V19H20C21.1046 19 22 18.1046 22 17V7C22 5.89543 21.1046 5 20 5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><line x1="12" y1="7" x2="12" y2="19" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
         ];
     }
     if (!empty($hasNewsletters) && !empty($newslettersIndexUrl)) {
@@ -245,6 +246,11 @@ $renderHeaderButtons = static function () use ($searchAction, $hasCategories, $c
             'svg' => $postalLogoSvg,
         ];
     }
+    $items[] = [
+        'label' => 'Buscar',
+        'href' => $searchAction,
+        'svg' => '<svg width="20" height="20" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6" stroke="#fff" stroke-width="2"/><line x1="12.5" y1="12.5" x2="17" y2="17" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+    ];
     if (empty($items)) {
         return '';
     }
@@ -701,19 +707,21 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .post-header-buttons {
         display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
+        flex-wrap: nowrap;
+        gap: 6px;
         align-items: center;
         justify-content: center;
         margin: 0.2rem auto 0.8rem;
+        max-width: 100%;
+        overflow-x: auto;
     }
     .post-header-button-link {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 28px;
-        height: 28px;
-        border-radius: 8px;
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
         background: <?= $colorAccent ?>;
         border: 1px solid <?= $colorAccent ?>;
         color: #fff;
@@ -724,8 +732,8 @@ if ($isPageTemplate && $formattedDate !== '') {
         box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
     }
     .post-header-button-link svg {
-        width: 16px;
-        height: 16px;
+        width: 14px;
+        height: 14px;
     }
     .post-intro {
         max-width: min(760px, 100%);

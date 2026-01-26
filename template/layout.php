@@ -244,19 +244,21 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
         .site-header-buttons {
             --nammu-header-button-accent: <?= $colorAccent ?>;
             display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
+            flex-wrap: nowrap;
+            gap: 6px;
             align-items: center;
             justify-content: center;
             margin: 0.3rem auto 0.8rem;
+            max-width: 100%;
+            overflow-x: auto;
         }
         .site-header-button-link {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 28px;
-            height: 28px;
-            border-radius: 8px;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
             background: var(--nammu-header-button-accent);
             border: 1px solid var(--nammu-header-button-accent);
             color: #fff;
@@ -267,8 +269,8 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
         }
         .site-header-button-link svg {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
         }
         table {
             width: 100%;

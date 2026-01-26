@@ -4689,7 +4689,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $contentText = trim(strip_tags($contentHtml));
             $payload = admin_prepare_newsletter_payload($settings, $title, $contentHtml, $contentText, $image);
             try {
-                admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                if (($sendResult['sent'] ?? 0) === 0) {
+                    $error = 'No se pudo enviar la newsletter. Revisa la configuración de correo.' . (!empty($sendResult['error']) ? ' Detalle: ' . $sendResult['error'] : '');
+                }
             } catch (Throwable $e) {
                 $error = 'No se pudo enviar la newsletter. Revisa la configuración de correo.';
             }
@@ -4953,6 +4956,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
+    } elseif (isset($_POST['resend_newsletter_edit'])) {
+        $title = trim($_POST['title'] ?? '');
+        $editFilename = trim($_POST['filename'] ?? '');
+        $image = trim($_POST['image'] ?? '');
+        $content = $_POST['content'] ?? '';
+        $settings = get_settings();
+        if (!admin_is_mailing_ready($settings)) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Configura el correo de la lista antes de reenviar la newsletter.',
+            ];
+            header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+            exit;
+        }
+        $mailing = $settings['mailing'] ?? [];
+        if (($mailing['auto_newsletter'] ?? 'off') !== 'on') {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'warning',
+                'message' => 'Activa la newsletter en Lista > Preferencias de envio.',
+            ];
+            header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+            exit;
+        }
+        $subscribers = admin_mailing_recipients_for_type('newsletter', $settings);
+        if (empty($subscribers)) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'warning',
+                'message' => 'No hay suscriptores en la lista de correo.',
+            ];
+            header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+            exit;
+        }
+        $markdown = new MarkdownConverter();
+        $contentHtml = $markdown->toHtml($content);
+        $contentText = trim(strip_tags($contentHtml));
+        $payload = admin_prepare_newsletter_payload($settings, $title, $contentHtml, $contentText, $image);
+        try {
+            $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+            if (($sendResult['sent'] ?? 0) === 0) {
+                $_SESSION['mailing_feedback'] = [
+                    'type' => 'danger',
+                    'message' => 'No se pudo enviar la newsletter. Revisa la configuración de correo.' . (!empty($sendResult['error']) ? ' Detalle: ' . $sendResult['error'] : ''),
+                ];
+                header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+                exit;
+            }
+        } catch (Throwable $e) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudo enviar la newsletter. Revisa la configuración de correo.',
+            ];
+            header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+            exit;
+        }
+        $_SESSION['mailing_feedback'] = [
+            'type' => 'success',
+            'message' => 'Newsletter reenviada correctamente.',
+        ];
+        header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+        exit;
     } elseif (isset($_POST['send_newsletter_edit'])) {
         $title = trim($_POST['title'] ?? '');
         $editFilename = trim($_POST['filename'] ?? '');
@@ -4999,7 +5062,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $contentText = trim(strip_tags($contentHtml));
         $payload = admin_prepare_newsletter_payload($settings, $title, $contentHtml, $contentText, $image);
         try {
-            admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+            $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+            if (($sendResult['sent'] ?? 0) === 0) {
+                $_SESSION['mailing_feedback'] = [
+                    'type' => 'danger',
+                    'message' => 'No se pudo enviar la newsletter. Revisa la configuración de correo.' . (!empty($sendResult['error']) ? ' Detalle: ' . $sendResult['error'] : ''),
+                ];
+                header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+                exit;
+            }
         } catch (Throwable $e) {
             $_SESSION['mailing_feedback'] = [
                 'type' => 'danger',
@@ -9407,7 +9478,12 @@ $ideasSuggestions = $ideasModalEnabled ? admin_ideas_build(CONTENT_DIR, 30) : []
 
                     </nav>
 
-        
+                    <?php if (!empty($error)): ?>
+                        <div class="alert alert-danger mb-3"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
+                    <?php endif; ?>
+                    <?php if (!empty($mailingFeedback)): ?>
+                        <div class="alert alert-<?= htmlspecialchars($mailingFeedback['type'], ENT_QUOTES, 'UTF-8') ?> mb-3"><?= htmlspecialchars($mailingFeedback['message'], ENT_QUOTES, 'UTF-8') ?></div>
+                    <?php endif; ?>
 
                     <div class="tab-content">
 

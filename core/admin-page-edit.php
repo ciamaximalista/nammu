@@ -550,6 +550,9 @@ if ($editFeedback !== null) {
                 <?php if (!($isNewsletterType && $newsletterSent)): ?>
                     <button type="submit" name="update" class="btn btn-primary">Actualizar</button>
                 <?php endif; ?>
+                <?php if ($isNewsletterType && $newsletterSent && $mailingNewsletterEnabled): ?>
+                    <button type="submit" name="resend_newsletter_edit" value="1" class="btn btn-primary">Volver a enviar</button>
+                <?php endif; ?>
                 <?php if ($isDraftEditing): ?>
                     <?php if ($currentTypeValue === 'Podcast'): ?>
                         <button type="submit" name="publish_draft_podcast" value="1" class="btn btn-primary ml-2" data-confirm-publish="1">Emitir</button>

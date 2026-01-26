@@ -1,1 +1,122 @@
-[]
+[
+    {
+        "email": "be.nt.m.arz.d1991@gmail.com",
+        "token": "3475785e7c568dc22cf2cba31f53914c",
+        "created_at": 1769384724,
+        "prefs": {
+            "posts": true,
+            "itineraries": true,
+            "newsletter": true
+        }
+    },
+    {
+        "email": "sshabazzbryan@lbbassociates.com",
+        "token": "50c47e57b469b5f1c1c73d5843c6471d",
+        "created_at": 1769398190,
+        "prefs": {
+            "posts": true,
+            "itineraries": true,
+            "newsletter": true
+        }
+    },
+    {
+        "email": "j.bell@coasthotels.com",
+        "token": "882310deb0ad712fbb6b7484068f8814",
+        "created_at": 1769403626,
+        "prefs": {
+            "posts": true,
+            "itineraries": true,
+            "newsletter": true
+        }
+    },
+    {
+        "email": "jnoble@bakerlaw.com",
+        "token": "42d553330516b9212a8bab8efd210c3f",
+        "created_at": 1769406650,
+        "prefs": {
+            "posts": true,
+            "itineraries": true,
+            "newsletter": true
+        }
+    },
+    {
+        "email": "david.hall@sleemanbreweries.com",
+        "token": "956e471add113d8f2ebd5c8cbb62e62f",
+        "created_at": 1769409186,
+        "prefs": {
+            "posts": true,
+            "itineraries": true,
+            "newsletter": true
+        }
+    },
+    {
+        "email": "h.attlesey@coasthotels.com",
+        "token": "a82a44b16fff4784e3c894a4a7a9761d",
+        "created_at": 1769411633,
+        "prefs": {
+            "posts": true,
+            "itineraries": true,
+            "newsletter": true
+        }
+    },
+    {
+        "email": "kburns@las.org",
+        "token": "7f2a05b7ac8f347f2c540f451d2b25cc",
+        "created_at": 1769418218,
+        "prefs": {
+            "posts": true,
+            "itineraries": true,
+            "newsletter": true
+        }
+    },
+    {
+        "email": "anna.scott@tforce.com",
+        "token": "969deba006fddc9279fe34283e15844f",
+        "created_at": 1769420301,
+        "prefs": {
+            "posts": true,
+            "itineraries": true,
+            "newsletter": true
+        }
+    },
+    {
+        "email": "s.barnes@coasthotels.com",
+        "token": "708c555da833af606480dc85f26c03fb",
+        "created_at": 1769421682,
+        "prefs": {
+            "posts": true,
+            "itineraries": true,
+            "newsletter": true
+        }
+    },
+    {
+        "email": "bro.w.ngdavid1@gmail.com",
+        "token": "e338092748cd60b8d1a9ed0ac0dfc475",
+        "created_at": 1769422780,
+        "prefs": {
+            "posts": true,
+            "itineraries": true,
+            "newsletter": true
+        }
+    },
+    {
+        "email": "hannahkitchener@hotmail.co.uk",
+        "token": "0278e1a1982fc215803a71df2fe4eaef",
+        "created_at": 1769423944,
+        "prefs": {
+            "posts": true,
+            "itineraries": true,
+            "newsletter": true
+        }
+    },
+    {
+        "email": "aaron.bible@capmetro.org",
+        "token": "d33a2813a728d57ab652392646d673e8",
+        "created_at": 1769425420,
+        "prefs": {
+            "posts": true,
+            "itineraries": true,
+            "newsletter": true
+        }
+    }
+]

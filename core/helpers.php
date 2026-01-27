@@ -2665,7 +2665,7 @@ function nammu_newsletter_access_cookie_name(): string
 
 function nammu_newsletter_set_access_cookie(string $email, string $token, int $expires): void
 {
-    $payload = json_encode(['email' => $email, 'token' => $token], JSON_UNESCAPED_SLASHES);
+    $payload = json_encode(['email' => $email, 'token' => $token, 'expires_at' => $expires], JSON_UNESCAPED_SLASHES);
     if ($payload === false) {
         return;
     }
@@ -2690,7 +2690,13 @@ function nammu_newsletter_get_access_cookie(): ?array
     }
     $email = strtolower(trim((string) ($data['email'] ?? '')));
     $token = trim((string) ($data['token'] ?? ''));
+    $expiresAt = (int) ($data['expires_at'] ?? 0);
     if ($email === '' || $token === '') {
+        return null;
+    }
+    if ($expiresAt > 0 && $expiresAt <= time()) {
+        setcookie(nammu_newsletter_access_cookie_name(), '', time() - 3600, '/', '', false, true);
+        unset($_COOKIE[nammu_newsletter_access_cookie_name()]);
         return null;
     }
     return ['email' => $email, 'token' => $token];

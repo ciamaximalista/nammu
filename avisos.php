@@ -611,7 +611,7 @@ ob_start();
     <div class="post-header">
         <div class="postal-hero">
             <div class="postal-hero__content">
-                <h2>Recibe avisos de nuevas publicaciones y/o nuestra newsletter</h2>
+                <h2>Directamente a tu correo electrónico</h2>
             </div>
             <div class="postal-hero__logo" aria-hidden="true">
                 <svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

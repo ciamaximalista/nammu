@@ -640,7 +640,7 @@ ob_start();
     <div class="post-header">
         <div class="postal-hero">
             <div class="postal-hero__content">
-                <h2>Recibe nuestros envíos postales en h2</casa>
+                <h2>Recibe nuestros envíos postales en tu casa o apartado postal</casa>
             </div>
             <div class="postal-hero__logo" aria-hidden="true">
                 <?= $postalLogoSvg ?>

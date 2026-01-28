@@ -5728,7 +5728,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $sent = admin_send_bluesky_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
                                 break;
                             case 'mastodon':
-                                $sent = admin_send_mastodon_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
+                                if (function_exists('admin_send_mastodon_post')) {
+                                    $sent = admin_send_mastodon_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
+                                } else {
+                                    $customError = 'Mastodon no está disponible en esta versión.';
+                                }
                                 break;
                             case 'instagram':
                                 if (trim($image) === '') {
@@ -5807,7 +5811,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $sent = admin_send_bluesky_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
                             break;
                         case 'mastodon':
-                            $sent = admin_send_mastodon_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
+                            if (function_exists('admin_send_mastodon_post')) {
+                                $sent = admin_send_mastodon_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
+                            } else {
+                                $customError = 'Mastodon no está disponible en esta versión.';
+                            }
                             break;
                         case 'instagram':
                             if (trim($image) === '') {

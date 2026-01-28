@@ -640,8 +640,7 @@ ob_start();
     <div class="post-header">
         <div class="postal-hero">
             <div class="postal-hero__content">
-                <span class="postal-hero__badge">Correo postal</span>
-                <h1>Recibe envios fisicos en casa</h1>
+                <h2>Recibe nuestros envíos postales en h2</casa>
             </div>
             <div class="postal-hero__logo" aria-hidden="true">
                 <?= $postalLogoSvg ?>
@@ -990,24 +989,24 @@ ob_start();
 $content = ob_get_clean();
 
 $postalPost = new Nammu\Core\Post('correo-postal', [
-    'Title' => 'Correo Postal',
+    'Title' => 'Suscripción Postal',
     'Description' => '',
     'Template' => 'page',
 ], '');
 
 $pageContent = $renderer->render('single', [
-    'pageTitle' => 'Correo Postal',
+    'pageTitle' => 'Suscripción Postal',
     'post' => $postalPost,
     'htmlContent' => $content,
     'autoTocHtml' => '',
 ]);
 
 if (function_exists('nammu_record_pageview')) {
-    nammu_record_pageview('pages', 'correos', 'Correo postal');
+    nammu_record_pageview('pages', 'correos', 'Suscripción postal');
 }
 
 echo $renderer->render('layout', [
-    'pageTitle' => 'Correo Postal',
+    'pageTitle' => 'Suscripción Postal',
     'metaDescription' => 'Suscripción postal y gestión de direcciones.',
     'content' => $pageContent,
     'jsonLd' => [$siteJsonLd, $orgJsonLd],

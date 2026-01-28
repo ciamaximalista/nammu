@@ -390,7 +390,7 @@ if ($hasAlerts) {
     }
     $alertsLabel = implode(' y ', $alertsParts);
 }
-$pageLabel = $hasAvisos && $hasNewsletter ? 'Avisos por email y newsletters' : ($hasNewsletter ? 'Newsletter' : 'Avisos');
+$pageLabel = $hasAvisos && $hasNewsletter ? 'Suscripciones electrónicas' : ($hasNewsletter ? 'Newsletter' : 'Avisos');
 if (!$hasAnySubscription) {
     $pageIntro = 'El administrador del blog no ha configurado todavia ni el sistema de avisos ni las newsletters ni los avisos de podcast.';
 } else {
@@ -611,8 +611,7 @@ ob_start();
     <div class="post-header">
         <div class="postal-hero">
             <div class="postal-hero__content">
-                <span class="postal-hero__badge"><?= htmlspecialchars($badgeLabel, ENT_QUOTES, 'UTF-8') ?></span>
-                <h1><?= htmlspecialchars($pageLabel, ENT_QUOTES, 'UTF-8') ?></h1>
+                <h2>Recibe avisos de nuevas publicaciones y/o nuestra newsletter</h2>
             </div>
             <div class="postal-hero__logo" aria-hidden="true">
                 <svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

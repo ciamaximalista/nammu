@@ -2282,7 +2282,17 @@ function admin_is_social_network_configured(string $network, array $settings): b
         case 'bluesky':
             return ($settings['identifier'] ?? '') !== '' && ($settings['app_password'] ?? '') !== '';
         case 'mastodon':
-            return ($settings['instance'] ?? '') !== '' && ($settings['access_token'] ?? '') !== '';
+            if (($settings['access_token'] ?? '') === '') {
+                return false;
+            }
+            if (($settings['instance'] ?? '') !== '') {
+                return true;
+            }
+            if (($settings['profile'] ?? '') !== '') {
+                return true;
+            }
+            $handle = (string) ($settings['handle'] ?? '');
+            return str_contains($handle, '@');
         case 'instagram':
             return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
         default:
@@ -2675,6 +2685,25 @@ function admin_mastodon_base_url(string $instance): string
 function admin_send_mastodon_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = '', ?string &$error = null): bool
 {
     $instance = admin_mastodon_base_url((string) ($settings['instance'] ?? ''));
+    if ($instance === '') {
+        $profileUrl = trim((string) ($settings['profile'] ?? ''));
+        if ($profileUrl !== '') {
+            $profileUrl = preg_match('#^https?://#i', $profileUrl) ? $profileUrl : 'https://' . ltrim($profileUrl, '/');
+            $profileParts = parse_url($profileUrl);
+            if (!empty($profileParts['scheme']) && !empty($profileParts['host'])) {
+                $instance = admin_mastodon_base_url($profileParts['scheme'] . '://' . $profileParts['host']);
+            }
+        }
+    }
+    if ($instance === '') {
+        $handle = trim((string) ($settings['handle'] ?? ''));
+        if (str_contains($handle, '@')) {
+            $parts = explode('@', ltrim($handle, '@'));
+            if (count($parts) >= 2) {
+                $instance = admin_mastodon_base_url('https://' . $parts[1]);
+            }
+        }
+    }
     $token = trim((string) ($settings['access_token'] ?? ''));
     if ($instance === '' || $token === '') {
         $error = 'Faltan credenciales de Mastodon.';

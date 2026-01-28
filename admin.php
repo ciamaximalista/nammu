@@ -2180,8 +2180,17 @@ function admin_extract_social_settings(string $key, array $defaults, ?array $con
     if (isset($values['app_password'])) {
         $values['app_password'] = trim((string) $values['app_password']);
     }
+    if (isset($values['handle'])) {
+        $values['handle'] = trim((string) $values['handle']);
+    }
     if (isset($values['service'])) {
         $values['service'] = trim((string) $values['service']);
+    }
+    if (isset($values['instance'])) {
+        $values['instance'] = trim((string) $values['instance']);
+    }
+    if (isset($values['profile'])) {
+        $values['profile'] = trim((string) $values['profile']);
     }
     $values['auto_post'] = ($values['auto_post'] ?? 'off') === 'on' ? 'on' : 'off';
     return $values;
@@ -2235,6 +2244,13 @@ function admin_cached_social_settings(?string $key = null): array {
                 'app_password' => '',
                 'auto_post' => 'off',
             ], $config),
+            'mastodon' => admin_extract_social_settings('mastodon', [
+                'instance' => '',
+                'handle' => '',
+                'access_token' => '',
+                'profile' => '',
+                'auto_post' => 'off',
+            ], $config),
             'instagram' => admin_extract_social_settings('instagram', [
                 'token' => '',
                 'channel' => '',
@@ -2265,6 +2281,8 @@ function admin_is_social_network_configured(string $network, array $settings): b
             return ($settings['token'] ?? '') !== '';
         case 'bluesky':
             return ($settings['identifier'] ?? '') !== '' && ($settings['app_password'] ?? '') !== '';
+        case 'mastodon':
+            return ($settings['instance'] ?? '') !== '' && ($settings['access_token'] ?? '') !== '';
         case 'instagram':
             return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
         default:
@@ -2639,8 +2657,74 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
 function admin_bluesky_upload_blob(string $service, string $accessToken, string $imageUrl): ?array {
     $binary = admin_http_get_binary($imageUrl);
     if ($binary === '') {
-        return null;
+    return null;
+}
+
+function admin_mastodon_base_url(string $instance): string
+{
+    $instance = trim($instance);
+    if ($instance === '') {
+        return '';
     }
+    if (!preg_match('#^https?://#i', $instance)) {
+        $instance = 'https://' . ltrim($instance, '/');
+    }
+    return rtrim($instance, '/');
+}
+
+function admin_send_mastodon_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = '', ?string &$error = null): bool
+{
+    $instance = admin_mastodon_base_url((string) ($settings['instance'] ?? ''));
+    $token = trim((string) ($settings['access_token'] ?? ''));
+    if ($instance === '' || $token === '') {
+        $error = 'Faltan credenciales de Mastodon.';
+        return false;
+    }
+    $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
+    $trackedUrl = admin_add_utm_params($targetUrl, [
+        'utm_source' => 'mastodon',
+        'utm_medium' => 'social',
+    ]);
+    $parts = [];
+    $title = trim($title);
+    if ($title !== '') {
+        $parts[] = $title;
+    }
+    if ($trackedUrl !== '') {
+        $parts[] = $trackedUrl;
+    }
+    $text = trim(implode("\n\n", $parts));
+    if ($text === '') {
+        $text = 'Nueva publicación disponible';
+    }
+    $maxLen = 500;
+    if (function_exists('mb_strlen') && mb_strlen($text, 'UTF-8') > $maxLen) {
+        $text = rtrim(mb_substr($text, 0, $maxLen - 1, 'UTF-8')) . '…';
+    } elseif (strlen($text) > $maxLen) {
+        $text = rtrim(substr($text, 0, $maxLen - 1)) . '…';
+    }
+    $payload = json_encode([
+        'status' => $text,
+    ]);
+    $headers = [
+        'Authorization: Bearer ' . $token,
+        'Content-Type: application/json',
+        'Content-Length: ' . strlen((string) $payload),
+    ];
+    $httpCode = null;
+    $response = admin_http_post_body_response($instance . '/api/v1/statuses', (string) $payload, $headers, $httpCode);
+    if ($httpCode !== null && $httpCode >= 200 && $httpCode < 300) {
+        return true;
+    }
+    $error = 'No se pudo enviar la publicación a Mastodon.';
+    if ($response !== null) {
+        $decoded = json_decode($response, true);
+        if (is_array($decoded) && isset($decoded['error'])) {
+            $error = 'Mastodon: ' . $decoded['error'];
+        }
+    }
+    return false;
+}
     $mime = 'application/octet-stream';
     if (class_exists('finfo')) {
         $finfo = new finfo(FILEINFO_MIME_TYPE);
@@ -3051,6 +3135,9 @@ function admin_maybe_auto_post_to_social_networks(string $filename, string $titl
     }
     if (($settings['bluesky']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('bluesky', $settings['bluesky'])) {
         admin_send_bluesky_post($slug, $title, $description, $settings['bluesky'], $urlOverride, $imageUrl);
+    }
+    if (($settings['mastodon']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('mastodon', $settings['mastodon'])) {
+        admin_send_mastodon_post($slug, $title, $description, $settings['mastodon'], $urlOverride, $imageUrl);
     }
     if (($settings['instagram']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('instagram', $settings['instagram'])) {
         if (trim($image) !== '') {
@@ -5542,6 +5629,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'facebook' => 'Facebook',
             'twitter' => 'X',
             'bluesky' => 'Bluesky',
+            'mastodon' => 'Mastodon',
             'instagram' => 'Instagram',
         ];
         if (!isset($networkLabels[$networkKey])) {
@@ -5602,6 +5690,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             case 'bluesky':
                                 $sent = admin_send_bluesky_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
                                 break;
+                            case 'mastodon':
+                                $sent = admin_send_mastodon_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
+                                break;
                             case 'instagram':
                                 if (trim($image) === '') {
                                     $customError = 'Instagram requiere una imagen destacada para enviar la publicación.';
@@ -5638,6 +5729,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'facebook' => 'Facebook',
             'twitter' => 'X',
             'bluesky' => 'Bluesky',
+            'mastodon' => 'Mastodon',
             'instagram' => 'Instagram',
         ];
         $feedback = [
@@ -5676,6 +5768,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             break;
                         case 'bluesky':
                             $sent = admin_send_bluesky_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
+                            break;
+                        case 'mastodon':
+                            $sent = admin_send_mastodon_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
                             break;
                         case 'instagram':
                             if (trim($image) === '') {
@@ -6846,6 +6941,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $bluesky_identifier = trim($_POST['bluesky_identifier'] ?? '');
         $bluesky_app_password = trim($_POST['bluesky_app_password'] ?? '');
         $bluesky_auto = isset($_POST['bluesky_auto']) ? 'on' : 'off';
+        $mastodon_instance = trim($_POST['mastodon_instance'] ?? '');
+        $mastodon_handle = trim($_POST['mastodon_handle'] ?? '');
+        $mastodon_access_token = trim($_POST['mastodon_access_token'] ?? '');
+        $mastodon_profile = trim($_POST['mastodon_profile'] ?? '');
+        $mastodon_auto = isset($_POST['mastodon_auto']) ? 'on' : 'off';
         $instagram_token = trim($_POST['instagram_token'] ?? '');
         $instagram_channel = trim($_POST['instagram_channel'] ?? '');
         $instagram_auto = isset($_POST['instagram_auto']) ? 'on' : 'off';
@@ -6919,6 +7019,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ];
             } else {
                 unset($config['bluesky']);
+            }
+            if ($mastodon_instance !== '' || $mastodon_handle !== '' || $mastodon_access_token !== '' || $mastodon_profile !== '' || $mastodon_auto === 'on') {
+                $config['mastodon'] = [
+                    'instance' => $mastodon_instance,
+                    'handle' => $mastodon_handle,
+                    'access_token' => $mastodon_access_token,
+                    'profile' => $mastodon_profile,
+                    'auto_post' => $mastodon_auto,
+                ];
+            } else {
+                unset($config['mastodon']);
             }
             if ($instagram_token !== '' || $instagram_channel !== '' || $instagram_auto === 'on') {
                 $config['instagram'] = [

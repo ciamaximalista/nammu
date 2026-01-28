@@ -30,6 +30,8 @@
     $twitterAccessSecret = $twitterSettings['access_secret'] ?? '';
     $blueskySettings = $settings['bluesky'] ?? ['service' => 'https://bsky.social', 'identifier' => '', 'app_password' => '', 'auto_post' => 'off'];
     $blueskyAutoEnabled = ($blueskySettings['auto_post'] ?? 'off') === 'on';
+    $mastodonSettings = $settings['mastodon'] ?? ['instance' => '', 'handle' => '', 'access_token' => '', 'profile' => '', 'auto_post' => 'off'];
+    $mastodonAutoEnabled = ($mastodonSettings['auto_post'] ?? 'off') === 'on';
     $instagramSettings = $settings['instagram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
     $instagramAutoEnabled = ($instagramSettings['auto_post'] ?? 'off') === 'on';
     $podcastServices = $settings['podcast_services'] ?? [];
@@ -323,6 +325,57 @@
                                         <li>Introduce el ID de la página y el token.</li>
                                     </ol>
                                     <p class="mb-0">Puedes obtener el ID de página en la configuración avanzada de Facebook.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h4 class="mt-4">Mastodon (opcional)</h4>
+                    <p class="text-muted">Publica en tu instancia de Mastodon usando un token de acceso personal. <a href="#" data-toggle="modal" data-target="#mastodonHelpModal">Ver guía rápida</a></p>
+                    <div class="form-group">
+                        <label for="mastodon_instance">Instancia</label>
+                        <input type="text" name="mastodon_instance" id="mastodon_instance" class="form-control" value="<?= htmlspecialchars($mastodonSettings['instance'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="https://mastodon.social">
+                        <small class="form-text text-muted">La URL base de tu instancia, incluyendo https.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="mastodon_handle">Usuario / handle</label>
+                        <input type="text" name="mastodon_handle" id="mastodon_handle" class="form-control" value="<?= htmlspecialchars($mastodonSettings['handle'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="usuario">
+                        <small class="form-text text-muted">Tu usuario de Mastodon (sin @). Se usa para enlazar el perfil en el footer.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="mastodon_access_token">Token de acceso</label>
+                        <input type="text" name="mastodon_access_token" id="mastodon_access_token" class="form-control" value="<?= htmlspecialchars($mastodonSettings['access_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Token personal">
+                        <small class="form-text text-muted">Debe tener permisos de publicación (write:statuses).</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="mastodon_profile">URL del perfil (opcional)</label>
+                        <input type="text" name="mastodon_profile" id="mastodon_profile" class="form-control" value="<?= htmlspecialchars($mastodonSettings['profile'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="https://tu-instancia/@usuario">
+                        <small class="form-text text-muted">Si lo dejas vacío, se construirá con la instancia y el usuario.</small>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" name="mastodon_auto" id="mastodon_auto" value="1" <?= $mastodonAutoEnabled ? 'checked' : '' ?>>
+                        <label for="mastodon_auto" class="form-check-label">Enviar automáticamente cada nueva entrada, itinerario o podcast publicado</label>
+                    </div>
+                    <div class="modal fade" id="mastodonHelpModal" tabindex="-1" role="dialog" aria-labelledby="mastodonHelpModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="mastodonHelpModalLabel">Guía rápida para Mastodon</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <ol class="mb-3">
+                                        <li>Entra en tu instancia &rarr; Preferencias &rarr; Desarrollo.</li>
+                                        <li>Crea una nueva aplicación con permisos <code>write:statuses</code>.</li>
+                                        <li>Copia el token de acceso y pégalo aquí.</li>
+                                        <li>Indica la URL de la instancia y tu usuario.</li>
+                                    </ol>
+                                    <p class="mb-0">Las publicaciones incluirán el título y un enlace a la entrada.</p>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>

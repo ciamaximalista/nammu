@@ -223,6 +223,8 @@ function nammu_detect_referrer_source(string $referer, string $host): array
         'bsky.app' => 'Bluesky',
         'go.bsky.app' => 'Bluesky',
         'bsky.social' => 'Bluesky',
+        'mastodon.' => 'Mastodon',
+        'mstdn.' => 'Mastodon',
         'linkedin.com' => 'LinkedIn',
         'pinterest.' => 'Pinterest',
         'whatsapp.com' => 'WhatsApp',
@@ -256,6 +258,8 @@ function nammu_detect_user_agent_source(string $userAgent): array
         'x.com' => 'Twitter/X',
         'bluesky' => 'Bluesky',
         'bsky' => 'Bluesky',
+        'mastodon' => 'Mastodon',
+        'mstdn' => 'Mastodon',
     ];
     foreach ($uaSocial as $needle => $label) {
         if (str_contains($userAgent, $needle)) {
@@ -562,6 +566,7 @@ function nammu_record_visit(): void
         'twitter' => 'Twitter/X',
         'x' => 'Twitter/X',
         't.co' => 'Twitter/X',
+        'mastodon' => 'Mastodon',
         'linkedin' => 'LinkedIn',
         'lnkd' => 'LinkedIn',
         'pinterest' => 'Pinterest',
@@ -1501,6 +1506,7 @@ function nammu_footer_icon_svgs(): array
         'facebook' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M14 8h3V5h-3c-2.2 0-4 1.8-4 4v3H7v3h3v7h3v-7h3l1-3h-4V9c0-.6.4-1 1-1z"/></svg>',
         'twitter' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 4h3.7l4.3 5.2L17 4h3l-6.4 7.4L20 20h-3.7l-4.8-5.9L6.2 20H3l6.9-7.9L4 4z"/></svg>',
         'bluesky' => '<svg width="20" height="20" viewBox="0 0 600 600" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="m135.72 44.03c66.496 49.921 138.02 151.14 164.28 205.46 26.262-54.316 97.782-155.54 164.28-205.46 47.98-36.021 125.72-63.892 125.72 24.795 0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.3797-3.6904-10.832-3.7077-7.8964-0.0174-2.9357-1.1937 0.51669-3.7077 7.8964-13.714 40.255-67.233 197.36-189.63 71.766-64.444-66.128-34.605-132.26 82.697-152.22-67.108 11.421-142.55-7.4491-163.25-81.433-5.9562-21.282-16.111-152.36-16.111-170.07 0-88.687 77.742-60.816 125.72-24.795z" fill="currentColor"/></svg>',
+        'mastodon' => '<svg width="20" height="20" viewBox="0 0 448 512" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M433 179.11c0-97.2-63.7-125.7-63.7-125.7-62.5-28.7-168.9-27.8-168.9-27.8h-1.1s-106.4-.9-168.9 27.8c0 0-63.7 28.5-63.7 125.7 0 0-8.1 78.8 11.4 159.8 0 0 18.1 75.7 84.7 91.2 0 0 38.5 9.2 70.4 10.9 0 0 12.8.7 23.4-13.9 0 0 14-19.8 15.6-29.3 0 0-56.4-13.5-78-47.6 0 0-4.6-6.9-7.1-12.5l-.1-.3c1.8 1.1 17.1 10.5 38.2 14.8 12.3 2.6 24.7 4.8 38.1 6.1 25.9 2.4 55.4 3.1 86.2-1.5 0 0 18.2-3.2 30.1-6 6.8-1.6 34-10.6 37.7-12.4-.6 1.7-7 12.8-7 12.8-21.6 34.1-78 47.6-78 47.6 1.6 9.5 15.6 29.3 15.6 29.3 10.6 14.6 23.4 13.9 23.4 13.9 31.9-1.7 70.4-10.9 70.4-10.9 66.6-15.5 84.7-91.2 84.7-91.2 19.5-81 11.4-159.8 11.4-159.8zM358 302.22h-48.5V183.11c0-25.1-10.5-37.9-31.6-37.9-23.4 0-35.1 15.2-35.1 45.3v65.1h-48.3v-65.1c0-30.1-11.7-45.3-35.1-45.3-21.1 0-31.6 12.8-31.6 37.9v119.1H79.3V179.11c0-25.1 6.4-45.1 19.2-60.2 13.2-15.1 30.5-22.8 51.8-22.8 24.9 0 43.6 9.6 56 28.7l11.8 19.8 11.8-19.8c12.4-19.1 31.1-28.7 56-28.7 21.3 0 38.6 7.7 51.8 22.8 12.8 15.1 19.2 35.1 19.2 60.2v123.11z"/></svg>',
         'email' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2v.3l8 5.2 8-5.2V8H4z"/></svg>',
         'postal' => nammu_postal_icon_svg(),
         'rss' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M6 18a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm-2-8v-3a11 11 0 0 1 11 11h-3a8 8 0 0 0-8-8zm0-6V1a17 17 0 0 1 17 17h-3a14 14 0 0 0-14-14z"/></svg>',
@@ -1606,6 +1612,33 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
                 'svg' => $icons['bluesky'],
             ];
         }
+    }
+
+    $mastodonProfile = trim((string) ($config['mastodon']['profile'] ?? ''));
+    $mastodonHandle = trim((string) ($config['mastodon']['handle'] ?? ''));
+    $mastodonInstance = trim((string) ($config['mastodon']['instance'] ?? ''));
+    $mastodonUrl = '';
+    if ($mastodonProfile !== '') {
+        $mastodonUrl = $normalizeExternalUrl($mastodonProfile);
+    } else {
+        if ($mastodonInstance === '' && str_contains($mastodonHandle, '@')) {
+            $parts = explode('@', ltrim($mastodonHandle, '@'));
+            if (count($parts) >= 2) {
+                $mastodonHandle = $parts[0];
+                $mastodonInstance = $parts[1];
+            }
+        }
+        $mastodonHandle = ltrim($mastodonHandle, '@');
+        if ($mastodonHandle !== '' && $mastodonInstance !== '') {
+            $mastodonUrl = rtrim($normalizeExternalUrl($mastodonInstance), '/') . '/@' . rawurlencode($mastodonHandle);
+        }
+    }
+    if ($mastodonUrl !== '') {
+        $links[] = [
+            'label' => 'Mastodon',
+            'href' => $mastodonUrl,
+            'svg' => $icons['mastodon'],
+        ];
     }
 
     $subscriptionMode = $theme['subscription']['mode'] ?? 'none';
@@ -2690,11 +2723,11 @@ function nammu_newsletter_get_access_cookie(): ?array
     }
     $email = strtolower(trim((string) ($data['email'] ?? '')));
     $token = trim((string) ($data['token'] ?? ''));
-    $expiresAt = (int) ($data['expires_at'] ?? 0);
+    $expiresAt = array_key_exists('expires_at', $data) ? (int) ($data['expires_at'] ?? 0) : 0;
     if ($email === '' || $token === '') {
         return null;
     }
-    if ($expiresAt > 0 && $expiresAt <= time()) {
+    if ($expiresAt === 0 || $expiresAt <= time()) {
         setcookie(nammu_newsletter_access_cookie_name(), '', time() - 3600, '/', '', false, true);
         unset($_COOKIE[nammu_newsletter_access_cookie_name()]);
         return null;

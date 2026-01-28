@@ -1013,6 +1013,13 @@ function get_settings() {
         'app_password' => '',
         'auto_post' => 'off',
     ], $config);
+    $mastodon = admin_extract_social_settings('mastodon', [
+        'instance' => '',
+        'handle' => '',
+        'access_token' => '',
+        'profile' => '',
+        'auto_post' => 'off',
+    ], $config);
     $instagram = admin_extract_social_settings('instagram', [
         'token' => '',
         'channel' => '',
@@ -1110,6 +1117,7 @@ function get_settings() {
         'facebook' => $facebook,
         'twitter' => $twitter,
         'bluesky' => $bluesky,
+        'mastodon' => $mastodon,
         'instagram' => $instagram,
         'mailing' => $mailing,
         'postal' => $postal,

@@ -238,7 +238,11 @@ function nammu_detect_referrer_source(string $referer, string $host): array
     if (str_starts_with($refHost, 'www.')) {
         $refHost = substr($refHost, 4);
     }
-    return ['bucket' => 'other', 'detail' => $refHost !== '' ? $refHost : 'Sitios web'];
+    return [
+        'bucket' => 'other',
+        'detail' => $refHost !== '' ? $refHost : 'Sitios web',
+        'url' => $referer,
+    ];
 }
 
 function nammu_detect_user_agent_source(string $userAgent): array
@@ -626,6 +630,10 @@ function nammu_record_visit(): void
     }
     $bucket = $source['bucket'] ?? 'other';
     $detail = $source['detail'] ?? '';
+    $detailUrl = '';
+    if ($bucket === 'other') {
+        $detailUrl = trim((string) ($source['url'] ?? ''));
+    }
     if (!isset($data['sources']['daily'][$date][$bucket]['uids'])) {
         $data['sources']['daily'][$date][$bucket]['uids'] = [];
     }
@@ -637,8 +645,14 @@ function nammu_record_visit(): void
         if (!isset($data['sources']['daily'][$date][$bucket]['detail'])) {
             $data['sources']['daily'][$date][$bucket]['detail'] = [];
         }
+        if (!isset($data['sources']['daily'][$date][$bucket]['detail'][$detail]) || !is_array($data['sources']['daily'][$date][$bucket]['detail'][$detail])) {
+            $data['sources']['daily'][$date][$bucket]['detail'][$detail] = [];
+        }
         if (!isset($data['sources']['daily'][$date][$bucket]['detail'][$detail]['uids'])) {
             $data['sources']['daily'][$date][$bucket]['detail'][$detail]['uids'] = [];
+        }
+        if ($detailUrl !== '') {
+            $data['sources']['daily'][$date][$bucket]['detail'][$detail]['url'] = $detailUrl;
         }
         if (!isset($data['sources']['daily'][$date][$bucket]['detail'][$detail]['uids'][$uid])) {
             $data['sources']['daily'][$date][$bucket]['detail'][$detail]['uids'][$uid] = 1;

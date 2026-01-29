@@ -1248,7 +1248,52 @@
     $searchDetailRows = $buildPercentTable($collectSourceUids('search'), []);
     $socialDetailRows = $buildPercentTable($collectSourceUids('social'), []);
     $pushDetailRows = $buildPercentTable($collectSourceUids('push'), []);
-    $otherDetailRows = $buildPercentTable($collectSourceUids('other'), []);
+    $collectOtherDetails = static function () use ($sourcesDaily, $startKey): array {
+        $details = [];
+        foreach ($sourcesDaily as $day => $payload) {
+            if (!is_string($day) || $day < $startKey) {
+                continue;
+            }
+            $bucketData = is_array($payload) ? ($payload['other'] ?? []) : [];
+            $detailData = is_array($bucketData) ? ($bucketData['detail'] ?? []) : [];
+            if (!is_array($detailData)) {
+                continue;
+            }
+            foreach ($detailData as $label => $detailPayload) {
+                if (!isset($details[$label])) {
+                    $details[$label] = ['uids' => [], 'url' => ''];
+                }
+                $detailUids = is_array($detailPayload) ? ($detailPayload['uids'] ?? []) : [];
+                if (is_array($detailUids)) {
+                    foreach ($detailUids as $uid => $flag) {
+                        $details[$label]['uids'][$uid] = true;
+                    }
+                }
+                $detailUrl = is_array($detailPayload) ? (string) ($detailPayload['url'] ?? '') : '';
+                if ($detailUrl !== '') {
+                    $details[$label]['url'] = $detailUrl;
+                }
+            }
+        }
+        return $details;
+    };
+    $otherDetails = $collectOtherDetails();
+    $otherUids = [];
+    $otherUrls = [];
+    foreach ($otherDetails as $label => $detailPayload) {
+        $otherUids[$label] = $detailPayload['uids'] ?? [];
+        if (!empty($detailPayload['url'])) {
+            $otherUrls[$label] = $detailPayload['url'];
+        }
+    }
+    $otherDetailRows = $buildPercentTable($otherUids, []);
+    foreach ($otherDetailRows as &$row) {
+        $label = $row['label'] ?? '';
+        if ($label !== '' && isset($otherUrls[$label])) {
+            $row['url'] = $otherUrls[$label];
+        }
+    }
+    unset($row);
 
     $searchTermCounts = [];
     $searchTermUids = [];
@@ -2705,7 +2750,15 @@
                                         <tbody>
                                             <?php foreach ($otherDetailRows as $item): ?>
                                                 <tr>
-                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                    <td>
+                                                        <?php if (!empty($item['url'])): ?>
+                                                            <a href="<?= htmlspecialchars((string) $item['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                                <?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>
+                                                            </a>
+                                                        <?php else: ?>
+                                                            <?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>
+                                                        <?php endif; ?>
+                                                    </td>
                                                     <td class="text-right"><?= (int) $item['percent'] ?>% <span class="text-muted">(<?= (int) $item['count'] ?>)</span></td>
                                                 </tr>
                                             <?php endforeach; ?>

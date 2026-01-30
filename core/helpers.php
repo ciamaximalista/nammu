@@ -580,6 +580,7 @@ function nammu_record_visit(): void
         'correo' => 'Suscriptores',
         'mail' => 'Suscriptores',
         'newsletter' => 'Newsletter',
+        'avisos' => 'Suscriptores',
         'push' => 'Notificaciones push',
         'webpush' => 'Notificaciones push',
         'push_notification' => 'Notificaciones push',
@@ -667,7 +668,7 @@ function nammu_record_visit(): void
         $data['sources']['daily'][$date][$bucket]['uids'][$uid] = 1;
         $changed = true;
     }
-    if ($detail !== '' && in_array($bucket, ['search', 'social', 'other'], true)) {
+    if ($detail !== '' && in_array($bucket, ['search', 'social', 'other', 'email'], true)) {
         if (!isset($data['sources']['daily'][$date][$bucket]['detail'])) {
             $data['sources']['daily'][$date][$bucket]['detail'] = [];
         }

@@ -1023,6 +1023,7 @@
     $platformLanguages = $collectPlatformUids('language');
 
     $emailDetailLabels = ['Suscriptores', 'Newsletter', 'Reenvios', 'Lista de correo'];
+    $emailBreakdownLabels = ['Suscriptores', 'Reenvios', 'Lista de correo'];
     $collectSourceUids = static function (string $category) use ($sourcesDaily, $startKey, $emailDetailLabels): array {
         $result = [];
         foreach ($sourcesDaily as $day => $payload) {
@@ -1248,7 +1249,7 @@
     $searchDetailRows = $buildPercentTable($collectSourceUids('search'), []);
     $socialDetailRows = $buildPercentTable($collectSourceUids('social'), []);
     $pushDetailRows = $buildPercentTable($collectSourceUids('push'), []);
-    $collectEmailDetails = static function () use ($sourcesDaily, $startKey, $emailDetailLabels): array {
+    $collectEmailDetails = static function () use ($sourcesDaily, $startKey, $emailBreakdownLabels): array {
         $details = [];
         $mailNeedles = [
             'mail.google.com',
@@ -1281,7 +1282,7 @@
                 continue;
             }
             foreach ($detailData as $label => $detailPayload) {
-                if (!in_array((string) $label, $emailDetailLabels, true)) {
+                if (!in_array((string) $label, $emailBreakdownLabels, true)) {
                     continue;
                 }
                 if ((string) $label === 'Lista de correo') {

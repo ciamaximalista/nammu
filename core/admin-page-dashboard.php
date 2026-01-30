@@ -1250,6 +1250,27 @@
     $pushDetailRows = $buildPercentTable($collectSourceUids('push'), []);
     $collectEmailDetails = static function () use ($sourcesDaily, $startKey, $emailDetailLabels): array {
         $details = [];
+        $mailNeedles = [
+            'mail.google.com',
+            'gmail.com',
+            'outlook.live.com',
+            'outlook.com',
+            'hotmail.com',
+            'live.com',
+            'protection.outlook.com',
+            'mail.yahoo.com',
+            'yahoo.com',
+            'mail.aol.com',
+            'aol.com',
+            'icloud.com',
+            'mail.icloud.com',
+            'proton.me',
+            'protonmail.com',
+            'tutanota.com',
+            'mail.com',
+            'gmx.',
+            'zoho.',
+        ];
         foreach ($sourcesDaily as $day => $payload) {
             if (!is_string($day) || $day < $startKey) {
                 continue;
@@ -1276,6 +1297,32 @@
                     }
                 }
             }
+            $otherBucket = is_array($payload) ? ($payload['other'] ?? []) : [];
+            $otherDetail = is_array($otherBucket) ? ($otherBucket['detail'] ?? []) : [];
+            if (is_array($otherDetail)) {
+                foreach ($otherDetail as $label => $detailPayload) {
+                    $key = strtolower(trim((string) $label));
+                    $isMail = false;
+                    foreach ($mailNeedles as $needle) {
+                        if ($key === $needle || str_contains($key, $needle)) {
+                            $isMail = true;
+                            break;
+                        }
+                    }
+                    if (!$isMail) {
+                        continue;
+                    }
+                    if (!isset($details['Reenvios'])) {
+                        $details['Reenvios'] = ['uids' => []];
+                    }
+                    $detailUids = is_array($detailPayload) ? ($detailPayload['uids'] ?? []) : [];
+                    if (is_array($detailUids)) {
+                        foreach ($detailUids as $uid => $flag) {
+                            $details['Reenvios']['uids'][$uid] = true;
+                        }
+                    }
+                }
+            }
         }
         return $details;
     };
@@ -1285,6 +1332,19 @@
         $emailUids[$label] = $detailPayload['uids'] ?? [];
     }
     $emailDetailRows = $buildPercentTable($emailUids, []);
+    $emailTotalUids = [];
+    foreach ($emailUids as $uids) {
+        if (!is_array($uids)) {
+            continue;
+        }
+        foreach ($uids as $uid => $flag) {
+            $emailTotalUids[$uid] = true;
+        }
+    }
+    if (!empty($emailTotalUids)) {
+        $sourceMain['email'] = $emailTotalUids;
+        $sourceMainRows = $buildPercentTable($sourceMain, $sourceMainLabels);
+    }
     $collectOtherDetails = static function () use ($sourcesDaily, $startKey, $emailDetailLabels): array {
         $details = [];
         foreach ($sourcesDaily as $day => $payload) {

@@ -1022,7 +1022,7 @@
     $platformSystems = $collectPlatformUids('os');
     $platformLanguages = $collectPlatformUids('language');
 
-    $emailDetailLabels = ['Lista de correo', 'Newsletter'];
+    $emailDetailLabels = ['Suscriptores', 'Newsletter', 'Reenvios'];
     $collectSourceUids = static function (string $category) use ($sourcesDaily, $startKey, $emailDetailLabels): array {
         $result = [];
         foreach ($sourcesDaily as $day => $payload) {

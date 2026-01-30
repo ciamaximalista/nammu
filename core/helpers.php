@@ -235,6 +235,32 @@ function nammu_detect_referrer_source(string $referer, string $host): array
             return ['bucket' => 'social', 'detail' => $label];
         }
     }
+    $mailDomains = [
+        'mail.google.com',
+        'gmail.com',
+        'outlook.live.com',
+        'outlook.com',
+        'hotmail.com',
+        'live.com',
+        'protection.outlook.com',
+        'mail.yahoo.com',
+        'yahoo.com',
+        'mail.aol.com',
+        'aol.com',
+        'icloud.com',
+        'mail.icloud.com',
+        'proton.me',
+        'protonmail.com',
+        'tutanota.com',
+        'mail.com',
+        'gmx.',
+        'zoho.',
+    ];
+    foreach ($mailDomains as $needle) {
+        if (str_contains($refHost, $needle)) {
+            return ['bucket' => 'email', 'detail' => 'Reenvios'];
+        }
+    }
     if (str_starts_with($refHost, 'www.')) {
         $refHost = substr($refHost, 4);
     }
@@ -550,9 +576,9 @@ function nammu_record_visit(): void
     $utmSource = strtolower(trim((string) ($_GET['utm_source'] ?? '')));
     $utmMedium = strtolower(trim((string) ($_GET['utm_medium'] ?? '')));
     $sourceMap = [
-        'email' => 'Lista de correo',
-        'correo' => 'Lista de correo',
-        'mail' => 'Lista de correo',
+        'email' => 'Suscriptores',
+        'correo' => 'Suscriptores',
+        'mail' => 'Suscriptores',
         'newsletter' => 'Newsletter',
         'push' => 'Notificaciones push',
         'webpush' => 'Notificaciones push',
@@ -606,7 +632,7 @@ function nammu_record_visit(): void
 
     if ($utmDetail !== '') {
         $bucket = 'other';
-        if (in_array($utmDetail, ['Lista de correo', 'Newsletter'], true)) {
+        if (in_array($utmDetail, ['Suscriptores', 'Newsletter', 'Reenvios'], true)) {
             $bucket = 'email';
         } elseif ($utmDetail === 'Notificaciones push') {
             $bucket = 'push';

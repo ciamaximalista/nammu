@@ -1285,7 +1285,7 @@
         $emailUids[$label] = $detailPayload['uids'] ?? [];
     }
     $emailDetailRows = $buildPercentTable($emailUids, []);
-    $collectOtherDetails = static function () use ($sourcesDaily, $startKey): array {
+    $collectOtherDetails = static function () use ($sourcesDaily, $startKey, $emailDetailLabels): array {
         $details = [];
         foreach ($sourcesDaily as $day => $payload) {
             if (!is_string($day) || $day < $startKey) {
@@ -1297,7 +1297,7 @@
                 continue;
             }
             foreach ($detailData as $label => $detailPayload) {
-                if (in_array((string) $label, $emailDetailLabels, true)) {
+                if (is_array($emailDetailLabels) && in_array((string) $label, $emailDetailLabels, true)) {
                     continue;
                 }
                 if (!isset($details[$label])) {

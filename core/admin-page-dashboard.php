@@ -1022,7 +1022,7 @@
     $platformSystems = $collectPlatformUids('os');
     $platformLanguages = $collectPlatformUids('language');
 
-    $emailDetailLabels = ['Suscriptores', 'Newsletter', 'Reenvios'];
+    $emailDetailLabels = ['Suscriptores', 'Newsletter', 'Reenvios', 'Lista de correo'];
     $collectSourceUids = static function (string $category) use ($sourcesDaily, $startKey, $emailDetailLabels): array {
         $result = [];
         foreach ($sourcesDaily as $day => $payload) {
@@ -1248,6 +1248,43 @@
     $searchDetailRows = $buildPercentTable($collectSourceUids('search'), []);
     $socialDetailRows = $buildPercentTable($collectSourceUids('social'), []);
     $pushDetailRows = $buildPercentTable($collectSourceUids('push'), []);
+    $collectEmailDetails = static function () use ($sourcesDaily, $startKey, $emailDetailLabels): array {
+        $details = [];
+        foreach ($sourcesDaily as $day => $payload) {
+            if (!is_string($day) || $day < $startKey) {
+                continue;
+            }
+            $bucketData = is_array($payload) ? ($payload['email'] ?? []) : [];
+            $detailData = is_array($bucketData) ? ($bucketData['detail'] ?? []) : [];
+            if (!is_array($detailData)) {
+                continue;
+            }
+            foreach ($detailData as $label => $detailPayload) {
+                if (!in_array((string) $label, $emailDetailLabels, true)) {
+                    continue;
+                }
+                if ((string) $label === 'Lista de correo') {
+                    $label = 'Suscriptores';
+                }
+                if (!isset($details[$label])) {
+                    $details[$label] = ['uids' => []];
+                }
+                $detailUids = is_array($detailPayload) ? ($detailPayload['uids'] ?? []) : [];
+                if (is_array($detailUids)) {
+                    foreach ($detailUids as $uid => $flag) {
+                        $details[$label]['uids'][$uid] = true;
+                    }
+                }
+            }
+        }
+        return $details;
+    };
+    $emailDetails = $collectEmailDetails();
+    $emailUids = [];
+    foreach ($emailDetails as $label => $detailPayload) {
+        $emailUids[$label] = $detailPayload['uids'] ?? [];
+    }
+    $emailDetailRows = $buildPercentTable($emailUids, []);
     $collectOtherDetails = static function () use ($sourcesDaily, $startKey): array {
         $details = [];
         foreach ($sourcesDaily as $day => $payload) {
@@ -1260,6 +1297,9 @@
                 continue;
             }
             foreach ($detailData as $label => $detailPayload) {
+                if (in_array((string) $label, $emailDetailLabels, true)) {
+                    continue;
+                }
                 if (!isset($details[$label])) {
                     $details[$label] = ['uids' => [], 'url' => ''];
                 }
@@ -2724,6 +2764,21 @@
                                                     <td class="text-right"><?= (int) $item['percent'] ?>% <span class="text-muted">(<?= (int) $item['count'] ?>)</span></td>
                                                 </tr>
                                         <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($emailDetailRows)): ?>
+                                <p class="text-muted mb-2 text-uppercase small dashboard-section-title">Lista de correo</p>
+                                <div class="table-responsive">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <?php foreach ($emailDetailRows as $item): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></td>
+                                                    <td class="text-right"><?= (int) $item['percent'] ?>% <span class="text-muted">(<?= (int) $item['count'] ?>)</span></td>
+                                                </tr>
+                                            <?php endforeach; ?>
                                         </tbody>
                                     </table>
                                 </div>

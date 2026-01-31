@@ -113,6 +113,14 @@ function admin_telex_fetch_notes(array $urls, int $days = 14): array {
                 $content = (string) $item->summary;
             }
             $content = trim((string) $content);
+            if ($content === '' && isset($item->description)) {
+                $descXml = $item->description->asXML();
+                if (is_string($descXml) && $descXml !== '') {
+                    $inner = preg_replace('~^<description[^>]*>|</description>$~i', '', trim($descXml));
+                    $inner = preg_replace('~^<!\\[CDATA\\[(.*)\\]\\]>$~s', '$1', trim($inner));
+                    $content = trim($inner);
+                }
+            }
             $content = admin_telex_strip_scripts($content);
             $displayContent = admin_telex_display_content($content);
             $insertContent = admin_telex_prepare_insert_content($content);

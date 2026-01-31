@@ -26,8 +26,11 @@ function admin_telex_display_content(string $html): string {
 
 function admin_telex_prepare_insert_content(string $content): string {
     $decoded = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if (trim($decoded) === '') {
+        return '';
+    }
     if (!preg_match('/«[^»]+»/u', $decoded)) {
-        return $content;
+        return trim($decoded);
     }
     $prepared = preg_replace_callback('/«([^»]+)»/u', static function (array $matches): string {
         $text = trim($matches[1]);
@@ -37,7 +40,11 @@ function admin_telex_prepare_insert_content(string $content): string {
         return "\n\n> " . $text . "\n";
     }, $decoded);
     $prepared = preg_replace("/\n{3,}/", "\n\n", $prepared);
-    return htmlspecialchars_decode(trim($prepared), ENT_QUOTES);
+    $prepared = trim($prepared);
+    if ($prepared === '') {
+        return trim($decoded);
+    }
+    return htmlspecialchars_decode($prepared, ENT_QUOTES);
 }
 
 function admin_telex_fetch_notes(array $urls, int $days = 14): array {
@@ -85,11 +92,16 @@ function admin_telex_fetch_notes(array $urls, int $days = 14): array {
             $content = '';
             if (isset($item->children('content', true)->encoded)) {
                 $content = (string) $item->children('content', true)->encoded;
+            } elseif (isset($item->children('http://purl.org/rss/1.0/modules/content/')->encoded)) {
+                $content = (string) $item->children('http://purl.org/rss/1.0/modules/content/')->encoded;
             } elseif (isset($item->description)) {
                 $content = (string) $item->description;
             } elseif (isset($item->content)) {
                 $content = (string) $item->content;
+            } elseif (isset($item->summary)) {
+                $content = (string) $item->summary;
             }
+            $content = trim((string) $content);
             $content = admin_telex_strip_scripts($content);
             $displayContent = admin_telex_display_content($content);
             $insertContent = admin_telex_prepare_insert_content($content);

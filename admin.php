@@ -9847,7 +9847,13 @@ $ideasSuggestions = $ideasModalEnabled ? admin_ideas_build(CONTENT_DIR, 30) : []
                                     $noteId = 'nisaba-note-' . $index;
                                     $noteTitle = $note['title'] ?? '';
                                     $noteLink = $note['link'] ?? '';
-                                    $noteContent = $note['insert_content'] ?? ($note['content'] ?? '');
+                                    $noteContent = $note['insert_content'] ?? '';
+                                    if (trim($noteContent) === '') {
+                                        $noteContent = $note['content'] ?? '';
+                                    }
+                                    if (trim($noteContent) === '') {
+                                        $noteContent = $note['display_content'] ?? '';
+                                    }
                                     $noteDisplay = $note['display_content'] ?? '';
                                     $noteDateLabel = isset($note['timestamp']) ? date('d/m/y', (int) $note['timestamp']) : '';
                                     $noteDomain = '';

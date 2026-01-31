@@ -29,22 +29,33 @@ function admin_telex_prepare_insert_content(string $content): string {
     if (trim($decoded) === '') {
         return '';
     }
-    if (!preg_match('/«[^»]+»/u', $decoded)) {
-        return trim($decoded);
+
+    $normalized = preg_replace('~<br\\s*/?>~i', "\n", $decoded);
+    $normalized = preg_replace('~</p\\s*>~i', "\n\n", $normalized);
+    $normalized = preg_replace('~<p\\b[^>]*>~i', '', $normalized);
+    $normalized = strip_tags($normalized);
+    $normalized = trim($normalized);
+    if ($normalized === '') {
+        return '';
     }
-    $prepared = preg_replace_callback('/«([^»]+)»/u', static function (array $matches): string {
-        $text = trim($matches[1]);
-        if ($text === '') {
+
+    $lines = preg_split("/\\r?\\n/", $normalized);
+    $lines = array_map(static function (string $line): string {
+        $trimmed = trim($line);
+        if ($trimmed === '') {
             return '';
         }
-        return "\n\n> " . $text . "\n";
-    }, $decoded);
-    $prepared = preg_replace("/\n{3,}/", "\n\n", $prepared);
+        if (preg_match('/^«(.+)»$/u', $trimmed, $matches)) {
+            $inner = trim($matches[1]);
+            return $inner === '' ? '' : '> ' . $inner;
+        }
+        return $trimmed;
+    }, $lines);
+
+    $prepared = implode("\n", $lines);
+    $prepared = preg_replace("/\\n{3,}/", "\n\n", $prepared);
     $prepared = trim($prepared);
-    if ($prepared === '') {
-        return trim($decoded);
-    }
-    return htmlspecialchars_decode($prepared, ENT_QUOTES);
+    return $prepared;
 }
 
 function admin_telex_fetch_notes(array $urls, int $days = 14): array {

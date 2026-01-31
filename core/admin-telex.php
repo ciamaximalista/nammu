@@ -73,7 +73,7 @@ function admin_telex_fetch_notes(array $urls, int $days = 14): array {
             continue;
         }
         libxml_use_internal_errors(true);
-        $xml = simplexml_load_string($raw);
+        $xml = simplexml_load_string($raw, 'SimpleXMLElement', LIBXML_NOCDATA);
         if ($xml === false) {
             continue;
         }

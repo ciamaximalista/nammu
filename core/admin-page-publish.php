@@ -160,6 +160,11 @@
                             <img src="nisaba.png" alt="" class="nisaba-icon">
                         </button>
                     <?php endif; ?>
+                    <?php if (!empty($telexEnabled)): ?>
+                        <button type="button" class="btn btn-outline-secondary" data-md-action="telex" title="Telex" aria-label="Telex">
+                            <img src="telex.png" alt="" class="telex-icon">
+                        </button>
+                    <?php endif; ?>
                     <?php if (!empty($ideasEnabled)): ?>
                         <button type="button" class="btn btn-outline-secondary" data-md-action="ideas" title="Ideas" aria-label="Ideas">Ideas</button>
                     <?php endif; ?>

@@ -5,6 +5,7 @@ require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
 require_once __DIR__ . '/core/postal.php';
 require_once __DIR__ . '/core/admin-nisaba.php';
+require_once __DIR__ . '/core/admin-telex.php';
 require_once __DIR__ . '/core/admin-ideas.php';
 
 // Load dependencies (optional)
@@ -1088,6 +1089,7 @@ function get_settings() {
     ];
     $indexnow = array_merge($indexnowDefaults, $config['indexnow'] ?? []);
     $nisaba = $config['nisaba'] ?? [];
+    $telex = $config['telex'] ?? [];
 
     return [
         'sort_order' => $sort_order,
@@ -1124,6 +1126,7 @@ function get_settings() {
         'ads' => $ads,
         'indexnow' => $indexnow,
         'nisaba' => $nisaba,
+        'telex' => $telex,
         'entry' => $entry,
     ];
 }
@@ -4683,6 +4686,12 @@ if (!is_array($nisabaFeedback) || !isset($nisabaFeedback['message'], $nisabaFeed
 } else {
     unset($_SESSION['nisaba_feedback']);
 }
+$telexFeedback = $_SESSION['telex_feedback'] ?? null;
+if (!is_array($telexFeedback) || !isset($telexFeedback['message'], $telexFeedback['type'])) {
+    $telexFeedback = null;
+} else {
+    unset($_SESSION['telex_feedback']);
+}
 $postalFeedback = $_SESSION['postal_feedback'] ?? null;
 if (!is_array($postalFeedback) || !isset($postalFeedback['message'], $postalFeedback['type'])) {
     $postalFeedback = null;
@@ -6925,6 +6934,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         header('Location: admin.php?page=configuracion');
         exit;
+    } elseif (isset($_POST['save_telex'])) {
+        $telex_raw = trim($_POST['telex_urls'] ?? '');
+        $telex_urls = array_values(array_filter(array_map('trim', preg_split('/\\r?\\n/', $telex_raw))));
+        $telex_urls = array_values(array_filter($telex_urls, static function (string $url): bool {
+            return $url !== '' && preg_match('~\\.xml(\\?|#|$)~i', $url);
+        }));
+        try {
+            $config = load_config_file();
+            if (!empty($telex_urls)) {
+                $config['telex'] = [
+                    'urls' => $telex_urls,
+                ];
+                $_SESSION['telex_feedback'] = [
+                    'type' => 'success',
+                    'message' => 'Configuración de Telex guardada correctamente.',
+                ];
+            } else {
+                unset($config['telex']);
+                $_SESSION['telex_feedback'] = [
+                    'type' => 'success',
+                    'message' => 'Integración con Telex desactivada.',
+                ];
+            }
+            save_config_file($config);
+        } catch (Throwable $e) {
+            $_SESSION['telex_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Error guardando Telex: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: admin.php?page=configuracion');
+        exit;
     } elseif (isset($_POST['save_twitter_media'])) {
         $twitter_api_key = trim($_POST['twitter_api_key'] ?? '');
         $twitter_api_secret = trim($_POST['twitter_api_secret'] ?? '');
@@ -8079,6 +8120,12 @@ $nisabaFeedUrl = $nisabaEnabled ? admin_nisaba_feed_url($nisabaUrl) : '';
 $nisabaPages = ['publish', 'edit', 'edit-post', 'itinerario', 'itinerario-tema'];
 $nisabaModalEnabled = $nisabaEnabled && in_array($page, $nisabaPages, true);
 $nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : [];
+$telexConfig = $settings['telex'] ?? [];
+$telexUrls = is_array($telexConfig['urls'] ?? null) ? $telexConfig['urls'] : [];
+$telexEnabled = !empty($telexUrls) && function_exists('admin_telex_fetch_notes');
+$telexPages = ['publish', 'edit', 'edit-post', 'itinerario', 'itinerario-tema'];
+$telexModalEnabled = $telexEnabled && in_array($page, $telexPages, true);
+$telexNotes = $telexModalEnabled ? admin_telex_fetch_notes($telexUrls, 14) : [];
 $ideasPages = ['publish', 'edit', 'edit-post', 'itinerario', 'itinerario-tema'];
 $ideasModalEnabled = in_array($page, $ideasPages, true) && function_exists('admin_ideas_build');
 $ideasEnabled = $ideasModalEnabled;
@@ -8107,6 +8154,11 @@ $ideasSuggestions = $ideasModalEnabled ? admin_ideas_build(CONTENT_DIR, 30) : []
         .nav-link h1 { font-size: 1.2rem; color: #1b8eed; }
         h2 { color: #ea2f28; }
         .nisaba-icon {
+            width: 16px;
+            height: 16px;
+            display: block;
+        }
+        .telex-icon {
             width: 16px;
             height: 16px;
             display: block;
@@ -9840,6 +9892,69 @@ $ideasSuggestions = $ideasModalEnabled ? admin_ideas_build(CONTENT_DIR, 30) : []
                 </div>
             </div>
         <?php endif; ?>
+        <?php if (!empty($telexModalEnabled)): ?>
+            <div class="modal fade" id="telexModal" tabindex="-1" role="dialog" aria-labelledby="telexModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="telexModalLabel">Notas recientes de Telex</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <?php if (!empty($telexNotes)): ?>
+                                <p class="text-muted mb-3">Selecciona las notas de los últimos 14 días que quieres insertar.</p>
+                                <?php foreach ($telexNotes as $index => $note): ?>
+                                    <?php
+                                    $noteId = 'telex-note-' . $index;
+                                    $noteTitle = $note['title'] ?? '';
+                                    $noteLink = $note['link'] ?? '';
+                                    $noteContent = $note['insert_content'] ?? ($note['content'] ?? '');
+                                    $noteDisplay = $note['display_content'] ?? '';
+                                    $noteDateLabel = isset($note['timestamp']) ? date('d/m/y', (int) $note['timestamp']) : '';
+                                    $noteDomain = '';
+                                    if ($noteLink !== '') {
+                                        $host = parse_url($noteLink, PHP_URL_HOST);
+                                        if (is_string($host)) {
+                                            $noteDomain = preg_replace('/^www\\./i', '', $host);
+                                        }
+                                    }
+                                    ?>
+                                    <div class="border rounded p-3 mb-3">
+                                        <div class="custom-control custom-checkbox">
+                                            <input type="checkbox"
+                                                   class="custom-control-input telex-note-toggle"
+                                                   id="<?= htmlspecialchars($noteId, ENT_QUOTES, 'UTF-8') ?>"
+                                                   data-telex-item="1"
+                                                   data-note-title="<?= htmlspecialchars($noteTitle, ENT_QUOTES, 'UTF-8') ?>"
+                                                   data-note-link="<?= htmlspecialchars($noteLink, ENT_QUOTES, 'UTF-8') ?>"
+                                                   data-note-domain="<?= htmlspecialchars($noteDomain, ENT_QUOTES, 'UTF-8') ?>"
+                                                   data-note-content="<?= htmlspecialchars(base64_encode($noteContent), ENT_QUOTES, 'UTF-8') ?>">
+                                            <label class="custom-control-label" for="<?= htmlspecialchars($noteId, ENT_QUOTES, 'UTF-8') ?>">
+                                                <?= htmlspecialchars($noteTitle, ENT_QUOTES, 'UTF-8') ?>
+                                            </label>
+                                        </div>
+                                        <?php if ($noteDisplay !== ''): ?>
+                                            <div class="mt-2 text-muted telex-note-preview"><?= $noteDisplay ?></div>
+                                        <?php endif; ?>
+                                        <?php if ($noteDateLabel !== ''): ?>
+                                            <small class="text-muted d-block mt-2"><?= htmlspecialchars($noteDateLabel, ENT_QUOTES, 'UTF-8') ?></small>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <p class="text-muted mb-0">No hay notas recientes en las feeds configuradas.</p>
+                            <?php endif; ?>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-primary" id="telexInsert" <?= empty($telexNotes) ? 'disabled' : '' ?>>Insertar notas</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
         <?php if (!empty($ideasModalEnabled)): ?>
             <div class="modal fade" id="ideasModal" tabindex="-1" role="dialog" aria-labelledby="ideasModalLabel" aria-hidden="true">
                 <div class="modal-dialog modal-lg" role="document">
@@ -10957,6 +11072,9 @@ $ideasSuggestions = $ideasModalEnabled ? admin_ideas_build(CONTENT_DIR, 30) : []
                     case 'nisaba':
                         openNisabaModal(textarea);
                         break;
+                    case 'telex':
+                        openTelexModal(textarea);
+                        break;
                     case 'ideas':
                         openIdeasModal();
                         break;
@@ -11188,6 +11306,35 @@ $ideasSuggestions = $ideasModalEnabled ? admin_ideas_build(CONTENT_DIR, 30) : []
                 }
             }
 
+            var telexTarget = null;
+            function openTelexModal(textarea) {
+                var modal = document.getElementById('telexModal');
+                if (!modal) {
+                    return;
+                }
+                var target = textarea;
+                if (!target || target.tagName !== 'TEXTAREA') {
+                    if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
+                        target = document.activeElement;
+                    } else if (lastFocusedTextarea && lastFocusedTextarea.tagName === 'TEXTAREA') {
+                        target = lastFocusedTextarea;
+                    } else {
+                        target = fallbackTextarea();
+                    }
+                }
+                if (target && target.id === 'calloutBody') {
+                    target = null;
+                }
+                telexTarget = target || fallbackTextarea();
+                if (window.jQuery && typeof window.jQuery.fn.modal === 'function') {
+                    window.jQuery(modal).modal('show');
+                } else {
+                    modal.classList.add('show');
+                    modal.style.display = 'block';
+                    modal.removeAttribute('aria-hidden');
+                }
+            }
+
             function openIdeasModal() {
                 var modal = document.getElementById('ideasModal');
                 if (!modal) {
@@ -11329,6 +11476,61 @@ $ideasSuggestions = $ideasModalEnabled ? admin_ideas_build(CONTENT_DIR, 30) : []
                             return;
                         }
                         var title = input.getAttribute('data-note-title') || 'Nota de Nisaba';
+                        var link = input.getAttribute('data-note-link') || '';
+                        var noteDomain = input.getAttribute('data-note-domain') || '';
+                        var contentEncoded = input.getAttribute('data-note-content') || '';
+                        var content = decodeBase64Utf8(contentEncoded);
+                        content = content.replace(/&gt;|&#62;/gi, '>');
+                        content = content.replace(/&laquo;/gi, '«').replace(/&raquo;/gi, '»');
+                        content = nisabaNormalizeQuotes(content);
+                        content = content.replace(/&gt;|&#62;/gi, '>');
+                        var safeTitle = escapeHtml(title);
+                        var sourceLine = '';
+                        if (link) {
+                            var safeLink = escapeHtml(link);
+                            var hostLabel = noteDomain || '';
+                            if (!hostLabel) {
+                                try {
+                                    hostLabel = new URL(link).hostname || '';
+                                } catch (err) {
+                                    hostLabel = link.replace(/^https?:\/\//i, '').split('/')[0];
+                                }
+                            }
+                            hostLabel = hostLabel.replace(/^www\\./i, '');
+                            sourceLine = '\n<p><strong>Fuente</strong>: <a href="' + safeLink + '" target="_blank" rel="noopener">' + escapeHtml(hostLabel) + '</a></p>';
+                        }
+                        blocks.push('\n\n<h3>' + safeTitle + '</h3>\n' + content + sourceLine + '\n');
+                    });
+                    if (!blocks.length) {
+                        return;
+                    }
+                    var insertText = blocks.join('\n');
+                    replaceSelection(target, insertText, insertText.length, insertText.length);
+                    if (window.jQuery && typeof window.jQuery.fn.modal === 'function') {
+                        window.jQuery(modal).modal('hide');
+                    } else {
+                        modal.classList.remove('show');
+                        modal.style.display = 'none';
+                        modal.setAttribute('aria-hidden', 'true');
+                    }
+                });
+            }
+
+            var telexInsertButton = document.getElementById('telexInsert');
+            if (telexInsertButton) {
+                telexInsertButton.addEventListener('click', function() {
+                    var modal = document.getElementById('telexModal');
+                    var target = telexTarget || fallbackTextarea();
+                    if (!modal || !target) {
+                        return;
+                    }
+                    var selections = modal.querySelectorAll('[data-telex-item]');
+                    var blocks = [];
+                    selections.forEach(function(input) {
+                        if (!input.checked) {
+                            return;
+                        }
+                        var title = input.getAttribute('data-note-title') || 'Nota de Telex';
                         var link = input.getAttribute('data-note-link') || '';
                         var noteDomain = input.getAttribute('data-note-domain') || '';
                         var contentEncoded = input.getAttribute('data-note-content') || '';

@@ -492,14 +492,19 @@ if ($editFeedback !== null) {
                         <button type="button" class="btn btn-outline-secondary" data-md-action="hr" title="Separador" aria-label="Separador">—</button>
                         <button type="button" class="btn btn-outline-secondary" data-md-action="table" title="Tabla" aria-label="Tabla">Tbl</button>
                         <button type="button" class="btn btn-outline-secondary" data-md-action="callout" data-toggle="modal" data-target="#calloutModal" title="Caja destacada" aria-label="Caja destacada">Aviso</button>
-                        <?php if (!empty($nisabaEnabled)): ?>
-                            <button type="button" class="btn btn-outline-secondary" data-md-action="nisaba" title="Nisaba" aria-label="Nisaba">
-                                <img src="nisaba.png" alt="" class="nisaba-icon">
-                            </button>
-                        <?php endif; ?>
-                        <?php if (!empty($ideasEnabled)): ?>
-                            <button type="button" class="btn btn-outline-secondary" data-md-action="ideas" title="Ideas" aria-label="Ideas">Ideas</button>
-                        <?php endif; ?>
+                            <?php if (!empty($nisabaEnabled)): ?>
+                                <button type="button" class="btn btn-outline-secondary" data-md-action="nisaba" title="Nisaba" aria-label="Nisaba">
+                                    <img src="nisaba.png" alt="" class="nisaba-icon">
+                                </button>
+                            <?php endif; ?>
+                            <?php if (!empty($telexEnabled)): ?>
+                                <button type="button" class="btn btn-outline-secondary" data-md-action="telex" title="Telex" aria-label="Telex">
+                                    <img src="telex.png" alt="" class="telex-icon">
+                                </button>
+                            <?php endif; ?>
+                            <?php if (!empty($ideasEnabled)): ?>
+                                <button type="button" class="btn btn-outline-secondary" data-md-action="ideas" title="Ideas" aria-label="Ideas">Ideas</button>
+                            <?php endif; ?>
                     </div>
                 </div>
 

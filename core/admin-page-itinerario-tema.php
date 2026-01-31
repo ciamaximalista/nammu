@@ -91,14 +91,19 @@
                                     <button type="button" class="btn btn-outline-secondary" data-md-action="hr">—</button>
                                     <button type="button" class="btn btn-outline-secondary" data-md-action="table">Tbl</button>
                                     <button type="button" class="btn btn-outline-secondary" data-md-action="callout" data-toggle="modal" data-target="#calloutModal">Aviso</button>
-                                    <?php if (!empty($nisabaEnabled)): ?>
-                                        <button type="button" class="btn btn-outline-secondary" data-md-action="nisaba" title="Nisaba" aria-label="Nisaba">
-                                            <img src="nisaba.png" alt="" class="nisaba-icon">
-                                        </button>
-                                    <?php endif; ?>
-                                    <?php if (!empty($ideasEnabled)): ?>
-                                        <button type="button" class="btn btn-outline-secondary" data-md-action="ideas" title="Ideas" aria-label="Ideas">Ideas</button>
-                                    <?php endif; ?>
+                                        <?php if (!empty($nisabaEnabled)): ?>
+                                            <button type="button" class="btn btn-outline-secondary" data-md-action="nisaba" title="Nisaba" aria-label="Nisaba">
+                                                <img src="nisaba.png" alt="" class="nisaba-icon">
+                                            </button>
+                                        <?php endif; ?>
+                                        <?php if (!empty($telexEnabled)): ?>
+                                            <button type="button" class="btn btn-outline-secondary" data-md-action="telex" title="Telex" aria-label="Telex">
+                                                <img src="telex.png" alt="" class="telex-icon">
+                                            </button>
+                                        <?php endif; ?>
+                                        <?php if (!empty($ideasEnabled)): ?>
+                                            <button type="button" class="btn btn-outline-secondary" data-md-action="ideas" title="Ideas" aria-label="Ideas">Ideas</button>
+                                        <?php endif; ?>
                                 </div>
                             </div>
                             <textarea name="topic_content" id="topic_content" class="form-control" rows="10" data-markdown-editor="itinerary-topic"><?= htmlspecialchars($topicFormData['content'], ENT_QUOTES, 'UTF-8') ?></textarea>

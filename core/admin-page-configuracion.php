@@ -24,6 +24,11 @@
                 <?= htmlspecialchars($nisabaFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
             </div>
         <?php endif; ?>
+        <?php if (isset($telexFeedback) && $telexFeedback !== null): ?>
+            <div class="alert alert-<?= $telexFeedback['type'] === 'success' ? 'success' : 'danger' ?>">
+                <?= htmlspecialchars($telexFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
         <?php
         $telegramSettings = $settings['telegram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
         $telegramAutoEnabled = ($telegramSettings['auto_post'] ?? 'off') === 'on';
@@ -58,6 +63,9 @@
         $bingRedirectUri = function_exists('admin_bing_oauth_redirect_uri') ? admin_bing_oauth_redirect_uri() : '';
         $nisabaSettings = $settings['nisaba'] ?? [];
         $nisabaUrl = $nisabaSettings['url'] ?? '';
+        $telexSettings = $settings['telex'] ?? [];
+        $telexUrls = is_array($telexSettings['urls'] ?? null) ? $telexSettings['urls'] : [];
+        $telexUrlsValue = $telexUrls ? implode("\n", $telexUrls) : '';
         $languageOptions = [
             'es' => 'Español',
             'ca' => 'Català',
@@ -229,6 +237,18 @@
             </div>
             <div class="text-right mb-4">
                 <button type="submit" name="save_nisaba" class="btn btn-outline-primary">Guardar Nisaba</button>
+            </div>
+        </form>
+        <form method="post" class="mt-4">
+            <h4 class="mt-2">Integración con Telex</h4>
+            <p class="text-muted mb-3">Añade una o varias feeds de Telex para insertar notas recientes desde sus XML.</p>
+            <div class="form-group">
+                <label for="telex_urls">URIs de la feed de Telex</label>
+                <textarea name="telex_urls" id="telex_urls" class="form-control" rows="4" placeholder="https://tu-telex.example/feed.xml"><?= htmlspecialchars($telexUrlsValue, ENT_QUOTES, 'UTF-8') ?></textarea>
+                <small class="form-text text-muted">Introduce una URL por línea. Deben terminar en <code>.xml</code>.</small>
+            </div>
+            <div class="text-right mb-4">
+                <button type="submit" name="save_telex" class="btn btn-outline-primary">Guardar Telex</button>
             </div>
         </form>
 

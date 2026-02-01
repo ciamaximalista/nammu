@@ -8130,6 +8130,23 @@ $ideasPages = ['publish', 'edit', 'edit-post', 'itinerario', 'itinerario-tema'];
 $ideasModalEnabled = in_array($page, $ideasPages, true) && function_exists('admin_ideas_build');
 $ideasEnabled = $ideasModalEnabled;
 $ideasSuggestions = $ideasModalEnabled ? admin_ideas_build(CONTENT_DIR, 30) : [];
+$templateImages = is_array($settings['template']['images'] ?? null) ? $settings['template']['images'] : [];
+$adminLogoPath = trim((string) ($templateImages['logo'] ?? ''));
+$adminLogoUrl = '';
+if ($adminLogoPath !== '') {
+    if (preg_match('#^https?://#i', $adminLogoPath)) {
+        $adminLogoUrl = $adminLogoPath;
+    } else {
+        $normalizedLogo = ltrim($adminLogoPath, '/');
+        $normalizedLogo = str_replace(['../', '..\\', './', '.\\'], '', $normalizedLogo);
+        if (!str_starts_with($normalizedLogo, 'assets/')) {
+            $normalizedLogo = 'assets/' . $normalizedLogo;
+        }
+        $adminLogoUrl = $normalizedLogo;
+    }
+}
+$adminLogoLink = trim((string) ($settings['site_url'] ?? ''));
+$adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
 ?>
 <!DOCTYPE html>
@@ -8161,6 +8178,25 @@ $ideasSuggestions = $ideasModalEnabled ? admin_ideas_build(CONTENT_DIR, 30) : []
         .telex-icon {
             width: 16px;
             height: 16px;
+            display: block;
+        }
+        .admin-floating-logo {
+            position: fixed;
+            top: 2.5rem;
+            right: clamp(1.5rem, 5vw, 2.5rem);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            overflow: hidden;
+            box-shadow: 0 12px 25px rgba(0,0,0,0.15);
+            background: #ffffff;
+            display: block;
+            z-index: 1050;
+        }
+        .admin-floating-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
             display: block;
         }
         .container {
@@ -9829,6 +9865,11 @@ $ideasSuggestions = $ideasModalEnabled ? admin_ideas_build(CONTENT_DIR, 30) : []
         
         </div>
 
+        <?php if ($adminLogoUrl !== ''): ?>
+            <a class="admin-floating-logo" href="<?= htmlspecialchars($adminLogoLink, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" aria-label="Ir al blog">
+                <img src="<?= htmlspecialchars($adminLogoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
+            </a>
+        <?php endif; ?>
         <?php if (!empty($nisabaModalEnabled)): ?>
             <div class="modal fade" id="nisabaModal" tabindex="-1" role="dialog" aria-labelledby="nisabaModalLabel" aria-hidden="true">
                 <div class="modal-dialog modal-lg" role="document">

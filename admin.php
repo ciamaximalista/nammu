@@ -3882,6 +3882,12 @@ function admin_send_mailing_broadcast(string $subject, string $textBody, string 
     $gmail = $mailingConfig['gmail_address'] ?? '';
     $clientId = $mailingConfig['client_id'] ?? '';
     $clientSecret = $mailingConfig['client_secret'] ?? '';
+    if ($fromName === null || trim($fromName) === '') {
+        $settings = get_settings();
+        $authorName = trim((string) ($settings['site_author'] ?? ''));
+        $blogName = trim((string) ($settings['site_name'] ?? ''));
+        $fromName = $authorName !== '' ? $authorName : $blogName;
+    }
     $tokens = admin_load_mailing_tokens();
     $refresh = $tokens['refresh_token'] ?? '';
     if ($gmail === '' || $clientId === '' || $clientSecret === '' || $refresh === '') {
@@ -4021,7 +4027,7 @@ function admin_prepare_mailing_payload(string $template, array $settings, string
     $isHtml = $format !== 'text';
     $subject = $title;
     $blogName = $settings['site_name'] ?? 'Tu blog';
-    $authorName = $settings['site_author'] ?? 'Autor';
+    $authorName = trim((string) ($settings['site_author'] ?? ''));
     $siteBase = rtrim($settings['site_url'] ?? '', '/');
     $baseForAssets = $siteBase !== '' ? $siteBase : rtrim(admin_base_url(), '/');
     $imageUrl = '';
@@ -4183,7 +4189,7 @@ function admin_prepare_newsletter_payload(array $settings, string $title, string
     $isHtml = $format !== 'text';
     $subject = $title;
     $blogName = $settings['site_name'] ?? 'Tu blog';
-    $authorName = $settings['site_author'] ?? 'Autor';
+    $authorName = trim((string) ($settings['site_author'] ?? ''));
     $siteBase = rtrim($settings['site_url'] ?? '', '/');
     $baseForAssets = $siteBase !== '' ? $siteBase : rtrim(admin_base_url(), '/');
     $link = $siteBase !== '' ? $siteBase : rtrim(admin_base_url(), '/');

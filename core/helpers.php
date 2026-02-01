@@ -3180,6 +3180,7 @@ function nammu_send_newsletter_access_email(array $settings, string $email, stri
     $tokens = nammu_load_mailing_tokens();
     $refresh = $tokens['refresh_token'] ?? '';
     $siteLabel = trim((string) ($settings['site_name'] ?? 'tu blog'));
+    $authorName = trim((string) ($settings['site_author'] ?? ''));
     $base = nammu_base_url();
     $base = $base !== '' ? rtrim($base, '/') : '';
     $link = $base . '/newsletters?email=' . urlencode($email) . '&token=' . urlencode($token);
@@ -3193,12 +3194,13 @@ function nammu_send_newsletter_access_email(array $settings, string $email, stri
         $refreshed = nammu_google_refresh_access_token($clientId, $clientSecret, $refresh);
         $accessToken = $refreshed['access_token'] ?? '';
         if ($accessToken !== '') {
-            nammu_gmail_send_message($fromEmail, $email, $subject, $textBody, $htmlBody, $accessToken, $siteLabel);
+            $fromName = $authorName !== '' ? $authorName : $siteLabel;
+            nammu_gmail_send_message($fromEmail, $email, $subject, $textBody, $htmlBody, $accessToken, $fromName);
             return;
         }
     }
     $headers = [];
-    $fromName = $siteLabel !== '' ? $siteLabel : 'Nammu';
+    $fromName = $authorName !== '' ? $authorName : ($siteLabel !== '' ? $siteLabel : 'Nammu');
     $encodedName = '=?UTF-8?B?' . base64_encode($fromName) . '?=';
     $headers[] = 'From: ' . $encodedName . ' <no-reply@' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '>';
     $headers[] = 'Content-Type: text/plain; charset=UTF-8';

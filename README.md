@@ -88,6 +88,12 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 ### Paso a paso
 
 1. Clona el repositorio o descarga el ZIP y descomprímelo en tu raíz web (ej. `/var/www/html/blogs/memoria`).
+   Si ya estás dentro del directorio que será la raíz del dominio y está vacío, usa:
+
+```bash
+git clone https://github.com/ciamaximalista/nammu.git .
+```
+
 2. Crea los directorios `config/`, `content/`, `assets/` e `itinerarios/` si no existen.
 3. Ajusta los permisos (ver siguiente bloque).
 4. Configura tu host virtual apuntando a la carpeta pública y habilita PHP 8.

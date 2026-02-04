@@ -132,7 +132,7 @@ if ($editFeedback !== null) {
                     <?php endif; ?>
 
                     <?php if ($showVisibilityColumn): ?>
-                        <th class="text-center">👁</th>
+                        <th class="text-center"><i class="fas fa-eye" aria-hidden="true"></i><span class="sr-only">Visibilidad</span></th>
                     <?php elseif ($showSocialColumn): ?>
                         <th class="text-center">Redes</th>
                     <?php endif; ?>
@@ -199,10 +199,18 @@ if ($editFeedback !== null) {
 
                         <?php if ($showVisibilityColumn): ?>
                         <td class="text-center">
-                            <?php if (($post['visibility'] ?? 'public') === 'private'): ?>
-                                <span title="Privada" aria-label="Privada">🔐</span>
+                            <?php
+                            $visibilityValue = strtolower(trim((string) ($post['visibility'] ?? 'public')));
+                            if ($templateFilter === 'page' && !in_array($visibilityValue, ['private', 'privada', '1', 'true', 'yes', 'on'], true)) {
+                                $postDataForVisibility = get_post_content($post['filename']);
+                                $visibilityValue = strtolower(trim((string) (($postDataForVisibility['metadata']['Visibility'] ?? $postDataForVisibility['metadata']['visibility'] ?? $visibilityValue))));
+                            }
+                            $isPrivateVisibility = in_array($visibilityValue, ['private', 'privada', '1', 'true', 'yes', 'on'], true);
+                            ?>
+                            <?php if ($isPrivateVisibility): ?>
+                                <span title="Privada" aria-label="Privada"><i class="fas fa-lock" aria-hidden="true"></i></span>
                             <?php else: ?>
-                                <span title="Pública" aria-label="Pública">👁</span>
+                                <span title="Pública" aria-label="Pública"><i class="fas fa-eye" aria-hidden="true"></i></span>
                             <?php endif; ?>
                         </td>
                         <?php elseif ($showSocialColumn): ?>

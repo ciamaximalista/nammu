@@ -309,7 +309,8 @@ function nammu_page_date_fallback(array $metadata, ?string $filePath): ?string {
 $postTemplate = method_exists($post, 'getTemplate') ? $post->getTemplate() : strtolower($post->getMetadata()['Template'] ?? '');
 $isPageTemplate = ($postTemplate === 'page');
 $isDraftPost = method_exists($post, 'isDraft') ? $post->isDraft() : false;
-$isPrivatePage = $isPageTemplate && strtolower(trim((string) ($post->getMetadata()['Visibility'] ?? 'public'))) === 'private';
+$visibilityRaw = strtolower(trim((string) (($post->getMetadata()['Visibility'] ?? $post->getMetadata()['visibility'] ?? 'public'))));
+$isPrivatePage = $isPageTemplate && in_array($visibilityRaw, ['private', 'privada', '1', 'true', 'yes', 'on'], true);
 $category = $post->getMetadata()['Category'] ?? '';
 $postFilePath = $postFilePath ?? null;
 $rawDate = $post->getRawDate();

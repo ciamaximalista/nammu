@@ -45,6 +45,7 @@ function get_all_posts_metadata() {
     foreach ($files as $file) {
         $content = file_get_contents($file);
         $metadata = parse_yaml_front_matter($content);
+        $visibilityRaw = strtolower(trim((string) ($metadata['Visibility'] ?? $metadata['visibility'] ?? 'public')));
         $posts[] = [
             'filename' => basename($file),
             'metadata' => $metadata,
@@ -153,7 +154,7 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string
             'timestamp' => $timestamp,
             'status' => $isDraft ? 'draft' : 'published',
             'publish_at' => $metadata['PublishAt'] ?? '',
-            'visibility' => strtolower(trim((string) ($metadata['Visibility'] ?? 'public'))) === 'private' ? 'private' : 'public',
+            'visibility' => in_array($visibilityRaw, ['private', 'privada', '1', 'true', 'yes', 'on'], true) ? 'private' : 'public',
         ];
     }
 

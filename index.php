@@ -333,8 +333,8 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
 
     foreach ($posts as $post) {
         $postTemplate = strtolower($post->getTemplate());
-        $postVisibility = strtolower(trim((string) ($post->getMetadata()['Visibility'] ?? 'public')));
-        if ($postTemplate === 'page' && $postVisibility === 'private') {
+        $postVisibility = strtolower(trim((string) ($post->getMetadata()['Visibility'] ?? $post->getMetadata()['visibility'] ?? 'public')));
+        if ($postTemplate === 'page' && in_array($postVisibility, ['private', 'privada', '1', 'true', 'yes', 'on'], true)) {
             continue;
         }
         $postTimestamp = $timestampFromPost($post);
@@ -1952,8 +1952,8 @@ if ($slug !== null && $slug !== '') {
         $renderNotFound('Contenido no encontrado', 'La página solicitada no se encuentra disponible.', $routePath);
     }
     $postTemplateName = strtolower($post->getTemplate());
-    $postVisibility = strtolower(trim((string) ($post->getMetadata()['Visibility'] ?? 'public')));
-    if ($postTemplateName === 'page' && $postVisibility === 'private' && !$isAdminLogged) {
+    $postVisibility = strtolower(trim((string) ($post->getMetadata()['Visibility'] ?? $post->getMetadata()['visibility'] ?? 'public')));
+    if ($postTemplateName === 'page' && in_array($postVisibility, ['private', 'privada', '1', 'true', 'yes', 'on'], true) && !$isAdminLogged) {
         $renderNotFound('Contenido no encontrado', 'La página solicitada no se encuentra disponible.', $routePath);
     }
 

@@ -309,6 +309,7 @@ function nammu_page_date_fallback(array $metadata, ?string $filePath): ?string {
 $postTemplate = method_exists($post, 'getTemplate') ? $post->getTemplate() : strtolower($post->getMetadata()['Template'] ?? '');
 $isPageTemplate = ($postTemplate === 'page');
 $isDraftPost = method_exists($post, 'isDraft') ? $post->isDraft() : false;
+$isPrivatePage = $isPageTemplate && strtolower(trim((string) ($post->getMetadata()['Visibility'] ?? 'public'))) === 'private';
 $category = $post->getMetadata()['Category'] ?? '';
 $postFilePath = $postFilePath ?? null;
 $rawDate = $post->getRawDate();
@@ -352,9 +353,9 @@ if ($isPageTemplate && $formattedDate !== '') {
     $bottomMetaText = 'Actualizado por última vez el ' . htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') . '.';
 }
 ?>
-<article class="post<?= $isDraftPost ? ' post-draft' : '' ?>">
-    <?php if ($isDraftPost): ?>
-        <div class="draft-stamp" aria-hidden="true">Borrador</div>
+<article class="post<?= $isDraftPost ? ' post-draft' : '' ?><?= $isPrivatePage ? ' post-private' : '' ?>">
+    <?php if ($isDraftPost || $isPrivatePage): ?>
+        <div class="draft-stamp" aria-hidden="true"><?= $isPrivatePage ? 'Zona Privada' : 'Borrador' ?></div>
     <?php endif; ?>
     <div class="post-header">
         <div class="post-brand">
@@ -1027,11 +1028,13 @@ if ($isPageTemplate && $formattedDate !== '') {
         color: <?= $colorText ?>;
         font-size: 0.95rem;
     }
-    .post.post-draft {
+    .post.post-draft,
+    .post.post-private {
         position: relative;
         overflow: hidden;
     }
-    .post.post-draft .draft-stamp {
+    .post.post-draft .draft-stamp,
+    .post.post-private .draft-stamp {
         position: absolute;
         top: 1.5rem;
         right: -3rem;
@@ -1048,7 +1051,8 @@ if ($isPageTemplate && $formattedDate !== '') {
         z-index: 2;
     }
     @media (max-width: 640px) {
-        .post.post-draft .draft-stamp {
+        .post.post-draft .draft-stamp,
+        .post.post-private .draft-stamp {
             top: 0.75rem;
             font-size: 1rem;
             right: -2rem;

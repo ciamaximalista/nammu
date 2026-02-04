@@ -104,7 +104,8 @@ if ($editFeedback !== null) {
         ?>
 
         <?php
-        $showSocialColumn = ($templateFilter !== 'newsletter');
+        $showVisibilityColumn = ($templateFilter === 'page');
+        $showSocialColumn = ($templateFilter !== 'newsletter' && !$showVisibilityColumn);
         $columnCount = 4;
         if ($templateFilter !== 'podcast') {
             $columnCount++;
@@ -130,7 +131,9 @@ if ($editFeedback !== null) {
                         <th>Nombre de archivo</th>
                     <?php endif; ?>
 
-                    <?php if ($showSocialColumn): ?>
+                    <?php if ($showVisibilityColumn): ?>
+                        <th class="text-center">👁</th>
+                    <?php elseif ($showSocialColumn): ?>
                         <th class="text-center">Redes</th>
                     <?php endif; ?>
 
@@ -194,7 +197,15 @@ if ($editFeedback !== null) {
                             </td>
                         <?php endif; ?>
 
-                        <?php if ($showSocialColumn): ?>
+                        <?php if ($showVisibilityColumn): ?>
+                        <td class="text-center">
+                            <?php if (($post['visibility'] ?? 'public') === 'private'): ?>
+                                <span title="Privada" aria-label="Privada">🔐</span>
+                            <?php else: ?>
+                                <span title="Pública" aria-label="Pública">👁</span>
+                            <?php endif; ?>
+                        </td>
+                        <?php elseif ($showSocialColumn): ?>
                         <td class="text-center">
                             <?php
                             $availableNetworks = [];
@@ -367,6 +378,8 @@ if ($editFeedback !== null) {
             $audioValue = $post_data['metadata']['Audio'] ?? '';
             $audioLength = $post_data['metadata']['AudioLength'] ?? '';
             $audioDuration = $post_data['metadata']['AudioDuration'] ?? '';
+            $pageVisibilityRaw = strtolower(trim((string) ($post_data['metadata']['Visibility'] ?? 'public')));
+            $pageVisibility = $pageVisibilityRaw === 'private' ? 'private' : 'public';
         ?>
 
         <?php if ($editFeedback !== null): ?>
@@ -407,6 +420,14 @@ if ($editFeedback !== null) {
 
                 <input type="text" name="category" id="category" class="form-control" value="<?= htmlspecialchars($post_data['metadata']['Category'] ?? '') ?>">
 
+            </div>
+
+            <div class="form-group page-only<?= $currentTypeValue === 'Página' ? '' : ' d-none' ?>">
+                <label for="page_visibility">Visibilidad de la página</label>
+                <select name="page_visibility" id="page_visibility" class="form-control">
+                    <option value="public" <?= $pageVisibility === 'public' ? 'selected' : '' ?>>Pública</option>
+                    <option value="private" <?= $pageVisibility === 'private' ? 'selected' : '' ?>>Privada</option>
+                </select>
             </div>
 
             <div class="form-group">
@@ -589,6 +610,7 @@ if ($editFeedback !== null) {
                 var podcastOnly = document.querySelectorAll('.podcast-only');
                 var nonPodcast = document.querySelectorAll('.non-podcast');
                 var entryOnly = document.querySelectorAll('.entry-only');
+                var pageOnly = document.querySelectorAll('.page-only');
                 var titleLabel = document.querySelector('label[for="title"]');
                 var descriptionLabel = document.querySelector('label[for="description"]');
                 var imageLabel = document.querySelector('label[for="image"]');
@@ -669,6 +691,7 @@ if ($editFeedback !== null) {
                     var typeValue = typeValueInput.value || 'Entrada';
                     var isPodcast = typeValue === 'Podcast';
                     var isEntry = typeValue === 'Entrada';
+                    var isPage = typeValue === 'Página';
                     podcastOnly.forEach(function(el) {
                         el.classList.toggle('d-none', !isPodcast);
                     });
@@ -677,6 +700,9 @@ if ($editFeedback !== null) {
                     });
                     entryOnly.forEach(function(el) {
                         el.classList.toggle('d-none', !isEntry);
+                    });
+                    pageOnly.forEach(function(el) {
+                        el.classList.toggle('d-none', !isPage);
                     });
                     if (titleLabel && titleLabel.dataset.podcastLabel && titleLabel.dataset.postLabel) {
                         titleLabel.textContent = isPodcast ? titleLabel.dataset.podcastLabel : titleLabel.dataset.postLabel;

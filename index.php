@@ -41,6 +41,11 @@ if (preg_match('/^\/indexnow-([a-f0-9]+)\.txt$/i', $requestPath, $match)) {
     }
 }
 
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    @session_start();
+}
+$isAdminLogged = !empty($_SESSION['loggedin']);
+
 if (function_exists('nammu_publish_scheduled_posts')) {
     nammu_publish_scheduled_posts(__DIR__ . '/content');
 }
@@ -327,6 +332,11 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
     ];
 
     foreach ($posts as $post) {
+        $postTemplate = strtolower($post->getTemplate());
+        $postVisibility = strtolower(trim((string) ($post->getMetadata()['Visibility'] ?? 'public')));
+        if ($postTemplate === 'page' && $postVisibility === 'private') {
+            continue;
+        }
         $postTimestamp = $timestampFromPost($post);
         $imageUrl = nammu_resolve_asset($post->getImage(), $publicBaseUrl);
         $entries[] = [
@@ -1941,6 +1951,11 @@ if ($slug !== null && $slug !== '') {
     if (!$post) {
         $renderNotFound('Contenido no encontrado', 'La página solicitada no se encuentra disponible.', $routePath);
     }
+    $postTemplateName = strtolower($post->getTemplate());
+    $postVisibility = strtolower(trim((string) ($post->getMetadata()['Visibility'] ?? 'public')));
+    if ($postTemplateName === 'page' && $postVisibility === 'private' && !$isAdminLogged) {
+        $renderNotFound('Contenido no encontrado', 'La página solicitada no se encuentra disponible.', $routePath);
+    }
 
     $documentData = $markdown->convertDocument($post->getContent());
     $converted = $documentData['html'];
@@ -1951,7 +1966,6 @@ if ($slug !== null && $slug !== '') {
     if (!in_array($entryMinHeadings, [2, 3, 4], true)) {
         $entryMinHeadings = 3;
     }
-    $postTemplateName = strtolower($post->getTemplate());
     if ($postTemplateName === 'page') {
         nammu_record_pageview('pages', $post->getSlug(), $post->getTitle());
     } else {

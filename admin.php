@@ -153,6 +153,7 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string
             'timestamp' => $timestamp,
             'status' => $isDraft ? 'draft' : 'published',
             'publish_at' => $metadata['PublishAt'] ?? '',
+            'visibility' => strtolower(trim((string) ($metadata['Visibility'] ?? 'public'))) === 'private' ? 'private' : 'public',
         ];
     }
 
@@ -4544,6 +4545,8 @@ function admin_autosave_from_payload($jsonPayload): array {
     $image = trim((string) ($fields['image'] ?? ''));
     $type = ($fields['type'] ?? '') === 'Página' ? 'Página' : 'Entrada';
     $template = $type === 'Página' ? 'page' : 'post';
+    $pageVisibilityInput = strtolower(trim((string) ($fields['page_visibility'] ?? 'public')));
+    $pageVisibility = ($type === 'Página' && $pageVisibilityInput === 'private') ? 'private' : 'public';
     $statusInput = strtolower(trim((string) ($fields['status'] ?? '')));
     $status = in_array($statusInput, ['draft', 'published'], true) ? $statusInput : 'draft';
 
@@ -4603,6 +4606,9 @@ function admin_autosave_from_payload($jsonPayload): array {
     $file_content .= "Date: " . $date . "\n";
     $file_content .= "Image: " . $image . "\n";
     $file_content .= "Description: " . $description . "\n";
+    if ($template === 'page') {
+        $file_content .= "Visibility: " . $pageVisibility . "\n";
+    }
     $file_content .= "Status: " . $status . "\n";
     $file_content .= "Ordo: " . $ordo . "\n";
     $file_content .= "---\n\n";
@@ -4982,6 +4988,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audio = trim($_POST['audio'] ?? '');
         $audioLengthInput = trim($_POST['audio_length'] ?? '');
         $audioDuration = trim($_POST['audio_duration'] ?? '');
+        $pageVisibilityInput = strtolower(trim((string) ($_POST['page_visibility'] ?? 'public')));
         $type = $_POST['type'] ?? 'Entrada';
         if ($type === 'Página') {
             $type = 'Página';
@@ -4992,6 +4999,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $type = 'Entrada';
         }
+        $pageVisibility = ($type === 'Página' && $pageVisibilityInput === 'private') ? 'private' : 'public';
         $filenameInput = trim($_POST['filename'] ?? '');
         $isDraft = isset($_POST['save_draft']);
         $statusValue = $isDraft ? 'draft' : 'published';
@@ -5088,6 +5096,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $file_content .= "Lang: " . $lang . "
 ";
                 }
+                if ($templateValue === 'page') {
+                    $file_content .= "Visibility: " . $pageVisibility . "
+";
+                }
                 $file_content .= "Status: " . $statusValue . "
 ";
                 if ($isDraft && $publishAtDate !== '') {
@@ -5157,7 +5169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!$isDraft) {
                         $indexnowUrls = [];
                         $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
-                        if (in_array($type, ['Entrada', 'Página'], true) && $slug !== '') {
+                        if (in_array($type, ['Entrada', 'Página'], true) && $slug !== '' && !($type === 'Página' && $pageVisibility === 'private')) {
                             $indexnowUrls[] = admin_public_post_url($slug);
                         } elseif ($type === 'Podcast' && $audioUrl !== '') {
                             $indexnowUrls[] = $audioUrl;
@@ -5363,6 +5375,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audio = trim($_POST['audio'] ?? '');
         $audioLengthInput = trim($_POST['audio_length'] ?? '');
         $audioDuration = trim($_POST['audio_duration'] ?? '');
+        $pageVisibilityInputRaw = strtolower(trim((string) ($_POST['page_visibility'] ?? '')));
         $type = $_POST['type'] ?? null;
         $statusPosted = strtolower(trim($_POST['status'] ?? ''));
         $publishDraftAsEntry = isset($_POST['publish_draft_entry']);
@@ -5411,6 +5424,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $type = 'Página';
         } elseif ($publishDraftAsPodcast) {
             $type = 'Podcast';
+        }
+        $existingVisibility = '';
+        if (is_array($existing_post_data) && isset($existing_post_data['metadata']) && is_array($existing_post_data['metadata'])) {
+            $existingVisibility = strtolower(trim((string) ($existing_post_data['metadata']['Visibility'] ?? '')));
+        }
+        $pageVisibility = 'public';
+        if ($type === 'Página') {
+            if ($pageVisibilityInputRaw === 'private' || ($pageVisibilityInputRaw === '' && $existingVisibility === 'private')) {
+                $pageVisibility = 'private';
+            }
         }
         $template = $type === 'Página' ? 'page' : ($type === 'Podcast' ? 'podcast' : ($type === 'Newsletter' ? 'newsletter' : 'post'));
         if ($publishDraftAsEntry || $publishDraftAsPage || $publishDraftAsPodcast) {
@@ -5535,6 +5558,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $file_content .= "Lang: " . $lang . "
 ";
             }
+            if ($template === 'page') {
+                $file_content .= "Visibility: " . $pageVisibility . "
+";
+            }
             $file_content .= "Status: " . $status . "
 ";
             if ($publishAtValue !== '') {
@@ -5634,7 +5661,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if ($shouldIndexnow) {
                             $indexnowUrls = [];
                             $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
-                            if (in_array($template, ['post', 'page'], true) && $slug !== '') {
+                            if (in_array($template, ['post', 'page'], true) && $slug !== '' && !($template === 'page' && $pageVisibility === 'private')) {
                                 $indexnowUrls[] = admin_public_post_url($slug);
                             } elseif ($template === 'podcast') {
                                 $audioUrl = admin_public_asset_url($audio);

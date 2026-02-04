@@ -74,6 +74,14 @@
 
         </div>
 
+        <div class="form-group page-only d-none">
+            <label for="page_visibility">Visibilidad de la página</label>
+            <select name="page_visibility" id="page_visibility" class="form-control">
+                <option value="public" selected>Pública</option>
+                <option value="private">Privada</option>
+            </select>
+        </div>
+
         <div class="form-group">
 
             <label for="date">Fecha</label>
@@ -220,6 +228,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var podcastOnly = document.querySelectorAll('.podcast-only');
     var nonPodcast = document.querySelectorAll('.non-podcast');
     var entryOnly = document.querySelectorAll('.entry-only');
+    var pageOnly = document.querySelectorAll('.page-only');
     var titleLabel = document.querySelector('label[for="title"]');
     var descriptionLabel = document.querySelector('label[for="description"]');
     var imageLabel = document.querySelector('label[for="image"]');
@@ -301,6 +310,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var typeValue = typeValueInput.value || 'Entrada';
         var isPodcast = typeValue === 'Podcast';
         var isEntry = typeValue === 'Entrada';
+        var isPage = typeValue === 'Página';
         var isNewsletter = typeValue === 'Newsletter';
         podcastOnly.forEach(function(el) {
             el.classList.toggle('d-none', !isPodcast);
@@ -310,6 +320,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         entryOnly.forEach(function(el) {
             el.classList.toggle('d-none', !isEntry);
+        });
+        pageOnly.forEach(function(el) {
+            el.classList.toggle('d-none', !isPage);
         });
         if (titleLabel && titleLabel.dataset.podcastLabel && titleLabel.dataset.postLabel) {
             titleLabel.textContent = isPodcast ? titleLabel.dataset.podcastLabel : titleLabel.dataset.postLabel;

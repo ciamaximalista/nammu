@@ -430,6 +430,9 @@ if (($headerType === 'text' || $headerType === 'mixed') && !$hasTextHeaderConten
 if ($isAlphabetical && $headerType === 'none' && $hasTextHeaderContent) {
     $headerType = 'text';
 }
+if ($isAlphabetical && $headerType === 'graphic' && $hasHeaderImage && $hasTextHeaderContent) {
+    $headerType = 'mixed';
+}
 $mixedBoxedHeader = $headerType === 'mixed' && $textHeaderStyle === 'boxed';
 $mixedHasImage = $headerType === 'mixed' && $hasHeaderImage;
 $mixedBoxedFullWidth = $mixedBoxedHeader && $headerMode === 'cover';

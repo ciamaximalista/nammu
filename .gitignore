@@ -5,6 +5,7 @@ sitemap.xml
 assets/
 content/
 itinerarios/
+config/
 config/config.yml
 config/*.json
 config/*.key

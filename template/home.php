@@ -425,6 +425,11 @@ if (($headerType === 'text' || $headerType === 'mixed') && !$hasTextHeaderConten
         $headerType = 'none';
     }
 }
+
+// In dictionary mode, keep the textual site identity visible on the homepage.
+if ($isAlphabetical && $headerType === 'none' && $hasTextHeaderContent) {
+    $headerType = 'text';
+}
 $mixedBoxedHeader = $headerType === 'mixed' && $textHeaderStyle === 'boxed';
 $mixedHasImage = $headerType === 'mixed' && $hasHeaderImage;
 $mixedBoxedFullWidth = $mixedBoxedHeader && $headerMode === 'cover';

@@ -2571,9 +2571,16 @@ function nammu_render_header_buttons(array $options): string
     $hasCategories = !empty($options['has_categories']);
     $hasItineraries = !empty($options['has_itineraries']);
     $hasPodcast = !empty($options['has_podcast']);
+    $isDictionaryMode = false;
+    if (array_key_exists('is_dictionary_mode', $options)) {
+        $isDictionaryMode = !empty($options['is_dictionary_mode']);
+    } else {
+        $config = nammu_load_config();
+        $isDictionaryMode = (($config['sort_order'] ?? 'date') === 'alpha');
+    }
     $showLetters = array_key_exists('show_letters', $options)
         ? !empty($options['show_letters'])
-        : (!empty($GLOBALS['showLetterIndexButton']) && $lettersUrl !== '');
+        : ($isDictionaryMode && $lettersUrl !== '');
     $hasNewsletters = !empty($options['has_newsletters'] ?? ($GLOBALS['hasNewsletters'] ?? $GLOBALS['has_newsletters'] ?? false));
     $subscriptionEnabled = !empty($options['subscription_enabled']);
     $postalEnabled = !empty($options['postal_enabled']);

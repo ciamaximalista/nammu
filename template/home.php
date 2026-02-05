@@ -130,13 +130,20 @@ $postalUrl = $postalUrl ?? '/correos.php';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $hasPaginationLeft = $subscriptionEnabled || ($postalEnabled && $postalLogoSvg !== '');
 $homeUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/';
-$renderHeaderButtons = static function () use ($homeUrl, $searchAction, $hasCategories, $categoriesIndexUrl, $hasItineraries, $itinerariesIndexUrl, $hasPodcast, $podcastIndexUrl, $hasNewsletters, $newslettersIndexUrl, $subscriptionEnabled, $avisosUrl, $postalEnabled, $postalUrl, $postalLogoSvg, $accentColor, $highlight, $accentBorder): string {
+$renderHeaderButtons = static function () use ($homeUrl, $searchAction, $showLetterButton, $letterIndexUrlValue, $hasCategories, $categoriesIndexUrl, $hasItineraries, $itinerariesIndexUrl, $hasPodcast, $podcastIndexUrl, $hasNewsletters, $newslettersIndexUrl, $subscriptionEnabled, $avisosUrl, $postalEnabled, $postalUrl, $postalLogoSvg, $accentColor, $highlight, $accentBorder): string {
     $items = [];
     $items[] = [
         'label' => 'Portada',
         'href' => $homeUrl,
         'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 11.5L12 4L21 11.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>',
     ];
+    if ($showLetterButton && !empty($letterIndexUrlValue)) {
+        $items[] = [
+            'label' => 'Letras',
+            'href' => $letterIndexUrlValue,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 18L9 6H10.5L14.5 18M6.2 14H13.2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 7H21M16 12H20M16 17H21" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+        ];
+    }
     if ($hasCategories) {
         $items[] = [
             'label' => 'Categorías',

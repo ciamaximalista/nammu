@@ -2563,6 +2563,7 @@ function nammu_render_header_buttons(array $options): string
     $categoriesUrl = (string) ($options['categories_url'] ?? '/categorias');
     $itinerariesUrl = (string) ($options['itineraries_url'] ?? '/itinerarios');
     $podcastUrl = (string) ($options['podcast_url'] ?? '/podcast');
+    $lettersUrl = (string) ($options['letters_url'] ?? ($GLOBALS['lettersIndexUrl'] ?? '/letras'));
     $newslettersUrl = (string) ($options['newsletters_url'] ?? ($GLOBALS['newslettersIndexUrl'] ?? '/newsletters'));
     $avisosUrl = (string) ($options['avisos_url'] ?? '/avisos.php');
     $postalUrl = (string) ($options['postal_url'] ?? '/correos.php');
@@ -2570,6 +2571,9 @@ function nammu_render_header_buttons(array $options): string
     $hasCategories = !empty($options['has_categories']);
     $hasItineraries = !empty($options['has_itineraries']);
     $hasPodcast = !empty($options['has_podcast']);
+    $showLetters = array_key_exists('show_letters', $options)
+        ? !empty($options['show_letters'])
+        : (!empty($GLOBALS['showLetterIndexButton']) && $lettersUrl !== '');
     $hasNewsletters = !empty($options['has_newsletters'] ?? ($GLOBALS['hasNewsletters'] ?? $GLOBALS['has_newsletters'] ?? false));
     $subscriptionEnabled = !empty($options['subscription_enabled']);
     $postalEnabled = !empty($options['postal_enabled']);
@@ -2580,6 +2584,13 @@ function nammu_render_header_buttons(array $options): string
         'href' => $homeUrl,
         'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 11.5L12 4L21 11.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>',
     ];
+    if ($showLetters) {
+        $items[] = [
+            'label' => 'Letras',
+            'href' => $lettersUrl,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 18L9 6H10.5L14.5 18M6.2 14H13.2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 7H21M16 12H20M16 17H21" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+        ];
+    }
     if ($hasCategories) {
         $items[] = [
             'label' => 'Categorías',

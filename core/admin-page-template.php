@@ -90,6 +90,7 @@
                             if (!in_array($homeHeaderOrder, ['image-text', 'text-image'], true)) {
                                 $homeHeaderOrder = $defaults['home']['header']['order'];
                             }
+                            $homeDictionaryIntro = (string) ($templateHome['dictionary_intro'] ?? ($defaults['home']['dictionary_intro'] ?? ''));
                             if (in_array($homeHeaderType, ['graphic', 'mixed'], true) && trim((string) $homeHeaderImage) === '') {
                                 $homeHeaderType = $homeHeaderType === 'mixed' ? 'text' : 'none';
                                 $homeHeaderMode = $defaults['home']['header']['mode'];
@@ -706,6 +707,18 @@
                                                 <?php endforeach; ?>
                                             </div>
                                         </div>
+                                    </div>
+
+                                    <div class="mt-4">
+                                        <h6>Texto de presentación (sólo para diccionarios)</h6>
+                                        <label for="home_dictionary_intro" class="sr-only">Texto de presentación (sólo para diccionarios)</label>
+                                        <textarea
+                                            name="home_dictionary_intro"
+                                            id="home_dictionary_intro"
+                                            class="form-control"
+                                            rows="6"
+                                            placeholder="Escribe aquí un texto en Markdown y/o HTML para mostrar en portada cuando el sitio esté en modo diccionario."><?= htmlspecialchars($homeDictionaryIntro, ENT_QUOTES, 'UTF-8') ?></textarea>
+                                        <small class="form-text text-muted">Sólo se mostrará en portada si el sitio está en modo diccionario y el campo no está vacío.</small>
                                     </div>
 
                                     <h5 class="mt-4">Bucle</h5>

@@ -7775,6 +7775,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($homeHeaderButtonsPosted, ['home', 'both', 'none'], true)) {
             $homeHeaderButtonsPosted = $defaults['home']['header_buttons'] ?? 'none';
         }
+        $homeDictionaryIntroPosted = (string) ($_POST['home_dictionary_intro'] ?? '');
         $homeHeaderTypePosted = $_POST['home_header_type'] ?? $defaults['home']['header']['type'];
         $allowedHeaderTypes = ['none', 'graphic', 'text', 'mixed'];
         if (!in_array($homeHeaderTypePosted, $allowedHeaderTypes, true)) {
@@ -7878,6 +7879,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'card_style' => $homeCardStylePosted,
                 'full_image_mode' => $homeFullImageModePosted,
                 'blocks' => $homeBlocksModePosted,
+                'dictionary_intro' => $homeDictionaryIntroPosted,
                 'header_buttons' => $homeHeaderButtonsPosted,
                 'header' => [
                     'type' => $homeHeaderTypePosted,

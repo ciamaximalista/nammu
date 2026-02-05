@@ -9,6 +9,7 @@
  * @var array $theme
  * @var array<string, string> $letterGroupUrls
  * @var bool $isAlphabetical
+ * @var string $dictionaryIntroHtml
  */
 $colors = $theme['colors'] ?? [];
 $highlight = htmlspecialchars($colors['highlight'] ?? '#f3f6f9', ENT_QUOTES, 'UTF-8');
@@ -109,6 +110,7 @@ $hasNewsletters = !empty($hasNewsletters ?? ($GLOBALS['hasNewsletters'] ?? false
 $hasCategories = !empty($hasCategories);
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
 $isAlphabetical = !empty($isAlphabetical);
+$dictionaryIntroHtml = (string) ($dictionaryIntroHtml ?? '');
 $letterGroups = $letterGroups ?? [];
 $letterGroupUrls = $letterGroupUrls ?? [];
 $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
@@ -554,6 +556,12 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
 <?php if ($bioHtml !== ''): ?>
     <section class="site-bio">
         <?= $bioHtml ?>
+    </section>
+<?php endif; ?>
+
+<?php if ($isAlphabetical && trim($dictionaryIntroHtml) !== ''): ?>
+    <section class="dictionary-intro mode-<?= htmlspecialchars($blocksMode, ENT_QUOTES, 'UTF-8') ?>">
+        <?= $dictionaryIntroHtml ?>
     </section>
 <?php endif; ?>
 
@@ -1030,6 +1038,25 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     }
     .site-bio p {
         margin: 0 0 1rem 0;
+    }
+    .dictionary-intro {
+        margin: 0 auto 1.5rem;
+        max-width: min(980px, 100%);
+        color: <?= $textColor ?>;
+    }
+    .dictionary-intro.mode-boxed {
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+        border-radius: var(--nammu-radius-lg);
+        padding: 1.1rem 1.2rem;
+    }
+    .dictionary-intro.mode-flat {
+        border-left: 4px solid <?= $accentColor ?>;
+        padding: 0.75rem 0 0.75rem 0.9rem;
+    }
+    .dictionary-intro > *:last-child {
+        margin-bottom: 0;
     }
     .letter-block {
         margin-bottom: 2.5rem;

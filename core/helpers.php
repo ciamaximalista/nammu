@@ -863,6 +863,7 @@ function nammu_template_settings(): array
 
     $homeConfig = $template['home'] ?? [];
     $home = array_merge($defaults['home'], $homeConfig);
+    $home['dictionary_intro'] = (string) ($home['dictionary_intro'] ?? '');
     $homeBlocks = $home['blocks'] ?? $defaults['home']['blocks'];
     if (!in_array($homeBlocks, ['boxed', 'flat'], true)) {
         $homeBlocks = $defaults['home']['blocks'];
@@ -1049,6 +1050,7 @@ function nammu_default_template_settings(): array
             'card_style' => 'full',
             'blocks' => 'boxed',
             'full_image_mode' => 'natural',
+            'dictionary_intro' => '',
             'header_buttons' => 'none',
             'header' => [
                 'type' => 'none',

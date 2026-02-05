@@ -2149,6 +2149,11 @@ if ($isAlphabeticalOrder) {
 }
 
 $bioHtml = $siteBio !== '' ? $markdown->toHtml($siteBio) : '';
+$dictionaryIntroRaw = (string) (($theme['home']['dictionary_intro'] ?? ''));
+$dictionaryIntroHtml = '';
+if ($isAlphabeticalOrder && trim($dictionaryIntroRaw) !== '') {
+    $dictionaryIntroHtml = $markdown->toHtml($dictionaryIntroRaw);
+}
 
 $homeCanonicalPath = ($perPage !== null && $currentPage > 1) ? '/pagina/' . $currentPage : '/';
 if ($publicBaseUrl !== '') {
@@ -2188,6 +2193,7 @@ $content = $renderer->render('home', [
     'letterGroups' => $letterGroupsForView,
     'isAlphabetical' => $isAlphabeticalOrder,
     'letterGroupUrls' => $letterGroupUrls,
+    'dictionaryIntroHtml' => $dictionaryIntroHtml,
 ]);
 
 echo $renderer->render('layout', [

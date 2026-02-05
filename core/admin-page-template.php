@@ -539,6 +539,17 @@
 
                                     <h5 class="mt-4">Cabecera</h5>
                                     <p class="text-muted">Selecciona cómo se mostrará la cabecera en la portada.</p>
+                                    <div class="mt-3">
+                                        <h6>Texto de presentación (sólo para diccionarios)</h6>
+                                        <label for="home_dictionary_intro" class="sr-only">Texto de presentación (sólo para diccionarios)</label>
+                                        <textarea
+                                            name="home_dictionary_intro"
+                                            id="home_dictionary_intro"
+                                            class="form-control"
+                                            rows="6"
+                                            placeholder="Escribe aquí un texto en Markdown y/o HTML para mostrar en portada cuando el sitio esté en modo diccionario."><?= htmlspecialchars($homeDictionaryIntro, ENT_QUOTES, 'UTF-8') ?></textarea>
+                                        <small class="form-text text-muted">Sólo se mostrará en portada si el sitio está en modo diccionario y el campo no está vacío.</small>
+                                    </div>
                                     <div class="mt-3" data-header-text <?= in_array($homeHeaderType, ['text', 'mixed'], true) ? '' : 'style="display:none;"' ?>>
                                         <label>Estilo</label>
                                         <div class="home-card-style-options">
@@ -707,18 +718,6 @@
                                                 <?php endforeach; ?>
                                             </div>
                                         </div>
-                                    </div>
-
-                                    <div class="mt-4">
-                                        <h6>Texto de presentación (sólo para diccionarios)</h6>
-                                        <label for="home_dictionary_intro" class="sr-only">Texto de presentación (sólo para diccionarios)</label>
-                                        <textarea
-                                            name="home_dictionary_intro"
-                                            id="home_dictionary_intro"
-                                            class="form-control"
-                                            rows="6"
-                                            placeholder="Escribe aquí un texto en Markdown y/o HTML para mostrar en portada cuando el sitio esté en modo diccionario."><?= htmlspecialchars($homeDictionaryIntro, ENT_QUOTES, 'UTF-8') ?></textarea>
-                                        <small class="form-text text-muted">Sólo se mostrará en portada si el sitio está en modo diccionario y el campo no está vacío.</small>
                                     </div>
 
                                     <h5 class="mt-4">Bucle</h5>

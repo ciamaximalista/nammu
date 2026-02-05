@@ -1043,6 +1043,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         margin: 0 auto 1.5rem;
         max-width: min(980px, 100%);
         color: <?= $textColor ?>;
+        text-align: center;
     }
     .dictionary-intro.mode-boxed {
         background: #fff;

@@ -2680,7 +2680,38 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
 function admin_bluesky_upload_blob(string $service, string $accessToken, string $imageUrl): ?array {
     $binary = admin_http_get_binary($imageUrl);
     if ($binary === '') {
-    return null;
+        return null;
+    }
+    $mime = 'application/octet-stream';
+    if (class_exists('finfo')) {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $detected = $finfo->buffer($binary);
+        if (is_string($detected) && $detected !== '') {
+            $mime = $detected;
+        }
+    }
+    $headers = [
+        'Authorization: Bearer ' . $accessToken,
+        'Content-Type: ' . $mime,
+        'Content-Length: ' . strlen($binary),
+    ];
+    $httpCode = null;
+    $response = admin_http_post_body_response($service . '/xrpc/com.atproto.repo.uploadBlob', $binary, $headers, $httpCode);
+    if ($response === null || $httpCode === null || $httpCode < 200 || $httpCode >= 300) {
+        return null;
+    }
+    $payload = json_decode($response, true);
+    if (!is_array($payload) || empty($payload['blob']['ref']['$link']) || empty($payload['blob']['mimeType'])) {
+        return null;
+    }
+    return [
+        '$type' => 'blob',
+        'ref' => [
+            '$link' => $payload['blob']['ref']['$link'],
+        ],
+        'mimeType' => $payload['blob']['mimeType'],
+        'size' => (int) ($payload['blob']['size'] ?? 0),
+    ];
 }
 
 function admin_mastodon_base_url(string $instance): string
@@ -2766,37 +2797,6 @@ function admin_send_mastodon_post(string $slug, string $title, string $descripti
         }
     }
     return false;
-}
-    $mime = 'application/octet-stream';
-    if (class_exists('finfo')) {
-        $finfo = new finfo(FILEINFO_MIME_TYPE);
-        $detected = $finfo->buffer($binary);
-        if (is_string($detected) && $detected !== '') {
-            $mime = $detected;
-        }
-    }
-    $headers = [
-        'Authorization: Bearer ' . $accessToken,
-        'Content-Type: ' . $mime,
-        'Content-Length: ' . strlen($binary),
-    ];
-    $httpCode = null;
-    $response = admin_http_post_body_response($service . '/xrpc/com.atproto.repo.uploadBlob', $binary, $headers, $httpCode);
-    if ($response === null || $httpCode === null || $httpCode < 200 || $httpCode >= 300) {
-        return null;
-    }
-    $payload = json_decode($response, true);
-    if (!is_array($payload) || empty($payload['blob']['ref']['$link']) || empty($payload['blob']['mimeType'])) {
-        return null;
-    }
-    return [
-        '$type' => 'blob',
-        'ref' => [
-            '$link' => $payload['blob']['ref']['$link'],
-        ],
-        'mimeType' => $payload['blob']['mimeType'],
-        'size' => (int) ($payload['blob']['size'] ?? 0),
-    ];
 }
 
 function admin_twitter_has_media_credentials(array $settings): bool {

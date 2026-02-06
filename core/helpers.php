@@ -2764,7 +2764,18 @@ function nammu_newsletter_set_access_cookie(string $email, string $token, int $e
         return;
     }
     $encoded = base64_encode($payload);
-    setcookie(nammu_newsletter_access_cookie_name(), $encoded, $expires, '/', '', false, true);
+    $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    if (PHP_VERSION_ID >= 70300) {
+        setcookie(nammu_newsletter_access_cookie_name(), $encoded, [
+            'expires' => $expires,
+            'path' => '/',
+            'secure' => $secure,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    } else {
+        setcookie(nammu_newsletter_access_cookie_name(), $encoded, $expires, '/', '', $secure, true);
+    }
     $_COOKIE[nammu_newsletter_access_cookie_name()] = $encoded;
 }
 

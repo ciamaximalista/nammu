@@ -2734,11 +2734,16 @@ function nammu_newsletter_validate_access(string $email, string $token): bool
     if ($email === '' || $token === '') {
         return false;
     }
+    $now = time();
     $entries = nammu_newsletter_load_access_entries();
     $entries = nammu_newsletter_purge_access_entries($entries);
     $valid = false;
     foreach ($entries as $entry) {
         if (!is_array($entry)) {
+            continue;
+        }
+        $expires = (int) ($entry['expires_at'] ?? 0);
+        if ($expires <= $now) {
             continue;
         }
         if (($entry['email'] ?? '') === $email && ($entry['token'] ?? '') === $token) {

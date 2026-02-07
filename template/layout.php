@@ -64,8 +64,13 @@ $podcastIndexUrl = $podcastIndexUrl ?? ($searchBaseNormalized === '' ? '/podcast
 if ($postalLogoSvg === '' && function_exists('nammu_postal_icon_svg')) {
     $postalLogoSvg = nammu_postal_icon_svg();
 }
+$contactSettings = function_exists('nammu_contact_settings') ? nammu_contact_settings() : [];
+$contactFooterItems = [];
+if (!empty($contactSettings['footer']) && function_exists('nammu_contact_footer_items')) {
+    $contactFooterItems = nammu_contact_footer_items($contactSettings);
+}
 $hasFooterLogo = $footerLogoPosition !== 'none' && !empty($logoUrl);
-$showFooterBlock = ($footerHtml !== '') || $hasFooterLogo || $footerNammuEnabled;
+$showFooterBlock = ($footerHtml !== '') || $hasFooterLogo || $footerNammuEnabled || !empty($contactFooterItems);
 $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
 $defaultMetaDescription = '';
 if (function_exists('nammu_social_settings')) {
@@ -571,6 +576,52 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             text-decoration: none;
         }
         .footer-social-link svg {
+            width: 18px;
+            height: 18px;
+            display: block;
+        }
+        .footer-contact-block {
+            margin: 0 0 1.5rem 0;
+            padding: 1rem 1.5rem;
+            border-radius: var(--nammu-radius-md);
+            background: <?= $colorHighlight ?>;
+            color: <?= $colorText ?>;
+            text-align: center;
+        }
+        .footer-contact-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 600;
+            color: <?= $colorH2 ?>;
+            margin-bottom: 0.75rem;
+        }
+        .footer-contact-links {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+        .footer-contact-link {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            background: #ffffff;
+            color: <?= $colorAccent ?>;
+            border: 1px solid rgba(0,0,0,0.08);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+        .footer-contact-link:hover {
+            background: <?= $colorHighlight ?>;
+            transform: translateY(-1px);
+            text-decoration: none;
+        }
+        .footer-contact-link svg {
             width: 18px;
             height: 18px;
             display: block;
@@ -1279,6 +1330,18 @@ if (!empty($baseUrl)) {
                 <?php if ($footerNammuEnabled): ?>
                     <div class="footer-nammu-link">
                         <?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> utiliza <a href="https://ruralnext.org/nammu" target="_blank" rel="noopener">Nammu</a>, un CMS libre desarrollado en <a href="https://ruralnext.org" target="_blank" rel="noopener">RuralNEXT</a>.
+                    </div>
+                <?php endif; ?>
+                <?php if (!empty($contactFooterItems)): ?>
+                    <div class="footer-contact-block">
+                        <div class="footer-contact-title">Contacto</div>
+                        <div class="footer-contact-links">
+                            <?php foreach ($contactFooterItems as $item): ?>
+                                <a class="footer-contact-link" href="<?= htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>">
+                                    <?= $item['svg'] ?>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
                 <?php endif; ?>
             </footer>

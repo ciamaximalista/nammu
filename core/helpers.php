@@ -2762,6 +2762,96 @@ function nammu_newsletter_access_cookie_name(): string
     return 'nammu_newsletter_access';
 }
 
+function nammu_contact_settings_from_config(array $config): array
+{
+    $contact = is_array($config['contact'] ?? null) ? $config['contact'] : [];
+    $telegram = trim((string) ($contact['telegram'] ?? ''));
+    $email = trim((string) ($contact['email'] ?? ''));
+    $phone = trim((string) ($contact['phone'] ?? ''));
+    $footer = ($contact['footer'] ?? 'off') === 'on';
+    $signature = ($contact['signature'] ?? 'off') === 'on';
+    $fields = $contact['signature_fields'] ?? [];
+    if (!is_array($fields)) {
+        $fields = [];
+    }
+    $fields = array_values(array_intersect(['telegram', 'email', 'phone'], $fields));
+    return [
+        'telegram' => $telegram,
+        'email' => $email,
+        'phone' => $phone,
+        'footer' => $footer,
+        'signature' => $signature,
+        'signature_fields' => $fields,
+    ];
+}
+
+function nammu_contact_settings(): array
+{
+    return nammu_contact_settings_from_config(nammu_load_config());
+}
+
+function nammu_contact_signature_lines(array $contact): array
+{
+    $fields = $contact['signature_fields'] ?? [];
+    if (!is_array($fields)) {
+        $fields = [];
+    }
+    $lines = [];
+    foreach ($fields as $field) {
+        if ($field === 'telegram') {
+            $handle = trim((string) ($contact['telegram'] ?? ''));
+            if ($handle !== '') {
+                $handle = ltrim($handle, '@');
+                $lines[] = '@' . $handle;
+            }
+        } elseif ($field === 'email') {
+            $email = trim((string) ($contact['email'] ?? ''));
+            if ($email !== '') {
+                $lines[] = $email;
+            }
+        } elseif ($field === 'phone') {
+            $phone = trim((string) ($contact['phone'] ?? ''));
+            if ($phone !== '') {
+                $lines[] = $phone;
+            }
+        }
+    }
+    return $lines;
+}
+
+function nammu_contact_footer_items(array $contact): array
+{
+    $items = [];
+    $telegram = trim((string) ($contact['telegram'] ?? ''));
+    if ($telegram !== '') {
+        $handle = ltrim($telegram, '@');
+        $url = preg_match('#^https?://#i', $telegram) ? $telegram : ('https://t.me/' . rawurlencode($handle));
+        $items[] = [
+            'label' => 'Telegram',
+            'href' => $url,
+            'svg' => '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M21.7 5.2a1 1 0 0 0-1.1-.1L3.5 12.1a1 1 0 0 0 .1 1.9l4.7 1.7 1.9 5.1a1 1 0 0 0 1.7.3l2.8-3.2 4.6 3.4a1 1 0 0 0 1.6-.6l2-12.4a1 1 0 0 0-.2-0.7zM9.5 14.8l8-6.4-6.2 7.6-.2 2.8-1.2-3.1-3.5-1.3 11.7-4.6-10.6 5z"/></svg>',
+        ];
+    }
+    $email = trim((string) ($contact['email'] ?? ''));
+    if ($email !== '') {
+        $items[] = [
+            'label' => 'Email',
+            'href' => 'mailto:' . $email,
+            'svg' => '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="3,7 12,13 21,7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        ];
+    }
+    $phone = trim((string) ($contact['phone'] ?? ''));
+    if ($phone !== '') {
+        $tel = preg_replace('/\s+/', '', $phone);
+        $items[] = [
+            'label' => 'Teléfono',
+            'href' => 'tel:' . $tel,
+            'svg' => '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M6.6 2h3.1c.4 0 .8.3.9.7l.9 3.4c.1.4 0 .8-.3 1.1l-1.5 1.5a14.6 14.6 0 0 0 5.2 5.2l1.5-1.5c.3-.3.7-.4 1.1-.3l3.4.9c.4.1.7.5.7.9v3.1c0 .5-.4.9-.9.9C10 18.9 5.1 14 5.1 8.9c0-.5.4-.9.9-.9z" fill="currentColor"/></svg>',
+        ];
+    }
+    return $items;
+}
+
 function nammu_newsletter_set_access_cookie(string $email, string $token, int $expires): void
 {
     $payload = json_encode(['email' => $email, 'token' => $token, 'expires_at' => $expires], JSON_UNESCAPED_SLASHES);

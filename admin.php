@@ -5730,8 +5730,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (in_array($template, ['single', 'post', 'podcast'], true)) {
                     $slug = pathinfo($filename, PATHINFO_FILENAME);
                     $slug = $slug !== '' ? $slug : $filename;
-                    $title = $metadata['Title'] ?? $slug;
-                    $description = $metadata['Description'] ?? '';
+                    $title = (string) ($metadata['Title'] ?? $slug);
+                    $description = (string) ($metadata['Description'] ?? '');
                     $image = $metadata['Image'] ?? '';
                     $imageUrl = admin_public_asset_url((string) $image);
                     $customUrl = '';
@@ -5821,8 +5821,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($itinerarySlug !== '') {
             $itinerary = admin_load_itinerary($itinerarySlug);
             if ($itinerary) {
-                $title = $itinerary->getTitle();
-                $description = $itinerary->getDescription();
+                $title = (string) $itinerary->getTitle();
+                $description = (string) $itinerary->getDescription();
                 $image = $itinerary->getImage() ?? '';
                 $customUrl = admin_public_itinerary_url($itinerary->getSlug());
                 $imageUrl = admin_public_asset_url($image);
@@ -6876,6 +6876,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $site_url = trim($_POST['site_url'] ?? '');
         $site_lang = trim($_POST['site_lang'] ?? 'es');
         $social_default_description = trim($_POST['social_default_description'] ?? '');
+        $contact_telegram = trim($_POST['contact_telegram'] ?? '');
+        $contact_email = trim($_POST['contact_email'] ?? '');
+        $contact_phone = trim($_POST['contact_phone'] ?? '');
+        $contact_footer = isset($_POST['contact_footer']) ? 'on' : 'off';
+        $contact_signature = isset($_POST['contact_signature']) ? 'on' : 'off';
+        $contact_signature_fields = $_POST['contact_signature_fields'] ?? [];
+        if (!is_array($contact_signature_fields)) {
+            $contact_signature_fields = [];
+        }
+        $contact_signature_fields = array_values(array_intersect(['telegram', 'email', 'phone'], $contact_signature_fields));
 
         try {
             $config = load_config_file();
@@ -6915,6 +6925,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $config['social'] = $social;
             } else {
                 unset($config['social']);
+            }
+
+            if ($contact_telegram !== '' || $contact_email !== '' || $contact_phone !== '' || $contact_footer === 'on' || $contact_signature === 'on') {
+                $config['contact'] = [
+                    'telegram' => $contact_telegram,
+                    'email' => $contact_email,
+                    'phone' => $contact_phone,
+                    'footer' => $contact_footer,
+                    'signature' => $contact_signature,
+                    'signature_fields' => $contact_signature_fields,
+                ];
+            } else {
+                unset($config['contact']);
             }
 
             save_config_file($config);

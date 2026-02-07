@@ -66,6 +66,13 @@
         $telexSettings = $settings['telex'] ?? [];
         $telexUrls = is_array($telexSettings['urls'] ?? null) ? $telexSettings['urls'] : [];
         $telexUrlsValue = $telexUrls ? implode("\n", $telexUrls) : '';
+        $contactSettings = is_array($settings['contact'] ?? null) ? $settings['contact'] : [];
+        $contactTelegram = $contactSettings['telegram'] ?? '';
+        $contactEmail = $contactSettings['email'] ?? '';
+        $contactPhone = $contactSettings['phone'] ?? '';
+        $contactFooter = ($contactSettings['footer'] ?? 'off') === 'on';
+        $contactSignature = ($contactSettings['signature'] ?? 'off') === 'on';
+        $contactSignatureFields = is_array($contactSettings['signature_fields'] ?? null) ? $contactSettings['signature_fields'] : [];
         $languageOptions = [
             'es' => 'Español',
             'ca' => 'Català',
@@ -148,6 +155,52 @@
                 <button type="submit" name="save_settings" class="btn btn-primary">Guardar configuración general</button>
             </div>
 
+        </form>
+
+        <form method="post" class="mt-4">
+            <h4 class="mt-2">Formas de contacto para los lectores</h4>
+            <p class="text-muted mb-3">Comparte vías de contacto visibles para los lectores y decide si aparecen en el pie o como firma.</p>
+            <div class="form-group">
+                <label for="contact_telegram">Usuario de Telegram Business</label>
+                <input type="text" name="contact_telegram" id="contact_telegram" class="form-control" value="<?= htmlspecialchars($contactTelegram, ENT_QUOTES, 'UTF-8') ?>" placeholder="@tuusuario">
+            </div>
+            <div class="form-group">
+                <label for="contact_email">Email</label>
+                <input type="email" name="contact_email" id="contact_email" class="form-control" value="<?= htmlspecialchars($contactEmail, ENT_QUOTES, 'UTF-8') ?>" placeholder="hola@tusitio.com">
+            </div>
+            <div class="form-group">
+                <label for="contact_phone">Teléfono</label>
+                <input type="text" name="contact_phone" id="contact_phone" class="form-control" value="<?= htmlspecialchars($contactPhone, ENT_QUOTES, 'UTF-8') ?>" placeholder="+34 600 000 000">
+            </div>
+            <div class="form-group">
+                <div class="custom-control custom-checkbox">
+                    <input type="checkbox" class="custom-control-input" id="contact_footer" name="contact_footer" <?= $contactFooter ? 'checked' : '' ?>>
+                    <label class="custom-control-label" for="contact_footer">Poner en el pie</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="custom-control custom-checkbox">
+                    <input type="checkbox" class="custom-control-input" id="contact_signature" name="contact_signature" <?= $contactSignature ? 'checked' : '' ?>>
+                    <label class="custom-control-label" for="contact_signature">Firmar las entradas y la newsletter con...</label>
+                </div>
+                <div class="mt-2">
+                    <div class="custom-control custom-checkbox">
+                        <input type="checkbox" class="custom-control-input" id="contact_signature_telegram" name="contact_signature_fields[]" value="telegram" <?= in_array('telegram', $contactSignatureFields, true) ? 'checked' : '' ?>>
+                        <label class="custom-control-label" for="contact_signature_telegram">Usuario de Telegram Business</label>
+                    </div>
+                    <div class="custom-control custom-checkbox">
+                        <input type="checkbox" class="custom-control-input" id="contact_signature_email" name="contact_signature_fields[]" value="email" <?= in_array('email', $contactSignatureFields, true) ? 'checked' : '' ?>>
+                        <label class="custom-control-label" for="contact_signature_email">Email</label>
+                    </div>
+                    <div class="custom-control custom-checkbox">
+                        <input type="checkbox" class="custom-control-input" id="contact_signature_phone" name="contact_signature_fields[]" value="phone" <?= in_array('phone', $contactSignatureFields, true) ? 'checked' : '' ?>>
+                        <label class="custom-control-label" for="contact_signature_phone">Teléfono</label>
+                    </div>
+                </div>
+            </div>
+            <div class="text-right mb-4">
+                <button type="submit" name="save_settings" class="btn btn-primary">Guardar contacto</button>
+            </div>
         </form>
 
         <form method="post" class="mt-4">

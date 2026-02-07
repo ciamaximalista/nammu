@@ -1092,6 +1092,7 @@ function get_settings() {
     $indexnow = array_merge($indexnowDefaults, $config['indexnow'] ?? []);
     $nisaba = $config['nisaba'] ?? [];
     $telex = $config['telex'] ?? [];
+    $contact = $config['contact'] ?? [];
 
     return [
         'sort_order' => $sort_order,
@@ -1129,6 +1130,7 @@ function get_settings() {
         'indexnow' => $indexnow,
         'nisaba' => $nisaba,
         'telex' => $telex,
+        'contact' => $contact,
         'entry' => $entry,
     ];
 }
@@ -6946,6 +6948,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = "Error guardando la configuración: " . $e->getMessage();
         }
 
+        header('Location: admin.php?page=configuracion');
+        exit;
+    } elseif (isset($_POST['save_contact'])) {
+        $contact_telegram = trim($_POST['contact_telegram'] ?? '');
+        $contact_email = trim($_POST['contact_email'] ?? '');
+        $contact_phone = trim($_POST['contact_phone'] ?? '');
+        $contact_footer = isset($_POST['contact_footer']) ? 'on' : 'off';
+        $contact_signature = isset($_POST['contact_signature']) ? 'on' : 'off';
+        $contact_signature_fields = $_POST['contact_signature_fields'] ?? [];
+        if (!is_array($contact_signature_fields)) {
+            $contact_signature_fields = [];
+        }
+        $contact_signature_fields = array_values(array_intersect(['telegram', 'email', 'phone'], $contact_signature_fields));
+        try {
+            $config = load_config_file();
+            if ($contact_telegram !== '' || $contact_email !== '' || $contact_phone !== '' || $contact_footer === 'on' || $contact_signature === 'on') {
+                $config['contact'] = [
+                    'telegram' => $contact_telegram,
+                    'email' => $contact_email,
+                    'phone' => $contact_phone,
+                    'footer' => $contact_footer,
+                    'signature' => $contact_signature,
+                    'signature_fields' => $contact_signature_fields,
+                ];
+            } else {
+                unset($config['contact']);
+            }
+            save_config_file($config);
+        } catch (Throwable $e) {
+            $error = "Error guardando la configuración: " . $e->getMessage();
+        }
         header('Location: admin.php?page=configuracion');
         exit;
     } elseif (isset($_POST['save_google_fonts'])) {

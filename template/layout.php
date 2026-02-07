@@ -1300,9 +1300,33 @@ if (!empty($baseUrl)) {
                                 </div>
                             <?php endif; ?>
                         <?php endif; ?>
+                        <?php if (!empty($contactFooterItems) && $footerLogoPosition === 'bottom'): ?>
+                            <div class="footer-contact-block">
+                                <div class="footer-contact-title">Contacto</div>
+                                <div class="footer-contact-links">
+                                    <?php foreach ($contactFooterItems as $item): ?>
+                                        <a class="footer-contact-link" href="<?= htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>">
+                                            <?= $item['svg'] ?>
+                                        </a>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
                         <?php if ($footerHtml !== ''): ?>
                             <div class="footer-html-content">
                                 <?= $footerHtml ?>
+                            </div>
+                        <?php endif; ?>
+                        <?php if (!empty($contactFooterItems) && $footerLogoPosition !== 'bottom'): ?>
+                            <div class="footer-contact-block">
+                                <div class="footer-contact-title">Contacto</div>
+                                <div class="footer-contact-links">
+                                    <?php foreach ($contactFooterItems as $item): ?>
+                                        <a class="footer-contact-link" href="<?= htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>">
+                                            <?= $item['svg'] ?>
+                                        </a>
+                                    <?php endforeach; ?>
+                                </div>
                             </div>
                         <?php endif; ?>
                         <?php if ($hasFooterLogo && $footerLogoPosition === 'bottom'): ?>
@@ -1330,18 +1354,6 @@ if (!empty($baseUrl)) {
                 <?php if ($footerNammuEnabled): ?>
                     <div class="footer-nammu-link">
                         <?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> utiliza <a href="https://ruralnext.org/nammu" target="_blank" rel="noopener">Nammu</a>, un CMS libre desarrollado en <a href="https://ruralnext.org" target="_blank" rel="noopener">RuralNEXT</a>.
-                    </div>
-                <?php endif; ?>
-                <?php if (!empty($contactFooterItems)): ?>
-                    <div class="footer-contact-block">
-                        <div class="footer-contact-title">Contacto</div>
-                        <div class="footer-contact-links">
-                            <?php foreach ($contactFooterItems as $item): ?>
-                                <a class="footer-contact-link" href="<?= htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>">
-                                    <?= $item['svg'] ?>
-                                </a>
-                            <?php endforeach; ?>
-                        </div>
                     </div>
                 <?php endif; ?>
             </footer>

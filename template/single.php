@@ -405,8 +405,8 @@ if ($isPageTemplate && $formattedDate !== '') {
     <?php endif; ?>
     <?php
     $contactSettings = function_exists('nammu_contact_settings') ? nammu_contact_settings() : [];
-    $contactSignatureLines = (!empty($contactSettings['signature'] ?? false))
-        ? nammu_contact_signature_lines($contactSettings)
+    $contactSignatureItems = (!empty($contactSettings['signature'] ?? false))
+        ? nammu_contact_signature_items($contactSettings)
         : [];
     ?>
     <div class="post-body">
@@ -422,10 +422,14 @@ if ($isPageTemplate && $formattedDate !== '') {
             </section>
         <?php endif; ?>
         <?= $htmlContent ?>
-        <?php if (!empty($contactSignatureLines)): ?>
+        <?php if (!empty($contactSignatureItems)): ?>
             <div class="post-contact-signature">
-                <?php foreach ($contactSignatureLines as $line): ?>
-                    <div class="post-contact-line"><?= htmlspecialchars($line, ENT_QUOTES, 'UTF-8') ?></div>
+                <?php foreach ($contactSignatureItems as $item): ?>
+                    <div class="post-contact-line">
+                        <a href="<?= htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>">
+                            <?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>
+                        </a>
+                    </div>
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
@@ -950,6 +954,13 @@ if ($isPageTemplate && $formattedDate !== '') {
         font-size: 1.6rem;
         font-weight: 600;
         line-height: 1.3;
+    }
+    .post-contact-signature a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .post-contact-signature a:hover {
+        text-decoration: underline;
     }
     .post-contact-signature .post-contact-line + .post-contact-line {
         margin-top: 0.35rem;

@@ -2819,6 +2819,45 @@ function nammu_contact_signature_lines(array $contact): array
     return $lines;
 }
 
+function nammu_contact_signature_items(array $contact): array
+{
+    $fields = $contact['signature_fields'] ?? [];
+    if (!is_array($fields)) {
+        $fields = [];
+    }
+    $items = [];
+    foreach ($fields as $field) {
+        if ($field === 'telegram') {
+            $handle = trim((string) ($contact['telegram'] ?? ''));
+            if ($handle !== '') {
+                $handle = ltrim($handle, '@');
+                $items[] = [
+                    'label' => '@' . $handle,
+                    'href' => 'https://t.me/' . rawurlencode($handle),
+                ];
+            }
+        } elseif ($field === 'email') {
+            $email = trim((string) ($contact['email'] ?? ''));
+            if ($email !== '') {
+                $items[] = [
+                    'label' => $email,
+                    'href' => 'mailto:' . $email,
+                ];
+            }
+        } elseif ($field === 'phone') {
+            $phone = trim((string) ($contact['phone'] ?? ''));
+            if ($phone !== '') {
+                $tel = preg_replace('/\s+/', '', $phone);
+                $items[] = [
+                    'label' => $phone,
+                    'href' => 'tel:' . $tel,
+                ];
+            }
+        }
+    }
+    return $items;
+}
+
 function nammu_contact_footer_items(array $contact): array
 {
     $items = [];
@@ -2844,9 +2883,9 @@ function nammu_contact_footer_items(array $contact): array
     if ($phone !== '') {
         $tel = preg_replace('/\s+/', '', $phone);
         $items[] = [
-            'label' => 'Teléfono',
+            'label' => $phone,
             'href' => 'tel:' . $tel,
-            'svg' => '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M6.6 2h3.1c.4 0 .8.3.9.7l.9 3.4c.1.4 0 .8-.3 1.1l-1.5 1.5a14.6 14.6 0 0 0 5.2 5.2l1.5-1.5c.3-.3.7-.4 1.1-.3l3.4.9c.4.1.7.5.7.9v3.1c0 .5-.4.9-.9.9C10 18.9 5.1 14 5.1 8.9c0-.5.4-.9.9-.9z" fill="currentColor"/></svg>',
+            'svg' => '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 .97-.25c1.07.27 2.22.41 3.41.41a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1C10.4 21 3 13.6 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.19.14 2.34.41 3.41a1 1 0 0 1-.25.97l-2.04 2.41z"/></svg>',
         ];
     }
     return $items;
@@ -3432,11 +3471,11 @@ function nammu_build_newsletter_html(array $settings, string $title, string $con
         $html[] = '      <div style="margin:0; line-height:1.75; font-size:18px; color:' . htmlspecialchars($colorText, ENT_QUOTES, 'UTF-8') . '; font-family:' . $bodyFontCss . ', Arial, sans-serif;">' . $contentHtml . '</div>';
     }
     $contact = nammu_contact_settings_from_config($settings);
-    $signatureLines = (!empty($contact['signature'] ?? false)) ? nammu_contact_signature_lines($contact) : [];
-    if (!empty($signatureLines)) {
+    $signatureItems = (!empty($contact['signature'] ?? false)) ? nammu_contact_signature_items($contact) : [];
+    if (!empty($signatureItems)) {
         $html[] = '      <div style="margin:22px 0 0 0; text-align:right; font-family:' . $titleFontCss . ', Arial, sans-serif; font-size:32px; line-height:1.2; font-weight:600; color:' . htmlspecialchars($signatureColor, ENT_QUOTES, 'UTF-8') . ';">';
-        foreach ($signatureLines as $line) {
-            $html[] = '        <div>' . htmlspecialchars($line, ENT_QUOTES, 'UTF-8') . '</div>';
+        foreach ($signatureItems as $item) {
+            $html[] = '        <div><a href="' . htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8') . '" style="color:' . htmlspecialchars($signatureColor, ENT_QUOTES, 'UTF-8') . '; text-decoration:none;">' . htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') . '</a></div>';
         }
         $html[] = '      </div>';
     }

@@ -199,7 +199,7 @@
                 </div>
             </div>
             <div class="text-right mb-4">
-                <button type="submit" name="save_settings" class="btn btn-primary">Guardar contacto</button>
+                <button type="submit" name="save_contact" class="btn btn-primary">Guardar contacto</button>
             </div>
         </form>
 

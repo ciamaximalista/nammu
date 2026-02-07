@@ -403,6 +403,12 @@ if ($isPageTemplate && $formattedDate !== '') {
             <img src="<?= htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($post->getTitle(), ENT_QUOTES, 'UTF-8') ?>" decoding="async" fetchpriority="high">
         </figure>
     <?php endif; ?>
+    <?php
+    $contactSettings = function_exists('nammu_contact_settings') ? nammu_contact_settings() : [];
+    $contactSignatureLines = (!empty($contactSettings['signature'] ?? false))
+        ? nammu_contact_signature_lines($contactSettings)
+        : [];
+    ?>
     <div class="post-body">
         <?php if ($singleSubscriptionTop): ?>
             <div class="site-search-block placement-top site-subscription-block">
@@ -416,6 +422,13 @@ if ($isPageTemplate && $formattedDate !== '') {
             </section>
         <?php endif; ?>
         <?= $htmlContent ?>
+        <?php if (!empty($contactSignatureLines)): ?>
+            <div class="post-contact-signature">
+                <?php foreach ($contactSignatureLines as $line): ?>
+                    <div class="post-contact-line"><?= htmlspecialchars($line, ENT_QUOTES, 'UTF-8') ?></div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
     </div>
     <?php if ($bottomMetaText !== ''): ?>
         <div class="post-meta-update"><?= $bottomMetaText ?></div>
@@ -928,6 +941,18 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .post-body blockquote p:last-child {
         margin-bottom: 0;
+    }
+    .post-contact-signature {
+        margin-top: 2.4rem;
+        text-align: right;
+        font-family: "<?= $fonts['title'] ?>", "<?= $fonts['body'] ?>", "Helvetica Neue", Arial, sans-serif;
+        color: <?= htmlspecialchars($colors['h1'] ?? '#1b8eed', ENT_QUOTES, 'UTF-8') ?>;
+        font-size: 1.6rem;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+    .post-contact-signature .post-contact-line + .post-contact-line {
+        margin-top: 0.35rem;
     }
     .category-tag-link {
         color: <?= $colorAccent ?>;

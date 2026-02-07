@@ -3384,6 +3384,7 @@ function nammu_build_newsletter_html(array $settings, string $title, string $con
     $colorH2 = $colors['h2'] ?? $colorText;
     $headerBg = $colors['h1'] ?? $colorAccent;
     $ctaColor = $colors['h1'] ?? $colorAccent;
+    $signatureColor = $colors['h1'] ?? $colorAccent;
     $outerBg = $colorHighlight;
     $cardBg = $colorBackground;
     $footerBg = $colorHighlight;
@@ -3429,6 +3430,15 @@ function nammu_build_newsletter_html(array $settings, string $title, string $con
     }
     if ($contentHtml !== '') {
         $html[] = '      <div style="margin:0; line-height:1.75; font-size:18px; color:' . htmlspecialchars($colorText, ENT_QUOTES, 'UTF-8') . '; font-family:' . $bodyFontCss . ', Arial, sans-serif;">' . $contentHtml . '</div>';
+    }
+    $contact = nammu_contact_settings_from_config($settings);
+    $signatureLines = (!empty($contact['signature'] ?? false)) ? nammu_contact_signature_lines($contact) : [];
+    if (!empty($signatureLines)) {
+        $html[] = '      <div style="margin:22px 0 0 0; text-align:right; font-family:' . $titleFontCss . ', Arial, sans-serif; font-size:32px; line-height:1.2; font-weight:600; color:' . htmlspecialchars($signatureColor, ENT_QUOTES, 'UTF-8') . ';">';
+        foreach ($signatureLines as $line) {
+            $html[] = '        <div>' . htmlspecialchars($line, ENT_QUOTES, 'UTF-8') . '</div>';
+        }
+        $html[] = '      </div>';
     }
     if ($link !== '') {
         $html[] = '      <p style="margin:20px 0 0 0;">';

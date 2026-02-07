@@ -3387,24 +3387,21 @@ function simple_yaml_dump(array $data, int $level = 0): string {
 
 function load_config_file(): array {
     $configFile = __DIR__ . '/config/config.yml';
-    if (class_exists(Yaml::class) && is_file($configFile)) {
-        try {
-            $parsed = Yaml::parseFile($configFile);
-            return is_array($parsed) ? $parsed : [];
-        } catch (Exception $e) {
-            return [];
-        }
-    }
-
     if (!is_file($configFile)) {
         return [];
     }
-
     $raw = file_get_contents($configFile);
     if ($raw === false) {
         return [];
     }
-
+    if (class_exists(Yaml::class)) {
+        try {
+            $parsed = Yaml::parse($raw);
+            return is_array($parsed) ? $parsed : [];
+        } catch (Exception $e) {
+            // Fallback to simple parser if Symfony YAML fails.
+        }
+    }
     $parsed = simple_yaml_parse($raw);
     return is_array($parsed) ? $parsed : [];
 }

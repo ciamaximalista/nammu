@@ -2866,7 +2866,7 @@ function nammu_contact_footer_items(array $contact): array
         $handle = ltrim($telegram, '@');
         $url = preg_match('#^https?://#i', $telegram) ? $telegram : ('https://t.me/' . rawurlencode($handle));
         $items[] = [
-            'label' => 'Telegram',
+            'label' => '@' . $handle,
             'href' => $url,
             'svg' => '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M21.7 5.2a1 1 0 0 0-1.1-.1L3.5 12.1a1 1 0 0 0 .1 1.9l4.7 1.7 1.9 5.1a1 1 0 0 0 1.7.3l2.8-3.2 4.6 3.4a1 1 0 0 0 1.6-.6l2-12.4a1 1 0 0 0-.2-0.7zM9.5 14.8l8-6.4-6.2 7.6-.2 2.8-1.2-3.1-3.5-1.3 11.7-4.6-10.6 5z"/></svg>',
         ];
@@ -2874,7 +2874,7 @@ function nammu_contact_footer_items(array $contact): array
     $email = trim((string) ($contact['email'] ?? ''));
     if ($email !== '') {
         $items[] = [
-            'label' => 'Email',
+            'label' => $email,
             'href' => 'mailto:' . $email,
             'svg' => '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="3,7 12,13 21,7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         ];

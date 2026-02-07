@@ -1003,6 +1003,9 @@ function get_settings() {
         'channel' => '',
         'recipient' => '',
         'auto_post' => 'off',
+        'app_secret' => '',
+        'token_refreshed_at' => 0,
+        'token_refresh_attempted_at' => 0,
     ], $config);
     $twitter = admin_extract_social_settings('twitter', [
         'token' => '',
@@ -1026,6 +1029,7 @@ function get_settings() {
     $instagram = admin_extract_social_settings('instagram', [
         'token' => '',
         'channel' => '',
+        'profile' => '',
         'recipient' => '',
         'auto_post' => 'off',
     ], $config);
@@ -2225,10 +2229,40 @@ function admin_extract_telegram_settings(?array $config = null): array {
     return $telegram;
 }
 
+function admin_refresh_facebook_token_if_needed(array $config): array {
+    $facebook = $config['facebook'] ?? [];
+    $appId = trim((string) ($config['social']['facebook_app_id'] ?? ''));
+    $appSecret = trim((string) ($facebook['app_secret'] ?? ''));
+    $token = trim((string) ($facebook['token'] ?? ''));
+    if ($appId === '' || $appSecret === '' || $token === '') {
+        return $config;
+    }
+    $lastAttempt = (int) ($facebook['token_refresh_attempted_at'] ?? 0);
+    if ($lastAttempt > 0 && (time() - $lastAttempt) < 86400) {
+        return $config;
+    }
+    $facebook['token_refresh_attempted_at'] = time();
+    $endpoint = 'https://graph.facebook.com/v17.0/oauth/access_token?grant_type=fb_exchange_token'
+        . '&client_id=' . rawurlencode($appId)
+        . '&client_secret=' . rawurlencode($appSecret)
+        . '&fb_exchange_token=' . rawurlencode($token);
+    $response = admin_http_get_json($endpoint);
+    if (is_array($response) && isset($response['access_token'])) {
+        $facebook['token'] = (string) $response['access_token'];
+        $facebook['token_refreshed_at'] = time();
+    } else {
+        error_log('Facebook token refresh failed: ' . json_encode($response));
+    }
+    $config['facebook'] = $facebook;
+    save_config_file($config);
+    return $config;
+}
+
 function admin_cached_social_settings(?string $key = null): array {
     static $cache = null;
     if ($cache === null) {
         $config = load_config_file();
+        $config = admin_refresh_facebook_token_if_needed($config);
         $cache = [
             'telegram' => admin_extract_telegram_settings($config),
             'whatsapp' => admin_extract_social_settings('whatsapp', [
@@ -2242,6 +2276,9 @@ function admin_cached_social_settings(?string $key = null): array {
                 'channel' => '',
                 'recipient' => '',
                 'auto_post' => 'off',
+                'app_secret' => '',
+                'token_refreshed_at' => 0,
+                'token_refresh_attempted_at' => 0,
             ], $config),
             'twitter' => admin_extract_social_settings('twitter', [
                 'token' => '',
@@ -2269,6 +2306,7 @@ function admin_cached_social_settings(?string $key = null): array {
             'instagram' => admin_extract_social_settings('instagram', [
                 'token' => '',
                 'channel' => '',
+                'profile' => '',
                 'recipient' => '',
                 'auto_post' => 'off',
             ], $config),
@@ -2345,6 +2383,16 @@ function admin_get_facebook_follower_count(array $settings): ?int {
         return (int) $payload['followers_count'];
     }
     return null;
+}
+
+function admin_facebook_debug_token(string $token, string $appId, string $appSecret): ?array {
+    if ($token === '' || $appId === '' || $appSecret === '') {
+        return null;
+    }
+    $endpoint = 'https://graph.facebook.com/debug_token?input_token=' . rawurlencode($token)
+        . '&access_token=' . rawurlencode($appId . '|' . $appSecret);
+    $payload = admin_http_get_json($endpoint);
+    return is_array($payload) ? $payload : null;
 }
 
 function admin_get_twitter_follower_count(array $settings): ?int {
@@ -2483,6 +2531,7 @@ function admin_send_facebook_post(string $slug, string $title, string $descripti
     $token = $settings['token'] ?? '';
     $pageId = $settings['channel'] ?? '';
     if ($token === '' || $pageId === '') {
+        error_log('Facebook post error (missing credentials): token=' . ($token !== '' ? 'set' : 'empty') . ' pageId=' . ($pageId !== '' ? $pageId : 'empty'));
         return false;
     }
     $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
@@ -2498,14 +2547,36 @@ function admin_send_facebook_post(string $slug, string $title, string $descripti
             'caption' => admin_build_post_message($slug, $title, $description, $trackedUrl),
             'access_token' => $token,
         ];
-        return admin_http_post_form($endpoint, $params);
+        $body = http_build_query($params);
+        $headers = [
+            'Content-Type: application/x-www-form-urlencoded',
+            'Content-Length: ' . strlen($body),
+        ];
+        $httpCode = null;
+        $responseBody = admin_http_post_body_response($endpoint, $body, $headers, $httpCode);
+        $ok = $responseBody !== null && ($httpCode === null || ($httpCode >= 200 && $httpCode < 300));
+        if (!$ok) {
+            error_log('Facebook post error (photo): http=' . ($httpCode ?? 'n/a') . ' response=' . (string) $responseBody);
+        }
+        return $ok;
     }
     $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($pageId) . '/feed';
     $params = [
         'message' => admin_build_post_message($slug, $title, $description, $trackedUrl, $imageUrl),
         'access_token' => $token,
     ];
-    return admin_http_post_form($endpoint, $params);
+    $body = http_build_query($params);
+    $headers = [
+        'Content-Type: application/x-www-form-urlencoded',
+        'Content-Length: ' . strlen($body),
+    ];
+    $httpCode = null;
+    $responseBody = admin_http_post_body_response($endpoint, $body, $headers, $httpCode);
+    $ok = $responseBody !== null && ($httpCode === null || ($httpCode >= 200 && $httpCode < 300));
+    if (!$ok) {
+        error_log('Facebook post error (feed): http=' . ($httpCode ?? 'n/a') . ' response=' . (string) $responseBody);
+    }
+    return $ok;
 }
 
 function admin_send_twitter_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = ''): bool {
@@ -2926,19 +2997,216 @@ function admin_build_instagram_caption(string $slug, string $title, string $desc
     return implode("\n\n", $parts);
 }
 
-function admin_send_instagram_post(string $slug, string $title, string $image, array $settings, string $description = '', string $urlOverride = ''): bool {
+function admin_instagram_load_image_resource(string $absolutePath, ?string &$type = null) {
+    if (!is_file($absolutePath)) {
+        return null;
+    }
+    $info = @getimagesize($absolutePath);
+    if (!is_array($info) || empty($info[2])) {
+        return null;
+    }
+    $imageType = (int) $info[2];
+    $resource = null;
+    if ($imageType === IMAGETYPE_JPEG && function_exists('imagecreatefromjpeg')) {
+        $resource = @imagecreatefromjpeg($absolutePath);
+        $type = 'jpeg';
+    } elseif ($imageType === IMAGETYPE_PNG && function_exists('imagecreatefrompng')) {
+        $resource = @imagecreatefrompng($absolutePath);
+        $type = 'png';
+    } elseif ($imageType === IMAGETYPE_GIF && function_exists('imagecreatefromgif')) {
+        $resource = @imagecreatefromgif($absolutePath);
+        $type = 'gif';
+    } elseif ($imageType === IMAGETYPE_WEBP && function_exists('imagecreatefromwebp')) {
+        $resource = @imagecreatefromwebp($absolutePath);
+        $type = 'webp';
+    }
+    return $resource ?: null;
+}
+
+function admin_prepare_instagram_image_url(string $imageTrim, string $baseUrl, ?string &$error = null): string {
+    $imageUrl = function_exists('nammu_resolve_asset') ? nammu_resolve_asset($imageTrim, $baseUrl) : '';
+    if ($imageUrl === null || $imageUrl === '') {
+        $error = 'No se pudo resolver la URL pública de la imagen destacada.';
+        return '';
+    }
+    $minAllowedRatio = 0.8;
+    $maxAllowedRatio = 1.91;
+    $projectRoot = __DIR__;
+    $imageTrimNorm = str_replace('\\', '/', $imageTrim);
+    $relativePath = ltrim($imageTrimNorm, '/');
+    if (preg_match('#^https?://#i', $imageTrimNorm)) {
+        $imageUrlParts = @parse_url($imageTrimNorm);
+        $baseUrlParts = @parse_url($baseUrl);
+        $imageHost = strtolower((string) ($imageUrlParts['host'] ?? ''));
+        $baseHost = strtolower((string) ($baseUrlParts['host'] ?? ''));
+        $imagePath = (string) ($imageUrlParts['path'] ?? '');
+        if ($imagePath !== '' && ($baseHost === '' || $imageHost === $baseHost)) {
+            $relativePath = ltrim($imagePath, '/');
+        }
+    }
+    if ($relativePath === '') {
+        $urlPath = (string) (@parse_url($imageUrl, PHP_URL_PATH) ?: '');
+        if ($urlPath !== '') {
+            $relativePath = ltrim($urlPath, '/');
+        }
+    }
+    $absolutePath = $relativePath !== '' ? ($projectRoot . '/' . $relativePath) : '';
+
+    $src = null;
+    $sourceMtime = '';
+    if ($absolutePath !== '' && is_file($absolutePath)) {
+        $srcType = null;
+        $src = admin_instagram_load_image_resource($absolutePath, $srcType);
+        $sourceMtime = (string) @filemtime($absolutePath);
+    }
+    if (!$src && function_exists('imagecreatefromstring')) {
+        $rawImage = @file_get_contents($imageUrl);
+        if (($rawImage === false || $rawImage === '') && function_exists('curl_init')) {
+            $ch = curl_init($imageUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            $rawImage = curl_exec($ch);
+            curl_close($ch);
+        }
+        if (is_string($rawImage) && $rawImage !== '') {
+            $src = @imagecreatefromstring($rawImage);
+            $sourceMtime = (string) strlen($rawImage);
+        }
+    }
+    if (!$src) {
+        $error = 'No se pudo cargar la imagen para Instagram.';
+        return '';
+    }
+    $width = (int) imagesx($src);
+    $height = (int) imagesy($src);
+    if ($width < 10 || $height < 10) {
+        imagedestroy($src);
+        $error = 'La imagen destacada no tiene dimensiones válidas para Instagram.';
+        return '';
+    }
+    $originalRatio = $height > 0 ? ($width / $height) : 0.0;
+    $originalRatioAllowed = $originalRatio >= $minAllowedRatio && $originalRatio <= $maxAllowedRatio;
+    if (!function_exists('imagecreatetruecolor')) {
+        imagedestroy($src);
+        if (!$originalRatioAllowed) {
+            $error = 'La imagen destacada tiene una proporcion no admitida por Instagram y el servidor no puede generar una variante valida (GD no disponible).';
+            return '';
+        }
+        return $imageUrl;
+    }
+
+    // Build a square, centered variant (1:1) to avoid intermittent Instagram ratio rejections.
+    $squareSide = (int) min($width, $height);
+    $srcX = (int) floor(($width - $squareSide) / 2);
+    $srcY = (int) floor(($height - $squareSide) / 2);
+    // Instagram accepts 1:1, and a stable 1080x1080 output avoids size/ratio edge cases.
+    $targetSide = 1080;
+
+    $dst = imagecreatetruecolor($targetSide, $targetSide);
+    if (!$dst) {
+        imagedestroy($src);
+        return $imageUrl;
+    }
+    imagecopyresampled($dst, $src, 0, 0, $srcX, $srcY, $targetSide, $targetSide, $squareSide, $squareSide);
+
+    $socialDir = $projectRoot . '/assets/social';
+    if (!is_dir($socialDir)) {
+        @mkdir($socialDir, 0755, true);
+    }
+    $hashBase = ($relativePath !== '' ? $relativePath : $imageUrl) . '|' . $sourceMtime . '|' . $width . 'x' . $height . '|sq';
+    $variantName = 'instagram_' . substr(sha1($hashBase), 0, 20) . '.jpg';
+    $variantAbsolute = $socialDir . '/' . $variantName;
+    $saved = @imagejpeg($dst, $variantAbsolute, 88);
+    imagedestroy($dst);
+    imagedestroy($src);
+    if (!$saved) {
+        if (!$originalRatioAllowed) {
+            $error = 'No se pudo generar la imagen ajustada para Instagram.';
+            return '';
+        }
+        return $imageUrl;
+    }
+    $variantSize = @getimagesize($variantAbsolute);
+    if (!is_array($variantSize) || (int) ($variantSize[0] ?? 0) !== 1080 || (int) ($variantSize[1] ?? 0) !== 1080) {
+        @unlink($variantAbsolute);
+        $error = 'No se pudo generar una imagen valida 1080x1080 para Instagram.';
+        return '';
+    }
+    $variantUrl = rtrim($baseUrl, '/') . '/assets/social/' . rawurlencode($variantName);
+    return $variantUrl;
+}
+
+function admin_probe_public_url_headers(string $url): array {
+    $headers = @get_headers($url, true);
+    if (!is_array($headers) || empty($headers[0])) {
+        return ['ok' => false, 'status' => '', 'content_type' => ''];
+    }
+    $statusLine = is_array($headers[0]) ? (string) end($headers[0]) : (string) $headers[0];
+    $contentTypeRaw = $headers['Content-Type'] ?? '';
+    if (is_array($contentTypeRaw)) {
+        $contentTypeRaw = (string) end($contentTypeRaw);
+    } else {
+        $contentTypeRaw = (string) $contentTypeRaw;
+    }
+    $contentType = strtolower(trim(explode(';', $contentTypeRaw)[0]));
+    $isOkStatus = stripos($statusLine, ' 200 ') !== false;
+    $isImage = strncmp($contentType, 'image/', 6) === 0;
+    return [
+        'ok' => $isOkStatus && $isImage,
+        'status' => $statusLine,
+        'content_type' => $contentType,
+    ];
+}
+
+function admin_wait_instagram_media_ready(string $creationId, string $token, int $maxAttempts = 12, int $delaySeconds = 2, ?array &$lastPayload = null): bool {
+    $lastPayload = null;
+    for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+        $statusEndpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($creationId)
+            . '?fields=status_code,status,error_message&access_token=' . rawurlencode($token);
+        $payload = admin_http_get_json($statusEndpoint);
+        if (is_array($payload)) {
+            $lastPayload = $payload;
+            if (isset($payload['error']['message'])) {
+                return false;
+            }
+            $statusCode = strtoupper((string) ($payload['status_code'] ?? ''));
+            if ($statusCode === 'FINISHED') {
+                return true;
+            }
+            if ($statusCode === 'ERROR' || !empty($payload['error_message'])) {
+                return false;
+            }
+        }
+        if ($attempt < $maxAttempts - 1) {
+            sleep($delaySeconds);
+        }
+    }
+    return false;
+}
+
+function admin_send_instagram_post(string $slug, string $title, string $image, array $settings, string $description = '', string $urlOverride = '', ?string &$error = null): bool {
     $token = trim((string) ($settings['token'] ?? ''));
     $accountId = trim((string) ($settings['channel'] ?? ''));
     if ($token === '' || $accountId === '') {
+        $error = 'Falta token o ID de cuenta de Instagram.';
         return false;
     }
     $imageTrim = trim($image);
     if ($imageTrim === '') {
+        $error = 'Instagram requiere una imagen destacada.';
         return false;
     }
     $baseUrl = admin_base_url();
-    $imageUrl = function_exists('nammu_resolve_asset') ? nammu_resolve_asset($imageTrim, $baseUrl) : '';
-    if ($imageUrl === null || $imageUrl === '') {
+    $imageUrl = admin_prepare_instagram_image_url($imageTrim, $baseUrl, $error);
+    if ($imageUrl === '') {
+        return false;
+    }
+    $probe = admin_probe_public_url_headers($imageUrl);
+    if (!($probe['ok'] ?? false)) {
+        $status = (string) ($probe['status'] ?? '');
+        $contentType = (string) ($probe['content_type'] ?? '');
+        $error = 'Instagram: la URL de imagen no es accesible como imagen pública (HTTP=' . $status . ', Content-Type=' . $contentType . ').';
+        error_log('Instagram post error (image_url_probe): slug=' . $slug . ' imageUrl=' . $imageUrl . ' status=' . $status . ' contentType=' . $contentType);
         return false;
     }
     $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
@@ -2954,15 +3222,49 @@ function admin_send_instagram_post(string $slug, string $title, string $image, a
         'access_token' => $token,
     ]);
     if (!is_array($createResponse) || empty($createResponse['id'])) {
+        if (is_array($createResponse) && isset($createResponse['error']['message'])) {
+            $error = 'Instagram: ' . (string) $createResponse['error']['message'];
+        }
+        error_log('Instagram post error (create_media): slug=' . $slug . ' accountId=' . $accountId . ' imageUrl=' . $imageUrl . ' response=' . json_encode($createResponse, JSON_UNESCAPED_UNICODE));
         return false;
     }
     $creationId = (string) $createResponse['id'];
+    $mediaStatus = null;
+    $mediaReady = admin_wait_instagram_media_ready($creationId, $token, 12, 2, $mediaStatus);
+    if (!$mediaReady) {
+        $statusCode = is_array($mediaStatus) ? (string) ($mediaStatus['status_code'] ?? '') : '';
+        $statusMessage = '';
+        if (is_array($mediaStatus)) {
+            $statusMessage = (string) ($mediaStatus['error']['message'] ?? ($mediaStatus['error_message'] ?? ($mediaStatus['status'] ?? '')));
+        }
+        error_log('Instagram post warning (media_not_ready_yet): slug=' . $slug . ' accountId=' . $accountId . ' creationId=' . $creationId . ' statusCode=' . $statusCode . ' payload=' . json_encode($mediaStatus, JSON_UNESCAPED_UNICODE));
+        // Do not abort here. Some containers become publishable even when status polling is inconclusive.
+    }
     $publishEndpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($accountId) . '/media_publish';
-    $publishResponse = admin_http_post_form_json($publishEndpoint, [
-        'creation_id' => $creationId,
-        'access_token' => $token,
-    ]);
-    return is_array($publishResponse) && !empty($publishResponse['id']);
+    $publishResponse = null;
+    $publishAttempts = 8;
+    for ($attempt = 0; $attempt < $publishAttempts; $attempt++) {
+        $publishResponse = admin_http_post_form_json($publishEndpoint, [
+            'creation_id' => $creationId,
+            'access_token' => $token,
+        ]);
+        if (is_array($publishResponse) && !empty($publishResponse['id'])) {
+            return true;
+        }
+        $message = is_array($publishResponse) ? (string) ($publishResponse['error']['message'] ?? '') : '';
+        $isMediaNotReady = stripos($message, 'Media ID is not available') !== false;
+        $isStillProcessing = stripos($message, 'not finished processing') !== false || stripos($message, 'is still being processed') !== false;
+        if (($isMediaNotReady || $isStillProcessing) && $attempt < $publishAttempts - 1) {
+            sleep(3);
+            continue;
+        }
+        break;
+    }
+    if (is_array($publishResponse) && isset($publishResponse['error']['message'])) {
+        $error = 'Instagram: ' . (string) $publishResponse['error']['message'];
+    }
+    error_log('Instagram post error (publish_media): slug=' . $slug . ' accountId=' . $accountId . ' response=' . json_encode($publishResponse, JSON_UNESCAPED_UNICODE));
+    return false;
 }
 
 function admin_http_post_json(string $url, array $payload, array $headers = []): bool {
@@ -4825,7 +5127,7 @@ if (isset($_GET['bing_oauth'])) {
                 'message' => 'Error al conectar con Bing Webmaster Tools: ' . $e->getMessage(),
             ];
         }
-        header('Location: admin.php?page=configuracion');
+        header('Location: admin.php?page=anuncios#facebook');
         exit;
     }
 }
@@ -5761,7 +6063,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $sent = admin_send_whatsapp_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
                                 break;
                             case 'facebook':
+                                error_log('Facebook manual send: slug=' . $slug . ' pageId=' . ($networkSettings['channel'] ?? ''));
                                 $sent = admin_send_facebook_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
+                                if (!$sent) {
+                                    error_log('Facebook manual send failed for slug=' . $slug);
+                                }
                                 break;
                             case 'twitter':
                                 $sent = admin_send_twitter_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
@@ -5777,7 +6083,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     $customError = 'Instagram requiere una imagen destacada para enviar la publicación.';
                                     break;
                                 }
-                                $sent = admin_send_instagram_post($slug, $title, $image, $networkSettings, $description, $customUrl);
+                                $sent = admin_send_instagram_post($slug, $title, $image, $networkSettings, $description, $customUrl, $customError);
                                 break;
                         }
                         if ($sent) {
@@ -5856,7 +6162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $customError = 'Instagram requiere una imagen destacada para enviar la publicación.';
                                 break;
                             }
-                            $sent = admin_send_instagram_post($itinerarySlug, $title, $image, $networkSettings, $description, $customUrl);
+                            $sent = admin_send_instagram_post($itinerarySlug, $title, $image, $networkSettings, $description, $customUrl, $customError);
                             break;
                     }
                     if ($sent) {
@@ -7097,6 +7403,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $whatsapp_recipient = trim($_POST['whatsapp_recipient'] ?? '');
         $whatsapp_auto = isset($_POST['whatsapp_auto']) ? 'on' : 'off';
         $facebook_token = trim($_POST['facebook_token'] ?? '');
+        $facebook_app_secret = trim($_POST['facebook_app_secret'] ?? '');
         $facebook_channel = trim($_POST['facebook_channel'] ?? '');
         $facebook_auto = isset($_POST['facebook_auto']) ? 'on' : 'off';
         $twitter_token = trim($_POST['twitter_token'] ?? '');
@@ -7113,6 +7420,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $mastodon_auto = isset($_POST['mastodon_auto']) ? 'on' : 'off';
         $instagram_token = trim($_POST['instagram_token'] ?? '');
         $instagram_channel = trim($_POST['instagram_channel'] ?? '');
+        $instagram_profile = trim($_POST['instagram_profile'] ?? '');
         $instagram_auto = isset($_POST['instagram_auto']) ? 'on' : 'off';
         $podcast_spotify = trim($_POST['podcast_spotify'] ?? '');
         $podcast_ivoox = trim($_POST['podcast_ivoox'] ?? '');
@@ -7156,11 +7464,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 unset($config['whatsapp']);
             }
-            if ($facebook_token !== '' || $facebook_channel !== '' || $facebook_auto === 'on') {
+            if ($facebook_token !== '' || $facebook_channel !== '' || $facebook_app_secret !== '' || $facebook_auto === 'on') {
                 $config['facebook'] = [
                     'token' => $facebook_token,
                     'channel' => $facebook_channel,
                     'auto_post' => $facebook_auto,
+                    'app_secret' => $facebook_app_secret,
                 ];
             } else {
                 unset($config['facebook']);
@@ -7196,10 +7505,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 unset($config['mastodon']);
             }
-            if ($instagram_token !== '' || $instagram_channel !== '' || $instagram_auto === 'on') {
+            if ($instagram_token !== '' || $instagram_channel !== '' || $instagram_profile !== '' || $instagram_auto === 'on') {
                 $config['instagram'] = [
                     'token' => $instagram_token,
                     'channel' => $instagram_channel,
+                    'profile' => $instagram_profile,
                     'auto_post' => $instagram_auto,
                 ];
             } else {
@@ -7222,11 +7532,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             save_config_file($config);
+            $_SESSION['social_feedback'] = [
+                'type' => 'success',
+                'message' => 'Redes sociales guardadas correctamente.',
+            ];
         } catch (Throwable $e) {
-            $error = "Error guardando la configuración: " . $e->getMessage();
+            $_SESSION['social_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Error guardando la configuración: ' . $e->getMessage(),
+            ];
         }
 
-        header('Location: admin.php?page=configuracion');
+        header('Location: admin.php?page=anuncios#facebook');
         exit;
     } elseif (isset($_POST['save_mailing'])) {
         $mailingGmail = trim($_POST['mailing_gmail'] ?? '');

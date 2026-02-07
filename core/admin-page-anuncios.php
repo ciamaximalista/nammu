@@ -20,8 +20,17 @@
     $telegramAutoEnabled = ($telegramSettings['auto_post'] ?? 'off') === 'on';
     $whatsappSettings = $settings['whatsapp'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off', 'recipient' => ''];
     $whatsappAutoEnabled = ($whatsappSettings['auto_post'] ?? 'off') === 'on';
-    $facebookSettings = $settings['facebook'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
+    $facebookSettings = $settings['facebook'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off', 'app_secret' => ''];
     $facebookAutoEnabled = ($facebookSettings['auto_post'] ?? 'off') === 'on';
+    $facebookAppId = trim((string) (($settings['social']['facebook_app_id'] ?? '') ?: ''));
+    $facebookTokenDebug = null;
+    if (function_exists('admin_facebook_debug_token')) {
+        $facebookToken = trim((string) ($facebookSettings['token'] ?? ''));
+        $facebookAppSecret = trim((string) ($facebookSettings['app_secret'] ?? ''));
+        if ($facebookToken !== '' && $facebookAppId !== '' && $facebookAppSecret !== '') {
+            $facebookTokenDebug = admin_facebook_debug_token($facebookToken, $facebookAppId, $facebookAppSecret);
+        }
+    }
     $twitterSettings = $settings['twitter'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
     $twitterAutoEnabled = ($twitterSettings['auto_post'] ?? 'off') === 'on';
     $twitterApiKey = $twitterSettings['api_key'] ?? '';
@@ -32,7 +41,7 @@
     $blueskyAutoEnabled = ($blueskySettings['auto_post'] ?? 'off') === 'on';
     $mastodonSettings = $settings['mastodon'] ?? ['instance' => '', 'handle' => '', 'access_token' => '', 'profile' => '', 'auto_post' => 'off'];
     $mastodonAutoEnabled = ($mastodonSettings['auto_post'] ?? 'off') === 'on';
-    $instagramSettings = $settings['instagram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
+    $instagramSettings = $settings['instagram'] ?? ['token' => '', 'channel' => '', 'profile' => '', 'auto_post' => 'off'];
     $instagramAutoEnabled = ($instagramSettings['auto_post'] ?? 'off') === 'on';
     $podcastServices = $settings['podcast_services'] ?? [];
     $podcastSpotify = trim((string) ($podcastServices['spotify'] ?? ''));
@@ -178,6 +187,12 @@
             <div class="card mb-4">
                 <div class="card-body">
                     <h3 class="h5 mb-3">Integración con Redes Sociales</h3>
+                    <?php if (!empty($_SESSION['social_feedback'])): ?>
+                        <?php $socialFeedback = $_SESSION['social_feedback']; unset($_SESSION['social_feedback']); ?>
+                        <div class="alert alert-<?= htmlspecialchars($socialFeedback['type'] ?? 'info', ENT_QUOTES, 'UTF-8') ?>">
+                            <?= htmlspecialchars($socialFeedback['message'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+                        </div>
+                    <?php endif; ?>
 
                     <div class="form-group">
                         <label for="social_default_description">Descripción por defecto</label>
@@ -301,6 +316,44 @@
                         <small class="form-text text-muted">Usa un token con permisos para publicar en la página objetivo.</small>
                     </div>
                     <div class="form-group">
+                        <label for="social_facebook_app_id_block">Facebook App ID</label>
+                        <input type="text" name="social_facebook_app_id" id="social_facebook_app_id_block" class="form-control" value="<?= htmlspecialchars($facebookAppId, ENT_QUOTES, 'UTF-8') ?>" placeholder="Opcional">
+                        <small class="form-text text-muted">Repite el App ID aquí si no lo has puesto en la parte superior.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="facebook_app_secret">App Secret</label>
+                        <input type="password" name="facebook_app_secret" id="facebook_app_secret" class="form-control" value="<?= htmlspecialchars($facebookSettings['app_secret'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Opcional pero recomendado">
+                        <small class="form-text text-muted">Necesario para refrescar automáticamente el token cada día.</small>
+                    </div>
+                    <?php if (!is_array($facebookTokenDebug) && ($facebookSettings['token'] ?? '') !== '' && $facebookAppId !== '' && ($facebookSettings['app_secret'] ?? '') === ''): ?>
+                        <div class="alert alert-warning">
+                            Para ver el diagnóstico del token, añade el App Secret.
+                        </div>
+                    <?php elseif (!is_array($facebookTokenDebug) && ($facebookSettings['token'] ?? '') !== '' && ($facebookSettings['app_secret'] ?? '') !== '' && $facebookAppId === ''): ?>
+                        <div class="alert alert-warning">
+                            Para ver el diagnóstico del token, añade el Facebook App ID.
+                        </div>
+                    <?php elseif (is_array($facebookTokenDebug)): ?>
+                        <?php if (isset($facebookTokenDebug['data'])): ?>
+                            <?php
+                            $facebookTokenData = $facebookTokenDebug['data'];
+                            $facebookScopes = isset($facebookTokenData['scopes']) && is_array($facebookTokenData['scopes']) ? $facebookTokenData['scopes'] : [];
+                            $facebookTokenType = (string) ($facebookTokenData['type'] ?? '');
+                            $facebookExpiresAt = isset($facebookTokenData['expires_at']) ? (int) $facebookTokenData['expires_at'] : 0;
+                            $facebookExpiresText = $facebookExpiresAt > 0 ? date('Y-m-d H:i', $facebookExpiresAt) : 'n/d';
+                            ?>
+                            <div class="alert alert-info">
+                                Token: tipo <strong><?= htmlspecialchars($facebookTokenType, ENT_QUOTES, 'UTF-8') ?></strong>,
+                                permisos <strong><?= htmlspecialchars(implode(', ', $facebookScopes), ENT_QUOTES, 'UTF-8') ?></strong>,
+                                caduca <strong><?= htmlspecialchars($facebookExpiresText, ENT_QUOTES, 'UTF-8') ?></strong>.
+                            </div>
+                        <?php elseif (isset($facebookTokenDebug['error']['message'])): ?>
+                            <div class="alert alert-warning">
+                                <?= htmlspecialchars((string) $facebookTokenDebug['error']['message'], ENT_QUOTES, 'UTF-8') ?>
+                            </div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                    <div class="form-group">
                         <label for="facebook_channel">ID de página o grupo</label>
                         <input type="text" name="facebook_channel" id="facebook_channel" class="form-control" value="<?= htmlspecialchars($facebookSettings['channel'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="1234567890">
                         <small class="form-text text-muted">Puedes obtenerlo desde la configuración avanzada de la página.</small>
@@ -320,11 +373,78 @@
                                 </div>
                                 <div class="modal-body">
                                     <ol class="mb-3">
-                                        <li>Crea una app en Meta Developers y habilita Graph API.</li>
-                                        <li>Genera un token con permisos para publicar en la página.</li>
-                                        <li>Introduce el ID de la página y el token.</li>
+                                        <li>Entra en Meta for Developers y crea una app.</li>
+                                        <li>Cuando pregunte por casos de uso, filtra por “Todo” y selecciona “Otro. Tu app se creará en la experiencia antigua”.</li>
+                                        <li>En tipo de app, selecciona “Empresa”.</li>
+                                        <li>Si te pide conectar un portfolio empresarial, conéctalo (recomendado, sobre todo si luego usarás Instagram).</li>
+                                        <li>Pon la app en Producción (Live).</li>
+                                        <li>Abre Configuración &gt; Básica y copia el App ID.</li>
+                                        <li>En el mismo sitio, en “App Secret”, pulsa “Mostrar”, confirma contraseña y copia el App Secret.</li>
+                                        <li>En <code>business.facebook.com</code>, ve a Configuración del negocio &gt; Usuarios &gt; Usuarios del sistema y crea un usuario del sistema.</li>
+                                        <li>En ese usuario del sistema, añade activos: la app (rol administrador) y la página de Facebook (control total o permisos para publicar).</li>
+                                        <li>En ese mismo usuario del sistema, pulsa “Generar token”, elige la app y marca permisos: <code>pages_manage_posts</code>, <code>pages_read_engagement</code> y <code>pages_show_list</code> (si aparece).</li>
+                                        <li>Importante: estos permisos del token se conceden en Business Manager (usuario del sistema), no con token de usuario en Graph Explorer.</li>
+                                        <li>Obtén el Page Access Token final abriendo en tu navegador esta URL (sustituyendo valores):<br><code>https://graph.facebook.com/v17.0/TU_PAGE_ID?fields=access_token&amp;access_token=TU_TOKEN_DE_USUARIO_DE_SISTEMA</code></li>
+                                        <li>De la respuesta JSON, copia el campo <code>access_token</code> (ese es el token de página que debe ir en Nammu).</li>
+                                        <li>En este bloque de Nammu pega: App ID, App Secret, Token de acceso (token de página) e ID de página.</li>
+                                        <li>Guarda y prueba con el botón Facebook en “Editar”.</li>
                                     </ol>
-                                    <p class="mb-0">Puedes obtener el ID de página en la configuración avanzada de Facebook.</p>
+                                    <p class="mb-0">Nota: el “identificador de acceso” válido para publicar es el token de página, no el token de usuario. El ID de página se ve en Configuración de la página &gt; Información o en la URL de la página en Facebook.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h4 class="mt-4">Instagram (opcional)</h4>
+                    <p class="text-muted">Requiere cuenta Business/Creator vinculada a una página de Facebook. Publica la imagen destacada con título y enlace. <a href="#" data-toggle="modal" data-target="#instagramHelpModal">Ver guía rápida</a></p>
+                    <div class="form-group">
+                        <label for="instagram_token">Token de acceso</label>
+                        <input type="text" name="instagram_token" id="instagram_token" class="form-control" value="<?= htmlspecialchars($instagramSettings['token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="EAAG...">
+                        <small class="form-text text-muted">Token con permisos para publicar en Instagram Graph API.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="instagram_channel">ID de cuenta de Instagram</label>
+                        <input type="text" name="instagram_channel" id="instagram_channel" class="form-control" value="<?= htmlspecialchars($instagramSettings['channel'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="17841400000000000">
+                        <small class="form-text text-muted">ID numérico de la cuenta de Instagram vinculada.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="instagram_profile">Perfil público de Instagram (usuario o URL)</label>
+                        <input type="text" name="instagram_profile" id="instagram_profile" class="form-control" value="<?= htmlspecialchars($instagramSettings['profile'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="@fundacionrepoblacion o https://www.instagram.com/fundacionrepoblacion/">
+                        <small class="form-text text-muted">Se usa para enlazar el icono de Instagram en el footer.</small>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" name="instagram_auto" id="instagram_auto" value="1" <?= $instagramAutoEnabled ? 'checked' : '' ?>>
+                        <label for="instagram_auto" class="form-check-label">Enviar automáticamente cada nueva entrada o itinerario publicado</label>
+                    </div>
+
+                    <div class="modal fade" id="instagramHelpModal" tabindex="-1" role="dialog" aria-labelledby="instagramHelpModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="instagramHelpModalLabel">Guía rápida para Instagram</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <ol class="mb-3">
+                                        <li>Convierte tu cuenta de Instagram a tipo <strong>Business</strong> o <strong>Creator</strong>.</li>
+                                        <li>Vincula esa cuenta de Instagram a una página de Facebook que administres.</li>
+                                        <li>En Meta for Developers, usa la misma app que ya usas para Facebook (tipo Empresa).</li>
+                                        <li>Dentro de esa app, añade el producto <strong>Instagram</strong> / <strong>Instagram Graph API</strong> (el nombre puede variar según panel).</li>
+                                        <li>Asegura que la app está en <strong>Producción (Live)</strong> y conectada al mismo Business Manager.</li>
+                                        <li>En permisos del token, incluye: <code>instagram_basic</code>, <code>instagram_content_publish</code>, <code>pages_show_list</code> y <code>pages_read_engagement</code>.</li>
+                                        <li>Genera un token válido para esa app y ese negocio (si usas usuario del sistema, debe tener acceso a la página vinculada).</li>
+                                        <li>Obtén el ID de la cuenta de Instagram consultando la página vinculada en Graph API:<br><code>https://graph.facebook.com/v17.0/TU_PAGE_ID?fields=instagram_business_account&amp;access_token=TU_TOKEN</code></li>
+                                        <li>Si la respuesta incluye <code>instagram_business_account.id</code>, ese es el ID que debes pegar en Nammu.</li>
+                                        <li>También puedes ver el ID de cuenta de Instagram desde Meta Business (en la sección de cuentas de Instagram del negocio).</li>
+                                        <li>Pega en este bloque el token y el ID de cuenta de Instagram.</li>
+                                        <li>Guarda y prueba publicando desde “Editar”.</li>
+                                    </ol>
+                                    <p class="mb-0">Nota: Instagram muestra el enlace en el texto, pero normalmente no lo vuelve clicable en el pie del post.</p>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
@@ -469,48 +589,6 @@
                         </div>
                     </div>
 
-                    <h4 class="mt-4">Instagram (opcional)</h4>
-                    <p class="text-muted">Requiere cuenta Business/Creator vinculada a una página de Facebook. Publica la imagen destacada con título y enlace. <a href="#" data-toggle="modal" data-target="#instagramHelpModal">Ver guía rápida</a></p>
-                    <div class="form-group">
-                        <label for="instagram_token">Token de acceso</label>
-                        <input type="text" name="instagram_token" id="instagram_token" class="form-control" value="<?= htmlspecialchars($instagramSettings['token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="EAAG...">
-                        <small class="form-text text-muted">Token con permisos para publicar en Instagram Graph API.</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="instagram_channel">ID de cuenta de Instagram</label>
-                        <input type="text" name="instagram_channel" id="instagram_channel" class="form-control" value="<?= htmlspecialchars($instagramSettings['channel'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="17841400000000000">
-                        <small class="form-text text-muted">ID numérico de la cuenta de Instagram vinculada.</small>
-                    </div>
-                    <div class="form-check mb-3">
-                        <input type="checkbox" class="form-check-input" name="instagram_auto" id="instagram_auto" value="1" <?= $instagramAutoEnabled ? 'checked' : '' ?>>
-                        <label for="instagram_auto" class="form-check-label">Enviar automáticamente cada nueva entrada o itinerario publicado</label>
-                    </div>
-
-                    <div class="modal fade" id="instagramHelpModal" tabindex="-1" role="dialog" aria-labelledby="instagramHelpModalLabel" aria-hidden="true">
-                        <div class="modal-dialog modal-lg" role="document">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title" id="instagramHelpModalLabel">Guía rápida para Instagram</h5>
-                                    <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
-                                        <span aria-hidden="true">&times;</span>
-                                    </button>
-                                </div>
-                                <div class="modal-body">
-                                    <ol class="mb-3">
-                                        <li>Convierte tu cuenta en Business o Creator y vincúlala a una página de Facebook.</li>
-                                        <li>En Meta Developers crea una app con permisos: <code>instagram_basic</code>, <code>instagram_content_publish</code> y <code>pages_show_list</code>.</li>
-                                        <li>Genera un access token de larga duración y consigue el ID de la cuenta de Instagram conectada.</li>
-                                        <li>Introduce el token y el ID en este formulario.</li>
-                                    </ol>
-                                    <p class="mb-0">El enlace se incluye en el texto del post, pero Instagram no lo hace clicable.</p>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="border rounded p-3 bg-light mt-4">
                         <h4 class="h6 text-uppercase mb-2">Servicios de Podcast</h4>
                         <p class="text-muted mb-3">Usa esta URL para dar de alta el feed: <code><?= htmlspecialchars($podcastFeedUrl, ENT_QUOTES, 'UTF-8') ?></code></p>
@@ -536,7 +614,7 @@
                         </div>
                     </div>
 
-                    <button type="submit" name="save_social" class="btn btn-outline-primary">Guardar redes sociales</button>
+                    <button type="submit" name="save_social" class="btn btn-outline-primary mt-3">Guardar redes sociales</button>
                 </div>
             </div>
         </form>

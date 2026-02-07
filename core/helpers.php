@@ -1547,6 +1547,7 @@ function nammu_footer_icon_svgs(): array
         'telegram' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M21.7 5.2a1 1 0 0 0-1.1-.1L3.5 12.1a1 1 0 0 0 .1 1.9l4.7 1.7 1.9 5.1a1 1 0 0 0 1.7.3l2.8-3.2 4.6 3.4a1 1 0 0 0 1.6-.6l2-12.4a1 1 0 0 0-.2-0.7zM9.5 14.8l8-6.4-6.2 7.6-.2 2.8-1.2-3.1-3.5-1.3 11.7-4.6-10.6 5z"/></svg>',
         'whatsapp' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.6-1.2A9 9 0 1 0 12 3zm4.9 12.4c-.2.5-1 1-1.6 1.1-.4 0-.8.1-2.9-.9-2.3-1.1-3.8-3.3-4-3.6-.3-.4-1-1.3-1-2.2 0-.9.5-1.4.8-1.6.2-.2.5-.2.7-.2h.5c.2 0 .5-.1.8.6.2.5.8 2.2.8 2.3.1.2.1.4 0 .6-.1.2-.2.4-.3.5-.2.2-.3.3-.5.6-.2.2-.3.4-.1.7.2.3.9 1.5 2 2.4 1.4 1.2 2.5 1.5 2.9 1.6.3.1.5.1.7-.1.2-.2.8-.9 1-1.2.2-.3.4-.2.7-.1.2.1 1.6.7 1.9.8.2.1.4.2.4.3.1.1.1.6-.1 1.1z"/></svg>',
         'facebook' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M14 8h3V5h-3c-2.2 0-4 1.8-4 4v3H7v3h3v7h3v-7h3l1-3h-4V9c0-.6.4-1 1-1z"/></svg>',
+        'instagram' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M7.5 2h9A5.5 5.5 0 0 1 22 7.5v9a5.5 5.5 0 0 1-5.5 5.5h-9A5.5 5.5 0 0 1 2 16.5v-9A5.5 5.5 0 0 1 7.5 2zm0 2A3.5 3.5 0 0 0 4 7.5v9A3.5 3.5 0 0 0 7.5 20h9a3.5 3.5 0 0 0 3.5-3.5v-9A3.5 3.5 0 0 0 16.5 4zm9.75 1.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5zM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>',
         'twitter' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 4h3.7l4.3 5.2L17 4h3l-6.4 7.4L20 20h-3.7l-4.8-5.9L6.2 20H3l6.9-7.9L4 4z"/></svg>',
         'bluesky' => '<svg width="20" height="20" viewBox="0 0 600 600" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="m135.72 44.03c66.496 49.921 138.02 151.14 164.28 205.46 26.262-54.316 97.782-155.54 164.28-205.46 47.98-36.021 125.72-63.892 125.72 24.795 0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.3797-3.6904-10.832-3.7077-7.8964-0.0174-2.9357-1.1937 0.51669-3.7077 7.8964-13.714 40.255-67.233 197.36-189.63 71.766-64.444-66.128-34.605-132.26 82.697-152.22-67.108 11.421-142.55-7.4491-163.25-81.433-5.9562-21.282-16.111-152.36-16.111-170.07 0-88.687 77.742-60.816 125.72-24.795z" fill="currentColor"/></svg>',
         'mastodon' => '<svg width="20" height="20" viewBox="-20 -20 520 551.476" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill-rule="evenodd" clip-rule="evenodd" shape-rendering="geometricPrecision" text-rendering="geometricPrecision" image-rendering="optimizeQuality"><defs><mask id="mastodon-mask"><rect width="100%" height="100%" fill="#fff"/><path fill="#000" d="M396.545 174.981v136.53h-54.104V179.002c0-27.896-11.625-42.124-35.272-42.124-25.996 0-39.017 16.833-39.017 50.074v72.531h-53.777v-72.531c0-33.241-13.044-50.074-39.04-50.074-23.507 0-35.248 14.228-35.248 42.124v132.509H86.006v-136.53c0-27.896 7.123-50.059 21.366-66.488 14.695-16.387 33.97-24.803 57.896-24.803 27.691 0 48.617 10.647 62.568 31.917l13.464 22.597 13.484-22.597c13.951-21.27 34.877-31.917 62.521-31.917 23.902 0 43.177 8.416 57.919 24.803 14.231 16.414 21.336 38.577 21.321 66.488z"/></mask></defs><path fill="currentColor" mask="url(#mastodon-mask)" d="M478.064 113.237c-7.393-54.954-55.29-98.266-112.071-106.656C356.413 5.163 320.121 0 236.045 0h-.628c-84.1 0-102.141 5.163-111.72 6.581C68.498 14.739 18.088 53.655 5.859 109.261c-5.883 27.385-6.51 57.747-5.416 85.596 1.555 39.939 1.859 79.806 5.487 119.581a562.694 562.694 0 0013.089 78.437c11.625 47.654 58.687 87.313 104.793 103.494a281.073 281.073 0 00153.316 8.09 224.345 224.345 0 0016.577-4.533c12.369-3.928 26.856-8.321 37.506-16.042.146-.107.265-.247.348-.407.086-.161.134-.339.14-.521v-38.543a1.187 1.187 0 00-.119-.491 1.122 1.122 0 00-.773-.604 1.139 1.139 0 00-.503 0 424.932 424.932 0 01-99.491 11.626c-57.664 0-73.171-27.361-77.611-38.752a120.09 120.09 0 01-6.745-30.546 1.123 1.123 0 01.877-1.152c.173-.035.349-.032.518.012a416.876 416.876 0 0097.864 11.623c7.929 0 15.834 0 23.763-.211 33.155-.928 68.103-2.626 100.722-8.997.815-.16 1.63-.3 2.326-.508 51.454-9.883 100.422-40.894 105.397-119.42.185-3.093.651-32.385.651-35.591.022-10.903 3.51-77.343-.511-118.165z"/></svg>',
@@ -1629,6 +1630,36 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
             'label' => 'Facebook',
             'href' => 'https://www.facebook.com/' . rawurlencode($facebookPage),
             'svg' => $icons['facebook'],
+        ];
+    }
+
+    $instagramProfile = trim((string) ($config['instagram']['profile'] ?? ''));
+    $instagramChannel = trim((string) ($config['instagram']['channel'] ?? ''));
+    $instagramToken = trim((string) ($config['instagram']['token'] ?? ''));
+    if ($instagramProfile !== '' || $instagramChannel !== '' || $instagramToken !== '') {
+        $instagramHref = 'https://www.instagram.com/';
+        $instagramLabel = 'Instagram';
+        if ($instagramProfile !== '') {
+            if (preg_match('#^https?://#i', $instagramProfile)) {
+                $instagramHref = $instagramProfile;
+            } else {
+                $instagramHandle = ltrim($instagramProfile, '@');
+                if ($instagramHandle !== '') {
+                    $instagramHref = 'https://www.instagram.com/' . rawurlencode($instagramHandle) . '/';
+                    $instagramLabel = 'Instagram (@' . $instagramHandle . ')';
+                }
+            }
+        } elseif ($instagramChannel !== '' && preg_match('/^@?[A-Za-z0-9._]+$/', $instagramChannel)) {
+            $instagramHandle = ltrim($instagramChannel, '@');
+            if ($instagramHandle !== '') {
+                $instagramHref = 'https://www.instagram.com/' . rawurlencode($instagramHandle) . '/';
+                $instagramLabel = 'Instagram (@' . $instagramHandle . ')';
+            }
+        }
+        $links[] = [
+            'label' => $instagramLabel,
+            'href' => $instagramHref,
+            'svg' => $icons['instagram'],
         ];
     }
 

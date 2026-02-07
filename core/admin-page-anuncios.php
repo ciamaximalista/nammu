@@ -322,7 +322,7 @@
                     </div>
                     <div class="form-group">
                         <label for="facebook_app_secret">App Secret</label>
-                        <input type="password" name="facebook_app_secret" id="facebook_app_secret" class="form-control" value="<?= htmlspecialchars($facebookSettings['app_secret'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Opcional pero recomendado">
+                        <input type="text" name="facebook_app_secret" id="facebook_app_secret" class="form-control" value="<?= htmlspecialchars($facebookSettings['app_secret'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Opcional pero recomendado">
                         <small class="form-text text-muted">Necesario para refrescar automáticamente el token cada día.</small>
                     </div>
                     <?php if (!is_array($facebookTokenDebug) && ($facebookSettings['token'] ?? '') !== '' && $facebookAppId !== '' && ($facebookSettings['app_secret'] ?? '') === ''): ?>

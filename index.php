@@ -1998,7 +1998,7 @@ if ($slug !== null && $slug !== '') {
                 if ($itinerarySlug === '') {
                     continue;
                 }
-                $relatedItinerary = $itineraryRepository->findBySlug($itinerarySlug);
+                $relatedItinerary = $itineraryRepository->find($itinerarySlug);
                 if (!$relatedItinerary) {
                     continue;
                 }

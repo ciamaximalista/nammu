@@ -390,7 +390,36 @@ class MarkdownConverter
             // Auto-link plain URLs and emails
             $escaped = preg_replace_callback('/\bhttps?:\/\/[^\s<>"\']+/i', function ($matches) use ($storePlaceholder) {
                 $url = $matches[0];
-                return $storePlaceholder('<a href="' . $url . '">' . $url . '</a>');
+                $suffix = '';
+
+                // Trim sentence punctuation that should not be part of the URL.
+                while ($url !== '' && preg_match('/[.,;:!?]$/', $url) === 1) {
+                    $suffix = substr($url, -1) . $suffix;
+                    $url = substr($url, 0, -1);
+                }
+
+                // If the URL is wrapped by surrounding punctuation, keep only balanced pairs in the href.
+                $balancePairs = [
+                    ')' => '(',
+                    ']' => '[',
+                    '}' => '{',
+                ];
+                foreach ($balancePairs as $close => $open) {
+                    while (
+                        $url !== ''
+                        && substr($url, -1) === $close
+                        && substr_count($url, $close) > substr_count($url, $open)
+                    ) {
+                        $suffix = $close . $suffix;
+                        $url = substr($url, 0, -1);
+                    }
+                }
+
+                if ($url === '') {
+                    return $matches[0];
+                }
+
+                return $storePlaceholder('<a href="' . $url . '">' . $url . '</a>') . $suffix;
             }, $escaped);
 
             $escaped = preg_replace_callback('/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i', function ($matches) use ($storePlaceholder) {

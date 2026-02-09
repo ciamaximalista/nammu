@@ -13,6 +13,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 - Panel `admin.php` con sesión propia y creación del primer usuario en el onboarding.
 - Entradas y páginas Markdown con front matter YAML, soporte para `[toc]`, tablas, superíndices, bloques de código y TOC automático configurable por plantilla.
 - Páginas con visibilidad pública/privada: las privadas solo son accesibles para el administrador logueado y no se envían a canales externos ni se incluyen en sitemap.
+- Entradas relacionadas en posts y podcasts: permite definir de 2 a 6 slugs relacionados, combinando entradas y páginas de itinerario (`itinerarios/slug`), para mostrar recomendaciones contextuales al final de la vista individual.
 - Sistema de borradores con filtros “Entradas / Páginas / Borradores”, publicación directa desde el formulario y sello rojo en la vista pública cuando está sin publicar.
 - Publicaciones programadas con fecha y hora: se publican automáticamente y lanzan los avisos configurados (email, push y redes sociales).
 - Buscador interno dentro de la pestaña “Editar” que filtra por título, descripción, categoría o archivo para localizar contenidos en segundos.

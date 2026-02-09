@@ -451,7 +451,7 @@ if ($isPageTemplate && $formattedDate !== '') {
     </div>
     <?php if (!empty($relatedPosts)): ?>
         <section class="post-related" aria-label="Entradas o itinerarios relacionados">
-            <div class="post-related-heading">Sigue leyendo</div>
+            <div class="post-related-heading">Descubre ahora</div>
             <div class="post-related-grid">
                 <?php foreach ($relatedPosts as $relatedPost): ?>
                     <?php

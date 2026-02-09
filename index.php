@@ -1992,11 +1992,31 @@ if ($slug !== null && $slug !== '') {
     $relatedPosts = [];
     $relatedRaw = trim((string) ($post->getMetadata()['Related'] ?? $post->getMetadata()['related'] ?? ''));
     if ($relatedRaw !== '') {
-        foreach (nammu_parse_related_slugs_input($relatedRaw) as $relatedSlug) {
-            if ($relatedSlug === $post->getSlug()) {
+        foreach (nammu_parse_related_slugs_input($relatedRaw) as $relatedRef) {
+            if (str_starts_with($relatedRef, 'itinerarios/')) {
+                $itinerarySlug = ItineraryRepository::normalizeSlug(substr($relatedRef, strlen('itinerarios/')));
+                if ($itinerarySlug === '') {
+                    continue;
+                }
+                $relatedItinerary = $itineraryRepository->findBySlug($itinerarySlug);
+                if (!$relatedItinerary) {
+                    continue;
+                }
+                if ($relatedItinerary->isDraft() && !$isAdminLogged) {
+                    continue;
+                }
+                $relatedPosts[] = [
+                    'slug' => 'itinerarios/' . $relatedItinerary->getSlug(),
+                    'title' => $relatedItinerary->getTitle(),
+                    'url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/itinerarios/' . rawurlencode($relatedItinerary->getSlug()),
+                    'image' => nammu_resolve_asset($relatedItinerary->getImage(), $publicBaseUrl),
+                ];
                 continue;
             }
-            $relatedPost = $contentRepository->findBySlug($relatedSlug);
+            if ($relatedRef === $post->getSlug()) {
+                continue;
+            }
+            $relatedPost = $contentRepository->findBySlug($relatedRef);
             if (!$relatedPost) {
                 continue;
             }

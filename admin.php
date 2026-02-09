@@ -5328,9 +5328,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($type === 'Entrada' || $type === 'Podcast') {
             $relatedSlugs = admin_parse_related_slugs_input($relatedSlugsInput);
             if ($relatedSlugsInput !== '' && count($relatedSlugs) < 2) {
-                $error = 'Entradas relacionadas: indica al menos 2 slugs válidos.';
+                $error = 'Entradas o itinerarios relacionados: indica al menos 2 slugs válidos.';
             } elseif (count($relatedSlugs) > 6) {
-                $error = 'Entradas relacionadas: el máximo son 6 slugs.';
+                $error = 'Entradas o itinerarios relacionados: el máximo son 6 slugs.';
             }
         }
 
@@ -5804,9 +5804,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($type === 'Entrada' || $type === 'Podcast') {
             $relatedSlugs = admin_parse_related_slugs_input($relatedSlugsInput);
             if ($relatedSlugsInput !== '' && count($relatedSlugs) < 2) {
-                $error = 'Entradas relacionadas: indica al menos 2 slugs válidos.';
+                $error = 'Entradas o itinerarios relacionados: indica al menos 2 slugs válidos.';
             } elseif (count($relatedSlugs) > 6) {
-                $error = 'Entradas relacionadas: el máximo son 6 slugs.';
+                $error = 'Entradas o itinerarios relacionados: el máximo son 6 slugs.';
             }
         }
 

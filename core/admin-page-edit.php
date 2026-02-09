@@ -568,8 +568,8 @@ if ($editFeedback !== null) {
             </div>
 
             <div class="form-group entry-podcast-only">
-                <label for="related_slugs">Entradas relacionadas (2 a 6 slugs)</label>
-                <textarea name="related_slugs" id="related_slugs" class="form-control" rows="3" placeholder="slug-entrada-1&#10;slug-entrada-2&#10;slug-entrada-3"><?= htmlspecialchars($relatedInput, ENT_QUOTES, 'UTF-8') ?></textarea>
+                <label for="related_slugs">Entradas o itinerarios relacionados (2 a 6 slugs)</label>
+                <textarea name="related_slugs" id="related_slugs" class="form-control" rows="3" placeholder="slug-entrada-1&#10;slug-entrada-2&#10;itinerarios/mi-itinerario"><?= htmlspecialchars($relatedInput, ENT_QUOTES, 'UTF-8') ?></textarea>
                 <small class="form-text text-muted">Solo para entradas y podcasts. Escribe un slug por línea (o separados por coma).</small>
             </div>
 

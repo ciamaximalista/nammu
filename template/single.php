@@ -8,6 +8,20 @@ $colorAccent = htmlspecialchars($colors['accent'] ?? '#0a4c8a', ENT_QUOTES, 'UTF
 $colorBrand = htmlspecialchars($colors['brand'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8');
 $colorCodeBg = htmlspecialchars($colors['code_background'] ?? '#000000', ENT_QUOTES, 'UTF-8');
 $colorCodeText = htmlspecialchars($colors['code_text'] ?? '#90ee90', ENT_QUOTES, 'UTF-8');
+$h1ColorRaw = trim((string) ($colors['h1'] ?? '#1b8eed'));
+$relatedHeadingColor = '#6f8295';
+if (preg_match('/^#([a-f0-9]{6})$/i', $h1ColorRaw, $m) === 1) {
+    $hex = $m[1];
+    $r = hexdec(substr($hex, 0, 2));
+    $g = hexdec(substr($hex, 2, 2));
+    $b = hexdec(substr($hex, 4, 2));
+    // Blend 30% heading color + 70% white for a soft palette-compatible tone.
+    $mix = static function (int $channel): int {
+        return (int) round(($channel * 0.30) + (255 * 0.70));
+    };
+    $relatedHeadingColor = sprintf('#%02x%02x%02x', $mix($r), $mix($g), $mix($b));
+}
+$relatedHeadingColorEsc = htmlspecialchars($relatedHeadingColor, ENT_QUOTES, 'UTF-8');
 $fonts = $theme['fonts'] ?? [];
 $codeFont = htmlspecialchars($fonts['code'] ?? 'VT323', ENT_QUOTES, 'UTF-8');
 $quoteFont = htmlspecialchars($fonts['quote'] ?? 'Castoro', ENT_QUOTES, 'UTF-8');
@@ -436,7 +450,8 @@ if ($isPageTemplate && $formattedDate !== '') {
         <?php endif; ?>
     </div>
     <?php if (!empty($relatedPosts)): ?>
-        <section class="post-related" aria-label="Entradas relacionadas">
+        <section class="post-related" aria-label="Entradas o itinerarios relacionados">
+            <div class="post-related-heading">Sigue leyendo</div>
             <div class="post-related-grid">
                 <?php foreach ($relatedPosts as $relatedPost): ?>
                     <?php
@@ -993,6 +1008,14 @@ if ($isPageTemplate && $formattedDate !== '') {
     .post-related {
         width: 100%;
         margin: 1.4rem 0 1.8rem;
+    }
+    .post-related-heading {
+        margin: 0 0 0.65rem;
+        font-family: "<?= $fonts['title'] ?>", "<?= $fonts['body'] ?>", "Helvetica Neue", Arial, sans-serif;
+        font-size: 1.55rem;
+        font-weight: 700;
+        line-height: 1.15;
+        color: <?= $relatedHeadingColorEsc ?>;
     }
     .post-related-grid {
         display: grid;

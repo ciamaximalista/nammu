@@ -2082,11 +2082,24 @@ function nammu_parse_related_slugs_input(string $raw): array
     $parts = preg_split('/[\r\n,;]+/', $raw) ?: [];
     $slugs = [];
     foreach ($parts as $part) {
-        $slug = nammu_slugify_label(trim((string) $part));
-        if ($slug === '' || isset($slugs[$slug])) {
+        $candidate = trim((string) $part);
+        if ($candidate === '') {
             continue;
         }
-        $slugs[$slug] = true;
+        $candidate = ltrim($candidate, '/');
+        $normalized = '';
+        if (preg_match('#^itinerarios/(.+)$#i', $candidate, $match) === 1) {
+            $itinerarySlug = nammu_slugify_label((string) $match[1]);
+            if ($itinerarySlug !== '') {
+                $normalized = 'itinerarios/' . $itinerarySlug;
+            }
+        } else {
+            $normalized = nammu_slugify_label($candidate);
+        }
+        if ($normalized === '' || isset($slugs[$normalized])) {
+            continue;
+        }
+        $slugs[$normalized] = true;
     }
     return array_keys($slugs);
 }

@@ -140,6 +140,12 @@
 
         </div>
 
+        <div class="form-group entry-podcast-only">
+            <label for="related_slugs">Entradas relacionadas (2 a 6 slugs)</label>
+            <textarea name="related_slugs" id="related_slugs" class="form-control" rows="3" placeholder="slug-entrada-1&#10;slug-entrada-2&#10;slug-entrada-3"></textarea>
+            <small class="form-text text-muted">Solo para entradas y podcasts. Escribe un slug por línea (o separados por coma).</small>
+        </div>
+
         <div class="form-group non-podcast">
 
             <label for="content_publish">Contenido (Markdown)</label>
@@ -229,6 +235,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var nonPodcast = document.querySelectorAll('.non-podcast');
     var entryOnly = document.querySelectorAll('.entry-only');
     var pageOnly = document.querySelectorAll('.page-only');
+    var entryPodcastOnly = document.querySelectorAll('.entry-podcast-only');
     var titleLabel = document.querySelector('label[for="title"]');
     var descriptionLabel = document.querySelector('label[for="description"]');
     var imageLabel = document.querySelector('label[for="image"]');
@@ -323,6 +330,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         pageOnly.forEach(function(el) {
             el.classList.toggle('d-none', !isPage);
+        });
+        entryPodcastOnly.forEach(function(el) {
+            el.classList.toggle('d-none', !(isEntry || isPodcast));
         });
         if (titleLabel && titleLabel.dataset.podcastLabel && titleLabel.dataset.postLabel) {
             titleLabel.textContent = isPodcast ? titleLabel.dataset.podcastLabel : titleLabel.dataset.postLabel;

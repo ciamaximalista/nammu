@@ -1989,6 +1989,32 @@ if ($slug !== null && $slug !== '') {
             $autoTocHtml = $generatedToc;
         }
     }
+    $relatedPosts = [];
+    $relatedRaw = trim((string) ($post->getMetadata()['Related'] ?? $post->getMetadata()['related'] ?? ''));
+    if ($relatedRaw !== '') {
+        foreach (admin_parse_related_slugs_input($relatedRaw) as $relatedSlug) {
+            if ($relatedSlug === $post->getSlug()) {
+                continue;
+            }
+            $relatedPost = $contentRepository->findBySlug($relatedSlug);
+            if (!$relatedPost) {
+                continue;
+            }
+            $relatedTemplate = strtolower($relatedPost->getTemplate());
+            if (!in_array($relatedTemplate, ['post', 'single'], true)) {
+                continue;
+            }
+            if ($relatedPost->isDraft() && !$isAdminLogged) {
+                continue;
+            }
+            $relatedPosts[] = [
+                'slug' => $relatedPost->getSlug(),
+                'title' => $relatedPost->getTitle(),
+                'url' => admin_public_post_url($relatedPost->getSlug()),
+                'image' => nammu_resolve_asset($relatedPost->getImage(), $publicBaseUrl),
+            ];
+        }
+    }
     $postFilePath = __DIR__ . '/content/' . $post->getSlug() . '.md';
     $content = $renderer->render('single', [
         'pageTitle' => $post->getTitle(),
@@ -1996,6 +2022,7 @@ if ($slug !== null && $slug !== '') {
         'htmlContent' => $converted,
         'postFilePath' => $postFilePath,
         'autoTocHtml' => $autoTocHtml,
+        'relatedPosts' => $relatedPosts,
     ]);
 
     $postImage = nammu_resolve_asset($post->getImage(), $publicBaseUrl);

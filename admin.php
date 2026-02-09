@@ -1727,6 +1727,26 @@ function admin_public_post_url(string $slug): string {
     return $base . $path;
 }
 
+/**
+ * @return string[]
+ */
+function admin_parse_related_slugs_input(string $raw): array {
+    $raw = trim($raw);
+    if ($raw === '') {
+        return [];
+    }
+    $parts = preg_split('/[\r\n,;]+/', $raw) ?: [];
+    $slugs = [];
+    foreach ($parts as $part) {
+        $slug = nammu_slugify(trim((string) $part));
+        if ($slug === '' || isset($slugs[$slug])) {
+            continue;
+        }
+        $slugs[$slug] = true;
+    }
+    return array_keys($slugs);
+}
+
 function admin_public_asset_url(string $path): string {
     $path = trim($path);
     if ($path === '') {
@@ -5291,6 +5311,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audioLengthInput = trim($_POST['audio_length'] ?? '');
         $audioDuration = trim($_POST['audio_duration'] ?? '');
         $pageVisibilityInput = strtolower(trim((string) ($_POST['page_visibility'] ?? 'public')));
+        $relatedSlugsInput = trim((string) ($_POST['related_slugs'] ?? ''));
         $type = $_POST['type'] ?? 'Entrada';
         if ($type === 'Página') {
             $type = 'Página';
@@ -5314,6 +5335,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($filenameInput === '' && $title !== '') {
             $filenameInput = nammu_slugify($title);
+        }
+
+        $relatedSlugs = [];
+        if ($type === 'Entrada' || $type === 'Podcast') {
+            $relatedSlugs = admin_parse_related_slugs_input($relatedSlugsInput);
+            if ($relatedSlugsInput !== '' && count($relatedSlugs) < 2) {
+                $error = 'Entradas relacionadas: indica al menos 2 slugs válidos.';
+            } elseif (count($relatedSlugs) > 6) {
+                $error = 'Entradas relacionadas: el máximo son 6 slugs.';
+            }
         }
 
         if ($error === null) {
@@ -5400,6 +5431,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 if ($templateValue === 'page') {
                     $file_content .= "Visibility: " . $pageVisibility . "
+";
+                }
+                if (!empty($relatedSlugs) && in_array($templateValue, ['post', 'podcast'], true)) {
+                    $file_content .= "Related: " . implode(', ', $relatedSlugs) . "
 ";
                 }
                 $file_content .= "Status: " . $statusValue . "
@@ -5678,6 +5713,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audioLengthInput = trim($_POST['audio_length'] ?? '');
         $audioDuration = trim($_POST['audio_duration'] ?? '');
         $pageVisibilityInputRaw = strtolower(trim((string) ($_POST['page_visibility'] ?? '')));
+        $relatedSlugsInput = trim((string) ($_POST['related_slugs'] ?? ''));
         $type = $_POST['type'] ?? null;
         $statusPosted = strtolower(trim($_POST['status'] ?? ''));
         $publishDraftAsEntry = isset($_POST['publish_draft_entry']);
@@ -5777,6 +5813,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $category = '';
         }
 
+        $relatedSlugs = [];
+        if ($type === 'Entrada' || $type === 'Podcast') {
+            $relatedSlugs = admin_parse_related_slugs_input($relatedSlugsInput);
+            if ($relatedSlugsInput !== '' && count($relatedSlugs) < 2) {
+                $error = 'Entradas relacionadas: indica al menos 2 slugs válidos.';
+            } elseif (count($relatedSlugs) > 6) {
+                $error = 'Entradas relacionadas: el máximo son 6 slugs.';
+            }
+        }
+
         $targetFilename = $normalizedFilename;
         $renameRequested = false;
         $slugPattern = '/^[a-z0-9-]+$/i';
@@ -5862,6 +5908,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if ($template === 'page') {
                 $file_content .= "Visibility: " . $pageVisibility . "
+";
+            }
+            if (!empty($relatedSlugs) && in_array($template, ['post', 'podcast'], true)) {
+                $file_content .= "Related: " . implode(', ', $relatedSlugs) . "
 ";
             }
             $file_content .= "Status: " . $status . "

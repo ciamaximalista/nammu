@@ -386,6 +386,8 @@ if ($editFeedback !== null) {
             $audioValue = $post_data['metadata']['Audio'] ?? '';
             $audioLength = $post_data['metadata']['AudioLength'] ?? '';
             $audioDuration = $post_data['metadata']['AudioDuration'] ?? '';
+            $relatedRaw = trim((string) ($post_data['metadata']['Related'] ?? $post_data['metadata']['related'] ?? ''));
+            $relatedInput = $relatedRaw !== '' ? implode("\n", admin_parse_related_slugs_input($relatedRaw)) : '';
             $pageVisibilityRaw = strtolower(trim((string) ($post_data['metadata']['Visibility'] ?? 'public')));
             $pageVisibility = $pageVisibilityRaw === 'private' ? 'private' : 'public';
         ?>
@@ -565,6 +567,12 @@ if ($editFeedback !== null) {
                 <input type="text" name="audio_duration" id="audio_duration" class="form-control" value="<?= htmlspecialchars($audioDuration, ENT_QUOTES, 'UTF-8') ?>" placeholder="00:45:00">
             </div>
 
+            <div class="form-group entry-podcast-only">
+                <label for="related_slugs">Entradas relacionadas (2 a 6 slugs)</label>
+                <textarea name="related_slugs" id="related_slugs" class="form-control" rows="3" placeholder="slug-entrada-1&#10;slug-entrada-2&#10;slug-entrada-3"><?= htmlspecialchars($relatedInput, ENT_QUOTES, 'UTF-8') ?></textarea>
+                <small class="form-text text-muted">Solo para entradas y podcasts. Escribe un slug por línea (o separados por coma).</small>
+            </div>
+
             <div class="form-group non-podcast">
                 <label for="new_filename" data-podcast-label="Slug del episodio (opcional)" data-post-label="Slug del post (nombre de archivo sin .md)">Slug del post (nombre de archivo sin .md)</label>
                 <input type="text"
@@ -619,6 +627,7 @@ if ($editFeedback !== null) {
                 var nonPodcast = document.querySelectorAll('.non-podcast');
                 var entryOnly = document.querySelectorAll('.entry-only');
                 var pageOnly = document.querySelectorAll('.page-only');
+                var entryPodcastOnly = document.querySelectorAll('.entry-podcast-only');
                 var titleLabel = document.querySelector('label[for="title"]');
                 var descriptionLabel = document.querySelector('label[for="description"]');
                 var imageLabel = document.querySelector('label[for="image"]');
@@ -711,6 +720,9 @@ if ($editFeedback !== null) {
                     });
                     pageOnly.forEach(function(el) {
                         el.classList.toggle('d-none', !isPage);
+                    });
+                    entryPodcastOnly.forEach(function(el) {
+                        el.classList.toggle('d-none', !(isEntry || isPodcast));
                     });
                     if (titleLabel && titleLabel.dataset.podcastLabel && titleLabel.dataset.postLabel) {
                         titleLabel.textContent = isPodcast ? titleLabel.dataset.podcastLabel : titleLabel.dataset.postLabel;

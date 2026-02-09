@@ -71,6 +71,7 @@ $postalEnabled = $postalEnabled ?? false;
 $postalUrl = $postalUrl ?? '/correos.php';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $autoTocHtml = isset($autoTocHtml) ? trim((string) $autoTocHtml) : '';
+$relatedPosts = is_array($relatedPosts ?? null) ? $relatedPosts : [];
 $customMetaBand = isset($customMetaBand) ? trim((string) $customMetaBand) : '';
 $homeSettings = $theme['home'] ?? [];
 $headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
@@ -434,6 +435,30 @@ if ($isPageTemplate && $formattedDate !== '') {
             </div>
         <?php endif; ?>
     </div>
+    <?php if (!empty($relatedPosts)): ?>
+        <section class="post-related" aria-label="Entradas relacionadas">
+            <div class="post-related-grid">
+                <?php foreach ($relatedPosts as $relatedPost): ?>
+                    <?php
+                    $relatedTitle = trim((string) ($relatedPost['title'] ?? ''));
+                    $relatedUrl = trim((string) ($relatedPost['url'] ?? ''));
+                    $relatedImage = trim((string) ($relatedPost['image'] ?? ''));
+                    if ($relatedTitle === '' || $relatedUrl === '') {
+                        continue;
+                    }
+                    ?>
+                    <a class="post-related-card" href="<?= htmlspecialchars($relatedUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?>">
+                        <?php if ($relatedImage !== ''): ?>
+                            <img src="<?= htmlspecialchars($relatedImage, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
+                        <?php else: ?>
+                            <span class="post-related-fallback" aria-hidden="true"></span>
+                        <?php endif; ?>
+                        <span class="post-related-title"><?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?></span>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        </section>
+    <?php endif; ?>
     <?php if ($bottomMetaText !== ''): ?>
         <div class="post-meta-update"><?= $bottomMetaText ?></div>
     <?php endif; ?>
@@ -965,6 +990,53 @@ if ($isPageTemplate && $formattedDate !== '') {
     .post-contact-signature .post-contact-line + .post-contact-line {
         margin-top: 0.35rem;
     }
+    .post-related {
+        width: 100%;
+        margin: 1.4rem 0 1.8rem;
+    }
+    .post-related-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.7rem;
+        width: 100%;
+    }
+    .post-related-card {
+        position: relative;
+        display: block;
+        min-height: 130px;
+        border-radius: var(--nammu-radius-md);
+        overflow: hidden;
+        background: <?= $colorHighlight ?>;
+        text-decoration: none;
+    }
+    .post-related-card img,
+    .post-related-fallback {
+        display: block;
+        width: 100%;
+        height: 100%;
+        min-height: 130px;
+        object-fit: cover;
+    }
+    .post-related-title {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        padding: 0.45rem 0.55rem;
+        background: rgba(92, 92, 92, 0.72);
+        color: #fff;
+        font-size: 0.78rem;
+        font-weight: 600;
+        line-height: 1.25;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .post-related-card:hover .post-related-title {
+        background: rgba(55, 55, 55, 0.78);
+    }
     .category-tag-link {
         color: <?= $colorAccent ?>;
         text-decoration: none;
@@ -1039,6 +1111,11 @@ if ($isPageTemplate && $formattedDate !== '') {
         font-weight: 600;
         color: <?= $colorAccent ?>;
         margin-bottom: 0.65rem;
+    }
+    @media (max-width: 700px) {
+        .post-related-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
     }
     .nammu-toc {
         margin: 0;

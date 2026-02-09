@@ -1021,7 +1021,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         position: absolute;
         left: 0;
         right: 0;
-        top: 0;
+        bottom: 0;
         padding: 0.45rem 0.55rem;
         background: rgba(92, 92, 92, 0.72);
         color: #fff;

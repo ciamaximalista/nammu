@@ -1992,7 +1992,7 @@ if ($slug !== null && $slug !== '') {
     $relatedPosts = [];
     $relatedRaw = trim((string) ($post->getMetadata()['Related'] ?? $post->getMetadata()['related'] ?? ''));
     if ($relatedRaw !== '') {
-        foreach (admin_parse_related_slugs_input($relatedRaw) as $relatedSlug) {
+        foreach (nammu_parse_related_slugs_input($relatedRaw) as $relatedSlug) {
             if ($relatedSlug === $post->getSlug()) {
                 continue;
             }
@@ -2010,7 +2010,7 @@ if ($slug !== null && $slug !== '') {
             $relatedPosts[] = [
                 'slug' => $relatedPost->getSlug(),
                 'title' => $relatedPost->getTitle(),
-                'url' => admin_public_post_url($relatedPost->getSlug()),
+                'url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/' . rawurlencode($relatedPost->getSlug()),
                 'image' => nammu_resolve_asset($relatedPost->getImage(), $publicBaseUrl),
             ];
         }

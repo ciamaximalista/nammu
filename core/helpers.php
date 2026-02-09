@@ -2071,6 +2071,27 @@ function nammu_slugify_label(string $text): string
 }
 
 /**
+ * @return string[]
+ */
+function nammu_parse_related_slugs_input(string $raw): array
+{
+    $raw = trim($raw);
+    if ($raw === '') {
+        return [];
+    }
+    $parts = preg_split('/[\r\n,;]+/', $raw) ?: [];
+    $slugs = [];
+    foreach ($parts as $part) {
+        $slug = nammu_slugify_label(trim((string) $part));
+        if ($slug === '' || isset($slugs[$slug])) {
+            continue;
+        }
+        $slugs[$slug] = true;
+    }
+    return array_keys($slugs);
+}
+
+/**
  * @param Post[] $posts
  * @return array<string, array{name:string, posts:Post[], count:int}>
  */

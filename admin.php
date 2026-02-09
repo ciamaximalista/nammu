@@ -1731,20 +1731,7 @@ function admin_public_post_url(string $slug): string {
  * @return string[]
  */
 function admin_parse_related_slugs_input(string $raw): array {
-    $raw = trim($raw);
-    if ($raw === '') {
-        return [];
-    }
-    $parts = preg_split('/[\r\n,;]+/', $raw) ?: [];
-    $slugs = [];
-    foreach ($parts as $part) {
-        $slug = nammu_slugify(trim((string) $part));
-        if ($slug === '' || isset($slugs[$slug])) {
-            continue;
-        }
-        $slugs[$slug] = true;
-    }
-    return array_keys($slugs);
+    return nammu_parse_related_slugs_input($raw);
 }
 
 function admin_public_asset_url(string $path): string {

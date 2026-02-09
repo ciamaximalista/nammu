@@ -369,13 +369,13 @@ class MarkdownConverter
                 return $token;
             };
 
-            $escaped = preg_replace_callback('/!\[([^\]]*)\]\(([^)]+)\)/', function ($matches) use ($storePlaceholder) {
+            $escaped = preg_replace_callback('/!\[([^\]]*)\]\(((?:[^()\s]|(?:\([^)]*\)))+)\)/', function ($matches) use ($storePlaceholder) {
                 $alt = $matches[1];
                 $url = htmlspecialchars(trim($matches[2]), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                 return $storePlaceholder('<img src="' . $url . '" alt="' . $alt . '">');
             }, $escaped);
 
-            $escaped = preg_replace_callback('/\[([^\]]+)\]\(([^)]+)\)/', function ($matches) use ($storePlaceholder) {
+            $escaped = preg_replace_callback('/\[([^\]]+)\]\(((?:[^()\s]|(?:\([^)]*\)))+)\)/', function ($matches) use ($storePlaceholder) {
                 $text = $this->applyInlineFormatting($matches[1]);
                 $url = htmlspecialchars(trim($matches[2]), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                 return $storePlaceholder('<a href="' . $url . '">' . $text . '</a>');

@@ -1683,6 +1683,98 @@
         return $b['count'] <=> $a['count'];
     });
     $topPosts = array_slice($topPosts, 0, 10);
+
+    $templateBySlug = [];
+    foreach ($postsMetadata as $item) {
+        $filename = (string) ($item['filename'] ?? '');
+        if ($filename === '' || !str_ends_with($filename, '.md')) {
+            continue;
+        }
+        $slug = basename($filename, '.md');
+        $status = strtolower((string) ($item['metadata']['Status'] ?? 'published'));
+        if ($status === 'draft') {
+            continue;
+        }
+        $templateBySlug[$slug] = strtolower((string) ($item['metadata']['Template'] ?? 'post'));
+    }
+
+    $image30ViewsPosts = 0;
+    $image30ViewsNewsletter = 0;
+    $image30ViewsPodcast = 0;
+    foreach ($postsStats as $slug => $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $daily = is_array($item['daily'] ?? null) ? $item['daily'] : [];
+        $views30 = $sumRange($daily, $last30Start, $today);
+        if ($views30 <= 0) {
+            continue;
+        }
+        $template = $templateBySlug[(string) $slug] ?? 'post';
+        if ($template === 'newsletter') {
+            $image30ViewsNewsletter += $views30;
+        } elseif ($template === 'podcast') {
+            $image30ViewsPodcast += $views30;
+        } else {
+            $image30ViewsPosts += $views30;
+        }
+    }
+
+    $image30ViewsPages = 0;
+    $image30ViewsItineraries = 0;
+    foreach ($pagesStats as $slug => $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $daily = is_array($item['daily'] ?? null) ? $item['daily'] : [];
+        $views30 = $sumRange($daily, $last30Start, $today);
+        if ($views30 <= 0) {
+            continue;
+        }
+        if (is_string($slug) && str_starts_with($slug, 'itinerarios/')) {
+            $image30ViewsItineraries += $views30;
+        } else {
+            $image30ViewsPages += $views30;
+        }
+    }
+
+    $image30TotalViews = $image30ViewsPosts + $image30ViewsPages + $image30ViewsItineraries + $image30ViewsNewsletter + $image30ViewsPodcast;
+    $image30PagesPerUser = $unique30Count > 0 ? ($image30TotalViews / $unique30Count) : 0.0;
+
+    $image30UserDays = [];
+    foreach ($last30Daily as $dayKey => $_count) {
+        $payload = $visitorsDaily[$dayKey] ?? [];
+        $uids = is_array($payload) ? ($payload['uids'] ?? []) : [];
+        if (!is_array($uids)) {
+            continue;
+        }
+        foreach ($uids as $uid => $flag) {
+            $image30UserDays[$uid] = (int) ($image30UserDays[$uid] ?? 0) + 1;
+        }
+    }
+    $image30RecurringUsers = 0;
+    foreach ($image30UserDays as $daysSeen) {
+        if ((int) $daysSeen >= 2) {
+            $image30RecurringUsers++;
+        }
+    }
+    $image30RecurringRate = $unique30Count > 0 ? (($image30RecurringUsers / $unique30Count) * 100) : 0.0;
+
+    $image30DailyValues = array_values($last30Daily);
+    $image30DailyAverage = !empty($image30DailyValues) ? (array_sum($image30DailyValues) / count($image30DailyValues)) : 0.0;
+    if (!empty($image30DailyValues)) {
+        sort($image30DailyValues);
+        $mid = (int) floor(count($image30DailyValues) / 2);
+        if (count($image30DailyValues) % 2 === 0) {
+            $image30DailyMedian = ($image30DailyValues[$mid - 1] + $image30DailyValues[$mid]) / 2;
+        } else {
+            $image30DailyMedian = $image30DailyValues[$mid];
+        }
+        $image30DailyPeak = max($image30DailyValues);
+    } else {
+        $image30DailyMedian = 0;
+        $image30DailyPeak = 0;
+    }
     $topPostsByUnique = array_values(array_filter($allPosts, static function (array $item): bool {
         return (int) ($item['unique'] ?? 0) > 0;
     }));
@@ -2240,6 +2332,16 @@
 
         <div class="row">
             <div class="col-lg-4 order-lg-2">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Imagen 30 días</h4>
+                        <p class="mb-2"><strong>Usuarios únicos humanos:</strong> <?= (int) $unique30Count ?></p>
+                        <p class="mb-2"><strong>Recurrentes (2+ días):</strong> <?= (int) $image30RecurringUsers ?> (<?= number_format($image30RecurringRate, 2, ',', '.') ?>%)</p>
+                        <p class="mb-2"><strong>Vistas totales (posts + páginas + itinerarios + newsletter + podcast):</strong> <?= (int) $image30TotalViews ?></p>
+                        <p class="mb-2"><strong>Páginas por usuario:</strong> <?= number_format($image30PagesPerUser, 2, ',', '.') ?></p>
+                        <p class="mb-0"><strong>Promedio diario:</strong> <?= number_format($image30DailyAverage, 2, ',', '.') ?> · <strong>Mediana:</strong> <?= number_format($image30DailyMedian, 2, ',', '.') ?> · <strong>Pico:</strong> <?= (int) $image30DailyPeak ?></p>
+                    </div>
+                </div>
                 <div class="card mb-4">
                     <div class="card-body">
                         <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Suscriptores</h4>

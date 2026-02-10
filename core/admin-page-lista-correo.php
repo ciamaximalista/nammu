@@ -20,17 +20,27 @@
         $mailingTokens = admin_load_mailing_tokens();
         $isConnected = !empty($mailingTokens['refresh_token']);
         $canConnect = $mailingGmail !== '' && $mailingClientId !== '' && $mailingClientSecret !== '';
+        $subsQuery = trim((string) ($_GET['subs_q'] ?? ''));
+        $mailingFilteredEntries = $mailingEntries;
+        if ($subsQuery !== '') {
+            $mailingFilteredEntries = array_values(array_filter($mailingEntries, static function ($subscriber) use ($subsQuery): bool {
+                $email = (string) ($subscriber['email'] ?? '');
+                return $email !== '' && stripos($email, $subsQuery) !== false;
+            }));
+        }
+        $mailingFilteredCount = count($mailingFilteredEntries);
         $subsPerPage = 25;
         $subsPage = (int) ($_GET['subs_page'] ?? 1);
         if ($subsPage < 1) {
             $subsPage = 1;
         }
-        $subsTotalPages = $mailingCount > 0 ? (int) ceil($mailingCount / $subsPerPage) : 1;
+        $subsTotalPages = $mailingFilteredCount > 0 ? (int) ceil($mailingFilteredCount / $subsPerPage) : 1;
         if ($subsPage > $subsTotalPages) {
             $subsPage = $subsTotalPages;
         }
         $subsOffset = ($subsPage - 1) * $subsPerPage;
-        $mailingEntriesPage = array_slice($mailingEntries, $subsOffset, $subsPerPage);
+        $mailingEntriesPage = array_slice($mailingFilteredEntries, $subsOffset, $subsPerPage);
+        $subsQueryParam = $subsQuery !== '' ? '&amp;subs_q=' . rawurlencode($subsQuery) : '';
         ?>
 
         <p class="text-muted">Configura y consulta aquí la futura lista de correo. Usaremos tu cuenta de Gmail (SMTP con OAuth2 sobre SSL/TLS, puerto 465) para enviar mensajes cuando el módulo esté activo.</p>
@@ -143,8 +153,24 @@
                             <button type="submit" class="btn btn-sm btn-primary mb-2">Añadir</button>
                         </form>
                     </div>
-                    <?php if (empty($mailingEntries)): ?>
-                        <p class="text-muted mb-0">Aún no hay suscriptores. Añade el primero usando el formulario.</p>
+                    <form method="get" class="form-inline mb-3">
+                        <input type="hidden" name="page" value="lista-correo">
+                        <label class="sr-only" for="subs_q">Buscar correo</label>
+                        <input type="text" class="form-control form-control-sm mr-2 mb-2" name="subs_q" id="subs_q" value="<?= htmlspecialchars($subsQuery, ENT_QUOTES, 'UTF-8') ?>" placeholder="Buscar por correo">
+                        <button type="submit" class="btn btn-sm btn-outline-primary mr-2 mb-2">Buscar</button>
+                        <?php if ($subsQuery !== ''): ?>
+                            <a class="btn btn-sm btn-outline-secondary mb-2" href="?page=lista-correo#suscriptores">Limpiar</a>
+                        <?php endif; ?>
+                    </form>
+                    <?php if ($subsQuery !== ''): ?>
+                        <p class="text-muted small">Mostrando <?= (int) $mailingFilteredCount ?> de <?= (int) $mailingCount ?> suscriptores.</p>
+                    <?php endif; ?>
+                    <?php if (empty($mailingFilteredEntries)): ?>
+                        <?php if ($mailingCount === 0): ?>
+                            <p class="text-muted mb-0">Aún no hay suscriptores. Añade el primero usando el formulario.</p>
+                        <?php else: ?>
+                            <p class="text-muted mb-0">No hay resultados para esa búsqueda.</p>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div class="table-responsive">
                             <table class="table table-sm table-borderless mb-0">
@@ -203,15 +229,15 @@
                             <nav class="mt-3" aria-label="Paginacion de suscriptores">
                                 <ul class="pagination pagination-sm mb-0">
                                     <li class="page-item <?= $subsPage <= 1 ? 'disabled' : '' ?>">
-                                        <a class="page-link" href="?page=lista-correo&amp;subs_page=<?= $subsPage - 1 ?>#suscriptores">Anterior</a>
+                                        <a class="page-link" href="?page=lista-correo&amp;subs_page=<?= $subsPage - 1 ?><?= $subsQueryParam ?>#suscriptores">Anterior</a>
                                     </li>
                                     <?php for ($pageIndex = 1; $pageIndex <= $subsTotalPages; $pageIndex++): ?>
                                         <li class="page-item <?= $pageIndex === $subsPage ? 'active' : '' ?>">
-                                            <a class="page-link" href="?page=lista-correo&amp;subs_page=<?= $pageIndex ?>#suscriptores"><?= $pageIndex ?></a>
+                                            <a class="page-link" href="?page=lista-correo&amp;subs_page=<?= $pageIndex ?><?= $subsQueryParam ?>#suscriptores"><?= $pageIndex ?></a>
                                         </li>
                                     <?php endfor; ?>
                                     <li class="page-item <?= $subsPage >= $subsTotalPages ? 'disabled' : '' ?>">
-                                        <a class="page-link" href="?page=lista-correo&amp;subs_page=<?= $subsPage + 1 ?>#suscriptores">Siguiente</a>
+                                        <a class="page-link" href="?page=lista-correo&amp;subs_page=<?= $subsPage + 1 ?><?= $subsQueryParam ?>#suscriptores">Siguiente</a>
                                     </li>
                                 </ul>
                             </nav>

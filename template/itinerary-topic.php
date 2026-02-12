@@ -76,6 +76,8 @@ if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
         'postal_enabled' => $postalEnabled,
     ]);
 }
+$isAdminLogged = !empty($isAdminLogged ?? false);
+$editButtonHref = trim((string) ($editButtonHref ?? ''));
 $renderSearchBox = static function (string $variant) use ($searchAction, $searchActionBase, $accentColor, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories, $hasPodcast, $podcastIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
@@ -340,3 +342,37 @@ if ($quizAvailable) {
         <?= $renderSearchBox('variant-panel') ?>
     </section>
 <?php endif; ?>
+<?php if ($isAdminLogged && $editButtonHref !== ''): ?>
+    <div class="public-edit-floating-wrap">
+        <a class="public-edit-floating-btn" href="<?= htmlspecialchars($editButtonHref, ENT_QUOTES, 'UTF-8') ?>">Editar</a>
+    </div>
+<?php endif; ?>
+<style>
+    .public-edit-floating-wrap {
+        margin: 0.9rem auto 0;
+        max-width: min(680px, 100%);
+        display: flex;
+        justify-content: center;
+    }
+    .public-edit-floating-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.45rem 0.95rem;
+        border-radius: 999px;
+        background: <?= $accentColor ?>;
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.86rem;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: transform .16s ease, box-shadow .16s ease;
+    }
+    .public-edit-floating-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 13px 28px rgba(0, 0, 0, 0.24);
+        color: #fff;
+        text-decoration: none;
+    }
+</style>

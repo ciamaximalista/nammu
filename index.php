@@ -266,6 +266,7 @@ $renderer->setGlobal('markdownToHtml', function (string $markdownText) use ($mar
 $renderer->setGlobal('baseUrl', $publicBaseUrl !== '' ? $publicBaseUrl : '/');
 $renderer->setGlobal('socialConfig', $socialConfig);
 $renderer->setGlobal('isAlphabeticalOrder', $isAlphabeticalOrder);
+$renderer->setGlobal('isAdminLogged', $isAdminLogged);
 
 $routePath = nammu_route_path();
 $alphabeticalSorter = static function (Post $a, Post $b): int {
@@ -1251,6 +1252,9 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
         'progress' => $progressData,
         'nextStep' => $nextStep,
         'previousStep' => $previousStep,
+        'editButtonHref' => $isAdminLogged
+            ? (($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/admin.php?page=itinerario-tema&itinerary=' . rawurlencode($itinerary->getSlug()) . '&topic=' . rawurlencode($topic->getSlug()) . '#topic-form')
+            : '',
     ]);
     $content = $topicMainContent . $topicExtras;
     $itinerariesIndexUrlLocal = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios';
@@ -2043,6 +2047,9 @@ if ($slug !== null && $slug !== '') {
         'postFilePath' => $postFilePath,
         'autoTocHtml' => $autoTocHtml,
         'relatedPosts' => $relatedPosts,
+        'editButtonHref' => $isAdminLogged
+            ? (($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/admin.php?page=edit-post&file=' . rawurlencode($post->getSlug() . '.md'))
+            : '',
     ]);
 
     $postImage = nammu_resolve_asset($post->getImage(), $publicBaseUrl);

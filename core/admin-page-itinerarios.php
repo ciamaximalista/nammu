@@ -21,7 +21,6 @@
                 <?php
                         $networkConfigs = [
                             'telegram' => $settings['telegram'] ?? [],
-                            'whatsapp' => $settings['whatsapp'] ?? [],
                             'facebook' => $settings['facebook'] ?? [],
                             'twitter' => $settings['twitter'] ?? [],
                             'bluesky' => $settings['bluesky'] ?? [],
@@ -30,7 +29,6 @@
                         ];
                         $networkLabels = [
                             'telegram' => 'Telegram',
-                            'whatsapp' => 'WhatsApp',
                             'facebook' => 'Facebook',
                             'twitter' => 'X',
                             'bluesky' => 'Bluesky',

@@ -67,7 +67,6 @@ if ($editFeedback !== null) {
         <?php
         $networkConfigs = [
             'telegram' => $settings['telegram'] ?? [],
-            'whatsapp' => $settings['whatsapp'] ?? [],
             'facebook' => $settings['facebook'] ?? [],
             'twitter' => $settings['twitter'] ?? [],
             'bluesky' => $settings['bluesky'] ?? [],
@@ -76,7 +75,6 @@ if ($editFeedback !== null) {
         ];
         $networkLabels = [
             'telegram' => 'Telegram',
-            'whatsapp' => 'WhatsApp',
             'facebook' => 'Facebook',
             'twitter' => 'X',
             'bluesky' => 'Bluesky',

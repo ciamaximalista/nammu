@@ -992,12 +992,6 @@ function get_settings() {
         'username' => $userData['username'] ?? '',
     ];
     $telegram = admin_extract_telegram_settings($config);
-    $whatsapp = admin_extract_social_settings('whatsapp', [
-        'token' => '',
-        'channel' => '',
-        'recipient' => '',
-        'auto_post' => 'off',
-    ], $config);
     $facebook = admin_extract_social_settings('facebook', [
         'token' => '',
         'channel' => '',
@@ -1122,7 +1116,6 @@ function get_settings() {
         'social' => $social,
         'account' => $account,
         'telegram' => $telegram,
-        'whatsapp' => $whatsapp,
         'facebook' => $facebook,
         'twitter' => $twitter,
         'bluesky' => $bluesky,
@@ -2272,12 +2265,6 @@ function admin_cached_social_settings(?string $key = null): array {
         $config = admin_refresh_facebook_token_if_needed($config);
         $cache = [
             'telegram' => admin_extract_telegram_settings($config),
-            'whatsapp' => admin_extract_social_settings('whatsapp', [
-                'token' => '',
-                'channel' => '',
-                'recipient' => '',
-                'auto_post' => 'off',
-            ], $config),
             'facebook' => admin_extract_social_settings('facebook', [
                 'token' => '',
                 'channel' => '',
@@ -2333,8 +2320,6 @@ function admin_is_social_network_configured(string $network, array $settings): b
     switch ($network) {
         case 'telegram':
             return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
-        case 'whatsapp':
-            return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '' && ($settings['recipient'] ?? '') !== '';
         case 'facebook':
             return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
         case 'twitter':
@@ -2489,49 +2474,6 @@ function admin_build_telegram_message(string $slug, string $title, string $descr
         $parts[] = admin_telegram_escape('Nueva publicación disponible');
     }
     return implode("\n\n", $parts);
-}
-
-function admin_send_whatsapp_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = ''): bool {
-    $token = $settings['token'] ?? '';
-    $phoneId = $settings['channel'] ?? '';
-    $recipient = $settings['recipient'] ?? '';
-    if ($token === '' || $phoneId === '' || $recipient === '') {
-        return false;
-    }
-    $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
-    $trackedUrl = admin_add_utm_params($targetUrl, [
-        'utm_source' => 'whatsapp',
-        'utm_medium' => 'social',
-    ]);
-    $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($phoneId) . '/messages';
-    $imageUrl = trim($imageUrl);
-    if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
-        $payload = [
-            'messaging_product' => 'whatsapp',
-            'to' => $recipient,
-            'type' => 'image',
-            'image' => [
-                'link' => $imageUrl,
-                'caption' => admin_build_post_message($slug, $title, $description, $trackedUrl),
-            ],
-        ];
-        return admin_http_post_json($endpoint, $payload, [
-            'Authorization: Bearer ' . $token,
-            'Content-Type: application/json',
-        ]);
-    }
-    $payload = [
-        'messaging_product' => 'whatsapp',
-        'to' => $recipient,
-        'type' => 'text',
-        'text' => [
-            'body' => admin_build_post_message($slug, $title, $description, $trackedUrl, $imageUrl),
-        ],
-    ];
-    return admin_http_post_json($endpoint, $payload, [
-        'Authorization: Bearer ' . $token,
-        'Content-Type: application/json',
-    ]);
 }
 
 function admin_send_facebook_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = ''): bool {
@@ -3476,9 +3418,6 @@ function admin_maybe_auto_post_to_social_networks(string $filename, string $titl
     $settings = admin_cached_social_settings();
     if (($settings['telegram']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('telegram', $settings['telegram'])) {
         admin_send_post_to_telegram($slug, $title, $description, $settings['telegram'], $urlOverride, $imageUrl);
-    }
-    if (($settings['whatsapp']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('whatsapp', $settings['whatsapp'])) {
-        admin_send_whatsapp_post($slug, $title, $description, $settings['whatsapp'], $urlOverride, $imageUrl);
     }
     if (($settings['facebook']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('facebook', $settings['facebook'])) {
         admin_send_facebook_post($slug, $title, $description, $settings['facebook'], $urlOverride, $imageUrl);
@@ -6043,7 +5982,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $redirectTemplate = urlencode($templateTarget);
         $networkLabels = [
             'telegram' => 'Telegram',
-            'whatsapp' => 'WhatsApp',
             'facebook' => 'Facebook',
             'twitter' => 'X',
             'bluesky' => 'Bluesky',
@@ -6096,9 +6034,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             case 'telegram':
                                 $sent = admin_send_post_to_telegram($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
                                 break;
-                            case 'whatsapp':
-                                $sent = admin_send_whatsapp_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
-                                break;
                             case 'facebook':
                                 error_log('Facebook manual send: slug=' . $slug . ' pageId=' . ($networkSettings['channel'] ?? ''));
                                 $sent = admin_send_facebook_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
@@ -6147,7 +6082,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $itinerarySlug = ItineraryRepository::normalizeSlug($_POST['itinerary_slug'] ?? '');
         $networkLabels = [
             'telegram' => 'Telegram',
-            'whatsapp' => 'WhatsApp',
             'facebook' => 'Facebook',
             'twitter' => 'X',
             'bluesky' => 'Bluesky',
@@ -6178,9 +6112,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     switch ($networkKey) {
                         case 'telegram':
                             $sent = admin_send_post_to_telegram($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
-                            break;
-                        case 'whatsapp':
-                            $sent = admin_send_whatsapp_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
                             break;
                         case 'facebook':
                             $sent = admin_send_facebook_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
@@ -7435,10 +7366,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $telegram_token = trim($_POST['telegram_token'] ?? '');
         $telegram_channel = trim($_POST['telegram_channel'] ?? '');
         $telegram_auto = isset($_POST['telegram_auto']) ? 'on' : 'off';
-        $whatsapp_token = trim($_POST['whatsapp_token'] ?? '');
-        $whatsapp_channel = trim($_POST['whatsapp_channel'] ?? '');
-        $whatsapp_recipient = trim($_POST['whatsapp_recipient'] ?? '');
-        $whatsapp_auto = isset($_POST['whatsapp_auto']) ? 'on' : 'off';
         $facebook_token = trim($_POST['facebook_token'] ?? '');
         $facebook_app_secret = trim($_POST['facebook_app_secret'] ?? '');
         $facebook_channel = trim($_POST['facebook_channel'] ?? '');
@@ -7491,16 +7418,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 unset($config['telegram']);
             }
-            if ($whatsapp_token !== '' || $whatsapp_channel !== '' || $whatsapp_recipient !== '' || $whatsapp_auto === 'on') {
-                $config['whatsapp'] = [
-                    'token' => $whatsapp_token,
-                    'channel' => $whatsapp_channel,
-                    'recipient' => $whatsapp_recipient,
-                    'auto_post' => $whatsapp_auto,
-                ];
-            } else {
-                unset($config['whatsapp']);
-            }
+            unset($config['whatsapp']);
             if ($facebook_token !== '' || $facebook_channel !== '' || $facebook_app_secret !== '' || $facebook_auto === 'on') {
                 $config['facebook'] = [
                     'token' => $facebook_token,

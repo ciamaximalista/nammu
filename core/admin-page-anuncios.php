@@ -18,8 +18,6 @@
     $pushQueueCount = $pushAvailable && function_exists('nammu_push_queue_count') ? nammu_push_queue_count() : 0;
     $telegramSettings = $settings['telegram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
     $telegramAutoEnabled = ($telegramSettings['auto_post'] ?? 'off') === 'on';
-    $whatsappSettings = $settings['whatsapp'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off', 'recipient' => ''];
-    $whatsappAutoEnabled = ($whatsappSettings['auto_post'] ?? 'off') === 'on';
     $facebookSettings = $settings['facebook'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off', 'app_secret' => ''];
     $facebookAutoEnabled = ($facebookSettings['auto_post'] ?? 'off') === 'on';
     $facebookAppId = trim((string) (($settings['social']['facebook_app_id'] ?? '') ?: ''));
@@ -255,51 +253,6 @@
                                         <li>Introduce el token y el @del canal o el ID numérico del grupo.</li>
                                     </ol>
                                     <p class="mb-0">Telegram permite enlaces clicables en los mensajes.</p>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <h4 class="mt-4">WhatsApp (opcional)</h4>
-                    <p class="text-muted">Usa la API de WhatsApp Business Cloud para avisar a tus contactos o grupos. <a href="#" data-toggle="modal" data-target="#whatsappHelpModal">Ver guía rápida</a></p>
-                    <div class="form-group">
-                        <label for="whatsapp_token">Token del bot o app</label>
-                        <input type="text" name="whatsapp_token" id="whatsapp_token" class="form-control" value="<?= htmlspecialchars($whatsappSettings['token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Token de acceso">
-                        <small class="form-text text-muted">Token generado en Meta Developers para tu número de WhatsApp Business.</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="whatsapp_channel">ID del número de WhatsApp Business</label>
-                        <input type="text" name="whatsapp_channel" id="whatsapp_channel" class="form-control" value="<?= htmlspecialchars($whatsappSettings['channel'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej: 123456789012345">
-                        <small class="form-text text-muted">Identificador del número conectado en la API de WhatsApp Cloud (phone number ID).</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="whatsapp_recipient">Número destino</label>
-                        <input type="text" name="whatsapp_recipient" id="whatsapp_recipient" class="form-control" value="<?= htmlspecialchars($whatsappSettings['recipient'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej: 34600111222">
-                        <small class="form-text text-muted">Número (con prefijo internacional, sin +) al que se enviará el mensaje.</small>
-                    </div>
-                    <div class="form-check mb-3">
-                        <input type="checkbox" class="form-check-input" name="whatsapp_auto" id="whatsapp_auto" value="1" <?= $whatsappAutoEnabled ? 'checked' : '' ?>>
-                        <label for="whatsapp_auto" class="form-check-label">Enviar automáticamente cada nueva entrada o itinerario publicado</label>
-                    </div>
-                    <div class="modal fade" id="whatsappHelpModal" tabindex="-1" role="dialog" aria-labelledby="whatsappHelpModalLabel" aria-hidden="true">
-                        <div class="modal-dialog modal-lg" role="document">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title" id="whatsappHelpModalLabel">Guía rápida para WhatsApp</h5>
-                                    <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
-                                        <span aria-hidden="true">&times;</span>
-                                    </button>
-                                </div>
-                                <div class="modal-body">
-                                    <ol class="mb-3">
-                                        <li>Activa WhatsApp Business Cloud en Meta Developers.</li>
-                                        <li>Obtén el token y el <code>phone number ID</code>.</li>
-                                        <li>Indica el número destino en formato internacional (sin +).</li>
-                                    </ol>
-                                    <p class="mb-0">WhatsApp suele exigir plantillas aprobadas para mensajes fuera de ventana de 24h.</p>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>

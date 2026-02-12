@@ -60,7 +60,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 
 ### Automatización, lista de correo y redes sociales
 
-- Integración opcional con Telegram, WhatsApp Cloud API, Facebook Pages y Twitter/X: auto-posting al publicar o envío manual desde la tabla de “Editar”.
+- Integración opcional con Telegram, Facebook Pages y Twitter/X: auto-posting al publicar o envío manual desde la tabla de “Editar”.
 - Plantillas de mensaje consistentes (título, descripción y URL pública) con escape apropiado para HTML o texto plano.
 - Feedback inmediato en la UI usando `$_SESSION['social_feedback']`.
 - Avisos por email: mensajes automáticos con título, descripción y enlace al publicar entradas o itinerarios.

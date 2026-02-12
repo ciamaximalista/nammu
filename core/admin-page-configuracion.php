@@ -32,8 +32,6 @@
         <?php
         $telegramSettings = $settings['telegram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
         $telegramAutoEnabled = ($telegramSettings['auto_post'] ?? 'off') === 'on';
-        $whatsappSettings = $settings['whatsapp'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
-        $whatsappAutoEnabled = ($whatsappSettings['auto_post'] ?? 'off') === 'on';
         $facebookSettings = $settings['facebook'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
         $facebookAutoEnabled = ($facebookSettings['auto_post'] ?? 'off') === 'on';
         $twitterSettings = $settings['twitter'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];

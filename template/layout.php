@@ -78,7 +78,7 @@ if (function_exists('nammu_social_settings')) {
     $defaultMetaDescription = trim((string) ($socialSettings['default_description'] ?? ''));
 }
 $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-$isCrawler = $userAgent !== '' && preg_match('/(bot|crawl|spider|slurp|bingpreview|facebookexternalhit|facebot|linkedinbot|twitterbot|pinterest|whatsapp|telegram|yandex|baiduspider|duckduckbot|sogou|ia_archiver|pagespeed|lighthouse|chrome-lighthouse|google-page-speed|adsbot-google|gtmetrix|pingdom)/i', $userAgent);
+$isCrawler = $userAgent !== '' && preg_match('/(bot|crawl|spider|slurp|bingpreview|facebookexternalhit|facebot|linkedinbot|twitterbot|pinterest|telegram|yandex|baiduspider|duckduckbot|sogou|ia_archiver|pagespeed|lighthouse|chrome-lighthouse|google-page-speed|adsbot-google|gtmetrix|pingdom)/i', $userAgent);
 $statsConsentGiven = $isCrawler || (function_exists('nammu_has_stats_consent') ? nammu_has_stats_consent() : false);
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
 $basePath = parse_url($baseHref, PHP_URL_PATH) ?? '/';

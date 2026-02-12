@@ -227,8 +227,6 @@ function nammu_detect_referrer_source(string $referer, string $host): array
         'mstdn.' => 'Mastodon',
         'linkedin.com' => 'LinkedIn',
         'pinterest.' => 'Pinterest',
-        'whatsapp.com' => 'WhatsApp',
-        'wa.me' => 'WhatsApp',
     ];
     foreach ($socialDomains as $needle => $label) {
         if (str_contains($refHost, $needle)) {
@@ -279,7 +277,6 @@ function nammu_detect_user_agent_source(string $userAgent): array
     }
     $uaSocial = [
         'telegram' => 'Telegram',
-        'whatsapp' => 'WhatsApp',
         'instagram' => 'Instagram',
         'facebook' => 'Facebook',
         'fbav' => 'Facebook',
@@ -318,7 +315,6 @@ function nammu_detect_bot_name(string $userAgent): string
         'twitterbot' => 'Twitter/X',
         'pinterest' => 'Pinterest',
         'linkedinbot' => 'LinkedIn',
-        'whatsapp' => 'WhatsApp',
         'telegram' => 'Telegram',
         'bot' => 'Bot',
         'crawl' => 'Crawler',
@@ -587,8 +583,6 @@ function nammu_record_visit(): void
         'telegram' => 'Telegram',
         't.me' => 'Telegram',
         'tg' => 'Telegram',
-        'whatsapp' => 'WhatsApp',
-        'wa' => 'WhatsApp',
         'instagram' => 'Instagram',
         'ig' => 'Instagram',
         'facebook' => 'Facebook',
@@ -639,7 +633,7 @@ function nammu_record_visit(): void
             $bucket = 'push';
         } elseif (in_array($utmDetail, ['Google Search', 'Bing', 'DuckDuckGo', 'Yahoo', 'Yandex', 'Baidu', 'Ecosia', 'Startpage'], true)) {
             $bucket = 'search';
-        } elseif (in_array($utmDetail, ['Telegram', 'WhatsApp', 'Instagram', 'Facebook', 'Twitter/X', 'Mastodon', 'LinkedIn', 'Pinterest', 'Reddit', 'TikTok', 'YouTube'], true)) {
+        } elseif (in_array($utmDetail, ['Telegram', 'Instagram', 'Facebook', 'Twitter/X', 'Mastodon', 'LinkedIn', 'Pinterest', 'Reddit', 'TikTok', 'YouTube'], true)) {
             $bucket = 'social';
         }
         $source = ['bucket' => $bucket, 'detail' => $utmDetail];
@@ -1545,7 +1539,6 @@ function nammu_footer_icon_svgs(): array
 {
     return [
         'telegram' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M21.7 5.2a1 1 0 0 0-1.1-.1L3.5 12.1a1 1 0 0 0 .1 1.9l4.7 1.7 1.9 5.1a1 1 0 0 0 1.7.3l2.8-3.2 4.6 3.4a1 1 0 0 0 1.6-.6l2-12.4a1 1 0 0 0-.2-0.7zM9.5 14.8l8-6.4-6.2 7.6-.2 2.8-1.2-3.1-3.5-1.3 11.7-4.6-10.6 5z"/></svg>',
-        'whatsapp' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.6-1.2A9 9 0 1 0 12 3zm4.9 12.4c-.2.5-1 1-1.6 1.1-.4 0-.8.1-2.9-.9-2.3-1.1-3.8-3.3-4-3.6-.3-.4-1-1.3-1-2.2 0-.9.5-1.4.8-1.6.2-.2.5-.2.7-.2h.5c.2 0 .5-.1.8.6.2.5.8 2.2.8 2.3.1.2.1.4 0 .6-.1.2-.2.4-.3.5-.2.2-.3.3-.5.6-.2.2-.3.4-.1.7.2.3.9 1.5 2 2.4 1.4 1.2 2.5 1.5 2.9 1.6.3.1.5.1.7-.1.2-.2.8-.9 1-1.2.2-.3.4-.2.7-.1.2.1 1.6.7 1.9.8.2.1.4.2.4.3.1.1.1.6-.1 1.1z"/></svg>',
         'facebook' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M14 8h3V5h-3c-2.2 0-4 1.8-4 4v3H7v3h3v7h3v-7h3l1-3h-4V9c0-.6.4-1 1-1z"/></svg>',
         'instagram' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M7.5 2h9A5.5 5.5 0 0 1 22 7.5v9a5.5 5.5 0 0 1-5.5 5.5h-9A5.5 5.5 0 0 1 2 16.5v-9A5.5 5.5 0 0 1 7.5 2zm0 2A3.5 3.5 0 0 0 4 7.5v9A3.5 3.5 0 0 0 7.5 20h9a3.5 3.5 0 0 0 3.5-3.5v-9A3.5 3.5 0 0 0 16.5 4zm9.75 1.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5zM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>',
         'twitter' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 4h3.7l4.3 5.2L17 4h3l-6.4 7.4L20 20h-3.7l-4.8-5.9L6.2 20H3l6.9-7.9L4 4z"/></svg>',
@@ -1605,21 +1598,6 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
                 'label' => 'Telegram',
                 'href' => 'https://t.me/' . rawurlencode($slug),
                 'svg' => $icons['telegram'],
-            ];
-        }
-    }
-
-    $whatsappTarget = trim((string) ($config['whatsapp']['recipient'] ?? ''));
-    if ($whatsappTarget === '') {
-        $whatsappTarget = trim((string) ($config['whatsapp']['channel'] ?? ''));
-    }
-    if ($whatsappTarget !== '') {
-        $clean = preg_replace('/\D+/', '', $whatsappTarget);
-        if ($clean !== '') {
-            $links[] = [
-                'label' => 'WhatsApp',
-                'href' => 'https://wa.me/' . $clean,
-                'svg' => $icons['whatsapp'],
             ];
         }
     }

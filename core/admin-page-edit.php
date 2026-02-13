@@ -403,7 +403,7 @@ if ($editFeedback !== null) {
             <input type="hidden" name="filename" value="<?= htmlspecialchars($safeEditFilename, ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" name="status" value="<?= htmlspecialchars($currentStatusValue, ENT_QUOTES, 'UTF-8') ?>">
 
-            <div class="form-group">
+            <div class="form-group non-podcast<?= $currentTypeValue === 'Podcast' ? ' d-none' : '' ?>">
 
                 <label for="title" data-podcast-label="Título del episodio" data-post-label="Título">Título</label>
 
@@ -544,7 +544,7 @@ if ($editFeedback !== null) {
 
             </div>
 
-            <div class="form-group podcast-only d-none">
+            <div class="form-group podcast-only<?= $currentTypeValue === 'Podcast' ? '' : ' d-none' ?>">
                 <label for="audio">Archivo de audio (mp3)</label>
                 <div class="input-group">
                     <input type="text" name="audio" id="audio" class="form-control" value="<?= htmlspecialchars($audioValue, ENT_QUOTES, 'UTF-8') ?>" readonly>
@@ -555,12 +555,12 @@ if ($editFeedback !== null) {
                 <small class="form-text text-muted">Selecciona un archivo mp3 desde Recursos.</small>
             </div>
 
-            <div class="form-group podcast-only d-none">
+            <div class="form-group podcast-only<?= $currentTypeValue === 'Podcast' ? '' : ' d-none' ?>">
                 <label for="audio_length">Longitud del archivo (bytes)</label>
                 <input type="text" name="audio_length" id="audio_length" class="form-control" value="<?= htmlspecialchars($audioLength, ENT_QUOTES, 'UTF-8') ?>" placeholder="Se calcula automáticamente si es posible">
             </div>
 
-            <div class="form-group podcast-only d-none">
+            <div class="form-group podcast-only<?= $currentTypeValue === 'Podcast' ? '' : ' d-none' ?>">
                 <label for="audio_duration">Duración (hh:mm:ss)</label>
                 <input type="text" name="audio_duration" id="audio_duration" class="form-control" value="<?= htmlspecialchars($audioDuration, ENT_QUOTES, 'UTF-8') ?>" placeholder="00:45:00">
             </div>
@@ -571,8 +571,8 @@ if ($editFeedback !== null) {
                 <small class="form-text text-muted">Solo para entradas y podcasts. Escribe un slug por línea (o separados por coma).</small>
             </div>
 
-            <div class="form-group non-podcast">
-                <label for="new_filename" data-podcast-label="Slug del episodio (opcional)" data-post-label="Slug del post (nombre de archivo sin .md)">Slug del post (nombre de archivo sin .md)</label>
+            <div class="form-group">
+                <label for="new_filename" data-podcast-label="Slug" data-post-label="Slug del post (nombre de archivo sin .md)">Slug del post (nombre de archivo sin .md)</label>
                 <input type="text"
                        name="new_filename"
                        id="new_filename"

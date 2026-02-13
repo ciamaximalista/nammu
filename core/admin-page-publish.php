@@ -192,9 +192,9 @@
 
         </div>
 
-        <div class="form-group non-podcast">
+        <div class="form-group">
 
-            <label for="filename" data-podcast-label="Slug del episodio (opcional)" data-post-label="Slug del post (nombre de archivo sin .md)">Slug del post (nombre de archivo sin .md)</label>
+            <label for="filename" data-podcast-label="Slug" data-post-label="Slug del post (nombre de archivo sin .md)">Slug del post (nombre de archivo sin .md)</label>
 
             <input type="text"
                    name="filename"

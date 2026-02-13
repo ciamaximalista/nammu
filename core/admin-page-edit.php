@@ -403,7 +403,7 @@ if ($editFeedback !== null) {
             <input type="hidden" name="filename" value="<?= htmlspecialchars($safeEditFilename, ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" name="status" value="<?= htmlspecialchars($currentStatusValue, ENT_QUOTES, 'UTF-8') ?>">
 
-            <div class="form-group non-podcast<?= $currentTypeValue === 'Podcast' ? ' d-none' : '' ?>">
+            <div class="form-group">
 
                 <label for="title" data-podcast-label="Título del episodio" data-post-label="Título">Título</label>
 
@@ -498,7 +498,7 @@ if ($editFeedback !== null) {
 
             </div>
 
-            <div class="form-group">
+            <div class="form-group non-podcast<?= $currentTypeValue === 'Podcast' ? ' d-none' : '' ?>">
 
                 <label for="content_edit">Contenido (Markdown)</label>
                 <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#content_edit">

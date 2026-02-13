@@ -2546,39 +2546,16 @@ function admin_send_facebook_post(string $slug, string $title, string $descripti
 
 function admin_send_twitter_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = ''): bool {
     $token = $settings['token'] ?? '';
-    $imageUrl = trim($imageUrl);
     $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
     $trackedUrl = admin_add_utm_params($targetUrl, [
         'utm_source' => 'twitter',
         'utm_medium' => 'social',
     ]);
-    if ($imageUrl !== '' && admin_twitter_has_media_credentials($settings)) {
-        $mediaId = admin_twitter_upload_media($imageUrl, $settings);
-        if ($mediaId !== '') {
-            $endpoint = 'https://api.twitter.com/2/tweets';
-            $text = admin_build_post_message($slug, $title, $description, $trackedUrl);
-            if (function_exists('mb_strlen')) {
-                if (mb_strlen($text, 'UTF-8') > 280) {
-                    $text = mb_substr($text, 0, 275, 'UTF-8') . '…';
-                }
-            } elseif (strlen($text) > 280) {
-                $text = substr($text, 0, 275) . '…';
-            }
-            $payload = [
-                'text' => $text,
-                'media' => [
-                    'media_ids' => [$mediaId],
-                ],
-            ];
-            return admin_twitter_post_json_oauth1($endpoint, $payload, $settings);
-        }
-        return false;
-    }
     if ($token === '') {
         return false;
     }
     $endpoint = 'https://api.twitter.com/2/tweets';
-    $text = admin_build_post_message($slug, $title, $description, $trackedUrl, $imageUrl);
+    $text = admin_build_post_message($slug, $title, $description, $trackedUrl);
     if (function_exists('mb_strlen')) {
         if (mb_strlen($text, 'UTF-8') > 280) {
             $text = mb_substr($text, 0, 275, 'UTF-8') . '…';
@@ -2837,88 +2814,6 @@ function admin_send_mastodon_post(string $slug, string $title, string $descripti
     return false;
 }
 
-function admin_twitter_has_media_credentials(array $settings): bool {
-    return trim((string) ($settings['api_key'] ?? '')) !== ''
-        && trim((string) ($settings['api_secret'] ?? '')) !== ''
-        && trim((string) ($settings['access_token'] ?? '')) !== ''
-        && trim((string) ($settings['access_secret'] ?? '')) !== '';
-}
-
-function admin_twitter_upload_media(string $imageUrl, array $settings): string {
-    $binary = admin_http_get_binary($imageUrl);
-    if ($binary === '') {
-        return '';
-    }
-    $endpoint = 'https://upload.twitter.com/1.1/media/upload.json';
-    $boundary = '----Nammu' . bin2hex(random_bytes(8));
-    $mime = 'application/octet-stream';
-    if (class_exists('finfo')) {
-        $finfo = new finfo(FILEINFO_MIME_TYPE);
-        $detected = $finfo->buffer($binary);
-        if (is_string($detected) && $detected !== '') {
-            $mime = $detected;
-        }
-    }
-    $body = '--' . $boundary . "\r\n";
-    $body .= 'Content-Disposition: form-data; name="media"; filename="podcast-image"' . "\r\n";
-    $body .= 'Content-Type: ' . $mime . "\r\n\r\n";
-    $body .= $binary . "\r\n";
-    $body .= '--' . $boundary . "--\r\n";
-    $authHeader = admin_twitter_oauth_header('POST', $endpoint, $settings);
-    $headers = [
-        'Authorization: ' . $authHeader,
-        'Content-Type: multipart/form-data; boundary=' . $boundary,
-        'Content-Length: ' . strlen($body),
-    ];
-    $response = admin_http_post_raw($endpoint, $body, $headers);
-    if ($response === '') {
-        return '';
-    }
-    $decoded = json_decode($response, true);
-    if (!is_array($decoded)) {
-        return '';
-    }
-    return (string) ($decoded['media_id_string'] ?? '');
-}
-
-function admin_twitter_post_json_oauth1(string $endpoint, array $payload, array $settings): bool {
-    $authHeader = admin_twitter_oauth_header('POST', $endpoint, $settings);
-    return admin_http_post_json($endpoint, $payload, [
-        'Authorization: ' . $authHeader,
-        'Content-Type: application/json',
-    ]);
-}
-
-function admin_twitter_oauth_header(string $method, string $url, array $settings): string {
-    $oauth = [
-        'oauth_consumer_key' => trim((string) ($settings['api_key'] ?? '')),
-        'oauth_nonce' => bin2hex(random_bytes(16)),
-        'oauth_signature_method' => 'HMAC-SHA1',
-        'oauth_timestamp' => (string) time(),
-        'oauth_token' => trim((string) ($settings['access_token'] ?? '')),
-        'oauth_version' => '1.0',
-    ];
-    $baseParams = [];
-    foreach ($oauth as $key => $value) {
-        $baseParams[rawurlencode($key)] = rawurlencode($value);
-    }
-    ksort($baseParams);
-    $paramString = [];
-    foreach ($baseParams as $key => $value) {
-        $paramString[] = $key . '=' . $value;
-    }
-    $baseUrl = $url;
-    $baseString = strtoupper($method) . '&' . rawurlencode($baseUrl) . '&' . rawurlencode(implode('&', $paramString));
-    $signingKey = rawurlencode((string) ($settings['api_secret'] ?? '')) . '&' . rawurlencode((string) ($settings['access_secret'] ?? ''));
-    $signature = base64_encode(hash_hmac('sha1', $baseString, $signingKey, true));
-    $oauth['oauth_signature'] = $signature;
-    $headerParts = [];
-    foreach ($oauth as $key => $value) {
-        $headerParts[] = $key . '="' . rawurlencode($value) . '"';
-    }
-    return 'OAuth ' . implode(', ', $headerParts);
-}
-
 function admin_http_get_binary(string $url): string {
     $opts = [
         'http' => [
@@ -2929,20 +2824,6 @@ function admin_http_get_binary(string $url): string {
     ];
     $data = @file_get_contents($url, false, stream_context_create($opts));
     return is_string($data) ? $data : '';
-}
-
-function admin_http_post_raw(string $url, string $body, array $headers): string {
-    $opts = [
-        'http' => [
-            'method' => 'POST',
-            'header' => implode("\r\n", $headers),
-            'content' => $body,
-            'ignore_errors' => true,
-            'timeout' => 15,
-        ],
-    ];
-    $response = @file_get_contents($url, false, stream_context_create($opts));
-    return is_string($response) ? $response : '';
 }
 
 function admin_build_instagram_caption(string $slug, string $title, string $description, string $urlOverride = ''): string {
@@ -7344,34 +7225,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
         }
         header('Location: admin.php?page=configuracion');
-        exit;
-    } elseif (isset($_POST['save_twitter_media'])) {
-        $twitter_api_key = trim($_POST['twitter_api_key'] ?? '');
-        $twitter_api_secret = trim($_POST['twitter_api_secret'] ?? '');
-        $twitter_access_token = trim($_POST['twitter_access_token'] ?? '');
-        $twitter_access_secret = trim($_POST['twitter_access_secret'] ?? '');
-        try {
-            $config = load_config_file();
-            $twitter = $config['twitter'] ?? [];
-            if (!is_array($twitter)) {
-                $twitter = [];
-            }
-            $twitter['api_key'] = $twitter_api_key;
-            $twitter['api_secret'] = $twitter_api_secret;
-            $twitter['access_token'] = $twitter_access_token;
-            $twitter['access_secret'] = $twitter_access_secret;
-            $hasCoreTwitter = isset($twitter['token'], $twitter['channel']) || ($twitter['auto_post'] ?? 'off') === 'on';
-            $hasMediaTwitter = ($twitter_api_key !== '' || $twitter_api_secret !== '' || $twitter_access_token !== '' || $twitter_access_secret !== '');
-            if ($hasCoreTwitter || $hasMediaTwitter) {
-                $config['twitter'] = $twitter;
-            } else {
-                unset($config['twitter']);
-            }
-            save_config_file($config);
-        } catch (Throwable $e) {
-            $error = "Error guardando Twitter / X: " . $e->getMessage();
-        }
-        header('Location: admin.php?page=anuncios#twitter-media');
         exit;
     } elseif (isset($_POST['save_social'])) {
         $social_default_description = trim($_POST['social_default_description'] ?? '');

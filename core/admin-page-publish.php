@@ -146,7 +146,7 @@
             <small class="form-text text-muted">Solo para entradas y podcasts. Escribe un slug por línea (o separados por coma).</small>
         </div>
 
-        <div class="form-group non-podcast">
+        <div class="form-group">
 
             <label for="content_publish">Contenido (Markdown)</label>
             <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#content_publish">

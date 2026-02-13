@@ -95,6 +95,9 @@ if (!in_array($headerButtonsMode, ['home', 'both', 'none'], true)) {
 $showHeaderButtonsSingle = $headerButtonsMode === 'both';
 $isAdminLogged = !empty($isAdminLogged ?? false);
 $editButtonHref = trim((string) ($editButtonHref ?? ''));
+$hidePostIntro = !empty($hidePostIntro ?? false);
+$isPodcastTemplate = ($postTemplate === 'podcast');
+$podcastEpisodesIndexUrl = trim((string) ($podcastEpisodesIndexUrl ?? (($baseUrl ?? '') !== '' ? rtrim((string) $baseUrl, '/') . '/podcast' : '/podcast')));
 $renderSearchBox = static function (string $variant) use ($searchAction, $colorHighlight, $colorAccent, $colorText, $searchActionBase, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories, $hasPodcast, $podcastIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
@@ -406,7 +409,7 @@ if ($isPageTemplate && $formattedDate !== '') {
 <?php if ($showHeaderButtonsSingle && !$isPageTemplate): ?>
     <?= $renderHeaderButtons() ?>
 <?php endif; ?>
-        <?php if ($post->getDescription() !== ''): ?>
+        <?php if (!$hidePostIntro && $post->getDescription() !== ''): ?>
             <div class="post-intro">
                 <p><?= htmlspecialchars($post->getDescription(), ENT_QUOTES, 'UTF-8') ?></p>
             </div>
@@ -450,32 +453,37 @@ if ($isPageTemplate && $formattedDate !== '') {
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
-    </div>
-    <?php if (!empty($relatedPosts)): ?>
-        <section class="post-related" aria-label="Entradas o itinerarios relacionados">
-            <div class="post-related-heading">Descubre ahora</div>
-            <div class="post-related-grid">
-                <?php foreach ($relatedPosts as $relatedPost): ?>
-                    <?php
-                    $relatedTitle = trim((string) ($relatedPost['title'] ?? ''));
-                    $relatedUrl = trim((string) ($relatedPost['url'] ?? ''));
-                    $relatedImage = trim((string) ($relatedPost['image'] ?? ''));
-                    if ($relatedTitle === '' || $relatedUrl === '') {
-                        continue;
-                    }
-                    ?>
-                    <a class="post-related-card" href="<?= htmlspecialchars($relatedUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?>">
-                        <?php if ($relatedImage !== ''): ?>
-                            <img src="<?= htmlspecialchars($relatedImage, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
-                        <?php else: ?>
-                            <span class="post-related-fallback" aria-hidden="true"></span>
-                        <?php endif; ?>
-                        <span class="post-related-title"><?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?></span>
-                    </a>
-                <?php endforeach; ?>
+        <?php if (!empty($relatedPosts)): ?>
+            <section class="post-related" aria-label="Entradas o itinerarios relacionados">
+                <div class="post-related-heading">Descubre ahora</div>
+                <div class="post-related-grid">
+                    <?php foreach ($relatedPosts as $relatedPost): ?>
+                        <?php
+                        $relatedTitle = trim((string) ($relatedPost['title'] ?? ''));
+                        $relatedUrl = trim((string) ($relatedPost['url'] ?? ''));
+                        $relatedImage = trim((string) ($relatedPost['image'] ?? ''));
+                        if ($relatedTitle === '' || $relatedUrl === '') {
+                            continue;
+                        }
+                        ?>
+                        <a class="post-related-card" href="<?= htmlspecialchars($relatedUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?>">
+                            <?php if ($relatedImage !== ''): ?>
+                                <img src="<?= htmlspecialchars($relatedImage, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
+                            <?php else: ?>
+                                <span class="post-related-fallback" aria-hidden="true"></span>
+                            <?php endif; ?>
+                            <span class="post-related-title"><?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?></span>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+        <?php endif; ?>
+        <?php if ($isPodcastTemplate && $podcastEpisodesIndexUrl !== ''): ?>
+            <div class="podcast-index-cta">
+                <a class="podcast-index-cta-btn" href="<?= htmlspecialchars($podcastEpisodesIndexUrl, ENT_QUOTES, 'UTF-8') ?>">Índice de episodios</a>
             </div>
-        </section>
-    <?php endif; ?>
+        <?php endif; ?>
+    </div>
     <?php if ($bottomMetaText !== ''): ?>
         <div class="post-meta-update"><?= $bottomMetaText ?></div>
     <?php endif; ?>
@@ -505,6 +513,46 @@ if ($isPageTemplate && $formattedDate !== '') {
     .site-search-block {
         margin: 1.5rem auto;
         max-width: min(680px, 100%);
+    }
+    .post-body .podcast-player-single {
+        width: min(960px, 100%);
+        display: block;
+        margin: 0.35rem auto 1rem;
+    }
+    .post-body .podcast-episode-description {
+        margin: 0 auto 1rem;
+        max-width: min(960px, 100%);
+        background: <?= $colorIntroBg ?>;
+        border-radius: var(--nammu-radius-lg);
+        padding: 1rem 1.15rem;
+        color: <?= $colorText ?>;
+    }
+    .post-body .podcast-episode-description p {
+        margin: 0;
+        line-height: 1.65;
+    }
+    .podcast-index-cta {
+        display: flex;
+        justify-content: center;
+        margin: 1rem auto 0.4rem;
+    }
+    .podcast-index-cta-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem 1rem;
+        border-radius: 999px;
+        background: <?= $colorAccent ?>;
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+        border: 1px solid rgba(255,255,255,.25);
+    }
+    .podcast-index-cta-btn:hover {
+        color: #fff;
+        text-decoration: none;
+        filter: brightness(0.96);
     }
     .public-edit-floating-wrap {
         margin: 0.9rem auto 0;

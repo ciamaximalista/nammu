@@ -833,7 +833,7 @@ if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
     $episodeDateRaw = trim((string) ($episode->getMetadata()['Date'] ?? ''));
     $episodeDateTs = $episodeDateRaw !== '' ? strtotime($episodeDateRaw) : false;
     $episodeDateDisplay = $episodeDateTs !== false ? date('d/m/Y', $episodeDateTs) : $episodeDateRaw;
-    $episodeDescriptionHtml = $episodeDescription !== '' ? '<p>' . nl2br(htmlspecialchars($episodeDescription, ENT_QUOTES, 'UTF-8')) . '</p>' : '';
+    $episodeDescriptionHtml = $episodeDescription !== '' ? '<div class="podcast-episode-description"><p>' . nl2br(htmlspecialchars($episodeDescription, ENT_QUOTES, 'UTF-8')) . '</p></div>' : '';
     $episodePlayerHtml = $audioUrl !== ''
         ? '<audio class="podcast-player-single" controls preload="none"><source src="' . htmlspecialchars($audioUrl, ENT_QUOTES, 'UTF-8') . '" type="audio/mpeg"></audio>'
         : '';
@@ -861,6 +861,7 @@ if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
         'postFilePath' => $episodeFilePath,
         'hideCategory' => true,
         'hidePostIntro' => true,
+        'podcastEpisodesIndexUrl' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/podcast',
         'customMetaBand' => $episodeDateDisplay !== '' ? 'Emitido el ' . $episodeDateDisplay : '',
         'editButtonHref' => $isAdminLogged
             ? (($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/admin.php?page=edit-post&file=' . rawurlencode($episode->getSlug() . '.md'))

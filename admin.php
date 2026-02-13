@@ -1720,6 +1720,22 @@ function admin_public_post_url(string $slug): string {
     return $base . $path;
 }
 
+function admin_public_podcast_url(string $slug): string {
+    $base = admin_base_url();
+    if ($base === '') {
+        $settings = get_settings();
+        $siteUrl = trim((string) ($settings['site_url'] ?? ''));
+        if ($siteUrl !== '') {
+            $base = rtrim($siteUrl, '/');
+        }
+    }
+    $path = '/podcast/' . rawurlencode(ltrim($slug, '/'));
+    if ($base === '') {
+        return $path;
+    }
+    return $base . $path;
+}
+
 /**
  * @return string[]
  */
@@ -5409,8 +5425,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!$isDraft && $type === 'Podcast') {
                         $audioUrl = admin_public_asset_url($audio);
                         $imageUrl = admin_public_asset_url($image);
-                        if ($audioUrl !== '') {
-                            admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image, $audioUrl, $imageUrl);
+                        $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
+                        $podcastUrl = $slug !== '' ? admin_public_podcast_url($slug) : '';
+                        if ($podcastUrl !== '') {
+                            admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image, $podcastUrl, $imageUrl);
                         }
                         $settings = get_settings();
                         $mailing = $settings['mailing'] ?? [];
@@ -5434,8 +5452,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
                         if (in_array($type, ['Entrada', 'Página'], true) && $slug !== '' && !($type === 'Página' && $pageVisibility === 'private')) {
                             $indexnowUrls[] = admin_public_post_url($slug);
-                        } elseif ($type === 'Podcast' && $audioUrl !== '') {
-                            $indexnowUrls[] = $audioUrl;
+                        } elseif ($type === 'Podcast' && $slug !== '') {
+                            $indexnowUrls[] = admin_public_podcast_url($slug);
                         }
                         if (!empty($indexnowUrls)) {
                             admin_maybe_send_indexnow($indexnowUrls);
@@ -5890,8 +5908,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($shouldAutoSharePodcast) {
                         $audioUrl = admin_public_asset_url($audio);
                         $imageUrl = admin_public_asset_url($image);
-                        if ($audioUrl !== '') {
-                            admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image, $audioUrl, $imageUrl);
+                        $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
+                        $podcastUrl = $slug !== '' ? admin_public_podcast_url($slug) : '';
+                        if ($podcastUrl !== '') {
+                            admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image, $podcastUrl, $imageUrl);
                         }
                         $settings = get_settings();
                         $mailing = $settings['mailing'] ?? [];
@@ -5942,9 +5962,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if (in_array($template, ['post', 'page'], true) && $slug !== '' && !($template === 'page' && $pageVisibility === 'private')) {
                                 $indexnowUrls[] = admin_public_post_url($slug);
                             } elseif ($template === 'podcast') {
-                                $audioUrl = admin_public_asset_url($audio);
-                                if ($audioUrl !== '') {
-                                    $indexnowUrls[] = $audioUrl;
+                                if ($slug !== '') {
+                                    $indexnowUrls[] = admin_public_podcast_url($slug);
                                 }
                             }
                             if (!empty($indexnowUrls)) {
@@ -6012,12 +6031,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $imageUrl = admin_public_asset_url((string) $image);
                     $customUrl = '';
                     if ($template === 'podcast') {
-                        $audioPath = (string) ($metadata['Audio'] ?? '');
-                        $customUrl = admin_public_asset_url($audioPath);
+                        $customUrl = admin_public_podcast_url($slug);
                         $imagePath = (string) ($metadata['Image'] ?? '');
                         $imageUrl = admin_public_asset_url($imagePath);
                         if ($customUrl === '') {
-                            $feedback['message'] = 'No se encontró el mp3 del podcast para compartir.';
+                            $feedback['message'] = 'No se encontró la URL pública del episodio para compartir.';
                             $_SESSION['social_feedback'] = $feedback;
                             header('Location: admin.php?page=edit&template=' . $redirectTemplate);
                             exit;

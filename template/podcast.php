@@ -251,6 +251,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
         <?php foreach ($episodes as $episode): ?>
             <?php
             $audioLink = $episode['audio'] ?? '';
+            $episodeLink = $episode['url'] ?? '';
             $imageUrl = $resolveImage($episode['image'] ?? '');
             $cardClassParts = ['post-card', 'style-' . $cardStyle];
             if ($cardStyle === 'full') {
@@ -291,7 +292,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
                     </a>
                 <?php endif; ?>
                 <div class="post-body">
-                    <h2><a href="<?= htmlspecialchars($audioLink, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($episode['title'], ENT_QUOTES, 'UTF-8') ?></a></h2>
+                    <h2><a href="<?= htmlspecialchars($episodeLink !== '' ? $episodeLink : $audioLink, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($episode['title'], ENT_QUOTES, 'UTF-8') ?></a></h2>
                     <?php if ($metaHtml !== ''): ?>
                         <p class="post-meta"><?= $metaHtml ?></p>
                     <?php endif; ?>

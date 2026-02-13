@@ -334,6 +334,9 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
 
     foreach ($posts as $post) {
         $postTemplate = strtolower($post->getTemplate());
+        if ($postTemplate === 'podcast') {
+            continue;
+        }
         $postVisibility = strtolower(trim((string) ($post->getMetadata()['Visibility'] ?? $post->getMetadata()['visibility'] ?? 'public')));
         if ($postTemplate === 'page' && in_array($postVisibility, ['private', 'privada', '1', 'true', 'yes', 'on'], true)) {
             continue;
@@ -458,6 +461,16 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
             $ts = isset($item['timestamp']) ? (int) $item['timestamp'] : null;
             if ($ts !== null && $ts > 0) {
                 $latestPodcastTimestamp = $latestPodcastTimestamp === null ? $ts : max($latestPodcastTimestamp, $ts);
+            }
+            $episodeUrl = trim((string) ($item['page_url'] ?? ''));
+            if ($episodeUrl !== '') {
+                $entries[] = [
+                    'loc' => $episodeUrl,
+                    'lastmod' => $ts !== null && $ts > 0 ? gmdate('c', $ts) : null,
+                    'changefreq' => 'weekly',
+                    'priority' => 0.7,
+                    'image' => !empty($item['image']) ? (string) $item['image'] : null,
+                ];
             }
         }
         $entries[] = [
@@ -801,12 +814,75 @@ if ($routePath === '/itinerarios.xml') {
     exit;
 }
 
+if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
+    $episodeSlug = trim(rawurldecode($podcastEpisodeMatch[1]));
+    $episode = $episodeSlug !== '' ? $contentRepository->findBySlug($episodeSlug) : null;
+    if (!$episode || strtolower((string) $episode->getTemplate()) !== 'podcast' || $episode->isDraft()) {
+        $renderNotFound('Episodio no encontrado', 'El episodio de podcast solicitado no está disponible.', $routePath);
+    }
+
+    $episodeTitle = $episode->getTitle();
+    $episodeDescription = trim((string) ($episode->getMetadata()['Description'] ?? ''));
+    $episodeImage = nammu_resolve_asset((string) ($episode->getMetadata()['Image'] ?? ''), $publicBaseUrl);
+    $audioPath = trim((string) ($episode->getMetadata()['Audio'] ?? ''));
+    $audioUrl = nammu_resolve_asset($audioPath, $publicBaseUrl) ?? '';
+    $episodeDateRaw = trim((string) ($episode->getMetadata()['Date'] ?? ''));
+    $episodeDateTs = $episodeDateRaw !== '' ? strtotime($episodeDateRaw) : false;
+    $episodeDateDisplay = $episodeDateTs !== false ? date('d/m/Y', $episodeDateTs) : $episodeDateRaw;
+    $episodeDescriptionHtml = $episodeDescription !== '' ? '<p>' . nl2br(htmlspecialchars($episodeDescription, ENT_QUOTES, 'UTF-8')) . '</p>' : '';
+    $episodePlayerHtml = $audioUrl !== ''
+        ? '<audio class="podcast-player-single" controls preload="none"><source src="' . htmlspecialchars($audioUrl, ENT_QUOTES, 'UTF-8') . '" type="audio/mpeg"></audio>'
+        : '';
+    $episodeBodyHtml = '<div class="podcast-episode-body">' . $episodePlayerHtml . $episodeDescriptionHtml . '</div>';
+    $episodeCanonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/podcast/' . rawurlencode($episode->getSlug());
+
+    if (function_exists('nammu_record_pageview')) {
+        nammu_record_pageview('pages', 'podcast/' . $episode->getSlug(), $episodeTitle);
+    }
+
+    $episodeSocialMeta = nammu_build_social_meta([
+        'type' => 'article',
+        'title' => $episodeTitle . ' — Podcast',
+        'description' => $episodeDescription !== '' ? $episodeDescription : 'Nuevo episodio de podcast.',
+        'url' => $episodeCanonical,
+        'image' => $episodeImage ?: $homeImage,
+        'site_name' => $siteNameForMeta,
+    ], $socialConfig);
+
+    $episodeFilePath = __DIR__ . '/content/' . $episode->getSlug() . '.md';
+    $content = $renderer->render('single', [
+        'pageTitle' => $episodeTitle,
+        'post' => $episode,
+        'htmlContent' => $episodeBodyHtml,
+        'postFilePath' => $episodeFilePath,
+        'hideCategory' => true,
+        'hidePostIntro' => true,
+        'customMetaBand' => $episodeDateDisplay !== '' ? 'Emitido el ' . $episodeDateDisplay : '',
+        'editButtonHref' => $isAdminLogged
+            ? (($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/admin.php?page=edit-post&file=' . rawurlencode($episode->getSlug() . '.md'))
+            : '',
+    ]);
+
+    echo $renderer->render('layout', [
+        'pageTitle' => $episodeTitle . ' — Podcast',
+        'metaDescription' => $episodeDescription !== '' ? $episodeDescription : 'Episodio de podcast.',
+        'content' => $content,
+        'socialMeta' => $episodeSocialMeta,
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
+        'showLogo' => true,
+    ]);
+    exit;
+}
+
 if (preg_match('#^/podcast/?$#i', $routePath)) {
     $rawEpisodes = nammu_collect_podcast_items(__DIR__ . '/content', $publicBaseUrl);
     $episodes = [];
     foreach ($rawEpisodes as $episode) {
         $timestamp = (int) ($episode['timestamp'] ?? 0);
         $episodes[] = [
+            'slug' => (string) ($episode['slug'] ?? ''),
+            'url' => (string) ($episode['page_url'] ?? ''),
             'title' => (string) ($episode['title'] ?? ''),
             'description' => (string) ($episode['description'] ?? ''),
             'date' => $timestamp > 0 ? date('d/m/y', $timestamp) : '',

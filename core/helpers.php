@@ -199,6 +199,8 @@ function nammu_detect_referrer_source(string $referer, string $host): array
     $searchEngines = [
         'google.' => 'Google Search',
         'bing.com' => 'Bing',
+        'search.brave.com' => 'Brave Search',
+        'brave.com' => 'Brave Search',
         'duckduckgo.com' => 'DuckDuckGo',
         'yahoo.' => 'Yahoo',
         'yandex.' => 'Yandex',
@@ -604,6 +606,9 @@ function nammu_record_visit(): void
         'google_search' => 'Google Search',
         'googleorganic' => 'Google Search',
         'bing' => 'Bing',
+        'brave' => 'Brave Search',
+        'brave_search' => 'Brave Search',
+        'search.brave.com' => 'Brave Search',
         'duckduckgo' => 'DuckDuckGo',
         'ddg' => 'DuckDuckGo',
         'yahoo' => 'Yahoo',
@@ -631,7 +636,7 @@ function nammu_record_visit(): void
             $bucket = 'email';
         } elseif ($utmDetail === 'Notificaciones push') {
             $bucket = 'push';
-        } elseif (in_array($utmDetail, ['Google Search', 'Bing', 'DuckDuckGo', 'Yahoo', 'Yandex', 'Baidu', 'Ecosia', 'Startpage'], true)) {
+        } elseif (in_array($utmDetail, ['Google Search', 'Bing', 'Brave Search', 'DuckDuckGo', 'Yahoo', 'Yandex', 'Baidu', 'Ecosia', 'Startpage'], true)) {
             $bucket = 'search';
         } elseif (in_array($utmDetail, ['Telegram', 'Instagram', 'Facebook', 'Twitter/X', 'Mastodon', 'LinkedIn', 'Pinterest', 'Reddit', 'TikTok', 'YouTube'], true)) {
             $bucket = 'social';
@@ -1946,6 +1951,7 @@ function nammu_collect_podcast_items(string $contentDir, string $baseUrl = ''): 
         }
         $items[] = [
             'filename' => basename($file),
+            'slug' => pathinfo($file, PATHINFO_FILENAME),
             'title' => (string) ($metadata['Title'] ?? ''),
             'description' => (string) ($metadata['Description'] ?? ''),
             'image' => nammu_resolve_asset((string) ($metadata['Image'] ?? ''), $baseUrl),
@@ -1955,6 +1961,12 @@ function nammu_collect_podcast_items(string $contentDir, string $baseUrl = ''): 
             'timestamp' => $timestamp,
         ];
     }
+    $base = rtrim($baseUrl, '/');
+    foreach ($items as &$item) {
+        $slug = trim((string) ($item['slug'] ?? ''));
+        $item['page_url'] = $slug !== '' ? (($base !== '' ? $base : '') . '/podcast/' . rawurlencode($slug)) : '';
+    }
+    unset($item);
     usort($items, static function (array $a, array $b): int {
         return ($b['timestamp'] ?? 0) <=> ($a['timestamp'] ?? 0);
     });
@@ -2305,9 +2317,11 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
     $audio = (string) ($payload['audio'] ?? '');
     $indexnowUrls = [];
     if ($template === 'podcast') {
-        $audioUrl = admin_public_asset_url($audio);
-        if ($audioUrl !== '') {
-            $indexnowUrls[] = $audioUrl;
+        if ($slug !== '' && function_exists('admin_public_podcast_url')) {
+            $podcastUrl = admin_public_podcast_url($slug);
+            if ($podcastUrl !== '') {
+                $indexnowUrls[] = $podcastUrl;
+            }
         }
     } else {
         $link = $slug !== '' ? admin_public_post_url($slug) : '';
@@ -2324,10 +2338,10 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
 
     if ($filename !== '') {
         if ($template === 'podcast') {
-            $audioUrl = admin_public_asset_url($audio);
+            $podcastUrl = ($slug !== '' && function_exists('admin_public_podcast_url')) ? admin_public_podcast_url($slug) : '';
             $imageUrl = admin_public_asset_url($image);
-            if ($audioUrl !== '') {
-                admin_maybe_auto_post_to_social_networks($filename, $title, $description, $image, $audioUrl, $imageUrl);
+            if ($podcastUrl !== '') {
+                admin_maybe_auto_post_to_social_networks($filename, $title, $description, $image, $podcastUrl, $imageUrl);
             }
         } else {
             $imageUrl = admin_public_asset_url($image);

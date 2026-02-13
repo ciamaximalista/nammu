@@ -816,10 +816,14 @@ if ($routePath === '/itinerarios.xml') {
 
 if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
     $episodeSlug = trim(rawurldecode($podcastEpisodeMatch[1]));
-    $episode = $episodeSlug !== '' ? $contentRepository->findBySlug($episodeSlug) : null;
-    if (!$episode || strtolower((string) $episode->getTemplate()) !== 'podcast' || $episode->isDraft()) {
+    $episodeDocument = $episodeSlug !== '' ? $contentRepository->getDocument($episodeSlug) : null;
+    $episodeMeta = is_array($episodeDocument['metadata'] ?? null) ? $episodeDocument['metadata'] : [];
+    $episodeTemplate = strtolower(trim((string) ($episodeMeta['Template'] ?? $episodeMeta['template'] ?? '')));
+    $episodeStatus = strtolower(trim((string) ($episodeMeta['Status'] ?? 'published')));
+    if (!$episodeDocument || $episodeTemplate !== 'podcast' || $episodeStatus === 'draft') {
         $renderNotFound('Episodio no encontrado', 'El episodio de podcast solicitado no está disponible.', $routePath);
     }
+    $episode = new Post($episodeSlug, $episodeMeta, (string) ($episodeDocument['content'] ?? ''), $episodeStatus);
 
     $episodeTitle = $episode->getTitle();
     $episodeDescription = trim((string) ($episode->getMetadata()['Description'] ?? ''));

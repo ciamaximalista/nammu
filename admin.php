@@ -1088,6 +1088,14 @@ function get_settings() {
         'key_file' => '',
     ];
     $indexnow = array_merge($indexnowDefaults, $config['indexnow'] ?? []);
+    $podcastServicesDefaults = [
+        'spotify' => '',
+        'ivoox' => '',
+        'apple' => '',
+        'google' => '',
+        'youtube_music' => '',
+    ];
+    $podcastServices = array_merge($podcastServicesDefaults, $config['podcast_services'] ?? []);
     $nisaba = $config['nisaba'] ?? [];
     $telex = $config['telex'] ?? [];
     $contact = $config['contact'] ?? [];
@@ -1125,6 +1133,7 @@ function get_settings() {
         'postal' => $postal,
         'ads' => $ads,
         'indexnow' => $indexnow,
+        'podcast_services' => $podcastServices,
         'nisaba' => $nisaba,
         'telex' => $telex,
         'contact' => $contact,

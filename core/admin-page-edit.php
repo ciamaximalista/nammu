@@ -105,9 +105,7 @@ if ($editFeedback !== null) {
         $showVisibilityColumn = ($templateFilter === 'page');
         $showSocialColumn = ($templateFilter !== 'newsletter' && !$showVisibilityColumn);
         $columnCount = 4;
-        if ($templateFilter !== 'podcast') {
-            $columnCount++;
-        }
+        $columnCount++;
         if ($showSocialColumn) {
             $columnCount++;
         }
@@ -125,9 +123,7 @@ if ($editFeedback !== null) {
 
                     <th>Fecha</th>
 
-                    <?php if ($templateFilter !== 'podcast'): ?>
-                        <th>Nombre de archivo</th>
-                    <?php endif; ?>
+                    <th>Nombre de archivo</th>
 
                     <?php if ($showVisibilityColumn): ?>
                         <th class="text-center"><i class="fas fa-eye" aria-hidden="true"></i><span class="sr-only">Visibilidad</span></th>
@@ -185,15 +181,15 @@ if ($editFeedback !== null) {
 
                         <td><?= htmlspecialchars($post['date']) ?></td>
 
-                        <?php if ($templateFilter !== 'podcast'): ?>
-                            <?php
-                            $postSlug = pathinfo($post['filename'], PATHINFO_FILENAME);
-                            $postLink = admin_public_post_url($postSlug);
-                            ?>
-                            <td>
-                                <a href="<?= htmlspecialchars($postLink, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($post['filename']) ?></a>
-                            </td>
-                        <?php endif; ?>
+                        <?php
+                        $postSlug = pathinfo($post['filename'], PATHINFO_FILENAME);
+                        $postLink = $templateFilter === 'podcast'
+                            ? admin_public_podcast_url($postSlug)
+                            : admin_public_post_url($postSlug);
+                        ?>
+                        <td>
+                            <a href="<?= htmlspecialchars($postLink, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($post['filename']) ?></a>
+                        </td>
 
                         <?php if ($showVisibilityColumn): ?>
                         <td class="text-center">

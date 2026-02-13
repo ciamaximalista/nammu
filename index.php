@@ -839,6 +839,52 @@ if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
         : '';
     $episodeBodyHtml = '<div class="podcast-episode-body">' . $episodePlayerHtml . $episodeDescriptionHtml . '</div>';
     $episodeCanonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/podcast/' . rawurlencode($episode->getSlug());
+    $relatedPosts = [];
+    $relatedRaw = trim((string) ($episode->getMetadata()['Related'] ?? $episode->getMetadata()['related'] ?? ''));
+    if ($relatedRaw !== '') {
+        foreach (nammu_parse_related_slugs_input($relatedRaw) as $relatedRef) {
+            if (str_starts_with($relatedRef, 'itinerarios/')) {
+                $itinerarySlug = ItineraryRepository::normalizeSlug(substr($relatedRef, strlen('itinerarios/')));
+                if ($itinerarySlug === '') {
+                    continue;
+                }
+                $relatedItinerary = $itineraryRepository->find($itinerarySlug);
+                if (!$relatedItinerary) {
+                    continue;
+                }
+                if ($relatedItinerary->isDraft() && !$isAdminLogged) {
+                    continue;
+                }
+                $relatedPosts[] = [
+                    'slug' => 'itinerarios/' . $relatedItinerary->getSlug(),
+                    'title' => $relatedItinerary->getTitle(),
+                    'url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/itinerarios/' . rawurlencode($relatedItinerary->getSlug()),
+                    'image' => nammu_resolve_asset($relatedItinerary->getImage(), $publicBaseUrl),
+                ];
+                continue;
+            }
+            if ($relatedRef === $episode->getSlug()) {
+                continue;
+            }
+            $relatedPost = $contentRepository->findBySlug($relatedRef);
+            if (!$relatedPost) {
+                continue;
+            }
+            $relatedTemplate = strtolower($relatedPost->getTemplate());
+            if (!in_array($relatedTemplate, ['post', 'single'], true)) {
+                continue;
+            }
+            if ($relatedPost->isDraft() && !$isAdminLogged) {
+                continue;
+            }
+            $relatedPosts[] = [
+                'slug' => $relatedPost->getSlug(),
+                'title' => $relatedPost->getTitle(),
+                'url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/' . rawurlencode($relatedPost->getSlug()),
+                'image' => nammu_resolve_asset($relatedPost->getImage(), $publicBaseUrl),
+            ];
+        }
+    }
 
     if (function_exists('nammu_record_pageview')) {
         nammu_record_pageview('pages', 'podcast/' . $episode->getSlug(), $episodeTitle);
@@ -861,6 +907,7 @@ if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
         'postFilePath' => $episodeFilePath,
         'hideCategory' => true,
         'hidePostIntro' => true,
+        'relatedPosts' => $relatedPosts,
         'podcastEpisodesIndexUrl' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/podcast',
         'customMetaBand' => $episodeDateDisplay !== '' ? 'Emitido el ' . $episodeDateDisplay : '',
         'editButtonHref' => $isAdminLogged

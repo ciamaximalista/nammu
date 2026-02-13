@@ -86,6 +86,7 @@ $postalUrl = $postalUrl ?? '/correos.php';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $autoTocHtml = isset($autoTocHtml) ? trim((string) $autoTocHtml) : '';
 $relatedPosts = is_array($relatedPosts ?? null) ? $relatedPosts : [];
+$postTemplate = strtolower((string) (method_exists($post, 'getTemplate') ? $post->getTemplate() : ($post->getMetadata()['Template'] ?? '')));
 $customMetaBand = isset($customMetaBand) ? trim((string) $customMetaBand) : '';
 $homeSettings = $theme['home'] ?? [];
 $headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
@@ -333,7 +334,6 @@ function nammu_page_date_fallback(array $metadata, ?string $filePath): ?string {
     }
     return null;
 }
-$postTemplate = method_exists($post, 'getTemplate') ? $post->getTemplate() : strtolower($post->getMetadata()['Template'] ?? '');
 $isPageTemplate = ($postTemplate === 'page');
 $isDraftPost = method_exists($post, 'isDraft') ? $post->isDraft() : false;
 $visibilityRaw = strtolower(trim((string) (($post->getMetadata()['Visibility'] ?? $post->getMetadata()['visibility'] ?? 'public'))));

@@ -1756,6 +1756,18 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
         if ($href === '') {
             continue;
         }
+        if ($key === 'youtube_music') {
+            $parts = @parse_url($href);
+            $host = strtolower((string) ($parts['host'] ?? ''));
+            $path = (string) ($parts['path'] ?? '');
+            if ($host !== '' && str_contains($host, 'youtube.com')) {
+                $trimmedPath = rtrim($path, '/');
+                if ($trimmedPath === '' || !str_ends_with($trimmedPath, '/podcasts')) {
+                    $pathBase = $trimmedPath !== '' ? $trimmedPath : '';
+                    $href = 'https://' . $host . ($pathBase !== '' ? $pathBase : '') . '/podcasts';
+                }
+            }
+        }
         $links[] = [
             'label' => $label,
             'href' => $href,

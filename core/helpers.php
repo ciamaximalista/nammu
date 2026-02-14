@@ -1569,6 +1569,8 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
 {
     $icons = nammu_footer_icon_svgs();
     $links = [];
+    $socialLinks = [];
+    $platformLinks = [];
     $normalizeExternalUrl = static function (string $value): string {
         $value = trim($value);
         if ($value === '') {
@@ -1585,7 +1587,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
     if ($telegramChannel !== '') {
         $slug = ltrim($telegramChannel, '@');
         if ($slug !== '') {
-            $links[] = [
+            $socialLinks[] = [
                 'label' => 'Telegram',
                 'href' => 'https://t.me/' . rawurlencode($slug),
                 'svg' => $icons['telegram'],
@@ -1595,7 +1597,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
 
     $facebookPage = trim((string) ($config['facebook']['channel'] ?? ''));
     if ($facebookPage !== '') {
-        $links[] = [
+        $socialLinks[] = [
             'label' => 'Facebook',
             'href' => 'https://www.facebook.com/' . rawurlencode($facebookPage),
             'svg' => $icons['facebook'],
@@ -1625,7 +1627,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
                 $instagramLabel = 'Instagram (@' . $instagramHandle . ')';
             }
         }
-        $links[] = [
+        $socialLinks[] = [
             'label' => $instagramLabel,
             'href' => $instagramHref,
             'svg' => $icons['instagram'],
@@ -1636,7 +1638,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
     if ($twitterHandle !== '') {
         $handle = ltrim($twitterHandle, '@');
         if ($handle !== '') {
-            $links[] = [
+            $socialLinks[] = [
                 'label' => 'X',
                 'href' => 'https://twitter.com/' . rawurlencode($handle),
                 'svg' => $icons['twitter'],
@@ -1649,7 +1651,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
         $handle = ltrim($blueskyHandle, '@');
         $handle = preg_replace('/[\\p{Cf}\\p{Z}\\s]+/u', '', $handle);
         if ($handle !== '') {
-            $links[] = [
+            $socialLinks[] = [
                 'label' => 'Bluesky',
                 'href' => 'https://bsky.app/profile/' . rawurlencode($handle),
                 'svg' => $icons['bluesky'],
@@ -1677,7 +1679,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
         }
     }
     if ($mastodonUrl !== '') {
-        $links[] = [
+        $socialLinks[] = [
             'label' => 'Mastodon',
             'href' => $mastodonUrl,
             'svg' => $icons['mastodon'],
@@ -1736,7 +1738,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
             if ($podcastTitle === '') {
                 $podcastTitle = 'Podcast';
             }
-            $links[] = [
+            $platformLinks[] = [
                 'label' => 'AntennaPod',
                 'href' => 'https://antennapod.org/deeplink/subscribe/?url=%22' . $podcastFeedUrl . '%22&title=' . $podcastTitle,
                 'svg' => $icons['antennapod'],
@@ -1770,13 +1772,13 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
                 }
             }
         }
-        $links[] = [
+        $platformLinks[] = [
             'label' => $label,
             'href' => $href,
             'svg' => $icons[$key] ?? $icons['email'],
         ];
     }
-
+    $links = array_merge($links, $socialLinks, $platformLinks);
     return $links;
 }
 

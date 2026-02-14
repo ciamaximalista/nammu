@@ -194,7 +194,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="social_home_image">Imagen de la portada para redes sociales y plataformas de podcast</label>
+                        <label for="social_home_image">Imagen de la portada para redes sociales</label>
                         <div class="input-group">
                             <input type="text" name="social_home_image" id="social_home_image" class="form-control" value="<?= htmlspecialchars($socialHomeImage, ENT_QUOTES, 'UTF-8') ?>" placeholder="assets/imagen-portada.jpg" readonly>
                             <div class="input-group-append">
@@ -203,6 +203,18 @@
                             </div>
                         </div>
                         <small class="form-text text-muted">Se utilizará como imagen por defecto para la portada y cuando una entrada no tenga imagen destacada.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="social_podcast_image">Imagen de la portada para plataformas de podcast</label>
+                        <div class="input-group">
+                            <input type="text" name="social_podcast_image" id="social_podcast_image" class="form-control" value="<?= htmlspecialchars($socialPodcastImage, ENT_QUOTES, 'UTF-8') ?>" placeholder="assets/imagen-podcast.jpg" readonly>
+                            <div class="input-group-append">
+                                <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="social_podcast_image" data-target-prefix="assets/">Seleccionar imagen</button>
+                                <button type="button" class="btn btn-outline-danger" id="clear-social-podcast-image">Quitar</button>
+                            </div>
+                        </div>
+                        <small class="form-text text-muted">Se usará en las tarjetas de la página de podcast y como imagen del canal en podcast.xml. Si está vacío, se usará la imagen de redes sociales.</small>
                     </div>
 
                     <div class="form-row">

@@ -72,6 +72,15 @@ $hasPodcast = !empty($hasPodcast);
 $hasCategories = !empty($hasCategories);
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
 $currentUrl = ($baseUrl ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
+$socialConfigLocal = is_array($socialConfig ?? null) ? $socialConfig : [];
+$podcastHeroImage = trim((string) ($socialConfigLocal['podcast_image'] ?? ''));
+if ($podcastHeroImage === '') {
+    $podcastHeroImage = trim((string) ($socialConfigLocal['home_image'] ?? ''));
+}
+$podcastHeroStyle = '';
+if ($podcastHeroImage !== '') {
+    $podcastHeroStyle = ' style="background-image: linear-gradient(rgba(0,0,0,0.36), rgba(0,0,0,0.36)), url(\'' . htmlspecialchars($podcastHeroImage, ENT_QUOTES, 'UTF-8') . '\');"';
+}
 $subscriptionSuccess = isset($_GET['subscribed']) && $_GET['subscribed'] === '1';
 $subscriptionSent = isset($_GET['sub_sent']) && $_GET['sub_sent'] === '1';
 $subscriptionError = isset($_GET['sub_error']) && $_GET['sub_error'] === '1';
@@ -223,7 +232,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
 };
 ?>
 
-<section class="category-detail-hero">
+<section class="category-detail-hero<?= $podcastHeroImage !== '' ? ' has-hero-image' : '' ?>"<?= $podcastHeroStyle ?>>
     <div>
         <p class="category-label"><?= htmlspecialchars((string) ($theme['author'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
         <h1><?= htmlspecialchars((string) ($theme['blog'] ?? $siteTitle ?? 'Nammu Blog'), ENT_QUOTES, 'UTF-8') ?> · Podcast</h1>
@@ -333,9 +342,21 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     .category-detail-hero {
         margin-bottom: 2rem;
         background: <?= $highlight ?>;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
         border-radius: var(--nammu-radius-lg);
         padding: 1.7rem 2rem;
         border: 1px solid rgba(0,0,0,0.05);
+    }
+    .category-detail-hero.has-hero-image {
+        border-color: rgba(255,255,255,0.28);
+    }
+    .category-detail-hero.has-hero-image .category-label,
+    .category-detail-hero.has-hero-image h1,
+    .category-detail-hero.has-hero-image .category-count {
+        color: #ffffff;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.38);
     }
     .category-label {
         margin: 0;

@@ -1167,6 +1167,7 @@ function nammu_social_settings(): array
     $defaults = [
         'default_description' => '',
         'home_image' => '',
+        'podcast_image' => '',
         'twitter' => '',
         'facebook_app_id' => '',
     ];
@@ -1175,6 +1176,9 @@ function nammu_social_settings(): array
 
     if ($social['home_image'] !== '') {
         $social['home_image'] = nammu_resolve_asset($social['home_image'], '');
+    }
+    if ($social['podcast_image'] !== '') {
+        $social['podcast_image'] = nammu_resolve_asset($social['podcast_image'], '');
     }
 
     return $social;
@@ -1983,6 +1987,10 @@ function nammu_generate_podcast_feed(string $baseUrl, array $config): string
     $ownerEmail = trim((string) ($config['mailing']['gmail_address'] ?? ''));
     $social = $config['social'] ?? [];
     $homeImage = nammu_resolve_asset((string) ($social['home_image'] ?? ''), $baseUrl);
+    $podcastHomeImage = nammu_resolve_asset((string) ($social['podcast_image'] ?? ''), $baseUrl);
+    if ($podcastHomeImage === '') {
+        $podcastHomeImage = $homeImage;
+    }
     $items = nammu_collect_podcast_items(dirname(__DIR__) . '/content', $baseUrl);
     $channelLink = $baseUrl !== '' ? $baseUrl . '/podcast' : '/podcast';
     $lastBuild = gmdate(DATE_RSS, !empty($items) ? (int) $items[0]['timestamp'] : time());
@@ -2017,7 +2025,7 @@ function nammu_generate_podcast_feed(string $baseUrl, array $config): string
 XML;
     }
     $itemsBlock = implode("\n", $itemsXml);
-    $itunesImageTag = $homeImage !== '' ? "\n    <itunes:image href=\"" . htmlspecialchars((string) $homeImage, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "\" />" : '';
+    $itunesImageTag = $podcastHomeImage !== '' ? "\n    <itunes:image href=\"" . htmlspecialchars((string) $podcastHomeImage, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "\" />" : '';
     $ownerEmailTag = $ownerEmailEsc !== '' ? "<itunes:email>{$ownerEmailEsc}</itunes:email>" : "<itunes:email></itunes:email>";
 
     return <<<XML

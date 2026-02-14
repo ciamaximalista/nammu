@@ -106,6 +106,10 @@ $socialConfig = nammu_social_settings();
 $siteNameForMeta = $theme['blog'] !== '' ? $theme['blog'] : $siteTitle;
 $homeDescription = $socialConfig['default_description'] !== '' ? $socialConfig['default_description'] : $siteDescription;
 $homeImage = nammu_resolve_asset($socialConfig['home_image'] ?? '', $publicBaseUrl);
+$podcastHomeImage = nammu_resolve_asset($socialConfig['podcast_image'] ?? '', $publicBaseUrl);
+if ($podcastHomeImage === '') {
+    $podcastHomeImage = $homeImage;
+}
 
 $displaySiteTitle = $theme['blog'] !== '' ? $theme['blog'] : $siteTitle;
 
@@ -963,7 +967,7 @@ if (preg_match('#^/podcast/?$#i', $routePath)) {
         'title' => 'Podcast — ' . $siteNameForMeta,
         'description' => $description,
         'url' => $canon,
-        'image' => $homeImage,
+        'image' => $podcastHomeImage,
         'site_name' => $siteNameForMeta,
     ], $socialConfig);
     echo $renderer->render('layout', [

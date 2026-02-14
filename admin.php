@@ -7238,6 +7238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['save_social'])) {
         $social_default_description = trim($_POST['social_default_description'] ?? '');
         $social_home_image = trim($_POST['social_home_image'] ?? '');
+        $social_podcast_image = trim($_POST['social_podcast_image'] ?? '');
         $social_twitter = trim($_POST['social_twitter'] ?? '');
         if ($social_twitter !== '' && $social_twitter[0] === '@') {
             $social_twitter = substr($social_twitter, 1);
@@ -7278,6 +7279,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $social = [
                 'default_description' => $social_default_description,
                 'home_image' => $social_home_image,
+                'podcast_image' => $social_podcast_image,
                 'twitter' => $social_twitter,
                 'facebook_app_id' => $social_facebook_app_id,
             ];
@@ -8346,12 +8348,14 @@ $settings = get_settings();
 $socialDefaults = [
     'default_description' => '',
     'home_image' => '',
+    'podcast_image' => '',
     'twitter' => '',
     'facebook_app_id' => '',
 ];
 $socialSettings = array_merge($socialDefaults, $settings['social'] ?? []);
 $socialDefaultDescription = $socialSettings['default_description'] ?? '';
 $socialHomeImage = $socialSettings['home_image'] ?? '';
+$socialPodcastImage = $socialSettings['podcast_image'] ?? '';
 $socialTwitter = $socialSettings['twitter'] ?? '';
 $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 $nisabaConfig = $settings['nisaba'] ?? [];
@@ -10752,6 +10756,15 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     var socialInput = document.getElementById('social_home_image');
                     if (socialInput) {
                         socialInput.value = '';
+                    }
+                });
+            }
+            var clearSocialPodcastBtn = document.getElementById('clear-social-podcast-image');
+            if (clearSocialPodcastBtn) {
+                clearSocialPodcastBtn.addEventListener('click', function() {
+                    var socialPodcastInput = document.getElementById('social_podcast_image');
+                    if (socialPodcastInput) {
+                        socialPodcastInput.value = '';
                     }
                 });
             }

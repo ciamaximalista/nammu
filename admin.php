@@ -2992,6 +2992,128 @@ function admin_prepare_instagram_image_url(string $imageTrim, string $baseUrl, ?
     return $variantUrl;
 }
 
+function admin_prepare_podcast_artwork_image(string $imageValue, string $siteUrl = '', ?string &$error = null): string
+{
+    $imageValue = trim($imageValue);
+    if ($imageValue === '') {
+        return '';
+    }
+    if (!function_exists('imagecreatetruecolor') || !function_exists('imagecopyresampled')) {
+        $error = 'No se pudo normalizar la imagen de podcast (GD no disponible).';
+        return $imageValue;
+    }
+
+    $projectRoot = __DIR__;
+    $siteHost = '';
+    if ($siteUrl !== '') {
+        $siteHost = strtolower((string) (@parse_url($siteUrl, PHP_URL_HOST) ?: ''));
+    }
+
+    $relativePath = '';
+    if (preg_match('#^https?://#i', $imageValue)) {
+        $imageHost = strtolower((string) (@parse_url($imageValue, PHP_URL_HOST) ?: ''));
+        $imagePath = (string) (@parse_url($imageValue, PHP_URL_PATH) ?: '');
+        if ($imagePath !== '' && ($siteHost === '' || $imageHost === $siteHost)) {
+            $relativePath = ltrim($imagePath, '/');
+        }
+    } else {
+        $relativePath = ltrim(str_replace('\\', '/', $imageValue), '/');
+    }
+
+    $src = null;
+    $sourceKey = $imageValue;
+    if ($relativePath !== '') {
+        $absolutePath = $projectRoot . '/' . $relativePath;
+        $srcType = null;
+        $src = admin_instagram_load_image_resource($absolutePath, $srcType);
+        if ($src) {
+            $sourceKey = $relativePath . '|' . (string) @filemtime($absolutePath);
+        }
+    }
+
+    if (!$src && function_exists('imagecreatefromstring') && preg_match('#^https?://#i', $imageValue)) {
+        $rawImage = @file_get_contents($imageValue);
+        if (($rawImage === false || $rawImage === '') && function_exists('curl_init')) {
+            $ch = curl_init($imageValue);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            $rawImage = curl_exec($ch);
+            curl_close($ch);
+        }
+        if (is_string($rawImage) && $rawImage !== '') {
+            $src = @imagecreatefromstring($rawImage);
+            $sourceKey = $imageValue . '|len:' . strlen($rawImage);
+        }
+    }
+
+    if (!$src) {
+        $error = 'No se pudo cargar la imagen de podcast para normalizarla.';
+        return $imageValue;
+    }
+
+    $width = (int) imagesx($src);
+    $height = (int) imagesy($src);
+    if ($width < 10 || $height < 10) {
+        imagedestroy($src);
+        $error = 'La imagen de podcast no tiene dimensiones válidas.';
+        return $imageValue;
+    }
+
+    if ($width === 3000 && $height === 3000) {
+        imagedestroy($src);
+        return $imageValue;
+    }
+
+    // Escala para cubrir 3000x3000 y recorta el centro.
+    $target = 3000;
+    $scale = max($target / $width, $target / $height);
+    $scaledW = (int) ceil($width * $scale);
+    $scaledH = (int) ceil($height * $scale);
+
+    $tmp = imagecreatetruecolor($scaledW, $scaledH);
+    if (!$tmp) {
+        imagedestroy($src);
+        return $imageValue;
+    }
+    imagecopyresampled($tmp, $src, 0, 0, 0, 0, $scaledW, $scaledH, $width, $height);
+
+    $dst = imagecreatetruecolor($target, $target);
+    if (!$dst) {
+        imagedestroy($tmp);
+        imagedestroy($src);
+        return $imageValue;
+    }
+    $srcX = (int) floor(($scaledW - $target) / 2);
+    $srcY = (int) floor(($scaledH - $target) / 2);
+    imagecopyresampled($dst, $tmp, 0, 0, $srcX, $srcY, $target, $target, $target, $target);
+
+    $podcastDir = $projectRoot . '/assets/podcast';
+    if (!is_dir($podcastDir)) {
+        @mkdir($podcastDir, 0755, true);
+    }
+    $variantName = 'artwork_' . substr(sha1($sourceKey . '|' . $width . 'x' . $height . '|3000sq'), 0, 20) . '.jpg';
+    $variantAbsolute = $podcastDir . '/' . $variantName;
+    $saved = @imagejpeg($dst, $variantAbsolute, 90);
+
+    imagedestroy($dst);
+    imagedestroy($tmp);
+    imagedestroy($src);
+
+    if (!$saved) {
+        $error = 'No se pudo guardar la imagen normalizada de podcast.';
+        return $imageValue;
+    }
+
+    $check = @getimagesize($variantAbsolute);
+    if (!is_array($check) || (int) ($check[0] ?? 0) !== 3000 || (int) ($check[1] ?? 0) !== 3000) {
+        @unlink($variantAbsolute);
+        $error = 'No se pudo generar una imagen 3000x3000 válida para podcast.';
+        return $imageValue;
+    }
+
+    return 'assets/podcast/' . $variantName;
+}
+
 function admin_probe_public_url_headers(string $url): array {
     $headers = @get_headers($url, true);
     if (!is_array($headers) || empty($headers[0])) {
@@ -7280,7 +7402,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             $config = load_config_file();
-
             $social = [
                 'default_description' => $social_default_description,
                 'home_image' => $social_home_image,

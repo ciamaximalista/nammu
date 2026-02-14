@@ -2033,6 +2033,104 @@ function nammu_podcast_duration_to_seconds(string $duration): int
     return 0;
 }
 
+function nammu_prepare_podcast_feed_artwork(string $imageUrl, string $baseUrl): string
+{
+    $imageUrl = trim($imageUrl);
+    if ($imageUrl === '') {
+        return '';
+    }
+    if (!function_exists('imagecreatetruecolor') || !function_exists('imagecopyresampled')) {
+        return $imageUrl;
+    }
+
+    $baseHost = strtolower((string) (@parse_url($baseUrl, PHP_URL_HOST) ?: ''));
+    $imageHost = strtolower((string) (@parse_url($imageUrl, PHP_URL_HOST) ?: ''));
+    $imagePath = (string) (@parse_url($imageUrl, PHP_URL_PATH) ?: '');
+    if ($imagePath === '' || ($baseHost !== '' && $imageHost !== '' && $imageHost !== $baseHost)) {
+        return $imageUrl;
+    }
+
+    $relativePath = ltrim($imagePath, '/');
+    $absolutePath = dirname(__DIR__) . '/' . $relativePath;
+    if (!is_file($absolutePath) || !function_exists('getimagesize')) {
+        return $imageUrl;
+    }
+
+    $size = @getimagesize($absolutePath);
+    if (!is_array($size)) {
+        return $imageUrl;
+    }
+    $width = (int) ($size[0] ?? 0);
+    $height = (int) ($size[1] ?? 0);
+    if ($width < 10 || $height < 10) {
+        return $imageUrl;
+    }
+    if ($width === 3000 && $height === 3000) {
+        return $imageUrl;
+    }
+
+    $src = null;
+    $type = (int) ($size[2] ?? 0);
+    if ($type === IMAGETYPE_JPEG && function_exists('imagecreatefromjpeg')) {
+        $src = @imagecreatefromjpeg($absolutePath);
+    } elseif ($type === IMAGETYPE_PNG && function_exists('imagecreatefrompng')) {
+        $src = @imagecreatefrompng($absolutePath);
+    } elseif ($type === IMAGETYPE_GIF && function_exists('imagecreatefromgif')) {
+        $src = @imagecreatefromgif($absolutePath);
+    } elseif ($type === IMAGETYPE_WEBP && function_exists('imagecreatefromwebp')) {
+        $src = @imagecreatefromwebp($absolutePath);
+    }
+    if (!$src) {
+        return $imageUrl;
+    }
+
+    $target = 3000;
+    $scale = max($target / $width, $target / $height);
+    $scaledW = (int) ceil($width * $scale);
+    $scaledH = (int) ceil($height * $scale);
+    $tmp = imagecreatetruecolor($scaledW, $scaledH);
+    if (!$tmp) {
+        imagedestroy($src);
+        return $imageUrl;
+    }
+    imagecopyresampled($tmp, $src, 0, 0, 0, 0, $scaledW, $scaledH, $width, $height);
+
+    $dst = imagecreatetruecolor($target, $target);
+    if (!$dst) {
+        imagedestroy($tmp);
+        imagedestroy($src);
+        return $imageUrl;
+    }
+    $srcX = (int) floor(($scaledW - $target) / 2);
+    $srcY = (int) floor(($scaledH - $target) / 2);
+    imagecopyresampled($dst, $tmp, 0, 0, $srcX, $srcY, $target, $target, $target, $target);
+
+    $outDir = dirname(__DIR__) . '/assets/podcast';
+    if (!is_dir($outDir)) {
+        @mkdir($outDir, 0755, true);
+    }
+    $hashBase = $relativePath . '|' . (string) @filemtime($absolutePath) . '|' . $width . 'x' . $height . '|feed3000';
+    $fileName = 'feed_' . substr(sha1($hashBase), 0, 20) . '.jpg';
+    $outAbsolute = $outDir . '/' . $fileName;
+    $ok = @imagejpeg($dst, $outAbsolute, 90);
+
+    imagedestroy($dst);
+    imagedestroy($tmp);
+    imagedestroy($src);
+
+    if (!$ok) {
+        return $imageUrl;
+    }
+    $check = @getimagesize($outAbsolute);
+    if (!is_array($check) || (int) ($check[0] ?? 0) !== 3000 || (int) ($check[1] ?? 0) !== 3000) {
+        @unlink($outAbsolute);
+        return $imageUrl;
+    }
+
+    $base = rtrim($baseUrl, '/');
+    return ($base !== '' ? $base : '') . '/assets/podcast/' . rawurlencode($fileName);
+}
+
 function nammu_generate_podcast_feed(string $baseUrl, array $config): string
 {
     $baseUrl = rtrim($baseUrl, '/');
@@ -2046,6 +2144,10 @@ function nammu_generate_podcast_feed(string $baseUrl, array $config): string
     $podcastHomeImage = nammu_resolve_asset((string) ($social['podcast_image'] ?? ''), $baseUrl);
     if ($podcastHomeImage === '') {
         $podcastHomeImage = $homeImage;
+    }
+    $podcastHomeImageFeed = nammu_prepare_podcast_feed_artwork((string) $podcastHomeImage, $baseUrl);
+    if ($podcastHomeImageFeed === '') {
+        $podcastHomeImageFeed = $podcastHomeImage;
     }
     $podcastCategoryOptions = ['Arts', 'Business', 'Comedy', 'Education', 'Fiction', 'Government', 'History', 'Health & Fitness', 'Kids & Family', 'Leisure', 'Music', 'News', 'Religion & Spirituality', 'Science', 'Society & Culture', 'Sports', 'Technology', 'True Crime', 'TV & Film'];
     $podcastCategory = trim((string) ($social['podcast_category'] ?? 'Technology'));
@@ -2074,7 +2176,12 @@ function nammu_generate_podcast_feed(string $baseUrl, array $config): string
         $audioUrl = htmlspecialchars((string) ($item['audio'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $audioLength = htmlspecialchars((string) ($item['audio_length'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $durationEsc = htmlspecialchars((string) nammu_podcast_duration_to_seconds((string) ($item['audio_duration'] ?? '')), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $imageUrl = htmlspecialchars((string) ($item['image'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $itemImage = (string) ($item['image'] ?? '');
+        $itemImageFeed = nammu_prepare_podcast_feed_artwork($itemImage, $baseUrl);
+        if ($itemImageFeed === '') {
+            $itemImageFeed = $itemImage;
+        }
+        $imageUrl = htmlspecialchars($itemImageFeed, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $imageTag = $imageUrl !== '' ? "\n      <itunes:image href=\"{$imageUrl}\" />" : '';
         $itemsXml[] = <<<XML
     <item>
@@ -2089,7 +2196,7 @@ function nammu_generate_podcast_feed(string $baseUrl, array $config): string
 XML;
     }
     $itemsBlock = implode("\n", $itemsXml);
-    $itunesImageTag = $podcastHomeImage !== '' ? "\n    <itunes:image href=\"" . htmlspecialchars((string) $podcastHomeImage, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "\" />" : '';
+    $itunesImageTag = $podcastHomeImageFeed !== '' ? "\n    <itunes:image href=\"" . htmlspecialchars((string) $podcastHomeImageFeed, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "\" />" : '';
     $ownerEmailTag = $ownerEmailEsc !== '' ? "<itunes:email>{$ownerEmailEsc}</itunes:email>" : "<itunes:email></itunes:email>";
 
     return <<<XML

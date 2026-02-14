@@ -17,7 +17,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 - Sistema de borradores con filtros “Entradas / Páginas / Borradores”, publicación directa desde el formulario y sello rojo en la vista pública cuando está sin publicar.
 - Publicaciones programadas con fecha y hora: se publican automáticamente y lanzan los avisos configurados (email, push y redes sociales).
 - Buscador interno dentro de la pestaña “Editar” que filtra por título, descripción, categoría o archivo para localizar contenidos en segundos.
-- Podcasts: entradas tipo episodio con audio mp3 obligatorio, metadatos específicos y feed `podcast.xml` compatible con plataformas de podcasting.
+- Podcasts: entradas tipo episodio con audio mp3 obligatorio, metadatos específicos y feed `podcast.xml` compatible con plataformas de podcasting (categoría seleccionable, duración en segundos, `link` por episodio y metadatos iTunes validados).
 
 ### Biblioteca multimedia integrada
 
@@ -63,6 +63,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 - Integración opcional con Telegram, Facebook Pages y Twitter/X: auto-posting al publicar o envío manual desde la tabla de “Editar”.
 - Plantillas de mensaje consistentes (título, descripción y URL pública) con escape apropiado para HTML o texto plano.
 - Feedback inmediato en la UI usando `$_SESSION['social_feedback']`.
+- Footer con enlaces sociales/plataformas y acceso directo a AntennaPod (deeplink al `podcast.xml`) cuando hay podcast publicado.
 - Avisos por email: mensajes automáticos con título, descripción y enlace al publicar entradas o itinerarios.
 - Newsletter: envíos completos del contenido (no publican en el blog) y se gestionan desde Publicar/Editar.
 - Ambas funciones comparten la misma lista de correo, pero el lector puede elegir si recibe avisos, newsletter o ambos.
@@ -80,6 +81,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 ## Requisitos mínimos
 
 - PHP 8.0 o superior con extensiones estándar (`json`, `mbstring`, `iconv`, `curl` recomendado).
+- Extensión `gd` recomendada para normalizar automáticamente imágenes de podcast en el feed (`podcast.xml`) a 3000x3000 sin alterar las imágenes usadas en HTML/redes.
 - Para notificaciones push: extensión `openssl` habilitada.
 - Servidor web capaz de ejecutar PHP y escribir en `content/`, `assets/` e `itinerarios/`.
 - Composer opcional para aprovechar Symfony Yaml (el núcleo funciona sin él).

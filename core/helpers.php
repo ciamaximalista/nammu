@@ -1580,25 +1580,6 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
         return 'https://' . ltrim($value, '/');
     };
     $baseRoot = $baseUrl !== '' ? rtrim($baseUrl, '/') : '';
-    $links[] = [
-        'label' => 'RSS',
-        'href' => $baseRoot . '/rss.xml',
-        'svg' => $icons['rss'],
-    ];
-    if ($hasItineraries) {
-        $links[] = [
-            'label' => 'RSS Itinerarios',
-            'href' => $baseRoot . '/itinerarios.xml',
-            'svg' => $icons['rss'],
-        ];
-    }
-    if ($hasPodcast) {
-        $links[] = [
-            'label' => 'RSS Podcast',
-            'href' => $baseRoot . '/podcast.xml',
-            'svg' => $icons['rss'],
-        ];
-    }
 
     $telegramChannel = trim((string) ($config['telegram']['channel'] ?? ''));
     if ($telegramChannel !== '') {
@@ -1718,6 +1699,26 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
             'label' => 'Suscripción a envíos postales',
             'href' => $postalUrl !== '' ? $postalUrl : '/correos.php',
             'svg' => $icons['postal'],
+        ];
+    }
+
+    $links[] = [
+        'label' => 'RSS',
+        'href' => $baseRoot . '/rss.xml',
+        'svg' => $icons['rss'],
+    ];
+    if ($hasItineraries) {
+        $links[] = [
+            'label' => 'RSS Itinerarios',
+            'href' => $baseRoot . '/itinerarios.xml',
+            'svg' => $icons['rss'],
+        ];
+    }
+    if ($hasPodcast) {
+        $links[] = [
+            'label' => 'RSS Podcast',
+            'href' => $baseRoot . '/podcast.xml',
+            'svg' => $icons['rss'],
         ];
     }
 

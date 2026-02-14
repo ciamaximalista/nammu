@@ -130,8 +130,6 @@
 
             </div>
 
-            <small class="form-text text-muted">Si es un episodio de podcast, usa imagen cuadrada (ideal 3000x3000; mínimo 1400x1400).</small>
-
         </div>
 
         <div class="form-group">

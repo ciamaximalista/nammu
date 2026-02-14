@@ -1597,24 +1597,6 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
             'href' => $baseRoot . '/podcast.xml',
             'svg' => $icons['rss'],
         ];
-        $podcastFeedUrl = $baseRoot !== '' ? $baseRoot . '/podcast.xml' : '';
-        if ($podcastFeedUrl === '') {
-            $siteUrl = trim((string) ($config['site_url'] ?? ''));
-            if ($siteUrl !== '') {
-                $podcastFeedUrl = rtrim($normalizeExternalUrl($siteUrl), '/') . '/podcast.xml';
-            }
-        }
-        if ($podcastFeedUrl !== '') {
-            $podcastTitle = trim((string) (($theme['blog'] ?? '') ?: ($config['site_name'] ?? 'Podcast')));
-            if ($podcastTitle === '') {
-                $podcastTitle = 'Podcast';
-            }
-            $links[] = [
-                'label' => 'AntennaPod',
-                'href' => 'https://antennapod.org/deeplink/subscribe/?url=' . rawurlencode($podcastFeedUrl) . '&title=' . rawurlencode($podcastTitle),
-                'svg' => $icons['antennapod'],
-            ];
-        }
     }
 
     $telegramChannel = trim((string) ($config['telegram']['channel'] ?? ''));
@@ -1739,6 +1721,26 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
     }
 
     $podcastServices = $config['podcast_services'] ?? [];
+    if ($hasPodcast) {
+        $podcastFeedUrl = $baseRoot !== '' ? $baseRoot . '/podcast.xml' : '';
+        if ($podcastFeedUrl === '') {
+            $siteUrl = trim((string) ($config['site_url'] ?? ''));
+            if ($siteUrl !== '') {
+                $podcastFeedUrl = rtrim($normalizeExternalUrl($siteUrl), '/') . '/podcast.xml';
+            }
+        }
+        if ($podcastFeedUrl !== '') {
+            $podcastTitle = trim((string) (($theme['blog'] ?? '') ?: ($config['site_name'] ?? 'Podcast')));
+            if ($podcastTitle === '') {
+                $podcastTitle = 'Podcast';
+            }
+            $links[] = [
+                'label' => 'AntennaPod',
+                'href' => 'https://antennapod.org/deeplink/subscribe/?url=' . rawurlencode($podcastFeedUrl) . '&title=' . rawurlencode($podcastTitle),
+                'svg' => $icons['antennapod'],
+            ];
+        }
+    }
     $podcastMap = [
         'spotify' => 'Spotify',
         'ivoox' => 'iVoox',

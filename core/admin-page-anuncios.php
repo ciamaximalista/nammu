@@ -215,6 +215,7 @@
                             </div>
                         </div>
                         <small class="form-text text-muted">Se usará en las tarjetas de la página de podcast y como imagen del canal en podcast.xml. Si está vacío, se usará la imagen de redes sociales.</small>
+                        <small class="form-text text-muted">Recomendación: imagen cuadrada. Mínimo 1400x1400 e ideal 3000x3000 para Apple Podcasts y agregadores.</small>
                     </div>
 
                     <div class="form-group">

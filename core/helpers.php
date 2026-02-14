@@ -1737,7 +1737,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
             }
             $links[] = [
                 'label' => 'AntennaPod',
-                'href' => 'https://antennapod.org/deeplink/subscribe/?url=' . $podcastFeedUrl . '&title=' . $podcastTitle,
+                'href' => 'https://antennapod.org/deeplink/subscribe/?url=%22' . $podcastFeedUrl . '%22&title=%22' . $podcastTitle . '%22',
                 'svg' => $icons['antennapod'],
             ];
         }

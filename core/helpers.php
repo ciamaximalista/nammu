@@ -1778,7 +1778,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
             'svg' => $icons[$key] ?? $icons['email'],
         ];
     }
-    $links = array_merge($links, $socialLinks, $platformLinks);
+    $links = array_merge($links, $platformLinks, $socialLinks);
     return $links;
 }
 

@@ -111,6 +111,18 @@ if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
         'postal_enabled' => $postalEnabled,
     ]);
 }
+$latestCategoryHeroImage = '';
+if (!empty($posts) && isset($posts[0]) && is_array($posts[0])) {
+    $latestImageRaw = trim((string) ($posts[0]['image'] ?? ''));
+    if ($latestImageRaw !== '') {
+        $latestCategoryHeroImage = (string) ($resolveImage($latestImageRaw) ?? '');
+    }
+}
+$categoryHeroClass = 'category-detail-hero' . ($latestCategoryHeroImage !== '' ? ' has-hero-image' : '');
+$categoryHeroStyle = '';
+if ($latestCategoryHeroImage !== '') {
+    $categoryHeroStyle = ' style="background-image: linear-gradient(rgba(0,0,0,0.36), rgba(0,0,0,0.36)), url(\'' . htmlspecialchars($latestCategoryHeroImage, ENT_QUOTES, 'UTF-8') . '\');"';
+}
 $renderSearchBox = static function (string $variant) use ($searchAction, $searchActionBase, $accentColor, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories, $hasPodcast, $podcastIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
@@ -229,7 +241,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     return (string) ob_get_clean();
 };
 ?>
-<section class="category-detail-hero">
+<section class="<?= htmlspecialchars($categoryHeroClass, ENT_QUOTES, 'UTF-8') ?>"<?= $categoryHeroStyle ?>>
     <div>
         <p class="category-label">
             <a class="category-label__link" href="<?= htmlspecialchars($homeUrl, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($blogName, ENT_QUOTES, 'UTF-8') ?></a>
@@ -343,6 +355,17 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
         border-radius: var(--nammu-radius-lg);
         padding: 1.7rem 2rem;
         border: 1px solid rgba(0,0,0,0.05);
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+    .category-detail-hero.has-hero-image .category-label,
+    .category-detail-hero.has-hero-image .category-detail-hero h1,
+    .category-detail-hero.has-hero-image .category-count,
+    .category-detail-hero.has-hero-image .category-label__link,
+    .category-detail-hero.has-hero-image .category-label__by {
+        color: #fff;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
     }
     .category-label {
         margin: 0;

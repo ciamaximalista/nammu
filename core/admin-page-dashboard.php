@@ -987,13 +987,70 @@
         return count($uids);
     };
 
+    $collectDailyUidsFromStats = static function (array $stats): array {
+        $result = [];
+        foreach ($stats as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $daily = is_array($item['daily'] ?? null) ? $item['daily'] : [];
+            foreach ($daily as $day => $payload) {
+                if (!is_string($day) || !is_array($payload)) {
+                    continue;
+                }
+                $uids = is_array($payload['uids'] ?? null) ? $payload['uids'] : [];
+                if (!isset($result[$day])) {
+                    $result[$day] = [];
+                }
+                foreach ($uids as $uid => $flag) {
+                    if ($uid === '') {
+                        continue;
+                    }
+                    $result[$day][$uid] = true;
+                }
+            }
+        }
+        return $result;
+    };
+    $combinedDailyUids = [];
+    foreach ($visitorsDaily as $day => $payload) {
+        if (!is_string($day) || !is_array($payload)) {
+            continue;
+        }
+        $uids = is_array($payload['uids'] ?? null) ? $payload['uids'] : [];
+        if (!isset($combinedDailyUids[$day])) {
+            $combinedDailyUids[$day] = [];
+        }
+        foreach ($uids as $uid => $flag) {
+            if ($uid === '') {
+                continue;
+            }
+            $combinedDailyUids[$day][$uid] = true;
+        }
+    }
+    foreach ($collectDailyUidsFromStats($pagesStats) as $day => $uids) {
+        if (!isset($combinedDailyUids[$day])) {
+            $combinedDailyUids[$day] = [];
+        }
+        foreach ($uids as $uid => $flag) {
+            $combinedDailyUids[$day][$uid] = true;
+        }
+    }
+    foreach ($collectDailyUidsFromStats($postsStats) as $day => $uids) {
+        if (!isset($combinedDailyUids[$day])) {
+            $combinedDailyUids[$day] = [];
+        }
+        foreach ($uids as $uid => $flag) {
+            $combinedDailyUids[$day][$uid] = true;
+        }
+    }
+
     $unique30 = [];
     $startKey = $last30Start->format('Y-m-d');
-    foreach ($visitorsDaily as $day => $payload) {
+    foreach ($combinedDailyUids as $day => $uids) {
         if (!is_string($day) || $day < $startKey) {
             continue;
         }
-        $uids = is_array($payload) ? ($payload['uids'] ?? []) : [];
         foreach ($uids as $uid => $flag) {
             $unique30[$uid] = true;
         }
@@ -1454,7 +1511,7 @@
 
     $monthlyUids = [];
     $monthlyTotals = [];
-    foreach ($visitorsDaily as $day => $payload) {
+    foreach ($combinedDailyUids as $day => $uids) {
         if (!is_string($day) || strlen($day) < 7) {
             continue;
         }
@@ -1462,7 +1519,6 @@
         if (!isset($monthlyUids[$month])) {
             $monthlyUids[$month] = [];
         }
-        $uids = is_array($payload) ? ($payload['uids'] ?? []) : [];
         foreach ($uids as $uid => $flag) {
             $monthlyUids[$month][$uid] = true;
         }
@@ -1480,8 +1536,7 @@
     $last30Daily = [];
     for ($i = 29; $i >= 0; $i--) {
         $dayKey = $today->modify('-' . $i . ' days')->format('Y-m-d');
-        $payload = $visitorsDaily[$dayKey] ?? [];
-        $uids = is_array($payload) ? ($payload['uids'] ?? []) : [];
+        $uids = is_array($combinedDailyUids[$dayKey] ?? null) ? $combinedDailyUids[$dayKey] : [];
         $last30Daily[$dayKey] = count($uids);
     }
     $last30DailyMax = max(1, max($last30Daily));
@@ -1567,7 +1622,7 @@
 
     $yearlyUids = [];
     $yearlyTotals = [];
-    foreach ($visitorsDaily as $day => $payload) {
+    foreach ($combinedDailyUids as $day => $uids) {
         if (!is_string($day) || strlen($day) < 4) {
             continue;
         }
@@ -1575,7 +1630,6 @@
         if (!isset($yearlyUids[$yearKey])) {
             $yearlyUids[$yearKey] = [];
         }
-        $uids = is_array($payload) ? ($payload['uids'] ?? []) : [];
         foreach ($uids as $uid => $flag) {
             $yearlyUids[$yearKey][$uid] = true;
         }
@@ -1591,8 +1645,7 @@
     ksort($yearlyUids);
 
     $todayKey = $today->format('Y-m-d');
-    $todayPayload = $visitorsDaily[$todayKey] ?? [];
-    $todayUids = is_array($todayPayload) ? ($todayPayload['uids'] ?? []) : [];
+    $todayUids = is_array($combinedDailyUids[$todayKey] ?? null) ? $combinedDailyUids[$todayKey] : [];
     $todayCount = count($todayUids);
 
     $dayNames = [
@@ -1610,7 +1663,7 @@
         9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre',
     ];
     $last7DailyList = [];
-    $dailyKeys = array_keys($visitorsDaily);
+    $dailyKeys = array_keys($combinedDailyUids);
     sort($dailyKeys);
     $firstDayKey = $dailyKeys[0] ?? '';
     for ($i = 0; $i < 7; $i++) {
@@ -1619,8 +1672,7 @@
         if ($firstDayKey !== '' && $dayKey < $firstDayKey) {
             break;
         }
-        $payload = $visitorsDaily[$dayKey] ?? [];
-        $uids = is_array($payload) ? ($payload['uids'] ?? []) : [];
+        $uids = is_array($combinedDailyUids[$dayKey] ?? null) ? $combinedDailyUids[$dayKey] : [];
         $dayLabelKey = strtolower($day->format('D'));
         $last7DailyList[] = [
             'label' => $dayNames[$dayLabelKey] ?? $dayKey,
@@ -1743,8 +1795,7 @@
 
     $image30UserDays = [];
     foreach ($last30Daily as $dayKey => $_count) {
-        $payload = $visitorsDaily[$dayKey] ?? [];
-        $uids = is_array($payload) ? ($payload['uids'] ?? []) : [];
+        $uids = is_array($combinedDailyUids[$dayKey] ?? null) ? $combinedDailyUids[$dayKey] : [];
         if (!is_array($uids)) {
             continue;
         }
@@ -1844,9 +1895,6 @@
     $allPages = [];
     $allSystemPages = [];
     foreach ($pagesStats as $slug => $item) {
-        if (str_starts_with($slug, 'itinerarios/')) {
-            continue;
-        }
         $daily = $item['daily'] ?? [];
         $total = (int) ($item['total'] ?? 0);
         $totalFromDaily = $sumAllViews(is_array($daily) ? $daily : []);

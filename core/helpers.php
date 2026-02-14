@@ -1737,7 +1737,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
             }
             $links[] = [
                 'label' => 'AntennaPod',
-                'href' => 'https://antennapod.org/deeplink/subscribe/?url=%22' . $podcastFeedUrl . '%22&title=%22' . $podcastTitle . '%22',
+                'href' => 'https://antennapod.org/deeplink/subscribe/?url=%22' . $podcastFeedUrl . '%22&title=' . $podcastTitle,
                 'svg' => $icons['antennapod'],
             ];
         }
@@ -2052,6 +2052,7 @@ function nammu_generate_podcast_feed(string $baseUrl, array $config): string
     if (!in_array($podcastCategory, $podcastCategoryOptions, true)) {
         $podcastCategory = 'Technology';
     }
+    $podcastCategoryEsc = htmlspecialchars($podcastCategory, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $items = nammu_collect_podcast_items(dirname(__DIR__) . '/content', $baseUrl);
     $channelLink = $baseUrl !== '' ? $baseUrl . '/podcast' : '/podcast';
     $lastBuild = gmdate(DATE_RSS, !empty($items) ? (int) $items[0]['timestamp'] : time());
@@ -2101,7 +2102,7 @@ XML;
     <language>{$langEsc}</language>
     <lastBuildDate>{$lastBuild}</lastBuildDate>
     <itunes:author>{$authorEsc}</itunes:author>{$itunesImageTag}
-    <itunes:category text="{$podcastCategory}" />
+    <itunes:category text="{$podcastCategoryEsc}" />
     <itunes:explicit>false</itunes:explicit>
     <itunes:owner>
       <itunes:name>{$ownerNameEsc}</itunes:name>

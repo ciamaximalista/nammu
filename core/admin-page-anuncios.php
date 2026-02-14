@@ -41,7 +41,6 @@
     $podcastSpotify = trim((string) ($podcastServices['spotify'] ?? ''));
     $podcastIvoox = trim((string) ($podcastServices['ivoox'] ?? ''));
     $podcastApple = trim((string) ($podcastServices['apple'] ?? ''));
-    $podcastGoogle = trim((string) ($podcastServices['google'] ?? ''));
     $podcastYouTube = trim((string) ($podcastServices['youtube_music'] ?? ''));
     $indexnowSettings = $settings['indexnow'] ?? [];
     $indexnowEnabled = ($indexnowSettings['enabled'] ?? 'off') === 'on';
@@ -564,10 +563,6 @@
                         <div class="form-group">
                             <label for="podcast_apple">Apple Podcasts</label>
                             <input type="text" name="podcast_apple" id="podcast_apple" class="form-control" value="<?= htmlspecialchars($podcastApple, ENT_QUOTES, 'UTF-8') ?>" placeholder="URL o ID en Apple Podcasts">
-                        </div>
-                        <div class="form-group">
-                            <label for="podcast_google">Google Podcasts</label>
-                            <input type="text" name="podcast_google" id="podcast_google" class="form-control" value="<?= htmlspecialchars($podcastGoogle, ENT_QUOTES, 'UTF-8') ?>" placeholder="URL o ID en Google Podcasts">
                         </div>
                         <div class="form-group mb-0">
                             <label for="podcast_youtube_music">YouTube Music</label>

@@ -1092,7 +1092,6 @@ function get_settings() {
         'spotify' => '',
         'ivoox' => '',
         'apple' => '',
-        'google' => '',
         'youtube_music' => '',
     ];
     $podcastServices = array_merge($podcastServicesDefaults, $config['podcast_services'] ?? []);
@@ -7270,7 +7269,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $podcast_spotify = trim($_POST['podcast_spotify'] ?? '');
         $podcast_ivoox = trim($_POST['podcast_ivoox'] ?? '');
         $podcast_apple = trim($_POST['podcast_apple'] ?? '');
-        $podcast_google = trim($_POST['podcast_google'] ?? '');
         $podcast_youtube_music = trim($_POST['podcast_youtube_music'] ?? '');
 
         try {
@@ -7356,7 +7354,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'spotify' => $podcast_spotify,
                 'ivoox' => $podcast_ivoox,
                 'apple' => $podcast_apple,
-                'google' => $podcast_google,
                 'youtube_music' => $podcast_youtube_music,
             ];
             $hasPodcastServices = array_filter($podcastServices, static function ($value) {

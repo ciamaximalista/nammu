@@ -250,7 +250,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
                 <?= htmlspecialchars($authorName, ENT_QUOTES, 'UTF-8') ?>
             <?php endif; ?>
         </p>
-        <h1><?= htmlspecialchars($category, ENT_QUOTES, 'UTF-8') ?></h1>
+        <h1><span class="category-title-pill"><?= htmlspecialchars($category, ENT_QUOTES, 'UTF-8') ?></span></h1>
         <p class="category-count"><?= htmlspecialchars((string) $count, ENT_QUOTES, 'UTF-8') ?> <?= $count === 1 ? 'entrada publicada' : 'entradas publicadas' ?></p>
         <?= $headerButtonsHtml ?>
     </div>
@@ -390,6 +390,17 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
         margin: 0.3rem 0 0;
         font-size: clamp(2rem, 5vw, 2.8rem);
         color: <?= $brandColor ?>;
+    }
+    .category-title-pill {
+        display: inline-block;
+        padding: 0.2rem 0.65rem 0.28rem;
+        border-radius: 0.35rem;
+        background: <?= $accentBackground ?>;
+        border: 1px solid <?= $accentBorder ?>;
+    }
+    .category-detail-hero.has-hero-image .category-title-pill {
+        background: rgba(0, 0, 0, 0.42);
+        border-color: rgba(255, 255, 255, 0.28);
     }
     .category-count {
         margin: 0.3rem 0 0;

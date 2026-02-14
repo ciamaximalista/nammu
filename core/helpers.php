@@ -1168,6 +1168,7 @@ function nammu_social_settings(): array
         'default_description' => '',
         'home_image' => '',
         'podcast_image' => '',
+        'podcast_category' => 'Technology',
         'twitter' => '',
         'facebook_app_id' => '',
     ];
@@ -2008,6 +2009,30 @@ function nammu_collect_podcast_items(string $contentDir, string $baseUrl = ''): 
     return $items;
 }
 
+function nammu_podcast_duration_to_seconds(string $duration): int
+{
+    $duration = trim($duration);
+    if ($duration === '') {
+        return 0;
+    }
+    if (ctype_digit($duration)) {
+        return (int) $duration;
+    }
+    if (str_contains($duration, ':')) {
+        $parts = array_map('trim', explode(':', $duration));
+        $parts = array_values(array_filter($parts, static function ($part) {
+            return $part !== '';
+        }));
+        if (count($parts) === 3 && ctype_digit($parts[0]) && ctype_digit($parts[1]) && ctype_digit($parts[2])) {
+            return ((int) $parts[0] * 3600) + ((int) $parts[1] * 60) + (int) $parts[2];
+        }
+        if (count($parts) === 2 && ctype_digit($parts[0]) && ctype_digit($parts[1])) {
+            return ((int) $parts[0] * 60) + (int) $parts[1];
+        }
+    }
+    return 0;
+}
+
 function nammu_generate_podcast_feed(string $baseUrl, array $config): string
 {
     $baseUrl = rtrim($baseUrl, '/');
@@ -2021,6 +2046,11 @@ function nammu_generate_podcast_feed(string $baseUrl, array $config): string
     $podcastHomeImage = nammu_resolve_asset((string) ($social['podcast_image'] ?? ''), $baseUrl);
     if ($podcastHomeImage === '') {
         $podcastHomeImage = $homeImage;
+    }
+    $podcastCategoryOptions = ['Arts', 'Business', 'Comedy', 'Education', 'Fiction', 'Government', 'History', 'Health & Fitness', 'Kids & Family', 'Leisure', 'Music', 'News', 'Religion & Spirituality', 'Science', 'Society & Culture', 'Sports', 'Technology', 'True Crime', 'TV & Film'];
+    $podcastCategory = trim((string) ($social['podcast_category'] ?? 'Technology'));
+    if (!in_array($podcastCategory, $podcastCategoryOptions, true)) {
+        $podcastCategory = 'Technology';
     }
     $items = nammu_collect_podcast_items(dirname(__DIR__) . '/content', $baseUrl);
     $channelLink = $baseUrl !== '' ? $baseUrl . '/podcast' : '/podcast';
@@ -2038,20 +2068,22 @@ function nammu_generate_podcast_feed(string $baseUrl, array $config): string
         $itemDescription = htmlspecialchars((string) ($item['description'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $pubDate = gmdate(DATE_RSS, (int) $item['timestamp']);
         $guid = 'podcast:' . md5((string) ($item['filename'] ?? $item['audio']));
+        $itemLinkEsc = htmlspecialchars((string) ($item['page_url'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $itemLinkTag = $itemLinkEsc !== '' ? "\n      <link>{$itemLinkEsc}</link>" : '';
         $audioUrl = htmlspecialchars((string) ($item['audio'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $audioLength = htmlspecialchars((string) ($item['audio_length'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $durationEsc = htmlspecialchars((string) ($item['audio_duration'] ?? '00:00:00'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $durationEsc = htmlspecialchars((string) nammu_podcast_duration_to_seconds((string) ($item['audio_duration'] ?? '')), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $imageUrl = htmlspecialchars((string) ($item['image'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $imageTag = $imageUrl !== '' ? "\n      <itunes:image href=\"{$imageUrl}\" />" : '';
         $itemsXml[] = <<<XML
     <item>
       <title>{$itemTitle}</title>
-      <description>{$itemDescription}</description>
+      <description>{$itemDescription}</description>{$itemLinkTag}
       <pubDate>{$pubDate}</pubDate>
       <guid isPermaLink="false">{$guid}</guid>
       <enclosure url="{$audioUrl}" length="{$audioLength}" type="audio/mpeg" />
       <itunes:duration>{$durationEsc}</itunes:duration>
-      <itunes:explicit>no</itunes:explicit>{$imageTag}
+      <itunes:explicit>false</itunes:explicit>{$imageTag}
     </item>
 XML;
     }
@@ -2069,8 +2101,8 @@ XML;
     <language>{$langEsc}</language>
     <lastBuildDate>{$lastBuild}</lastBuildDate>
     <itunes:author>{$authorEsc}</itunes:author>{$itunesImageTag}
-    <itunes:category text="Tecnología" />
-    <itunes:explicit>no</itunes:explicit>
+    <itunes:category text="{$podcastCategory}" />
+    <itunes:explicit>false</itunes:explicit>
     <itunes:owner>
       <itunes:name>{$ownerNameEsc}</itunes:name>
       {$ownerEmailTag}

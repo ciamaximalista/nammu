@@ -983,6 +983,8 @@ function get_settings() {
     $socialDefaults = [
         'default_description' => '',
         'home_image' => '',
+        'podcast_image' => '',
+        'podcast_category' => 'Technology',
         'twitter' => '',
         'facebook_app_id' => '',
     ];
@@ -7235,9 +7237,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: admin.php?page=configuracion');
         exit;
     } elseif (isset($_POST['save_social'])) {
+        $podcastCategoryOptions = ['Arts', 'Business', 'Comedy', 'Education', 'Fiction', 'Government', 'History', 'Health & Fitness', 'Kids & Family', 'Leisure', 'Music', 'News', 'Religion & Spirituality', 'Science', 'Society & Culture', 'Sports', 'Technology', 'True Crime', 'TV & Film'];
         $social_default_description = trim($_POST['social_default_description'] ?? '');
         $social_home_image = trim($_POST['social_home_image'] ?? '');
         $social_podcast_image = trim($_POST['social_podcast_image'] ?? '');
+        $social_podcast_category = trim($_POST['social_podcast_category'] ?? 'Technology');
+        if (!in_array($social_podcast_category, $podcastCategoryOptions, true)) {
+            $social_podcast_category = 'Technology';
+        }
         $social_twitter = trim($_POST['social_twitter'] ?? '');
         if ($social_twitter !== '' && $social_twitter[0] === '@') {
             $social_twitter = substr($social_twitter, 1);
@@ -7278,6 +7285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'default_description' => $social_default_description,
                 'home_image' => $social_home_image,
                 'podcast_image' => $social_podcast_image,
+                'podcast_category' => $social_podcast_category,
                 'twitter' => $social_twitter,
                 'facebook_app_id' => $social_facebook_app_id,
             ];
@@ -8346,6 +8354,7 @@ $socialDefaults = [
     'default_description' => '',
     'home_image' => '',
     'podcast_image' => '',
+    'podcast_category' => 'Technology',
     'twitter' => '',
     'facebook_app_id' => '',
 ];
@@ -8353,6 +8362,11 @@ $socialSettings = array_merge($socialDefaults, $settings['social'] ?? []);
 $socialDefaultDescription = $socialSettings['default_description'] ?? '';
 $socialHomeImage = $socialSettings['home_image'] ?? '';
 $socialPodcastImage = $socialSettings['podcast_image'] ?? '';
+$socialPodcastCategory = $socialSettings['podcast_category'] ?? 'Technology';
+$socialPodcastCategoryOptions = ['Arts', 'Business', 'Comedy', 'Education', 'Fiction', 'Government', 'History', 'Health & Fitness', 'Kids & Family', 'Leisure', 'Music', 'News', 'Religion & Spirituality', 'Science', 'Society & Culture', 'Sports', 'Technology', 'True Crime', 'TV & Film'];
+if (!in_array($socialPodcastCategory, $socialPodcastCategoryOptions, true)) {
+    $socialPodcastCategory = 'Technology';
+}
 $socialTwitter = $socialSettings['twitter'] ?? '';
 $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 $nisabaConfig = $settings['nisaba'] ?? [];

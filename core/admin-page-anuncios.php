@@ -50,6 +50,7 @@
     $indexnowFileOk = (bool) ($indexnowStatus['file_ok'] ?? false);
     $siteBaseUrl = function_exists('nammu_base_url') ? nammu_base_url() : '';
     $podcastFeedUrl = $siteBaseUrl !== '' ? rtrim($siteBaseUrl, '/') . '/podcast.xml' : '/podcast.xml';
+    $podcastCategoryOptions = ['Arts', 'Business', 'Comedy', 'Education', 'Fiction', 'Government', 'History', 'Health & Fitness', 'Kids & Family', 'Leisure', 'Music', 'News', 'Religion & Spirituality', 'Science', 'Society & Culture', 'Sports', 'Technology', 'True Crime', 'TV & Film'];
     if ($adsImage !== '') {
         if (str_starts_with($adsImage, 'http')) {
             $adsImagePreview = $adsImage;
@@ -214,6 +215,18 @@
                             </div>
                         </div>
                         <small class="form-text text-muted">Se usará en las tarjetas de la página de podcast y como imagen del canal en podcast.xml. Si está vacío, se usará la imagen de redes sociales.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="social_podcast_category">Categoría del canal de podcast</label>
+                        <select name="social_podcast_category" id="social_podcast_category" class="form-control">
+                            <?php foreach ($podcastCategoryOptions as $podcastCategory): ?>
+                                <option value="<?= htmlspecialchars($podcastCategory, ENT_QUOTES, 'UTF-8') ?>" <?= ($socialPodcastCategory === $podcastCategory) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($podcastCategory, ENT_QUOTES, 'UTF-8') ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="form-text text-muted">Se usará en la etiqueta itunes:category de podcast.xml.</small>
                     </div>
 
                     <div class="form-row">

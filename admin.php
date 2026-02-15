@@ -5266,6 +5266,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audioLengthInput = trim($_POST['audio_length'] ?? '');
         $audioDuration = trim($_POST['audio_duration'] ?? '');
         $pageVisibilityInput = strtolower(trim((string) ($_POST['page_visibility'] ?? 'public')));
+        $relatedSlugsFieldPresent = array_key_exists('related_slugs', $_POST);
         $relatedSlugsInput = trim((string) ($_POST['related_slugs'] ?? ''));
         $type = $_POST['type'] ?? 'Entrada';
         if ($type === 'Página') {
@@ -5294,7 +5295,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $relatedSlugs = [];
         if ($type === 'Entrada' || $type === 'Podcast') {
-            $relatedSlugs = admin_parse_related_slugs_input($relatedSlugsInput);
+            $existingRelatedRaw = '';
+            if (is_array($existing_post_data) && isset($existing_post_data['metadata']) && is_array($existing_post_data['metadata'])) {
+                $existingRelatedRaw = trim((string) ($existing_post_data['metadata']['Related'] ?? $existing_post_data['metadata']['related'] ?? ''));
+            }
+            if ($relatedSlugsInput === '' && $existingRelatedRaw !== '' && $relatedSlugsFieldPresent) {
+                // Evita perder relacionados al actualizar campos no relacionados (por ejemplo, imagen).
+                $relatedSlugs = admin_parse_related_slugs_input($existingRelatedRaw);
+            } else {
+                $relatedSlugs = admin_parse_related_slugs_input($relatedSlugsInput);
+            }
             if ($relatedSlugsInput !== '' && count($relatedSlugs) < 2) {
                 $error = 'Entradas o itinerarios relacionados: indica al menos 2 slugs válidos.';
             } elseif (count($relatedSlugs) > 6) {

@@ -1961,6 +1961,53 @@
         return $b['unique'] <=> $a['unique'];
     });
     $topPagesByUnique = array_slice($topPagesByUnique, 0, 10);
+    $topPagesWeek = [];
+    $topPagesMonth = [];
+    foreach ($allPages as $item) {
+        $daily = $item['daily'] ?? [];
+        $countWeek = $sumRange($daily, $last7Start, $today);
+        $countMonth = $sumRange($daily, $last30Start, $today);
+        if ($countWeek > 0) {
+            $topPagesWeek[] = [
+                'slug' => $item['slug'],
+                'title' => $item['title'],
+                'count' => $countWeek,
+                'unique' => $uniqueRange($daily, $last7Start, $today),
+            ];
+        }
+        if ($countMonth > 0) {
+            $topPagesMonth[] = [
+                'slug' => $item['slug'],
+                'title' => $item['title'],
+                'count' => $countMonth,
+                'unique' => $uniqueRange($daily, $last30Start, $today),
+            ];
+        }
+    }
+    $topPagesWeekByUnique = $topPagesWeek;
+    usort($topPagesWeekByUnique, static function (array $a, array $b): int {
+        return $b['unique'] <=> $a['unique'];
+    });
+    $topPagesWeekByUnique = array_values(array_filter($topPagesWeekByUnique, static function (array $item): bool {
+        return (int) ($item['unique'] ?? 0) > 0;
+    }));
+    $topPagesWeekByUnique = array_slice($topPagesWeekByUnique, 0, 10);
+    $topPagesMonthByUnique = $topPagesMonth;
+    usort($topPagesMonthByUnique, static function (array $a, array $b): int {
+        return $b['unique'] <=> $a['unique'];
+    });
+    $topPagesMonthByUnique = array_values(array_filter($topPagesMonthByUnique, static function (array $item): bool {
+        return (int) ($item['unique'] ?? 0) > 0;
+    }));
+    $topPagesMonthByUnique = array_slice($topPagesMonthByUnique, 0, 10);
+    usort($topPagesWeek, static function (array $a, array $b): int {
+        return $b['count'] <=> $a['count'];
+    });
+    usort($topPagesMonth, static function (array $a, array $b): int {
+        return $b['count'] <=> $a['count'];
+    });
+    $topPagesWeek = array_slice($topPagesWeek, 0, 10);
+    $topPagesMonth = array_slice($topPagesMonth, 0, 10);
 
     $topSystemPages = $allSystemPages;
     usort($topSystemPages, static function (array $a, array $b): int {
@@ -2891,17 +2938,24 @@
                 <?php if ($pageCount > 0): ?>
                     <div class="card mb-4 dashboard-stat-block">
                         <div class="card-body">
-                            <div class="d-flex flex-column gap-2 mb-3">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                                 <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Páginas más leídas</h4>
-                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle align-self-start" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="mode">
-                                    <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
-                                    <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
+                                <div class="d-flex flex-column align-items-start">
+                                    <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle my-2" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="mode">
+                                        <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
+                                        <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
+                                    </div>
+                                    <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle my-2" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="period">
+                                        <button type="button" class="btn btn-outline-primary" data-stat-period="week">Últimos 7 días</button>
+                                        <button type="button" class="btn btn-outline-primary" data-stat-period="month">Últimos 30 días</button>
+                                        <button type="button" class="btn btn-outline-primary active" data-stat-period="all">Desde el comienzo del blog</button>
+                                    </div>
                                 </div>
                             </div>
                             <?php if (empty($topPages) && empty($topPagesByUnique)): ?>
                                 <p class="text-muted mb-0">Sin datos todavía.</p>
                             <?php else: ?>
-                                <ol class="mb-0 dashboard-links" data-stat-list="pages-all" data-stat-mode="views">
+                                <ol class="mb-0 dashboard-links" data-stat-list="pages-all" data-stat-mode="views" data-stat-period="all">
                                     <?php foreach ($topPages as $item): ?>
                                         <li>
                                             <?php $url = admin_public_post_url($item['slug']); ?>
@@ -2912,8 +2966,52 @@
                                         </li>
                                     <?php endforeach; ?>
                                 </ol>
-                                <ol class="mb-0 dashboard-links d-none" data-stat-list="pages-all" data-stat-mode="users">
+                                <ol class="mb-0 dashboard-links d-none" data-stat-list="pages-all" data-stat-mode="users" data-stat-period="all">
                                     <?php foreach ($topPagesByUnique as $item): ?>
+                                        <li>
+                                            <?php $url = admin_public_post_url($item['slug']); ?>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['unique'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                                <ol class="mb-0 dashboard-links d-none" data-stat-list="pages-all" data-stat-mode="views" data-stat-period="week">
+                                    <?php foreach ($topPagesWeek as $item): ?>
+                                        <li>
+                                            <?php $url = admin_public_post_url($item['slug']); ?>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                                <ol class="mb-0 dashboard-links d-none" data-stat-list="pages-all" data-stat-mode="users" data-stat-period="week">
+                                    <?php foreach ($topPagesWeekByUnique as $item): ?>
+                                        <li>
+                                            <?php $url = admin_public_post_url($item['slug']); ?>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['unique'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                                <ol class="mb-0 dashboard-links d-none" data-stat-list="pages-all" data-stat-mode="views" data-stat-period="month">
+                                    <?php foreach ($topPagesMonth as $item): ?>
+                                        <li>
+                                            <?php $url = admin_public_post_url($item['slug']); ?>
+                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ol>
+                                <ol class="mb-0 dashboard-links d-none" data-stat-list="pages-all" data-stat-mode="users" data-stat-period="month">
+                                    <?php foreach ($topPagesMonthByUnique as $item): ?>
                                         <li>
                                             <?php $url = admin_public_post_url($item['slug']); ?>
                                             <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">

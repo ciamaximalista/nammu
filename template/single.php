@@ -1111,7 +1111,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         min-height: 130px;
         border-radius: var(--nammu-radius-md);
         overflow: hidden;
-        background: <?= $colorHighlight ?>;
+        background: transparent;
         text-decoration: none;
     }
     .post-related-card img,
@@ -1121,6 +1121,9 @@ if ($isPageTemplate && $formattedDate !== '') {
         height: 100%;
         min-height: 130px;
         object-fit: cover;
+    }
+    .post-related-fallback {
+        background: <?= $colorHighlight ?>;
     }
     .post-related-title {
         position: absolute;

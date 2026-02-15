@@ -1729,8 +1729,7 @@
             continue;
         }
         $isPodcastEpisodePage = str_starts_with($slug, 'podcast/');
-        $isItineraryPage = str_starts_with($slug, 'itinerarios/');
-        if (!$isPodcastEpisodePage && !$isItineraryPage) {
+        if (!$isPodcastEpisodePage) {
             continue;
         }
         if (!isset($entryStats[$slug])) {
@@ -1921,6 +1920,9 @@
     $allPages = [];
     $allSystemPages = [];
     foreach ($pagesStats as $slug => $item) {
+        if (is_string($slug) && str_starts_with($slug, 'podcast/')) {
+            continue;
+        }
         $daily = $item['daily'] ?? [];
         $total = (int) ($item['total'] ?? 0);
         $totalFromDaily = $sumAllViews(is_array($daily) ? $daily : []);
@@ -2935,21 +2937,19 @@
                     </div>
                 <?php endif; ?>
 
-                <?php if ($pageCount > 0): ?>
+                <?php if (!empty($topPages) || !empty($topPagesByUnique) || !empty($topPagesWeek) || !empty($topPagesWeekByUnique) || !empty($topPagesMonth) || !empty($topPagesMonthByUnique)): ?>
                     <div class="card mb-4 dashboard-stat-block">
                         <div class="card-body">
-                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Páginas más leídas</h4>
-                                <div class="d-flex flex-column align-items-start">
-                                    <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle my-2" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="mode">
-                                        <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
-                                        <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
-                                    </div>
-                                    <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle my-2" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="period">
-                                        <button type="button" class="btn btn-outline-primary" data-stat-period="week">Últimos 7 días</button>
-                                        <button type="button" class="btn btn-outline-primary" data-stat-period="month">Últimos 30 días</button>
-                                        <button type="button" class="btn btn-outline-primary active" data-stat-period="all">Desde el comienzo del blog</button>
-                                    </div>
+                            <div class="d-flex flex-column gap-2 mb-3">
+                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Páginas estáticas y temas de itinerario más leídos</h4>
+                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle align-self-start my-2" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="mode">
+                                    <button type="button" class="btn btn-outline-primary active" data-stat-mode="views">Vistas</button>
+                                    <button type="button" class="btn btn-outline-primary" data-stat-mode="users">Usuarios</button>
+                                </div>
+                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle align-self-start my-2" role="group" data-stat-toggle="pages-all" data-stat-toggle-type="period">
+                                    <button type="button" class="btn btn-outline-primary" data-stat-period="week">Últimos 7 días</button>
+                                    <button type="button" class="btn btn-outline-primary" data-stat-period="month">Últimos 30 días</button>
+                                    <button type="button" class="btn btn-outline-primary active" data-stat-period="all">Desde el comienzo del blog</button>
                                 </div>
                             </div>
                             <?php if (empty($topPages) && empty($topPagesByUnique)): ?>

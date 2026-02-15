@@ -6,6 +6,23 @@
     $postCountsByYear = [];
     $newsletterCount = 0;
     $podcastCount = 0;
+    $parsePublishedDate = static function (array $metadata): ?DateTimeImmutable {
+        $dateValue = trim((string) ($metadata['Date'] ?? ''));
+        if ($dateValue === '') {
+            return null;
+        }
+        foreach (['d/m/Y', 'd-m-Y', 'Y-m-d', 'Y/m/d'] as $format) {
+            $parsed = DateTimeImmutable::createFromFormat($format, $dateValue);
+            if ($parsed instanceof DateTimeImmutable) {
+                return $parsed;
+            }
+        }
+        $timestamp = strtotime($dateValue);
+        if ($timestamp === false) {
+            return null;
+        }
+        return (new DateTimeImmutable())->setTimestamp($timestamp);
+    };
     foreach ($postsMetadata as $item) {
         $status = strtolower((string) ($item['metadata']['Status'] ?? 'published'));
         if ($status === 'draft') {
@@ -20,15 +37,9 @@
             $podcastCount++;
         } elseif (in_array($template, ['post', 'single'], true)) {
             $postCount++;
-            $dateValue = $item['metadata']['Date'] ?? ($item['metadata']['Updated'] ?? '');
-            $timestamp = $dateValue !== '' ? strtotime($dateValue) : false;
-            if ($timestamp === false) {
-                $filename = $item['filename'] ?? '';
-                $filePath = $filename !== '' ? CONTENT_DIR . '/' . $filename : '';
-                $timestamp = ($filePath !== '' && is_file($filePath)) ? @filemtime($filePath) : false;
-            }
-            if ($timestamp !== false) {
-                $year = (int) date('Y', $timestamp);
+            $publishedDate = $parsePublishedDate(is_array($item['metadata'] ?? null) ? $item['metadata'] : []);
+            if ($publishedDate instanceof DateTimeImmutable) {
+                $year = (int) $publishedDate->format('Y');
                 if ($year > 0) {
                     $postCountsByYear[$year] = ($postCountsByYear[$year] ?? 0) + 1;
                 }

@@ -1723,8 +1723,23 @@
         ];
     }
 
+    $entryStats = is_array($postsStats) ? $postsStats : [];
+    foreach ($pagesStats as $slug => $item) {
+        if (!is_string($slug)) {
+            continue;
+        }
+        $isPodcastEpisodePage = str_starts_with($slug, 'podcast/');
+        $isItineraryPage = str_starts_with($slug, 'itinerarios/');
+        if (!$isPodcastEpisodePage && !$isItineraryPage) {
+            continue;
+        }
+        if (!isset($entryStats[$slug])) {
+            $entryStats[$slug] = $item;
+        }
+    }
+
     $allPosts = [];
-    foreach ($postsStats as $slug => $item) {
+    foreach ($entryStats as $slug => $item) {
         $daily = $item['daily'] ?? [];
         $total = (int) ($item['total'] ?? 0);
         $totalFromDaily = $sumAllViews(is_array($daily) ? $daily : []);
@@ -1847,7 +1862,7 @@
 
     $topPostsWeek = [];
     $topPostsMonth = [];
-    foreach ($postsStats as $slug => $item) {
+    foreach ($entryStats as $slug => $item) {
         $daily = $item['daily'] ?? [];
         $countWeek = $sumRange($daily, $last7Start, $today);
         $countMonth = $sumRange($daily, $last30Start, $today);

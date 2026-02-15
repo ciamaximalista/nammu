@@ -848,8 +848,26 @@ if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
     if ($relatedRaw !== '') {
         foreach (nammu_parse_related_slugs_input($relatedRaw) as $relatedRef) {
             if (str_starts_with($relatedRef, 'itinerarios/')) {
-                $itinerarySlug = ItineraryRepository::normalizeSlug(substr($relatedRef, strlen('itinerarios/')));
+                $itineraryPath = trim(substr($relatedRef, strlen('itinerarios/')), '/');
+                $itineraryParts = array_values(array_filter(explode('/', $itineraryPath), static function (string $part): bool {
+                    return trim($part) !== '';
+                }));
+                $itinerarySlug = ItineraryRepository::normalizeSlug((string) ($itineraryParts[0] ?? ''));
                 if ($itinerarySlug === '') {
+                    continue;
+                }
+                $topicSlug = ItineraryRepository::normalizeSlug((string) ($itineraryParts[1] ?? ''));
+                if ($topicSlug !== '') {
+                    $relatedTopic = $itineraryRepository->findTopic($itinerarySlug, $topicSlug);
+                    if (!$relatedTopic) {
+                        continue;
+                    }
+                    $relatedPosts[] = [
+                        'slug' => 'itinerarios/' . $itinerarySlug . '/' . $topicSlug,
+                        'title' => $relatedTopic->getTitle(),
+                        'url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/itinerarios/' . rawurlencode($itinerarySlug) . '/' . rawurlencode($topicSlug),
+                        'image' => nammu_resolve_asset($relatedTopic->getImage(), $publicBaseUrl),
+                    ];
                     continue;
                 }
                 $relatedItinerary = $itineraryRepository->find($itinerarySlug);
@@ -2130,8 +2148,26 @@ if ($slug !== null && $slug !== '') {
     if ($relatedRaw !== '') {
         foreach (nammu_parse_related_slugs_input($relatedRaw) as $relatedRef) {
             if (str_starts_with($relatedRef, 'itinerarios/')) {
-                $itinerarySlug = ItineraryRepository::normalizeSlug(substr($relatedRef, strlen('itinerarios/')));
+                $itineraryPath = trim(substr($relatedRef, strlen('itinerarios/')), '/');
+                $itineraryParts = array_values(array_filter(explode('/', $itineraryPath), static function (string $part): bool {
+                    return trim($part) !== '';
+                }));
+                $itinerarySlug = ItineraryRepository::normalizeSlug((string) ($itineraryParts[0] ?? ''));
                 if ($itinerarySlug === '') {
+                    continue;
+                }
+                $topicSlug = ItineraryRepository::normalizeSlug((string) ($itineraryParts[1] ?? ''));
+                if ($topicSlug !== '') {
+                    $relatedTopic = $itineraryRepository->findTopic($itinerarySlug, $topicSlug);
+                    if (!$relatedTopic) {
+                        continue;
+                    }
+                    $relatedPosts[] = [
+                        'slug' => 'itinerarios/' . $itinerarySlug . '/' . $topicSlug,
+                        'title' => $relatedTopic->getTitle(),
+                        'url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/itinerarios/' . rawurlencode($itinerarySlug) . '/' . rawurlencode($topicSlug),
+                        'image' => nammu_resolve_asset($relatedTopic->getImage(), $publicBaseUrl),
+                    ];
                     continue;
                 }
                 $relatedItinerary = $itineraryRepository->find($itinerarySlug);

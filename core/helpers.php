@@ -2258,12 +2258,28 @@ function nammu_parse_related_slugs_input(string $raw): array
         if ($candidate === '') {
             continue;
         }
+        if (preg_match('#^https?://#i', $candidate)) {
+            $parsedPath = parse_url($candidate, PHP_URL_PATH);
+            if (is_string($parsedPath) && $parsedPath !== '') {
+                $candidate = $parsedPath;
+            }
+        }
         $candidate = ltrim($candidate, '/');
         $normalized = '';
         if (preg_match('#^itinerarios/(.+)$#i', $candidate, $match) === 1) {
-            $itinerarySlug = nammu_slugify_label((string) $match[1]);
+            $path = trim((string) $match[1], '/');
+            $segments = array_values(array_filter(explode('/', $path), static function (string $segment): bool {
+                return trim($segment) !== '';
+            }));
+            $itinerarySlug = isset($segments[0]) ? nammu_slugify_label((string) $segments[0]) : '';
             if ($itinerarySlug !== '') {
                 $normalized = 'itinerarios/' . $itinerarySlug;
+                if (isset($segments[1])) {
+                    $topicSlug = nammu_slugify_label((string) $segments[1]);
+                    if ($topicSlug !== '') {
+                        $normalized .= '/' . $topicSlug;
+                    }
+                }
             }
         } else {
             $normalized = nammu_slugify_label($candidate);

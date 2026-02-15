@@ -397,10 +397,12 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
         border-radius: 0.35rem;
         background: <?= $accentBackground ?>;
         border: 1px solid <?= $accentBorder ?>;
+        color: <?= $brandColor ?>;
     }
     .category-detail-hero.has-hero-image .category-title-pill {
         background: rgba(0, 0, 0, 0.42);
         border-color: rgba(255, 255, 255, 0.28);
+        color: #f7fbff;
     }
     .category-count {
         margin: 0.3rem 0 0;

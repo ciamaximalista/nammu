@@ -4820,29 +4820,62 @@ function admin_autosave_from_payload($jsonPayload): array {
     }
     $date = date('Y-m-d', $timestamp);
     $image = trim((string) ($fields['image'] ?? ''));
-    $type = ($fields['type'] ?? '') === 'Página' ? 'Página' : 'Entrada';
-    $template = $type === 'Página' ? 'page' : 'post';
+    $typeRaw = trim((string) ($fields['type'] ?? 'Entrada'));
+    if ($typeRaw === 'Página') {
+        $type = 'Página';
+        $template = 'page';
+    } elseif ($typeRaw === 'Podcast') {
+        $type = 'Podcast';
+        $template = 'podcast';
+    } elseif ($typeRaw === 'Newsletter') {
+        $type = 'Newsletter';
+        $template = 'newsletter';
+    } else {
+        $type = 'Entrada';
+        $template = 'post';
+    }
     $pageVisibilityInput = strtolower(trim((string) ($fields['page_visibility'] ?? 'public')));
     $pageVisibility = ($type === 'Página' && $pageVisibilityInput === 'private') ? 'private' : 'public';
     $statusInput = strtolower(trim((string) ($fields['status'] ?? '')));
     $status = in_array($statusInput, ['draft', 'published'], true) ? $statusInput : 'draft';
+    $lang = trim((string) ($fields['lang'] ?? ''));
+    $relatedInput = trim((string) ($fields['related_slugs'] ?? ''));
+    $hasRelatedField = array_key_exists('related_slugs', $fields);
+    $relatedSlugs = [];
 
     $existingFilename = nammu_normalize_filename((string) ($fields['filename'] ?? ''));
     $isExistingFile = $existingFilename !== '' && is_file(CONTENT_DIR . '/' . $existingFilename);
     $targetFilename = $existingFilename;
     $ordo = 0;
+    $existingMeta = [];
 
     if ($isExistingFile) {
         $existing = get_post_content($existingFilename);
-        $existingMeta = $existing['metadata'] ?? [];
+        $existingMeta = is_array($existing['metadata'] ?? null) ? $existing['metadata'] : [];
         $ordo = (int) ($existingMeta['Ordo'] ?? 0);
+        if ($lang === '') {
+            $lang = trim((string) ($existingMeta['Lang'] ?? ''));
+        }
         if (!in_array($status, ['draft', 'published'], true)) {
             $status = strtolower($existingMeta['Status'] ?? 'draft');
             if ($status !== 'draft' && $status !== 'published') {
                 $status = 'draft';
             }
         }
-        $template = $type === 'Página' ? 'page' : ($template === 'page' ? 'page' : 'post');
+        if ($type === 'Entrada' && isset($existingMeta['Template'])) {
+            $existingTemplate = strtolower(trim((string) $existingMeta['Template']));
+            if (in_array($existingTemplate, ['post', 'single'], true)) {
+                $template = $existingTemplate;
+            }
+        }
+        if ($template !== 'post' && $template !== 'podcast') {
+            $relatedInput = '';
+        } elseif ($hasRelatedField && $relatedInput === '') {
+            $existingRelatedRaw = trim((string) ($existingMeta['Related'] ?? $existingMeta['related'] ?? ''));
+            if ($existingRelatedRaw !== '') {
+                $relatedSlugs = admin_parse_related_slugs_input($existingRelatedRaw);
+            }
+        }
     } else {
         $status = 'draft';
         $slugPattern = '/^[a-z0-9-]+$/i';
@@ -4871,6 +4904,10 @@ function admin_autosave_from_payload($jsonPayload): array {
         $ordo = $maxOrdo + 1;
     }
 
+    if (($template === 'post' || $template === 'podcast') && empty($relatedSlugs)) {
+        $relatedSlugs = admin_parse_related_slugs_input($relatedInput);
+    }
+
     if ($targetFilename === '') {
         $result['message'] = 'No se pudo determinar el archivo para guardar el borrador.';
         return $result;
@@ -4883,8 +4920,14 @@ function admin_autosave_from_payload($jsonPayload): array {
     $file_content .= "Date: " . $date . "\n";
     $file_content .= "Image: " . $image . "\n";
     $file_content .= "Description: " . $description . "\n";
+    if ($lang !== '') {
+        $file_content .= "Lang: " . $lang . "\n";
+    }
     if ($template === 'page') {
         $file_content .= "Visibility: " . $pageVisibility . "\n";
+    }
+    if (!empty($relatedSlugs) && in_array($template, ['post', 'podcast'], true)) {
+        $file_content .= "Related: " . implode(', ', $relatedSlugs) . "\n";
     }
     $file_content .= "Status: " . $status . "\n";
     $file_content .= "Ordo: " . $ordo . "\n";
@@ -12244,7 +12287,13 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                         type: form.find('[name="type"]').val() || '',
                         status: form.find('[name="status"]').val() || '',
                         filename: form.find('[name="filename"]').val() || '',
-                        new_filename: form.find('[name="new_filename"]').val() || ''
+                        new_filename: form.find('[name="new_filename"]').val() || '',
+                        related_slugs: form.find('[name="related_slugs"]').val() || '',
+                        lang: form.find('[name="lang"]').val() || '',
+                        page_visibility: form.find('[name="page_visibility"]').val() || '',
+                        audio: form.find('[name="audio"]').val() || '',
+                        audio_length: form.find('[name="audio_length"]').val() || '',
+                        audio_duration: form.find('[name="audio_duration"]').val() || ''
                     };
                 }
                 var hasContent = Object.keys(fields).some(function(key) {

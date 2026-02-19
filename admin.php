@@ -1746,6 +1746,22 @@ function admin_public_podcast_url(string $slug): string {
     return $base . $path;
 }
 
+function admin_public_newsletter_url(string $slug): string {
+    $base = admin_base_url();
+    if ($base === '') {
+        $settings = get_settings();
+        $siteUrl = trim((string) ($settings['site_url'] ?? ''));
+        if ($siteUrl !== '') {
+            $base = rtrim($siteUrl, '/');
+        }
+    }
+    $path = '/newsletters/' . rawurlencode(ltrim($slug, '/'));
+    if ($base === '') {
+        return $path;
+    }
+    return $base . $path;
+}
+
 /**
  * @return string[]
  */
@@ -5325,6 +5341,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $filenameInput = trim($_POST['filename'] ?? '');
         $viewAfterSave = isset($_POST['publish_and_view']);
         $isDraft = isset($_POST['save_draft']);
+        if ($viewAfterSave && $type === 'Newsletter') {
+            // Previsualización de newsletter: guarda como borrador.
+            $isDraft = true;
+        }
         $statusValue = $isDraft ? 'draft' : 'published';
         $publishAtValue = '';
         $slugPattern = '/^[a-z0-9-]+$/i';
@@ -5532,6 +5552,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if ($slug !== '') {
                             if ($type === 'Podcast') {
                                 $viewUrl = admin_public_podcast_url($slug);
+                            } elseif ($type === 'Newsletter') {
+                                $viewUrl = admin_public_newsletter_url($slug);
                             } elseif (in_array($type, ['Entrada', 'Página'], true)) {
                                 $viewUrl = admin_public_post_url($slug);
                             }
@@ -6074,6 +6096,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if ($slug !== '') {
                             if ($template === 'podcast') {
                                 $viewUrl = admin_public_podcast_url($slug);
+                            } elseif ($template === 'newsletter') {
+                                $viewUrl = admin_public_newsletter_url($slug);
                             } elseif (in_array($template, ['post', 'page'], true)) {
                                 $viewUrl = admin_public_post_url($slug);
                             }

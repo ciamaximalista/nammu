@@ -7646,39 +7646,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: admin.php?page=lista-correo#mailing');
         exit;
     } elseif (isset($_POST['add_subscriber'])) {
-        $email = admin_normalize_email($_POST['subscriber_email'] ?? '');
+        $rawEmails = trim((string) ($_POST['subscriber_email'] ?? ''));
         $redirect = 'admin.php?page=lista-correo#suscriptores';
-        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if ($rawEmails === '') {
             $_SESSION['mailing_feedback'] = [
                 'type' => 'danger',
-                'message' => 'Introduce un correo válido para suscribir.',
+                'message' => 'Introduce al menos un correo válido para suscribir.',
+            ];
+            header('Location: ' . $redirect);
+            exit;
+        }
+        $tokens = preg_split('/[\r\n,]+/', $rawEmails) ?: [];
+        $emails = [];
+        $invalidCount = 0;
+        foreach ($tokens as $token) {
+            $email = admin_normalize_email($token);
+            if ($email === '') {
+                continue;
+            }
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $invalidCount++;
+                continue;
+            }
+            $emails[$email] = true;
+        }
+        if (empty($emails)) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se detectaron direcciones de correo válidas.',
             ];
             header('Location: ' . $redirect);
             exit;
         }
         try {
             $subscribers = admin_load_mailing_subscriber_entries();
-            $exists = false;
+            $existing = [];
             foreach ($subscribers as $subscriber) {
-                if (admin_normalize_email((string) ($subscriber['email'] ?? '')) === $email) {
-                    $exists = true;
-                    break;
+                $existingEmail = admin_normalize_email((string) ($subscriber['email'] ?? ''));
+                if ($existingEmail !== '') {
+                    $existing[$existingEmail] = true;
                 }
             }
-            if ($exists) {
-                $_SESSION['mailing_feedback'] = [
-                    'type' => 'info',
-                    'message' => 'Esa dirección ya está en la lista.',
-                ];
-            } else {
+            $addedCount = 0;
+            $existsCount = 0;
+            foreach (array_keys($emails) as $email) {
+                if (isset($existing[$email])) {
+                    $existsCount++;
+                    continue;
+                }
                 $subscribers[] = [
                     'email' => $email,
                     'prefs' => admin_mailing_default_prefs(),
                 ];
+                $existing[$email] = true;
+                $addedCount++;
+            }
+            if ($addedCount > 0) {
                 admin_save_mailing_subscriber_entries($subscribers);
+            }
+            if ($addedCount > 0) {
+                $parts = [];
+                $parts[] = $addedCount === 1 ? '1 suscriptor añadido.' : $addedCount . ' suscriptores añadidos.';
+                if ($existsCount > 0) {
+                    $parts[] = $existsCount === 1 ? '1 ya existía.' : $existsCount . ' ya existían.';
+                }
+                if ($invalidCount > 0) {
+                    $parts[] = $invalidCount === 1 ? '1 correo inválido ignorado.' : $invalidCount . ' correos inválidos ignorados.';
+                }
                 $_SESSION['mailing_feedback'] = [
                     'type' => 'success',
-                    'message' => 'Suscriptor añadido correctamente.',
+                    'message' => implode(' ', $parts),
+                ];
+            } else {
+                $parts = ['Todas las direcciones ya estaban en la lista.'];
+                if ($invalidCount > 0) {
+                    $parts[] = $invalidCount === 1 ? '1 correo inválido ignorado.' : $invalidCount . ' correos inválidos ignorados.';
+                }
+                $_SESSION['mailing_feedback'] = [
+                    'type' => 'info',
+                    'message' => implode(' ', $parts),
                 ];
             }
         } catch (Throwable $e) {

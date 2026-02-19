@@ -148,11 +148,12 @@
                         </div>
                         <form method="post" class="form-inline">
                             <input type="hidden" name="add_subscriber" value="1">
-                            <label class="sr-only" for="subscriber_email">Correo</label>
-                            <input type="email" class="form-control form-control-sm mr-2 mb-2" name="subscriber_email" id="subscriber_email" placeholder="correo@ejemplo.com" required>
+                            <label class="sr-only" for="subscriber_email">Correos</label>
+                            <textarea class="form-control form-control-sm mr-2 mb-2" name="subscriber_email" id="subscriber_email" rows="2" placeholder="correo1@ejemplo.com, correo2@ejemplo.com&#10;correo3@ejemplo.com" required></textarea>
                             <button type="submit" class="btn btn-sm btn-primary mb-2">Añadir</button>
                         </form>
                     </div>
+                    <p class="text-muted small mb-3">Puedes añadir uno o varios correos separados por comas o por saltos de línea.</p>
                     <form method="get" class="form-inline mb-3">
                         <input type="hidden" name="page" value="lista-correo">
                         <label class="sr-only" for="subs_q">Buscar correo</label>

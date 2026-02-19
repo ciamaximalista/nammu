@@ -346,12 +346,17 @@ if ($editFeedback !== null) {
 
         if ($post_data):
             $currentTemplateValue = strtolower($post_data['metadata']['Template'] ?? 'post');
-            if ($currentTemplateValue === 'page') {
+            $currentStatusValue = strtolower($post_data['metadata']['Status'] ?? 'published');
+            if (!in_array($currentStatusValue, ['draft', 'published', 'newsletter'], true)) {
+                $currentStatusValue = 'published';
+            }
+            $isNewsletterByMeta = ($currentTemplateValue === 'newsletter') || ($currentStatusValue === 'newsletter');
+            if ($isNewsletterByMeta) {
+                $currentTypeValue = 'Newsletter';
+            } elseif ($currentTemplateValue === 'page') {
                 $currentTypeValue = 'Página';
             } elseif ($currentTemplateValue === 'podcast') {
                 $currentTypeValue = 'Podcast';
-            } elseif ($currentTemplateValue === 'newsletter') {
-                $currentTypeValue = 'Newsletter';
             } else {
                 $currentTypeValue = 'Entrada';
             }
@@ -363,10 +368,6 @@ if ($editFeedback !== null) {
                 $editHeading = 'Editar Newsletter';
             } else {
                 $editHeading = 'Editar Entrada';
-            }
-            $currentStatusValue = strtolower($post_data['metadata']['Status'] ?? 'published');
-            if (!in_array($currentStatusValue, ['draft', 'published', 'newsletter'], true)) {
-                $currentStatusValue = 'published';
             }
             $isNewsletterType = $currentTypeValue === 'Newsletter';
             $newsletterSent = $isNewsletterType && $currentStatusValue === 'newsletter';

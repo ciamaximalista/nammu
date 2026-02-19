@@ -430,7 +430,7 @@ if ($editFeedback !== null) {
 
             </div>
 
-            <div class="form-group description-group<?= $currentTypeValue === 'Newsletter' ? ' d-none' : '' ?>">
+            <div class="form-group">
                 <label>Tipo</label>
                 <input type="hidden" name="type" id="type" value="<?= htmlspecialchars($currentTypeValue, ENT_QUOTES, 'UTF-8') ?>" data-type-value>
                 <div class="btn-group d-flex flex-wrap" role="group" data-type-toggle>
@@ -509,7 +509,7 @@ if ($editFeedback !== null) {
 
             </div>
 
-            <div class="form-group">
+            <div class="form-group description-group<?= $currentTypeValue === 'Newsletter' ? ' d-none' : '' ?>">
 
                 <label for="description" data-podcast-label="Descripción" data-post-label="Descripción">Descripción</label>
 

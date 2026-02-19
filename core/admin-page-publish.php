@@ -34,7 +34,7 @@
 
         </div>
 
-        <div class="form-group description-group">
+        <div class="form-group">
             <label>Tipo</label>
             <input type="hidden" name="type" id="type" value="Entrada" data-type-value>
             <div class="btn-group d-flex flex-wrap" role="group" data-type-toggle>
@@ -132,7 +132,7 @@
 
         </div>
 
-        <div class="form-group">
+        <div class="form-group description-group">
 
             <label for="description" data-podcast-label="Descripción" data-post-label="Entradilla">Entradilla</label>
 

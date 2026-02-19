@@ -297,7 +297,7 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
         table td {
             padding: 0.75rem 0.85rem;
             border: 1px solid <?= $colorHighlight ?>;
-            font-size: 0.88rem;
+            font-size: 0.8rem;
         }
         table tbody tr:nth-child(odd) {
             background: <?= $colorBackground ?>;

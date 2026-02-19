@@ -5698,49 +5698,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
             exit;
         }
-        $filenameBase = nammu_slugify($title !== '' ? $title : 'newsletter');
-        if ($filenameBase === '') {
-            $filenameBase = 'newsletter';
-        }
-        $filename = nammu_unique_filename($filenameBase);
-        $targetFilename = nammu_normalize_filename($filename . '.md');
+        $targetFilename = nammu_normalize_filename($editFilename);
         if ($targetFilename !== '') {
-            $all_posts = get_all_posts_metadata();
-            $max_ordo = 0;
-            foreach ($all_posts as $post) {
-                if (isset($post['metadata']['Ordo']) && (int)$post['metadata']['Ordo'] > $max_ordo) {
-                    $max_ordo = (int)$post['metadata']['Ordo'];
-                }
+            $existing = get_post_content($targetFilename);
+            $existingOrdo = '';
+            if (is_array($existing) && isset($existing['metadata']) && is_array($existing['metadata'])) {
+                $existingOrdo = trim((string) ($existing['metadata']['Ordo'] ?? ''));
             }
-            $ordo = $max_ordo + 1;
+            if ($existingOrdo === '') {
+                $allPosts = get_all_posts_metadata();
+                $maxOrdo = 0;
+                foreach ($allPosts as $post) {
+                    if (isset($post['metadata']['Ordo']) && (int) $post['metadata']['Ordo'] > $maxOrdo) {
+                        $maxOrdo = (int) $post['metadata']['Ordo'];
+                    }
+                }
+                $existingOrdo = (string) ($maxOrdo + 1);
+            }
             $filepath = CONTENT_DIR . '/' . $targetFilename;
-            $file_content = "---
+            $fileContent = "---
 ";
-            $file_content .= "Title: " . $title . "
+            $fileContent .= "Title: " . $title . "
 ";
-            $file_content .= "Template: newsletter
+            $fileContent .= "Template: newsletter
 ";
-            $file_content .= "Category: " . $category . "
+            $fileContent .= "Category: " . $category . "
 ";
-            $file_content .= "Date: " . $date . "
+            $fileContent .= "Date: " . $date . "
 ";
-            $file_content .= "Image: " . $image . "
+            $fileContent .= "Image: " . $image . "
 ";
-            $file_content .= "Description: " . $description . "
+            $fileContent .= "Description: " . $description . "
 ";
             if ($lang !== '') {
-                $file_content .= "Lang: " . $lang . "
+                $fileContent .= "Lang: " . $lang . "
 ";
             }
-            $file_content .= "Status: newsletter
+            $fileContent .= "Status: newsletter
 ";
-            $file_content .= "Ordo: " . $ordo . "
+            $fileContent .= "Ordo: " . $existingOrdo . "
 ";
-            $file_content .= "---
+            $fileContent .= "---
 
 ";
-            $file_content .= $content;
-            @file_put_contents($filepath, $file_content);
+            $fileContent .= $content;
+            @file_put_contents($filepath, $fileContent);
         }
         $sentCount = (int) ($sendResult['sent'] ?? 0);
         $failedCount = (int) ($sendResult['failed'] ?? 0);
@@ -5748,7 +5750,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'type' => 'success',
             'message' => 'Newsletter enviada: ' . $sentCount . ' correos enviados' . ($failedCount > 0 ? ' y ' . $failedCount . ' fallidos' : '') . '.',
         ];
-        header('Location: admin.php?page=edit&template=newsletter&created=' . urlencode($targetFilename));
+        header('Location: admin.php?page=edit-post&file=' . urlencode($targetFilename !== '' ? $targetFilename : $editFilename));
         exit;
     } elseif (isset($_POST['update']) || isset($_POST['update_and_view']) || isset($_POST['publish_draft_entry']) || isset($_POST['publish_draft_page']) || isset($_POST['publish_draft_podcast']) || isset($_POST['convert_to_draft'])) {
         $existing_post_data = null;

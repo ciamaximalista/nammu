@@ -5635,6 +5635,94 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
         header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
         exit;
+    } elseif (isset($_POST['send_newsletter_custom_edit'])) {
+        $title = trim($_POST['title'] ?? '');
+        $editFilename = trim($_POST['filename'] ?? '');
+        $image = trim($_POST['image'] ?? '');
+        $content = $_POST['content'] ?? '';
+        $rawRecipients = trim((string) ($_POST['custom_recipients'] ?? ''));
+        $_SESSION['newsletter_custom_recipients'] = $rawRecipients;
+        $settings = get_settings();
+        if (!admin_is_mailing_ready($settings)) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Configura el correo de la lista antes de enviar la newsletter.',
+            ];
+            header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+            exit;
+        }
+        if ($rawRecipients === '') {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'warning',
+                'message' => 'Indica al menos una dirección de email en "Enviar a...".',
+            ];
+            header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+            exit;
+        }
+        $normalized = str_replace([',', ';', "\t"], ' ', $rawRecipients);
+        $tokens = preg_split('/\s+/u', $normalized) ?: [];
+        $recipientsMap = [];
+        $invalidCount = 0;
+        foreach ($tokens as $token) {
+            $email = admin_normalize_email($token);
+            if ($email === '') {
+                continue;
+            }
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $invalidCount++;
+                continue;
+            }
+            $recipientsMap[$email] = true;
+        }
+        $recipients = array_keys($recipientsMap);
+        if (empty($recipients)) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'warning',
+                'message' => 'No se detectaron direcciones válidas en "Enviar a...".',
+            ];
+            header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+            exit;
+        }
+        $markdown = new MarkdownConverter();
+        $contentHtml = $markdown->toHtml($content);
+        $contentText = trim(strip_tags($contentHtml));
+        $payload = admin_prepare_newsletter_payload($settings, $title, $contentHtml, $contentText, $image);
+        try {
+            $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $recipients, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+            if (($sendResult['sent'] ?? 0) === 0) {
+                $_SESSION['mailing_feedback'] = [
+                    'type' => 'danger',
+                    'message' => 'No se pudo enviar la newsletter a los destinatarios indicados.' . (!empty($sendResult['error']) ? ' Detalle: ' . $sendResult['error'] : ''),
+                ];
+                header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+                exit;
+            }
+        } catch (Throwable $e) {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'danger',
+                'message' => 'No se pudo enviar la newsletter a los destinatarios indicados.',
+            ];
+            header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+            exit;
+        }
+        $sentCount = (int) ($sendResult['sent'] ?? 0);
+        $failedCount = (int) ($sendResult['failed'] ?? 0);
+        $message = 'Newsletter enviada a ' . $sentCount . ' destinatario' . ($sentCount === 1 ? '' : 's');
+        if ($failedCount > 0) {
+            $message .= ' y ' . $failedCount . ' fallido' . ($failedCount === 1 ? '' : 's');
+        }
+        if ($invalidCount > 0) {
+            $message .= '. ' . $invalidCount . ' dirección' . ($invalidCount === 1 ? '' : 'es') . ' inválida' . ($invalidCount === 1 ? '' : 's') . ' ignorada' . ($invalidCount === 1 ? '' : 's') . '.';
+        } else {
+            $message .= '.';
+        }
+        $_SESSION['mailing_feedback'] = [
+            'type' => 'success',
+            'message' => $message,
+        ];
+        unset($_SESSION['newsletter_custom_recipients']);
+        header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
+        exit;
     } elseif (isset($_POST['send_newsletter_edit'])) {
         $title = trim($_POST['title'] ?? '');
         $editFilename = trim($_POST['filename'] ?? '');

@@ -3,6 +3,8 @@ $editFeedback = $_SESSION['edit_feedback'] ?? null;
 if ($editFeedback !== null) {
     unset($_SESSION['edit_feedback']);
 }
+$newsletterCustomRecipientsDraft = (string) ($_SESSION['newsletter_custom_recipients'] ?? '');
+unset($_SESSION['newsletter_custom_recipients']);
 ?>
 
 <?php if ($page === 'edit'): ?>
@@ -610,10 +612,21 @@ if ($editFeedback !== null) {
                 <div class="alert alert-warning d-none" data-publish-cancelled>Los cambios no se han guardado.</div>
                 <?php if (!($isNewsletterType && $newsletterSent)): ?>
                     <button type="submit" name="update" class="btn btn-primary">Actualizar</button>
-                    <button type="submit" name="update_and_view" value="1" class="btn btn-outline-primary ml-2">Ver en la web</button>
                 <?php endif; ?>
+                <button type="submit" name="update_and_view" value="1" class="btn btn-outline-primary ml-2">Ver en la web</button>
                 <?php if ($isNewsletterType && $newsletterSent && $mailingNewsletterEnabled): ?>
                     <button type="submit" name="resend_newsletter_edit" value="1" class="btn btn-primary">Volver a enviar</button>
+                    <div class="w-100 mt-3"></div>
+                    <label for="custom_recipients" class="mb-1">Enviar a...</label>
+                    <textarea
+                        name="custom_recipients"
+                        id="custom_recipients"
+                        class="form-control"
+                        rows="2"
+                        placeholder="correo1@ejemplo.com correo2@ejemplo.com&#10;correo3@ejemplo.com"
+                    ><?= htmlspecialchars($newsletterCustomRecipientsDraft, ENT_QUOTES, 'UTF-8') ?></textarea>
+                    <small class="form-text text-muted">Direcciones separadas por espacios o saltos de línea.</small>
+                    <button type="submit" name="send_newsletter_custom_edit" value="1" class="btn btn-outline-primary mt-2">Enviar a...</button>
                 <?php endif; ?>
                 <?php if ($isNewsletterType && !$newsletterSent && $mailingNewsletterEnabled): ?>
                     <button type="submit" name="send_newsletter_edit" value="1" class="btn btn-primary ml-2" data-confirm-publish="1" data-newsletter-button="1">Enviar</button>

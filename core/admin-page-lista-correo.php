@@ -153,7 +153,7 @@
                             <button type="submit" class="btn btn-sm btn-primary mb-2">Añadir</button>
                         </form>
                     </div>
-                    <p class="text-muted small mb-3">Puedes añadir uno o varios correos separados por comas o por saltos de línea.</p>
+                    <p class="text-muted small mb-3 text-right">Puedes añadir uno o varios correos separados por comas o por saltos de línea.</p>
                     <form method="get" class="form-inline mb-3">
                         <input type="hidden" name="page" value="lista-correo">
                         <label class="sr-only" for="subs_q">Buscar correo</label>

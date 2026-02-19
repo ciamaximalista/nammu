@@ -103,8 +103,12 @@ if ($editFeedback !== null) {
 
         <?php
         $showVisibilityColumn = ($templateFilter === 'page');
+        $showNewsletterStatusColumn = ($templateFilter === 'newsletter');
         $showSocialColumn = ($templateFilter !== 'newsletter' && !$showVisibilityColumn);
         $columnCount = 4;
+        if ($showNewsletterStatusColumn) {
+            $columnCount++;
+        }
         $columnCount++;
         if ($showSocialColumn) {
             $columnCount++;
@@ -125,7 +129,9 @@ if ($editFeedback !== null) {
 
                     <th>Nombre de archivo</th>
 
-                    <?php if ($showVisibilityColumn): ?>
+                    <?php if ($showNewsletterStatusColumn): ?>
+                        <th class="text-center">Envío</th>
+                    <?php elseif ($showVisibilityColumn): ?>
                         <th class="text-center"><i class="fas fa-eye" aria-hidden="true"></i><span class="sr-only">Visibilidad</span></th>
                     <?php elseif ($showSocialColumn): ?>
                         <th class="text-center">Redes</th>
@@ -183,15 +189,31 @@ if ($editFeedback !== null) {
 
                         <?php
                         $postSlug = pathinfo($post['filename'], PATHINFO_FILENAME);
-                        $postLink = $templateFilter === 'podcast'
-                            ? admin_public_podcast_url($postSlug)
-                            : admin_public_post_url($postSlug);
+                        if ($templateFilter === 'podcast') {
+                            $postLink = admin_public_podcast_url($postSlug);
+                        } elseif ($templateFilter === 'newsletter') {
+                            $postLink = admin_public_newsletter_url($postSlug);
+                            if (strtolower((string) ($post['status'] ?? '')) === 'draft') {
+                                $postLink .= (str_contains($postLink, '?') ? '&' : '?') . 'preview=1';
+                            }
+                        } else {
+                            $postLink = admin_public_post_url($postSlug);
+                        }
                         ?>
                         <td>
                             <a href="<?= htmlspecialchars($postLink, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($post['filename']) ?></a>
                         </td>
 
-                        <?php if ($showVisibilityColumn): ?>
+                        <?php if ($showNewsletterStatusColumn): ?>
+                        <td class="text-center">
+                            <?php $newsletterSentRow = strtolower((string) ($post['status'] ?? '')) === 'newsletter'; ?>
+                            <?php if ($newsletterSentRow): ?>
+                                <span class="badge badge-success">Enviado</span>
+                            <?php else: ?>
+                                <span class="badge badge-secondary">No enviado</span>
+                            <?php endif; ?>
+                        </td>
+                        <?php elseif ($showVisibilityColumn): ?>
                         <td class="text-center">
                             <?php
                             $visibilityValue = strtolower(trim((string) ($post['visibility'] ?? 'public')));

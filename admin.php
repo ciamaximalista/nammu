@@ -90,6 +90,7 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string
         $metadata = parse_yaml_front_matter($content);
         $template = strtolower($metadata['Template'] ?? '');
         $status = strtolower($metadata['Status'] ?? 'published');
+        $visibilityRaw = strtolower(trim((string) ($metadata['Visibility'] ?? $metadata['visibility'] ?? 'public')));
         $isEntry = in_array($template, ['single', 'post'], true);
         $isDraft = ($status === 'draft');
         if ($templateFilter === 'newsletter') {
@@ -152,7 +153,7 @@ function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string
             'description' => $metadata['Description'] ?? '',
             'date' => $date,
             'timestamp' => $timestamp,
-            'status' => $isDraft ? 'draft' : 'published',
+            'status' => ($template === 'newsletter' && $status === 'newsletter') ? 'newsletter' : ($isDraft ? 'draft' : 'published'),
             'publish_at' => $metadata['PublishAt'] ?? '',
             'visibility' => in_array($visibilityRaw, ['private', 'privada', '1', 'true', 'yes', 'on'], true) ? 'private' : 'public',
         ];

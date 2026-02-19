@@ -26,7 +26,7 @@
 
     <form method="post">
 
-        <div class="form-group description-group">
+        <div class="form-group">
 
             <label for="title" data-podcast-label="Título del episodio" data-post-label="Título">Título</label>
 
@@ -34,7 +34,7 @@
 
         </div>
 
-        <div class="form-group">
+        <div class="form-group description-group">
             <label>Tipo</label>
             <input type="hidden" name="type" id="type" value="Entrada" data-type-value>
             <div class="btn-group d-flex flex-wrap" role="group" data-type-toggle>

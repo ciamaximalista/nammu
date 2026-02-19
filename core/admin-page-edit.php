@@ -615,15 +615,14 @@ if ($editFeedback !== null) {
                 <?php if ($isNewsletterType && $newsletterSent && $mailingNewsletterEnabled): ?>
                     <button type="submit" name="resend_newsletter_edit" value="1" class="btn btn-primary">Volver a enviar</button>
                 <?php endif; ?>
+                <?php if ($isNewsletterType && !$newsletterSent && $mailingNewsletterEnabled): ?>
+                    <button type="submit" name="send_newsletter_edit" value="1" class="btn btn-primary ml-2" data-confirm-publish="1" data-newsletter-button="1">Enviar</button>
+                <?php endif; ?>
                 <?php if ($isDraftEditing): ?>
                     <?php if ($currentTypeValue === 'Podcast'): ?>
                         <button type="submit" name="publish_draft_podcast" value="1" class="btn btn-primary ml-2" data-confirm-publish="1">Emitir</button>
                     <?php elseif ($currentTypeValue === 'Página'): ?>
                         <button type="submit" name="publish_draft_page" value="1" class="btn btn-primary ml-2" data-confirm-publish="1">Publicar</button>
-                    <?php elseif ($currentTypeValue === 'Newsletter'): ?>
-                        <?php if ($mailingNewsletterEnabled): ?>
-                            <button type="submit" name="send_newsletter_edit" value="1" class="btn btn-primary ml-2" data-confirm-publish="1" data-newsletter-button="1">Enviar</button>
-                        <?php endif; ?>
                     <?php else: ?>
                         <button type="submit" name="publish_draft_entry" value="1" class="btn btn-primary ml-2" data-confirm-publish="1">Publicar</button>
                     <?php endif; ?>

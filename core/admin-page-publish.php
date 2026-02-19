@@ -215,6 +215,7 @@
             <div class="alert alert-warning d-none" data-publish-cancelled>Los cambios no se han guardado.</div>
             <button type="submit" name="publish" class="btn btn-primary mr-2" data-confirm-publish="1" data-podcast-label="Emitir" data-post-label="Publicar" data-publish-button="1">Publicar</button>
             <button type="submit" name="save_draft" value="1" class="btn btn-outline-secondary" data-confirm-publish="1">Guardar como borrador</button>
+            <button type="submit" name="publish_and_view" value="1" class="btn btn-outline-primary ml-2" data-confirm-publish="1">Ver en la web</button>
             <?php if ($mailingNewsletterEnabled): ?>
                 <button type="submit" name="send_newsletter" value="1" class="btn btn-primary mr-2 d-none" data-confirm-publish="1" data-newsletter-button="1">Enviar</button>
             <?php endif; ?>

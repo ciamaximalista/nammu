@@ -5291,7 +5291,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
-    } elseif (isset($_POST['publish']) || isset($_POST['save_draft'])) {
+    } elseif (isset($_POST['publish']) || isset($_POST['save_draft']) || isset($_POST['publish_and_view'])) {
         $title = trim($_POST['title'] ?? '');
         $category = trim($_POST['category'] ?? '');
         $dateInput = $_POST['date'] ?? '';
@@ -5323,6 +5323,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $pageVisibility = ($type === 'Página' && $pageVisibilityInput === 'private') ? 'private' : 'public';
         $filenameInput = trim($_POST['filename'] ?? '');
+        $viewAfterSave = isset($_POST['publish_and_view']);
         $isDraft = isset($_POST['save_draft']);
         $statusValue = $isDraft ? 'draft' : 'published';
         $publishAtValue = '';
@@ -5525,6 +5526,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             admin_maybe_send_indexnow($indexnowUrls);
                         }
                     }
+                    if ($viewAfterSave) {
+                        $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
+                        $viewUrl = '';
+                        if ($slug !== '') {
+                            if ($type === 'Podcast') {
+                                $viewUrl = admin_public_podcast_url($slug);
+                            } elseif (in_array($type, ['Entrada', 'Página'], true)) {
+                                $viewUrl = admin_public_post_url($slug);
+                            }
+                        }
+                        if ($viewUrl !== '' && $isDraft) {
+                            $viewUrl .= (str_contains($viewUrl, '?') ? '&' : '?') . 'preview=1';
+                        }
+                        if ($viewUrl !== '') {
+                            header('Location: ' . $viewUrl);
+                            exit;
+                        }
+                    }
                     $redirectTemplate = $isDraft ? 'draft' : ($type === 'Página' ? 'page' : ($type === 'Podcast' ? 'podcast' : ($type === 'Newsletter' ? 'newsletter' : 'single')));
                     header('Location: admin.php?page=edit&template=' . $redirectTemplate . '&created=' . urlencode($targetFilename));
                     exit;
@@ -5708,7 +5727,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
         header('Location: admin.php?page=edit&template=newsletter&created=' . urlencode($targetFilename));
         exit;
-    } elseif (isset($_POST['update']) || isset($_POST['publish_draft_entry']) || isset($_POST['publish_draft_page']) || isset($_POST['publish_draft_podcast']) || isset($_POST['convert_to_draft'])) {
+    } elseif (isset($_POST['update']) || isset($_POST['update_and_view']) || isset($_POST['publish_draft_entry']) || isset($_POST['publish_draft_page']) || isset($_POST['publish_draft_podcast']) || isset($_POST['convert_to_draft'])) {
         $existing_post_data = null;
         $filename = $_POST['filename'] ?? '';
         $title = $_POST['title'] ?? '';
@@ -5726,6 +5745,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $relatedSlugsInput = trim((string) ($_POST['related_slugs'] ?? ''));
         $type = $_POST['type'] ?? null;
         $statusPosted = strtolower(trim($_POST['status'] ?? ''));
+        $viewAfterSave = isset($_POST['update_and_view']);
         $publishDraftAsEntry = isset($_POST['publish_draft_entry']);
         $publishDraftAsPage = isset($_POST['publish_draft_page']);
         $publishDraftAsPodcast = isset($_POST['publish_draft_podcast']);
@@ -6048,6 +6068,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } elseif ($convertToDraft) {
                         $feedbackMessage = 'Contenido pasado a borrador.';
                     }
+                    if ($viewAfterSave) {
+                        $slug = pathinfo($targetFilename, PATHINFO_FILENAME);
+                        $viewUrl = '';
+                        if ($slug !== '') {
+                            if ($template === 'podcast') {
+                                $viewUrl = admin_public_podcast_url($slug);
+                            } elseif (in_array($template, ['post', 'page'], true)) {
+                                $viewUrl = admin_public_post_url($slug);
+                            }
+                        }
+                        if ($viewUrl !== '' && $status === 'draft') {
+                            $viewUrl .= (str_contains($viewUrl, '?') ? '&' : '?') . 'preview=1';
+                        }
+                        if ($viewUrl !== '') {
+                            header('Location: ' . $viewUrl);
+                            exit;
+                        }
+                    }
                     $_SESSION['edit_feedback'] = [
                         'type' => 'success',
                         'message' => $feedbackMessage,
@@ -6233,7 +6271,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['itinerary_feedback'] = $feedback;
         header('Location: admin.php?page=itinerarios');
         exit;
-    } elseif (isset($_POST['save_itinerary'])) {
+    } elseif (isset($_POST['save_itinerary']) || isset($_POST['save_itinerary_view'])) {
+        $viewItineraryAfterSave = isset($_POST['save_itinerary_view']);
         $title = trim($_POST['itinerary_title'] ?? '');
         $description = trim($_POST['itinerary_description'] ?? '');
         $image = trim($_POST['itinerary_image'] ?? '');
@@ -6345,6 +6384,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 admin_maybe_auto_post_to_social_networks($saved->getSlug(), $title, $description, $image, $link, $imageUrl);
                 admin_maybe_send_indexnow([$link]);
             }
+            if ($viewItineraryAfterSave) {
+                $itineraryUrl = admin_public_itinerary_url($saved->getSlug());
+                if ($statusValue === 'draft') {
+                    $itineraryUrl .= (str_contains($itineraryUrl, '?') ? '&' : '?') . 'preview=1';
+                }
+                header('Location: ' . $itineraryUrl);
+                exit;
+            }
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario guardado correctamente.'];
             header('Location: admin.php?page=itinerario&itinerary=' . urlencode($saved->getSlug()));
             exit;
@@ -6353,8 +6400,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . $redirectBase);
             exit;
         }
-    } elseif (isset($_POST['save_itinerary_topic']) || isset($_POST['save_itinerary_topic_add'])) {
+    } elseif (isset($_POST['save_itinerary_topic']) || isset($_POST['save_itinerary_topic_add']) || isset($_POST['save_itinerary_topic_view'])) {
         $redirectToNewForm = isset($_POST['save_itinerary_topic_add']);
+        $viewTopicAfterSave = isset($_POST['save_itinerary_topic_view']);
         $itinerarySlug = ItineraryRepository::normalizeSlug($_POST['topic_itinerary_slug'] ?? '');
         $title = trim($_POST['topic_title'] ?? '');
         $description = trim($_POST['topic_description'] ?? '');
@@ -6482,6 +6530,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($itinerary->isPublished()) {
                 $topicUrl = admin_public_itinerary_url($itinerarySlug) . '/' . rawurlencode($topicSlug);
                 admin_maybe_send_indexnow([$topicUrl]);
+            }
+            if ($viewTopicAfterSave) {
+                $topicUrl = admin_public_itinerary_url($itinerarySlug) . '/' . rawurlencode($topicSlug);
+                if ($itinerary->isDraft()) {
+                    $topicUrl .= (str_contains($topicUrl, '?') ? '&' : '?') . 'preview=1';
+                }
+                header('Location: ' . $topicUrl);
+                exit;
             }
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Tema guardado correctamente.'];
             if ($redirectToNewForm) {

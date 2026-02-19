@@ -126,6 +126,7 @@
                         </div>
                         <div class="mt-3">
                             <button type="submit" name="save_itinerary_topic" class="btn btn-primary">Guardar tema</button>
+                            <button type="submit" name="save_itinerary_topic_view" value="1" class="btn btn-outline-primary ml-2">Ver en la web</button>
                             <button type="submit" name="save_itinerary_topic_add" class="btn btn-secondary ml-2">Añadir nuevo tema</button>
                         </div>
                     </form>

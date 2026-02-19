@@ -29,7 +29,10 @@
                         <form method="post">
                             <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
                                 <h3 class="h5 mb-0"><?= $itineraryFormData['mode'] === 'existing' ? 'Editar itinerario' : 'Nuevo itinerario' ?></h3>
-                                <button type="submit" name="save_itinerary" class="btn btn-primary">Guardar itinerario</button>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button type="submit" name="save_itinerary" class="btn btn-primary">Guardar itinerario</button>
+                                    <button type="submit" name="save_itinerary_view" value="1" class="btn btn-outline-primary">Ver en la web</button>
+                                </div>
                             </div>
                             <input type="hidden" name="itinerary_original_slug" value="<?= htmlspecialchars($itineraryFormData['slug'], ENT_QUOTES, 'UTF-8') ?>">
                             <input type="hidden" name="itinerary_mode" value="<?= htmlspecialchars($itineraryFormData['mode'], ENT_QUOTES, 'UTF-8') ?>">
@@ -166,6 +169,7 @@
                             </div>
                             <div class="sticky-save">
                                 <button type="submit" name="save_itinerary" class="btn btn-primary">Guardar itinerario</button>
+                                <button type="submit" name="save_itinerary_view" value="1" class="btn btn-outline-primary ml-2">Ver en la web</button>
                             </div>
                         </form>
                     </div>

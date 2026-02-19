@@ -421,7 +421,7 @@ if ($editFeedback !== null) {
             <input type="hidden" name="filename" value="<?= htmlspecialchars($safeEditFilename, ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" name="status" value="<?= htmlspecialchars($currentStatusValue, ENT_QUOTES, 'UTF-8') ?>">
 
-            <div class="form-group description-group">
+            <div class="form-group description-group<?= $currentTypeValue === 'Newsletter' ? ' d-none' : '' ?>">
 
                 <label for="title" data-podcast-label="Título del episodio" data-post-label="Título">Título</label>
 

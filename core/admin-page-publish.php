@@ -26,7 +26,7 @@
 
     <form method="post">
 
-        <div class="form-group">
+        <div class="form-group description-group">
 
             <label for="title" data-podcast-label="Título del episodio" data-post-label="Título">Título</label>
 
@@ -239,6 +239,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var entryPodcastOnly = document.querySelectorAll('.entry-podcast-only');
     var titleLabel = document.querySelector('label[for="title"]');
     var descriptionLabel = document.querySelector('label[for="description"]');
+    var descriptionGroup = document.querySelector('.description-group');
     var imageLabel = document.querySelector('label[for="image"]');
     var slugLabel = document.querySelector('label[for="filename"]');
     var publishButton = document.querySelector('[data-publish-button]');
@@ -340,6 +341,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (descriptionLabel && descriptionLabel.dataset.podcastLabel && descriptionLabel.dataset.postLabel) {
             descriptionLabel.textContent = isPodcast ? descriptionLabel.dataset.podcastLabel : descriptionLabel.dataset.postLabel;
+        }
+        if (descriptionGroup) {
+            descriptionGroup.classList.toggle('d-none', isNewsletter);
         }
         if (imageLabel && imageLabel.dataset.podcastLabel && imageLabel.dataset.postLabel) {
             imageLabel.textContent = isPodcast ? imageLabel.dataset.podcastLabel : imageLabel.dataset.postLabel;

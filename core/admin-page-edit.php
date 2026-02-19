@@ -421,7 +421,7 @@ if ($editFeedback !== null) {
             <input type="hidden" name="filename" value="<?= htmlspecialchars($safeEditFilename, ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" name="status" value="<?= htmlspecialchars($currentStatusValue, ENT_QUOTES, 'UTF-8') ?>">
 
-            <div class="form-group">
+            <div class="form-group description-group">
 
                 <label for="title" data-podcast-label="Título del episodio" data-post-label="Título">Título</label>
 
@@ -647,6 +647,7 @@ if ($editFeedback !== null) {
                 var entryPodcastOnly = document.querySelectorAll('.entry-podcast-only');
                 var titleLabel = document.querySelector('label[for="title"]');
                 var descriptionLabel = document.querySelector('label[for="description"]');
+                var descriptionGroup = document.querySelector('.description-group');
                 var imageLabel = document.querySelector('label[for="image"]');
                 var slugLabel = document.querySelector('label[for="new_filename"]');
                 var audioInput = document.getElementById('audio');
@@ -726,6 +727,7 @@ if ($editFeedback !== null) {
                     var isPodcast = typeValue === 'Podcast';
                     var isEntry = typeValue === 'Entrada';
                     var isPage = typeValue === 'Página';
+                    var isNewsletter = typeValue === 'Newsletter';
                     podcastOnly.forEach(function(el) {
                         el.classList.toggle('d-none', !isPodcast);
                     });
@@ -746,6 +748,9 @@ if ($editFeedback !== null) {
                     }
                     if (descriptionLabel && descriptionLabel.dataset.podcastLabel && descriptionLabel.dataset.postLabel) {
                         descriptionLabel.textContent = isPodcast ? descriptionLabel.dataset.podcastLabel : descriptionLabel.dataset.postLabel;
+                    }
+                    if (descriptionGroup) {
+                        descriptionGroup.classList.toggle('d-none', isNewsletter);
                     }
                     if (imageLabel && imageLabel.dataset.podcastLabel && imageLabel.dataset.postLabel) {
                         imageLabel.textContent = isPodcast ? imageLabel.dataset.podcastLabel : imageLabel.dataset.postLabel;

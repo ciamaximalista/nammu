@@ -2383,11 +2383,24 @@ function nammu_publish_scheduled_posts(string $contentDir): int
         if (!is_file($file)) {
             continue;
         }
-        $raw = file_get_contents($file);
+        $fp = @fopen($file, 'c+');
+        if ($fp === false) {
+            continue;
+        }
+        if (!flock($fp, LOCK_EX)) {
+            fclose($fp);
+            continue;
+        }
+        rewind($fp);
+        $raw = stream_get_contents($fp);
         if ($raw === false) {
+            flock($fp, LOCK_UN);
+            fclose($fp);
             continue;
         }
         if (!preg_match('/^---\\s*\\R(.*?)\\R---\\s*\\R?(.*)$/s', $raw, $matches)) {
+            flock($fp, LOCK_UN);
+            fclose($fp);
             continue;
         }
         $metaRaw = $matches[1];
@@ -2409,10 +2422,14 @@ function nammu_publish_scheduled_posts(string $contentDir): int
         $template = strtolower($meta['Template'] ?? 'post');
         $publishAt = $meta['PublishAt'] ?? '';
         if ($status !== 'draft' || $publishAt === '') {
+            flock($fp, LOCK_UN);
+            fclose($fp);
             continue;
         }
         $publishTimestamp = strtotime($publishAt);
         if ($publishTimestamp === false || $publishTimestamp > $now) {
+            flock($fp, LOCK_UN);
+            fclose($fp);
             continue;
         }
         $publishDate = date('Y-m-d', $publishTimestamp);
@@ -2449,7 +2466,17 @@ function nammu_publish_scheduled_posts(string $contentDir): int
         }
         $updatedMeta = implode("\n", $updatedLines);
         $newContent = "---\n" . $updatedMeta . "\n---\n" . ltrim($body);
-        if ($newContent !== $raw && file_put_contents($file, $newContent) !== false) {
+        $saved = false;
+        if ($newContent !== $raw) {
+            rewind($fp);
+            if (ftruncate($fp, 0) && fwrite($fp, $newContent) !== false) {
+                fflush($fp);
+                $saved = true;
+            }
+        }
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        if ($saved) {
             $published++;
             $slug = basename($file, '.md');
             $payload = [

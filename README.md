@@ -137,6 +137,43 @@ sudo find . -type f -exec chmod 664 {} \;
 
 Si cediste propiedad al usuario del servidor para que pueda escribir, ejecuta `sudo chown -R <tu-usuario>:www-data .` antes de `git pull` y deshaz el cambio después.
 
+## Backup Diario
+
+Nammu incluye un script CLI de backup diario en `core/backup-daily.php`.
+Este backup guarda **solo estadísticas**:
+
+- `config/analytics.json`
+- `config/gsc-cache.json`
+- `config/bing-cache.json`
+- `config/indexnow-log.json`
+- `itinerarios/*/stats.json`
+
+### Ejecución manual
+
+```bash
+php /var/www/html/<carpeta-publica>/core/backup-daily.php
+```
+
+Esto crea un archivo `nammu-stats-backup-AAAA-MM-DD_HHMMSS.tar.gz` en `backups/`, junto con su hash `.sha256` y un resumen `latest-backup.json`.
+
+### Programarlo en cron (diario)
+
+Ejemplo (03:15 cada día, retención 30 días):
+
+```bash
+15 3 * * * www-data php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=30 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
+```
+
+Puedes cambiar el destino con `--dest=/ruta/de/backups`.
+
+### Restauración rápida
+
+```bash
+tar -xzf /var/www/html/<carpeta-publica>/backups/nammu-stats-backup-AAAA-MM-DD_HHMMSS.tar.gz -C /var/www/html/<carpeta-publica>
+```
+
+`backups/` está protegido con `.htaccess` para evitar acceso web directo.
+
 ### Migración desde PicoCMS
 
 1. Copia tus carpetas `content/` y `assets/` dentro de la instalación de Nammu.

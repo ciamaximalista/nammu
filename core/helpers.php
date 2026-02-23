@@ -278,7 +278,7 @@ function nammu_detect_user_agent_source(string $userAgent): array
         return ['bucket' => '', 'detail' => ''];
     }
     $uaSocial = [
-        'telegram' => 'Telegram',
+        'telegrambot' => 'Telegram',
         'instagram' => 'Instagram',
         'facebook' => 'Facebook',
         'fbav' => 'Facebook',

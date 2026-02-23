@@ -26,3 +26,6 @@ config/postal-reset.json
 config/scheduled-*.json
 indexnow-*.txt
 vendor/
+backups/*
+!backups/.gitkeep
+!backups/.htaccess

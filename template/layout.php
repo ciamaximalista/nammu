@@ -78,7 +78,11 @@ if (function_exists('nammu_social_settings')) {
     $defaultMetaDescription = trim((string) ($socialSettings['default_description'] ?? ''));
 }
 $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-$isCrawler = $userAgent !== '' && preg_match('/(bot|crawl|spider|slurp|bingpreview|facebookexternalhit|facebot|linkedinbot|twitterbot|pinterest|telegrambot|yandex|baiduspider|duckduckbot|sogou|ia_archiver|pagespeed|lighthouse|chrome-lighthouse|google-page-speed|adsbot-google|gtmetrix|pingdom)/i', $userAgent);
+$isCrawler = $userAgent !== '' && (
+    function_exists('nammu_is_crawler_user_agent')
+        ? nammu_is_crawler_user_agent($userAgent)
+        : (bool) preg_match('/\b(bot|crawl(?:er)?|spider)\b/i', $userAgent)
+);
 $statsConsentGiven = $isCrawler || (function_exists('nammu_has_stats_consent') ? nammu_has_stats_consent() : false);
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
 $basePath = parse_url($baseHref, PHP_URL_PATH) ?? '/';
@@ -139,6 +143,10 @@ $serverDayExpires = date(DATE_RFC2822, strtotime('today 23:59:59'));
 $serverConsentDate = date('Y-m-d');
 $serverConsentExpires = gmdate('D, d M Y H:i:s T', time() + 31536000);
 $serverYearExpires = gmdate('D, d M Y H:i:s T', time() + 31536000);
+$contentOutput = $content;
+if (!$statsConsentGiven && !$isCrawler) {
+    $contentOutput = '<section class="consent-required-notice"><p>Debes aceptar las cookies de estadisticas para poder leer el contenido.</p></section>';
+}
 if ($isCrawler) {
     if (function_exists('nammu_record_bot_visit')) {
         nammu_record_bot_visit($userAgent);
@@ -1275,7 +1283,7 @@ if (!empty($baseUrl)) {
     </div>
     <div class="wrapper">
         <main>
-            <?= $content ?>
+            <?= $contentOutput ?>
         </main>
         <?php if ($showFooterBlock): ?>
             <footer>

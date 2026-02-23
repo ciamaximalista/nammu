@@ -317,17 +317,43 @@ function nammu_detect_bot_name(string $userAgent): string
         'twitterbot' => 'Twitter/X',
         'pinterest' => 'Pinterest',
         'linkedinbot' => 'LinkedIn',
-        'telegram' => 'Telegram',
-        'bot' => 'Bot',
-        'crawl' => 'Crawler',
-        'spider' => 'Spider',
+        'telegrambot' => 'Telegram',
+        'adsbot-google' => 'Google AdsBot',
+        'applebot' => 'Applebot',
+        'petalbot' => 'PetalBot',
+        'ahrefsbot' => 'AhrefsBot',
+        'semrushbot' => 'SemrushBot',
+        'mj12bot' => 'Majestic',
+        'dotbot' => 'DotBot',
+        'screaming frog seo spider' => 'Screaming Frog',
+        'pagespeed' => 'PageSpeed',
+        'lighthouse' => 'Lighthouse',
+        'chrome-lighthouse' => 'Lighthouse',
+        'google-page-speed' => 'PageSpeed',
+        'gtmetrix' => 'GTmetrix',
+        'pingdom' => 'Pingdom',
+        'uptimerobot' => 'UptimeRobot',
     ];
     foreach ($bots as $needle => $label) {
         if (str_contains($ua, $needle)) {
             return $label;
         }
     }
+    if (preg_match('/\bbot\b/i', $ua)) {
+        return 'Bot';
+    }
+    if (preg_match('/\bcrawl(?:er)?\b/i', $ua)) {
+        return 'Crawler';
+    }
+    if (preg_match('/\bspider\b/i', $ua)) {
+        return 'Spider';
+    }
     return '';
+}
+
+function nammu_is_crawler_user_agent(string $userAgent): bool
+{
+    return nammu_detect_bot_name($userAgent) !== '';
 }
 
 function nammu_record_bot_visit(string $userAgent): void

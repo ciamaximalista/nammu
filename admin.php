@@ -5342,8 +5342,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $filenameInput = trim($_POST['filename'] ?? '');
         $viewAfterSave = isset($_POST['publish_and_view']);
         $isDraft = isset($_POST['save_draft']);
-        if ($viewAfterSave && $type === 'Newsletter') {
-            // Previsualización de newsletter: guarda como borrador.
+        if ($viewAfterSave) {
+            // "Ver en la web" siempre previsualiza: guardar como borrador.
             $isDraft = true;
         }
         $statusValue = $isDraft ? 'draft' : 'published';

@@ -519,6 +519,13 @@ if ($isPageTemplate && $formattedDate !== '') {
         display: block;
         margin: 0.35rem auto 1rem;
     }
+    .post-body .podcast-video-single {
+        width: min(960px, 100%);
+        display: block;
+        margin: 0.25rem auto 1rem;
+        border-radius: var(--nammu-radius-lg);
+        background: #000;
+    }
     .post-body .podcast-episode-description {
         margin: 0 auto 1rem;
         max-width: min(960px, 100%);

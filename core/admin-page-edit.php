@@ -403,6 +403,7 @@ unset($_SESSION['newsletter_custom_recipients']);
                 $postLang = $siteLang;
             }
             $audioValue = $post_data['metadata']['Audio'] ?? '';
+            $videoValue = $post_data['metadata']['Video'] ?? '';
             $audioLength = $post_data['metadata']['AudioLength'] ?? '';
             $audioDuration = $post_data['metadata']['AudioDuration'] ?? '';
             $relatedRaw = trim((string) ($post_data['metadata']['Related'] ?? $post_data['metadata']['related'] ?? ''));
@@ -574,6 +575,17 @@ unset($_SESSION['newsletter_custom_recipients']);
                     </div>
                 </div>
                 <small class="form-text text-muted">Selecciona un archivo mp3 desde Recursos.</small>
+            </div>
+
+            <div class="form-group podcast-only<?= $currentTypeValue === 'Podcast' ? '' : ' d-none' ?>">
+                <label for="video">Vídeo del episodio (mp4, opcional)</label>
+                <div class="input-group">
+                    <input type="text" name="video" id="video" class="form-control" value="<?= htmlspecialchars($videoValue, ENT_QUOTES, 'UTF-8') ?>" readonly>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="video" data-target-prefix="" data-target-accept="video">Seleccionar vídeo</button>
+                    </div>
+                </div>
+                <small class="form-text text-muted">Opcional. Selecciona un archivo mp4 desde Recursos.</small>
             </div>
 
             <div class="form-group podcast-only<?= $currentTypeValue === 'Podcast' ? '' : ' d-none' ?>">

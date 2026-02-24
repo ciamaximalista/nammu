@@ -836,6 +836,8 @@ if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
     $episodeImage = nammu_resolve_asset((string) ($episode->getMetadata()['Image'] ?? ''), $publicBaseUrl);
     $audioPath = trim((string) ($episode->getMetadata()['Audio'] ?? ''));
     $audioUrl = nammu_resolve_asset($audioPath, $publicBaseUrl) ?? '';
+    $videoPath = trim((string) ($episode->getMetadata()['Video'] ?? ''));
+    $videoUrl = nammu_resolve_asset($videoPath, $publicBaseUrl) ?? '';
     $episodeDateRaw = trim((string) ($episode->getMetadata()['Date'] ?? ''));
     $episodeDateTs = $episodeDateRaw !== '' ? strtotime($episodeDateRaw) : false;
     $episodeDateDisplay = $episodeDateTs !== false ? date('d/m/Y', $episodeDateTs) : $episodeDateRaw;
@@ -843,7 +845,10 @@ if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
     $episodePlayerHtml = $audioUrl !== ''
         ? '<audio class="podcast-player-single" controls preload="none"><source src="' . htmlspecialchars($audioUrl, ENT_QUOTES, 'UTF-8') . '" type="audio/mpeg"></audio>'
         : '';
-    $episodeBodyHtml = '<div class="podcast-episode-body">' . $episodePlayerHtml . $episodeDescriptionHtml . '</div>';
+    $episodeVideoHtml = $videoUrl !== ''
+        ? '<video class="podcast-video-single" controls preload="metadata"><source src="' . htmlspecialchars($videoUrl, ENT_QUOTES, 'UTF-8') . '" type="video/mp4"></video>'
+        : '';
+    $episodeBodyHtml = '<div class="podcast-episode-body">' . $episodePlayerHtml . $episodeDescriptionHtml . $episodeVideoHtml . '</div>';
     $episodeCanonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/podcast/' . rawurlencode($episode->getSlug());
     $relatedPosts = [];
     $relatedRaw = trim((string) ($episode->getMetadata()['Related'] ?? $episode->getMetadata()['related'] ?? ''));

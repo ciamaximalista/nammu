@@ -5323,6 +5323,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $description = trim($_POST['description'] ?? '');
         $lang = trim($_POST['lang'] ?? '');
         $audio = trim($_POST['audio'] ?? '');
+        $video = trim($_POST['video'] ?? '');
         $audioLengthInput = trim($_POST['audio_length'] ?? '');
         $audioDuration = trim($_POST['audio_duration'] ?? '');
         $pageVisibilityInput = strtolower(trim((string) ($_POST['page_visibility'] ?? 'public')));
@@ -5402,6 +5403,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($audio !== '' && !preg_match('/\.mp3$/i', $audio)) {
                 $error = 'El audio del podcast debe ser un archivo mp3.';
             }
+            if ($video !== '' && !preg_match('/\.mp4$/i', $video)) {
+                $error = 'El vídeo del podcast debe ser un archivo mp4.';
+            }
             if ($audioDuration === '') {
                 $error = 'Indica la duración del episodio en formato hh:mm:ss.';
             }
@@ -5446,6 +5450,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($type === 'Podcast') {
                     $file_content .= "Audio: " . $audio . "
 ";
+                    if ($video !== '') {
+                        $file_content .= "Video: " . $video . "
+";
+                    }
                     if ($audioLength !== '') {
                         $file_content .= "AudioLength: " . $audioLength . "
 ";
@@ -5852,6 +5860,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $description = $_POST['description'] ?? '';
         $lang = trim($_POST['lang'] ?? '');
         $audio = trim($_POST['audio'] ?? '');
+        $video = trim($_POST['video'] ?? '');
         $audioLengthInput = trim($_POST['audio_length'] ?? '');
         $audioDuration = trim($_POST['audio_duration'] ?? '');
         $pageVisibilityInputRaw = strtolower(trim((string) ($_POST['page_visibility'] ?? '')));
@@ -5936,6 +5945,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if ($audio !== '' && !preg_match('/\.mp3$/i', $audio)) {
                 $error = 'El audio del podcast debe ser un archivo mp3.';
+            }
+            if ($video !== '' && !preg_match('/\.mp4$/i', $video)) {
+                $error = 'El vídeo del podcast debe ser un archivo mp4.';
             }
             if ($audioDuration === '') {
                 $error = 'Indica la duración del episodio en formato hh:mm:ss.';
@@ -6036,6 +6048,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($type === 'Podcast') {
                 $file_content .= "Audio: " . $audio . "
 ";
+                if ($video !== '') {
+                    $file_content .= "Video: " . $video . "
+";
+                }
                 if ($audioLength !== '') {
                     $file_content .= "AudioLength: " . $audioLength . "
 ";

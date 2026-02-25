@@ -2465,7 +2465,12 @@ function admin_send_post_to_telegram(string $slug, string $title, string $descri
     $message = admin_build_telegram_message($slug, $title, $description, $trackedUrl);
     $imageUrl = trim($imageUrl);
     if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
-        return admin_send_telegram_photo($token, $channel, $imageUrl, $message);
+        $sentWithPhoto = admin_send_telegram_photo($token, $channel, $imageUrl, $message);
+        if ($sentWithPhoto) {
+            return true;
+        }
+        // Fallback: keep delivery even if the image is rejected/unavailable.
+        return admin_send_telegram_message($token, $channel, $message, 'HTML');
     }
     return admin_send_telegram_message($token, $channel, $message, 'HTML');
 }
@@ -2547,10 +2552,13 @@ function admin_send_facebook_post(string $slug, string $title, string $descripti
         $httpCode = null;
         $responseBody = admin_http_post_body_response($endpoint, $body, $headers, $httpCode);
         $ok = $responseBody !== null && ($httpCode === null || ($httpCode >= 200 && $httpCode < 300));
+        if ($ok) {
+            return true;
+        }
         if (!$ok) {
             error_log('Facebook post error (photo): http=' . ($httpCode ?? 'n/a') . ' response=' . (string) $responseBody);
         }
-        return $ok;
+        // Fallback: publish without image when media upload fails.
     }
     $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($pageId) . '/feed';
     $params = [
@@ -2694,18 +2702,31 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
             'external' => $embed['external'],
         ];
     }
-    $payload = json_encode([
-        'repo' => $session['did'],
-        'collection' => 'app.bsky.feed.post',
-        'record' => $record,
-    ]);
-    $headers = [
-        'Authorization: Bearer ' . $session['accessJwt'],
-        'Content-Type: application/json',
-        'Content-Length: ' . strlen((string) $payload),
-    ];
-    $httpCode = null;
-    $postResponse = admin_http_post_body_response($service . '/xrpc/com.atproto.repo.createRecord', (string) $payload, $headers, $httpCode);
+    $sendRecord = static function (array $recordPayload) use ($service, $session): array {
+        $payload = json_encode([
+            'repo' => $session['did'],
+            'collection' => 'app.bsky.feed.post',
+            'record' => $recordPayload,
+        ]);
+        $headers = [
+            'Authorization: Bearer ' . $session['accessJwt'],
+            'Content-Type: application/json',
+            'Content-Length: ' . strlen((string) $payload),
+        ];
+        $httpCode = null;
+        $response = admin_http_post_body_response($service . '/xrpc/com.atproto.repo.createRecord', (string) $payload, $headers, $httpCode);
+        return [$httpCode, $response];
+    };
+    [$httpCode, $postResponse] = $sendRecord($record);
+    if (($httpCode === null || $httpCode < 200 || $httpCode >= 300) && is_array($record['embed']['external'] ?? null)) {
+        $decodedFirst = $postResponse !== null ? json_decode($postResponse, true) : null;
+        $firstError = is_array($decodedFirst) ? (string) ($decodedFirst['error'] ?? '') : '';
+        if (strcasecmp($firstError, 'BlobTooLarge') === 0 && isset($record['embed']['external']['thumb'])) {
+            $recordRetry = $record;
+            unset($recordRetry['embed']['external']['thumb']);
+            [$httpCode, $postResponse] = $sendRecord($recordRetry);
+        }
+    }
     if ($httpCode !== null && $httpCode >= 200 && $httpCode < 300) {
         return true;
     }
@@ -2724,6 +2745,7 @@ function admin_bluesky_upload_blob(string $service, string $accessToken, string 
     if ($binary === '') {
         return null;
     }
+    $binary = admin_bluesky_prepare_blob_binary($binary);
     $mime = 'application/octet-stream';
     if (class_exists('finfo')) {
         $finfo = new finfo(FILEINFO_MIME_TYPE);
@@ -2754,6 +2776,85 @@ function admin_bluesky_upload_blob(string $service, string $accessToken, string 
         'mimeType' => $payload['blob']['mimeType'],
         'size' => (int) ($payload['blob']['size'] ?? 0),
     ];
+}
+
+function admin_bluesky_prepare_blob_binary(string $binary, int $maxBytes = 900000): string
+{
+    if ($binary === '' || strlen($binary) <= $maxBytes) {
+        return $binary;
+    }
+    if (class_exists('Imagick')) {
+        try {
+            $image = new Imagick();
+            $image->readImageBlob($binary);
+            $image = $image->coalesceImages();
+            $image->setImageOrientation(Imagick::ORIENTATION_TOPLEFT);
+            $width = (int) $image->getImageWidth();
+            $height = (int) $image->getImageHeight();
+            if ($width > 1600 || $height > 1600) {
+                $image->thumbnailImage(1600, 1600, true, true);
+            }
+            $image->setImageFormat('jpeg');
+            $image->setImageCompression(Imagick::COMPRESSION_JPEG);
+            $quality = 82;
+            for ($i = 0; $i < 8; $i++) {
+                $image->setImageCompressionQuality($quality);
+                $candidate = (string) $image->getImageBlob();
+                if ($candidate !== '' && strlen($candidate) <= $maxBytes) {
+                    return $candidate;
+                }
+                $quality -= 8;
+                if ($quality < 40) {
+                    break;
+                }
+            }
+            $fallback = (string) $image->getImageBlob();
+            if ($fallback !== '') {
+                return strlen($fallback) < strlen($binary) ? $fallback : $binary;
+            }
+        } catch (Throwable $e) {
+            // fallback to GD below
+        }
+    }
+    if (function_exists('imagecreatefromstring') && function_exists('imagejpeg')) {
+        $resource = @imagecreatefromstring($binary);
+        if ($resource !== false) {
+            $width = imagesx($resource);
+            $height = imagesy($resource);
+            if ($width > 1600 || $height > 1600) {
+                $ratio = min(1600 / max(1, $width), 1600 / max(1, $height));
+                $targetW = max(1, (int) floor($width * $ratio));
+                $targetH = max(1, (int) floor($height * $ratio));
+                $resized = imagecreatetruecolor($targetW, $targetH);
+                imagecopyresampled($resized, $resource, 0, 0, 0, 0, $targetW, $targetH, $width, $height);
+                imagedestroy($resource);
+                $resource = $resized;
+            }
+            $quality = 82;
+            $best = '';
+            for ($i = 0; $i < 8; $i++) {
+                ob_start();
+                imagejpeg($resource, null, $quality);
+                $candidate = (string) ob_get_clean();
+                if ($candidate !== '') {
+                    $best = $candidate;
+                    if (strlen($candidate) <= $maxBytes) {
+                        imagedestroy($resource);
+                        return $candidate;
+                    }
+                }
+                $quality -= 8;
+                if ($quality < 40) {
+                    break;
+                }
+            }
+            imagedestroy($resource);
+            if ($best !== '' && strlen($best) < strlen($binary)) {
+                return $best;
+            }
+        }
+    }
+    return $binary;
 }
 
 function admin_mastodon_base_url(string $instance): string
@@ -2974,6 +3075,13 @@ function admin_prepare_instagram_image_url(string $imageTrim, string $baseUrl, ?
     $srcY = (int) floor(($height - $squareSide) / 2);
     // Instagram accepts 1:1, and a stable 1080x1080 output avoids size/ratio edge cases.
     $targetSide = 1080;
+    $jpegQuality = 88;
+    if (isset($GLOBALS['nammu_instagram_target_side']) && is_int($GLOBALS['nammu_instagram_target_side'])) {
+        $targetSide = max(640, min(1080, (int) $GLOBALS['nammu_instagram_target_side']));
+    }
+    if (isset($GLOBALS['nammu_instagram_jpeg_quality']) && is_int($GLOBALS['nammu_instagram_jpeg_quality'])) {
+        $jpegQuality = max(60, min(92, (int) $GLOBALS['nammu_instagram_jpeg_quality']));
+    }
 
     $dst = imagecreatetruecolor($targetSide, $targetSide);
     if (!$dst) {
@@ -2987,9 +3095,9 @@ function admin_prepare_instagram_image_url(string $imageTrim, string $baseUrl, ?
         @mkdir($socialDir, 0755, true);
     }
     $hashBase = ($relativePath !== '' ? $relativePath : $imageUrl) . '|' . $sourceMtime . '|' . $width . 'x' . $height . '|sq';
-    $variantName = 'instagram_' . substr(sha1($hashBase), 0, 20) . '.jpg';
+    $variantName = 'instagram_' . substr(sha1($hashBase . '|q:' . $jpegQuality . '|t:' . $targetSide), 0, 20) . '.jpg';
     $variantAbsolute = $socialDir . '/' . $variantName;
-    $saved = @imagejpeg($dst, $variantAbsolute, 88);
+    $saved = @imagejpeg($dst, $variantAbsolute, $jpegQuality);
     imagedestroy($dst);
     imagedestroy($src);
     if (!$saved) {
@@ -3192,7 +3300,10 @@ function admin_send_instagram_post(string $slug, string $title, string $image, a
         return false;
     }
     $baseUrl = admin_base_url();
+    $GLOBALS['nammu_instagram_target_side'] = 1080;
+    $GLOBALS['nammu_instagram_jpeg_quality'] = 88;
     $imageUrl = admin_prepare_instagram_image_url($imageTrim, $baseUrl, $error);
+    unset($GLOBALS['nammu_instagram_target_side'], $GLOBALS['nammu_instagram_jpeg_quality']);
     if ($imageUrl === '') {
         return false;
     }
@@ -3211,11 +3322,33 @@ function admin_send_instagram_post(string $slug, string $title, string $image, a
     ]);
     $caption = admin_build_instagram_caption($slug, $title, $description, $trackedUrl);
     $createEndpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($accountId) . '/media';
-    $createResponse = admin_http_post_form_json($createEndpoint, [
+    $createPayload = [
         'image_url' => $imageUrl,
         'caption' => $caption,
         'access_token' => $token,
-    ]);
+    ];
+    $createResponse = admin_http_post_form_json($createEndpoint, $createPayload);
+    $createErrorMessage = is_array($createResponse) ? (string) ($createResponse['error']['message'] ?? '') : '';
+    if ((!is_array($createResponse) || empty($createResponse['id'])) && $createErrorMessage !== '') {
+        $mightBeMediaIssue = stripos($createErrorMessage, 'aspect ratio') !== false
+            || stripos($createErrorMessage, 'only photo or video') !== false
+            || stripos($createErrorMessage, 'image') !== false
+            || stripos($createErrorMessage, 'media') !== false;
+        if ($mightBeMediaIssue) {
+            $retryError = null;
+            $GLOBALS['nammu_instagram_target_side'] = 960;
+            $GLOBALS['nammu_instagram_jpeg_quality'] = 76;
+            $retryImageUrl = admin_prepare_instagram_image_url($imageTrim, $baseUrl, $retryError);
+            unset($GLOBALS['nammu_instagram_target_side'], $GLOBALS['nammu_instagram_jpeg_quality']);
+            if ($retryImageUrl !== '' && $retryImageUrl !== $imageUrl) {
+                $retryProbe = admin_probe_public_url_headers($retryImageUrl);
+                if (!empty($retryProbe['ok'])) {
+                    $createPayload['image_url'] = $retryImageUrl;
+                    $createResponse = admin_http_post_form_json($createEndpoint, $createPayload);
+                }
+            }
+        }
+    }
     if (!is_array($createResponse) || empty($createResponse['id'])) {
         if (is_array($createResponse) && isset($createResponse['error']['message'])) {
             $error = 'Instagram: ' . (string) $createResponse['error']['message'];

@@ -901,6 +901,14 @@ if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
             }
             $relatedPost = $contentRepository->findBySlug($relatedLookupSlug);
             if (!$relatedPost) {
+                $relatedDoc = $contentRepository->getDocument($relatedLookupSlug);
+                if (is_array($relatedDoc)) {
+                    $relatedMeta = is_array($relatedDoc['metadata'] ?? null) ? $relatedDoc['metadata'] : [];
+                    $relatedStatus = strtolower(trim((string) ($relatedMeta['Status'] ?? 'published')));
+                    $relatedPost = new Post($relatedLookupSlug, $relatedMeta, (string) ($relatedDoc['content'] ?? ''), $relatedStatus);
+                }
+            }
+            if (!$relatedPost) {
                 continue;
             }
             $relatedTemplate = strtolower($relatedPost->getTemplate());
@@ -2208,6 +2216,14 @@ if ($slug !== null && $slug !== '') {
                 continue;
             }
             $relatedPost = $contentRepository->findBySlug($relatedLookupSlug);
+            if (!$relatedPost) {
+                $relatedDoc = $contentRepository->getDocument($relatedLookupSlug);
+                if (is_array($relatedDoc)) {
+                    $relatedMeta = is_array($relatedDoc['metadata'] ?? null) ? $relatedDoc['metadata'] : [];
+                    $relatedStatus = strtolower(trim((string) ($relatedMeta['Status'] ?? 'published')));
+                    $relatedPost = new Post($relatedLookupSlug, $relatedMeta, (string) ($relatedDoc['content'] ?? ''), $relatedStatus);
+                }
+            }
             if (!$relatedPost) {
                 continue;
             }

@@ -153,11 +153,11 @@
 
         <div class="form-group entry-podcast-only">
             <label for="related_slugs">Entradas o itinerarios relacionados (2 a 6 slugs)</label>
-            <textarea name="related_slugs" id="related_slugs" class="form-control" rows="3" placeholder="slug-entrada-1&#10;slug-entrada-2&#10;itinerarios/mi-itinerario"></textarea>
+            <textarea name="related_slugs" id="related_slugs" class="form-control" rows="3" placeholder="slug-entrada-1&#10;podcast/mi-episodio&#10;itinerarios/mi-itinerario"></textarea>
             <small class="form-text text-muted">Solo para entradas y podcasts. Escribe un slug por línea (o separados por coma).</small>
         </div>
 
-        <div class="form-group">
+        <div class="form-group non-podcast">
 
             <label for="content_publish">Contenido (Markdown)</label>
             <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#content_publish">

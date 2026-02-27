@@ -2307,6 +2307,11 @@ function nammu_parse_related_slugs_input(string $raw): array
                     }
                 }
             }
+        } elseif (preg_match('#^podcast/(.+)$#i', $candidate, $match) === 1) {
+            $podcastSlug = nammu_slugify_label(trim((string) $match[1], '/'));
+            if ($podcastSlug !== '') {
+                $normalized = 'podcast/' . $podcastSlug;
+            }
         } else {
             $normalized = nammu_slugify_label($candidate);
         }

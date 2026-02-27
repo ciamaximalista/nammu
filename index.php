@@ -892,24 +892,32 @@ if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
                 ];
                 continue;
             }
-            if ($relatedRef === $episode->getSlug()) {
+            $relatedLookupSlug = $relatedRef;
+            if (str_starts_with($relatedRef, 'podcast/')) {
+                $relatedLookupSlug = trim(substr($relatedRef, strlen('podcast/')), '/');
+            }
+            if ($relatedLookupSlug === '' || $relatedLookupSlug === $episode->getSlug()) {
                 continue;
             }
-            $relatedPost = $contentRepository->findBySlug($relatedRef);
+            $relatedPost = $contentRepository->findBySlug($relatedLookupSlug);
             if (!$relatedPost) {
                 continue;
             }
             $relatedTemplate = strtolower($relatedPost->getTemplate());
-            if (!in_array($relatedTemplate, ['post', 'single'], true)) {
+            if (!in_array($relatedTemplate, ['post', 'single', 'podcast'], true)) {
                 continue;
             }
             if ($relatedPost->isDraft() && !$isAdminLogged) {
                 continue;
             }
+            $relatedUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/' . rawurlencode($relatedPost->getSlug());
+            if ($relatedTemplate === 'podcast') {
+                $relatedUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/podcast/' . rawurlencode($relatedPost->getSlug());
+            }
             $relatedPosts[] = [
                 'slug' => $relatedPost->getSlug(),
                 'title' => $relatedPost->getTitle(),
-                'url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/' . rawurlencode($relatedPost->getSlug()),
+                'url' => $relatedUrl,
                 'image' => nammu_resolve_asset($relatedPost->getImage(), $publicBaseUrl),
             ];
         }
@@ -2192,24 +2200,32 @@ if ($slug !== null && $slug !== '') {
                 ];
                 continue;
             }
-            if ($relatedRef === $post->getSlug()) {
+            $relatedLookupSlug = $relatedRef;
+            if (str_starts_with($relatedRef, 'podcast/')) {
+                $relatedLookupSlug = trim(substr($relatedRef, strlen('podcast/')), '/');
+            }
+            if ($relatedLookupSlug === '' || $relatedLookupSlug === $post->getSlug()) {
                 continue;
             }
-            $relatedPost = $contentRepository->findBySlug($relatedRef);
+            $relatedPost = $contentRepository->findBySlug($relatedLookupSlug);
             if (!$relatedPost) {
                 continue;
             }
             $relatedTemplate = strtolower($relatedPost->getTemplate());
-            if (!in_array($relatedTemplate, ['post', 'single'], true)) {
+            if (!in_array($relatedTemplate, ['post', 'single', 'podcast'], true)) {
                 continue;
             }
             if ($relatedPost->isDraft() && !$isAdminLogged) {
                 continue;
             }
+            $relatedUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/' . rawurlencode($relatedPost->getSlug());
+            if ($relatedTemplate === 'podcast') {
+                $relatedUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/podcast/' . rawurlencode($relatedPost->getSlug());
+            }
             $relatedPosts[] = [
                 'slug' => $relatedPost->getSlug(),
                 'title' => $relatedPost->getTitle(),
-                'url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/' . rawurlencode($relatedPost->getSlug()),
+                'url' => $relatedUrl,
                 'image' => nammu_resolve_asset($relatedPost->getImage(), $publicBaseUrl),
             ];
         }

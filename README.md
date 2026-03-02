@@ -22,6 +22,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 ### Biblioteca multimedia integrada
 
 - Subida múltiple de imágenes, vídeos (MP4, WebM, MOV), GIF y PDF con renombrado seguro (`nammu_unique_asset_filename`) y validación de extensión.
+- Generación automática de variantes WebP (`.jpg.webp` / `.png.webp`) al subir o editar imágenes, con entrega automática al navegador compatible y caché prolongada para estáticos.
 - Editor web con recorte, brillo, contraste, saturación y pixelado antes de sobrescribir el archivo en `assets/`.
 - Selector de medios reutilizable que inserta imágenes, vídeos locales (`<video>`), PDF (`<iframe>`) o enlaces de YouTube convertidos a iframes responsive.
 

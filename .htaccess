@@ -2,6 +2,13 @@
     RewriteEngine On
     RewriteBase /
 
+    # Serve WebP variants for JPEG/PNG when supported by the client.
+    # Example: /assets/photo.jpg -> /assets/photo.jpg.webp (if exists)
+    RewriteCond %{HTTP_ACCEPT} image/webp [NC]
+    RewriteCond %{REQUEST_URI} ^(.+)\.(jpe?g|png)$ [NC]
+    RewriteCond %{DOCUMENT_ROOT}%1.%2.webp -f
+    RewriteRule ^ %1.%2.webp [T=image/webp,E=serve_webp:1,L]
+
     # Friendly URLs: delegate RSS to the front controller too
     RewriteRule ^rss\.xml$ index.php [L]
     RewriteRule ^podcast\.xml$ index.php [L]
@@ -24,3 +31,38 @@
 
 # Prevent file browsing
 Options -Indexes -MultiViews
+
+<IfModule mod_headers.c>
+    Header append Vary Accept env=serve_webp
+    <FilesMatch "\.(?:css|js|mjs|json|xml|txt|svg|ico|gif|jpe?g|png|webp|avif|mp4|webm|ogv|mp3|wav|m4a|flac|pdf|woff2?|ttf|otf)$">
+        Header set Cache-Control "public, max-age=2592000, immutable"
+    </FilesMatch>
+</IfModule>
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType text/javascript "access plus 1 month"
+    ExpiresByType application/json "access plus 1 month"
+    ExpiresByType application/xml "access plus 1 month"
+    ExpiresByType application/rss+xml "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/gif "access plus 1 month"
+    ExpiresByType image/webp "access plus 1 month"
+    ExpiresByType image/avif "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType video/mp4 "access plus 1 month"
+    ExpiresByType video/webm "access plus 1 month"
+    ExpiresByType video/ogg "access plus 1 month"
+    ExpiresByType audio/mpeg "access plus 1 month"
+    ExpiresByType audio/mp4 "access plus 1 month"
+    ExpiresByType audio/ogg "access plus 1 month"
+    ExpiresByType audio/flac "access plus 1 month"
+    ExpiresByType application/pdf "access plus 1 month"
+    ExpiresByType font/woff2 "access plus 1 month"
+    ExpiresByType font/woff "access plus 1 month"
+    ExpiresByType font/ttf "access plus 1 month"
+    ExpiresByType font/otf "access plus 1 month"
+</IfModule>

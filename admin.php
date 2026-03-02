@@ -219,6 +219,57 @@ function nammu_allowed_media_extensions(): array {
     ];
 }
 
+function nammu_is_generated_webp_variant(string $pathOrName): bool {
+    $name = strtolower(basename($pathOrName));
+    return (bool) preg_match('/\.(?:jpe?g|png|gif)\.webp$/i', $name);
+}
+
+function nammu_generate_webp_variant_for_asset(string $absolutePath): ?string {
+    if (!is_file($absolutePath) || !function_exists('imagewebp') || !function_exists('getimagesize')) {
+        return null;
+    }
+    $extension = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
+    if ($extension === 'webp' || nammu_is_generated_webp_variant($absolutePath)) {
+        return null;
+    }
+    $imageInfo = @getimagesize($absolutePath);
+    if (!is_array($imageInfo)) {
+        return null;
+    }
+    $type = (int) ($imageInfo[2] ?? 0);
+    $src = null;
+    if ($type === IMAGETYPE_JPEG && function_exists('imagecreatefromjpeg')) {
+        $src = @imagecreatefromjpeg($absolutePath);
+    } elseif ($type === IMAGETYPE_PNG && function_exists('imagecreatefrompng')) {
+        $src = @imagecreatefrompng($absolutePath);
+    } elseif ($type === IMAGETYPE_GIF && function_exists('imagecreatefromgif')) {
+        $src = @imagecreatefromgif($absolutePath);
+    }
+    if (!$src) {
+        return null;
+    }
+    if (function_exists('imagepalettetotruecolor')) {
+        @imagepalettetotruecolor($src);
+    }
+    @imagealphablending($src, true);
+    @imagesavealpha($src, true);
+
+    $target = $absolutePath . '.webp';
+    $tmp = $target . '.tmp-' . getmypid();
+    $ok = @imagewebp($src, $tmp, 82);
+    @imagedestroy($src);
+    if (!$ok || !is_file($tmp) || filesize($tmp) <= 0) {
+        @unlink($tmp);
+        return null;
+    }
+    if (!@rename($tmp, $target)) {
+        @unlink($tmp);
+        return null;
+    }
+    @chmod($target, 0664);
+    return $target;
+}
+
 function get_media_items($page = 1, $per_page = 24) {
     $extensions = nammu_allowed_media_extensions();
     $patterns = array_merge($extensions, array_map('strtoupper', $extensions));
@@ -226,6 +277,9 @@ function get_media_items($page = 1, $per_page = 24) {
     $files = glob($pattern, GLOB_BRACE) ?: [];
     $items = [];
     foreach ($files as $file) {
+        if (nammu_is_generated_webp_variant($file)) {
+            continue;
+        }
         $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
         $type = 'image';
         $documentExts = ['pdf','doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp','md','txt','rtf'];
@@ -7434,6 +7488,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $targetPath = ASSETS_DIR . '/' . $targetName;
                 if (move_uploaded_file($file['tmp_name'], $targetPath)) {
                     $successCount++;
+                    nammu_generate_webp_variant_for_asset($targetPath);
                     $savedAssets[] = [
                         'name' => $targetName,
                         'src' => 'assets/' . $targetName,
@@ -7505,6 +7560,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $target_path = ASSETS_DIR . '/' . $image_name;
 
             file_put_contents($target_path, $image_data);
+            nammu_generate_webp_variant_for_asset($target_path);
             update_media_tags_entry($image_name, parse_media_tags_input($tagsInput));
             $_SESSION['asset_feedback'] = [
                 'type' => 'success',

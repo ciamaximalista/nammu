@@ -42,9 +42,15 @@ if (preg_match('/^\/indexnow-([a-f0-9]+)\.txt$/i', $requestPath, $match)) {
 }
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
-    @session_start();
+    $sessionCookieName = session_name();
+    $hasSessionCookie = isset($_COOKIE[$sessionCookieName]) && trim((string) $_COOKIE[$sessionCookieName]) !== '';
+    if ($hasSessionCookie) {
+        // En frontend evitamos que PHP imponga cabeceras no-cache automáticas por sesión.
+        session_cache_limiter('');
+        @session_start();
+    }
 }
-$isAdminLogged = !empty($_SESSION['loggedin']);
+$isAdminLogged = session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['loggedin']);
 
 if (function_exists('nammu_publish_scheduled_posts')) {
     nammu_publish_scheduled_posts(__DIR__ . '/content');

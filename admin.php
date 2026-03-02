@@ -56,12 +56,12 @@ function get_all_posts_metadata() {
 
 function parse_yaml_front_matter($content) {
     $metadata = [];
-    $parts = preg_split('/---s*
-/', $content, 3);
-    if (count($parts) >= 3) {
-        $yaml = $parts[1];
-        $lines = explode("
-", $yaml);
+    if (!is_string($content)) {
+        return $metadata;
+    }
+    if (preg_match('/^---\s*\R(.*?)\R---\s*\R?/s', $content, $matches) === 1) {
+        $yaml = (string) ($matches[1] ?? '');
+        $lines = preg_split('/\R/', $yaml) ?: [];
         foreach ($lines as $line) {
             if (strpos($line, ':') !== false) {
                 list($key, $value) = explode(':', $line, 2);
@@ -194,25 +194,18 @@ function get_post_content($filename) {
     }
 
     $content = file_get_contents($filepath);
-    $parts = preg_split('/---s*
-/', $content, 3);
-    
-    $metadata = [];
-    if (count($parts) >= 3) {
-        $yaml = $parts[1];
-        $lines = explode("
-", $yaml);
-        foreach ($lines as $line) {
-            if (strpos($line, ':') !== false) {
-                list($key, $value) = explode(':', $line, 2);
-                $metadata[trim($key)] = trim($value);
-            }
-        }
+    if (!is_string($content)) {
+        return null;
+    }
+    $metadata = parse_yaml_front_matter($content);
+    $body = $content;
+    if (preg_match('/^---\s*\R(.*?)\R---\s*\R?(.*)$/s', $content, $matches) === 1) {
+        $body = (string) ($matches[2] ?? '');
     }
 
     return [
         'metadata' => $metadata,
-        'content' => $parts[2] ?? '',
+        'content' => $body,
     ];
 }
 

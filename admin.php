@@ -19,6 +19,7 @@ use Nammu\Core\ItineraryTopic;
 use Nammu\Core\MarkdownConverter;
 use Nammu\Core\Post;
 use Nammu\Core\RssGenerator;
+use Nammu\Core\SitemapGenerator;
 use Symfony\Component\Yaml\Yaml;
 
 // --- User Configuration ---
@@ -601,14 +602,363 @@ function admin_regenerate_itinerary_feed(): void {
     }
 }
 
+function admin_build_sitemap_entries(array $posts, array $theme, string $publicBaseUrl): array {
+    $itineraryListing = admin_list_itineraries();
+    $base = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '';
+    $buildItineraryUrl = static function (Itinerary $itinerary) use ($base): string {
+        $path = '/itinerarios/' . rawurlencode($itinerary->getSlug());
+        return $base !== '' ? $base . $path : $path;
+    };
+    $buildItineraryTopicUrl = static function (Itinerary $itinerary, ItineraryTopic $topic) use ($base): string {
+        $path = '/itinerarios/' . rawurlencode($itinerary->getSlug()) . '/' . rawurlencode($topic->getSlug());
+        return $base !== '' ? $base . $path : $path;
+    };
+    $settings = get_settings();
+    $sortOrder = strtolower(trim((string) ($settings['sort_order'] ?? 'date')));
+    $isAlphabeticalOrder = $sortOrder === 'alphabetical';
+    $podcastItems = nammu_podcast_load_items();
+    $hasPodcast = !empty($podcastItems);
+
+    $entries = [];
+    $timestampFromPost = static function (Post $post): ?int {
+        $date = $post->getDate();
+        if ($date) {
+            return $date->setTime(0, 0)->getTimestamp();
+        }
+        $raw = $post->getRawDate();
+        if ($raw) {
+            $ts = strtotime($raw);
+            if ($ts !== false) {
+                return $ts;
+            }
+        }
+        return null;
+    };
+
+    $latestTimestamp = null;
+    foreach ($posts as $post) {
+        $ts = $timestampFromPost($post);
+        if ($ts !== null) {
+            $latestTimestamp = $latestTimestamp === null ? $ts : max($latestTimestamp, $ts);
+        }
+    }
+
+    $entries[] = [
+        'loc' => '/',
+        'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
+        'changefreq' => 'daily',
+        'priority' => 1.0,
+    ];
+
+    foreach ($posts as $post) {
+        $postTemplate = strtolower($post->getTemplate());
+        if ($postTemplate === 'podcast') {
+            continue;
+        }
+        $postVisibility = strtolower(trim((string) ($post->getMetadata()['Visibility'] ?? $post->getMetadata()['visibility'] ?? 'public')));
+        if ($postTemplate === 'page' && in_array($postVisibility, ['private', 'privada', '1', 'true', 'yes', 'on'], true)) {
+            continue;
+        }
+        $postTimestamp = $timestampFromPost($post);
+        $imageUrl = nammu_resolve_asset($post->getImage(), $publicBaseUrl);
+        $entries[] = [
+            'loc' => '/' . rawurlencode($post->getSlug()),
+            'lastmod' => $postTimestamp !== null ? gmdate('c', $postTimestamp) : null,
+            'changefreq' => 'weekly',
+            'priority' => 0.8,
+            'image' => $imageUrl ?: null,
+        ];
+    }
+
+    $categories = nammu_collect_categories_from_posts($posts);
+    $latestCategoryTimestamp = null;
+    foreach ($categories as $slug => $data) {
+        $categoryTimestamp = null;
+        foreach ($data['posts'] as $categoryPost) {
+            if (!$categoryPost instanceof Post) {
+                continue;
+            }
+            $ts = $timestampFromPost($categoryPost);
+            if ($ts !== null) {
+                $categoryTimestamp = $categoryTimestamp === null ? $ts : max($categoryTimestamp, $ts);
+            }
+        }
+        if ($categoryTimestamp !== null) {
+            $latestCategoryTimestamp = $latestCategoryTimestamp === null ? $categoryTimestamp : max($latestCategoryTimestamp, $categoryTimestamp);
+        }
+        $entries[] = [
+            'loc' => '/categoria/' . rawurlencode($slug),
+            'lastmod' => $categoryTimestamp !== null ? gmdate('c', $categoryTimestamp) : null,
+            'changefreq' => 'weekly',
+            'priority' => 0.7,
+        ];
+    }
+    if (!empty($categories)) {
+        $entries[] = [
+            'loc' => '/categorias',
+            'lastmod' => $latestCategoryTimestamp !== null ? gmdate('c', $latestCategoryTimestamp) : ($latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null),
+            'changefreq' => 'weekly',
+            'priority' => 0.7,
+        ];
+    }
+
+    $themeHome = is_array($theme['home'] ?? null) ? $theme['home'] : [];
+    $perPageSetting = $themeHome['per_page'] ?? 'all';
+    $perPage = null;
+    if (is_string($perPageSetting)) {
+        if (strtolower($perPageSetting) !== 'all') {
+            $intCandidate = filter_var($perPageSetting, FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 1],
+            ]);
+            if ($intCandidate !== false) {
+                $perPage = (int) $intCandidate;
+            }
+        }
+    } elseif (is_int($perPageSetting)) {
+        $perPage = $perPageSetting;
+    }
+    if ($perPage !== null && $perPage > 0) {
+        $totalPages = max(1, (int) ceil(count($posts) / $perPage));
+        for ($page = 2; $page <= $totalPages; $page++) {
+            $entries[] = [
+                'loc' => '/pagina/' . $page,
+                'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
+                'changefreq' => 'weekly',
+                'priority' => 0.6,
+            ];
+        }
+    }
+
+    if (!empty($itineraryListing)) {
+        $latestItineraryTimestamp = null;
+        foreach ($itineraryListing as $itineraryItem) {
+            if (!$itineraryItem instanceof Itinerary) {
+                continue;
+            }
+            $meta = $itineraryItem->getMetadata();
+            $dateValue = $meta['Updated'] ?? ($meta['Date'] ?? '');
+            $ts = $dateValue !== '' ? strtotime($dateValue) : null;
+            if ($ts !== false && $ts !== null) {
+                $latestItineraryTimestamp = $latestItineraryTimestamp === null ? $ts : max($latestItineraryTimestamp, $ts);
+            }
+            $imageUrl = nammu_resolve_asset($itineraryItem->getImage(), $publicBaseUrl);
+            $entries[] = [
+                'loc' => $buildItineraryUrl($itineraryItem),
+                'lastmod' => $ts !== false && $ts !== null ? gmdate('c', $ts) : null,
+                'changefreq' => 'weekly',
+                'priority' => 0.7,
+                'image' => $imageUrl ?: null,
+            ];
+            foreach ($itineraryItem->getTopics() as $topicItem) {
+                if (!$topicItem instanceof ItineraryTopic) {
+                    continue;
+                }
+                $entries[] = [
+                    'loc' => $buildItineraryTopicUrl($itineraryItem, $topicItem),
+                    'lastmod' => $ts !== false && $ts !== null ? gmdate('c', $ts) : null,
+                    'changefreq' => 'weekly',
+                    'priority' => 0.6,
+                ];
+            }
+        }
+        $entries[] = [
+            'loc' => '/itinerarios',
+            'lastmod' => $latestItineraryTimestamp !== null ? gmdate('c', $latestItineraryTimestamp) : null,
+            'changefreq' => 'weekly',
+            'priority' => 0.7,
+        ];
+    }
+
+    if ($hasPodcast) {
+        $latestPodcastTimestamp = null;
+        foreach ($podcastItems as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $ts = isset($item['timestamp']) ? (int) $item['timestamp'] : null;
+            if ($ts !== null && $ts > 0) {
+                $latestPodcastTimestamp = $latestPodcastTimestamp === null ? $ts : max($latestPodcastTimestamp, $ts);
+            }
+            $episodeUrl = trim((string) ($item['page_url'] ?? ''));
+            if ($episodeUrl !== '') {
+                $entries[] = [
+                    'loc' => $episodeUrl,
+                    'lastmod' => $ts !== null && $ts > 0 ? gmdate('c', $ts) : null,
+                    'changefreq' => 'weekly',
+                    'priority' => 0.7,
+                    'image' => !empty($item['image']) ? (string) $item['image'] : null,
+                ];
+            }
+        }
+        $entries[] = [
+            'loc' => '/podcast',
+            'lastmod' => $latestPodcastTimestamp !== null ? gmdate('c', $latestPodcastTimestamp) : ($latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null),
+            'changefreq' => 'weekly',
+            'priority' => 0.7,
+        ];
+    }
+
+    $analytics = function_exists('nammu_load_analytics') ? nammu_load_analytics() : [];
+    $searchesDaily = $analytics['searches']['daily'] ?? [];
+    $searchPageLastMod = $analytics['updated_at'] ?? null;
+    if (is_int($searchPageLastMod) && $searchPageLastMod > 0) {
+        $searchPageLastMod = gmdate('c', $searchPageLastMod);
+    } else {
+        $searchPageLastMod = $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null;
+    }
+    $entries[] = [
+        'loc' => '/buscar.php',
+        'lastmod' => $searchPageLastMod,
+        'changefreq' => 'weekly',
+        'priority' => 0.6,
+    ];
+
+    $searchTermCounts = [];
+    $searchTermLatest = [];
+    $today = new DateTimeImmutable('now');
+    $startKey = $today->modify('-29 days')->format('Y-m-d');
+    foreach ($searchesDaily as $day => $payload) {
+        if (!is_string($day) || $day < $startKey || !is_array($payload)) {
+            continue;
+        }
+        foreach ($payload as $term => $termData) {
+            $termKey = trim((string) $term);
+            if ($termKey === '') {
+                continue;
+            }
+            $count = is_array($termData) ? (int) ($termData['count'] ?? 0) : (int) $termData;
+            if ($count <= 0) {
+                continue;
+            }
+            $searchTermCounts[$termKey] = ($searchTermCounts[$termKey] ?? 0) + $count;
+            $dayTs = strtotime($day);
+            if ($dayTs !== false) {
+                $searchTermLatest[$termKey] = isset($searchTermLatest[$termKey])
+                    ? max($searchTermLatest[$termKey], $dayTs)
+                    : $dayTs;
+            }
+        }
+    }
+    if (!empty($searchTermCounts)) {
+        $searchList = [];
+        foreach ($searchTermCounts as $term => $count) {
+            $searchList[] = ['term' => $term, 'count' => $count];
+        }
+        usort($searchList, static fn(array $a, array $b): int => $b['count'] <=> $a['count']);
+        $searchList = array_slice($searchList, 0, 10);
+        foreach ($searchList as $item) {
+            $term = $item['term'];
+            $termLast = $searchTermLatest[$term] ?? null;
+            $entries[] = [
+                'loc' => '/buscar.php?q=' . rawurlencode($term),
+                'lastmod' => $termLast !== null ? gmdate('c', $termLast) : $searchPageLastMod,
+                'changefreq' => 'weekly',
+                'priority' => 0.5,
+            ];
+        }
+    }
+
+    if ($isAlphabeticalOrder) {
+        $letterGroups = nammu_group_items_by_letter($posts);
+        $entries[] = [
+            'loc' => '/letras',
+            'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
+            'changefreq' => 'weekly',
+            'priority' => 0.6,
+        ];
+        foreach ($letterGroups as $letter => $groupPosts) {
+            $entries[] = [
+                'loc' => '/letra/' . rawurlencode(nammu_letter_slug($letter)),
+                'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
+                'changefreq' => 'weekly',
+                'priority' => 0.5,
+            ];
+        }
+    }
+
+    return $entries;
+}
+
 function admin_regenerate_podcast_feed(): void {
     try {
+        $podcastItems = nammu_podcast_load_items();
+        if (empty($podcastItems)) {
+            @unlink(__DIR__ . '/podcast.xml');
+            return;
+        }
         $baseUrl = nammu_base_url();
         $config = load_config_file();
         $feed = nammu_generate_podcast_feed($baseUrl, $config);
         @file_put_contents(__DIR__ . '/podcast.xml', $feed);
     } catch (Throwable $e) {
         error_log('No se pudo regenerar podcast.xml: ' . $e->getMessage());
+    }
+}
+
+function admin_regenerate_rss_feed(): void {
+    try {
+        $baseUrl = nammu_base_url();
+        if ($baseUrl === '') {
+            return;
+        }
+        $config = load_config_file();
+        $siteTitle = trim((string) ($config['site_name'] ?? 'Nammu Blog'));
+        $siteDescription = trim((string) ($config['social']['default_description'] ?? ''));
+        $siteLang = $config['site_lang'] ?? 'es';
+        if (!is_string($siteLang) || $siteLang === '') {
+            $siteLang = 'es';
+        }
+        $homeUrl = rtrim($baseUrl, '/') . '/';
+        $rssUrl = rtrim($baseUrl, '/') . '/rss.xml';
+        $repository = new \Nammu\Core\ContentRepository(CONTENT_DIR);
+        $posts = $repository->all();
+        $markdown = new MarkdownConverter();
+        $rssGenerator = new RssGenerator($baseUrl, $siteTitle, $siteDescription, $homeUrl, $rssUrl, $siteLang);
+        $rss = $rssGenerator->generate(
+            $posts,
+            static fn (Post $post): string => '/' . rawurlencode($post->getSlug()),
+            $markdown
+        );
+        @file_put_contents(__DIR__ . '/rss.xml', $rss);
+    } catch (Throwable $e) {
+        error_log('No se pudo regenerar rss.xml: ' . $e->getMessage());
+    }
+}
+
+function admin_regenerate_sitemap(): void {
+    try {
+        $baseUrl = nammu_base_url();
+        $repository = new \Nammu\Core\ContentRepository(CONTENT_DIR);
+        $posts = $repository->all();
+        $config = load_config_file();
+        $theme = nammu_theme_config($config);
+        $entries = admin_build_sitemap_entries($posts, $theme, $baseUrl);
+        $generator = new SitemapGenerator($baseUrl);
+        $sitemapXml = $generator->generate($entries);
+        @file_put_contents(__DIR__ . '/sitemap.xml', $sitemapXml);
+    } catch (Throwable $e) {
+        error_log('No se pudo regenerar sitemap.xml: ' . $e->getMessage());
+    }
+}
+
+function admin_regenerate_public_artifacts(): void {
+    $lockPath = __DIR__ . '/config/public-artifacts-refresh.lock';
+    $fp = @fopen($lockPath, 'c');
+    if ($fp === false) {
+        return;
+    }
+    if (!@flock($fp, LOCK_EX | LOCK_NB)) {
+        @fclose($fp);
+        return;
+    }
+    try {
+        admin_regenerate_rss_feed();
+        admin_regenerate_itinerary_feed();
+        admin_regenerate_podcast_feed();
+        admin_regenerate_sitemap();
+    } finally {
+        @flock($fp, LOCK_UN);
+        @fclose($fp);
     }
 }
 
@@ -5666,8 +6016,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             }
                         }
                     }
-                    if ($type === 'Podcast') {
-                        admin_regenerate_podcast_feed();
+                    if (!$isDraft) {
+                        admin_regenerate_public_artifacts();
                     }
                     if (!$isDraft) {
                         $indexnowUrls = [];
@@ -6292,9 +6642,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             @unlink($previousPath);
                         }
                     }
-                    if ($template === 'podcast') {
-                        admin_regenerate_podcast_feed();
-                    }
+                    admin_regenerate_public_artifacts();
                     if ($status === 'published') {
                         $shouldIndexnow = $previousStatus === 'published' || $previousStatus === 'draft' || $publishDraftAsEntry || $publishDraftAsPage || $publishDraftAsPodcast || $renameRequested;
                         if ($shouldIndexnow) {
@@ -6618,7 +6966,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'Status' => $statusValue,
                 'Order' => $orderInput,
             ], $content, !empty($itineraryQuizResult['data']['questions']) ? $itineraryQuizResult['data'] : null);
-            admin_regenerate_itinerary_feed();
+            admin_regenerate_public_artifacts();
             $shouldAutoMail = $statusValue === 'published' && ($mode === 'new' || $previousStatus === 'draft');
             if ($shouldAutoMail) {
                 $settings = get_settings();
@@ -6784,6 +7132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     );
                 }
             }
+            admin_regenerate_public_artifacts();
             if ($itinerary->isPublished()) {
                 $topicUrl = admin_public_itinerary_url($itinerarySlug) . '/' . rawurlencode($topicSlug);
                 admin_maybe_send_indexnow([$topicUrl]);
@@ -6824,7 +7173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (admin_recursive_delete_path($targetDir)) {
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario borrado correctamente.'];
-            admin_regenerate_itinerary_feed();
+            admin_regenerate_public_artifacts();
         } else {
             $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudo borrar la carpeta del itinerario. Revisa los permisos.'];
         }
@@ -6850,6 +7199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (@unlink($filePath)) {
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Tema borrado correctamente.'];
+            admin_regenerate_public_artifacts();
         } else {
             $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudo borrar el archivo del tema. Revisa los permisos.'];
         }
@@ -6889,6 +7239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $filepath = CONTENT_DIR . '/' . $basename;
             if (is_file($filepath)) {
                 @unlink($filepath);
+                admin_regenerate_public_artifacts();
                 header('Location: admin.php?page=edit&template=' . $templateParam . '&deleted=' . urlencode($basename));
                 exit;
             }
@@ -6940,7 +7291,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $metaOther['Order'] = $orderCurrent;
             $repo->saveItinerary($current->getSlug(), $metaCurrent, $current->getContent(), $current->getQuiz());
             $repo->saveItinerary($other->getSlug(), $metaOther, $other->getContent(), $other->getQuiz());
-            admin_regenerate_itinerary_feed();
+            admin_regenerate_public_artifacts();
             $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Orden actualizado.'];
         } catch (Throwable $e) {
             $_SESSION['itinerary_feedback'] = ['type' => 'danger', 'message' => 'No se pudo reordenar: ' . $e->getMessage()];

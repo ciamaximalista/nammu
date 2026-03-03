@@ -146,7 +146,6 @@ Este backup guarda **solo estadísticas**:
 - `config/analytics.json`
 - `config/gsc-cache.json`
 - `config/bing-cache.json`
-- `config/indexnow-log.json`
 - `itinerarios/*/stats.json`
 
 ### Ejecución manual
@@ -157,12 +156,13 @@ php /var/www/html/<carpeta-publica>/core/backup-daily.php
 
 Esto crea un archivo `nammu-stats-backup-AAAA-MM-DD_HHMMSS.tar.gz` en `backups/`, junto con su hash `.sha256` y un resumen `latest-backup.json`.
 
-### Programarlo en cron (diario)
+### Programarlo en cron
 
-Ejemplo (03:15 cada día, retención 30 días):
+Ejemplo recomendado:
 
 ```bash
-15 3 * * * www-data php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=30 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
+15 3 * * * www-data php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
+30 3 * * 0 www-data php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
 ```
 
 Puedes cambiar el destino con `--dest=/ruta/de/backups`.

@@ -1,5 +1,9 @@
 <?php
-session_start();
+$__nammuCliArgs = (PHP_SAPI === 'cli' && isset($argv) && is_array($argv)) ? $argv : [];
+$__nammuRunScheduledOnly = PHP_SAPI === 'cli' && in_array('--run-scheduled', $__nammuCliArgs, true);
+if (!$__nammuRunScheduledOnly) {
+    session_start();
+}
 
 require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
@@ -31,14 +35,30 @@ define('MEDIA_TAGS_FILE', __DIR__ . '/config/media-tags.json');
 define('MAILING_SUBSCRIBERS_FILE', __DIR__ . '/config/mailing-subscribers.json');
 define('MAILING_SECRET_FILE', __DIR__ . '/config/mailing-secret.key');
 nammu_ensure_directory(ITINERARIES_DIR);
-if (function_exists('nammu_publish_scheduled_posts')) {
-    nammu_publish_scheduled_posts(CONTENT_DIR);
-}
-if (function_exists('nammu_process_scheduled_notifications_queue')) {
-    nammu_process_scheduled_notifications_queue();
-}
+$runScheduledOnly = $__nammuRunScheduledOnly;
 
 // --- Helper Functions ---
+
+/**
+ * Ejecuta tareas programadas fuera del ciclo de petición web.
+ *
+ * @return array{published:int,notifications_processed:int,notifications_remaining:int}
+ */
+function admin_run_scheduled_tasks(): array {
+    $published = 0;
+    $queueStats = ['processed' => 0, 'remaining' => 0];
+    if (function_exists('nammu_publish_scheduled_posts')) {
+        $published = (int) nammu_publish_scheduled_posts(CONTENT_DIR);
+    }
+    if (function_exists('nammu_process_scheduled_notifications_queue')) {
+        $queueStats = nammu_process_scheduled_notifications_queue();
+    }
+    return [
+        'published' => $published,
+        'notifications_processed' => (int) ($queueStats['processed'] ?? 0),
+        'notifications_remaining' => (int) ($queueStats['remaining'] ?? 0),
+    ];
+}
 
 function get_all_posts_metadata() {
     $posts = [];
@@ -71,6 +91,111 @@ function parse_yaml_front_matter($content) {
         }
     }
     return $metadata;
+}
+
+function admin_stats_backup_dir(): string {
+    return __DIR__ . '/backups';
+}
+
+/**
+ * @return array<int, array{file:string,mtime:int,size:int,label:string}>
+ */
+function admin_list_stats_backups(int $maxDays = 7): array {
+    $dir = admin_stats_backup_dir();
+    if (!is_dir($dir)) {
+        return [];
+    }
+    $files = glob($dir . '/nammu-stats-backup-*.tar.gz') ?: [];
+    $items = [];
+    $cutoff = time() - max(1, $maxDays) * 86400;
+    foreach ($files as $fullPath) {
+        $base = basename($fullPath);
+        if (!preg_match('/^nammu-stats-backup-\d{4}-\d{2}-\d{2}_\d{6}\.tar\.gz$/', $base)) {
+            continue;
+        }
+        $mtime = (int) (@filemtime($fullPath) ?: 0);
+        if ($mtime > 0 && $mtime < $cutoff) {
+            continue;
+        }
+        $size = (int) (@filesize($fullPath) ?: 0);
+        $items[] = [
+            'file' => $base,
+            'mtime' => $mtime,
+            'size' => $size,
+            'label' => date('d/m/Y H:i:s', $mtime) . ' · ' . $base . ' · ' . number_format($size / 1024, 1, ',', '.') . ' KiB',
+        ];
+    }
+    usort($items, static fn(array $a, array $b): int => $b['mtime'] <=> $a['mtime']);
+    return $items;
+}
+
+function admin_restore_stats_backup(string $archiveFile, ?string &$error = null): bool {
+    $archiveFile = trim($archiveFile);
+    if (!preg_match('/^nammu-stats-backup-\d{4}-\d{2}-\d{2}_\d{6}\.tar\.gz$/', $archiveFile)) {
+        $error = 'Backup inválido.';
+        return false;
+    }
+    $archivePath = admin_stats_backup_dir() . '/' . $archiveFile;
+    if (!is_file($archivePath)) {
+        $error = 'El archivo de backup no existe.';
+        return false;
+    }
+    $tmpBase = __DIR__ . '/config/.stats-restore-' . bin2hex(random_bytes(6));
+    if (!@mkdir($tmpBase, 0775, true) && !is_dir($tmpBase)) {
+        $error = 'No se pudo crear el directorio temporal de restauración.';
+        return false;
+    }
+    $cmd = 'tar -xzf ' . escapeshellarg($archivePath) . ' -C ' . escapeshellarg($tmpBase);
+    exec($cmd . ' 2>&1', $out, $code);
+    if ($code !== 0) {
+        admin_recursive_delete_path($tmpBase);
+        $error = 'No se pudo descomprimir el backup.';
+        return false;
+    }
+
+    $root = __DIR__;
+    $restored = 0;
+    $safeFiles = [
+        'config/analytics.json',
+        'config/gsc-cache.json',
+        'config/bing-cache.json',
+    ];
+    foreach ($safeFiles as $relative) {
+        $src = $tmpBase . '/' . $relative;
+        $dst = $root . '/' . $relative;
+        if (!is_file($src)) {
+            continue;
+        }
+        $dstDir = dirname($dst);
+        if (!is_dir($dstDir)) {
+            @mkdir($dstDir, 0775, true);
+        }
+        if (@copy($src, $dst)) {
+            @chmod($dst, 0664);
+            $restored++;
+        }
+    }
+    foreach (glob($tmpBase . '/itinerarios/*/stats.json') ?: [] as $srcStats) {
+        $relative = ltrim(str_replace($tmpBase, '', $srcStats), '/');
+        if (!preg_match('#^itinerarios/[a-z0-9._-]+/stats\.json$#i', $relative)) {
+            continue;
+        }
+        $dst = $root . '/' . $relative;
+        $dstDir = dirname($dst);
+        if (!is_dir($dstDir)) {
+            @mkdir($dstDir, 0775, true);
+        }
+        if (@copy($srcStats, $dst)) {
+            @chmod($dst, 0664);
+            $restored++;
+        }
+    }
+    admin_recursive_delete_path($tmpBase);
+    if ($restored === 0) {
+        $error = 'El backup no contenía archivos de estadísticas restaurables.';
+        return false;
+    }
+    return true;
 }
 
 function get_posts($page = 1, $per_page = 16, $templateFilter = 'single', string $searchTerm = '') {
@@ -5571,6 +5696,12 @@ if (!is_array($telexFeedback) || !isset($telexFeedback['message'], $telexFeedbac
 } else {
     unset($_SESSION['telex_feedback']);
 }
+$statsBackupFeedback = $_SESSION['stats_backup_feedback'] ?? null;
+if (!is_array($statsBackupFeedback) || !isset($statsBackupFeedback['message'], $statsBackupFeedback['type'])) {
+    $statsBackupFeedback = null;
+} else {
+    unset($_SESSION['stats_backup_feedback']);
+}
 $postalFeedback = $_SESSION['postal_feedback'] ?? null;
 if (!is_array($postalFeedback) || !isset($postalFeedback['message'], $postalFeedback['type'])) {
     $postalFeedback = null;
@@ -5594,6 +5725,12 @@ if (!is_array($itineraryFeedback) || !isset($itineraryFeedback['message'], $itin
     $itineraryFeedback = null;
 } else {
     unset($_SESSION['itinerary_feedback']);
+}
+
+if ($runScheduledOnly) {
+    $result = admin_run_scheduled_tasks();
+    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+    exit(0);
 }
 
 if (isset($_GET['bing_oauth'])) {
@@ -7943,6 +8080,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         $_SESSION['bing_webmaster_feedback'] = $feedback;
+        header('Location: admin.php?page=configuracion');
+        exit;
+    } elseif (isset($_POST['restore_stats_backup'])) {
+        $selectedBackup = trim((string) ($_POST['stats_backup_file'] ?? ''));
+        $restoreError = null;
+        if ($selectedBackup === '') {
+            $_SESSION['stats_backup_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Selecciona un backup para restaurar.',
+            ];
+        } elseif (admin_restore_stats_backup($selectedBackup, $restoreError)) {
+            $_SESSION['stats_backup_feedback'] = [
+                'type' => 'success',
+                'message' => 'Estadísticas restauradas correctamente desde ' . $selectedBackup . '.',
+            ];
+        } else {
+            $_SESSION['stats_backup_feedback'] = [
+                'type' => 'danger',
+                'message' => $restoreError ?: 'No se pudieron restaurar las estadísticas.',
+            ];
+        }
         header('Location: admin.php?page=configuracion');
         exit;
     } elseif (isset($_POST['save_settings'])) {

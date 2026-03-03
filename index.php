@@ -52,13 +52,6 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 }
 $isAdminLogged = session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['loggedin']);
 
-if (function_exists('nammu_publish_scheduled_posts')) {
-    nammu_publish_scheduled_posts(__DIR__ . '/content');
-}
-if (function_exists('nammu_process_scheduled_notifications_queue')) {
-    nammu_process_scheduled_notifications_queue();
-}
-
 $contentRepository = new ContentRepository(__DIR__ . '/content');
 $itinerariesBaseDir = __DIR__ . '/itinerarios';
 nammu_ensure_directory($itinerariesBaseDir);

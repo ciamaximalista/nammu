@@ -10,14 +10,15 @@ if (PHP_SAPI !== 'cli') {
 
 $root = dirname(__DIR__);
 $defaultBackupDir = $root . '/backups';
-$defaultRetention = 30;
+$defaultRetention = 7;
 $lockFile = $root . '/config/backup.lock';
 
-$options = getopt('', ['dest::', 'retention::']);
+$options = getopt('', ['dest::', 'retention::', 'cleanup-only']);
 $backupDir = isset($options['dest']) && is_string($options['dest']) && trim($options['dest']) !== ''
     ? trim($options['dest'])
     : $defaultBackupDir;
 $retentionDays = isset($options['retention']) ? (int) $options['retention'] : $defaultRetention;
+$cleanupOnly = array_key_exists('cleanup-only', $options);
 if ($retentionDays < 1) {
     $retentionDays = $defaultRetention;
 }
@@ -44,11 +45,36 @@ $archiveName = "nammu-stats-backup-{$stamp}.tar.gz";
 $archivePath = rtrim($backupDir, '/') . '/' . $archiveName;
 $tempPath = $archivePath . '.tmp';
 
+/**
+ * @return int archivos borrados
+ */
+$cleanupOldBackups = static function (string $dir, int $currentTs, int $retention) : int {
+    $deleted = 0;
+    $cutoff = $currentTs - ($retention * 86400);
+    $dirItems = @scandir($dir);
+    if (!is_array($dirItems)) {
+        return 0;
+    }
+    foreach ($dirItems as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+        if (!preg_match('/^nammu-(?:stats-)?backup-\d{4}-\d{2}-\d{2}_\d{6}\.tar\.gz(?:\.sha256)?$/', $item)) {
+            continue;
+        }
+        $fullPath = rtrim($dir, '/') . '/' . $item;
+        $mtime = @filemtime($fullPath);
+        if ($mtime !== false && $mtime < $cutoff && @unlink($fullPath)) {
+            $deleted++;
+        }
+    }
+    return $deleted;
+};
+
 $statsFiles = [
     'config/analytics.json',
     'config/gsc-cache.json',
     'config/bing-cache.json',
-    'config/indexnow-log.json',
 ];
 
 foreach (glob($root . '/itinerarios/*/stats.json') ?: [] as $statsPath) {
@@ -64,6 +90,18 @@ $statsFiles = array_values(array_unique(array_filter($statsFiles, static functio
 
 if (empty($statsFiles)) {
     fwrite(STDOUT, "No hay archivos de estadísticas para respaldar.\n");
+    $deleted = $cleanupOldBackups($backupDir, $timestamp, $retentionDays);
+    if ($deleted > 0) {
+        fwrite(STDOUT, "Backups antiguos borrados: {$deleted}\n");
+    }
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
+    exit(0);
+}
+
+if ($cleanupOnly) {
+    $deleted = $cleanupOldBackups($backupDir, $timestamp, $retentionDays);
+    fwrite(STDOUT, "Limpieza completada. Backups antiguos borrados: {$deleted}\n");
     flock($lockHandle, LOCK_UN);
     fclose($lockHandle);
     exit(0);
@@ -112,23 +150,7 @@ if ($hash !== '') {
     @file_put_contents($archivePath . '.sha256', $hash . '  ' . basename($archivePath) . PHP_EOL);
 }
 
-$cutoff = $timestamp - ($retentionDays * 86400);
-$dirItems = @scandir($backupDir);
-if (is_array($dirItems)) {
-    foreach ($dirItems as $item) {
-        if ($item === '.' || $item === '..') {
-            continue;
-        }
-        if (!preg_match('/^nammu-(?:stats-)?backup-\d{4}-\d{2}-\d{2}_\d{6}\.tar\.gz(?:\.sha256)?$/', $item)) {
-            continue;
-        }
-        $fullPath = rtrim($backupDir, '/') . '/' . $item;
-        $mtime = @filemtime($fullPath);
-        if ($mtime !== false && $mtime < $cutoff) {
-            @unlink($fullPath);
-        }
-    }
-}
+$deleted = $cleanupOldBackups($backupDir, $timestamp, $retentionDays);
 
 $summary = [
     'timestamp' => $timestamp,
@@ -143,6 +165,9 @@ $summary = [
 fwrite(STDOUT, "Backup creado: {$archivePath}\n");
 if ($hash !== '') {
     fwrite(STDOUT, "SHA256: {$hash}\n");
+}
+if ($deleted > 0) {
+    fwrite(STDOUT, "Backups antiguos borrados: {$deleted}\n");
 }
 
 flock($lockHandle, LOCK_UN);

@@ -5,9 +5,10 @@
     # Serve WebP variants for JPEG/PNG when supported by the client.
     # Example: /assets/photo.jpg -> /assets/photo.jpg.webp (if exists)
     RewriteCond %{HTTP_ACCEPT} image/webp [NC]
-    RewriteCond %{REQUEST_URI} ^(.+)\.(jpe?g|png)$ [NC]
-    RewriteCond %{DOCUMENT_ROOT}%1.%2.webp -f
-    RewriteRule ^ %1.%2.webp [T=image/webp,E=serve_webp:1,L]
+    RewriteCond %{REQUEST_URI} \.(jpe?g|png)$ [NC]
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteCond %{REQUEST_FILENAME}.webp -f
+    RewriteRule ^ %{REQUEST_URI}.webp [T=image/webp,E=serve_webp:1,L]
 
     # Friendly URLs: delegate RSS to the front controller too
     RewriteRule ^rss\.xml$ index.php [L]

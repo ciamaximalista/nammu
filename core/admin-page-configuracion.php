@@ -34,6 +34,11 @@
                 <?= htmlspecialchars($statsBackupFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
             </div>
         <?php endif; ?>
+        <?php if (isset($fullBackupFeedback) && $fullBackupFeedback !== null): ?>
+            <div class="alert alert-<?= $fullBackupFeedback['type'] === 'success' ? 'success' : 'danger' ?>">
+                <?= htmlspecialchars($fullBackupFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
         <?php
         $telegramSettings = $settings['telegram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
         $telegramAutoEnabled = ($telegramSettings['auto_post'] ?? 'off') === 'on';
@@ -77,6 +82,7 @@
         $contactSignature = ($contactSettings['signature'] ?? 'off') === 'on';
         $contactSignatureFields = is_array($contactSettings['signature_fields'] ?? null) ? $contactSettings['signature_fields'] : [];
         $statsBackups = function_exists('admin_list_stats_backups') ? admin_list_stats_backups(7) : [];
+        $fullBackups = function_exists('admin_list_full_backups') ? admin_list_full_backups(8) : [];
         $languageOptions = [
             'es' => 'Español',
             'ca' => 'Català',
@@ -440,6 +446,38 @@
                 </div>
                 <button type="submit" name="update_account" class="btn btn-outline-primary">Actualizar cuenta</button>
             </form>
+
+            <hr class="my-5">
+            <h3>Backup completo semanal</h3>
+            <p class="text-muted">Incluye <code>content/</code>, <code>assets/</code>, <code>config/</code> y estadísticas. Se conservan las últimas 8 semanas.</p>
+            <?php if (empty($fullBackups)): ?>
+                <p class="text-muted mb-4">Todavía no hay backups completos disponibles.</p>
+            <?php else: ?>
+                <div class="table-responsive mb-4">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Archivo</th>
+                                <th>Fecha</th>
+                                <th>Tamaño</th>
+                                <th class="text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($fullBackups as $backup): ?>
+                                <tr>
+                                    <td><code><?= htmlspecialchars($backup['file'], ENT_QUOTES, 'UTF-8') ?></code></td>
+                                    <td><?= htmlspecialchars(date('d/m/Y H:i:s', (int) ($backup['mtime'] ?? 0)), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td><?= htmlspecialchars(number_format(((int) ($backup['size'] ?? 0)) / 1024 / 1024, 2, ',', '.') . ' MiB', ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td class="text-right">
+                                        <a class="btn btn-sm btn-outline-primary" href="<?= htmlspecialchars($backup['download_url'], ENT_QUOTES, 'UTF-8') ?>">Descargar</a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
 
         </div>
 

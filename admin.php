@@ -98,6 +98,38 @@ function admin_stats_backup_dir(): string {
 }
 
 /**
+ * @return array<int, array{file:string,mtime:int,size:int,label:string,download_url:string}>
+ */
+function admin_list_full_backups(int $limit = 8): array {
+    $dir = admin_stats_backup_dir();
+    if (!is_dir($dir)) {
+        return [];
+    }
+    $files = glob($dir . '/nammu-full-backup-*.tar.gz') ?: [];
+    $items = [];
+    foreach ($files as $fullPath) {
+        $base = basename($fullPath);
+        if (!preg_match('/^nammu-full-backup-\d{4}-\d{2}-\d{2}_\d{6}\.tar\.gz$/', $base)) {
+            continue;
+        }
+        $mtime = (int) (@filemtime($fullPath) ?: 0);
+        $size = (int) (@filesize($fullPath) ?: 0);
+        $items[] = [
+            'file' => $base,
+            'mtime' => $mtime,
+            'size' => $size,
+            'label' => date('d/m/Y H:i:s', $mtime) . ' · ' . number_format($size / 1024 / 1024, 2, ',', '.') . ' MiB',
+            'download_url' => 'admin.php?page=configuracion&download_full_backup=' . rawurlencode($base),
+        ];
+    }
+    usort($items, static fn(array $a, array $b): int => $b['mtime'] <=> $a['mtime']);
+    if ($limit > 0 && count($items) > $limit) {
+        $items = array_slice($items, 0, $limit);
+    }
+    return $items;
+}
+
+/**
  * @return array<int, array{file:string,mtime:int,size:int,label:string}>
  */
 function admin_list_stats_backups(int $maxDays = 7): array {
@@ -5703,6 +5735,12 @@ if (!is_array($statsBackupFeedback) || !isset($statsBackupFeedback['message'], $
 } else {
     unset($_SESSION['stats_backup_feedback']);
 }
+$fullBackupFeedback = $_SESSION['full_backup_feedback'] ?? null;
+if (!is_array($fullBackupFeedback) || !isset($fullBackupFeedback['message'], $fullBackupFeedback['type'])) {
+    $fullBackupFeedback = null;
+} else {
+    unset($_SESSION['full_backup_feedback']);
+}
 $postalFeedback = $_SESSION['postal_feedback'] ?? null;
 if (!is_array($postalFeedback) || !isset($postalFeedback['message'], $postalFeedback['type'])) {
     $postalFeedback = null;
@@ -9342,6 +9380,37 @@ if ($isLoggedIn) {
     $page = $user_exists ? 'login' : 'register';
 }
 $isItineraryAdminPage = in_array($page, ['itinerarios', 'itinerario', 'itinerario-tema'], true);
+
+if ($isLoggedIn && isset($_GET['download_full_backup'])) {
+    $backupFile = trim((string) ($_GET['download_full_backup'] ?? ''));
+    if (!preg_match('/^nammu-full-backup-\d{4}-\d{2}-\d{2}_\d{6}\.tar\.gz$/', $backupFile)) {
+        $_SESSION['full_backup_feedback'] = [
+            'type' => 'danger',
+            'message' => 'Backup inválido.',
+        ];
+        header('Location: admin.php?page=configuracion');
+        exit;
+    }
+    $backupPath = admin_stats_backup_dir() . '/' . $backupFile;
+    if (!is_file($backupPath) || !is_readable($backupPath)) {
+        $_SESSION['full_backup_feedback'] = [
+            'type' => 'danger',
+            'message' => 'No se pudo encontrar el backup solicitado.',
+        ];
+        header('Location: admin.php?page=configuracion');
+        exit;
+    }
+    if (ob_get_length()) {
+        @ob_end_clean();
+    }
+    header('Content-Type: application/gzip');
+    header('Content-Disposition: attachment; filename="' . basename($backupPath) . '"');
+    header('Content-Length: ' . (string) (@filesize($backupPath) ?: 0));
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Pragma: no-cache');
+    readfile($backupPath);
+    exit;
+}
 
 $itinerariesList = [];
 $selectedItinerary = null;

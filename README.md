@@ -78,6 +78,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 - Markdown enriquecido en el panel gracias a una barra de botones que aplica negrita, listas, enlaces, código, citas y atajos para imágenes/vídeos. Incluye atajos de teclado (Ctrl/Cmd+B, Ctrl/Cmd+I, Ctrl/Cmd+K) en el editor de contenidos.
 - Botón **Ideas** en el editor: sugiere temas basados en estadísticas (artículos más leídos, categorías inactivas y búsquedas internas).
 - Integración con Nisaba: inserta notas recientes desde su feed `notas.xml` directamente en el editor.
+- Backups integrados: backup diario de estadísticas y backup completo semanal (content, assets, config e itinerarios), con retención automática y descarga desde el panel.
 
 ## Requisitos mínimos
 
@@ -138,7 +139,7 @@ sudo find . -type f -exec chmod 664 {} \;
 
 Si cediste propiedad al usuario del servidor para que pueda escribir, ejecuta `sudo chown -R <tu-usuario>:www-data .` antes de `git pull` y deshaz el cambio después.
 
-## Backup Diario
+## Backups y cron
 
 Nammu incluye un script CLI de backup diario en `core/backup-daily.php`.
 Este backup guarda **solo estadísticas**:
@@ -157,13 +158,24 @@ php /var/www/html/<carpeta-publica>/core/backup-daily.php
 
 Esto crea un archivo `nammu-stats-backup-AAAA-MM-DD_HHMMSS.tar.gz` en `backups/`, junto con su hash `.sha256` y un resumen `latest-backup.json`.
 
-### Programarlo en cron
+Nammu incluye también un backup completo semanal en `core/backup-weekly.php`, que comprime:
+
+- `content/`
+- `assets/`
+- `config/`
+- `itinerarios/`
+
+Con retención por defecto de 8 semanas y limpieza automática de los más antiguos.
+
+### Programarlo en cron (instalación recomendada)
 
 Ejemplo recomendado:
 
 ```bash
+* * * * * www-data php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
 15 3 * * * www-data php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
 30 3 * * 0 www-data php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
+45 3 * * 0 www-data php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> /var/www/html/<carpeta-publica>/backups/backup-full.log 2>&1
 ```
 
 Puedes cambiar el destino con `--dest=/ruta/de/backups`.

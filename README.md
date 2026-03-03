@@ -144,6 +144,7 @@ Nammu incluye un script CLI de backup diario en `core/backup-daily.php`.
 Este backup guarda **solo estadísticas**:
 
 - `config/analytics.json`
+- `config/analytics.last-good.json`
 - `config/gsc-cache.json`
 - `config/bing-cache.json`
 - `itinerarios/*/stats.json`

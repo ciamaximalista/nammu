@@ -132,43 +132,30 @@ function nammu_analytics_file_path(): string
     return dirname(__DIR__) . '/config/analytics.json';
 }
 
-function nammu_load_analytics(): array
+function nammu_analytics_last_good_file_path(): string
 {
-    $file = nammu_analytics_file_path();
-    if (!is_file($file)) {
-        return [
-            'visitors' => ['daily' => []],
-            'content' => ['posts' => [], 'pages' => []],
-            'itineraries' => ['items' => []],
-            'bots' => ['daily' => []],
-            'sources' => ['daily' => []],
-            'searches' => ['daily' => []],
-            'updated_at' => 0,
-        ];
-    }
-    $raw = file_get_contents($file);
-    if ($raw === false) {
-        return [
-            'visitors' => ['daily' => []],
-            'content' => ['posts' => [], 'pages' => []],
-            'itineraries' => ['items' => []],
-            'bots' => ['daily' => []],
-            'searches' => ['daily' => []],
-            'updated_at' => 0,
-        ];
-    }
+    return dirname(__DIR__) . '/config/analytics.last-good.json';
+}
+
+function nammu_default_analytics_payload(): array
+{
+    return [
+        'visitors' => ['daily' => []],
+        'content' => ['posts' => [], 'pages' => []],
+        'itineraries' => ['items' => []],
+        'platform' => ['daily' => []],
+        'sources' => ['daily' => []],
+        'bots' => ['daily' => []],
+        'searches' => ['daily' => []],
+        'updated_at' => 0,
+    ];
+}
+
+function nammu_decode_analytics_payload(string $raw): ?array
+{
     $decoded = json_decode($raw, true);
     if (!is_array($decoded)) {
-        return [
-            'visitors' => ['daily' => []],
-            'content' => ['posts' => [], 'pages' => []],
-            'itineraries' => ['items' => []],
-            'platform' => ['daily' => []],
-            'sources' => ['daily' => []],
-            'bots' => ['daily' => []],
-            'searches' => ['daily' => []],
-            'updated_at' => 0,
-        ];
+        return null;
     }
     $decoded['visitors'] = $decoded['visitors'] ?? ['daily' => []];
     $decoded['content'] = $decoded['content'] ?? ['posts' => [], 'pages' => []];
@@ -179,6 +166,83 @@ function nammu_load_analytics(): array
     $decoded['searches'] = $decoded['searches'] ?? ['daily' => []];
     $decoded['updated_at'] = (int) ($decoded['updated_at'] ?? 0);
     return $decoded;
+}
+
+function nammu_atomic_write_file(string $file, string $payload): bool
+{
+    $dir = dirname($file);
+    nammu_ensure_directory($dir, 0775);
+    try {
+        $suffix = bin2hex(random_bytes(4));
+    } catch (Throwable $e) {
+        $suffix = dechex((int) (microtime(true) * 1000000));
+    }
+    $tmp = $file . '.tmp-' . getmypid() . '-' . $suffix;
+    $ok = @file_put_contents($tmp, $payload, LOCK_EX);
+    if ($ok === false) {
+        @unlink($tmp);
+        return false;
+    }
+    if (!@rename($tmp, $file)) {
+        @unlink($tmp);
+        return false;
+    }
+    @chmod($file, 0664);
+    return true;
+}
+
+function nammu_load_analytics(): array
+{
+    $file = nammu_analytics_file_path();
+    $lastGood = nammu_analytics_last_good_file_path();
+    if (!is_file($file)) {
+        if (is_file($lastGood)) {
+            $fallbackRaw = @file_get_contents($lastGood);
+            if (is_string($fallbackRaw) && $fallbackRaw !== '') {
+                $fallback = nammu_decode_analytics_payload($fallbackRaw);
+                if (is_array($fallback)) {
+                    error_log('Analytics recovery: analytics.json missing, restoring from analytics.last-good.json');
+                    nammu_atomic_write_file($file, $fallbackRaw);
+                    return $fallback;
+                }
+            }
+        }
+        return nammu_default_analytics_payload();
+    }
+    $raw = @file_get_contents($file);
+    if ($raw === false) {
+        if (is_file($lastGood)) {
+            $fallbackRaw = @file_get_contents($lastGood);
+            if (is_string($fallbackRaw) && $fallbackRaw !== '') {
+                $fallback = nammu_decode_analytics_payload($fallbackRaw);
+                if (is_array($fallback)) {
+                    return $fallback;
+                }
+            }
+        }
+        return nammu_default_analytics_payload();
+    }
+    $decoded = nammu_decode_analytics_payload($raw);
+    if (is_array($decoded)) {
+        // Refresca el backup de último estado válido.
+        if (!is_file($lastGood) || (@filesize($lastGood) ?: 0) === 0 || (int) (@filemtime($lastGood) ?: 0) < (int) (@filemtime($file) ?: 0)) {
+            nammu_atomic_write_file($lastGood, $raw);
+        }
+        return $decoded;
+    }
+    // Si analytics.json está corrupto/truncado, intenta recuperar desde last-good.
+    if (is_file($lastGood)) {
+        $fallbackRaw = @file_get_contents($lastGood);
+        if (is_string($fallbackRaw) && $fallbackRaw !== '') {
+            $fallback = nammu_decode_analytics_payload($fallbackRaw);
+            if (is_array($fallback)) {
+                error_log('Analytics recovery: analytics.json invalid JSON, restoring from analytics.last-good.json');
+                nammu_atomic_write_file($file, $fallbackRaw);
+                return $fallback;
+            }
+        }
+    }
+    return nammu_default_analytics_payload();
 }
 
 function nammu_detect_referrer_source(string $referer, string $host): array
@@ -378,13 +442,16 @@ function nammu_record_bot_visit(string $userAgent): void
 function nammu_save_analytics(array $data): void
 {
     $file = nammu_analytics_file_path();
+    $lastGood = nammu_analytics_last_good_file_path();
     $dir = dirname($file);
     nammu_ensure_directory($dir, 0775);
     $payload = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($payload === false) {
         return;
     }
-    @file_put_contents($file, $payload);
+    if (nammu_atomic_write_file($file, $payload)) {
+        nammu_atomic_write_file($lastGood, $payload);
+    }
 }
 
 function nammu_analytics_touch_visit(array &$data, string $uid, string $date): bool

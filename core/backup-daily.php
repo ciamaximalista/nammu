@@ -73,6 +73,7 @@ $cleanupOldBackups = static function (string $dir, int $currentTs, int $retentio
 
 $statsFiles = [
     'config/analytics.json',
+    'config/analytics.last-good.json',
     'config/gsc-cache.json',
     'config/bing-cache.json',
 ];

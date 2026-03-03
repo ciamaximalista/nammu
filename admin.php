@@ -157,6 +157,7 @@ function admin_restore_stats_backup(string $archiveFile, ?string &$error = null)
     $restored = 0;
     $safeFiles = [
         'config/analytics.json',
+        'config/analytics.last-good.json',
         'config/gsc-cache.json',
         'config/bing-cache.json',
     ];

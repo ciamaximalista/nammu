@@ -1362,7 +1362,7 @@ if (!empty($baseUrl)) {
                 <?php endif; ?>
                 <?php if ($footerNammuEnabled): ?>
                     <div class="footer-nammu-link">
-                        <?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> utiliza <a href="https://ruralnext.org/nammu" target="_blank" rel="noopener">Nammu</a>, un CMS libre desarrollado en <a href="https://ruralnext.org" target="_blank" rel="noopener">RuralNEXT</a> por <a href="https://maximalismo.coop" target="_blank" rel="noopener">Compañía Maximalista S.Coop.</a>
+                        <?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> utiliza <a href="https://ruralnext.org/nammu" target="_blank" rel="noopener">Nammu</a>, un CMS libre desarrollado en <a href="https://ruralnext.org" target="_blank" rel="noopener">RuralNEXT</a> por <a href="https://maximalista.coop/" target="_blank" rel="noopener">Compañía Maximalista S.Coop.</a>
                     </div>
                 <?php endif; ?>
             </footer>

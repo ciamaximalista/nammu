@@ -1542,6 +1542,7 @@ function get_settings() {
         'podcast_image' => '',
         'podcast_category' => 'Technology',
         'twitter' => '',
+        'linkedin' => '',
         'facebook_app_id' => '',
     ];
     $social = array_merge($socialDefaults, $config['social'] ?? []);
@@ -1583,6 +1584,11 @@ function get_settings() {
         'channel' => '',
         'profile' => '',
         'recipient' => '',
+        'auto_post' => 'off',
+    ], $config);
+    $linkedin = admin_extract_social_settings('linkedin', [
+        'token' => '',
+        'author' => '',
         'auto_post' => 'off',
     ], $config);
     $mailingDefaults = [
@@ -1686,6 +1692,7 @@ function get_settings() {
         'bluesky' => $bluesky,
         'mastodon' => $mastodon,
         'instagram' => $instagram,
+        'linkedin' => $linkedin,
         'mailing' => $mailing,
         'postal' => $postal,
         'ads' => $ads,
@@ -2902,6 +2909,11 @@ function admin_cached_social_settings(?string $key = null): array {
                 'recipient' => '',
                 'auto_post' => 'off',
             ], $config),
+            'linkedin' => admin_extract_social_settings('linkedin', [
+                'token' => '',
+                'author' => '',
+                'auto_post' => 'off',
+            ], $config),
         ];
     }
     if ($key === null) {
@@ -2938,6 +2950,8 @@ function admin_is_social_network_configured(string $network, array $settings): b
             return str_contains($handle, '@');
         case 'instagram':
             return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
+        case 'linkedin':
+            return ($settings['token'] ?? '') !== '' && ($settings['author'] ?? '') !== '';
         default:
             return false;
     }
@@ -3158,6 +3172,74 @@ function admin_send_twitter_post(string $slug, string $title, string $descriptio
         'Authorization: Bearer ' . $token,
         'Content-Type: application/json',
     ]);
+}
+
+function admin_send_linkedin_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = '', ?string &$error = null): bool {
+    $token = trim((string) ($settings['token'] ?? ''));
+    $author = trim((string) ($settings['author'] ?? ''));
+    if ($token === '' || $author === '') {
+        return false;
+    }
+    $baseUrl = nammu_base_url();
+    if ($urlOverride !== '') {
+        $postUrl = $urlOverride;
+    } else {
+        $postUrl = rtrim($baseUrl, '/') . '/' . ltrim($slug, '/');
+    }
+    $trackedUrl = admin_add_utm_params($postUrl, [
+        'utm_source' => 'linkedin',
+        'utm_medium' => 'social',
+    ]);
+    $messageTitle = trim($title) !== '' ? trim($title) : $slug;
+    $payload = [
+        'author' => $author,
+        'lifecycleState' => 'PUBLISHED',
+        'specificContent' => [
+            'com.linkedin.ugc.ShareContent' => [
+                'shareCommentary' => [
+                    'text' => $messageTitle . "\n\n" . 'Lee el artículo: ' . $trackedUrl,
+                ],
+                'shareMediaCategory' => 'ARTICLE',
+                'media' => [
+                    [
+                        'status' => 'READY',
+                        'originalUrl' => $trackedUrl,
+                    ],
+                ],
+            ],
+        ],
+        'visibility' => [
+            'com.linkedin.ugc.MemberNetworkVisibility' => 'PUBLIC',
+        ],
+    ];
+    $headers = [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . $token,
+        'X-Restli-Protocol-Version: 2.0.0',
+    ];
+    $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($body) || $body === '') {
+        $error = 'LinkedIn: no se pudo codificar la publicación.';
+        return false;
+    }
+    $headers[] = 'Content-Length: ' . strlen($body);
+    $httpCode = null;
+    $responseBody = admin_http_post_body_response('https://api.linkedin.com/v2/ugcPosts', $body, $headers, $httpCode);
+    if ($responseBody === null || ($httpCode !== null && ($httpCode < 200 || $httpCode >= 300))) {
+        $decoded = is_string($responseBody) ? json_decode($responseBody, true) : null;
+        if (is_array($decoded)) {
+            $message = (string) ($decoded['message'] ?? $decoded['error_description'] ?? $decoded['error'] ?? '');
+            if ($message !== '') {
+                $error = 'LinkedIn: ' . $message;
+            }
+        }
+        if ($error === null || $error === '') {
+            $error = 'LinkedIn: error al publicar.';
+        }
+        error_log('LinkedIn post error: http=' . (string) $httpCode . ' response=' . (string) $responseBody);
+        return false;
+    }
+    return true;
 }
 
 function admin_send_bluesky_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = '', ?string &$error = null): bool {
@@ -4158,6 +4240,9 @@ function admin_maybe_auto_post_to_social_networks(string $filename, string $titl
     }
     if (($settings['twitter']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('twitter', $settings['twitter'])) {
         admin_send_twitter_post($slug, $title, $description, $settings['twitter'], $urlOverride, $imageUrl);
+    }
+    if (($settings['linkedin']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('linkedin', $settings['linkedin'])) {
+        admin_send_linkedin_post($slug, $title, $description, $settings['linkedin'], $urlOverride, $imageUrl);
     }
     if (($settings['bluesky']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('bluesky', $settings['bluesky'])) {
         admin_send_bluesky_post($slug, $title, $description, $settings['bluesky'], $urlOverride, $imageUrl);
@@ -6942,6 +7027,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'telegram' => 'Telegram',
             'facebook' => 'Facebook',
             'twitter' => 'X',
+            'linkedin' => 'LinkedIn',
             'bluesky' => 'Bluesky',
             'mastodon' => 'Mastodon',
             'instagram' => 'Instagram',
@@ -7001,6 +7087,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             case 'twitter':
                                 $sent = admin_send_twitter_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
                                 break;
+                            case 'linkedin':
+                                $sent = admin_send_linkedin_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
+                                break;
                             case 'bluesky':
                                 $sent = admin_send_bluesky_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
                                 break;
@@ -7041,6 +7130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'telegram' => 'Telegram',
             'facebook' => 'Facebook',
             'twitter' => 'X',
+            'linkedin' => 'LinkedIn',
             'bluesky' => 'Bluesky',
             'mastodon' => 'Mastodon',
             'instagram' => 'Instagram',
@@ -7075,6 +7165,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             break;
                         case 'twitter':
                             $sent = admin_send_twitter_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
+                            break;
+                        case 'linkedin':
+                            $sent = admin_send_linkedin_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
                             break;
                         case 'bluesky':
                             $sent = admin_send_bluesky_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
@@ -8341,6 +8434,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($social_twitter !== '' && $social_twitter[0] === '@') {
             $social_twitter = substr($social_twitter, 1);
         }
+        $social_linkedin = trim($_POST['social_linkedin'] ?? '');
         $social_facebook_app_id = trim($_POST['social_facebook_app_id'] ?? '');
         $telegram_token = trim($_POST['telegram_token'] ?? '');
         $telegram_channel = trim($_POST['telegram_channel'] ?? '');
@@ -8352,6 +8446,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $twitter_token = trim($_POST['twitter_token'] ?? '');
         $twitter_channel = trim($_POST['twitter_channel'] ?? '');
         $twitter_auto = isset($_POST['twitter_auto']) ? 'on' : 'off';
+        $linkedin_token = trim($_POST['linkedin_token'] ?? '');
+        $linkedin_author = trim($_POST['linkedin_author'] ?? '');
+        $linkedin_auto = isset($_POST['linkedin_auto']) ? 'on' : 'off';
         $bluesky_service = trim($_POST['bluesky_service'] ?? '');
         $bluesky_identifier = trim($_POST['bluesky_identifier'] ?? '');
         $bluesky_app_password = trim($_POST['bluesky_app_password'] ?? '');
@@ -8378,6 +8475,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'podcast_image' => $social_podcast_image,
                 'podcast_category' => $social_podcast_category,
                 'twitter' => $social_twitter,
+                'linkedin' => $social_linkedin,
                 'facebook_app_id' => $social_facebook_app_id,
             ];
             $hasSocial = array_filter($social, function ($value) {
@@ -8416,6 +8514,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ];
             } else {
                 unset($config['twitter']);
+            }
+            if ($linkedin_token !== '' || $linkedin_author !== '' || $linkedin_auto === 'on') {
+                $config['linkedin'] = [
+                    'token' => $linkedin_token,
+                    'author' => $linkedin_author,
+                    'auto_post' => $linkedin_auto,
+                ];
+            } else {
+                unset($config['linkedin']);
             }
             if ($bluesky_service !== '' || $bluesky_identifier !== '' || $bluesky_app_password !== '' || $bluesky_auto === 'on') {
                 $service = $bluesky_service !== '' ? $bluesky_service : 'https://bsky.social';
@@ -9524,6 +9631,7 @@ $socialDefaults = [
     'podcast_image' => '',
     'podcast_category' => 'Technology',
     'twitter' => '',
+    'linkedin' => '',
     'facebook_app_id' => '',
 ];
 $socialSettings = array_merge($socialDefaults, $settings['social'] ?? []);
@@ -9536,6 +9644,7 @@ if (!in_array($socialPodcastCategory, $socialPodcastCategoryOptions, true)) {
     $socialPodcastCategory = 'Technology';
 }
 $socialTwitter = $socialSettings['twitter'] ?? '';
+$socialLinkedin = $socialSettings['linkedin'] ?? '';
 $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 $nisabaConfig = $settings['nisaba'] ?? [];
 $nisabaUrl = $nisabaConfig['url'] ?? '';

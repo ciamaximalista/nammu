@@ -31,6 +31,8 @@
     }
     $twitterSettings = $settings['twitter'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
     $twitterAutoEnabled = ($twitterSettings['auto_post'] ?? 'off') === 'on';
+    $linkedinSettings = $settings['linkedin'] ?? ['token' => '', 'author' => '', 'auto_post' => 'off'];
+    $linkedinAutoEnabled = ($linkedinSettings['auto_post'] ?? 'off') === 'on';
     $blueskySettings = $settings['bluesky'] ?? ['service' => 'https://bsky.social', 'identifier' => '', 'app_password' => '', 'auto_post' => 'off'];
     $blueskyAutoEnabled = ($blueskySettings['auto_post'] ?? 'off') === 'on';
     $mastodonSettings = $settings['mastodon'] ?? ['instance' => '', 'handle' => '', 'access_token' => '', 'profile' => '', 'auto_post' => 'off'];
@@ -554,6 +556,54 @@
                                         <li>Introduce el token y el usuario o ID de la cuenta.</li>
                                     </ol>
                                     <p class="mb-0">Si el texto supera 280 caracteres se truncará.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h4 class="mt-4">LinkedIn (opcional)</h4>
+                    <p class="text-muted">Publica en LinkedIn con la API oficial usando token y author URN. <a href="#" data-toggle="modal" data-target="#linkedinHelpModal">Ver guía rápida</a></p>
+                    <div class="form-group">
+                        <label for="linkedin_token">Token de acceso</label>
+                        <input type="text" name="linkedin_token" id="linkedin_token" class="form-control" value="<?= htmlspecialchars($linkedinSettings['token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="AQX...">
+                        <small class="form-text text-muted">Debe tener permiso <code>w_member_social</code> (perfil) o <code>w_organization_social</code> (página).</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="linkedin_author">Author URN</label>
+                        <input type="text" name="linkedin_author" id="linkedin_author" class="form-control" value="<?= htmlspecialchars($linkedinSettings['author'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="urn:li:person:xxxx o urn:li:organization:xxxx">
+                    </div>
+                    <div class="form-group">
+                        <label for="social_linkedin">URL pública de perfil o página (footer)</label>
+                        <input type="text" name="social_linkedin" id="social_linkedin" class="form-control" value="<?= htmlspecialchars($socialLinkedin, ENT_QUOTES, 'UTF-8') ?>" placeholder="https://www.linkedin.com/company/tu-proyecto/">
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" name="linkedin_auto" id="linkedin_auto" value="1" <?= $linkedinAutoEnabled ? 'checked' : '' ?>>
+                        <label for="linkedin_auto" class="form-check-label">Enviar automáticamente cada nueva entrada, podcast o itinerario publicado</label>
+                    </div>
+                    <div class="modal fade" id="linkedinHelpModal" tabindex="-1" role="dialog" aria-labelledby="linkedinHelpModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="linkedinHelpModalLabel">Guía rápida para LinkedIn</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <ol class="mb-3">
+                                        <li>En <code>developer.linkedin.com</code>, crea una app y asígnala a tu perfil o página.</li>
+                                        <li>Solicita los permisos necesarios: <code>w_member_social</code> (perfil) o <code>w_organization_social</code> (página).</li>
+                                        <li>Genera un Access Token válido para tu app.</li>
+                                        <li>Obtén el <strong>Author URN</strong>:
+                                            <br>perfil: <code>urn:li:person:ID</code>
+                                            <br>página: <code>urn:li:organization:ID</code>
+                                        </li>
+                                        <li>Pega Token + Author URN aquí y, si quieres icono en footer, añade también la URL pública de tu perfil/página.</li>
+                                    </ol>
+                                    <p class="mb-0">Nammu enviará título y enlace con UTM al publicar contenidos.</p>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>

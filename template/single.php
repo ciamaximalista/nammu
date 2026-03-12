@@ -1300,6 +1300,20 @@ if ($isPageTemplate && $formattedDate !== '') {
         z-index: 2;
     }
     @media (max-width: 640px) {
+        .post {
+            padding-left: 8px;
+            padding-right: 8px;
+        }
+        .post-header,
+        .post-intro,
+        .post-hero,
+        .post-body,
+        .post-toc-block,
+        .post-meta-update,
+        .post-related {
+            max-width: 100%;
+            box-sizing: border-box;
+        }
         .post.post-draft .draft-stamp,
         .post.post-private .draft-stamp {
             top: 0.75rem;

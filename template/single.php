@@ -1018,6 +1018,10 @@ if ($isPageTemplate && $formattedDate !== '') {
     .post-body p {
         margin-top: 0;
     }
+    .post-body > p {
+        text-align: justify;
+        text-justify: inter-word;
+    }
     .post-body ul {
         padding-left: 1.2rem;
     }

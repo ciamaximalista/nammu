@@ -3191,13 +3191,89 @@ function admin_send_linkedin_post(string $slug, string $title, string $descripti
         'utm_medium' => 'social',
     ]);
     $messageTitle = trim($title) !== '' ? trim($title) : $slug;
+    $normalizedAuthor = $author;
+    if (preg_match('/^urn:li:member:(.+)$/', $normalizedAuthor, $match) === 1) {
+        $normalizedAuthor = 'urn:li:person:' . $match[1];
+    } elseif (preg_match('/^urn:li:company:(.+)$/', $normalizedAuthor, $match) === 1) {
+        $normalizedAuthor = 'urn:li:organization:' . $match[1];
+    }
+    if (!preg_match('/^urn:li:(person|organization):[A-Za-z0-9_-]+$/', $normalizedAuthor)) {
+        $error = 'LinkedIn: el Author URN debe ser urn:li:person:ID o urn:li:organization:ID.';
+        return false;
+    }
+    $commentary = $messageTitle . "\n\n" . 'Lee el artículo: ' . $trackedUrl;
+    $legacyAuthor = $normalizedAuthor;
+    if (preg_match('/^urn:li:person:(.+)$/', $legacyAuthor, $match) === 1) {
+        $legacyAuthor = 'urn:li:member:' . $match[1];
+    } elseif (preg_match('/^urn:li:organization:(.+)$/', $legacyAuthor, $match) === 1) {
+        $legacyAuthor = 'urn:li:company:' . $match[1];
+    }
     $payload = [
-        'author' => $author,
+        'author' => $normalizedAuthor,
+        'lifecycleState' => 'PUBLISHED',
+        'visibility' => 'PUBLIC',
+        'distribution' => [
+            'feedDistribution' => 'MAIN_FEED',
+            'targetEntities' => [],
+            'thirdPartyDistributionChannels' => [],
+        ],
+        'content' => [
+            'article' => [
+                'source' => $trackedUrl,
+                'title' => $messageTitle,
+            ],
+        ],
+        'commentary' => $commentary,
+        'isReshareDisabledByAuthor' => false,
+    ];
+    $baseHeaders = [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . $token,
+        'X-Restli-Protocol-Version: 2.0.0',
+    ];
+    $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($body) || $body === '') {
+        $error = 'LinkedIn: no se pudo codificar la publicación.';
+        return false;
+    }
+    $versionCandidates = [];
+    $cursor = new DateTimeImmutable('first day of this month');
+    for ($i = 0; $i < 24; $i++) {
+        $versionCandidates[] = $cursor->format('Ym');
+        $cursor = $cursor->modify('-1 month');
+    }
+    $lastHttpCode = null;
+    $lastResponseBody = null;
+    foreach ($versionCandidates as $version) {
+        $headers = $baseHeaders;
+        $headers[] = 'LinkedIn-Version: ' . $version;
+        $headers[] = 'Content-Length: ' . strlen($body);
+        $httpCode = null;
+        $responseBody = admin_http_post_body_response('https://api.linkedin.com/rest/posts', $body, $headers, $httpCode);
+        $lastHttpCode = $httpCode;
+        $lastResponseBody = $responseBody;
+        if ($responseBody !== null && $httpCode !== null && $httpCode >= 200 && $httpCode < 300) {
+            return true;
+        }
+        $decoded = is_string($responseBody) ? json_decode($responseBody, true) : null;
+        $message = is_array($decoded) ? (string) ($decoded['message'] ?? $decoded['error_description'] ?? $decoded['error'] ?? '') : '';
+        if ($message !== '' && stripos($message, 'Requested version') === false) {
+            $error = 'LinkedIn: ' . $message;
+            error_log('LinkedIn post error: http=' . (string) $httpCode . ' response=' . (string) $responseBody);
+            return false;
+        }
+    }
+    $decoded = is_string($lastResponseBody) ? json_decode($lastResponseBody, true) : null;
+    $lastMessage = is_array($decoded) ? (string) ($decoded['message'] ?? $decoded['error_description'] ?? $decoded['error'] ?? '') : '';
+
+    // Fallback al endpoint clásico, más tolerante en algunas apps.
+    $legacyPayload = [
+        'author' => $legacyAuthor,
         'lifecycleState' => 'PUBLISHED',
         'specificContent' => [
             'com.linkedin.ugc.ShareContent' => [
                 'shareCommentary' => [
-                    'text' => $messageTitle . "\n\n" . 'Lee el artículo: ' . $trackedUrl,
+                    'text' => $commentary,
                 ],
                 'shareMediaCategory' => 'ARTICLE',
                 'media' => [
@@ -3212,34 +3288,35 @@ function admin_send_linkedin_post(string $slug, string $title, string $descripti
             'com.linkedin.ugc.MemberNetworkVisibility' => 'PUBLIC',
         ],
     ];
-    $headers = [
-        'Content-Type: application/json',
-        'Authorization: Bearer ' . $token,
-        'X-Restli-Protocol-Version: 2.0.0',
-    ];
-    $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if (!is_string($body) || $body === '') {
-        $error = 'LinkedIn: no se pudo codificar la publicación.';
-        return false;
-    }
-    $headers[] = 'Content-Length: ' . strlen($body);
-    $httpCode = null;
-    $responseBody = admin_http_post_body_response('https://api.linkedin.com/v2/ugcPosts', $body, $headers, $httpCode);
-    if ($responseBody === null || ($httpCode !== null && ($httpCode < 200 || $httpCode >= 300))) {
-        $decoded = is_string($responseBody) ? json_decode($responseBody, true) : null;
-        if (is_array($decoded)) {
-            $message = (string) ($decoded['message'] ?? $decoded['error_description'] ?? $decoded['error'] ?? '');
-            if ($message !== '') {
-                $error = 'LinkedIn: ' . $message;
-            }
+    $legacyBody = json_encode($legacyPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (is_string($legacyBody) && $legacyBody !== '') {
+        $legacyHeaders = [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $token,
+            'X-Restli-Protocol-Version: 2.0.0',
+            'Content-Length: ' . strlen($legacyBody),
+        ];
+        $legacyHttpCode = null;
+        $legacyResponse = admin_http_post_body_response('https://api.linkedin.com/v2/ugcPosts', $legacyBody, $legacyHeaders, $legacyHttpCode);
+        if ($legacyResponse !== null && $legacyHttpCode !== null && $legacyHttpCode >= 200 && $legacyHttpCode < 300) {
+            return true;
         }
-        if ($error === null || $error === '') {
-            $error = 'LinkedIn: error al publicar.';
+        $legacyDecoded = is_string($legacyResponse) ? json_decode($legacyResponse, true) : null;
+        $legacyMessage = is_array($legacyDecoded) ? (string) ($legacyDecoded['message'] ?? $legacyDecoded['error_description'] ?? $legacyDecoded['error'] ?? '') : '';
+        if ($legacyMessage !== '') {
+            $error = 'LinkedIn: ' . $legacyMessage;
         }
-        error_log('LinkedIn post error: http=' . (string) $httpCode . ' response=' . (string) $responseBody);
-        return false;
+        error_log('LinkedIn legacy post error: http=' . (string) $legacyHttpCode . ' response=' . (string) $legacyResponse);
     }
-    return true;
+
+    if (($error === null || $error === '') && $lastMessage !== '') {
+        $error = 'LinkedIn: ' . $lastMessage;
+    }
+    if ($error === null || $error === '') {
+        $error = 'LinkedIn: error al publicar.';
+    }
+    error_log('LinkedIn post error: http=' . (string) $lastHttpCode . ' response=' . (string) $lastResponseBody);
+    return false;
 }
 
 function admin_send_bluesky_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = '', ?string &$error = null): bool {

@@ -235,12 +235,12 @@ class MarkdownConverter
                 continue;
             }
 
-            $youtubeId = $this->extractYoutubeId($trimmed);
-            if ($youtubeId !== null) {
+            $youtubeEmbed = $this->extractYoutubeEmbedData($trimmed);
+            if ($youtubeEmbed !== null) {
                 $flushParagraph();
                 $closeAllLists();
                 $flushBlockquote();
-                $html[] = $this->renderYoutubeEmbed($youtubeId);
+                $html[] = $this->renderYoutubeEmbed($youtubeEmbed['id'], $youtubeEmbed['start']);
                 continue;
             }
 
@@ -582,7 +582,7 @@ class MarkdownConverter
         return $toc;
     }
 
-    private function extractYoutubeId(string $text): ?string
+    private function extractYoutubeEmbedData(string $text): ?array
     {
         $url = trim($text);
         if ($url === '') {
@@ -595,6 +595,17 @@ class MarkdownConverter
         $host = strtolower($parsed['host']);
         $path = $parsed['path'] ?? '';
         $id = null;
+        $start = 0;
+
+        if (isset($parsed['query'])) {
+            parse_str($parsed['query'], $query);
+            $start = $this->parseYoutubeStartValue($query['t'] ?? $query['start'] ?? null);
+        }
+        if ($start <= 0 && isset($parsed['fragment'])) {
+            parse_str($parsed['fragment'], $fragmentQuery);
+            $fragmentValue = $fragmentQuery['t'] ?? $fragmentQuery['start'] ?? $parsed['fragment'];
+            $start = $this->parseYoutubeStartValue($fragmentValue);
+        }
 
         if (str_contains($host, 'youtube.com')) {
             if (strpos($path, '/watch') === 0 && isset($parsed['query'])) {
@@ -614,12 +625,46 @@ class MarkdownConverter
         }
 
         $id = preg_replace('/[^A-Za-z0-9_\-]/', '', $id);
-        return $id !== '' ? $id : null;
+        if ($id === '') {
+            return null;
+        }
+
+        return [
+            'id' => $id,
+            'start' => max(0, $start),
+        ];
     }
 
-    private function renderYoutubeEmbed(string $videoId): string
+    private function parseYoutubeStartValue($value): int
+    {
+        if ($value === null) {
+            return 0;
+        }
+        if (is_int($value) || (is_string($value) && ctype_digit($value))) {
+            return (int) $value;
+        }
+        if (!is_string($value)) {
+            return 0;
+        }
+        $value = trim($value);
+        if ($value === '') {
+            return 0;
+        }
+        if (preg_match('/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/i', $value, $matches)) {
+            $hours = isset($matches[1]) && $matches[1] !== '' ? (int) $matches[1] : 0;
+            $minutes = isset($matches[2]) && $matches[2] !== '' ? (int) $matches[2] : 0;
+            $seconds = isset($matches[3]) && $matches[3] !== '' ? (int) $matches[3] : 0;
+            return ($hours * 3600) + ($minutes * 60) + $seconds;
+        }
+        return 0;
+    }
+
+    private function renderYoutubeEmbed(string $videoId, int $startSeconds = 0): string
     {
         $src = 'https://www.youtube.com/embed/' . htmlspecialchars($videoId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        if ($startSeconds > 0) {
+            $src .= '?start=' . $startSeconds;
+        }
         return '<div class="embedded-video"><iframe src="' . $src . '" title="YouTube video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>';
     }
 

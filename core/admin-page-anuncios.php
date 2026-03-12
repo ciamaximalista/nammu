@@ -593,17 +593,70 @@
                                     </button>
                                 </div>
                                 <div class="modal-body">
+                                    <h6 class="mb-2">1) Crear y preparar la app</h6>
                                     <ol class="mb-3">
-                                        <li>En <code>developer.linkedin.com</code>, crea una app y asígnala a tu perfil o página.</li>
-                                        <li>Solicita los permisos necesarios: <code>w_member_social</code> (perfil) o <code>w_organization_social</code> (página).</li>
-                                        <li>Genera un Access Token válido para tu app.</li>
-                                        <li>Obtén el <strong>Author URN</strong>:
-                                            <br>perfil: <code>urn:li:person:ID</code>
-                                            <br>página: <code>urn:li:organization:ID</code>
-                                        </li>
-                                        <li>Pega Token + Author URN aquí y, si quieres icono en footer, añade también la URL pública de tu perfil/página.</li>
+                                        <li>Entra en <code>https://developer.linkedin.com/</code> y crea la app.</li>
+                                        <li>Antes de continuar, verifica la app (empresa y correo) para que LinkedIn permita solicitar productos avanzados.</li>
+                                        <li>En <strong>Auth</strong>, añade una Redirect URL exacta (ejemplo: <code>https://tu-dominio/</code>).</li>
+                                        <li>Guarda <strong>Client ID</strong> y <strong>Client Secret</strong> (el Secret no se usa como token ni como URN).</li>
                                     </ol>
-                                    <p class="mb-0">Nammu enviará título y enlace con UTM al publicar contenidos.</p>
+
+                                    <h6 class="mb-2">2) Elegir modo de publicación y permisos</h6>
+                                    <p class="mb-2">Debes elegir si publicarás como perfil personal o como página de empresa:</p>
+                                    <ul class="mb-3">
+                                        <li><strong>Perfil personal</strong>: scopes recomendados <code>openid profile w_member_social</code>.</li>
+                                        <li><strong>Página de empresa</strong>: scopes <code>w_organization_social rw_organization_admin</code> y además tu usuario debe ser admin de la página en LinkedIn.</li>
+                                    </ul>
+                                    <p class="mb-2"><strong>Importante para páginas:</strong> en la pestaña <strong>Products</strong> activa <strong>Community Management API</strong> (si no aparece, la app aún no es elegible).</p>
+                                    <p class="mb-2"><strong>Importante:</strong> para habilitar Community Management API, no debes tener otros productos activos incompatibles en la app. Si LinkedIn no deja activarlo, elimina los productos no necesarios y deja Community Management API como producto principal.</p>
+                                    <p class="mb-2">Community Management API es el que habilita scopes como <code>w_organization_social</code> y <code>rw_organization_admin</code>.</p>
+
+                                    <h6 class="mb-2">3) Obtener authorization code (OAuth)</h6>
+                                    <p class="mb-2">Abre en navegador esta URL (sustituye valores):</p>
+                                    <pre class="bg-light p-2 rounded small mb-2"><code>https://www.linkedin.com/oauth/v2/authorization?response_type=code&amp;client_id=TU_CLIENT_ID&amp;redirect_uri=TU_REDIRECT_URI_URLENCODEADA&amp;scope=openid%20profile%20w_member_social</code></pre>
+                                    <p class="mb-2">Para páginas de empresa cambia <code>scope</code> por:</p>
+                                    <pre class="bg-light p-2 rounded small mb-2"><code>w_organization_social%20rw_organization_admin</code></pre>
+                                    <p class="mb-3">Tras autorizar, LinkedIn redirige a tu URL con <code>?code=...</code>. Copia ese <code>code</code>.</p>
+
+                                    <h6 class="mb-2">4) Cambiar code por access token (curl)</h6>
+                                    <pre class="bg-light p-2 rounded small mb-3"><code>curl -s -X POST https://www.linkedin.com/oauth/v2/accessToken \
+  --data-urlencode grant_type=authorization_code \
+  --data-urlencode code='TU_CODE' \
+  --data-urlencode redirect_uri='TU_REDIRECT_URI' \
+  --data-urlencode client_id='TU_CLIENT_ID' \
+  --data-urlencode client_secret='TU_CLIENT_SECRET'</code></pre>
+                                    <p class="mb-3">El valor <code>access_token</code> de la respuesta es el que debes pegar en Nammu.</p>
+
+                                    <h6 class="mb-2">5) Obtener Author URN</h6>
+                                    <p class="mb-2"><strong>Perfil personal:</strong> con token que incluya <code>openid profile</code> consulta:</p>
+                                    <pre class="bg-light p-2 rounded small mb-2"><code>curl -s -H "Authorization: Bearer TU_ACCESS_TOKEN" \
+  https://api.linkedin.com/v2/userinfo</code></pre>
+                                    <p class="mb-2">Toma el campo <code>sub</code> y construye:</p>
+                                    <pre class="bg-light p-2 rounded small mb-3"><code>urn:li:person:SUB</code></pre>
+
+                                    <p class="mb-2"><strong>Página de empresa:</strong> con token que incluya <code>w_organization_social rw_organization_admin</code> consulta:</p>
+                                    <pre class="bg-light p-2 rounded small mb-2"><code>curl -s \
+  -H "Authorization: Bearer TU_ACCESS_TOKEN" \
+  -H "LinkedIn-Version: 202402" \
+  -H "X-Restli-Protocol-Version: 2.0.0" \
+  "https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&amp;role=ADMINISTRATOR&amp;state=APPROVED"</code></pre>
+                                    <p class="mb-2">Busca <code>organizationalTarget</code> y usa:</p>
+                                    <pre class="bg-light p-2 rounded small mb-3"><code>urn:li:organization:ID_NUMERICO</code></pre>
+
+                                    <h6 class="mb-2">6) Rellenar Nammu</h6>
+                                    <ol class="mb-3">
+                                        <li><strong>Token de acceso</strong>: pega el <code>access_token</code>.</li>
+                                        <li><strong>Author URN</strong>: pega <code>urn:li:person:...</code> o <code>urn:li:organization:...</code>.</li>
+                                        <li><strong>URL pública</strong>: pega tu perfil/página para mostrar el icono en el footer.</li>
+                                        <li>Marca “Enviar automáticamente...” si quieres publicar al crear entradas, podcasts o itinerarios.</li>
+                                    </ol>
+
+                                    <h6 class="mb-2">7) Errores frecuentes</h6>
+                                    <ul class="mb-0">
+                                        <li><code>redirect_uri does not match</code>: la redirect URI no coincide exactamente (incluido slash final).</li>
+                                        <li><code>Invalid Urn Format</code>: estás usando Client ID/Secret como URN. El URN debe ser de persona/organización real.</li>
+                                        <li><code>ACCESS_DENIED</code>: faltan scopes o permisos de admin en la página.</li>
+                                    </ul>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>

@@ -1,0 +1,18 @@
+# Memoria
+
+## Resumen
+Trabajamos para que construyas en una comarca en despoblación una vida mejor que la que te ofrece la ciudad
+
+## Enlaces principales
+- Portada: https://memoria.repoblacion.ong/
+- Sitemap: https://memoria.repoblacion.ong/sitemap.xml
+- RSS: https://memoria.repoblacion.ong/rss.xml
+- Buscador: https://memoria.repoblacion.ong/buscar.php?q={termino}
+
+## Notas para LLMs
+- Usa las URLs canónicas del sitemap.
+- Evita rutas de administración y archivos internos.
+- Prefiere el RSS para contenidos recientes.
+
+## Actualización
+10/03/26

@@ -3583,6 +3583,57 @@ function admin_mastodon_base_url(string $instance): string
     return rtrim($instance, '/');
 }
 
+function admin_mastodon_bold_text(string $text): string
+{
+    $map = [
+        'A' => '𝗔', 'B' => '𝗕', 'C' => '𝗖', 'D' => '𝗗', 'E' => '𝗘', 'F' => '𝗙', 'G' => '𝗚', 'H' => '𝗛', 'I' => '𝗜', 'J' => '𝗝',
+        'K' => '𝗞', 'L' => '𝗟', 'M' => '𝗠', 'N' => '𝗡', 'O' => '𝗢', 'P' => '𝗣', 'Q' => '𝗤', 'R' => '𝗥', 'S' => '𝗦', 'T' => '𝗧',
+        'U' => '𝗨', 'V' => '𝗩', 'W' => '𝗪', 'X' => '𝗫', 'Y' => '𝗬', 'Z' => '𝗭',
+        'a' => '𝗮', 'b' => '𝗯', 'c' => '𝗰', 'd' => '𝗱', 'e' => '𝗲', 'f' => '𝗳', 'g' => '𝗴', 'h' => '𝗵', 'i' => '𝗶', 'j' => '𝗷',
+        'k' => '𝗸', 'l' => '𝗹', 'm' => '𝗺', 'n' => '𝗻', 'o' => '𝗼', 'p' => '𝗽', 'q' => '𝗾', 'r' => '𝗿', 's' => '𝘀', 't' => '𝘁',
+        'u' => '𝘂', 'v' => '𝘃', 'w' => '𝘄', 'x' => '𝘅', 'y' => '𝘆', 'z' => '𝘇',
+        '0' => '𝟬', '1' => '𝟭', '2' => '𝟮', '3' => '𝟯', '4' => '𝟰', '5' => '𝟱', '6' => '𝟲', '7' => '𝟳', '8' => '𝟴', '9' => '𝟵',
+    ];
+    return strtr($text, $map);
+}
+
+function admin_mastodon_trim_status(string $text, int $maxLen = 2000): string
+{
+    $text = trim(preg_replace("/\n{3,}/", "\n\n", $text) ?? $text);
+    if ($text === '') {
+        return '';
+    }
+    $length = function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text);
+    if ($length <= $maxLen) {
+        return $text;
+    }
+
+    $slice = function_exists('mb_substr')
+        ? mb_substr($text, 0, $maxLen, 'UTF-8')
+        : substr($text, 0, $maxLen);
+    $slice = rtrim($slice);
+
+    $bestCut = null;
+    if (preg_match_all('/[.!?](?=(?:["»”’\')\]]|\s|$))/u', $slice, $matches, PREG_OFFSET_CAPTURE)) {
+        $last = end($matches[0]);
+        if (is_array($last) && isset($last[1])) {
+            $bestCut = (int) $last[1] + strlen((string) $last[0]);
+        }
+    }
+
+    if ($bestCut !== null && $bestCut > 0) {
+        $slice = function_exists('mb_substr')
+            ? mb_substr($slice, 0, $bestCut, 'UTF-8')
+            : substr($slice, 0, $bestCut);
+        return trim($slice);
+    }
+
+    if (function_exists('mb_substr')) {
+        return rtrim(mb_substr($slice, 0, max(0, $maxLen - 1), 'UTF-8')) . '…';
+    }
+    return rtrim(substr($slice, 0, max(0, $maxLen - 1))) . '…';
+}
+
 function admin_send_mastodon_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = '', ?string &$error = null): bool
 {
     $instance = admin_mastodon_base_url((string) ($settings['instance'] ?? ''));
@@ -3618,21 +3669,20 @@ function admin_send_mastodon_post(string $slug, string $title, string $descripti
     $parts = [];
     $title = trim($title);
     if ($title !== '') {
-        $parts[] = $title;
+        $parts[] = admin_mastodon_bold_text($title);
     }
     if ($trackedUrl !== '') {
         $parts[] = $trackedUrl;
+    }
+    $description = trim(preg_replace('/\s+/u', ' ', $description) ?? $description);
+    if ($description !== '') {
+        $parts[] = $description;
     }
     $text = trim(implode("\n\n", $parts));
     if ($text === '') {
         $text = 'Nueva publicación disponible';
     }
-    $maxLen = 500;
-    if (function_exists('mb_strlen') && mb_strlen($text, 'UTF-8') > $maxLen) {
-        $text = rtrim(mb_substr($text, 0, $maxLen - 1, 'UTF-8')) . '…';
-    } elseif (strlen($text) > $maxLen) {
-        $text = rtrim(substr($text, 0, $maxLen - 1)) . '…';
-    }
+    $text = admin_mastodon_trim_status($text, 2000);
     $payload = json_encode([
         'status' => $text,
     ]);

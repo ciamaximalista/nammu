@@ -1025,12 +1025,18 @@ if ($isPageTemplate && $formattedDate !== '') {
     .post-body ul {
         padding-left: 1.2rem;
     }
-    .post-body img {
+    .post-body img:not(.nammu-image-vignette) {
         max-width: 100%;
         height: auto;
         border-radius: var(--nammu-radius-md);
         display: block;
         margin: 1.5rem auto;
+    }
+    .post-body img.nammu-image-vignette {
+        height: auto;
+        border-radius: var(--nammu-radius-md);
+        display: block;
+        margin: 0 0 1rem 1.25rem;
     }
     .post-body pre {
         background: <?= $colorCodeBg ?>;
@@ -1353,6 +1359,11 @@ if ($isPageTemplate && $formattedDate !== '') {
         .post-body table,
         .post-body pre {
             max-width: 100% !important;
+        }
+        .post-body img.nammu-image-vignette {
+            width: 100%;
+            max-width: 100%;
+            margin: 0 0 1rem 0;
         }
         .post-body table {
             width: 100%;

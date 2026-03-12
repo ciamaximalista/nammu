@@ -256,8 +256,8 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
         }
         .nammu-image-vignette {
             float: right;
-            width: 112px;
-            max-width: none;
+            width: 33%;
+            max-width: 33%;
             height: auto;
             margin: 0 0 1rem 1.25rem;
             display: block;

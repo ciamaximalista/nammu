@@ -1292,6 +1292,8 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         margin: 0;
         font-size: 1.02rem;
         line-height: 1.65;
+        text-align: justify;
+        text-justify: inter-word;
     }
     .home-pagination {
         margin-top: 2rem;

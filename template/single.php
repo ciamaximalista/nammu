@@ -1167,9 +1167,15 @@ if ($isPageTemplate && $formattedDate !== '') {
         position: relative;
         --pdf-aspect: 1.414;
         overflow: hidden;
+        box-sizing: border-box;
+    }
+    .embedded-video {
+        background: transparent;
+        padding: 0;
+    }
+    .embedded-pdf {
         background: #000;
         padding: 0.5rem;
-        box-sizing: border-box;
     }
     .embedded-pdf__actions {
         display: flex;
@@ -1201,7 +1207,10 @@ if ($isPageTemplate && $formattedDate !== '') {
         border: none;
         border-radius: var(--nammu-radius-md);
         margin: 0 auto;
-        background: #000;
+    }
+    .embedded-video video,
+    .embedded-video iframe {
+        background: transparent;
     }
     .embedded-video video,
     .embedded-video iframe {

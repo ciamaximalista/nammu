@@ -254,6 +254,22 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             text-decoration: underline;
             color: <?= $colorAccent ?>;
         }
+        .nammu-image-vignette {
+            float: right;
+            width: 112px;
+            max-width: none;
+            height: auto;
+            margin: 0 0 1rem 1.25rem;
+            display: block;
+        }
+        @media (max-width: 640px) {
+            .nammu-image-vignette {
+                float: none;
+                width: 100%;
+                max-width: 100%;
+                margin: 0 0 1rem 0;
+            }
+        }
         .site-header-buttons {
             --nammu-header-button-accent: <?= $colorAccent ?>;
             display: flex;

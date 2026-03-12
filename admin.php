@@ -14109,7 +14109,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     if (mode === 'vignette') {
                         var altAttr = altText;
                         var titleAttr = titleText;
-                        snippet = '\n\n<img src="' + source + '" alt="' + altAttr + '"' + (titleAttr ? ' title="' + titleAttr + '"' : '') + ' style="float:right; max-width:33%; margin:0 0 1rem 1rem;" />\n\n';
+                        snippet = '\n\n<img src="' + source + '" alt="' + altAttr + '"' + (titleAttr ? ' title="' + titleAttr + '"' : '') + ' class="nammu-image-vignette" />\n\n';
                     } else {
                         snippet = '\n\n<img src="' + source + '" alt="' + altText + '"' + (titleText ? ' title="' + titleText + '"' : '') + ' />\n\n';
                     }

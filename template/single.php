@@ -1301,10 +1301,13 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     @media (max-width: 640px) {
         .post {
-            padding-left: 8px;
-            padding-right: 8px;
+            padding-left: 6px;
+            padding-right: 10px;
+            min-width: 0;
         }
         .post-header,
+        .post h1,
+        .post-brand,
         .post-intro,
         .post-hero,
         .post-body,
@@ -1312,7 +1315,61 @@ if ($isPageTemplate && $formattedDate !== '') {
         .post-meta-update,
         .post-related {
             max-width: 100%;
+            min-width: 0;
             box-sizing: border-box;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        .post-body {
+            width: auto;
+            padding-left: 6px;
+            padding-right: 10px;
+            overflow-x: hidden;
+        }
+        .post-body > * {
+            max-width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+        }
+        .post-body p,
+        .post-body li,
+        .post-body figcaption,
+        .post-body blockquote,
+        .post-body blockquote p,
+        .post-body h1,
+        .post-body h2,
+        .post-body h3,
+        .post-body h4,
+        .post-body h5,
+        .post-body h6 {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        .post-body img,
+        .post-body iframe,
+        .post-body video,
+        .post-body object,
+        .post-body embed,
+        .post-body table,
+        .post-body pre {
+            max-width: 100% !important;
+        }
+        .post-body table {
+            width: 100%;
+        }
+        .post-body iframe,
+        .post-body video {
+            width: 100%;
+        }
+        .post-body pre,
+        .post-body code {
+            white-space: pre-wrap;
+        }
+        .post-intro,
+        .post-toc-block,
+        .post-meta-update {
+            padding-left: 1rem;
+            padding-right: 1rem;
         }
         .post.post-draft .draft-stamp,
         .post.post-private .draft-stamp {

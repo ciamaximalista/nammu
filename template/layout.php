@@ -847,6 +847,14 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             display: block;
         }
         @media (max-width: 720px) {
+            .wrapper {
+                max-width: none;
+                width: auto;
+                margin-left: 8px;
+                margin-right: 8px;
+                padding: 1rem 0.75rem;
+                box-sizing: border-box;
+            }
             .floating-stack {
                 top: auto;
                 bottom: 1.2rem;

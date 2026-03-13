@@ -45,18 +45,27 @@ $runScheduledOnly = $__nammuRunScheduledOnly;
  * @return array{published:int,notifications_processed:int,notifications_remaining:int}
  */
 function admin_run_scheduled_tasks(): array {
+    if (!function_exists('admin_process_social_rss_feeds') && is_file(__DIR__ . '/core/admin-redes.php')) {
+        require_once __DIR__ . '/core/admin-redes.php';
+    }
     $published = 0;
     $queueStats = ['processed' => 0, 'remaining' => 0];
+    $rssStats = ['sent' => 0, 'checked' => 0];
     if (function_exists('nammu_publish_scheduled_posts')) {
         $published = (int) nammu_publish_scheduled_posts(CONTENT_DIR);
     }
     if (function_exists('nammu_process_scheduled_notifications_queue')) {
         $queueStats = nammu_process_scheduled_notifications_queue();
     }
+    if (function_exists('admin_process_social_rss_feeds')) {
+        $rssStats = admin_process_social_rss_feeds();
+    }
     return [
         'published' => $published,
         'notifications_processed' => (int) ($queueStats['processed'] ?? 0),
         'notifications_remaining' => (int) ($queueStats['remaining'] ?? 0),
+        'social_rss_sent' => (int) ($rssStats['sent'] ?? 0),
+        'social_rss_checked' => (int) ($rssStats['checked'] ?? 0),
     ];
 }
 
@@ -9613,6 +9622,18 @@ if ($isLoggedIn) {
 } else {
     $page = $user_exists ? 'login' : 'register';
 }
+$socialBroadcastFeedback = null;
+$socialBroadcastText = '';
+if ($isLoggedIn && $page === 'redes') {
+    require_once __DIR__ . '/core/admin-redes.php';
+    $socialBroadcastState = admin_handle_social_broadcast_request(get_settings());
+    $socialBroadcastFeedback = $socialBroadcastState['feedback'] ?? null;
+    $socialBroadcastText = (string) ($socialBroadcastState['message_text'] ?? '');
+    $socialRssState = admin_handle_social_rss_settings_request(get_settings());
+    $socialRssFeedback = $socialRssState['feedback'] ?? null;
+    $socialRssFeedsRaw = (string) ($socialRssState['feeds_raw'] ?? '');
+    $socialRssNetworks = is_array($socialRssState['networks'] ?? null) ? $socialRssState['networks'] : [];
+}
 $isItineraryAdminPage = in_array($page, ['itinerarios', 'itinerario', 'itinerario-tema'], true);
 
 if ($isLoggedIn && isset($_GET['download_full_backup'])) {
@@ -11433,6 +11454,17 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                                     </a>
                                 </li>
 
+                                <li class="nav-item <?= $page === 'redes' ? 'active' : '' ?>">
+                                    <a class="nav-link" href="?page=redes" title="Redes" aria-label="Redes">
+                                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                            <circle cx="6" cy="12" r="2" fill="currentColor"/>
+                                            <circle cx="18" cy="6" r="2" fill="currentColor"/>
+                                            <circle cx="18" cy="18" r="2" fill="currentColor"/>
+                                            <path d="M7.8 11.1l8.4-4.2M7.8 12.9l8.4 4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        </svg>
+                                    </a>
+                                </li>
+
                                 <li class="nav-item <?= $page === 'configuracion' ? 'active' : '' ?>">
                                     <a class="nav-link" href="?page=configuracion" title="Configuración" aria-label="Configuración">
                                         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -11508,6 +11540,10 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 <?php elseif ($page === 'anuncios'): ?>
 
     <?php include __DIR__ . '/core/admin-page-anuncios.php'; ?>
+
+<?php elseif ($page === 'redes'): ?>
+
+    <?php include __DIR__ . '/core/admin-page-redes.php'; ?>
 
 <?php elseif ($page === 'configuracion'): ?>
 

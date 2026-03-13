@@ -1,0 +1,180 @@
+<?php if ($page === 'redes'): ?>
+    <?php
+    $settings = get_settings();
+    $availableNetworks = admin_social_broadcast_available_networks($settings);
+    $labels = admin_social_broadcast_labels();
+    $rssConfig = admin_social_rss_settings($settings);
+    $cronCommand = '*/5 * * * * www-data php ' . __DIR__ . '/../admin.php --run-scheduled';
+    ?>
+    <div class="tab-pane active">
+        <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+            <div>
+                <h2 class="mb-1">Redes</h2>
+                <p class="text-muted mb-0">Escribe un mensaje manual y envíalo a las redes sociales que ya tengas configuradas.</p>
+            </div>
+        </div>
+
+        <?php if (!empty($socialBroadcastFeedback)): ?>
+            <div class="alert alert-<?= htmlspecialchars($socialBroadcastFeedback['type'] ?? 'info', ENT_QUOTES, 'UTF-8') ?>">
+                <?= htmlspecialchars($socialBroadcastFeedback['message'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
+
+        <form method="post" class="mb-4">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h3 class="h5 mb-3">Enviar mensaje</h3>
+                    <div class="row">
+                        <div class="col-lg-8 mb-3 mb-lg-0">
+                            <label for="social_broadcast_text">Mensaje</label>
+                            <textarea
+                                name="social_broadcast_text"
+                                id="social_broadcast_text"
+                                class="form-control"
+                                rows="10"
+                                maxlength="63206"
+                                placeholder="Escribe aquí el mensaje para tus redes sociales."
+                            ><?= htmlspecialchars($socialBroadcastText ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
+                            <div class="d-flex justify-content-end mt-2">
+                                <small class="text-muted">
+                                    <span id="social_broadcast_count">0</span> caracteres
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <label class="d-block">Redes configuradas</label>
+                            <?php if (!empty($availableNetworks)): ?>
+                                <div class="border rounded p-3 h-100">
+                                    <?php foreach ($availableNetworks as $networkKey => $networkData): ?>
+                                        <div class="form-check mb-3 social-network-option" data-limit="<?= (int) $networkData['limit'] ?>">
+                                            <input class="form-check-input" type="checkbox" name="social_networks[]" id="social_network_<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>">
+                                            <label class="form-check-label d-block" for="social_network_<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>">
+                                                <strong><?= htmlspecialchars($networkData['label'], ENT_QUOTES, 'UTF-8') ?></strong><br>
+                                                <small class="text-muted">Máximo: <?= (int) $networkData['limit'] ?> caracteres</small>
+                                            </label>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="alert alert-secondary mb-0">No hay redes configuradas todavía.</div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <button type="submit" name="send_social_broadcast" class="btn btn-primary mt-3">Enviar</button>
+                </div>
+            </div>
+        </form>
+
+        <div class="card">
+            <div class="card-body">
+                <h3 class="h5 mb-3">Estado de la configuración</h3>
+                <?php if (!empty($availableNetworks)): ?>
+                    <div class="row">
+                        <?php foreach ($labels as $networkKey => $networkLabel): ?>
+                            <?php $isConfigured = isset($availableNetworks[$networkKey]); ?>
+                            <div class="col-md-6 col-xl-4 mb-3">
+                                <div class="border rounded p-3 h-100">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <strong><?= htmlspecialchars($networkLabel, ENT_QUOTES, 'UTF-8') ?></strong>
+                                        <span class="badge badge-<?= $isConfigured ? 'success' : 'secondary' ?>">
+                                            <?= $isConfigured ? 'Configurada' : 'No configurada' ?>
+                                        </span>
+                                    </div>
+                                    <div class="mt-2 text-muted small">
+                                        Máximo: <?= (int) (admin_social_broadcast_limits()[$networkKey] ?? 0) ?> caracteres
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="alert alert-secondary mb-0">
+                        Configura primero tus redes en <a href="admin.php?page=anuncios">Difusión</a>.
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <form method="post" class="mt-4">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="h5 mb-3">RSS automáticas</h3>
+                    <?php if (!empty($socialRssFeedback)): ?>
+                        <div class="alert alert-<?= htmlspecialchars($socialRssFeedback['type'] ?? 'info', ENT_QUOTES, 'UTF-8') ?>">
+                            <?= htmlspecialchars($socialRssFeedback['message'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+                        </div>
+                    <?php endif; ?>
+                    <div class="form-group">
+                        <label for="social_rss_feeds">Feeds RSS</label>
+                        <textarea
+                            name="social_rss_feeds"
+                            id="social_rss_feeds"
+                            class="form-control"
+                            rows="6"
+                            placeholder="Una URL RSS por línea"
+                        ><?= htmlspecialchars($socialRssFeedsRaw ?? $rssConfig['feeds'], ENT_QUOTES, 'UTF-8') ?></textarea>
+                        <small class="form-text text-muted">Añade una URL RSS o Atom por línea. Cuando aparezca una entrada nueva, Nammu enviará automáticamente su título y su enlace.</small>
+                    </div>
+
+                    <label class="d-block">Redes de destino</label>
+                    <?php if (!empty($availableNetworks)): ?>
+                        <div class="row">
+                            <?php foreach ($availableNetworks as $networkKey => $networkData): ?>
+                                <?php $checked = in_array($networkKey, $socialRssNetworks ?? $rssConfig['networks'], true); ?>
+                                <div class="col-md-6 col-xl-4 mb-3">
+                                    <div class="form-check border rounded p-3 h-100">
+                                        <input class="form-check-input" type="checkbox" name="social_rss_networks[]" id="social_rss_network_<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>" <?= $checked ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="social_rss_network_<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>">
+                                            <strong><?= htmlspecialchars($networkData['label'], ENT_QUOTES, 'UTF-8') ?></strong><br>
+                                            <small class="text-muted">Enviará título + enlace</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="alert alert-secondary">Configura primero al menos una red en <a href="admin.php?page=anuncios">Difusión</a>.</div>
+                    <?php endif; ?>
+
+                    <div class="form-group mt-3">
+                        <label for="social_rss_cron">Instrucción para el cron</label>
+                        <input type="text" id="social_rss_cron" class="form-control" value="<?= htmlspecialchars($cronCommand, ENT_QUOTES, 'UTF-8') ?>" readonly>
+                        <small class="form-text text-muted">Añade esta línea al cron para que el chequeo y el envío se ejecuten cada 5 minutos.</small>
+                    </div>
+
+                    <button type="submit" name="save_social_rss_settings" class="btn btn-outline-primary">Guardar RSS automáticas</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <style>
+        .social-network-option.is-over-limit {
+            opacity: 0.55;
+        }
+        .social-network-option.is-over-limit strong,
+        .social-network-option.is-over-limit small {
+            color: #b02a37 !important;
+        }
+    </style>
+    <script>
+        (function () {
+            var textarea = document.getElementById('social_broadcast_text');
+            var counter = document.getElementById('social_broadcast_count');
+            if (!textarea || !counter) {
+                return;
+            }
+            var options = Array.prototype.slice.call(document.querySelectorAll('.social-network-option'));
+            var update = function () {
+                var length = textarea.value.length;
+                counter.textContent = String(length);
+                options.forEach(function (option) {
+                    var limit = parseInt(option.getAttribute('data-limit') || '0', 10);
+                    option.classList.toggle('is-over-limit', limit > 0 && length > limit);
+                });
+            };
+            textarea.addEventListener('input', update);
+            update();
+        }());
+    </script>
+<?php endif; ?>

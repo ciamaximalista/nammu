@@ -3050,12 +3050,48 @@ function admin_get_bluesky_follower_count(array $settings): ?int {
     if ($identifier === '') {
         return null;
     }
-    $endpoint = $service . '/xrpc/app.bsky.actor.getProfile?actor=' . rawurlencode($identifier);
-    $payload = admin_http_get_json($endpoint);
-    if (!is_array($payload) || !isset($payload['followersCount'])) {
+    $profilePayload = admin_http_get_json($service . '/xrpc/app.bsky.actor.getProfile?actor=' . rawurlencode($identifier));
+    if (is_array($profilePayload) && isset($profilePayload['followersCount'])) {
+        return (int) $profilePayload['followersCount'];
+    }
+
+    $appPassword = trim((string) ($settings['app_password'] ?? ''));
+    $appPassword = preg_replace('/\s+/', '', $appPassword);
+    if ($appPassword === '') {
         return null;
     }
-    return (int) $payload['followersCount'];
+    $sessionPayload = json_encode([
+        'identifier' => $identifier,
+        'password' => $appPassword,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($sessionPayload) || $sessionPayload === '') {
+        return null;
+    }
+    $sessionHeaders = [
+        'Content-Type: application/json',
+        'Content-Length: ' . strlen($sessionPayload),
+    ];
+    $sessionCode = null;
+    $sessionResponse = admin_http_post_body_response($service . '/xrpc/com.atproto.server.createSession', $sessionPayload, $sessionHeaders, $sessionCode);
+    if ($sessionResponse === null || $sessionCode === null || $sessionCode < 200 || $sessionCode >= 300) {
+        return null;
+    }
+    $session = json_decode($sessionResponse, true);
+    if (!is_array($session) || empty($session['did']) || empty($session['accessJwt'])) {
+        return null;
+    }
+    $did = trim((string) $session['did']);
+    if ($did === '') {
+        return null;
+    }
+    $authHeaders = [
+        'Authorization: Bearer ' . $session['accessJwt'],
+    ];
+    $profilePayload = admin_http_get_json($service . '/xrpc/app.bsky.actor.getProfile?actor=' . rawurlencode($did), $authHeaders);
+    if (!is_array($profilePayload) || !isset($profilePayload['followersCount'])) {
+        return null;
+    }
+    return (int) $profilePayload['followersCount'];
 }
 
 function admin_get_mastodon_follower_count(array $settings): ?int {

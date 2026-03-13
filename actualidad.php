@@ -137,10 +137,18 @@ usort($items, static function (array $a, array $b): int {
     return ($b['timestamp'] ?? 0) <=> ($a['timestamp'] ?? 0);
 });
 $cutoffTimestamp = time() - (4 * 86400);
-$items = array_values(array_filter($items, static function (array $item) use ($cutoffTimestamp): bool {
+$recentItems = array_values(array_filter($items, static function (array $item) use ($cutoffTimestamp): bool {
     $timestamp = (int) ($item['timestamp'] ?? 0);
     return $timestamp <= 0 || $timestamp >= $cutoffTimestamp;
 }));
+$olderItems = array_values(array_filter($items, static function (array $item) use ($cutoffTimestamp): bool {
+    $timestamp = (int) ($item['timestamp'] ?? 0);
+    return $timestamp > 0 && $timestamp < $cutoffTimestamp;
+}));
+if (count($recentItems) % 2 === 1 && !empty($olderItems)) {
+    $recentItems[] = $olderItems[0];
+}
+$items = $recentItems;
 $items = nammu_actuality_enrich_items($items, $publicBaseUrl);
 
 $content = $renderer->render('actuality', [

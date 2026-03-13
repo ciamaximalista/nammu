@@ -61,7 +61,9 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 
 ### Automatización, lista de correo y redes sociales
 
-- Integración opcional con Telegram, Facebook Pages y Twitter/X: auto-posting al publicar o envío manual desde la tabla de “Editar”.
+- Integración opcional con Telegram, Facebook Pages, Twitter/X, Bluesky, Mastodon y LinkedIn: auto-posting al publicar o envío manual desde la tabla de “Editar”.
+- Nueva pestaña **Redes** en el admin para redactar mensajes manuales, ver contador de caracteres y enviarlos a varias redes configuradas a la vez, mostrando el límite propio de cada plataforma.
+- Automatización por RSS externas desde la pestaña **Redes**: añade feeds RSS/Atom y elige a qué redes sociales se reenviarán automáticamente los nuevos contenidos detectados.
 - Plantillas de mensaje consistentes (título, descripción y URL pública) con escape apropiado para HTML o texto plano.
 - Feedback inmediato en la UI usando `$_SESSION['social_feedback']`.
 - Footer con enlaces sociales/plataformas y acceso directo a AntennaPod (deeplink al `podcast.xml`) cuando hay podcast publicado.
@@ -172,11 +174,13 @@ Con retención por defecto de 8 semanas y limpieza automática de los más antig
 Ejemplo recomendado:
 
 ```bash
-* * * * * www-data php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
+*/5 * * * * www-data php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
 15 3 * * * www-data php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
 30 3 * * 0 www-data php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
 45 3 * * 0 www-data php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> /var/www/html/<carpeta-publica>/backups/backup-full.log 2>&1
 ```
+
+La tarea `admin.php --run-scheduled` publica contenidos programados, procesa colas pendientes y revisa las RSS externas configuradas en la pestaña **Redes** para reenviar novedades a redes sociales.
 
 Puedes cambiar el destino con `--dest=/ruta/de/backups`.
 
@@ -206,6 +210,7 @@ tar -xzf /var/www/html/<carpeta-publica>/backups/nammu-stats-backup-AAAA-MM-DD_H
 - **Plantilla**: controla tipografías, colores, cabeceras, comportamiento del buscador (posición y modo flotante), TOC por defecto y número de entradas por home.
 - **Itinerarios**: crea portadas, define clase (Libro, Curso, Colección, Otros), lógica de uso, quizzes y estadísticas. Cada tema puede añadirse, duplicarse o borrarse desde la misma pestaña.
 - **Configuración**: modo blog/diccionario, búsqueda avanzada, nombre del sitio, autor, redes sociales, API de Google Fonts, correo de lista (Gmail + OAuth) y cambio de contraseña.
+- **Redes**: envío manual de mensajes a varias redes a la vez y configuración de RSS externas para reenvío automático de novedades.
 
 El modal “Insertar recurso” que aparece en Publicar, Editar e Itinerarios comparte el mismo buscador, así que puedes localizar imágenes etiquetadas sin salir del formulario.
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
 require_once __DIR__ . '/core/admin-redes.php';
+require_once __DIR__ . '/core/actualidad.php';
 
 use Nammu\Core\ContentRepository;
 use Nammu\Core\MarkdownConverter;
@@ -136,6 +137,7 @@ usort($items, static function (array $a, array $b): int {
     return ($b['timestamp'] ?? 0) <=> ($a['timestamp'] ?? 0);
 });
 $items = array_slice($items, 0, 60);
+$items = nammu_actuality_enrich_items($items, $publicBaseUrl);
 
 $content = $renderer->render('actuality', [
     'items' => $items,

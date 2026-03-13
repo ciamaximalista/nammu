@@ -66,7 +66,7 @@ $formatDate = static function (int $timestamp): string {
         <h1>Actualidad</h1>
         <p>
             <?php if ($feedsCount > 0): ?>
-                Noticias agregadas automáticamente desde <?= htmlspecialchars((string) $feedsCount, ENT_QUOTES, 'UTF-8') ?> feed<?= $feedsCount === 1 ? '' : 's' ?> configurada<?= $feedsCount === 1 ? '' : 's' ?>.
+                Selección de fuentes de <?= htmlspecialchars($theme['blog'] !== '' ? $theme['blog'] : $siteTitle, ENT_QUOTES, 'UTF-8') ?>.
             <?php else: ?>
                 No hay feeds automáticas configuradas todavía.
             <?php endif; ?>

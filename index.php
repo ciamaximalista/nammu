@@ -305,6 +305,9 @@ if (!$isLettersIndex && preg_match('#^/letra/([^/]+)/?$#i', $routePath, $matchLe
 }
 $buildSitemapEntries = static function (array $posts, array $theme, string $publicBaseUrl) use ($itineraryListing, $buildItineraryUrl, $buildItineraryTopicUrl, $isAlphabeticalOrder, $hasPodcast, $podcastItems): array {
     $entries = [];
+    $config = nammu_load_config();
+    $socialRssConfig = is_array($config['social_rss'] ?? null) ? $config['social_rss'] : [];
+    $hasActuality = trim((string) ($socialRssConfig['feeds'] ?? '')) !== '';
     $timestampFromPost = static function (Post $post): ?int {
         $date = $post->getDate();
         if ($date) {
@@ -481,6 +484,15 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
             'lastmod' => $latestPodcastTimestamp !== null ? gmdate('c', $latestPodcastTimestamp) : ($latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null),
             'changefreq' => 'weekly',
             'priority' => 0.7,
+        ];
+    }
+
+    if ($hasActuality) {
+        $entries[] = [
+            'loc' => '/actualidad.php',
+            'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
+            'changefreq' => 'hourly',
+            'priority' => 0.6,
         ];
     }
 

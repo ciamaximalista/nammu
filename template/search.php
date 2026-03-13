@@ -26,6 +26,8 @@ $hasItineraries = !empty($hasItineraries);
 $podcastIndexUrl = $podcastIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/podcast' : '/podcast');
 $hasPodcast = !empty($hasPodcast);
 $hasCategories = !empty($hasCategories);
+$newslettersIndexUrl = $newslettersIndexUrl ?? ($GLOBALS['newslettersIndexUrl'] ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl ?? '/', '/') . '/newsletters' : '/newsletters'));
+$hasNewsletters = !empty($hasNewsletters ?? ($GLOBALS['hasNewsletters'] ?? false));
 $homeSettings = $theme['home'] ?? [];
 $headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
 $showHeaderButtons = in_array($headerButtonsMode, ['home', 'both'], true);
@@ -42,12 +44,16 @@ if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
         'categories_url' => $categoriesIndexUrl,
         'itineraries_url' => $itinerariesIndexUrl,
         'podcast_url' => $podcastIndexUrl,
+        'letters_url' => $letterIndexUrlValue,
+        'show_letters' => $showLetterButton,
+        'newsletters_url' => $newslettersIndexUrl,
         'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php',
         'postal_url' => $postalUrl,
         'postal_svg' => $postalLogoSvg,
         'has_categories' => $hasCategories,
         'has_itineraries' => $hasItineraries,
         'has_podcast' => $hasPodcast,
+        'has_newsletters' => $hasNewsletters,
         'subscription_enabled' => $subscriptionModeForButtons !== 'none',
         'postal_enabled' => $postalEnabled,
     ]);

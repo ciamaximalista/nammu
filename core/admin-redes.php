@@ -88,11 +88,49 @@ function admin_fetch_social_rss_items(string $url): array
     }
     $items = [];
     if (isset($xml->channel->item)) {
+        $namespaces = $xml->getNamespaces(true);
         foreach ($xml->channel->item as $item) {
             $title = trim((string) ($item->title ?? ''));
             $link = trim((string) ($item->link ?? ''));
             $guid = trim((string) ($item->guid ?? ''));
             $pubDate = trim((string) ($item->pubDate ?? ''));
+            $description = trim((string) ($item->description ?? ''));
+            $image = '';
+            if (isset($item->enclosure)) {
+                foreach ($item->enclosure as $enclosure) {
+                    $type = strtolower(trim((string) ($enclosure['type'] ?? '')));
+                    $candidate = trim((string) ($enclosure['url'] ?? ''));
+                    if ($candidate !== '' && ($type === '' || str_starts_with($type, 'image/'))) {
+                        $image = $candidate;
+                        break;
+                    }
+                }
+            }
+            if ($image === '' && isset($namespaces['media'])) {
+                $media = $item->children($namespaces['media']);
+                if (isset($media->content)) {
+                    foreach ($media->content as $mediaContent) {
+                        $candidate = trim((string) ($mediaContent['url'] ?? ''));
+                        $type = strtolower(trim((string) ($mediaContent['type'] ?? '')));
+                        if ($candidate !== '' && ($type === '' || str_starts_with($type, 'image/'))) {
+                            $image = $candidate;
+                            break;
+                        }
+                    }
+                }
+                if ($image === '' && isset($media->thumbnail)) {
+                    foreach ($media->thumbnail as $thumbnail) {
+                        $candidate = trim((string) ($thumbnail['url'] ?? ''));
+                        if ($candidate !== '') {
+                            $image = $candidate;
+                            break;
+                        }
+                    }
+                }
+            }
+            if ($image === '' && preg_match('/<img[^>]+src=["\']([^"\']+)["\']/i', $description, $imageMatch)) {
+                $image = trim((string) ($imageMatch[1] ?? ''));
+            }
             $keyBase = $guid !== '' ? $guid : ($link !== '' ? $link : $title);
             if ($keyBase === '' || $link === '') {
                 continue;
@@ -101,6 +139,8 @@ function admin_fetch_social_rss_items(string $url): array
                 'key' => sha1($keyBase),
                 'title' => $title,
                 'link' => $link,
+                'description' => $description,
+                'image' => $image,
                 'timestamp' => $pubDate !== '' ? (int) (strtotime($pubDate) ?: 0) : 0,
             ];
         }
@@ -119,6 +159,10 @@ function admin_fetch_social_rss_items(string $url): array
             }
             $guid = trim((string) ($entry->id ?? ''));
             $updated = trim((string) ($entry->updated ?? ''));
+            $summary = trim((string) ($entry->summary ?? ''));
+            if ($summary === '') {
+                $summary = trim((string) ($entry->content ?? ''));
+            }
             $keyBase = $guid !== '' ? $guid : ($link !== '' ? $link : $title);
             if ($keyBase === '' || $link === '') {
                 continue;
@@ -127,6 +171,8 @@ function admin_fetch_social_rss_items(string $url): array
                 'key' => sha1($keyBase),
                 'title' => $title,
                 'link' => $link,
+                'description' => $summary,
+                'image' => '',
                 'timestamp' => $updated !== '' ? (int) (strtotime($updated) ?: 0) : 0,
             ];
         }

@@ -128,83 +128,37 @@ if ($subscriptionSuccess) {
 $postalEnabled = $postalEnabled ?? false;
 $postalUrl = $postalUrl ?? '/correos.php';
 $postalLogoSvg = $postalLogoSvg ?? '';
+$actualityUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/actualidad.php';
+$actualityConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
+$actualityRssConfig = is_array($actualityConfig['social_rss'] ?? null) ? $actualityConfig['social_rss'] : [];
+$hasActuality = trim((string) ($actualityRssConfig['feeds'] ?? '')) !== '';
 $hasPaginationLeft = $subscriptionEnabled || ($postalEnabled && $postalLogoSvg !== '');
 $homeUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/';
-$renderHeaderButtons = static function () use ($homeUrl, $searchAction, $showLetterButton, $letterIndexUrlValue, $hasCategories, $categoriesIndexUrl, $hasItineraries, $itinerariesIndexUrl, $hasPodcast, $podcastIndexUrl, $hasNewsletters, $newslettersIndexUrl, $subscriptionEnabled, $avisosUrl, $postalEnabled, $postalUrl, $postalLogoSvg, $accentColor, $highlight, $accentBorder): string {
-    $items = [];
-    $items[] = [
-        'label' => 'Portada',
-        'href' => $homeUrl,
-        'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 11.5L12 4L21 11.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>',
-    ];
-    if ($showLetterButton && !empty($letterIndexUrlValue)) {
-        $items[] = [
-            'label' => 'Letras',
-            'href' => $letterIndexUrlValue,
-            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 18L9 6H10.5L14.5 18M6.2 14H13.2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 7H21M16 12H20M16 17H21" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
-        ];
-    }
-    if ($hasCategories) {
-        $items[] = [
-            'label' => 'Categorías',
-            'href' => $categoriesIndexUrl,
-            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="#fff" stroke-width="2"/><line x1="8" y1="9" x2="16" y2="9" stroke="#fff" stroke-width="2"/><line x1="8" y1="13" x2="16" y2="13" stroke="#fff" stroke-width="2"/></svg>',
-        ];
-    }
-    if (!empty($hasPodcast) && !empty($podcastIndexUrl)) {
-        $items[] = [
-            'label' => 'Podcast',
-            'href' => $podcastIndexUrl,
-            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="3" width="6" height="10" rx="3" stroke="#fff" stroke-width="2"/><path d="M5 11C5 14.866 8.134 18 12 18C15.866 18 19 14.866 19 11" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="18" x2="12" y2="22" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="22" x2="16" y2="22" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
-        ];
-    }
-    if (!empty($hasItineraries) && !empty($itinerariesIndexUrl)) {
-        $items[] = [
-            'label' => 'Itinerarios',
-            'href' => $itinerariesIndexUrl,
-            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 5H10C11.1046 5 12 5.89543 12 7V19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M20 5H14C12.8954 5 12 5.89543 12 7V19H20C21.1046 19 22 18.1046 22 17V7C22 5.89543 21.1046 5 20 5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><line x1="12" y1="7" x2="12" y2="19" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
-        ];
-    }
-    if (!empty($hasNewsletters) && !empty($newslettersIndexUrl)) {
-        $items[] = [
-            'label' => 'Newsletters',
-            'href' => $newslettersIndexUrl,
-            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" stroke="#fff" stroke-width="2"/><path d="M15 3v4h4" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="8" y1="11" x2="16" y2="11" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="15" x2="16" y2="15" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
-        ];
-    }
-    if ($subscriptionEnabled) {
-        $items[] = [
-            'label' => 'Suscripción a Avisos y Newsletter',
-            'href' => $avisosUrl,
-            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="14" rx="2" stroke="#fff" stroke-width="2"/><polyline points="3,7 12,13 21,7" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-        ];
-    }
-    if ($postalEnabled && $postalLogoSvg !== '') {
-        $items[] = [
-            'label' => 'Suscripción a envíos postales',
-            'href' => $postalUrl,
-            'svg' => $postalLogoSvg,
-        ];
-    }
-    $items[] = [
-        'label' => 'Buscar',
-        'href' => $searchAction,
-        'svg' => '<svg width="20" height="20" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6" stroke="#fff" stroke-width="2"/><line x1="12.5" y1="12.5" x2="17" y2="17" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
-    ];
-    if (empty($items)) {
-        return '';
-    }
-    ob_start(); ?>
-    <div class="home-header-buttons">
-        <?php foreach ($items as $item): ?>
-            <a class="home-header-button-link" href="<?= htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>">
-                <?= $item['svg'] ?>
-            </a>
-        <?php endforeach; ?>
-    </div>
-    <?php
-    return (string) ob_get_clean();
-};
+$headerButtonsHtml = '';
+if (function_exists('nammu_render_header_buttons')) {
+    $headerButtonsHtml = nammu_render_header_buttons([
+        'accent' => $colors['accent'] ?? '#0a4c8a',
+        'home_url' => $homeUrl,
+        'search_url' => $searchAction,
+        'categories_url' => $categoriesIndexUrl,
+        'itineraries_url' => $itinerariesIndexUrl,
+        'podcast_url' => $podcastIndexUrl,
+        'letters_url' => $letterIndexUrlValue,
+        'show_letters' => $showLetterButton,
+        'actuality_url' => $actualityUrl,
+        'has_actuality' => $hasActuality,
+        'newsletters_url' => $newslettersIndexUrl,
+        'avisos_url' => $avisosUrl,
+        'postal_url' => $postalUrl,
+        'postal_svg' => $postalLogoSvg,
+        'has_categories' => $hasCategories,
+        'has_itineraries' => $hasItineraries,
+        'has_podcast' => $hasPodcast,
+        'has_newsletters' => $hasNewsletters,
+        'subscription_enabled' => $subscriptionEnabled,
+        'postal_enabled' => $postalEnabled,
+    ]);
+}
 $renderSearchBox = static function (string $variant) use ($searchAction, $accentColor, $highlight, $textColor, $searchActionBase, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories, $hasPodcast, $podcastIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
@@ -546,7 +500,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
 <?php endif; ?>
 
 <?php if ($showHeaderButtonsHome): ?>
-    <?= $renderHeaderButtons() ?>
+    <?= $headerButtonsHtml ?>
 <?php endif; ?>
 
 <?php if ($homeSubscriptionTop): ?>
@@ -1009,39 +963,6 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         max-width: 720px;
         margin-left: auto;
         margin-right: auto;
-    }
-    .home-header-buttons {
-        display: flex;
-        flex-wrap: nowrap;
-        gap: 6px;
-        align-items: center;
-        justify-content: center;
-        padding: 8px 2px 16px;
-        max-width: 100%;
-        overflow-x: auto;
-        overflow-y: visible;
-    }
-    .home-header-button-link {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px;
-        height: 24px;
-        border-radius: 6px;
-        background: <?= $accentColor ?>;
-        border: 1px solid <?= $accentColor ?>;
-        color: #fff;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .home-header-button-link:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
-        color: #fff;
-        text-decoration: none;
-    }
-    .home-header-button-link svg {
-        width: 14px;
-        height: 14px;
     }
     .site-bio p {
         margin: 0 0 1rem 0;

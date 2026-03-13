@@ -2957,6 +2957,7 @@ function nammu_render_header_buttons(array $options): string
     $podcastUrl = (string) ($options['podcast_url'] ?? '/podcast');
     $lettersUrl = (string) ($options['letters_url'] ?? ($GLOBALS['lettersIndexUrl'] ?? '/letras'));
     $newslettersUrl = (string) ($options['newsletters_url'] ?? ($GLOBALS['newslettersIndexUrl'] ?? '/newsletters'));
+    $actualityUrl = (string) ($options['actuality_url'] ?? ($homeUrl !== '' ? rtrim($homeUrl, '/') . '/actualidad.php' : '/actualidad.php'));
     $avisosUrl = (string) ($options['avisos_url'] ?? '/avisos.php');
     $postalUrl = (string) ($options['postal_url'] ?? '/correos.php');
     $postalLogoSvg = (string) ($options['postal_svg'] ?? '');
@@ -2974,6 +2975,11 @@ function nammu_render_header_buttons(array $options): string
         ? !empty($options['show_letters'])
         : ($isDictionaryMode && $lettersUrl !== '');
     $hasNewsletters = !empty($options['has_newsletters'] ?? ($GLOBALS['hasNewsletters'] ?? $GLOBALS['has_newsletters'] ?? false));
+    $config = $config ?? nammu_load_config();
+    $socialRssConfig = is_array($config['social_rss'] ?? null) ? $config['social_rss'] : [];
+    $hasActuality = array_key_exists('has_actuality', $options)
+        ? !empty($options['has_actuality'])
+        : trim((string) ($socialRssConfig['feeds'] ?? '')) !== '';
     $subscriptionEnabled = !empty($options['subscription_enabled']);
     $postalEnabled = !empty($options['postal_enabled']);
 
@@ -3009,6 +3015,13 @@ function nammu_render_header_buttons(array $options): string
             'label' => 'Itinerarios',
             'href' => $itinerariesUrl,
             'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 5H10C11.1046 5 12 5.89543 12 7V19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M20 5H14C12.8954 5 12 5.89543 12 7V19H20C21.1046 19 22 18.1046 22 17V7C22 5.89543 21.1046 5 20 5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><line x1="12" y1="7" x2="12" y2="19" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+        ];
+    }
+    if ($hasActuality && $actualityUrl !== '') {
+        $items[] = [
+            'label' => 'Actualidad',
+            'href' => $actualityUrl,
+            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="13" r="1.8" fill="#fff"/><path d="M12 4v3" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M5.64 6.64l2.12 2.12" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M18.36 6.64l-2.12 2.12" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M4 13h3" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M17 13h3" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M6.3 18.2C7.86 16.29 9.79 15.33 12 15.33c2.21 0 4.14.96 5.7 2.87" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M3.7 20.6C5.9 17.92 8.66 16.58 12 16.58c3.34 0 6.1 1.34 8.3 4.02" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
         ];
     }
     if ($hasNewsletters) {

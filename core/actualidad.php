@@ -141,6 +141,8 @@ function nammu_actuality_extract_social_image(string $pageUrl): string
     $xpath = new DOMXPath($dom);
     $queries = [
         '//meta[@property="og:image"]/@content',
+        '//meta[@property="twitter:image"]/@content',
+        '//meta[@property="twitter:image:src"]/@content',
         '//meta[@name="twitter:image"]/@content',
         '//meta[@name="twitter:image:src"]/@content',
     ];
@@ -259,6 +261,10 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
         $entry = is_array($cache['items'][$key] ?? null) ? $cache['items'][$key] : [];
         $localPath = (string) ($entry['local_path'] ?? '');
         $cachedUrl = (string) ($entry['public_url'] ?? '');
+        $sourceImage = trim((string) ($entry['source_image'] ?? ''));
+        if ($sourceImage !== '') {
+            $items[$index]['source_image'] = $sourceImage;
+        }
         if ($localPath !== '' && is_file($localPath) && $cachedUrl !== '') {
             $items[$index]['image'] = $cachedUrl;
             $cache['items'][$key]['last_used'] = time();
@@ -275,6 +281,7 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
         $path = parse_url($cachedPublicUrl, PHP_URL_PATH);
         $localCachedPath = $path !== null && $path !== '' ? dirname(__DIR__) . $path : '';
         $items[$index]['image'] = $cachedPublicUrl;
+        $items[$index]['source_image'] = $socialImage;
         $cache['items'][$key] = [
             'page_url' => $link,
             'source_image' => $socialImage,
@@ -360,7 +367,10 @@ function nammu_generate_actuality_feed(string $baseUrl, array $config, string $s
         $itemGuid = htmlspecialchars((string) ($item['link'] ?? sha1((string) ($item['title'] ?? ''))), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $pubDate = gmdate(DATE_RSS, (int) (($item['timestamp'] ?? 0) > 0 ? $item['timestamp'] : time()));
         $description = trim((string) ($item['description'] ?? ''));
-        $image = trim((string) ($item['image'] ?? ''));
+        $image = trim((string) ($item['source_image'] ?? ''));
+        if ($image === '') {
+            $image = trim((string) ($item['image'] ?? ''));
+        }
         $descriptionHtml = $description !== '' ? '<p>' . htmlspecialchars($description, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>' : '';
         if ($image !== '') {
             $descriptionHtml .= '<p><img src="' . htmlspecialchars($image, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" alt="' . $itemTitle . '" /></p>';

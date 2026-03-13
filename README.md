@@ -171,14 +171,22 @@ Con retención por defecto de 8 semanas y limpieza automática de los más antig
 
 ### Programarlo en cron (instalación recomendada)
 
-Ejemplo recomendado:
+Edita el cron del usuario del servidor web con:
 
 ```bash
-*/5 * * * * www-data php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
-15 3 * * * www-data php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
-30 3 * * 0 www-data php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
-45 3 * * 0 www-data php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> /var/www/html/<carpeta-publica>/backups/backup-full.log 2>&1
+sudo crontab -u www-data -e
 ```
+
+Si usas ese comando, las líneas del cron van **sin** la columna `www-data`. Ejemplo recomendado:
+
+```bash
+*/5 * * * * php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
+15 3 * * * php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
+30 3 * * 0 php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
+45 3 * * 0 php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> /var/www/html/<carpeta-publica>/backups/backup-full.log 2>&1
+```
+
+Si en lugar de eso editas `/etc/crontab` o usas `sudo crontab -e`, entonces sí debes añadir la columna `www-data` delante del comando.
 
 La tarea `admin.php --run-scheduled` publica contenidos programados, procesa colas pendientes y revisa las RSS externas configuradas en la pestaña **Redes** para reenviar novedades a redes sociales.
 

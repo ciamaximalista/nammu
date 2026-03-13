@@ -4,7 +4,7 @@
     $availableNetworks = admin_social_broadcast_available_networks($settings);
     $labels = admin_social_broadcast_labels();
     $rssConfig = admin_social_rss_settings($settings);
-    $cronCommand = '*/5 * * * * www-data php ' . __DIR__ . '/../admin.php --run-scheduled';
+    $cronCommand = '*/5 * * * * php ' . __DIR__ . '/../admin.php --run-scheduled >> ' . __DIR__ . '/../backups/cron.log 2>&1';
     ?>
     <div class="tab-pane active">
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
@@ -139,7 +139,7 @@
                     <div class="form-group mt-3">
                         <label for="social_rss_cron">Instrucción para el cron</label>
                         <input type="text" id="social_rss_cron" class="form-control" value="<?= htmlspecialchars($cronCommand, ENT_QUOTES, 'UTF-8') ?>" readonly>
-                        <small class="form-text text-muted">Añade esta línea al cron para que el chequeo y el envío se ejecuten cada 5 minutos.</small>
+                        <small class="form-text text-muted">Edita el cron con <code>sudo crontab -u www-data -e</code> y añade esta línea. Como estás editando el crontab de <code>www-data</code>, la línea no debe incluir la columna <code>www-data</code>. Así el chequeo y el envío se ejecutarán cada 5 minutos.</small>
                     </div>
 
                     <button type="submit" name="save_social_rss_settings" class="btn btn-outline-primary">Guardar RSS automáticas</button>

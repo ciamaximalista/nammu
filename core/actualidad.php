@@ -268,6 +268,13 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
         if ($localPath !== '' && is_file($localPath) && $cachedUrl !== '') {
             $items[$index]['image'] = $cachedUrl;
             $cache['items'][$key]['last_used'] = time();
+            if ($sourceImage === '') {
+                $refreshedSourceImage = nammu_actuality_extract_social_image($link);
+                if ($refreshedSourceImage !== '') {
+                    $items[$index]['source_image'] = $refreshedSourceImage;
+                    $cache['items'][$key]['source_image'] = $refreshedSourceImage;
+                }
+            }
             continue;
         }
         $socialImage = nammu_actuality_extract_social_image($link);

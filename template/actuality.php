@@ -10,6 +10,7 @@ $textColor = htmlspecialchars($colors['text'] ?? '#222222', ENT_QUOTES, 'UTF-8')
 $accentColor = htmlspecialchars($colors['accent'] ?? '#0a4c8a', ENT_QUOTES, 'UTF-8');
 $brandColor = htmlspecialchars($colors['brand'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8');
 $h1Color = htmlspecialchars($colors['h1'] ?? '#1b8eed', ENT_QUOTES, 'UTF-8');
+$headingSecondaryColor = htmlspecialchars($colors['h2'] ?? '#ea2f28', ENT_QUOTES, 'UTF-8');
 $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
 $categoriesIndexUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/categorias';
@@ -83,11 +84,6 @@ $formatDate = static function (int $timestamp): string {
     <section class="actuality-grid">
         <?php foreach ($items as $item): ?>
             <article class="actuality-card">
-                <?php if ($item['image'] !== ''): ?>
-                    <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                        <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                    </a>
-                <?php endif; ?>
                 <div class="actuality-card-body">
                     <h2><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h2>
                     <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
@@ -99,6 +95,11 @@ $formatDate = static function (int $timestamp): string {
                                 <span><?= htmlspecialchars(preg_replace('/^www\./i', '', $item['source']), ENT_QUOTES, 'UTF-8') ?></span>
                             <?php endif; ?>
                         </p>
+                    <?php endif; ?>
+                    <?php if ($item['image'] !== ''): ?>
+                        <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                            <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                        </a>
                     <?php endif; ?>
                     <?php if ($item['description'] !== ''): ?>
                         <p class="actuality-description"><?= htmlspecialchars($item['description'], ENT_QUOTES, 'UTF-8') ?></p>
@@ -162,8 +163,9 @@ $formatDate = static function (int $timestamp): string {
         line-height: 1.25;
     }
     .actuality-card h2 a {
-        color: inherit;
+        color: <?= $headingSecondaryColor ?>;
         text-decoration: none;
+        transition: color 0.2s ease;
     }
     .actuality-card h2 a:hover {
         color: <?= $accentColor ?>;

@@ -2333,6 +2333,14 @@
         if ($twitterCount !== null) {
             $socialCounts['Twitter/X'] = $twitterCount;
         }
+        $blueskyCount = admin_get_bluesky_follower_count($settings['bluesky'] ?? []);
+        if ($blueskyCount !== null) {
+            $socialCounts['Bluesky'] = $blueskyCount;
+        }
+        $mastodonCount = admin_get_mastodon_follower_count($settings['mastodon'] ?? []);
+        if ($mastodonCount !== null) {
+            $socialCounts['Mastodon'] = $mastodonCount;
+        }
     }
     ?>
 

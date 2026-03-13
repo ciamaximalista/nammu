@@ -3038,6 +3038,60 @@ function admin_get_twitter_follower_count(array $settings): ?int {
     return (int) $payload['data']['public_metrics']['followers_count'];
 }
 
+function admin_get_bluesky_follower_count(array $settings): ?int {
+    $service = trim((string) ($settings['service'] ?? ''));
+    if ($service === '') {
+        $service = 'https://bsky.social';
+    }
+    $service = rtrim($service, '/');
+    $identifier = trim((string) ($settings['identifier'] ?? ''));
+    $identifier = ltrim($identifier, '@');
+    $identifier = preg_replace('/[\p{Cf}\p{Z}\s]+/u', '', $identifier);
+    if ($identifier === '') {
+        return null;
+    }
+    $endpoint = $service . '/xrpc/app.bsky.actor.getProfile?actor=' . rawurlencode($identifier);
+    $payload = admin_http_get_json($endpoint);
+    if (!is_array($payload) || !isset($payload['followersCount'])) {
+        return null;
+    }
+    return (int) $payload['followersCount'];
+}
+
+function admin_get_mastodon_follower_count(array $settings): ?int {
+    $instance = admin_mastodon_base_url((string) ($settings['instance'] ?? ''));
+    if ($instance === '') {
+        $profileUrl = trim((string) ($settings['profile'] ?? ''));
+        if ($profileUrl !== '') {
+            $profileUrl = preg_match('#^https?://#i', $profileUrl) ? $profileUrl : 'https://' . ltrim($profileUrl, '/');
+            $profileParts = parse_url($profileUrl);
+            if (!empty($profileParts['scheme']) && !empty($profileParts['host'])) {
+                $instance = admin_mastodon_base_url($profileParts['scheme'] . '://' . $profileParts['host']);
+            }
+        }
+    }
+    if ($instance === '') {
+        $handle = trim((string) ($settings['handle'] ?? ''));
+        if (str_contains($handle, '@')) {
+            $parts = explode('@', ltrim($handle, '@'));
+            if (count($parts) >= 2) {
+                $instance = admin_mastodon_base_url('https://' . $parts[1]);
+            }
+        }
+    }
+    $token = trim((string) ($settings['access_token'] ?? ''));
+    if ($instance === '' || $token === '') {
+        return null;
+    }
+    $payload = admin_http_get_json($instance . '/api/v1/accounts/verify_credentials', [
+        'Authorization: Bearer ' . $token,
+    ]);
+    if (!is_array($payload) || !isset($payload['followers_count'])) {
+        return null;
+    }
+    return (int) $payload['followers_count'];
+}
+
 function admin_send_post_to_telegram(string $slug, string $title, string $description, array $telegramSettings, string $urlOverride = '', string $imageUrl = ''): bool {
     $token = $telegramSettings['token'] ?? '';
     $channel = $telegramSettings['channel'] ?? '';

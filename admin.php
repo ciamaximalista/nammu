@@ -1671,6 +1671,14 @@ function get_settings() {
     $nisaba = $config['nisaba'] ?? [];
     $telex = $config['telex'] ?? [];
     $contact = $config['contact'] ?? [];
+    $socialRssDefaults = [
+        'feeds' => '',
+        'networks' => [],
+    ];
+    $socialRss = array_merge($socialRssDefaults, $config['social_rss'] ?? []);
+    if (!is_array($socialRss['networks'] ?? null)) {
+        $socialRss['networks'] = [];
+    }
 
     return [
         'sort_order' => $sort_order,
@@ -1710,6 +1718,7 @@ function get_settings() {
         'nisaba' => $nisaba,
         'telex' => $telex,
         'contact' => $contact,
+        'social_rss' => $socialRss,
         'entry' => $entry,
     ];
 }

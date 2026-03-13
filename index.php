@@ -8,6 +8,8 @@ error_reporting(E_ALL);
 
 require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
+require_once __DIR__ . '/core/actualidad.php';
+require_once __DIR__ . '/core/actualidad.php';
 
 use Nammu\Core\ContentRepository;
 use Nammu\Core\Itinerary;
@@ -673,6 +675,26 @@ if ($routePath === '/podcast.xml') {
     if ($publicBaseUrl !== '') {
         @file_put_contents(__DIR__ . '/podcast.xml', $podcastFeed);
     }
+    exit;
+}
+
+if ($routePath === '/noticias.xml') {
+    if (!nammu_actuality_has_feeds($config)) {
+        header('HTTP/1.1 404 Not Found');
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo 'No hay fuentes de actualidad configuradas.';
+        exit;
+    }
+    $feedPath = __DIR__ . '/noticias.xml';
+    if (!is_file($feedPath) || trim((string) @file_get_contents($feedPath)) === '') {
+        nammu_actuality_rebuild_snapshot($publicBaseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+    }
+    $actualityFeed = is_file($feedPath) ? (string) file_get_contents($feedPath) : '';
+    if ($actualityFeed === '') {
+        $actualityFeed = nammu_generate_actuality_feed($publicBaseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+    }
+    header('Content-Type: application/rss+xml; charset=UTF-8');
+    echo $actualityFeed;
     exit;
 }
 

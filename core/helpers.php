@@ -1828,6 +1828,13 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
             'svg' => $icons['rss'],
         ];
     }
+    if (trim((string) (($config['social_rss']['feeds'] ?? ''))) !== '') {
+        $links[] = [
+            'label' => 'RSS Noticias',
+            'href' => $baseRoot . '/noticias.xml',
+            'svg' => $icons['rss'],
+        ];
+    }
 
     $podcastServices = $config['podcast_services'] ?? [];
     if ($hasPodcast) {

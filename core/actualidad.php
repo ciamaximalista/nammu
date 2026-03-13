@@ -7,6 +7,11 @@ function nammu_actuality_cache_file(): string
     return dirname(__DIR__) . '/config/actualidad-cache.json';
 }
 
+function nammu_actuality_items_file(): string
+{
+    return dirname(__DIR__) . '/config/actualidad-items.json';
+}
+
 function nammu_actuality_cache_dir(): string
 {
     return dirname(__DIR__) . '/assets/actualidad-cache';
@@ -34,6 +39,40 @@ function nammu_actuality_save_cache(array $cache): void
         @mkdir($dir, 0775, true);
     }
     @file_put_contents($file, json_encode($cache, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    @chmod($file, 0664);
+}
+
+function nammu_actuality_load_items_snapshot(): array
+{
+    $file = nammu_actuality_items_file();
+    if (!is_file($file)) {
+        return ['updated_at' => 0, 'items' => []];
+    }
+    $raw = @file_get_contents($file);
+    if (!is_string($raw) || $raw === '') {
+        return ['updated_at' => 0, 'items' => []];
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return ['updated_at' => 0, 'items' => []];
+    }
+    $decoded['items'] = is_array($decoded['items'] ?? null) ? $decoded['items'] : [];
+    $decoded['updated_at'] = (int) ($decoded['updated_at'] ?? 0);
+    return $decoded;
+}
+
+function nammu_actuality_save_items_snapshot(array $items): void
+{
+    $file = nammu_actuality_items_file();
+    $dir = dirname($file);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $payload = [
+        'updated_at' => time(),
+        'items' => array_values($items),
+    ];
+    @file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     @chmod($file, 0664);
 }
 
@@ -247,4 +286,143 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
     nammu_actuality_prune_cache($cache, array_values(array_unique($activeKeys)));
     nammu_actuality_save_cache($cache);
     return $items;
+}
+
+function nammu_actuality_has_feeds(array $config): bool
+{
+    $socialRssConfig = is_array($config['social_rss'] ?? null) ? $config['social_rss'] : [];
+    return trim((string) ($socialRssConfig['feeds'] ?? '')) !== '';
+}
+
+function nammu_actuality_collect_items(array $config, string $publicBaseUrl): array
+{
+    $rssSettings = admin_social_rss_settings(['social_rss' => $config['social_rss'] ?? []]);
+    $feeds = admin_social_rss_feed_list($rssSettings['feeds']);
+    if (empty($feeds)) {
+        return [];
+    }
+    $items = [];
+    $seen = [];
+    foreach ($feeds as $feedUrl) {
+        foreach (admin_fetch_social_rss_items($feedUrl) as $item) {
+            $key = (string) ($item['key'] ?? sha1(($item['link'] ?? '') . '|' . ($item['title'] ?? '')));
+            if ($key === '' || isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $descriptionHtml = (string) ($item['description'] ?? '');
+            $descriptionText = trim(preg_replace('/\s+/u', ' ', strip_tags($descriptionHtml)));
+            $items[] = [
+                'title' => trim((string) ($item['title'] ?? '')),
+                'link' => trim((string) ($item['link'] ?? '')),
+                'image' => trim((string) ($item['image'] ?? '')),
+                'description' => $descriptionText,
+                'timestamp' => (int) ($item['timestamp'] ?? 0),
+                'source' => parse_url((string) ($item['link'] ?? ''), PHP_URL_HOST) ?: '',
+            ];
+        }
+    }
+    usort($items, static function (array $a, array $b): int {
+        return ($b['timestamp'] ?? 0) <=> ($a['timestamp'] ?? 0);
+    });
+    $cutoffTimestamp = time() - (4 * 86400);
+    $recentItems = array_values(array_filter($items, static function (array $item) use ($cutoffTimestamp): bool {
+        $timestamp = (int) ($item['timestamp'] ?? 0);
+        return $timestamp <= 0 || $timestamp >= $cutoffTimestamp;
+    }));
+    $olderItems = array_values(array_filter($items, static function (array $item) use ($cutoffTimestamp): bool {
+        $timestamp = (int) ($item['timestamp'] ?? 0);
+        return $timestamp > 0 && $timestamp < $cutoffTimestamp;
+    }));
+    if (count($recentItems) % 2 === 1 && !empty($olderItems)) {
+        $recentItems[] = $olderItems[0];
+    }
+    return nammu_actuality_enrich_items($recentItems, $publicBaseUrl);
+}
+
+function nammu_generate_actuality_feed(string $baseUrl, array $config, string $siteTitle, string $siteDescription, string $siteLang = 'es'): string
+{
+    $baseUrl = rtrim($baseUrl, '/');
+    $feedUrl = ($baseUrl !== '' ? $baseUrl : '') . '/noticias.xml';
+    $pageUrl = ($baseUrl !== '' ? $baseUrl : '') . '/actualidad.php';
+    $items = nammu_actuality_collect_items($config, $baseUrl);
+    $lastBuild = gmdate(DATE_RSS, !empty($items) ? (int) ($items[0]['timestamp'] ?: time()) : time());
+    $titleEsc = htmlspecialchars('Actualidad — ' . ($siteTitle !== '' ? $siteTitle : 'Nammu Blog'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $descEsc = htmlspecialchars($siteDescription !== '' ? $siteDescription : 'Selección de fuentes agregadas.', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $langEsc = htmlspecialchars($siteLang !== '' ? $siteLang : 'es', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $pageUrlEsc = htmlspecialchars($pageUrl !== '' ? $pageUrl : '/actualidad.php', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $feedUrlEsc = htmlspecialchars($feedUrl !== '' ? $feedUrl : '/noticias.xml', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+    $itemsXml = [];
+    foreach ($items as $item) {
+        $itemTitle = htmlspecialchars((string) ($item['title'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $itemLink = htmlspecialchars((string) ($item['link'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $itemGuid = htmlspecialchars((string) ($item['link'] ?? sha1((string) ($item['title'] ?? ''))), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $pubDate = gmdate(DATE_RSS, (int) (($item['timestamp'] ?? 0) > 0 ? $item['timestamp'] : time()));
+        $description = trim((string) ($item['description'] ?? ''));
+        $image = trim((string) ($item['image'] ?? ''));
+        $descriptionHtml = $description !== '' ? '<p>' . htmlspecialchars($description, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>' : '';
+        if ($image !== '') {
+            $descriptionHtml .= '<p><img src="' . htmlspecialchars($image, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" alt="' . $itemTitle . '" /></p>';
+        }
+        $descriptionCdata = '<![CDATA[' . $descriptionHtml . ']]>';
+        $itemsXml[] = <<<XML
+    <item>
+      <title>{$itemTitle}</title>
+      <link>{$itemLink}</link>
+      <guid>{$itemGuid}</guid>
+      <pubDate>{$pubDate}</pubDate>
+      <description>{$descriptionCdata}</description>
+    </item>
+XML;
+    }
+    $itemsBlock = implode("\n", $itemsXml);
+
+    return <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>{$titleEsc}</title>
+    <description>{$descEsc}</description>
+    <link>{$pageUrlEsc}</link>
+    <language>{$langEsc}</language>
+    <lastBuildDate>{$lastBuild}</lastBuildDate>
+    <atom:link xmlns:atom="http://www.w3.org/2005/Atom" href="{$feedUrlEsc}" rel="self" type="application/rss+xml" />
+{$itemsBlock}
+  </channel>
+</rss>
+XML;
+}
+
+function nammu_actuality_clear_snapshot(): void
+{
+    $itemsFile = nammu_actuality_items_file();
+    if (is_file($itemsFile)) {
+        @unlink($itemsFile);
+    }
+    $feedFile = dirname(__DIR__) . '/noticias.xml';
+    if (is_file($feedFile)) {
+        @unlink($feedFile);
+    }
+    $cache = nammu_actuality_load_cache();
+    nammu_actuality_prune_cache($cache, []);
+    nammu_actuality_save_cache(['items' => []]);
+}
+
+function nammu_actuality_rebuild_snapshot(string $baseUrl, array $config, string $siteTitle, string $siteDescription, string $siteLang = 'es'): array
+{
+    if (!nammu_actuality_has_feeds($config)) {
+        nammu_actuality_clear_snapshot();
+        return ['updated_at' => 0, 'items' => []];
+    }
+    $items = nammu_actuality_collect_items($config, $baseUrl);
+    nammu_actuality_save_items_snapshot($items);
+    $feed = nammu_generate_actuality_feed($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+    if ($baseUrl !== '') {
+        @file_put_contents(dirname(__DIR__) . '/noticias.xml', $feed);
+    }
+    return [
+        'updated_at' => time(),
+        'items' => $items,
+    ];
 }

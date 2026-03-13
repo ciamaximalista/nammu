@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Actualidad — Memoria</title>
+    <description>Selección de fuentes agregadas.</description>
+    <link>https://memoria.repoblacion.ong/actualidad.php</link>
+    <language>es</language>
+    <lastBuildDate>Fri, 13 Mar 2026 13:29:11 +0000</lastBuildDate>
+    <atom:link xmlns:atom="http://www.w3.org/2005/Atom" href="https://memoria.repoblacion.ong/noticias.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Retroinnovación</title>
+      <link>https://www.bravellaoficial.com</link>
+      <guid>https://www.bravellaoficial.com</guid>
+      <pubDate>Fri, 13 Mar 2026 13:29:11 +0000</pubDate>
+      <description><![CDATA[<p>El proyecto de Terceros Lugares nos está llevando a conocer a muchas personas con las que compartimos una afinidad de vida, y, a descubrir los productos que transmiten esa particular forma de mirar. Hoy recibimos uno de ellos, Bravella, elaborado por Yolanda de Som Tribu aplicando uno de sus principios: la retroinnovación.</p><p><img src="https://memoria.repoblacion.ong/assets/actualidad-cache/90d82620f0f76c5828a7904f4c7e79d300f5f6ea.png" alt="Retroinnovación" /></p>]]></description>
+    </item>
+    <item>
+      <title>La Diputación de Cáceres estrena sistema de inserción profesional</title>
+      <link>https://www.regiondigital.com/noticias/caceres-y-provincia/425099-la-diputacion-de-caceres-pone-en-marcha-el-laboratorio-social-100kairos.html</link>
+      <guid>https://www.regiondigital.com/noticias/caceres-y-provincia/425099-la-diputacion-de-caceres-pone-en-marcha-el-laboratorio-social-100kairos.html</guid>
+      <pubDate>Tue, 03 Mar 2026 13:09:57 +0000</pubDate>
+      <description><![CDATA[<p>La Diputación de Cáceres, a través de su Agencia de Empleo, ha dado el pistoletazo de salida a la fase operativa del proyecto 100Kairós, un sistema avanzado de inserción profesional que busca transformar el mercado laboral de la provincia.En un acto de bienvenida a los participantes, se ha confirmado el éxito de la convocatoria, que ha recibido cerca de 350 solicitudes para las 100 plazas disponibles, atrayendo interés no solo en la provincia, sino también desde Badajoz, el resto de España e incluso el extranjero.En concreto, este proyecto, que cuenta con la cofinanciación del Ministerio para la Transición Ecológica y el Reto Demográfico, nace con un doble objetivo estratégico: fijar población en el territorio mediante la retención del talento local y fortalecer la competitividad de las pequeñas empresas y productores rurales a través de la digitalización.</p><p><img src="https://memoria.repoblacion.ong/assets/actualidad-cache/fc2ec96fc4ea4cdf38b713bba7cd78448121a391.jpg" alt="La Diputación de Cáceres estrena sistema de inserción profesional" /></p>]]></description>
+    </item>
+  </channel>
+</rss>

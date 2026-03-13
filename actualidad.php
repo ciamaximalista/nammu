@@ -112,44 +112,12 @@ $renderer->setGlobal('baseUrl', $publicBaseUrl !== '' ? $publicBaseUrl : '/');
 
 $rssSettings = admin_social_rss_settings(['social_rss' => $configData['social_rss'] ?? []]);
 $feeds = admin_social_rss_feed_list($rssSettings['feeds']);
-$items = [];
-$seen = [];
-foreach ($feeds as $feedUrl) {
-    foreach (admin_fetch_social_rss_items($feedUrl) as $item) {
-        $key = (string) ($item['key'] ?? sha1(($item['link'] ?? '') . '|' . ($item['title'] ?? '')));
-        if ($key === '' || isset($seen[$key])) {
-            continue;
-        }
-        $seen[$key] = true;
-        $descriptionHtml = (string) ($item['description'] ?? '');
-        $descriptionText = trim(preg_replace('/\s+/u', ' ', strip_tags($descriptionHtml)));
-        $items[] = [
-            'title' => trim((string) ($item['title'] ?? '')),
-            'link' => trim((string) ($item['link'] ?? '')),
-            'image' => trim((string) ($item['image'] ?? '')),
-            'description' => $descriptionText,
-            'timestamp' => (int) ($item['timestamp'] ?? 0),
-            'source' => parse_url((string) ($item['link'] ?? ''), PHP_URL_HOST) ?: '',
-        ];
-    }
+$snapshot = nammu_actuality_load_items_snapshot();
+$items = is_array($snapshot['items'] ?? null) ? $snapshot['items'] : [];
+if (empty($items) && !empty($feeds)) {
+    $rebuilt = nammu_actuality_rebuild_snapshot($publicBaseUrl, $configData, $siteTitle, $siteDescription, $siteLang);
+    $items = is_array($rebuilt['items'] ?? null) ? $rebuilt['items'] : [];
 }
-usort($items, static function (array $a, array $b): int {
-    return ($b['timestamp'] ?? 0) <=> ($a['timestamp'] ?? 0);
-});
-$cutoffTimestamp = time() - (4 * 86400);
-$recentItems = array_values(array_filter($items, static function (array $item) use ($cutoffTimestamp): bool {
-    $timestamp = (int) ($item['timestamp'] ?? 0);
-    return $timestamp <= 0 || $timestamp >= $cutoffTimestamp;
-}));
-$olderItems = array_values(array_filter($items, static function (array $item) use ($cutoffTimestamp): bool {
-    $timestamp = (int) ($item['timestamp'] ?? 0);
-    return $timestamp > 0 && $timestamp < $cutoffTimestamp;
-}));
-if (count($recentItems) % 2 === 1 && !empty($olderItems)) {
-    $recentItems[] = $olderItems[0];
-}
-$items = $recentItems;
-$items = nammu_actuality_enrich_items($items, $publicBaseUrl);
 
 $content = $renderer->render('actuality', [
     'items' => $items,

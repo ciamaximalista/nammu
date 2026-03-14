@@ -193,6 +193,46 @@ function nammu_actuality_extract_social_image(string $pageUrl): string
             }
         }
     }
+
+    $imageQueries = [
+        '//article//img',
+        '//main//img',
+        '//body//img',
+    ];
+    foreach ($imageQueries as $query) {
+        $nodes = $xpath->query($query);
+        if (!$nodes instanceof DOMNodeList || $nodes->length === 0) {
+            continue;
+        }
+        foreach ($nodes as $node) {
+            if (!$node instanceof DOMElement) {
+                continue;
+            }
+            $candidate = trim((string) ($node->getAttribute('src') ?: $node->getAttribute('data-src') ?: $node->getAttribute('srcset')));
+            if ($candidate === '') {
+                continue;
+            }
+            if (str_contains($candidate, ' ')) {
+                $candidate = trim((string) preg_split('/\s+/', $candidate)[0]);
+            }
+            $resolved = nammu_actuality_resolve_url($candidate, $pageUrl);
+            if ($resolved === '') {
+                continue;
+            }
+            $resolvedLower = strtolower($resolved);
+            if (str_starts_with($resolvedLower, 'data:')) {
+                continue;
+            }
+            if (preg_match('/\.svg(?:[?#].*)?$/i', $resolvedLower)) {
+                continue;
+            }
+            if (preg_match('/(?:sprite|icon|logo|avatar|pixel|spacer)/i', $resolvedLower)) {
+                continue;
+            }
+            return $resolved;
+        }
+    }
+
     return '';
 }
 

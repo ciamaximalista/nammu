@@ -562,6 +562,21 @@ function admin_send_twitter_text(string $text, array $settings, ?string &$error 
     return admin_send_twitter_api_request('https://api.twitter.com/2/tweets', $decodedPayload, $settings, $error);
 }
 
+function admin_send_twitter_text_with_image(string $text, string $imageRef, string $imageUrl, array $settings, ?string &$error = null): bool
+{
+    $mediaId = admin_twitter_upload_media($imageRef, $imageUrl, $settings, $error);
+    if ($mediaId === null || $mediaId === '') {
+        return false;
+    }
+    $payload = [
+        'text' => $text,
+        'media' => [
+            'media_ids' => [$mediaId],
+        ],
+    ];
+    return admin_send_twitter_api_request('https://api.twitter.com/2/tweets', $payload, $settings, $error);
+}
+
 function admin_mastodon_upload_media_from_url(string $instance, string $token, string $imageRef, string $imageUrl, ?string &$error = null): ?string
 {
     if (!function_exists('curl_file_create')) {
@@ -1132,9 +1147,9 @@ function admin_send_social_broadcast_message(string $network, string $text, arra
                 return false;
             }
             if ($imageUrl !== '') {
-                return admin_send_telegram_photo($token, $channel, $imageUrl, $telegramHtml);
+                return admin_send_telegram_photo($token, $channel, $imageUrl, $telegramHtml, $error);
             }
-            return admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML');
+            return admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML', $error);
         case 'facebook':
             if ($imageUrl !== '') {
                 $token = trim((string) ($settings['token'] ?? ''));
@@ -1161,6 +1176,9 @@ function admin_send_social_broadcast_message(string $network, string $text, arra
             }
             return admin_send_facebook_text($plainText, $settings, $error);
         case 'twitter':
+            if ($image !== '' && $imageUrl !== '') {
+                return admin_send_twitter_text_with_image($plainText, $image, $imageUrl, $settings, $error);
+            }
             return admin_send_twitter_text($plainText, $settings, $error);
         case 'bluesky':
             return admin_send_bluesky_broadcast($plainText, $settings, $imageUrl, $error);

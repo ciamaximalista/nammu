@@ -2398,6 +2398,32 @@ function admin_public_asset_url(string $path): string {
     return $base !== '' ? $base . $relative : $relative;
 }
 
+function admin_local_asset_path(string $pathOrUrl): string {
+    $value = trim($pathOrUrl);
+    if ($value === '' || !defined('ASSETS_DIR')) {
+        return '';
+    }
+    if (preg_match('#^https?://#i', $value)) {
+        $urlPath = (string) (parse_url($value, PHP_URL_PATH) ?? '');
+        if ($urlPath === '') {
+            return '';
+        }
+        $normalized = ltrim($urlPath, '/');
+        if (!str_starts_with($normalized, 'assets/')) {
+            return '';
+        }
+        $relative = substr($normalized, 7);
+    } else {
+        $normalized = ltrim(str_replace('\\', '/', $value), '/');
+        $relative = str_starts_with($normalized, 'assets/') ? substr($normalized, 7) : $normalized;
+    }
+    if ($relative === '') {
+        return '';
+    }
+    $absolute = rtrim(ASSETS_DIR, '/') . '/' . $relative;
+    return is_file($absolute) ? $absolute : '';
+}
+
 function admin_public_itinerary_url(string $slug): string {
     $base = admin_base_url();
     $path = '/itinerarios/' . rawurlencode($slug);
@@ -3465,6 +3491,129 @@ function admin_send_twitter_api_request(string $endpoint, array $payload, array 
     }
 
     return false;
+}
+
+function admin_twitter_upload_media(string $imageRef, string $imageUrl, array $settings, ?string &$error = null): ?string {
+    if (!function_exists('curl_init') || !function_exists('curl_file_create')) {
+        $error = 'X: el servidor no puede adjuntar imágenes porque falta soporte CURLFile.';
+        return null;
+    }
+
+    $localPath = admin_local_asset_path($imageRef);
+    $tmpPath = '';
+    $pathForCurl = '';
+    $mime = 'application/octet-stream';
+    $uploadName = 'imagen';
+
+    if ($localPath !== '') {
+        $pathForCurl = $localPath;
+        $uploadName = basename($localPath);
+        if (class_exists('finfo')) {
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $detected = $finfo->file($localPath);
+            if (is_string($detected) && $detected !== '') {
+                $mime = $detected;
+            }
+        }
+    } else {
+        $binary = admin_http_get_binary($imageUrl);
+        if ($binary === '') {
+            $error = 'X: no se pudo descargar la imagen pública para adjuntarla.';
+            return null;
+        }
+        $path = (string) (parse_url($imageUrl, PHP_URL_PATH) ?? '');
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if (class_exists('finfo')) {
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $detected = $finfo->buffer($binary);
+            if (is_string($detected) && $detected !== '') {
+                $mime = $detected;
+            }
+        }
+        if ($extension === '') {
+            $extension = match ($mime) {
+                'image/jpeg' => 'jpg',
+                'image/png' => 'png',
+                'image/gif' => 'gif',
+                'image/webp' => 'webp',
+                default => 'bin',
+            };
+        }
+        $tmpPath = tempnam(sys_get_temp_dir(), 'nammu_x_');
+        if ($tmpPath === false || @file_put_contents($tmpPath, $binary) === false) {
+            $error = 'X: no se pudo preparar temporalmente la imagen.';
+            return null;
+        }
+        $finalTmpPath = $tmpPath . '.' . $extension;
+        @rename($tmpPath, $finalTmpPath);
+        $tmpPath = $finalTmpPath;
+        $pathForCurl = $tmpPath;
+        $uploadName = basename($path !== '' ? $path : ('imagen.' . $extension));
+    }
+
+    $endpoint = 'https://upload.twitter.com/1.1/media/upload.json';
+    $authorization = admin_twitter_build_oauth_header('POST', $endpoint, $settings, $error);
+    if ($authorization === null) {
+        if ($tmpPath !== '') {
+            @unlink($tmpPath);
+        }
+        return null;
+    }
+
+    try {
+        $payload = [
+            'media' => curl_file_create($pathForCurl, $mime, $uploadName),
+        ];
+        $ch = curl_init($endpoint);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: ' . $authorization,
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        $responseBody = curl_exec($ch);
+        $httpCode = null;
+        if ($responseBody !== false) {
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        }
+        curl_close($ch);
+    } finally {
+        if ($tmpPath !== '') {
+            @unlink($tmpPath);
+        }
+    }
+
+    if (!is_string($responseBody) || $responseBody === '' || $httpCode === null || $httpCode < 200 || $httpCode >= 300) {
+        $error = 'X: no se pudo subir la imagen.';
+        $decoded = is_string($responseBody) ? json_decode($responseBody, true) : null;
+        if (is_array($decoded)) {
+            $message = '';
+            if (!empty($decoded['errors']) && is_array($decoded['errors'])) {
+                $first = $decoded['errors'][0] ?? null;
+                if (is_array($first)) {
+                    $message = (string) ($first['message'] ?? '');
+                }
+            } elseif (isset($decoded['error'])) {
+                $message = (string) $decoded['error'];
+            }
+            if ($message !== '') {
+                $error = 'X: ' . $message;
+            }
+        }
+        error_log('X media upload error: http=' . ($httpCode ?? 'n/a') . ' response=' . (string) $responseBody);
+        return null;
+    }
+
+    $decoded = json_decode($responseBody, true);
+    $mediaId = is_array($decoded) ? (string) ($decoded['media_id_string'] ?? $decoded['media_id'] ?? '') : '';
+    if ($mediaId === '') {
+        $error = 'X: la API no devolvió media_id.';
+        error_log('X media upload error: missing media_id response=' . (string) $responseBody);
+        return null;
+    }
+
+    return $mediaId;
 }
 
 function admin_send_linkedin_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = '', ?string &$error = null): bool {
@@ -4584,7 +4733,7 @@ function admin_http_get_json(string $url, array $headers = []): ?array {
     return $decoded;
 }
 
-function admin_send_telegram_message(string $token, string $chatId, string $text, ?string $parseMode = null): bool {
+function admin_send_telegram_message(string $token, string $chatId, string $text, ?string $parseMode = null, ?string &$error = null): bool {
     $endpoint = 'https://api.telegram.org/bot' . $token . '/sendMessage';
     $payload = [
         'chat_id' => $chatId,
@@ -4628,20 +4777,76 @@ function admin_send_telegram_message(string $token, string $chatId, string $text
         }
     }
     if ($responseBody === false || $responseBody === null) {
+        $error = 'Telegram: no se recibió respuesta de la API.';
         return false;
     }
     $decoded = json_decode($responseBody, true);
     if (is_array($decoded) && isset($decoded['ok'])) {
-        return (bool) $decoded['ok'];
+        if ((bool) $decoded['ok']) {
+            return true;
+        }
+        $error = 'Telegram: ' . (string) ($decoded['description'] ?? 'error desconocido');
+        return false;
     }
     if ($httpCode !== null) {
-        return $httpCode >= 200 && $httpCode < 300;
+        if ($httpCode >= 200 && $httpCode < 300) {
+            return true;
+        }
+        $error = 'Telegram: HTTP ' . $httpCode . '.';
+        return false;
     }
+    $error = 'Telegram: no se pudo enviar el mensaje.';
     return false;
 }
 
-function admin_send_telegram_photo(string $token, string $chatId, string $photoUrl, string $caption): bool {
+function admin_send_telegram_photo(string $token, string $chatId, string $photoUrl, string $caption, ?string &$error = null): bool {
     $endpoint = 'https://api.telegram.org/bot' . rawurlencode($token) . '/sendPhoto';
+    $localPath = admin_local_asset_path($photoUrl);
+    if ($localPath !== '' && function_exists('curl_init') && function_exists('curl_file_create')) {
+        $mime = 'application/octet-stream';
+        if (class_exists('finfo')) {
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $detected = $finfo->file($localPath);
+            if (is_string($detected) && $detected !== '') {
+                $mime = $detected;
+            }
+        }
+        $payload = [
+            'chat_id' => $chatId,
+            'photo' => curl_file_create($localPath, $mime, basename($localPath)),
+            'caption' => $caption,
+            'parse_mode' => 'HTML',
+            'disable_web_page_preview' => false,
+        ];
+        $ch = curl_init($endpoint);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+        $responseBody = curl_exec($ch);
+        $httpCode = null;
+        if ($responseBody !== false) {
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        }
+        curl_close($ch);
+        if ($responseBody === false || $responseBody === null) {
+            $error = 'Telegram: no se recibió respuesta de la API al subir la imagen.';
+            return false;
+        }
+        $decoded = json_decode($responseBody, true);
+        if (is_array($decoded) && isset($decoded['ok'])) {
+            if ((bool) $decoded['ok']) {
+                return true;
+            }
+            $error = 'Telegram: ' . (string) ($decoded['description'] ?? 'error desconocido');
+            return false;
+        }
+        if ($httpCode !== null && $httpCode >= 200 && $httpCode < 300) {
+            return true;
+        }
+        $error = 'Telegram: no se pudo enviar la imagen.';
+        return false;
+    }
     $payload = [
         'chat_id' => $chatId,
         'photo' => $photoUrl,
@@ -4649,7 +4854,16 @@ function admin_send_telegram_photo(string $token, string $chatId, string $photoU
         'parse_mode' => 'HTML',
         'disable_web_page_preview' => false,
     ];
-    return admin_http_post_form($endpoint, $payload);
+    $response = admin_http_post_form_json($endpoint, $payload);
+    if (is_array($response) && isset($response['ok'])) {
+        if ((bool) $response['ok']) {
+            return true;
+        }
+        $error = 'Telegram: ' . (string) ($response['description'] ?? 'error desconocido');
+        return false;
+    }
+    $error = 'Telegram: no se pudo enviar la imagen.';
+    return false;
 }
 
 function admin_maybe_auto_post_to_social_networks(string $filename, string $title, string $description, string $image = '', string $urlOverride = '', string $imageUrl = ''): void {

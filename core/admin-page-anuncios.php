@@ -431,7 +431,7 @@
                     <div class="form-group">
                         <label for="mastodon_access_token">Token de acceso</label>
                         <input type="text" name="mastodon_access_token" id="mastodon_access_token" class="form-control" value="<?= htmlspecialchars($mastodonSettings['access_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Token personal">
-                        <small class="form-text text-muted">Debe tener permisos de publicación (write:statuses).</small>
+                        <small class="form-text text-muted">Debe tener permisos <code>write:statuses</code>. Si también quieres adjuntar imágenes desde el formulario de Redes, añade <code>write:media</code>.</small>
                     </div>
                     <div class="form-group">
                         <label for="mastodon_profile">URL del perfil (opcional)</label>
@@ -455,6 +455,7 @@
                                     <ol class="mb-3">
                                         <li>Entra en tu instancia &rarr; Preferencias &rarr; Desarrollo.</li>
                                         <li>Crea una nueva aplicación con permisos <code>write:statuses</code>.</li>
+                                        <li>Si vas a adjuntar imágenes desde el formulario de Redes, añade también <code>write:media</code>.</li>
                                         <li>Copia el token de acceso y pégalo aquí.</li>
                                         <li>Indica la URL de la instancia y tu usuario.</li>
                                     </ol>

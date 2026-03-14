@@ -3201,6 +3201,92 @@ function admin_build_post_message(string $slug, string $title, string $descripti
     return implode("\n\n", $parts);
 }
 
+function admin_social_sentences_from_text(string $text): array {
+    $text = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '');
+    if ($text === '') {
+        return [];
+    }
+    $parts = preg_split('/(?<=[.!?…])\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY);
+    if (!is_array($parts) || $parts === []) {
+        return [$text];
+    }
+    return array_values(array_filter(array_map('trim', $parts), static fn($item) => $item !== ''));
+}
+
+function admin_unicode_bold_char(string $char): string {
+    $codepoint = mb_ord($char, 'UTF-8');
+    if ($codepoint >= 65 && $codepoint <= 90) {
+        return mb_chr(0x1D5D4 + ($codepoint - 65), 'UTF-8');
+    }
+    if ($codepoint >= 97 && $codepoint <= 122) {
+        return mb_chr(0x1D5EE + ($codepoint - 97), 'UTF-8');
+    }
+    if ($codepoint >= 48 && $codepoint <= 57) {
+        return mb_chr(0x1D7EC + ($codepoint - 48), 'UTF-8');
+    }
+    return $char;
+}
+
+function admin_bold_unicode_text(string $text): string {
+    if (!function_exists('mb_str_split') || !function_exists('mb_ord') || !function_exists('mb_chr')) {
+        return $text;
+    }
+    $chars = mb_str_split($text);
+    $mapped = array_map('admin_unicode_bold_char', $chars);
+    return implode('', $mapped);
+}
+
+function admin_build_sentence_limited_social_message(
+    string $title,
+    string $description,
+    string $url,
+    int $maxLen,
+    ?callable $titleFormatter = null
+): string {
+    $title = trim($title);
+    $description = trim($description);
+    $url = trim($url);
+
+    $parts = [];
+    if ($title !== '') {
+        $parts[] = $titleFormatter !== null ? (string) $titleFormatter($title) : $title;
+    }
+    if ($url !== '') {
+        $parts[] = $url;
+    }
+    $base = $parts !== [] ? implode("\n\n", $parts) : 'Nueva publicación disponible';
+
+    $sentences = admin_social_sentences_from_text($description);
+    foreach ($sentences as $sentence) {
+        $candidate = $base . "\n\n" . $sentence;
+        if (function_exists('mb_strlen')) {
+            if (mb_strlen($candidate, 'UTF-8') <= $maxLen) {
+                $base = $candidate;
+                continue;
+            }
+        } elseif (strlen($candidate) <= $maxLen) {
+            $base = $candidate;
+            continue;
+        }
+        break;
+    }
+
+    if (function_exists('mb_strlen')) {
+        if (mb_strlen($base, 'UTF-8') > $maxLen) {
+            return mb_substr($base, 0, max(0, $maxLen - 1), 'UTF-8') . '…';
+        }
+        return $base;
+    }
+    if (strlen($base) > $maxLen) {
+        return substr($base, 0, max(0, $maxLen - 1)) . '…';
+    }
+    return $base;
+}
+
+function admin_build_twitter_post_message(string $title, string $description, string $url): string {
+    return admin_build_sentence_limited_social_message($title, $description, $url, 280, 'admin_bold_unicode_text');
+}
+
 function admin_build_telegram_message(string $slug, string $title, string $description, string $urlOverride = ''): string {
     $parts = [];
     $titleTrim = trim($title);
@@ -3234,12 +3320,13 @@ function admin_send_facebook_post(string $slug, string $title, string $descripti
         'utm_source' => 'facebook',
         'utm_medium' => 'social',
     ]);
+    $message = admin_build_sentence_limited_social_message($title, $description, $trackedUrl, 5000, 'admin_bold_unicode_text');
     $imageUrl = trim($imageUrl);
     if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
         $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($pageId) . '/photos';
         $params = [
             'url' => $imageUrl,
-            'caption' => admin_build_post_message($slug, $title, $description, $trackedUrl),
+            'caption' => $message,
             'access_token' => $token,
         ];
         $body = http_build_query($params);
@@ -3260,7 +3347,7 @@ function admin_send_facebook_post(string $slug, string $title, string $descripti
     }
     $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($pageId) . '/feed';
     $params = [
-        'message' => admin_build_post_message($slug, $title, $description, $trackedUrl, $imageUrl),
+        'message' => $message,
         'access_token' => $token,
     ];
     $body = http_build_query($params);
@@ -3284,14 +3371,7 @@ function admin_send_twitter_post(string $slug, string $title, string $descriptio
         'utm_medium' => 'social',
     ]);
     $endpoint = 'https://api.twitter.com/2/tweets';
-    $text = admin_build_post_message($slug, $title, $description, $trackedUrl);
-    if (function_exists('mb_strlen')) {
-        if (mb_strlen($text, 'UTF-8') > 280) {
-            $text = mb_substr($text, 0, 275, 'UTF-8') . '…';
-        }
-    } elseif (strlen($text) > 280) {
-        $text = substr($text, 0, 275) . '…';
-    }
+    $text = admin_build_twitter_post_message($title, $description, $trackedUrl);
     $payload = ['text' => $text];
     return admin_send_twitter_api_request($endpoint, $payload, $settings, $error);
 }
@@ -3414,7 +3494,7 @@ function admin_send_linkedin_post(string $slug, string $title, string $descripti
         $error = 'LinkedIn: el Author URN debe ser urn:li:person:ID o urn:li:organization:ID.';
         return false;
     }
-    $commentary = $messageTitle . "\n\n" . 'Lee el artículo: ' . $trackedUrl;
+    $commentary = admin_build_sentence_limited_social_message($messageTitle, $description, $trackedUrl, 3000, 'admin_bold_unicode_text');
     $legacyAuthor = $normalizedAuthor;
     if (preg_match('/^urn:li:person:(.+)$/', $legacyAuthor, $match) === 1) {
         $legacyAuthor = 'urn:li:member:' . $match[1];
@@ -3578,19 +3658,7 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
         'utm_source' => 'bluesky',
         'utm_medium' => 'social',
     ]);
-    $parts = [];
-    $title = trim($title);
-    if ($title !== '') {
-        $parts[] = $title;
-    }
-    $text = implode("\n\n", $parts);
-    if (function_exists('mb_strlen')) {
-        if (mb_strlen($text, 'UTF-8') > 300) {
-            $text = mb_substr($text, 0, 296, 'UTF-8') . '…';
-        }
-    } elseif (strlen($text) > 300) {
-        $text = substr($text, 0, 296) . '…';
-    }
+    $text = admin_build_sentence_limited_social_message($title, $description, $trackedUrl, 300, 'admin_bold_unicode_text');
     $record = [
         '$type' => 'app.bsky.feed.post',
         'text' => $text,
@@ -3879,23 +3947,7 @@ function admin_send_mastodon_post(string $slug, string $title, string $descripti
         'utm_source' => 'mastodon',
         'utm_medium' => 'social',
     ]);
-    $parts = [];
-    $title = trim($title);
-    if ($title !== '') {
-        $parts[] = admin_mastodon_bold_text($title);
-    }
-    if ($trackedUrl !== '') {
-        $parts[] = $trackedUrl;
-    }
-    $description = trim(preg_replace('/\s+/u', ' ', $description) ?? $description);
-    if ($description !== '') {
-        $parts[] = $description;
-    }
-    $text = trim(implode("\n\n", $parts));
-    if ($text === '') {
-        $text = 'Nueva publicación disponible';
-    }
-    $text = admin_mastodon_trim_status($text, 2000);
+    $text = admin_build_sentence_limited_social_message($title, $description, $trackedUrl, 2000, 'admin_mastodon_bold_text');
     $payload = json_encode([
         'status' => $text,
     ]);

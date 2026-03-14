@@ -2052,9 +2052,18 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
             }));
         }
     }
+    $newsletterHeroImage = '';
+    if (!empty($visibleNewsletters)) {
+        $newsletterOldest = $visibleNewsletters;
+        usort($newsletterOldest, static function (array $a, array $b): int {
+            return ((int) ($a['timestamp'] ?? 0)) <=> ((int) ($b['timestamp'] ?? 0));
+        });
+        $newsletterHeroImage = trim((string) ($newsletterOldest[0]['image'] ?? ''));
+    }
     $content = $renderer->render('newsletters', [
         'newsletters' => $visibleNewsletters,
         'hasItineraries' => !empty($itineraryListing),
+        'newsletterHeroImage' => $newsletterHeroImage,
     ]);
     $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/newsletters' : '/newsletters';
     echo $renderer->render('layout', [

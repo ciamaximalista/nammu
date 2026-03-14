@@ -64,6 +64,8 @@ $hasActuality = !empty($hasActuality ?? ($GLOBALS['hasActuality'] ?? false));
 $postalEnabled = $postalEnabled ?? false;
 $postalUrl = $postalUrl ?? '/correos.php';
 $postalLogoSvg = $postalLogoSvg ?? '';
+$newsletterHeroImage = trim((string) ($newsletterHeroImage ?? ''));
+$newsletterHeroHasImage = $newsletterHeroImage !== '';
 $formatDateEs = static function (?string $date): string {
     if ($date === null || $date === '') {
         return '';
@@ -88,7 +90,7 @@ if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons'
 }
 ?>
 
-<section class="itinerary-archive-hero">
+<section class="itinerary-archive-hero<?= $newsletterHeroHasImage ? ' has-background' : '' ?>"<?= $newsletterHeroHasImage ? ' style="background-image: linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0.42)), url(\'' . htmlspecialchars($newsletterHeroImage, ENT_QUOTES, 'UTF-8') . '\');"' : '' ?>>
     <div>
         <p class="itinerary-archive-label"><?= $blogOwner ?></p>
         <h1>Newsletters</h1>
@@ -166,6 +168,12 @@ if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons'
         border: 1px solid rgba(0,0,0,0.05);
         text-align: center;
     }
+    .itinerary-archive-hero.has-background {
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: cover;
+        border: none;
+    }
     .itinerary-archive-label {
         margin: 0;
         text-transform: uppercase;
@@ -173,10 +181,17 @@ if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons'
         font-size: 0.85rem;
         color: <?= $accentColor ?>;
     }
+    .itinerary-archive-hero.has-background .itinerary-archive-label {
+        color: rgba(255,255,255,0.88);
+    }
     .itinerary-archive-hero h1 {
         margin: 0.3rem 0 0;
         font-size: clamp(2rem, 5vw, 2.8rem);
         color: <?= $brandColor ?>;
+    }
+    .itinerary-archive-hero.has-background h1 {
+        color: #fff;
+        text-shadow: 0 3px 20px rgba(0,0,0,0.35);
     }
     .itinerary-grid {
         display: grid;

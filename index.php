@@ -1924,6 +1924,15 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
         exit;
     }
     if (!$accessGranted) {
+        $accessAuthor = trim((string) ($theme['author'] ?? ''));
+        if ($accessAuthor === '') {
+            $accessAuthor = $siteTitle;
+        }
+        $accessBlog = trim((string) ($theme['blog'] ?? ''));
+        if ($accessBlog === '') {
+            $accessBlog = $siteTitle;
+        }
+        $accessTagline = trim((string) ($siteDescription ?? ''));
         $accessHeaderButtonsHtml = '';
         $homeSettings = $theme['home'] ?? [];
         $headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
@@ -1972,6 +1981,13 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
             }
         }
         $formHtml = '<section class="newsletter-access">';
+        $formHtml .= '<div class="newsletter-access-header">';
+        $formHtml .= '<span class="newsletter-access-author">' . htmlspecialchars($accessAuthor, ENT_QUOTES, 'UTF-8') . '</span>';
+        $formHtml .= '<h1 class="newsletter-access-blog">' . htmlspecialchars($accessBlog, ENT_QUOTES, 'UTF-8') . '</h1>';
+        if ($accessTagline !== '') {
+            $formHtml .= '<p class="newsletter-access-tagline">' . htmlspecialchars($accessTagline, ENT_QUOTES, 'UTF-8') . '</p>';
+        }
+        $formHtml .= '</div>';
         if ($accessHeaderButtonsHtml !== '') {
             $formHtml .= $accessHeaderButtonsHtml;
         }
@@ -1987,6 +2003,10 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
         $formHtml .= '<button type="submit">Enviar enlace</button>';
         $formHtml .= '</form></div></section>';
         $formHtml .= '<style>.newsletter-access{max-width:920px;margin:0 auto;padding:2rem 1.5rem;}';
+        $formHtml .= '.newsletter-access-header{max-width:760px;margin:0 auto 1.25rem auto;text-align:center;}';
+        $formHtml .= '.newsletter-access-author{display:block;margin-bottom:0.35rem;font-size:0.86rem;letter-spacing:0.18em;text-transform:uppercase;color:#6b7280;font-weight:700;}';
+        $formHtml .= '.newsletter-access-blog{margin:0;font-size:clamp(2rem,5vw,3.2rem);line-height:1.02;color:' . htmlspecialchars($theme['colors']['h1'] ?? '#1b8eed', ENT_QUOTES, 'UTF-8') . ';}';
+        $formHtml .= '.newsletter-access-tagline{max-width:58ch;margin:0.8rem auto 0 auto;color:#374151;line-height:1.65;}';
         $formHtml .= '.newsletter-access .site-header-buttons{margin:0 0 1.5rem 0;}';
         $formHtml .= '.newsletter-access-card{background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:16px;padding:1.8rem 2rem;box-shadow:0 12px 30px rgba(0,0,0,0.08);}';
         $formHtml .= '.newsletter-access-card h1{margin-top:0;}';
@@ -2070,6 +2090,15 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
         exit;
     }
     if (!$accessGranted) {
+        $accessAuthor = trim((string) ($theme['author'] ?? ''));
+        if ($accessAuthor === '') {
+            $accessAuthor = $siteTitle;
+        }
+        $accessBlog = trim((string) ($theme['blog'] ?? ''));
+        if ($accessBlog === '') {
+            $accessBlog = $siteTitle;
+        }
+        $accessTagline = trim((string) ($siteDescription ?? ''));
         $accessHeaderButtonsHtml = '';
         $homeSettings = $theme['home'] ?? [];
         $headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
@@ -2119,6 +2148,13 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
             }
         }
         $formHtml = '<section class="newsletter-access">';
+        $formHtml .= '<div class="newsletter-access-header">';
+        $formHtml .= '<span class="newsletter-access-author">' . htmlspecialchars($accessAuthor, ENT_QUOTES, 'UTF-8') . '</span>';
+        $formHtml .= '<h1 class="newsletter-access-blog">' . htmlspecialchars($accessBlog, ENT_QUOTES, 'UTF-8') . '</h1>';
+        if ($accessTagline !== '') {
+            $formHtml .= '<p class="newsletter-access-tagline">' . htmlspecialchars($accessTagline, ENT_QUOTES, 'UTF-8') . '</p>';
+        }
+        $formHtml .= '</div>';
         if ($accessHeaderButtonsHtml !== '') {
             $formHtml .= $accessHeaderButtonsHtml;
         }
@@ -2134,6 +2170,10 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
         $formHtml .= '<button type="submit">Enviar enlace</button>';
         $formHtml .= '</form></div></section>';
         $formHtml .= '<style>.newsletter-access{max-width:920px;margin:0 auto;padding:2rem 1.5rem;}';
+        $formHtml .= '.newsletter-access-header{max-width:760px;margin:0 auto 1.25rem auto;text-align:center;}';
+        $formHtml .= '.newsletter-access-author{display:block;margin-bottom:0.35rem;font-size:0.86rem;letter-spacing:0.18em;text-transform:uppercase;color:#6b7280;font-weight:700;}';
+        $formHtml .= '.newsletter-access-blog{margin:0;font-size:clamp(2rem,5vw,3.2rem);line-height:1.02;color:' . htmlspecialchars($theme['colors']['h1'] ?? '#1b8eed', ENT_QUOTES, 'UTF-8') . ';}';
+        $formHtml .= '.newsletter-access-tagline{max-width:58ch;margin:0.8rem auto 0 auto;color:#374151;line-height:1.65;}';
         $formHtml .= '.newsletter-access .site-header-buttons{margin:0 0 1.5rem 0;}';
         $formHtml .= '.newsletter-access-card{background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:16px;padding:1.8rem 2rem;box-shadow:0 12px 30px rgba(0,0,0,0.08);}';
         $formHtml .= '.newsletter-access-card h1{margin-top:0;}';

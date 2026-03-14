@@ -1965,7 +1965,7 @@
     $topPostsMonth = array_slice($topPostsMonth, 0, 10);
 
     $isSystemPageSlug = static function (string $slug): bool {
-        if ($slug === 'index' || $slug === 'podcast' || $slug === 'categorias' || $slug === 'letras' || $slug === 'itinerarios' || $slug === 'buscar' || $slug === 'avisos' || $slug === 'correos') {
+        if ($slug === 'index' || $slug === 'podcast' || $slug === 'categorias' || $slug === 'letras' || $slug === 'itinerarios' || $slug === 'buscar' || $slug === 'avisos' || $slug === 'correos' || $slug === 'actualidad') {
             return true;
         }
         if (preg_match('#^pagina/([1-9][0-9]*)$#', $slug)) {

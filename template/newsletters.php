@@ -52,12 +52,15 @@ if (!in_array($blocksMode, ['boxed', 'flat'], true)) {
 $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
 $categoriesIndexUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/categorias';
+$letterIndexUrlValue = $lettersIndexUrl ?? null;
+$showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
 $itinerariesIndexUrl = $itinerariesIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl, '/') . '/itinerarios' : '/itinerarios');
 $podcastIndexUrl = $podcastIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl, '/') . '/podcast' : '/podcast');
 $newslettersIndexUrl = $newslettersIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUrl, '/') . '/newsletters' : '/newsletters');
 $hasCategories = !empty($hasCategories);
 $hasPodcast = !empty($hasPodcast);
 $hasNewsletters = !empty($hasNewsletters);
+$hasActuality = !empty($hasActuality ?? ($GLOBALS['hasActuality'] ?? false));
 $postalEnabled = $postalEnabled ?? false;
 $postalUrl = $postalUrl ?? '/correos.php';
 $postalLogoSvg = $postalLogoSvg ?? '';
@@ -87,6 +90,10 @@ if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
         'categories_url' => $categoriesIndexUrl,
         'itineraries_url' => $itinerariesIndexUrl,
         'podcast_url' => $podcastIndexUrl,
+        'letters_url' => $letterIndexUrlValue,
+        'show_letters' => $showLetterButton,
+        'actuality_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/actualidad.php',
+        'has_actuality' => $hasActuality,
         'newsletters_url' => $newslettersIndexUrl,
         'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php',
         'postal_url' => $postalUrl,

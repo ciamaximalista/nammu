@@ -1729,7 +1729,10 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
         ];
     }
 
-    $twitterHandle = trim((string) ($config['twitter']['channel'] ?? ''));
+    $twitterHandle = trim((string) ($config['social']['twitter'] ?? ''));
+    if ($twitterHandle === '') {
+        $twitterHandle = trim((string) ($config['twitter']['channel'] ?? ''));
+    }
     if ($twitterHandle !== '') {
         $handle = ltrim($twitterHandle, '@');
         if ($handle !== '') {

@@ -231,18 +231,6 @@
                         <small class="form-text text-muted">Se usará en la etiqueta itunes:category de podcast.xml.</small>
                     </div>
 
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label for="social_twitter">Usuario de Twitter / X</label>
-                            <input type="text" name="social_twitter" id="social_twitter" class="form-control" value="<?= htmlspecialchars($socialTwitter, ENT_QUOTES, 'UTF-8') ?>" placeholder="usuario">
-                            <small class="form-text text-muted">Introduce el usuario sin la @ inicial.</small>
-                        </div>
-                        <div class="form-group col-md-6">
-                            <label for="social_facebook_app_id">Facebook App ID</label>
-                            <input type="text" name="social_facebook_app_id" id="social_facebook_app_id" class="form-control" value="<?= htmlspecialchars($socialFacebookAppId, ENT_QUOTES, 'UTF-8') ?>" placeholder="Opcional">
-                        </div>
-                    </div>
-
                     <h4 class="mt-4">Telegram (opcional)</h4>
                     <p class="text-muted">Conecta un bot y un canal/grupo para compartir automáticamente las nuevas entradas. <a href="#" data-toggle="modal" data-target="#telegramHelpModal">Ver guía rápida</a></p>
                     <div class="form-group">
@@ -291,9 +279,9 @@
                         <small class="form-text text-muted">Usa un token con permisos para publicar en la página objetivo.</small>
                     </div>
                     <div class="form-group">
-                        <label for="social_facebook_app_id_block">Facebook App ID</label>
-                        <input type="text" name="social_facebook_app_id" id="social_facebook_app_id_block" class="form-control" value="<?= htmlspecialchars($facebookAppId, ENT_QUOTES, 'UTF-8') ?>" placeholder="Opcional">
-                        <small class="form-text text-muted">Repite el App ID aquí si no lo has puesto en la parte superior.</small>
+                        <label for="social_facebook_app_id">Facebook App ID</label>
+                        <input type="text" name="social_facebook_app_id" id="social_facebook_app_id" class="form-control" value="<?= htmlspecialchars($facebookAppId, ENT_QUOTES, 'UTF-8') ?>" placeholder="Opcional">
+                        <small class="form-text text-muted">Necesario para el diagnóstico del token y algunas comprobaciones de la Graph API.</small>
                     </div>
                     <div class="form-group">
                         <label for="facebook_app_secret">App Secret</label>
@@ -545,6 +533,11 @@
                         <label for="twitter_access_secret">Access Token Secret</label>
                         <input type="text" name="twitter_access_secret" id="twitter_access_secret" class="form-control" value="<?= htmlspecialchars($twitterSettings['access_secret'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
                         <small class="form-text text-muted">Se genera junto al <code>Access Token</code>. Nammu no usa aquí ni el <code>Bearer Token</code> ni el <code>ID de Cliente</code> ni el <code>Client Secret</code>.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="social_twitter">Usuario público de X (footer y twitter:site)</label>
+                        <input type="text" name="social_twitter" id="social_twitter" class="form-control" value="<?= htmlspecialchars($socialTwitter, ENT_QUOTES, 'UTF-8') ?>" placeholder="MaximalismoBlog">
+                        <small class="form-text text-muted">Introduce el usuario sin la @ inicial. Se usa para enlazar el icono del footer y para la metaetiqueta <code>twitter:site</code>.</small>
                     </div>
                     <div class="form-check mb-3">
                         <input type="checkbox" class="form-check-input" name="twitter_auto" id="twitter_auto" value="1" <?= $twitterAutoEnabled ? 'checked' : '' ?>>

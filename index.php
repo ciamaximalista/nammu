@@ -1924,6 +1924,35 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
         exit;
     }
     if (!$accessGranted) {
+        $accessHeaderButtonsHtml = '';
+        $homeSettings = $theme['home'] ?? [];
+        $headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
+        $showHeaderButtons = in_array($headerButtonsMode, ['home', 'both'], true);
+        $subscriptionSettings = is_array($theme['subscription'] ?? null) ? $theme['subscription'] : [];
+        $subscriptionModeForButtons = $subscriptionSettings['mode'] ?? 'none';
+        if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
+            $accessHeaderButtonsHtml = nammu_render_header_buttons([
+                'accent' => $theme['colors']['accent'] ?? '#0a4c8a',
+                'search_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/buscar.php',
+                'categories_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/categorias',
+                'itineraries_url' => $itinerariesIndexUrl,
+                'podcast_url' => $podcastIndexUrl,
+                'letters_url' => $isAlphabeticalOrder ? $lettersIndexUrl : null,
+                'show_letters' => $isAlphabeticalOrder,
+                'actuality_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/actualidad.php',
+                'has_actuality' => $hasActuality,
+                'newsletters_url' => $newslettersIndexUrl,
+                'avisos_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/avisos.php',
+                'postal_url' => $postalUrl,
+                'postal_svg' => $postalLogoSvg,
+                'has_categories' => $hasCategories,
+                'has_itineraries' => !empty($itineraryListing),
+                'has_podcast' => $hasPodcast,
+                'has_newsletters' => $hasNewsletters,
+                'subscription_enabled' => $subscriptionModeForButtons !== 'none',
+                'postal_enabled' => $postalEnabled,
+            ]);
+        }
         $formMessage = '';
         $formType = 'info';
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -1942,7 +1971,11 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
                 $formType = 'success';
             }
         }
-        $formHtml = '<section class="newsletter-access"><div class="newsletter-access-card">';
+        $formHtml = '<section class="newsletter-access">';
+        if ($accessHeaderButtonsHtml !== '') {
+            $formHtml .= $accessHeaderButtonsHtml;
+        }
+        $formHtml .= '<div class="newsletter-access-card">';
         $formHtml .= '<h1>Archivo de newsletters</h1>';
         $formHtml .= '<p>Sólo los suscriptores de la newsletter tienen acceso a este archivo y sólo pueden leer los newsletters enviados después de haberse suscrito. Introduce tu email para acceder. Recibirás un enlace de acceso válido durante 1 hora.</p>';
         if ($formMessage !== '') {
@@ -1953,7 +1986,8 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
         $formHtml .= '<input type="email" id="newsletter_email" name="newsletter_email" required>';
         $formHtml .= '<button type="submit">Enviar enlace</button>';
         $formHtml .= '</form></div></section>';
-        $formHtml .= '<style>.newsletter-access{max-width:520px;margin:0 auto;padding:2rem 1.5rem;}';
+        $formHtml .= '<style>.newsletter-access{max-width:920px;margin:0 auto;padding:2rem 1.5rem;}';
+        $formHtml .= '.newsletter-access .site-header-buttons{margin:0 0 1.5rem 0;}';
         $formHtml .= '.newsletter-access-card{background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:16px;padding:1.8rem 2rem;box-shadow:0 12px 30px rgba(0,0,0,0.08);}';
         $formHtml .= '.newsletter-access-card h1{margin-top:0;}';
         $formHtml .= '.newsletter-access-form{display:flex;flex-direction:column;gap:0.8rem;margin-top:1rem;}';
@@ -2036,6 +2070,35 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
         exit;
     }
     if (!$accessGranted) {
+        $accessHeaderButtonsHtml = '';
+        $homeSettings = $theme['home'] ?? [];
+        $headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
+        $showHeaderButtons = in_array($headerButtonsMode, ['home', 'both'], true);
+        $subscriptionSettings = is_array($theme['subscription'] ?? null) ? $theme['subscription'] : [];
+        $subscriptionModeForButtons = $subscriptionSettings['mode'] ?? 'none';
+        if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
+            $accessHeaderButtonsHtml = nammu_render_header_buttons([
+                'accent' => $theme['colors']['accent'] ?? '#0a4c8a',
+                'search_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/buscar.php',
+                'categories_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/categorias',
+                'itineraries_url' => $itinerariesIndexUrl,
+                'podcast_url' => $podcastIndexUrl,
+                'letters_url' => $isAlphabeticalOrder ? $lettersIndexUrl : null,
+                'show_letters' => $isAlphabeticalOrder,
+                'actuality_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/actualidad.php',
+                'has_actuality' => $hasActuality,
+                'newsletters_url' => $newslettersIndexUrl,
+                'avisos_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/avisos.php',
+                'postal_url' => $postalUrl,
+                'postal_svg' => $postalLogoSvg,
+                'has_categories' => $hasCategories,
+                'has_itineraries' => !empty($itineraryListing),
+                'has_podcast' => $hasPodcast,
+                'has_newsletters' => $hasNewsletters,
+                'subscription_enabled' => $subscriptionModeForButtons !== 'none',
+                'postal_enabled' => $postalEnabled,
+            ]);
+        }
         $formMessage = '';
         $formType = 'info';
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -2055,7 +2118,11 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
                 $formType = 'success';
             }
         }
-        $formHtml = '<section class="newsletter-access"><div class="newsletter-access-card">';
+        $formHtml = '<section class="newsletter-access">';
+        if ($accessHeaderButtonsHtml !== '') {
+            $formHtml .= $accessHeaderButtonsHtml;
+        }
+        $formHtml .= '<div class="newsletter-access-card">';
         $formHtml .= '<h1>Acceso a newsletter</h1>';
         $formHtml .= '<p>Sólo los suscriptores de la newsletter tienen acceso a este archivo y sólo pueden leer los newsletters enviados después de haberse suscrito. Introduce tu email para acceder. Recibirás un enlace de acceso válido durante 1 hora.</p>';
         if ($formMessage !== '') {
@@ -2066,7 +2133,8 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
         $formHtml .= '<input type="email" id="newsletter_email" name="newsletter_email" required>';
         $formHtml .= '<button type="submit">Enviar enlace</button>';
         $formHtml .= '</form></div></section>';
-        $formHtml .= '<style>.newsletter-access{max-width:520px;margin:0 auto;padding:2rem 1.5rem;}';
+        $formHtml .= '<style>.newsletter-access{max-width:920px;margin:0 auto;padding:2rem 1.5rem;}';
+        $formHtml .= '.newsletter-access .site-header-buttons{margin:0 0 1.5rem 0;}';
         $formHtml .= '.newsletter-access-card{background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:16px;padding:1.8rem 2rem;box-shadow:0 12px 30px rgba(0,0,0,0.08);}';
         $formHtml .= '.newsletter-access-card h1{margin-top:0;}';
         $formHtml .= '.newsletter-access-form{display:flex;flex-direction:column;gap:0.8rem;margin-top:1rem;}';

@@ -69,7 +69,7 @@ $formatDate = static function (int $timestamp): string {
         <h1>Actualidad</h1>
         <p>
             <?php if ($feedsCount > 0): ?>
-                Selección de fuentes de <?= htmlspecialchars($theme['blog'] !== '' ? $theme['blog'] : $siteTitle, ENT_QUOTES, 'UTF-8') ?>.
+                Ultimas fuentes compartidas
             <?php else: ?>
                 No hay feeds automáticas configuradas todavía.
             <?php endif; ?>

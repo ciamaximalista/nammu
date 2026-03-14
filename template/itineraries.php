@@ -4,6 +4,7 @@
  * @var callable $itineraryUrl
  * @var callable $resolveImage
  * @var array $theme
+ * @var string|null $heroImage
  */
 $colors = $theme['colors'] ?? [];
 $highlight = htmlspecialchars($colors['highlight'] ?? '#f3f6f9', ENT_QUOTES, 'UTF-8');
@@ -83,9 +84,15 @@ if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
         'postal_enabled' => $postalEnabled,
     ]);
 }
+$heroImageUrl = $resolveImage($heroImage ?? null);
+$heroStyle = $heroImageUrl
+    ? ' style="background-image: linear-gradient(rgba(0,0,0,0.38), rgba(0,0,0,0.38)), url(\'' . htmlspecialchars($heroImageUrl, ENT_QUOTES, 'UTF-8') . '\'); background-size: cover; background-position: center;"'
+    : '';
+$heroTextColor = $heroImageUrl ? '#ffffff' : $brandColor;
+$heroLabelColor = $heroImageUrl ? 'rgba(255,255,255,0.92)' : $accentColor;
 ?>
 
-<section class="itinerary-archive-hero">
+<section class="itinerary-archive-hero<?= $heroImageUrl ? ' has-hero-image' : '' ?>"<?= $heroStyle ?>>
     <div>
         <p class="itinerary-archive-label"><?= $blogOwner ?></p>
         <h1>Itinerarios</h1>
@@ -170,12 +177,16 @@ if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
         text-transform: uppercase;
         letter-spacing: 0.1em;
         font-size: 0.85rem;
-        color: <?= $accentColor ?>;
+        color: <?= $heroLabelColor ?>;
     }
     .itinerary-archive-hero h1 {
         margin: 0.3rem 0 0;
         font-size: clamp(2rem, 5vw, 2.8rem);
-        color: <?= $brandColor ?>;
+        color: <?= $heroTextColor ?>;
+    }
+    .itinerary-archive-hero.has-hero-image {
+        border-color: rgba(0,0,0,0.12);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
     }
     .itinerary-grid {
         display: grid;

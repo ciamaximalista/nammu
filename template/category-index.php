@@ -2,6 +2,7 @@
 /**
  * @var array<int, array{name:string,slug:string,count:int,url:string}> $categories
  * @var int $total
+ * @var string|null $heroImage
  */
 $colors = $theme['colors'] ?? [];
 $highlight = htmlspecialchars($colors['highlight'] ?? '#f3f6f9', ENT_QUOTES, 'UTF-8');
@@ -51,6 +52,12 @@ if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
         'postal_enabled' => $postalEnabled,
     ]);
 }
+$heroImageUrl = $resolveImage($heroImage ?? null);
+$heroStyle = $heroImageUrl
+    ? ' style="background-image: linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0.42)), url(\'' . htmlspecialchars($heroImageUrl, ENT_QUOTES, 'UTF-8') . '\'); background-size: cover; background-position: center;"'
+    : '';
+$heroTitleColor = $heroImageUrl ? '#ffffff' : $h1Color;
+$heroTextColor = $heroImageUrl ? 'rgba(255,255,255,0.94)' : $textColor;
 $renderSearchBox = static function (string $variant) use ($searchAction, $searchActionBase, $accentColor, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories, $hasPodcast, $podcastIndexUrl): string {
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?>">
@@ -111,7 +118,7 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
 };
 ?>
 <section class="category-hero">
-    <div class="category-hero-inner">
+    <div class="category-hero-inner<?= $heroImageUrl ? ' has-hero-image' : '' ?>"<?= $heroStyle ?>>
         <h1>Explora por categorías</h1>
         <p>Tenemos <?= htmlspecialchars((string) $total, ENT_QUOTES, 'UTF-8') ?> categoría<?= $total === 1 ? '' : 's' ?> activas. Elige un tema y navega por sus contenidos.</p>
         <?= $headerButtonsHtml ?>
@@ -172,11 +179,15 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
     }
     .category-hero-inner h1 {
         margin: 0 0 0.5rem 0;
-        color: <?= $h1Color ?>;
+        color: <?= $heroTitleColor ?>;
     }
     .category-hero-inner p {
         margin: 0;
-        color: <?= $textColor ?>;
+        color: <?= $heroTextColor ?>;
+    }
+    .category-hero-inner.has-hero-image {
+        border-color: rgba(0,0,0,0.1);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
     }
     .category-grid {
         display: grid;

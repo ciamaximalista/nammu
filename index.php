@@ -1177,10 +1177,16 @@ if ($isCategoriesIndex) {
         ];
     }
     usort($categoriesList, static fn ($a, $b) => strcasecmp($a['name'], $b['name']));
+    $categoryHeroImage = null;
+    if (!empty($categoriesList)) {
+        $lastCategory = $categoriesList[count($categoriesList) - 1];
+        $categoryHeroImage = $lastCategory['image'] ?? null;
+    }
 
     $content = $renderer->render('category-index', [
         'categories' => $categoriesList,
         'total' => count($categoriesList),
+        'heroImage' => $categoryHeroImage,
     ]);
 
     $canonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/categorias';
@@ -1860,8 +1866,35 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
 
 if (preg_match('#^/itinerarios/?$#i', $routePath)) {
     $itineraries = $itineraryListing;
+    $itineraryHeroImage = null;
+    if (!empty($itineraries)) {
+        $itineraryCandidates = $itineraries;
+        usort($itineraryCandidates, static function (Itinerary $a, Itinerary $b): int {
+            $resolveTimestamp = static function (Itinerary $itinerary): int {
+                $metadata = method_exists($itinerary, 'getMetadata') ? $itinerary->getMetadata() : [];
+                $dateString = trim((string) ($metadata['Date'] ?? ($metadata['Updated'] ?? '')));
+                if ($dateString !== '') {
+                    $timestamp = strtotime($dateString);
+                    if ($timestamp !== false) {
+                        return (int) $timestamp;
+                    }
+                }
+
+                $indexPath = rtrim($itinerary->getDirectory(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'index.md';
+                $fileTimestamp = @filemtime($indexPath);
+                return $fileTimestamp !== false ? (int) $fileTimestamp : PHP_INT_MAX;
+            };
+
+            return $resolveTimestamp($a) <=> $resolveTimestamp($b);
+        });
+        $oldestItinerary = $itineraryCandidates[0] ?? null;
+        if ($oldestItinerary instanceof Itinerary) {
+            $itineraryHeroImage = $oldestItinerary->getImage();
+        }
+    }
     $content = $renderer->render('itineraries', [
         'itineraries' => $itineraries,
+        'heroImage' => $itineraryHeroImage,
     ]);
     $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios';
     $description = 'Selección de itinerarios temáticos para seguir paso a paso.';
@@ -1932,7 +1965,8 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
         if ($accessBlog === '') {
             $accessBlog = $siteTitle;
         }
-        $accessTagline = trim((string) ($siteDescription ?? ''));
+        $accessDefaultDescription = trim((string) ($socialConfig['default_description'] ?? ''));
+        $accessTagline = $accessDefaultDescription !== '' ? $accessDefaultDescription : trim((string) ($siteDescription ?? ''));
         $accessHeaderButtonsHtml = '';
         $homeSettings = $theme['home'] ?? [];
         $headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';
@@ -2098,7 +2132,8 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
         if ($accessBlog === '') {
             $accessBlog = $siteTitle;
         }
-        $accessTagline = trim((string) ($siteDescription ?? ''));
+        $accessDefaultDescription = trim((string) ($socialConfig['default_description'] ?? ''));
+        $accessTagline = $accessDefaultDescription !== '' ? $accessDefaultDescription : trim((string) ($siteDescription ?? ''));
         $accessHeaderButtonsHtml = '';
         $homeSettings = $theme['home'] ?? [];
         $headerButtonsMode = $homeSettings['header_buttons'] ?? 'none';

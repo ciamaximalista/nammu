@@ -22,7 +22,7 @@ function admin_social_broadcast_guidance(): array
         'bluesky' => 'Máximo: 300 caracteres',
         'mastodon' => 'Máximo: 2000 caracteres',
         'linkedin' => 'Máximo: 3000 caracteres',
-        'instagram' => 'Imagen recomendada: 1080x1350 o 1080x1080',
+        'instagram' => 'Nammu la adaptará a 1080x1080 para Instagram',
     ];
 }
 

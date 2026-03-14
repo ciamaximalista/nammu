@@ -53,7 +53,7 @@
                                         <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="social_broadcast_image" data-target-prefix="">Seleccionar imagen</button>
                                     </div>
                                 </div>
-                                <small class="form-text text-muted">La imagen se enviará cuando la red lo soporte. Instagram la requiere siempre.</small>
+                                <small class="form-text text-muted">La imagen se enviará cuando la red lo soporte. Si marcas Instagram, Nammu la adaptará automáticamente a 1080x1080.</small>
                             </div>
                         </div>
                         <div class="col-lg-4">

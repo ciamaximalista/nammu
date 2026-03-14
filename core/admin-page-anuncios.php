@@ -527,24 +527,24 @@
                     <h4 class="mt-4">Twitter / X (opcional)</h4>
                     <p class="text-muted">Publica un tweet con el título y enlace de cada entrada. <a href="#" data-toggle="modal" data-target="#twitterHelpModal">Ver guía rápida</a></p>
                     <div class="form-group">
-                        <label for="twitter_api_key">API Key</label>
+                        <label for="twitter_api_key">Consumer Key</label>
                         <input type="text" name="twitter_api_key" id="twitter_api_key" class="form-control" value="<?= htmlspecialchars($twitterSettings['api_key'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxxxxxxxxxxxxxx">
-                        <small class="form-text text-muted">En X for Developers aparece dentro de <code>Keys and tokens</code> como <code>API Key</code> o <code>Consumer Key</code>.</small>
+                        <small class="form-text text-muted">En X aparece en <code>Apps</code> &rarr; tu app &rarr; <code>Claves OAuth 1.0</code> como <code>Consumer Key</code>.</small>
                     </div>
                     <div class="form-group">
-                        <label for="twitter_api_secret">API Key Secret</label>
+                        <label for="twitter_api_secret">Consumer Secret</label>
                         <input type="text" name="twitter_api_secret" id="twitter_api_secret" class="form-control" value="<?= htmlspecialchars($twitterSettings['api_secret'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
-                        <small class="form-text text-muted">En X for Developers aparece como <code>API Key Secret</code> o <code>Consumer Secret</code>.</small>
+                        <small class="form-text text-muted">Va junto a <code>Consumer Key</code>. Si no lo ves, usa <code>Mostrar</code> o <code>Regenerar</code> en las claves OAuth 1.0.</small>
                     </div>
                     <div class="form-group">
                         <label for="twitter_access_token">Access Token</label>
                         <input type="text" name="twitter_access_token" id="twitter_access_token" class="form-control" value="<?= htmlspecialchars($twitterSettings['access_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
-                        <small class="form-text text-muted">Debe ser un token de usuario generado después de poner la app en <code>Read and write</code>.</small>
+                        <small class="form-text text-muted">En X aparece en <code>Apps</code> &rarr; tu app &rarr; <code>Claves OAuth 1.0</code> como <code>Access Token</code>. Debe poner <code>Leer y escribir</code>.</small>
                     </div>
                     <div class="form-group">
                         <label for="twitter_access_secret">Access Token Secret</label>
                         <input type="text" name="twitter_access_secret" id="twitter_access_secret" class="form-control" value="<?= htmlspecialchars($twitterSettings['access_secret'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
-                        <small class="form-text text-muted">Se genera junto al <code>Access Token</code>. Nammu no usa aquí el <code>Bearer Token</code>.</small>
+                        <small class="form-text text-muted">Se genera junto al <code>Access Token</code>. Nammu no usa aquí ni el <code>Bearer Token</code> ni el <code>ID de Cliente</code> ni el <code>Client Secret</code>.</small>
                     </div>
                     <div class="form-check mb-3">
                         <input type="checkbox" class="form-check-input" name="twitter_auto" id="twitter_auto" value="1" <?= $twitterAutoEnabled ? 'checked' : '' ?>>
@@ -560,10 +560,23 @@
                                     </button>
                                 </div>
                                 <div class="modal-body">
-                                    <h6 class="mb-2">1) Crear la app y activar autenticación de usuario</h6>
+                                    <h6 class="mb-2">Qué datos necesitas realmente</h6>
+                                    <ul class="mb-3">
+                                        <li><strong>Sí necesitas:</strong> <code>Consumer Key</code>, <code>Consumer Secret</code>, <code>Access Token</code> y <code>Access Token Secret</code>.</li>
+                                        <li><strong>No necesitas aquí:</strong> <code>Bearer Token</code>, <code>ID de Cliente</code> ni <code>Client Secret</code>.</li>
+                                    </ul>
+
+                                    <h6 class="mb-2">1) Entrar en la app correcta</h6>
                                     <ol class="mb-3">
-                                        <li>Entra en <code>https://console.x.com/</code> y crea o abre tu app.</li>
-                                        <li>Ve a <strong>Settings</strong> &rarr; <strong>User authentication settings</strong>.</li>
+                                        <li>Entra en <code>https://console.x.com/</code>.</li>
+                                        <li>En el menú lateral pulsa <strong>Apps</strong>.</li>
+                                        <li>Abre tu app.</li>
+                                        <li>Dentro de la app, entra en <strong>Settings</strong> o en <strong>Editar configuración</strong>.</li>
+                                    </ol>
+
+                                    <h6 class="mb-2">2) Activar permisos de escritura</h6>
+                                    <ol class="mb-3">
+                                        <li>Ve a <strong>User authentication settings</strong>.</li>
                                         <li>Pulsa <strong>Set up</strong> o <strong>Edit</strong>.</li>
                                         <li>Activa <strong>OAuth 2.0</strong> y pon la app con permiso <strong>Read and write</strong>.</li>
                                         <li>En <strong>App type</strong> puedes usar <strong>Web App</strong> o <strong>Automated App or Bot</strong>.</li>
@@ -572,27 +585,37 @@
                                         <li>Guarda los cambios.</li>
                                     </ol>
 
-                                    <h6 class="mb-2">2) Regenerar las credenciales correctas</h6>
+                                    <h6 class="mb-2">3) Sacar las credenciales que sí usa Nammu</h6>
                                     <ol class="mb-3">
-                                        <li>Ve a <strong>Keys and tokens</strong>.</li>
-                                        <li>Copia la <strong>API Key</strong> y la <strong>API Key Secret</strong>.</li>
-                                        <li>En <strong>Authentication Tokens</strong>, genera o regenera <strong>Access Token and Secret</strong>.</li>
-                                        <li>Si acabas de cambiar la app a <strong>Read and write</strong>, regenera estos tokens para que hereden ese permiso.</li>
+                                        <li>Vuelve a la pantalla principal de la app.</li>
+                                        <li>Busca el bloque <strong>Claves OAuth 1.0</strong>.</li>
+                                        <li>Copia <strong>Consumer Key</strong>.</li>
+                                        <li>Muestra o regenera y copia <strong>Consumer Secret</strong>.</li>
+                                        <li>Copia <strong>Access Token</strong>.</li>
+                                        <li>Muestra o regenera y copia <strong>Access Token Secret</strong>.</li>
+                                        <li>Si acabas de poner la app en <strong>Leer y escribir</strong>, regenera primero el <strong>Access Token</strong> para que salga con ese permiso.</li>
                                     </ol>
 
-                                    <h6 class="mb-2">3) Qué pegar en Nammu</h6>
+                                    <h6 class="mb-2">4) Qué pegar en Nammu</h6>
                                     <ol class="mb-3">
-                                        <li><strong>API Key</strong> &rarr; campo <strong>API Key</strong>.</li>
-                                        <li><strong>API Key Secret</strong> &rarr; campo <strong>API Key Secret</strong>.</li>
+                                        <li><strong>Consumer Key</strong> &rarr; campo <strong>Consumer Key</strong>.</li>
+                                        <li><strong>Consumer Secret</strong> &rarr; campo <strong>Consumer Secret</strong>.</li>
                                         <li><strong>Access Token</strong> &rarr; campo <strong>Access Token</strong>.</li>
                                         <li><strong>Access Token Secret</strong> &rarr; campo <strong>Access Token Secret</strong>.</li>
                                     </ol>
 
-                                    <h6 class="mb-2">4) Importante</h6>
+                                    <h6 class="mb-2">5) Qué no pegar</h6>
                                     <ul class="mb-3">
-                                        <li>El <strong>Bearer Token</strong> no es el dato correcto para publicar desde Nammu.</li>
-                                        <li>Si X devuelve errores de permisos, revisa que la app siga en <strong>Read and write</strong> y vuelve a regenerar el <strong>Access Token</strong> y su <strong>Secret</strong>.</li>
-                                        <li>Si cambias permisos o tipo de autenticación, espera unos minutos y vuelve a generar las credenciales.</li>
+                                        <li>No pegues el <strong>Bearer Token</strong>.</li>
+                                        <li>No pegues el <strong>ID de Cliente</strong>.</li>
+                                        <li>No pegues el <strong>Client Secret</strong>.</li>
+                                    </ul>
+
+                                    <h6 class="mb-2">6) Si sigue fallando</h6>
+                                    <ul class="mb-3">
+                                        <li>Comprueba que el <strong>Access Token</strong> indica <strong>Leer y escribir</strong>.</li>
+                                        <li>Si no lo indica, vuelve a <strong>User authentication settings</strong>, guarda <strong>Read and write</strong> y luego regenera el <strong>Access Token</strong> y su secreto.</li>
+                                        <li>Si cambias permisos, espera un poco y prueba de nuevo.</li>
                                     </ul>
 
                                     <p class="mb-0">Los mensajes de X se recortarán a un máximo de 280 caracteres cuando haga falta.</p>

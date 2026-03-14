@@ -55,6 +55,18 @@ foreach ($items as $item) {
     }
     $groupedItems[$groupKey]['items'][] = $item;
 }
+$splitColumns = static function (array $dayItems): array {
+    $left = [];
+    $right = [];
+    foreach (array_values($dayItems) as $index => $dayItem) {
+        if ($index % 2 === 0) {
+            $left[] = $dayItem;
+        } else {
+            $right[] = $dayItem;
+        }
+    }
+    return [$left, $right];
+};
 ?>
 <section class="actuality-hero">
     <div class="actuality-hero-inner">
@@ -76,34 +88,64 @@ foreach ($items as $item) {
     </section>
 <?php else: ?>
     <?php foreach ($groupedItems as $group): ?>
+        <?php [$leftColumnItems, $rightColumnItems] = $splitColumns($group['items']); ?>
         <section class="actuality-day">
             <h2 class="actuality-day-heading"><?= htmlspecialchars((string) $group['label'], ENT_QUOTES, 'UTF-8') ?></h2>
             <div class="actuality-grid">
-                <?php foreach ($group['items'] as $item): ?>
-                    <article class="actuality-card">
-                        <div class="actuality-card-body">
-                            <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
-                            <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
-                                <p class="actuality-meta">
-                                    <?php if ($item['timestamp'] > 0): ?>
-                                        <span><?= htmlspecialchars($formatDate($item['timestamp']), ENT_QUOTES, 'UTF-8') ?></span>
-                                    <?php endif; ?>
-                                    <?php if ($item['source'] !== ''): ?>
-                                        <span><?= htmlspecialchars(preg_replace('/^www\./i', '', $item['source']), ENT_QUOTES, 'UTF-8') ?></span>
-                                    <?php endif; ?>
-                                </p>
-                            <?php endif; ?>
-                            <?php if ($item['image'] !== ''): ?>
-                                <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                    <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                                </a>
-                            <?php endif; ?>
-                            <?php if ($item['description'] !== ''): ?>
-                                <div class="actuality-description"><?= nl2br(htmlspecialchars($item['description'], ENT_QUOTES, 'UTF-8')) ?></div>
-                            <?php endif; ?>
-                        </div>
-                    </article>
-                <?php endforeach; ?>
+                <div class="actuality-column">
+                    <?php foreach ($leftColumnItems as $item): ?>
+                        <article class="actuality-card">
+                            <div class="actuality-card-body">
+                                <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
+                                <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
+                                    <p class="actuality-meta">
+                                        <?php if ($item['timestamp'] > 0): ?>
+                                            <span><?= htmlspecialchars($formatDate($item['timestamp']), ENT_QUOTES, 'UTF-8') ?></span>
+                                        <?php endif; ?>
+                                        <?php if ($item['source'] !== ''): ?>
+                                            <span><?= htmlspecialchars(preg_replace('/^www\./i', '', $item['source']), ENT_QUOTES, 'UTF-8') ?></span>
+                                        <?php endif; ?>
+                                    </p>
+                                <?php endif; ?>
+                                <?php if ($item['image'] !== ''): ?>
+                                    <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                        <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                    </a>
+                                <?php endif; ?>
+                                <?php if ($item['description'] !== ''): ?>
+                                    <div class="actuality-description"><?= nl2br(htmlspecialchars($item['description'], ENT_QUOTES, 'UTF-8')) ?></div>
+                                <?php endif; ?>
+                            </div>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+                <div class="actuality-column">
+                    <?php foreach ($rightColumnItems as $item): ?>
+                        <article class="actuality-card">
+                            <div class="actuality-card-body">
+                                <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
+                                <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
+                                    <p class="actuality-meta">
+                                        <?php if ($item['timestamp'] > 0): ?>
+                                            <span><?= htmlspecialchars($formatDate($item['timestamp']), ENT_QUOTES, 'UTF-8') ?></span>
+                                        <?php endif; ?>
+                                        <?php if ($item['source'] !== ''): ?>
+                                            <span><?= htmlspecialchars(preg_replace('/^www\./i', '', $item['source']), ENT_QUOTES, 'UTF-8') ?></span>
+                                        <?php endif; ?>
+                                    </p>
+                                <?php endif; ?>
+                                <?php if ($item['image'] !== ''): ?>
+                                    <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                        <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                    </a>
+                                <?php endif; ?>
+                                <?php if ($item['description'] !== ''): ?>
+                                    <div class="actuality-description"><?= nl2br(htmlspecialchars($item['description'], ENT_QUOTES, 'UTF-8')) ?></div>
+                                <?php endif; ?>
+                            </div>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
             </div>
         </section>
     <?php endforeach; ?>
@@ -131,11 +173,18 @@ foreach ($items as $item) {
         color: <?= $actualityHeroBackgroundEsc !== '' ? 'rgba(255,255,255,0.92)' : $textColor ?>;
     }
     .actuality-grid {
-        column-count: 2;
-        column-gap: 1.5rem;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1.5rem;
     }
     .actuality-day {
         margin-bottom: 2rem;
+    }
+    .actuality-column {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        min-width: 0;
     }
     .actuality-day-heading {
         margin: 0 0 1.1rem 0;
@@ -144,12 +193,6 @@ foreach ($items as $item) {
         font-size: clamp(1.2rem, 2.5vw, 1.5rem);
     }
     .actuality-card {
-        display: inline-block;
-        width: 100%;
-        margin: 0 0 1.5rem 0;
-        break-inside: avoid;
-        -webkit-column-break-inside: avoid;
-        page-break-inside: avoid;
         background: #fff;
         border: 1px solid rgba(0,0,0,0.08);
         border-radius: var(--nammu-radius-lg);
@@ -209,7 +252,7 @@ foreach ($items as $item) {
     }
     @media (max-width: 760px) {
         .actuality-grid {
-            column-count: 1;
+            grid-template-columns: minmax(0, 1fr);
         }
     }
 </style>

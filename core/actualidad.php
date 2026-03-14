@@ -126,6 +126,44 @@ function nammu_actuality_resolve_url(string $candidate, string $baseUrl): string
     return $origin . ($dir !== '' ? $dir . '/' : '/') . $candidate;
 }
 
+function nammu_actuality_html_to_text_preserving_breaks(string $html): string
+{
+    $html = trim($html);
+    if ($html === '') {
+        return '';
+    }
+
+    $normalized = preg_replace('/<\s*br\s*\/?>/iu', "\n", $html) ?? $html;
+    $normalized = preg_replace('/<\/\s*(p|div|section|article|li|blockquote|h[1-6])\s*>/iu', "\n\n", $normalized) ?? $normalized;
+    $normalized = preg_replace('/<\s*li\b[^>]*>/iu', '- ', $normalized) ?? $normalized;
+    $text = html_entity_decode(strip_tags($normalized), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = preg_replace("/\r\n?/", "\n", $text) ?? $text;
+    $text = preg_replace("/[ \t]+\n/", "\n", $text) ?? $text;
+    $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
+
+    return trim($text);
+}
+
+function nammu_actuality_text_to_html(string $text): string
+{
+    $text = trim($text);
+    if ($text === '') {
+        return '';
+    }
+
+    $paragraphs = preg_split("/\n{2,}/", $text) ?: [];
+    $htmlParts = [];
+    foreach ($paragraphs as $paragraph) {
+        $paragraph = trim($paragraph);
+        if ($paragraph === '') {
+            continue;
+        }
+        $htmlParts[] = '<p>' . nl2br(htmlspecialchars($paragraph, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</p>';
+    }
+
+    return implode('', $htmlParts);
+}
+
 function nammu_actuality_extract_social_image(string $pageUrl): string
 {
     $response = nammu_actuality_fetch_url($pageUrl);
@@ -325,7 +363,7 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
             }
             $seen[$key] = true;
             $descriptionHtml = (string) ($item['description'] ?? '');
-            $descriptionText = trim(preg_replace('/\s+/u', ' ', strip_tags($descriptionHtml)));
+            $descriptionText = nammu_actuality_html_to_text_preserving_breaks($descriptionHtml);
             $items[] = [
                 'title' => trim((string) ($item['title'] ?? '')),
                 'link' => trim((string) ($item['link'] ?? '')),
@@ -378,7 +416,7 @@ function nammu_generate_actuality_feed(string $baseUrl, array $config, string $s
         if ($image === '') {
             $image = trim((string) ($item['image'] ?? ''));
         }
-        $descriptionHtml = $description !== '' ? '<p>' . htmlspecialchars($description, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>' : '';
+        $descriptionHtml = nammu_actuality_text_to_html($description);
         if ($image !== '') {
             $descriptionHtml .= '<p><img src="' . htmlspecialchars($image, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" alt="' . $itemTitle . '" /></p>';
         }

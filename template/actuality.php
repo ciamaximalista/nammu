@@ -102,7 +102,7 @@ $formatDate = static function (int $timestamp): string {
                         </a>
                     <?php endif; ?>
                     <?php if ($item['description'] !== ''): ?>
-                        <p class="actuality-description"><?= htmlspecialchars($item['description'], ENT_QUOTES, 'UTF-8') ?></p>
+                        <div class="actuality-description"><?= nl2br(htmlspecialchars($item['description'], ENT_QUOTES, 'UTF-8')) ?></div>
                     <?php endif; ?>
                 </div>
             </article>

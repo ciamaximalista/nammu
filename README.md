@@ -6,108 +6,58 @@ Nammu condensa todo lo que esperas de un gestor contemporáneo —edición Markd
 
 La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting que ofrezca PHP 8+.
 
-## Qué puedes construir con Nammu
+## Qué incluye Nammu
 
-### Publicaciones en Markdown con control editorial
+Nammu combina en una sola instalación:
 
-- Panel `admin.php` con sesión propia y creación del primer usuario en el onboarding.
-- Entradas y páginas Markdown con front matter YAML, soporte para `[toc]`, tablas, superíndices, bloques de código y TOC automático configurable por plantilla.
-- Páginas con visibilidad pública/privada: las privadas solo son accesibles para el administrador logueado y no se envían a canales externos ni se incluyen en sitemap.
-- Entradas relacionadas en posts y podcasts: permite definir de 2 a 6 slugs relacionados, combinando entradas y páginas de itinerario (`itinerarios/slug`), para mostrar recomendaciones contextuales al final de la vista individual.
-- Sistema de borradores con filtros “Entradas / Páginas / Borradores”, publicación directa desde el formulario y sello rojo en la vista pública cuando está sin publicar.
-- Publicaciones programadas con fecha y hora: se publican automáticamente y lanzan los avisos configurados (email, push y redes sociales).
-- Buscador interno dentro de la pestaña “Editar” que filtra por título, descripción, categoría o archivo para localizar contenidos en segundos.
-- Podcasts: entradas tipo episodio con audio mp3 obligatorio, metadatos específicos y feed `podcast.xml` compatible con plataformas de podcasting (categoría seleccionable, duración en segundos, `link` por episodio y metadatos iTunes validados).
-
-### Biblioteca multimedia integrada
-
-- Subida múltiple de imágenes, vídeos (MP4, WebM, MOV), GIF y PDF con renombrado seguro (`nammu_unique_asset_filename`) y validación de extensión.
-- Generación automática de variantes WebP (`.jpg.webp` / `.png.webp`) al subir o editar imágenes, con entrega automática al navegador compatible y caché prolongada para estáticos.
-- Editor web con recorte, brillo, contraste, saturación y pixelado antes de sobrescribir el archivo en `assets/`.
-- Selector de medios reutilizable que inserta imágenes, vídeos locales (`<video>`), PDF (`<iframe>`) o enlaces de YouTube convertidos a iframes responsive.
-
-### Plantillas vivas y SEO al día
-
-- Página “Plantilla” para elegir tipografías Google Fonts, colores, estilo de tarjetas, cabeceras de portada (texto, gráfico, mixtas) y comportamiento del TOC.
-- Footer editable con HTML libre, logotipos posicionables (arriba, abajo o ninguno) y radio global de esquinas.
-- `rss.xml` y `sitemap.xml` regenerados automáticamente desde `index.php`, con limpieza de `[toc]`, conversión de embeds a enlaces y `<enclosure>` para imágenes.
-- Tarjetas Open Graph y Twitter completas con imagen, títulos, descripciones y `alt` para mejorar la previsualización en redes.
-- Archivo `llms.txt` con enlaces y contexto para facilitar el uso del contenido por modelos de lenguaje.
-- Integración IndexNow para notificar nuevas entradas, páginas e itinerarios a buscadores compatibles.
-- Optimización SEO técnica con canónicos, datos estructurados y enlaces internos consistentes.
-- Botones contextuales en todas las cajas de búsqueda: índice de categorías, índice alfabético (modo diccionario) y, si hay cursos, acceso directo a `/itinerarios` con un icono de libro.
-
-### Buscador avanzado e índices
-
-- Buscador público (`buscar.php`) con `"-frase exacta"`, exclusiones `-palabra`, filtros `title:`, `category:`, `content:` y selector Entradas/Páginas.
-- Índice de categorías (`/categorias`) y vistas por categoría o letra (`/categoria/{slug}`, `/letra/{slug}`) que heredan la maquetación elegida.
-- Modo diccionario: agrupa la portada por letras, muestra `/letras`, añade accesos directos por letra y mantiene la navegación cuando vuelves a modo blog.
-
-### Itinerarios, cursos y libros interactivos
-
-- Cada itinerario vive en `/itinerarios/{slug}` con portada Markdown, imagen, descripción y autoevaluación opcional.
-- Temas independientes con imagen, descripción, contenido y quiz propio. Tres lógicas de uso: libre, secuencial y assessment (exige aprobar).
-- Progreso almacenado en cookies: desbloquea automáticamente los temas ya superados y el siguiente en línea, mostrando un aviso cuando todavía no puedes avanzar.
-- Estadísticas por itinerario: lectores de la presentación, usuarios que completaron el tema 1 (iniciados) y porcentaje por tema. Incluye botón **Poner estadísticas a cero** para reiniciar los contadores.
-- Feed dedicado `itinerarios.xml` y botones en los buscadores que llevan directo al índice de cursos.
-
-### Escritorio y cumplimiento RGPD
-
-- Escritorio Nammu con estadísticas del sitio: resumen de publicaciones, usuarios únicos, top de entradas/páginas, itinerarios iniciados/completados y suscriptores.
-- Integración opcional con Google Search Console y Microsoft Bing Webmaster Tools: si el usuario configura el API, el escritorio muestra métricas de rendimiento en Google Search y Bing.
-- Aviso de cookies RGPD con consentimiento obligatorio para continuar, uso exclusivo de estadísticas y sin compartir datos con terceros.
-- Anuncios flotantes configurables desde el admin: activación, alcance (portada o todo el sitio), texto/HTML e imagen para campañas puntuales.
-- Notificaciones push opcionales para avisar de nuevas entradas o itinerarios, con control desde la pestaña **Difusión**.
-
-### Automatización, lista de correo y redes sociales
-
-- Integración opcional con Telegram, Facebook Pages, Twitter/X, Bluesky, Mastodon y LinkedIn: auto-posting al publicar o envío manual desde la tabla de “Editar”.
-- Nueva pestaña **Redes** en el admin para redactar mensajes manuales, ver contador de caracteres y enviarlos a varias redes configuradas a la vez, mostrando el límite propio de cada plataforma.
-- Automatización por RSS externas desde la pestaña **Redes**: añade feeds RSS/Atom y elige a qué redes sociales se reenviarán automáticamente los nuevos contenidos detectados.
-- Composición automática de **`actualidad.php`** y de la feed agregada **`noticias.xml`** a partir de esas RSS externas configuradas en **Redes**, con caché local de imágenes sociales para acelerar la carga pública.
-- Plantillas de mensaje consistentes (título, descripción y URL pública) con escape apropiado para HTML o texto plano.
-- Feedback inmediato en la UI usando `$_SESSION['social_feedback']`.
-- Footer con enlaces sociales/plataformas y acceso directo a AntennaPod (deeplink al `podcast.xml`) cuando hay podcast publicado.
-- Avisos por email: mensajes automáticos con título, descripción y enlace al publicar entradas o itinerarios.
-- Newsletter: envíos completos del contenido (no publican en el blog) y se gestionan desde Publicar/Editar.
-- Ambas funciones comparten la misma lista de correo, pero el lector puede elegir si recibe avisos, newsletter o ambos.
-- Lista de correo con suscriptores guardados en `config/`, uso de Gmail vía SMTP con OAuth2 y gestión básica de altas/bajas desde el panel.
-- Gestor de libreta de direcciones de correo postal que genera etiquetas para sobres y archivo CSV con los suscriptores postales, listo para enviar boletines o materiales por correo postal.
-
-### Recursos técnicos clave
-
-- Compatible con la estructura `content/` y `assets/` de PicoCMS, lo que simplifica migraciones.
-- Si está disponible Symfony Yaml, se usa para parsear `config/config.yml`; si no, existe un parser propio robusto.
-- Markdown enriquecido en el panel gracias a una barra de botones que aplica negrita, listas, enlaces, código, citas y atajos para imágenes/vídeos. Incluye atajos de teclado (Ctrl/Cmd+B, Ctrl/Cmd+I, Ctrl/Cmd+K) en el editor de contenidos.
-- Botón **Ideas** en el editor: sugiere temas basados en estadísticas (artículos más leídos, categorías inactivas y búsquedas internas).
-- Integración con Nisaba: inserta notas recientes desde su feed `notas.xml` directamente en el editor.
-- Backups integrados: backup diario de estadísticas y backup completo semanal (content, assets, config e itinerarios), con retención automática y descarga desde el panel.
+- Blog y páginas en Markdown.
+- Podcast con `podcast.xml` y páginas HTML por episodio.
+- Newsletter y lista de avisos.
+- Itinerarios, cursos y colecciones de temas.
+- Biblioteca multimedia, buscador, SEO técnico, estadísticas propias y automatización social.
 
 ## Requisitos mínimos
 
-- PHP 8.0 o superior con extensiones estándar (`json`, `mbstring`, `iconv`, `curl` recomendado).
-- Extensión `gd` recomendada para normalizar automáticamente imágenes de podcast en el feed (`podcast.xml`) a 3000x3000 sin alterar las imágenes usadas en HTML/redes.
-- Para notificaciones push: extensión `openssl` habilitada.
-- Servidor web capaz de ejecutar PHP y escribir en `content/`, `assets/` e `itinerarios/`.
-- Composer opcional para aprovechar Symfony Yaml (el núcleo funciona sin él).
+- PHP 8.0 o superior.
+- Extensiones habituales: `json`, `mbstring`, `iconv`.
+- `curl` muy recomendable para integraciones externas y redes sociales.
+- `gd` recomendable para edición de imágenes, variantes WebP e imágenes de podcast.
+- `openssl` para notificaciones push.
+- Permisos de escritura sobre `config/`, `content/`, `assets/`, `itinerarios/` y `backups/`.
+- Composer es opcional. El núcleo funciona sin él, pero algunas integraciones mejoran si está disponible.
 
 ## Instalación
 
-### Paso a paso
+### 1. Clona o copia el proyecto
 
-1. Clona el repositorio o descarga el ZIP y descomprímelo en tu raíz web (ej. `/var/www/html/blogs/memoria`).
-   Si ya estás dentro del directorio que será la raíz del dominio y está vacío, usa:
+Si el directorio del sitio ya existe y está vacío:
 
 ```bash
+cd /var/www/html/<carpeta-publica>
 git clone https://github.com/ciamaximalista/nammu.git .
 ```
 
-2. Crea los directorios `config/`, `content/`, `assets/` e `itinerarios/` si no existen.
-3. Ajusta los permisos (ver siguiente bloque).
-4. Configura tu host virtual apuntando a la carpeta pública y habilita PHP 8.
-5. Accede a `https://tusitio/admin.php`, crea el usuario inicial y empieza a publicar.
+Si prefieres descargar un ZIP, descomprímelo en la carpeta pública del dominio.
 
-### Permisos recomendados
+### 2. Asegura la estructura básica
+
+Nammu trabaja sobre estas carpetas:
+
+- `config/`
+- `content/`
+- `assets/`
+- `itinerarios/`
+- `backups/`
+
+Si alguna no existe, créala:
+
+```bash
+mkdir -p config content assets itinerarios backups
+```
+
+### 3. Ajusta permisos
+
+Configuración recomendada en un servidor típico con `www-data`:
 
 ```bash
 sudo chown -R <tu-usuario>:www-data /var/www/html/<carpeta-publica>
@@ -115,18 +65,199 @@ sudo find /var/www/html/<carpeta-publica> -type d -exec chmod 2775 {} \;
 sudo find /var/www/html/<carpeta-publica> -type f -exec chmod 664 {} \;
 ```
 
-Sustituye `<tu-usuario>` y `<carpeta-publica>` según tu entorno. Usa el grupo del proceso web (www-data, apache, nginx…).
+Sustituye:
 
-### Notificaciones push (opcional)
+- `<tu-usuario>` por tu usuario del sistema.
+- `<carpeta-publica>` por la carpeta real del sitio.
 
-Para activar las notificaciones push necesitas instalar la librería Web Push y servir el sitio por HTTPS:
+Si tu servidor usa otro grupo para PHP o Apache (`apache`, `nginx`, etc.), cambia `www-data` por el correspondiente.
+
+### 4. Configura el dominio o virtual host
+
+Tu dominio debe apuntar a la carpeta donde está Nammu y ejecutar `index.php` con PHP 8+.
+
+Ejemplos habituales:
+
+- Apache con `DocumentRoot /var/www/html/<carpeta-publica>`
+- Nginx con `root /var/www/html/<carpeta-publica>`
+
+### 5. Entra al panel y crea el usuario inicial
+
+Abre:
+
+```text
+https://tu-dominio/admin.php
+```
+
+En el primer acceso Nammu crea el usuario inicial y guarda la configuración básica.
+
+### 6. Configura lo esencial desde el admin
+
+Nada más entrar, revisa estas pantallas:
+
+1. **Configuración**: nombre del sitio, autor, idioma, modo blog/diccionario, URL del sitio.
+2. **Plantilla**: tipografías, colores, portada, footer y botones de cabecera.
+3. **Difusión**: redes sociales, push, podcast y metadatos sociales.
+4. **Lista**: correo saliente y suscripciones si vas a usar avisos o newsletters.
+
+### 7. Activa las dependencias opcionales
+
+Si quieres notificaciones push:
 
 ```bash
 cd /var/www/html/<carpeta-publica>
 composer require minishlink/web-push
 ```
 
-Después activa **Notificaciones Push** en la pestaña **Difusión**. El sistema generará las claves VAPID y mostrará el prompt al lector cuando haya aceptado cookies.
+Si luego activas Push en **Difusión**, Nammu generará las claves VAPID.
+
+## Cron, automatización y backups
+
+### Qué tareas automáticas necesita Nammu
+
+La tarea principal es:
+
+```bash
+php /var/www/html/<carpeta-publica>/admin.php --run-scheduled
+```
+
+Esa tarea se encarga de:
+
+- publicar contenidos programados,
+- procesar colas pendientes,
+- revisar RSS externas configuradas en **Redes**,
+- regenerar snapshots públicos dependientes del cron.
+
+Además, Nammu incluye:
+
+- backup diario de estadísticas: `core/backup-daily.php`
+- backup completo semanal: `core/backup-weekly.php`
+
+### Cómo editar el cron correctamente
+
+La forma recomendada es editar el cron del usuario del servidor web:
+
+```bash
+sudo crontab -u www-data -e
+```
+
+Si usas ese comando, las líneas van **sin** la columna `www-data`.
+
+### Bloque de cron recomendado
+
+```bash
+*/5 * * * * php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
+15 3 * * * php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
+30 3 * * 0 php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
+45 3 * * 0 php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> /var/www/html/<carpeta-publica>/backups/backup-full.log 2>&1
+```
+
+Si en vez de eso editas `/etc/crontab` o usas `sudo crontab -e`, entonces sí debes añadir `www-data` delante del comando.
+
+### Qué guarda cada backup
+
+`core/backup-daily.php` guarda solo estadísticas:
+
+- `config/analytics.json`
+- `config/analytics.last-good.json`
+- `config/gsc-cache.json`
+- `config/bing-cache.json`
+- `itinerarios/*/stats.json`
+
+`core/backup-weekly.php` guarda una copia comprimida de:
+
+- `content/`
+- `assets/`
+- `config/`
+- `itinerarios/`
+
+### Restauración rápida del backup diario de estadísticas
+
+```bash
+tar -xzf /var/www/html/<carpeta-publica>/backups/nammu-stats-backup-AAAA-MM-DD_HHMMSS.tar.gz -C /var/www/html/<carpeta-publica>
+```
+
+## Funcionalidades principales
+
+### 1. Edición y publicación
+
+- Panel `admin.php` con sesión propia y creación del primer usuario en el onboarding.
+- Entradas, páginas, newsletters y podcasts en Markdown con front matter YAML.
+- Soporte para `[toc]`, tablas, superíndices, bloques de código, callouts y TOC automático configurable.
+- Borradores, publicación directa, paso a borrador y previsualización.
+- Publicaciones programadas con fecha y hora.
+- Entradas relacionadas en posts y podcasts, incluyendo páginas de itinerario.
+- Páginas privadas accesibles solo para el administrador logueado.
+
+### 2. Podcast, newsletter y avisos
+
+- Podcast con episodios en HTML, audio mp3, slug editable y feed `podcast.xml`.
+- Páginas HTML por episodio y enlaces desde `/podcast`.
+- Newsletter con archivo privado, vista web propia y control de envío.
+- Sistema de avisos por email separado de la newsletter.
+- Lista de suscriptores y libreta de direcciones postales en `config/`.
+
+### 3. Biblioteca de recursos
+
+- Subida múltiple de imágenes, vídeos y documentos.
+- Renombrado seguro y validación de extensión.
+- Editor web de imágenes con recorte y ajustes básicos.
+- Variantes WebP automáticas para imágenes compatibles.
+- Selector de recursos reutilizable en Publicar, Editar, Itinerarios y Redes.
+
+### 4. Diseño, portada y navegación
+
+- Configuración visual completa desde **Plantilla**.
+- Tipografías Google Fonts, paleta de color, cabeceras, tipos de tarjeta y footer.
+- Buscador configurable por posición y modo.
+- Footer editable con HTML libre, logotipos y enlaces sociales.
+- Botonera común en portada, posts y páginas sistémicas.
+
+### 5. SEO, feeds y previsualización social
+
+- `rss.xml`, `sitemap.xml`, `itinerarios.xml`, `podcast.xml`, `noticias.xml`.
+- Tarjetas Open Graph y Twitter completas con imagen, título, descripción y `alt`.
+- Canonical, datos estructurados e integración IndexNow.
+- `llms.txt` para consumo por modelos de lenguaje.
+
+### 6. Itinerarios y formación
+
+- Itinerarios con portada propia, temas, imágenes y quizzes.
+- Lógicas `free`, `sequential` y `assessment`.
+- Seguimiento del progreso por cookies.
+- Estadísticas por itinerario y reseteo desde el admin.
+
+### 7. Estadísticas y RGPD
+
+- Dashboard con usuarios únicos, páginas más vistas, búsquedas internas, orígenes y bots.
+- Integración opcional con Google Search Console y Bing Webmaster Tools.
+- Consentimiento de cookies obligatorio para usuarios humanos.
+- Sin envío de datos de analítica a terceros.
+
+### 8. Redes sociales y automatización
+
+- Integración opcional con Telegram, Facebook Pages, Twitter/X, Bluesky, Mastodon, Instagram y LinkedIn.
+- Auto-posting al publicar y envío manual desde la pestaña **Redes**.
+- Twitter/X usa OAuth 1.0a de usuario: `Consumer Key`, `Consumer Secret`, `Access Token`, `Access Token Secret`.
+- Envíos manuales con contador de caracteres y negritas básicas.
+- Telegram, Facebook, Bluesky, Instagram, Mastodon y X aceptan imágenes en los envíos manuales.
+- Telegram, Mastodon y X suben el archivo local de `assets/` cuando procede.
+- Mastodon con imagen requiere `write:statuses` y `write:media`.
+- Configuración de RSS externas para reenvío automático a redes.
+- Generación automática de `actualidad.php` y `noticias.xml` desde esas fuentes.
+
+### 9. Actualidad agregada
+
+- `actualidad.php` compone una página pública a partir de las RSS configuradas en **Redes**.
+- `noticias.xml` publica esa misma selección como feed agregada.
+- Se cachean imágenes sociales para acelerar la carga pública.
+- Si una fuente no trae imagen, Nammu intenta recuperar la imagen social o la primera imagen útil del artículo.
+
+### 10. Compatibilidad y migración
+
+- Compatible con la estructura `content/` y `assets/` de PicoCMS.
+- Parser propio robusto y uso opcional de Symfony Yaml si está disponible.
+- Integración con Nisaba y sugerencias editoriales desde el botón **Ideas**.
 
 ## Actualización
 
@@ -140,74 +271,12 @@ sudo find . -type d -exec chmod 2775 {} \;
 sudo find . -type f -exec chmod 664 {} \;
 ```
 
-Si cediste propiedad al usuario del servidor para que pueda escribir, ejecuta `sudo chown -R <tu-usuario>:www-data .` antes de `git pull` y deshaz el cambio después.
+## Migración desde PicoCMS
 
-## Backups y cron
-
-Nammu incluye un script CLI de backup diario en `core/backup-daily.php`.
-Este backup guarda **solo estadísticas**:
-
-- `config/analytics.json`
-- `config/analytics.last-good.json`
-- `config/gsc-cache.json`
-- `config/bing-cache.json`
-- `itinerarios/*/stats.json`
-
-### Ejecución manual
-
-```bash
-php /var/www/html/<carpeta-publica>/core/backup-daily.php
-```
-
-Esto crea un archivo `nammu-stats-backup-AAAA-MM-DD_HHMMSS.tar.gz` en `backups/`, junto con su hash `.sha256` y un resumen `latest-backup.json`.
-
-Nammu incluye también un backup completo semanal en `core/backup-weekly.php`, que comprime:
-
-- `content/`
-- `assets/`
-- `config/`
-- `itinerarios/`
-
-Con retención por defecto de 8 semanas y limpieza automática de los más antiguos.
-
-### Programarlo en cron (instalación recomendada)
-
-Edita el cron del usuario del servidor web con:
-
-```bash
-sudo crontab -u www-data -e
-```
-
-Si usas ese comando, las líneas del cron van **sin** la columna `www-data`. Ejemplo recomendado:
-
-```bash
-*/5 * * * * php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
-15 3 * * * php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
-30 3 * * 0 php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
-45 3 * * 0 php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> /var/www/html/<carpeta-publica>/backups/backup-full.log 2>&1
-```
-
-Si en lugar de eso editas `/etc/crontab` o usas `sudo crontab -e`, entonces sí debes añadir la columna `www-data` delante del comando.
-
-La tarea `admin.php --run-scheduled` publica contenidos programados, procesa colas pendientes y revisa las RSS externas configuradas en la pestaña **Redes** para reenviar novedades a redes sociales.
-
-Puedes cambiar el destino con `--dest=/ruta/de/backups`.
-
-### Restauración rápida
-
-```bash
-tar -xzf /var/www/html/<carpeta-publica>/backups/nammu-stats-backup-AAAA-MM-DD_HHMMSS.tar.gz -C /var/www/html/<carpeta-publica>
-```
-
-`backups/` está protegido con `.htaccess` para evitar acceso web directo.
-
-### Migración desde PicoCMS
-
-1. Copia tus carpetas `content/` y `assets/` dentro de la instalación de Nammu.
-2. Revisa el front matter y asegúrate de usar las claves que Nammu reconoce (`Title`, `Template`, `Date`, `Category`, `Image`, `Description`, `Status`, `Ordo`).
-3. Ve a **Configuración** y define el modo (blog/diccionario), nombre del sitio, autor y redes sociales.
-4. Replica tus estilos en **Plantilla** para ajustar fuentes, colores y portadas.
-5. Regenera `rss.xml`, `sitemap.xml` e `itinerarios.xml` cargando la portada; el sistema los crea automáticamente.
+1. Copia `content/` y `assets/` dentro de Nammu.
+2. Revisa el front matter y usa claves como `Title`, `Template`, `Date`, `Category`, `Image`, `Description`, `Status`, `Ordo`.
+3. Ajusta **Configuración** y **Plantilla**.
+4. Carga la portada una vez para regenerar feeds y sitemap.
 
 ## Administración diaria
 
@@ -219,6 +288,7 @@ tar -xzf /var/www/html/<carpeta-publica>/backups/nammu-stats-backup-AAAA-MM-DD_H
 - **Plantilla**: controla tipografías, colores, cabeceras, comportamiento del buscador (posición y modo flotante), TOC por defecto y número de entradas por home.
 - **Itinerarios**: crea portadas, define clase (Libro, Curso, Colección, Otros), lógica de uso, quizzes y estadísticas. Cada tema puede añadirse, duplicarse o borrarse desde la misma pestaña.
 - **Configuración**: modo blog/diccionario, búsqueda avanzada, nombre del sitio, autor, redes sociales, API de Google Fonts, correo de lista (Gmail + OAuth) y cambio de contraseña.
+- **Difusión**: credenciales y guías rápidas por red, usuario público de X para footer y `twitter:site`, App ID de Facebook, tokens de Instagram/Mastodon/LinkedIn y opciones de autoenvío.
 - **Redes**: envío manual de mensajes a varias redes a la vez y configuración de RSS externas para reenvío automático de novedades.
 - **Actualidad**: página pública agregada desde las fuentes RSS configuradas en **Redes**, con versión RSS propia en `noticias.xml`.
 

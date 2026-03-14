@@ -119,6 +119,19 @@ if (empty($items) && !empty($feeds)) {
     $items = is_array($rebuilt['items'] ?? null) ? $rebuilt['items'] : [];
 }
 
+$actualityHeroBackground = '';
+$actualityCache = nammu_actuality_load_cache();
+$cacheItems = array_values(is_array($actualityCache['items'] ?? null) ? $actualityCache['items'] : []);
+if (!empty($cacheItems)) {
+    usort($cacheItems, static function (array $a, array $b): int {
+        return ((int) ($a['last_used'] ?? 0)) <=> ((int) ($b['last_used'] ?? 0));
+    });
+    $heroIndex = max(0, count($cacheItems) - 3);
+    $candidate = is_array($cacheItems[$heroIndex] ?? null) ? $cacheItems[$heroIndex] : [];
+    $actualityHeroBackground = trim((string) ($candidate['public_url'] ?? ''));
+}
+$renderer->setGlobal('actualityHeroBackground', $actualityHeroBackground);
+
 $content = $renderer->render('actuality', [
     'items' => $items,
     'feedsCount' => count($feeds),

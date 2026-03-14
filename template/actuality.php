@@ -11,6 +11,8 @@ $accentColor = htmlspecialchars($colors['accent'] ?? '#0a4c8a', ENT_QUOTES, 'UTF
 $brandColor = htmlspecialchars($colors['brand'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8');
 $h1Color = htmlspecialchars($colors['h1'] ?? '#1b8eed', ENT_QUOTES, 'UTF-8');
 $headingSecondaryColor = htmlspecialchars($colors['h2'] ?? '#ea2f28', ENT_QUOTES, 'UTF-8');
+$actualityHeroBackground = trim((string) ($actualityHeroBackground ?? ''));
+$actualityHeroBackgroundEsc = htmlspecialchars($actualityHeroBackground, ENT_QUOTES, 'UTF-8');
 $searchActionBase = $baseUrl ?? '/';
 $searchAction = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/buscar.php';
 $categoriesIndexUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/categorias';
@@ -115,7 +117,9 @@ $formatDate = static function (int $timestamp): string {
         margin-bottom: 2rem;
     }
     .actuality-hero-inner {
-        background: <?= $highlight ?>;
+        background: <?= $actualityHeroBackgroundEsc !== '' ? "linear-gradient(rgba(0,0,0,0.48), rgba(0,0,0,0.48)), url('{$actualityHeroBackgroundEsc}')" : $highlight ?>;
+        background-size: cover;
+        background-position: center;
         border-radius: var(--nammu-radius-lg);
         padding: 2rem;
         text-align: center;
@@ -123,19 +127,23 @@ $formatDate = static function (int $timestamp): string {
     }
     .actuality-hero-inner h1 {
         margin: 0 0 0.5rem 0;
-        color: <?= $h1Color ?>;
+        color: <?= $actualityHeroBackgroundEsc !== '' ? '#ffffff' : $h1Color ?>;
     }
     .actuality-hero-inner p {
         margin: 0 0 1.25rem 0;
-        color: <?= $textColor ?>;
+        color: <?= $actualityHeroBackgroundEsc !== '' ? 'rgba(255,255,255,0.92)' : $textColor ?>;
     }
     .actuality-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 1.5rem;
-        align-items: start;
+        column-count: 2;
+        column-gap: 1.5rem;
     }
     .actuality-card {
+        display: inline-block;
+        width: 100%;
+        margin: 0 0 1.5rem 0;
+        break-inside: avoid;
+        -webkit-column-break-inside: avoid;
+        page-break-inside: avoid;
         background: #fff;
         border: 1px solid rgba(0,0,0,0.08);
         border-radius: var(--nammu-radius-lg);
@@ -194,7 +202,7 @@ $formatDate = static function (int $timestamp): string {
     }
     @media (max-width: 760px) {
         .actuality-grid {
-            grid-template-columns: 1fr;
+            column-count: 1;
         }
     }
 </style>

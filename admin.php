@@ -3658,7 +3658,17 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
         'utm_source' => 'bluesky',
         'utm_medium' => 'social',
     ]);
-    $text = admin_build_sentence_limited_social_message($title, $description, $trackedUrl, 300, 'admin_bold_unicode_text');
+    $text = trim($title);
+    if ($text === '') {
+        $text = 'Nueva publicación disponible';
+    }
+    if (function_exists('mb_strlen')) {
+        if (mb_strlen($text, 'UTF-8') > 300) {
+            $text = mb_substr($text, 0, 299, 'UTF-8') . '…';
+        }
+    } elseif (strlen($text) > 300) {
+        $text = substr($text, 0, 299) . '…';
+    }
     $record = [
         '$type' => 'app.bsky.feed.post',
         'text' => $text,

@@ -43,6 +43,18 @@ $formatDate = static function (int $timestamp): string {
     }
     return nammu_format_date_spanish((new DateTimeImmutable())->setTimestamp($timestamp), date('Y-m-d', $timestamp));
 };
+$groupedItems = [];
+foreach ($items as $item) {
+    $timestamp = (int) ($item['timestamp'] ?? 0);
+    $groupKey = $timestamp > 0 ? date('Y-m-d', $timestamp) : 'sin-fecha';
+    if (!isset($groupedItems[$groupKey])) {
+        $groupedItems[$groupKey] = [
+            'label' => $timestamp > 0 ? $formatDate($timestamp) : 'Sin fecha',
+            'items' => [],
+        ];
+    }
+    $groupedItems[$groupKey]['items'][] = $item;
+}
 ?>
 <section class="actuality-hero">
     <div class="actuality-hero-inner">
@@ -63,33 +75,38 @@ $formatDate = static function (int $timestamp): string {
         <p>Cuando configures feeds RSS automáticas en Redes, aquí aparecerán sus novedades agregadas.</p>
     </section>
 <?php else: ?>
-    <section class="actuality-grid">
-        <?php foreach ($items as $item): ?>
-            <article class="actuality-card">
-                <div class="actuality-card-body">
-                    <h2><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h2>
-                    <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
-                        <p class="actuality-meta">
-                            <?php if ($item['timestamp'] > 0): ?>
-                                <span><?= htmlspecialchars($formatDate($item['timestamp']), ENT_QUOTES, 'UTF-8') ?></span>
+    <?php foreach ($groupedItems as $group): ?>
+        <section class="actuality-day">
+            <h2 class="actuality-day-heading"><?= htmlspecialchars((string) $group['label'], ENT_QUOTES, 'UTF-8') ?></h2>
+            <div class="actuality-grid">
+                <?php foreach ($group['items'] as $item): ?>
+                    <article class="actuality-card">
+                        <div class="actuality-card-body">
+                            <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
+                            <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
+                                <p class="actuality-meta">
+                                    <?php if ($item['timestamp'] > 0): ?>
+                                        <span><?= htmlspecialchars($formatDate($item['timestamp']), ENT_QUOTES, 'UTF-8') ?></span>
+                                    <?php endif; ?>
+                                    <?php if ($item['source'] !== ''): ?>
+                                        <span><?= htmlspecialchars(preg_replace('/^www\./i', '', $item['source']), ENT_QUOTES, 'UTF-8') ?></span>
+                                    <?php endif; ?>
+                                </p>
                             <?php endif; ?>
-                            <?php if ($item['source'] !== ''): ?>
-                                <span><?= htmlspecialchars(preg_replace('/^www\./i', '', $item['source']), ENT_QUOTES, 'UTF-8') ?></span>
+                            <?php if ($item['image'] !== ''): ?>
+                                <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                    <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                </a>
                             <?php endif; ?>
-                        </p>
-                    <?php endif; ?>
-                    <?php if ($item['image'] !== ''): ?>
-                        <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                            <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                        </a>
-                    <?php endif; ?>
-                    <?php if ($item['description'] !== ''): ?>
-                        <div class="actuality-description"><?= nl2br(htmlspecialchars($item['description'], ENT_QUOTES, 'UTF-8')) ?></div>
-                    <?php endif; ?>
-                </div>
-            </article>
-        <?php endforeach; ?>
-    </section>
+                            <?php if ($item['description'] !== ''): ?>
+                                <div class="actuality-description"><?= nl2br(htmlspecialchars($item['description'], ENT_QUOTES, 'UTF-8')) ?></div>
+                            <?php endif; ?>
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+            </div>
+        </section>
+    <?php endforeach; ?>
 <?php endif; ?>
 
 <style>
@@ -116,6 +133,15 @@ $formatDate = static function (int $timestamp): string {
     .actuality-grid {
         column-count: 2;
         column-gap: 1.5rem;
+    }
+    .actuality-day {
+        margin-bottom: 2rem;
+    }
+    .actuality-day-heading {
+        margin: 0 0 1.1rem 0;
+        text-align: center;
+        color: <?= $brandColor ?>;
+        font-size: clamp(1.2rem, 2.5vw, 1.5rem);
     }
     .actuality-card {
         display: inline-block;
@@ -145,18 +171,18 @@ $formatDate = static function (int $timestamp): string {
     .actuality-card-body {
         padding: 1.15rem 1.2rem 1.3rem;
     }
-    .actuality-card h2 {
+    .actuality-card h3 {
         margin: 0 0 0.55rem 0;
         font-size: 1.15rem;
         color: <?= $brandColor ?>;
         line-height: 1.25;
     }
-    .actuality-card h2 a {
+    .actuality-card h3 a {
         color: <?= $headingSecondaryColor ?>;
         text-decoration: none;
         transition: color 0.2s ease;
     }
-    .actuality-card h2 a:hover {
+    .actuality-card h3 a:hover {
         color: <?= $accentColor ?>;
         text-decoration: underline;
     }

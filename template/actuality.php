@@ -249,7 +249,7 @@ $splitColumns = static function (array $dayItems): array {
     }
     .actuality-card h3 {
         margin: 0 0 0.55rem 0;
-        font-size: 1.15rem;
+        font-size: 1.32rem;
         color: <?= $brandColor ?>;
         line-height: 1.25;
     }

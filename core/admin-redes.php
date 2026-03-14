@@ -488,6 +488,33 @@ function admin_social_broadcast_image_url(string $image): string
     return admin_public_asset_url($image);
 }
 
+function admin_social_broadcast_local_asset_path(string $image): string
+{
+    $image = trim($image);
+    if ($image === '') {
+        return '';
+    }
+    if (preg_match('#^https?://#i', $image)) {
+        $path = (string) (parse_url($image, PHP_URL_PATH) ?? '');
+        if ($path === '') {
+            return '';
+        }
+        $normalized = ltrim($path, '/');
+        if (!str_starts_with($normalized, 'assets/')) {
+            return '';
+        }
+        $relative = substr($normalized, 7);
+    } else {
+        $normalized = ltrim(str_replace('\\', '/', $image), '/');
+        $relative = str_starts_with($normalized, 'assets/') ? substr($normalized, 7) : $normalized;
+    }
+    if ($relative === '' || !defined('ASSETS_DIR')) {
+        return '';
+    }
+    $absolute = rtrim(ASSETS_DIR, '/') . '/' . $relative;
+    return is_file($absolute) ? $absolute : '';
+}
+
 function admin_send_facebook_text(string $text, array $settings, ?string &$error = null): bool
 {
     $token = trim((string) ($settings['token'] ?? ''));
@@ -535,49 +562,68 @@ function admin_send_twitter_text(string $text, array $settings, ?string &$error 
     return admin_send_twitter_api_request('https://api.twitter.com/2/tweets', $decodedPayload, $settings, $error);
 }
 
-function admin_mastodon_upload_media_from_url(string $instance, string $token, string $imageUrl, ?string &$error = null): ?string
+function admin_mastodon_upload_media_from_url(string $instance, string $token, string $imageRef, string $imageUrl, ?string &$error = null): ?string
 {
     if (!function_exists('curl_file_create')) {
         $error = 'Mastodon: el servidor no puede adjuntar imágenes porque falta soporte CURLFile.';
         return null;
     }
-    $binary = admin_http_get_binary($imageUrl);
-    if ($binary === '') {
-        $error = 'Mastodon: no se pudo descargar la imagen pública para adjuntarla.';
-        return null;
-    }
-
-    $path = (string) (parse_url($imageUrl, PHP_URL_PATH) ?? '');
-    $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    $localPath = admin_social_broadcast_local_asset_path($imageRef);
+    $tmpPath = '';
+    $pathForCurl = '';
     $mime = 'application/octet-stream';
-    if (class_exists('finfo')) {
-        $finfo = new finfo(FILEINFO_MIME_TYPE);
-        $detected = $finfo->buffer($binary);
-        if (is_string($detected) && $detected !== '') {
-            $mime = $detected;
-        }
-    }
-    if ($extension === '') {
-        $extension = match ($mime) {
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp',
-            default => 'bin',
-        };
-    }
+    $uploadName = 'imagen';
 
-    $tmpPath = tempnam(sys_get_temp_dir(), 'nammu_mastodon_');
-    if ($tmpPath === false || @file_put_contents($tmpPath, $binary) === false) {
-        $error = 'Mastodon: no se pudo preparar temporalmente la imagen.';
-        return null;
+    if ($localPath !== '') {
+        $pathForCurl = $localPath;
+        $uploadName = basename($localPath);
+        if (class_exists('finfo')) {
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $detected = $finfo->file($localPath);
+            if (is_string($detected) && $detected !== '') {
+                $mime = $detected;
+            }
+        }
+    } else {
+        $binary = admin_http_get_binary($imageUrl);
+        if ($binary === '') {
+            $error = 'Mastodon: no se pudo descargar la imagen pública para adjuntarla.';
+            return null;
+        }
+
+        $path = (string) (parse_url($imageUrl, PHP_URL_PATH) ?? '');
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if (class_exists('finfo')) {
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $detected = $finfo->buffer($binary);
+            if (is_string($detected) && $detected !== '') {
+                $mime = $detected;
+            }
+        }
+        if ($extension === '') {
+            $extension = match ($mime) {
+                'image/jpeg' => 'jpg',
+                'image/png' => 'png',
+                'image/gif' => 'gif',
+                'image/webp' => 'webp',
+                default => 'bin',
+            };
+        }
+
+        $tmpPath = tempnam(sys_get_temp_dir(), 'nammu_mastodon_');
+        if ($tmpPath === false || @file_put_contents($tmpPath, $binary) === false) {
+            $error = 'Mastodon: no se pudo preparar temporalmente la imagen.';
+            return null;
+        }
+        $finalTmpPath = $tmpPath . '.' . $extension;
+        @rename($tmpPath, $finalTmpPath);
+        $tmpPath = $finalTmpPath;
+        $pathForCurl = $tmpPath;
+        $uploadName = basename($path !== '' ? $path : ('imagen.' . $extension));
     }
-    $finalTmpPath = $tmpPath . '.' . $extension;
-    @rename($tmpPath, $finalTmpPath);
-    $tmpPath = $finalTmpPath;
 
     try {
-        $file = curl_file_create($tmpPath, $mime, basename($path !== '' ? $path : ('imagen.' . $extension)));
+        $file = curl_file_create($pathForCurl, $mime, $uploadName);
         $httpCode = null;
         $response = admin_http_post_multipart_json(
             $instance . '/api/v2/media',
@@ -586,7 +632,9 @@ function admin_mastodon_upload_media_from_url(string $instance, string $token, s
             $httpCode
         );
     } finally {
-        @unlink($tmpPath);
+        if ($tmpPath !== '') {
+            @unlink($tmpPath);
+        }
     }
 
     if ($response === null || $httpCode === null || $httpCode < 200 || $httpCode >= 300) {
@@ -724,7 +772,7 @@ function admin_send_mastodon_text(string $text, array $settings, ?string &$error
     return false;
 }
 
-function admin_send_mastodon_text_with_image(string $text, string $imageUrl, array $settings, ?string &$error = null): bool
+function admin_send_mastodon_text_with_image(string $text, string $imageRef, string $imageUrl, array $settings, ?string &$error = null): bool
 {
     $instance = admin_mastodon_base_url((string) ($settings['instance'] ?? ''));
     if ($instance === '') {
@@ -752,7 +800,7 @@ function admin_send_mastodon_text_with_image(string $text, string $imageUrl, arr
         return false;
     }
 
-    $mediaId = admin_mastodon_upload_media_from_url($instance, $token, $imageUrl, $error);
+    $mediaId = admin_mastodon_upload_media_from_url($instance, $token, $imageRef, $imageUrl, $error);
     if ($mediaId === null) {
         return false;
     }
@@ -1086,7 +1134,7 @@ function admin_send_social_broadcast_message(string $network, string $text, arra
             return admin_send_bluesky_broadcast($plainText, $settings, $imageUrl, $error);
         case 'mastodon':
             if ($image !== '') {
-                return admin_send_mastodon_text_with_image($plainText, $image, $settings, $error);
+                return admin_send_mastodon_text_with_image($plainText, $image, $imageUrl, $settings, $error);
             }
             return admin_send_mastodon_text($plainText, $settings, $error);
         case 'linkedin':

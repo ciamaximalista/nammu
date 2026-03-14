@@ -4444,6 +4444,30 @@ function admin_http_post_form_json(string $url, array $params): ?array {
     return is_array($decoded) ? $decoded : null;
 }
 
+function admin_http_post_multipart_json(string $url, array $params, array $headers = [], ?int &$httpCode = null): ?array {
+    if (!function_exists('curl_init')) {
+        return null;
+    }
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+    if (!empty($headers)) {
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    }
+    $responseBody = curl_exec($ch);
+    if ($responseBody !== false) {
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    }
+    curl_close($ch);
+    if (!is_string($responseBody) || $responseBody === '') {
+        return null;
+    }
+    $decoded = json_decode($responseBody, true);
+    return is_array($decoded) ? $decoded : null;
+}
+
 function admin_http_post_form(string $url, array $params): bool {
     $body = http_build_query($params);
     $headers = [

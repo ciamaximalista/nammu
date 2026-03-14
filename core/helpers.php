@@ -1904,6 +1904,10 @@ function nammu_build_social_meta(array $data, array $socialConfig): array
     $url = $data['url'] ?? '';
     $image = $data['image'] ?? '';
     $siteName = trim($data['site_name'] ?? '');
+    $twitterImage = $image;
+    if ($twitterImage !== '' && preg_match('/\.(jpe?g|png|gif)\.webp(?=$|[?#])/i', $twitterImage) === 1) {
+        $twitterImage = preg_replace('/\.webp(?=$|[?#])/i', '', $twitterImage) ?? $twitterImage;
+    }
 
     $properties = [
         'og:type' => $data['type'] ?? 'website',
@@ -1945,8 +1949,9 @@ function nammu_build_social_meta(array $data, array $socialConfig): array
     if ($url !== '') {
         $names['twitter:url'] = $url;
     }
-    if ($image !== '') {
-        $names['twitter:image'] = $image;
+    if ($twitterImage !== '') {
+        $names['twitter:image'] = $twitterImage;
+        $names['twitter:image:src'] = $twitterImage;
         if ($title !== '') {
             $names['twitter:image:alt'] = $title;
         }

@@ -535,6 +535,77 @@ function admin_send_twitter_text(string $text, array $settings, ?string &$error 
     return admin_send_twitter_api_request('https://api.twitter.com/2/tweets', $decodedPayload, $settings, $error);
 }
 
+function admin_mastodon_upload_media_from_url(string $instance, string $token, string $imageUrl, ?string &$error = null): ?string
+{
+    if (!function_exists('curl_file_create')) {
+        $error = 'Mastodon: el servidor no puede adjuntar imágenes porque falta soporte CURLFile.';
+        return null;
+    }
+    $binary = admin_http_get_binary($imageUrl);
+    if ($binary === '') {
+        $error = 'Mastodon: no se pudo descargar la imagen pública para adjuntarla.';
+        return null;
+    }
+
+    $path = (string) (parse_url($imageUrl, PHP_URL_PATH) ?? '');
+    $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    $mime = 'application/octet-stream';
+    if (class_exists('finfo')) {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $detected = $finfo->buffer($binary);
+        if (is_string($detected) && $detected !== '') {
+            $mime = $detected;
+        }
+    }
+    if ($extension === '') {
+        $extension = match ($mime) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            default => 'bin',
+        };
+    }
+
+    $tmpPath = tempnam(sys_get_temp_dir(), 'nammu_mastodon_');
+    if ($tmpPath === false || @file_put_contents($tmpPath, $binary) === false) {
+        $error = 'Mastodon: no se pudo preparar temporalmente la imagen.';
+        return null;
+    }
+    $finalTmpPath = $tmpPath . '.' . $extension;
+    @rename($tmpPath, $finalTmpPath);
+    $tmpPath = $finalTmpPath;
+
+    try {
+        $file = curl_file_create($tmpPath, $mime, basename($path !== '' ? $path : ('imagen.' . $extension)));
+        $httpCode = null;
+        $response = admin_http_post_multipart_json(
+            $instance . '/api/v2/media',
+            ['file' => $file],
+            ['Authorization: Bearer ' . $token],
+            $httpCode
+        );
+    } finally {
+        @unlink($tmpPath);
+    }
+
+    if ($response === null || $httpCode === null || $httpCode < 200 || $httpCode >= 300) {
+        $error = 'Mastodon: no se pudo subir la imagen.';
+        if (is_array($response) && isset($response['error'])) {
+            $error = 'Mastodon: ' . (string) $response['error'];
+        }
+        return null;
+    }
+
+    $mediaId = (string) ($response['id'] ?? '');
+    if ($mediaId === '') {
+        $error = 'Mastodon: la API no devolvió un media id.';
+        return null;
+    }
+
+    return $mediaId;
+}
+
 function admin_send_bluesky_text(string $text, array $settings, ?string &$error = null): bool
 {
     $service = trim((string) ($settings['service'] ?? ''));
@@ -633,6 +704,63 @@ function admin_send_mastodon_text(string $text, array $settings, ?string &$error
         return false;
     }
     $payload = json_encode(['status' => $text], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $headers = [
+        'Authorization: Bearer ' . $token,
+        'Content-Type: application/json',
+        'Content-Length: ' . strlen((string) $payload),
+    ];
+    $httpCode = null;
+    $response = admin_http_post_body_response($instance . '/api/v1/statuses', (string) $payload, $headers, $httpCode);
+    if ($response !== null && $httpCode !== null && $httpCode >= 200 && $httpCode < 300) {
+        return true;
+    }
+    $error = 'No se pudo enviar el mensaje a Mastodon.';
+    if ($response !== null) {
+        $decoded = json_decode($response, true);
+        if (is_array($decoded) && isset($decoded['error'])) {
+            $error = 'Mastodon: ' . (string) $decoded['error'];
+        }
+    }
+    return false;
+}
+
+function admin_send_mastodon_text_with_image(string $text, string $imageUrl, array $settings, ?string &$error = null): bool
+{
+    $instance = admin_mastodon_base_url((string) ($settings['instance'] ?? ''));
+    if ($instance === '') {
+        $profileUrl = trim((string) ($settings['profile'] ?? ''));
+        if ($profileUrl !== '') {
+            $profileUrl = preg_match('#^https?://#i', $profileUrl) ? $profileUrl : 'https://' . ltrim($profileUrl, '/');
+            $profileParts = parse_url($profileUrl);
+            if (!empty($profileParts['scheme']) && !empty($profileParts['host'])) {
+                $instance = admin_mastodon_base_url($profileParts['scheme'] . '://' . $profileParts['host']);
+            }
+        }
+    }
+    if ($instance === '') {
+        $handle = trim((string) ($settings['handle'] ?? ''));
+        if (str_contains($handle, '@')) {
+            $parts = explode('@', ltrim($handle, '@'));
+            if (count($parts) >= 2) {
+                $instance = admin_mastodon_base_url('https://' . $parts[1]);
+            }
+        }
+    }
+    $token = trim((string) ($settings['access_token'] ?? ''));
+    if ($instance === '' || $token === '') {
+        $error = 'Faltan credenciales de Mastodon.';
+        return false;
+    }
+
+    $mediaId = admin_mastodon_upload_media_from_url($instance, $token, $imageUrl, $error);
+    if ($mediaId === null) {
+        return false;
+    }
+
+    $payload = json_encode([
+        'status' => $text,
+        'media_ids' => [$mediaId],
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     $headers = [
         'Authorization: Bearer ' . $token,
         'Content-Type: application/json',
@@ -957,6 +1085,9 @@ function admin_send_social_broadcast_message(string $network, string $text, arra
         case 'bluesky':
             return admin_send_bluesky_broadcast($plainText, $settings, $imageUrl, $error);
         case 'mastodon':
+            if ($image !== '') {
+                return admin_send_mastodon_text_with_image($plainText, $image, $settings, $error);
+            }
             return admin_send_mastodon_text($plainText, $settings, $error);
         case 'linkedin':
             return admin_send_linkedin_text($plainText, $settings, $error);

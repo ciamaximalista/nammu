@@ -5,5 +5,4 @@ Disallow: /config/
 Disallow: /core/
 Disallow: /template/
 Disallow: /private/
-Disallow: /newsletters
-Sitemap: https://maximalism.blog/sitemap.xml
+Sitemap: https://memoria.repoblacion.ong/sitemap.xml

@@ -1047,6 +1047,13 @@ function admin_send_instagram_broadcast(string $text, string $image, array $sett
     if ($imageUrl === '') {
         return false;
     }
+    $probe = admin_probe_public_url_headers($imageUrl);
+    if (!($probe['ok'] ?? false)) {
+        $status = (string) ($probe['status'] ?? '');
+        $contentType = (string) ($probe['content_type'] ?? '');
+        $error = 'Instagram: la URL de imagen no es accesible como imagen pública (HTTP=' . $status . ', Content-Type=' . $contentType . ').';
+        return false;
+    }
 
     $createEndpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($accountId) . '/media';
     $createPayload = [
@@ -1065,24 +1072,49 @@ function admin_send_instagram_broadcast(string $text, string $image, array $sett
     }
     $creationId = (string) $createResponse['id'];
     $mediaStatus = null;
-    if (!admin_wait_instagram_media_ready($creationId, $token, 12, 2, $mediaStatus)) {
-        $error = 'Instagram: el medio no quedó listo para publicarse.';
-        return false;
+    $mediaReady = admin_wait_instagram_media_ready($creationId, $token, 12, 2, $mediaStatus);
+    if (!$mediaReady) {
+        // No abortamos aún: Meta a veces publica correctamente aunque el polling quede en IN_PROGRESS.
+        error_log('Instagram manual broadcast warning (media_not_ready_yet): accountId=' . $accountId . ' creationId=' . $creationId . ' payload=' . json_encode($mediaStatus, JSON_UNESCAPED_UNICODE));
     }
     $publishEndpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($accountId) . '/media_publish';
-    $publishResponse = admin_http_post_form_json($publishEndpoint, [
-        'creation_id' => $creationId,
-        'access_token' => $token,
-    ]);
-    if (!is_array($publishResponse) || empty($publishResponse['id'])) {
-        if (is_array($publishResponse) && isset($publishResponse['error']['message'])) {
-            $error = 'Instagram: ' . (string) $publishResponse['error']['message'];
-        } else {
-            $error = 'Instagram: no se pudo publicar.';
+    $publishResponse = null;
+    $publishAttempts = 8;
+    for ($attempt = 0; $attempt < $publishAttempts; $attempt++) {
+        $publishResponse = admin_http_post_form_json($publishEndpoint, [
+            'creation_id' => $creationId,
+            'access_token' => $token,
+        ]);
+        if (is_array($publishResponse) && !empty($publishResponse['id'])) {
+            return true;
         }
-        return false;
+        $publishMessage = is_array($publishResponse) ? (string) ($publishResponse['error']['message'] ?? '') : '';
+        $transient = $publishMessage === ''
+            || stripos($publishMessage, 'not ready') !== false
+            || stripos($publishMessage, 'is not ready') !== false
+            || stripos($publishMessage, 'media is not ready') !== false
+            || stripos($publishMessage, 'please wait') !== false;
+        if (!$transient || $attempt === $publishAttempts - 1) {
+            break;
+        }
+        sleep(2);
     }
-    return true;
+    if (is_array($publishResponse) && isset($publishResponse['error']['message'])) {
+        $error = 'Instagram: ' . (string) $publishResponse['error']['message'];
+    } elseif (!$mediaReady) {
+        $statusCode = is_array($mediaStatus) ? (string) ($mediaStatus['status_code'] ?? '') : '';
+        $statusMessage = is_array($mediaStatus) ? (string) ($mediaStatus['error']['message'] ?? ($mediaStatus['error_message'] ?? ($mediaStatus['status'] ?? ''))) : '';
+        $error = 'Instagram: el medio no quedó listo para publicarse.';
+        if ($statusCode !== '' || $statusMessage !== '') {
+            $detail = trim($statusCode . ' ' . $statusMessage);
+            if ($detail !== '') {
+                $error .= ' (' . $detail . ')';
+            }
+        }
+    } else {
+        $error = 'Instagram: no se pudo publicar.';
+    }
+    return false;
 }
 
 function admin_send_social_broadcast_message(string $network, string $text, array $settings, string $image = '', ?string &$error = null): bool

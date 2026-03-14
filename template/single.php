@@ -222,30 +222,9 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     return (string) ob_get_clean();
 };
 $headerButtonsHtml = '';
-if (function_exists('nammu_render_header_buttons')) {
+if (function_exists('nammu_render_standard_header_buttons')) {
     $avisosUrl = $subscriptionAction !== '' ? str_replace('/subscribe.php', '/avisos.php', $subscriptionAction) : '/avisos.php';
-    $headerButtonsHtml = nammu_render_header_buttons([
-        'accent' => $colorAccent,
-        'home_url' => $homeUrl,
-        'search_url' => $searchAction,
-        'categories_url' => $categoriesIndexUrl,
-        'itineraries_url' => $itinerariesIndexUrl,
-        'podcast_url' => $podcastIndexUrl,
-        'letters_url' => $letterIndexUrlValue,
-        'show_letters' => $showLetterButton,
-        'actuality_url' => $actualityUrl,
-        'has_actuality' => $hasActuality,
-        'newsletters_url' => $newslettersIndexUrl,
-        'avisos_url' => $avisosUrl,
-        'postal_url' => $postalUrl,
-        'postal_svg' => $postalLogoSvg,
-        'has_categories' => $hasCategories,
-        'has_itineraries' => $hasItineraries,
-        'has_podcast' => $hasPodcast,
-        'has_newsletters' => $hasNewsletters,
-        'subscription_enabled' => $subscriptionEnabled,
-        'postal_enabled' => $postalEnabled,
-    ]);
+    $headerButtonsHtml = nammu_render_standard_header_buttons(get_defined_vars());
 }
 $siteAuthor = htmlspecialchars($theme['author'] !== '' ? $theme['author'] : ($siteTitle ?? ''), ENT_QUOTES, 'UTF-8');
 $siteBlog = htmlspecialchars($theme['blog'] !== '' ? $theme['blog'] : ($siteDescription ?? ''), ENT_QUOTES, 'UTF-8');

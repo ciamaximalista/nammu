@@ -83,28 +83,8 @@ $formatDateEs = static function (?string $date): string {
     return $dia . ' de ' . $meses[$mes - 1] . ' de ' . $anio;
 };
 $headerButtonsHtml = '';
-if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
-    $headerButtonsHtml = nammu_render_header_buttons([
-        'accent' => $colors['accent'] ?? '#0a4c8a',
-        'search_url' => $searchAction,
-        'categories_url' => $categoriesIndexUrl,
-        'itineraries_url' => $itinerariesIndexUrl,
-        'podcast_url' => $podcastIndexUrl,
-        'letters_url' => $letterIndexUrlValue,
-        'show_letters' => $showLetterButton,
-        'actuality_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/actualidad.php',
-        'has_actuality' => $hasActuality,
-        'newsletters_url' => $newslettersIndexUrl,
-        'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php',
-        'postal_url' => $postalUrl,
-        'postal_svg' => $postalLogoSvg,
-        'has_categories' => $hasCategories,
-        'has_itineraries' => !empty($hasItineraries),
-        'has_podcast' => $hasPodcast,
-        'has_newsletters' => $hasNewsletters,
-        'subscription_enabled' => $subscriptionModeForButtons !== 'none',
-        'postal_enabled' => $postalEnabled,
-    ]);
+if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons')) {
+    $headerButtonsHtml = nammu_render_standard_header_buttons(get_defined_vars());
 }
 ?>
 

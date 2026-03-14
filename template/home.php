@@ -135,29 +135,8 @@ $hasActuality = trim((string) ($actualityRssConfig['feeds'] ?? '')) !== '';
 $hasPaginationLeft = $subscriptionEnabled || ($postalEnabled && $postalLogoSvg !== '');
 $homeUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/';
 $headerButtonsHtml = '';
-if (function_exists('nammu_render_header_buttons')) {
-    $headerButtonsHtml = nammu_render_header_buttons([
-        'accent' => $colors['accent'] ?? '#0a4c8a',
-        'home_url' => $homeUrl,
-        'search_url' => $searchAction,
-        'categories_url' => $categoriesIndexUrl,
-        'itineraries_url' => $itinerariesIndexUrl,
-        'podcast_url' => $podcastIndexUrl,
-        'letters_url' => $letterIndexUrlValue,
-        'show_letters' => $showLetterButton,
-        'actuality_url' => $actualityUrl,
-        'has_actuality' => $hasActuality,
-        'newsletters_url' => $newslettersIndexUrl,
-        'avisos_url' => $avisosUrl,
-        'postal_url' => $postalUrl,
-        'postal_svg' => $postalLogoSvg,
-        'has_categories' => $hasCategories,
-        'has_itineraries' => $hasItineraries,
-        'has_podcast' => $hasPodcast,
-        'has_newsletters' => $hasNewsletters,
-        'subscription_enabled' => $subscriptionEnabled,
-        'postal_enabled' => $postalEnabled,
-    ]);
+if (function_exists('nammu_render_standard_header_buttons')) {
+    $headerButtonsHtml = nammu_render_standard_header_buttons(get_defined_vars());
 }
 $renderSearchBox = static function (string $variant) use ($searchAction, $accentColor, $highlight, $textColor, $searchActionBase, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories, $hasPodcast, $podcastIndexUrl): string {
     ob_start(); ?>

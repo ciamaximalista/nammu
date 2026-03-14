@@ -96,22 +96,8 @@ $postalEnabled = $postalEnabled ?? false;
 $postalUrl = $postalUrl ?? '/correos.php';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $headerButtonsHtml = '';
-if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
-    $headerButtonsHtml = nammu_render_header_buttons([
-        'accent' => $colors['accent'] ?? '#0a4c8a',
-        'search_url' => $searchAction,
-        'categories_url' => $categoriesIndexUrl,
-        'itineraries_url' => $itinerariesIndexUrl,
-        'podcast_url' => $podcastIndexUrl,
-        'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php',
-        'postal_url' => $postalUrl,
-        'postal_svg' => $postalLogoSvg,
-        'has_categories' => $hasCategories,
-        'has_itineraries' => $hasItineraries,
-        'has_podcast' => $hasPodcast,
-        'subscription_enabled' => $subscriptionMode !== 'none',
-        'postal_enabled' => $postalEnabled,
-    ]);
+if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons')) {
+    $headerButtonsHtml = nammu_render_standard_header_buttons(get_defined_vars());
 }
 $renderSearchBox = static function (string $variant) use ($searchAction, $searchActionBase, $accentColor, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories, $hasPodcast, $podcastIndexUrl): string {
     ob_start(); ?>

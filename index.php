@@ -1973,28 +1973,8 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
         $showHeaderButtons = in_array($headerButtonsMode, ['home', 'both'], true);
         $subscriptionSettings = is_array($theme['subscription'] ?? null) ? $theme['subscription'] : [];
         $subscriptionModeForButtons = $subscriptionSettings['mode'] ?? 'none';
-        if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
-            $accessHeaderButtonsHtml = nammu_render_header_buttons([
-                'accent' => $theme['colors']['accent'] ?? '#0a4c8a',
-                'search_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/buscar.php',
-                'categories_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/categorias',
-                'itineraries_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/itinerarios',
-                'podcast_url' => $podcastIndexUrl,
-                'letters_url' => $isAlphabeticalOrder ? $lettersIndexUrl : null,
-                'show_letters' => $isAlphabeticalOrder,
-                'actuality_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/actualidad.php',
-                'has_actuality' => $hasActuality,
-                'newsletters_url' => $newslettersIndexUrl,
-                'avisos_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/avisos.php',
-                'postal_url' => $postalUrl,
-                'postal_svg' => $postalLogoSvg,
-                'has_categories' => $hasCategories,
-                'has_itineraries' => !empty($itineraryListing),
-                'has_podcast' => $hasPodcast,
-                'has_newsletters' => $hasNewsletters,
-                'subscription_enabled' => $subscriptionModeForButtons !== 'none',
-                'postal_enabled' => $postalEnabled,
-            ]);
+        if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons')) {
+            $accessHeaderButtonsHtml = nammu_render_standard_header_buttons(get_defined_vars());
         }
         $formMessage = '';
         $formType = 'info';
@@ -2140,28 +2120,8 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
         $showHeaderButtons = in_array($headerButtonsMode, ['home', 'both'], true);
         $subscriptionSettings = is_array($theme['subscription'] ?? null) ? $theme['subscription'] : [];
         $subscriptionModeForButtons = $subscriptionSettings['mode'] ?? 'none';
-        if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
-            $accessHeaderButtonsHtml = nammu_render_header_buttons([
-                'accent' => $theme['colors']['accent'] ?? '#0a4c8a',
-                'search_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/buscar.php',
-                'categories_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/categorias',
-                'itineraries_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/itinerarios',
-                'podcast_url' => $podcastIndexUrl,
-                'letters_url' => $isAlphabeticalOrder ? $lettersIndexUrl : null,
-                'show_letters' => $isAlphabeticalOrder,
-                'actuality_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/actualidad.php',
-                'has_actuality' => $hasActuality,
-                'newsletters_url' => $newslettersIndexUrl,
-                'avisos_url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/avisos.php',
-                'postal_url' => $postalUrl,
-                'postal_svg' => $postalLogoSvg,
-                'has_categories' => $hasCategories,
-                'has_itineraries' => !empty($itineraryListing),
-                'has_podcast' => $hasPodcast,
-                'has_newsletters' => $hasNewsletters,
-                'subscription_enabled' => $subscriptionModeForButtons !== 'none',
-                'postal_enabled' => $postalEnabled,
-            ]);
+        if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons')) {
+            $accessHeaderButtonsHtml = nammu_render_standard_header_buttons(get_defined_vars());
         }
         $formMessage = '';
         $formType = 'info';

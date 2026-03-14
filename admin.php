@@ -9737,11 +9737,13 @@ if ($isLoggedIn) {
 }
 $socialBroadcastFeedback = null;
 $socialBroadcastText = '';
+$socialBroadcastImage = '';
 if ($isLoggedIn && $page === 'redes') {
     require_once __DIR__ . '/core/admin-redes.php';
     $socialBroadcastState = admin_handle_social_broadcast_request(get_settings());
     $socialBroadcastFeedback = $socialBroadcastState['feedback'] ?? null;
     $socialBroadcastText = (string) ($socialBroadcastState['message_text'] ?? '');
+    $socialBroadcastImage = (string) ($socialBroadcastState['image'] ?? '');
     $socialRssState = admin_handle_social_rss_settings_request(get_settings());
     $socialRssFeedback = $socialRssState['feedback'] ?? null;
     $socialRssFeedsRaw = (string) ($socialRssState['feeds_raw'] ?? '');

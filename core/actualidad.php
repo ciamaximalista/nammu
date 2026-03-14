@@ -377,18 +377,11 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
     usort($items, static function (array $a, array $b): int {
         return ($b['timestamp'] ?? 0) <=> ($a['timestamp'] ?? 0);
     });
-    $cutoffTimestamp = time() - (4 * 86400);
+    $cutoffTimestamp = time() - (8 * 86400);
     $recentItems = array_values(array_filter($items, static function (array $item) use ($cutoffTimestamp): bool {
         $timestamp = (int) ($item['timestamp'] ?? 0);
         return $timestamp <= 0 || $timestamp >= $cutoffTimestamp;
     }));
-    $olderItems = array_values(array_filter($items, static function (array $item) use ($cutoffTimestamp): bool {
-        $timestamp = (int) ($item['timestamp'] ?? 0);
-        return $timestamp > 0 && $timestamp < $cutoffTimestamp;
-    }));
-    if (count($recentItems) % 2 === 1 && !empty($olderItems)) {
-        $recentItems[] = $olderItems[0];
-    }
     return nammu_actuality_enrich_items($recentItems, $publicBaseUrl);
 }
 

@@ -64,6 +64,7 @@ La plataforma se distribuye bajo licencia **EUPL** y corre en cualquier hosting 
 - Integración opcional con Telegram, Facebook Pages, Twitter/X, Bluesky, Mastodon y LinkedIn: auto-posting al publicar o envío manual desde la tabla de “Editar”.
 - Nueva pestaña **Redes** en el admin para redactar mensajes manuales, ver contador de caracteres y enviarlos a varias redes configuradas a la vez, mostrando el límite propio de cada plataforma.
 - Automatización por RSS externas desde la pestaña **Redes**: añade feeds RSS/Atom y elige a qué redes sociales se reenviarán automáticamente los nuevos contenidos detectados.
+- Composición automática de **`actualidad.php`** y de la feed agregada **`noticias.xml`** a partir de esas RSS externas configuradas en **Redes**, con caché local de imágenes sociales para acelerar la carga pública.
 - Plantillas de mensaje consistentes (título, descripción y URL pública) con escape apropiado para HTML o texto plano.
 - Feedback inmediato en la UI usando `$_SESSION['social_feedback']`.
 - Footer con enlaces sociales/plataformas y acceso directo a AntennaPod (deeplink al `podcast.xml`) cuando hay podcast publicado.
@@ -219,6 +220,7 @@ tar -xzf /var/www/html/<carpeta-publica>/backups/nammu-stats-backup-AAAA-MM-DD_H
 - **Itinerarios**: crea portadas, define clase (Libro, Curso, Colección, Otros), lógica de uso, quizzes y estadísticas. Cada tema puede añadirse, duplicarse o borrarse desde la misma pestaña.
 - **Configuración**: modo blog/diccionario, búsqueda avanzada, nombre del sitio, autor, redes sociales, API de Google Fonts, correo de lista (Gmail + OAuth) y cambio de contraseña.
 - **Redes**: envío manual de mensajes a varias redes a la vez y configuración de RSS externas para reenvío automático de novedades.
+- **Actualidad**: página pública agregada desde las fuentes RSS configuradas en **Redes**, con versión RSS propia en `noticias.xml`.
 
 El modal “Insertar recurso” que aparece en Publicar, Editar e Itinerarios comparte el mismo buscador, así que puedes localizar imágenes etiquetadas sin salir del formulario.
 

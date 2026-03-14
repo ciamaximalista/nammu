@@ -9,6 +9,20 @@ function admin_social_broadcast_limits(): array
         'bluesky' => 300,
         'mastodon' => 2000,
         'linkedin' => 3000,
+        'instagram' => 2200,
+    ];
+}
+
+function admin_social_broadcast_guidance(): array
+{
+    return [
+        'telegram' => 'Máximo: 4096 caracteres',
+        'facebook' => 'Máximo: 63206 caracteres',
+        'twitter' => 'Máximo: 280 caracteres',
+        'bluesky' => 'Máximo: 300 caracteres',
+        'mastodon' => 'Máximo: 2000 caracteres',
+        'linkedin' => 'Máximo: 3000 caracteres',
+        'instagram' => 'Imagen recomendada: 1080x1350 o 1080x1080',
     ];
 }
 
@@ -183,6 +197,76 @@ function admin_fetch_social_rss_items(string $url): array
     return $items;
 }
 
+function admin_social_rss_description_text(string $html): string
+{
+    $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
+    return trim($text);
+}
+
+function admin_social_rss_sentences(string $text): array
+{
+    $text = trim($text);
+    if ($text === '') {
+        return [];
+    }
+    $sentences = preg_split('/(?<=[.!?…])\s+/u', $text) ?: [];
+    $sentences = array_values(array_filter(array_map(static function (string $sentence): string {
+        return trim($sentence);
+    }, $sentences), static function (string $sentence): bool {
+        return $sentence !== '';
+    }));
+    if (empty($sentences)) {
+        return [$text];
+    }
+    return $sentences;
+}
+
+function admin_build_social_rss_message(string $network, string $title, string $link, string $description = '', bool $hasImage = false): string
+{
+    $title = trim($title);
+    $link = trim($link);
+    $description = admin_social_rss_description_text($description);
+
+    $baseParts = [];
+    if ($title !== '') {
+        $baseParts[] = $title;
+    }
+    if ($link !== '') {
+        $baseParts[] = $link;
+    }
+    if (empty($baseParts)) {
+        $baseParts[] = 'Nuevo contenido';
+    }
+
+    $message = implode("\n\n", $baseParts);
+    $limit = (int) (admin_social_broadcast_limits()[$network] ?? 0);
+    if ($network === 'telegram' && $hasImage) {
+        $limit = 1024;
+    }
+    if ($limit <= 0 || $description === '') {
+        return $message;
+    }
+
+    $sentences = admin_social_rss_sentences($description);
+    if (empty($sentences)) {
+        return $message;
+    }
+
+    $separator = "\n\n";
+    $current = $message;
+    foreach ($sentences as $sentence) {
+        $candidate = $current . $separator . $sentence;
+        $length = function_exists('mb_strlen') ? mb_strlen($candidate, 'UTF-8') : strlen($candidate);
+        if ($length > $limit) {
+            break;
+        }
+        $current = $candidate;
+    }
+
+    return $current;
+}
+
 function admin_handle_social_rss_settings_request(array $settings): array
 {
     $result = [
@@ -266,10 +350,17 @@ function admin_process_social_rss_feeds(): array
             if (isset($feedState['seen'][$item['key']])) {
                 continue;
             }
-            $message = trim(($item['title'] !== '' ? $item['title'] : 'Nuevo contenido') . "\n\n" . $item['link']);
             foreach ($networks as $network) {
                 $error = null;
-                admin_send_social_broadcast_message($network, $message, $availableNetworks[$network]['settings'], $error);
+                $image = trim((string) ($item['image'] ?? ''));
+                $message = admin_build_social_rss_message(
+                    $network,
+                    (string) ($item['title'] ?? ''),
+                    (string) ($item['link'] ?? ''),
+                    (string) ($item['description'] ?? ''),
+                    $image !== ''
+                );
+                admin_send_social_broadcast_message($network, $message, $availableNetworks[$network]['settings'], $image, $error);
             }
             $feedState['seen'][$item['key']] = time();
             $sentCount++;
@@ -295,6 +386,7 @@ function admin_social_broadcast_labels(): array
         'bluesky' => 'Bluesky',
         'mastodon' => 'Mastodon',
         'linkedin' => 'LinkedIn',
+        'instagram' => 'Instagram',
     ];
 }
 
@@ -311,10 +403,89 @@ function admin_social_broadcast_available_networks(array $settings): array
         $available[$network] = [
             'label' => $label,
             'limit' => (int) ($limits[$network] ?? 0),
+            'guidance' => (string) (admin_social_broadcast_guidance()[$network] ?? ''),
             'settings' => $networkSettings,
         ];
     }
     return $available;
+}
+
+function admin_social_broadcast_unicode_bold_char(string $char): string
+{
+    $upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    $upperBold = ['𝐀','𝐁','𝐂','𝐃','𝐄','𝐅','𝐆','𝐇','𝐈','𝐉','𝐊','𝐋','𝐌','𝐍','𝐎','𝐏','𝐐','𝐑','𝐒','𝐓','𝐔','𝐕','𝐖','𝐗','𝐘','𝐙'];
+    $lower = 'abcdefghijklmnopqrstuvwxyz';
+    $lowerBold = ['𝐚','𝐛','𝐜','𝐝','𝐞','𝐟','𝐠','𝐡','𝐢','𝐣','𝐤','𝐥','𝐦','𝐧','𝐨','𝐩','𝐪','𝐫','𝐬','𝐭','𝐮','𝐯','𝐰','𝐱','𝐲','𝐳'];
+    $digits = '0123456789';
+    $digitBold = ['𝟎','𝟏','𝟐','𝟑','𝟒','𝟓','𝟔','𝟕','𝟖','𝟗'];
+
+    $index = strpos($upper, $char);
+    if ($index !== false) {
+        return $upperBold[$index];
+    }
+    $index = strpos($lower, $char);
+    if ($index !== false) {
+        return $lowerBold[$index];
+    }
+    $index = strpos($digits, $char);
+    if ($index !== false) {
+        return $digitBold[$index];
+    }
+
+    return $char;
+}
+
+function admin_social_broadcast_bold_unicode(string $text): string
+{
+    $chars = preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    $result = '';
+    foreach ($chars as $char) {
+        $result .= admin_social_broadcast_unicode_bold_char($char);
+    }
+    return $result;
+}
+
+function admin_social_broadcast_plain_text(string $text): string
+{
+    $text = str_replace(["\r\n", "\r"], "\n", $text);
+    $text = preg_replace_callback('/\*\*(.+?)\*\*/su', static function (array $matches): string {
+        return admin_social_broadcast_bold_unicode($matches[1]);
+    }, $text) ?? $text;
+    return trim($text);
+}
+
+function admin_social_broadcast_plain_without_markup(string $text): string
+{
+    $text = str_replace(["\r\n", "\r"], "\n", $text);
+    $text = preg_replace('/\*\*(.+?)\*\*/su', '$1', $text) ?? $text;
+    return trim($text);
+}
+
+function admin_social_broadcast_telegram_html(string $text): string
+{
+    $text = str_replace(["\r\n", "\r"], "\n", $text);
+    $parts = preg_split('/(\*\*.+?\*\*)/su', $text, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$text];
+    $result = '';
+    foreach ($parts as $part) {
+        if ($part === '') {
+            continue;
+        }
+        if (preg_match('/^\*\*(.+)\*\*$/su', $part, $matches) === 1) {
+            $result .= '<b>' . admin_telegram_escape($matches[1]) . '</b>';
+        } else {
+            $result .= admin_telegram_escape($part);
+        }
+    }
+    return trim($result);
+}
+
+function admin_social_broadcast_image_url(string $image): string
+{
+    $image = trim($image);
+    if ($image === '') {
+        return '';
+    }
+    return admin_public_asset_url($image);
 }
 
 function admin_send_facebook_text(string $text, array $settings, ?string &$error = null): bool
@@ -618,21 +789,199 @@ function admin_send_linkedin_text(string $text, array $settings, ?string &$error
     return false;
 }
 
-function admin_send_social_broadcast_message(string $network, string $text, array $settings, ?string &$error = null): bool
+function admin_send_bluesky_broadcast(string $text, array $settings, string $imageUrl = '', ?string &$error = null): bool
 {
+    $service = trim((string) ($settings['service'] ?? ''));
+    if ($service === '') {
+        $service = 'https://bsky.social';
+    }
+    $service = rtrim($service, '/');
+    $identifier = trim((string) ($settings['identifier'] ?? ''));
+    $identifier = ltrim($identifier, '@');
+    $identifier = preg_replace('/[\p{Cf}\p{Z}\s]+/u', '', $identifier);
+    $appPassword = trim((string) ($settings['app_password'] ?? ''));
+    $appPassword = preg_replace('/\s+/', '', $appPassword);
+    if ($identifier === '' || $appPassword === '') {
+        $error = 'Faltan credenciales de Bluesky.';
+        return false;
+    }
+
+    $sessionPayload = json_encode([
+        'identifier' => $identifier,
+        'password' => $appPassword,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $sessionHeaders = [
+        'Content-Type: application/json',
+        'Content-Length: ' . strlen((string) $sessionPayload),
+    ];
+    $sessionCode = null;
+    $sessionResponse = admin_http_post_body_response($service . '/xrpc/com.atproto.server.createSession', (string) $sessionPayload, $sessionHeaders, $sessionCode);
+    if ($sessionResponse === null || $sessionCode === null || $sessionCode < 200 || $sessionCode >= 300) {
+        $error = 'No se pudo crear sesión en Bluesky.';
+        return false;
+    }
+    $session = json_decode($sessionResponse, true);
+    if (!is_array($session) || empty($session['accessJwt']) || empty($session['did'])) {
+        $error = 'Respuesta inválida de Bluesky.';
+        return false;
+    }
+
+    $record = [
+        '$type' => 'app.bsky.feed.post',
+        'text' => $text,
+        'createdAt' => gmdate('Y-m-d\\TH:i:s\\Z'),
+    ];
+    $imageUrl = trim($imageUrl);
+    if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
+        $blob = admin_bluesky_upload_blob($service, $session['accessJwt'], $imageUrl);
+        if ($blob !== null) {
+            $record['embed'] = [
+                '$type' => 'app.bsky.embed.images',
+                'images' => [[
+                    'alt' => '',
+                    'image' => $blob,
+                ]],
+            ];
+        }
+    }
+
+    $payload = json_encode([
+        'repo' => $session['did'],
+        'collection' => 'app.bsky.feed.post',
+        'record' => $record,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $headers = [
+        'Authorization: Bearer ' . $session['accessJwt'],
+        'Content-Type: application/json',
+        'Content-Length: ' . strlen((string) $payload),
+    ];
+    $httpCode = null;
+    $response = admin_http_post_body_response($service . '/xrpc/com.atproto.repo.createRecord', (string) $payload, $headers, $httpCode);
+    if ($response !== null && $httpCode !== null && $httpCode >= 200 && $httpCode < 300) {
+        return true;
+    }
+    $error = 'No se pudo crear el post en Bluesky.';
+    if ($response !== null) {
+        $decoded = json_decode($response, true);
+        if (is_array($decoded) && isset($decoded['error'])) {
+            $error = 'Bluesky: ' . (string) $decoded['error'];
+        }
+    }
+    return false;
+}
+
+function admin_send_instagram_broadcast(string $text, string $image, array $settings, ?string &$error = null): bool
+{
+    $token = trim((string) ($settings['token'] ?? ''));
+    $accountId = trim((string) ($settings['channel'] ?? ''));
+    if ($token === '' || $accountId === '') {
+        $error = 'Falta token o ID de cuenta de Instagram.';
+        return false;
+    }
+    $imageTrim = trim($image);
+    if ($imageTrim === '') {
+        $error = 'Instagram requiere una imagen.';
+        return false;
+    }
+    $baseUrl = admin_base_url();
+    $GLOBALS['nammu_instagram_target_side'] = 1080;
+    $GLOBALS['nammu_instagram_jpeg_quality'] = 88;
+    $imageUrl = admin_prepare_instagram_image_url($imageTrim, $baseUrl, $error);
+    unset($GLOBALS['nammu_instagram_target_side'], $GLOBALS['nammu_instagram_jpeg_quality']);
+    if ($imageUrl === '') {
+        return false;
+    }
+
+    $createEndpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($accountId) . '/media';
+    $createPayload = [
+        'image_url' => $imageUrl,
+        'caption' => admin_social_broadcast_plain_without_markup($text),
+        'access_token' => $token,
+    ];
+    $createResponse = admin_http_post_form_json($createEndpoint, $createPayload);
+    if (!is_array($createResponse) || empty($createResponse['id'])) {
+        if (is_array($createResponse) && isset($createResponse['error']['message'])) {
+            $error = 'Instagram: ' . (string) $createResponse['error']['message'];
+        } else {
+            $error = 'Instagram: no se pudo crear el medio.';
+        }
+        return false;
+    }
+    $creationId = (string) $createResponse['id'];
+    $mediaStatus = null;
+    if (!admin_wait_instagram_media_ready($creationId, $token, 12, 2, $mediaStatus)) {
+        $error = 'Instagram: el medio no quedó listo para publicarse.';
+        return false;
+    }
+    $publishEndpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($accountId) . '/media_publish';
+    $publishResponse = admin_http_post_form_json($publishEndpoint, [
+        'creation_id' => $creationId,
+        'access_token' => $token,
+    ]);
+    if (!is_array($publishResponse) || empty($publishResponse['id'])) {
+        if (is_array($publishResponse) && isset($publishResponse['error']['message'])) {
+            $error = 'Instagram: ' . (string) $publishResponse['error']['message'];
+        } else {
+            $error = 'Instagram: no se pudo publicar.';
+        }
+        return false;
+    }
+    return true;
+}
+
+function admin_send_social_broadcast_message(string $network, string $text, array $settings, string $image = '', ?string &$error = null): bool
+{
+    $plainText = admin_social_broadcast_plain_text($text);
+    $telegramHtml = admin_social_broadcast_telegram_html($text);
+    $imageUrl = admin_social_broadcast_image_url($image);
+
     switch ($network) {
         case 'telegram':
-            return admin_send_telegram_message((string) ($settings['token'] ?? ''), (string) ($settings['channel'] ?? ''), $text);
+            $token = (string) ($settings['token'] ?? '');
+            $channel = (string) ($settings['channel'] ?? '');
+            if ($token === '' || $channel === '') {
+                $error = 'Faltan credenciales de Telegram.';
+                return false;
+            }
+            if ($imageUrl !== '') {
+                return admin_send_telegram_photo($token, $channel, $imageUrl, $telegramHtml);
+            }
+            return admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML');
         case 'facebook':
-            return admin_send_facebook_text($text, $settings, $error);
+            if ($imageUrl !== '') {
+                $token = trim((string) ($settings['token'] ?? ''));
+                $pageId = trim((string) ($settings['channel'] ?? ''));
+                if ($token === '' || $pageId === '') {
+                    $error = 'Faltan credenciales de Facebook.';
+                    return false;
+                }
+                $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($pageId) . '/photos';
+                $body = http_build_query([
+                    'url' => $imageUrl,
+                    'caption' => $plainText,
+                    'access_token' => $token,
+                ]);
+                $headers = [
+                    'Content-Type: application/x-www-form-urlencoded',
+                    'Content-Length: ' . strlen($body),
+                ];
+                $httpCode = null;
+                $response = admin_http_post_body_response($endpoint, $body, $headers, $httpCode);
+                if ($response !== null && $httpCode !== null && $httpCode >= 200 && $httpCode < 300) {
+                    return true;
+                }
+            }
+            return admin_send_facebook_text($plainText, $settings, $error);
         case 'twitter':
-            return admin_send_twitter_text($text, $settings, $error);
+            return admin_send_twitter_text($plainText, $settings, $error);
         case 'bluesky':
-            return admin_send_bluesky_text($text, $settings, $error);
+            return admin_send_bluesky_broadcast($plainText, $settings, $imageUrl, $error);
         case 'mastodon':
-            return admin_send_mastodon_text($text, $settings, $error);
+            return admin_send_mastodon_text($plainText, $settings, $error);
         case 'linkedin':
-            return admin_send_linkedin_text($text, $settings, $error);
+            return admin_send_linkedin_text($plainText, $settings, $error);
+        case 'instagram':
+            return admin_send_instagram_broadcast($text, $image, $settings, $error);
         default:
             $error = 'Red no soportada.';
             return false;
@@ -644,14 +993,17 @@ function admin_handle_social_broadcast_request(array $settings): array
     $result = [
         'feedback' => null,
         'message_text' => '',
+        'image' => '',
     ];
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['send_social_broadcast'])) {
         return $result;
     }
 
     $text = trim((string) ($_POST['social_broadcast_text'] ?? ''));
+    $image = trim((string) ($_POST['social_broadcast_image'] ?? ''));
     $selected = array_values(array_unique(array_filter(array_map('strval', $_POST['social_networks'] ?? []))));
     $result['message_text'] = $text;
+    $result['image'] = $image;
     $available = admin_social_broadcast_available_networks($settings);
 
     if ($text === '') {
@@ -673,13 +1025,23 @@ function admin_handle_social_broadcast_request(array $settings): array
             continue;
         }
         $limit = (int) ($limits[$network] ?? 0);
-        $length = function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text);
+        if ($network === 'telegram' && $image !== '') {
+            $limit = 1024;
+        }
+        $measureText = $network === 'telegram'
+            ? admin_social_broadcast_plain_without_markup($text)
+            : admin_social_broadcast_plain_text($text);
+        $length = function_exists('mb_strlen') ? mb_strlen($measureText, 'UTF-8') : strlen($measureText);
         if ($limit > 0 && $length > $limit) {
             $failed[] = $available[$network]['label'] . ': el mensaje supera el máximo de ' . $limit . ' caracteres.';
             continue;
         }
+        if ($network === 'instagram' && $image === '') {
+            $failed[] = 'Instagram: debes elegir una imagen.';
+            continue;
+        }
         $error = null;
-        $ok = admin_send_social_broadcast_message($network, $text, $available[$network]['settings'], $error);
+        $ok = admin_send_social_broadcast_message($network, $text, $available[$network]['settings'], $image, $error);
         if ($ok) {
             $sent[] = $available[$network]['label'];
         } else {
@@ -693,6 +1055,7 @@ function admin_handle_social_broadcast_request(array $settings): array
             'message' => 'Mensaje enviado a: ' . implode(', ', $sent) . '.',
         ];
         $result['message_text'] = '';
+        $result['image'] = '';
         return $result;
     }
     if (!empty($sent) && !empty($failed)) {

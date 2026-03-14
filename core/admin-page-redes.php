@@ -27,6 +27,11 @@
                     <div class="row">
                         <div class="col-lg-8 mb-3 mb-lg-0">
                             <label for="social_broadcast_text">Mensaje</label>
+                            <div class="btn-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Formato del mensaje">
+                                <div class="btn-group btn-group-sm mr-2 mb-2" role="group">
+                                    <button type="button" class="btn btn-outline-secondary" id="social_broadcast_bold" title="Negrita" aria-label="Negrita"><strong>B</strong></button>
+                                </div>
+                            </div>
                             <textarea
                                 name="social_broadcast_text"
                                 id="social_broadcast_text"
@@ -40,17 +45,28 @@
                                     <span id="social_broadcast_count">0</span> caracteres
                                 </small>
                             </div>
+                            <div class="form-group mt-3 mb-0">
+                                <label for="social_broadcast_image">Imagen opcional</label>
+                                <div class="input-group">
+                                    <input type="text" name="social_broadcast_image" id="social_broadcast_image" class="form-control" readonly value="<?= htmlspecialchars($socialBroadcastImage ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                                    <div class="input-group-append">
+                                        <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="social_broadcast_image" data-target-prefix="">Seleccionar imagen</button>
+                                    </div>
+                                </div>
+                                <small class="form-text text-muted">La imagen se enviará cuando la red lo soporte. Instagram la requiere siempre.</small>
+                            </div>
                         </div>
                         <div class="col-lg-4">
                             <label class="d-block">Redes configuradas</label>
                             <?php if (!empty($availableNetworks)): ?>
                                 <div class="border rounded p-3 h-100">
+                                    <?php $guidanceMap = admin_social_broadcast_guidance(); ?>
                                     <?php foreach ($availableNetworks as $networkKey => $networkData): ?>
-                                        <div class="form-check mb-3 social-network-option" data-limit="<?= (int) $networkData['limit'] ?>">
+                                        <div class="form-check mb-3 social-network-option" data-limit="<?= (int) $networkData['limit'] ?>" data-guidance="<?= htmlspecialchars((string) ($networkData['guidance'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                             <input class="form-check-input" type="checkbox" name="social_networks[]" id="social_network_<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>">
                                             <label class="form-check-label d-block" for="social_network_<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>">
                                                 <strong><?= htmlspecialchars($networkData['label'], ENT_QUOTES, 'UTF-8') ?></strong><br>
-                                                <small class="text-muted">Máximo: <?= (int) $networkData['limit'] ?> caracteres</small>
+                                                <small class="text-muted"><?= htmlspecialchars((string) ($networkData['guidance'] ?? ($guidanceMap[$networkKey] ?? '')), ENT_QUOTES, 'UTF-8') ?></small>
                                             </label>
                                         </div>
                                     <?php endforeach; ?>
@@ -81,7 +97,7 @@
                                         </span>
                                     </div>
                                     <div class="mt-2 text-muted small">
-                                        Máximo: <?= (int) (admin_social_broadcast_limits()[$networkKey] ?? 0) ?> caracteres
+                                        <?= htmlspecialchars((string) (admin_social_broadcast_guidance()[$networkKey] ?? ('Máximo: ' . (int) (admin_social_broadcast_limits()[$networkKey] ?? 0) . ' caracteres')), ENT_QUOTES, 'UTF-8') ?>
                                     </div>
                                 </div>
                             </div>
@@ -161,10 +177,22 @@
         (function () {
             var textarea = document.getElementById('social_broadcast_text');
             var counter = document.getElementById('social_broadcast_count');
+            var boldButton = document.getElementById('social_broadcast_bold');
             if (!textarea || !counter) {
                 return;
             }
             var options = Array.prototype.slice.call(document.querySelectorAll('.social-network-option'));
+            var wrapSelection = function (prefix, suffix) {
+                var start = textarea.selectionStart || 0;
+                var end = textarea.selectionEnd || 0;
+                var value = textarea.value;
+                var selected = value.slice(start, end);
+                var replacement = prefix + selected + suffix;
+                textarea.value = value.slice(0, start) + replacement + value.slice(end);
+                textarea.focus();
+                textarea.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
+                update();
+            };
             var update = function () {
                 var length = textarea.value.length;
                 counter.textContent = String(length);
@@ -173,6 +201,11 @@
                     option.classList.toggle('is-over-limit', limit > 0 && length > limit);
                 });
             };
+            if (boldButton) {
+                boldButton.addEventListener('click', function () {
+                    wrapSelection('**', '**');
+                });
+            }
             textarea.addEventListener('input', update);
             update();
         }());

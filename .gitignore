@@ -1,4 +1,5 @@
 rss.xml
+noticias.xml
 itinerarios.xml
 podcast.xml
 sitemap.xml
@@ -24,6 +25,9 @@ config/push-subscriptions.json
 config/push-queue.json
 config/postal-reset.json
 config/scheduled-*.json
+# Artefactos generados de Actualidad
+config/actualidad-*.json
+assets/actualidad-cache/
 indexnow-*.txt
 vendor/
 backups/*

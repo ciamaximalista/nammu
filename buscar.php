@@ -117,6 +117,14 @@ $renderer = new TemplateRenderer(__DIR__ . '/template', [
 ]);
 $renderer->setGlobal('hasCategories', $hasCategories);
 $renderer->setGlobal('pageLang', $siteLang);
+$renderer->setGlobal('hasPodcast', $hasPodcast);
+$renderer->setGlobal('podcastIndexUrl', $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/podcast' : '/podcast');
+$renderer->setGlobal('lettersIndexUrl', $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/letras' : '/letras');
+$renderer->setGlobal('showLetterIndexButton', (($configData['sort_order'] ?? 'date') === 'alpha'));
+$renderer->setGlobal('newslettersIndexUrl', $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/newsletters' : '/newsletters');
+$renderer->setGlobal('hasNewsletters', nammu_newsletters_available(__DIR__ . '/content'));
+$socialRssConfig = is_array($configData['social_rss'] ?? null) ? $configData['social_rss'] : [];
+$renderer->setGlobal('hasActuality', trim((string) ($socialRssConfig['feeds'] ?? '')) !== '');
 
 $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseUrl): ?string {
     if ($image === null || $image === '') {

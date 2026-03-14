@@ -29,7 +29,7 @@
             $facebookTokenDebug = admin_facebook_debug_token($facebookToken, $facebookAppId, $facebookAppSecret);
         }
     }
-    $twitterSettings = $settings['twitter'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
+    $twitterSettings = $settings['twitter'] ?? ['api_key' => '', 'api_secret' => '', 'access_token' => '', 'access_secret' => '', 'auto_post' => 'off'];
     $twitterAutoEnabled = ($twitterSettings['auto_post'] ?? 'off') === 'on';
     $linkedinSettings = $settings['linkedin'] ?? ['token' => '', 'author' => '', 'auto_post' => 'off'];
     $linkedinAutoEnabled = ($linkedinSettings['auto_post'] ?? 'off') === 'on';
@@ -527,14 +527,24 @@
                     <h4 class="mt-4">Twitter / X (opcional)</h4>
                     <p class="text-muted">Publica un tweet con el título y enlace de cada entrada. <a href="#" data-toggle="modal" data-target="#twitterHelpModal">Ver guía rápida</a></p>
                     <div class="form-group">
-                        <label for="twitter_token">Token / Bearer</label>
-                        <input type="text" name="twitter_token" id="twitter_token" class="form-control" value="<?= htmlspecialchars($twitterSettings['token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Bearer ...">
-                        <small class="form-text text-muted">Generado desde el portal de desarrolladores de Twitter.</small>
+                        <label for="twitter_api_key">API Key</label>
+                        <input type="text" name="twitter_api_key" id="twitter_api_key" class="form-control" value="<?= htmlspecialchars($twitterSettings['api_key'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxxxxxxxxxxxxxx">
+                        <small class="form-text text-muted">En X for Developers aparece dentro de <code>Keys and tokens</code> como <code>API Key</code> o <code>Consumer Key</code>.</small>
                     </div>
                     <div class="form-group">
-                        <label for="twitter_channel">Canal o usuario destino</label>
-                        <input type="text" name="twitter_channel" id="twitter_channel" class="form-control" value="<?= htmlspecialchars($twitterSettings['channel'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="@usuario o ID">
-                        <small class="form-text text-muted">Usa el nombre de usuario (sin @) o el ID numérico.</small>
+                        <label for="twitter_api_secret">API Key Secret</label>
+                        <input type="text" name="twitter_api_secret" id="twitter_api_secret" class="form-control" value="<?= htmlspecialchars($twitterSettings['api_secret'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                        <small class="form-text text-muted">En X for Developers aparece como <code>API Key Secret</code> o <code>Consumer Secret</code>.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="twitter_access_token">Access Token</label>
+                        <input type="text" name="twitter_access_token" id="twitter_access_token" class="form-control" value="<?= htmlspecialchars($twitterSettings['access_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                        <small class="form-text text-muted">Debe ser un token de usuario generado después de poner la app en <code>Read and write</code>.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="twitter_access_secret">Access Token Secret</label>
+                        <input type="text" name="twitter_access_secret" id="twitter_access_secret" class="form-control" value="<?= htmlspecialchars($twitterSettings['access_secret'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                        <small class="form-text text-muted">Se genera junto al <code>Access Token</code>. Nammu no usa aquí el <code>Bearer Token</code>.</small>
                     </div>
                     <div class="form-check mb-3">
                         <input type="checkbox" class="form-check-input" name="twitter_auto" id="twitter_auto" value="1" <?= $twitterAutoEnabled ? 'checked' : '' ?>>
@@ -550,12 +560,42 @@
                                     </button>
                                 </div>
                                 <div class="modal-body">
+                                    <h6 class="mb-2">1) Crear la app y activar autenticación de usuario</h6>
                                     <ol class="mb-3">
-                                        <li>Crea un proyecto en el portal de desarrolladores de X.</li>
-                                        <li>Genera un Bearer Token o token con permisos de publicación.</li>
-                                        <li>Introduce el token y el usuario o ID de la cuenta.</li>
+                                        <li>Entra en <code>https://console.x.com/</code> y crea o abre tu app.</li>
+                                        <li>Ve a <strong>Settings</strong> &rarr; <strong>User authentication settings</strong>.</li>
+                                        <li>Pulsa <strong>Set up</strong> o <strong>Edit</strong>.</li>
+                                        <li>Activa <strong>OAuth 2.0</strong> y pon la app con permiso <strong>Read and write</strong>.</li>
+                                        <li>En <strong>App type</strong> puedes usar <strong>Web App</strong> o <strong>Automated App or Bot</strong>.</li>
+                                        <li>En <strong>Callback / Redirect URI</strong> pon una URL HTTPS exacta de tu blog, por ejemplo <code>https://memoria.repoblacion.ong/</code>.</li>
+                                        <li>En <strong>Website URL</strong> pon la URL pública del blog.</li>
+                                        <li>Guarda los cambios.</li>
                                     </ol>
-                                    <p class="mb-0">Si el texto supera 280 caracteres se truncará.</p>
+
+                                    <h6 class="mb-2">2) Regenerar las credenciales correctas</h6>
+                                    <ol class="mb-3">
+                                        <li>Ve a <strong>Keys and tokens</strong>.</li>
+                                        <li>Copia la <strong>API Key</strong> y la <strong>API Key Secret</strong>.</li>
+                                        <li>En <strong>Authentication Tokens</strong>, genera o regenera <strong>Access Token and Secret</strong>.</li>
+                                        <li>Si acabas de cambiar la app a <strong>Read and write</strong>, regenera estos tokens para que hereden ese permiso.</li>
+                                    </ol>
+
+                                    <h6 class="mb-2">3) Qué pegar en Nammu</h6>
+                                    <ol class="mb-3">
+                                        <li><strong>API Key</strong> &rarr; campo <strong>API Key</strong>.</li>
+                                        <li><strong>API Key Secret</strong> &rarr; campo <strong>API Key Secret</strong>.</li>
+                                        <li><strong>Access Token</strong> &rarr; campo <strong>Access Token</strong>.</li>
+                                        <li><strong>Access Token Secret</strong> &rarr; campo <strong>Access Token Secret</strong>.</li>
+                                    </ol>
+
+                                    <h6 class="mb-2">4) Importante</h6>
+                                    <ul class="mb-3">
+                                        <li>El <strong>Bearer Token</strong> no es el dato correcto para publicar desde Nammu.</li>
+                                        <li>Si X devuelve errores de permisos, revisa que la app siga en <strong>Read and write</strong> y vuelve a regenerar el <strong>Access Token</strong> y su <strong>Secret</strong>.</li>
+                                        <li>Si cambias permisos o tipo de autenticación, espera unos minutos y vuelve a generar las credenciales.</li>
+                                    </ul>
+
+                                    <p class="mb-0">Los mensajes de X se recortarán a un máximo de 280 caracteres cuando haga falta.</p>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>

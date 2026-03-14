@@ -522,37 +522,17 @@ function admin_send_facebook_text(string $text, array $settings, ?string &$error
 
 function admin_send_twitter_text(string $text, array $settings, ?string &$error = null): bool
 {
-    $token = trim((string) ($settings['token'] ?? ''));
-    if ($token === '') {
-        $error = 'Faltan credenciales de Twitter / X.';
-        return false;
-    }
     $payload = json_encode(['text' => $text], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if (!is_string($payload) || $payload === '') {
         $error = 'No se pudo codificar el mensaje para Twitter / X.';
         return false;
     }
-    $headers = [
-        'Authorization: Bearer ' . $token,
-        'Content-Type: application/json',
-        'Content-Length: ' . strlen($payload),
-    ];
-    $httpCode = null;
-    $response = admin_http_post_body_response('https://api.twitter.com/2/tweets', $payload, $headers, $httpCode);
-    if ($response !== null && $httpCode !== null && $httpCode >= 200 && $httpCode < 300) {
-        return true;
+    $decodedPayload = json_decode($payload, true);
+    if (!is_array($decodedPayload)) {
+        $error = 'No se pudo preparar el mensaje para Twitter / X.';
+        return false;
     }
-    $error = 'No se pudo enviar el mensaje a Twitter / X.';
-    if ($response !== null) {
-        $decoded = json_decode($response, true);
-        if (is_array($decoded)) {
-            $message = (string) ($decoded['detail'] ?? $decoded['title'] ?? '');
-            if ($message !== '') {
-                $error = 'Twitter / X: ' . $message;
-            }
-        }
-    }
-    return false;
+    return admin_send_twitter_api_request('https://api.twitter.com/2/tweets', $decodedPayload, $settings, $error);
 }
 
 function admin_send_bluesky_text(string $text, array $settings, ?string &$error = null): bool

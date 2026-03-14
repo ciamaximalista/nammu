@@ -1588,6 +1588,10 @@ function get_settings() {
         'channel' => '',
         'recipient' => '',
         'auto_post' => 'off',
+        'api_key' => '',
+        'api_secret' => '',
+        'access_token' => '',
+        'access_secret' => '',
     ], $config);
     $bluesky = admin_extract_social_settings('bluesky', [
         'service' => 'https://bsky.social',
@@ -2965,7 +2969,10 @@ function admin_is_social_network_configured(string $network, array $settings): b
         case 'facebook':
             return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
         case 'twitter':
-            return ($settings['token'] ?? '') !== '';
+            return ($settings['api_key'] ?? '') !== ''
+                && ($settings['api_secret'] ?? '') !== ''
+                && ($settings['access_token'] ?? '') !== ''
+                && ($settings['access_secret'] ?? '') !== '';
         case 'bluesky':
             return ($settings['identifier'] ?? '') !== '' && ($settings['app_password'] ?? '') !== '';
         case 'mastodon':
@@ -3271,15 +3278,11 @@ function admin_send_facebook_post(string $slug, string $title, string $descripti
 }
 
 function admin_send_twitter_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = ''): bool {
-    $token = $settings['token'] ?? '';
     $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
     $trackedUrl = admin_add_utm_params($targetUrl, [
         'utm_source' => 'twitter',
         'utm_medium' => 'social',
     ]);
-    if ($token === '') {
-        return false;
-    }
     $endpoint = 'https://api.twitter.com/2/tweets';
     $text = admin_build_post_message($slug, $title, $description, $trackedUrl);
     if (function_exists('mb_strlen')) {
@@ -3290,10 +3293,83 @@ function admin_send_twitter_post(string $slug, string $title, string $descriptio
         $text = substr($text, 0, 275) . '…';
     }
     $payload = ['text' => $text];
-    return admin_http_post_json($endpoint, $payload, [
-        'Authorization: Bearer ' . $token,
+    return admin_send_twitter_api_request($endpoint, $payload, $settings);
+}
+
+function admin_twitter_percent_encode(string $value): string {
+    return str_replace('%7E', '~', rawurlencode($value));
+}
+
+function admin_twitter_build_oauth_header(string $method, string $url, array $settings, ?string &$error = null): ?string {
+    $consumerKey = trim((string) ($settings['api_key'] ?? ''));
+    $consumerSecret = trim((string) ($settings['api_secret'] ?? ''));
+    $accessToken = trim((string) ($settings['access_token'] ?? ''));
+    $accessSecret = trim((string) ($settings['access_secret'] ?? ''));
+    if ($consumerKey === '' || $consumerSecret === '' || $accessToken === '' || $accessSecret === '') {
+        $error = 'Faltan credenciales de X: API Key, API Key Secret, Access Token y Access Token Secret.';
+        return null;
+    }
+
+    $oauth = [
+        'oauth_consumer_key' => $consumerKey,
+        'oauth_nonce' => bin2hex(random_bytes(16)),
+        'oauth_signature_method' => 'HMAC-SHA1',
+        'oauth_timestamp' => (string) time(),
+        'oauth_token' => $accessToken,
+        'oauth_version' => '1.0',
+    ];
+    ksort($oauth);
+    $parameterPairs = [];
+    foreach ($oauth as $key => $value) {
+        $parameterPairs[] = admin_twitter_percent_encode((string) $key) . '=' . admin_twitter_percent_encode((string) $value);
+    }
+    $baseString = strtoupper($method) . '&' . admin_twitter_percent_encode($url) . '&' . admin_twitter_percent_encode(implode('&', $parameterPairs));
+    $signingKey = admin_twitter_percent_encode($consumerSecret) . '&' . admin_twitter_percent_encode($accessSecret);
+    $oauth['oauth_signature'] = base64_encode(hash_hmac('sha1', $baseString, $signingKey, true));
+
+    $headerParts = [];
+    foreach ($oauth as $key => $value) {
+        $headerParts[] = admin_twitter_percent_encode((string) $key) . '="' . admin_twitter_percent_encode((string) $value) . '"';
+    }
+
+    return 'OAuth ' . implode(', ', $headerParts);
+}
+
+function admin_send_twitter_api_request(string $endpoint, array $payload, array $settings, ?string &$error = null): bool {
+    $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($body) || $body === '') {
+        $error = 'No se pudo codificar el mensaje para X.';
+        return false;
+    }
+
+    $authorization = admin_twitter_build_oauth_header('POST', $endpoint, $settings, $error);
+    if ($authorization === null) {
+        return false;
+    }
+
+    $headers = [
+        'Authorization: ' . $authorization,
         'Content-Type: application/json',
-    ]);
+        'Content-Length: ' . strlen($body),
+    ];
+    $httpCode = null;
+    $responseBody = admin_http_post_body_response($endpoint, $body, $headers, $httpCode);
+    if ($responseBody !== null && $httpCode !== null && $httpCode >= 200 && $httpCode < 300) {
+        return true;
+    }
+
+    $error = 'No se pudo enviar la publicación a X. Comprueba las credenciales.';
+    if ($responseBody !== null) {
+        $decoded = json_decode($responseBody, true);
+        if (is_array($decoded)) {
+            $message = (string) ($decoded['detail'] ?? $decoded['title'] ?? $decoded['error'] ?? '');
+            if ($message !== '') {
+                $error = 'X: ' . $message;
+            }
+        }
+    }
+
+    return false;
 }
 
 function admin_send_linkedin_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = '', ?string &$error = null): bool {
@@ -8692,8 +8768,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $facebook_app_secret = trim($_POST['facebook_app_secret'] ?? '');
         $facebook_channel = trim($_POST['facebook_channel'] ?? '');
         $facebook_auto = isset($_POST['facebook_auto']) ? 'on' : 'off';
-        $twitter_token = trim($_POST['twitter_token'] ?? '');
-        $twitter_channel = trim($_POST['twitter_channel'] ?? '');
+        $twitter_api_key = trim($_POST['twitter_api_key'] ?? '');
+        $twitter_api_secret = trim($_POST['twitter_api_secret'] ?? '');
+        $twitter_access_token = trim($_POST['twitter_access_token'] ?? '');
+        $twitter_access_secret = trim($_POST['twitter_access_secret'] ?? '');
         $twitter_auto = isset($_POST['twitter_auto']) ? 'on' : 'off';
         $linkedin_token = trim($_POST['linkedin_token'] ?? '');
         $linkedin_author = trim($_POST['linkedin_author'] ?? '');
@@ -8755,10 +8833,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 unset($config['facebook']);
             }
-            if ($twitter_token !== '' || $twitter_channel !== '' || $twitter_auto === 'on') {
+            if ($twitter_api_key !== '' || $twitter_api_secret !== '' || $twitter_access_token !== '' || $twitter_access_secret !== '' || $twitter_auto === 'on') {
                 $config['twitter'] = [
-                    'token' => $twitter_token,
-                    'channel' => $twitter_channel,
+                    'api_key' => $twitter_api_key,
+                    'api_secret' => $twitter_api_secret,
+                    'access_token' => $twitter_access_token,
+                    'access_secret' => $twitter_access_secret,
                     'auto_post' => $twitter_auto,
                 ];
             } else {

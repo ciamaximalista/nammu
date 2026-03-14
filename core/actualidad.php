@@ -101,6 +101,146 @@ function nammu_actuality_fetch_url(string $url, string $accept = 'text/html,appl
     ];
 }
 
+function nammu_actuality_rss_settings(array $config): array
+{
+    $socialRss = is_array($config['social_rss'] ?? null) ? $config['social_rss'] : [];
+    return [
+        'feeds' => trim((string) ($socialRss['feeds'] ?? '')),
+    ];
+}
+
+function nammu_actuality_rss_feed_list(string $feedsRaw): array
+{
+    $lines = preg_split('/\R+/', $feedsRaw) ?: [];
+    $feeds = [];
+    foreach ($lines as $line) {
+        $url = trim($line);
+        if ($url === '' || !preg_match('#^https?://#i', $url)) {
+            continue;
+        }
+        $feeds[] = $url;
+    }
+    return array_values(array_unique($feeds));
+}
+
+function nammu_actuality_fetch_rss_items(string $url): array
+{
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'timeout' => 15,
+            'ignore_errors' => true,
+            'header' => "User-Agent: Nammu RSS Fetcher\r\n",
+        ],
+    ]);
+    $raw = @file_get_contents($url, false, $context);
+    if (!is_string($raw) || trim($raw) === '') {
+        return [];
+    }
+    libxml_use_internal_errors(true);
+    $xml = @simplexml_load_string($raw, 'SimpleXMLElement', LIBXML_NOCDATA);
+    if (!$xml instanceof SimpleXMLElement) {
+        return [];
+    }
+
+    $items = [];
+    if (isset($xml->channel->item)) {
+        $namespaces = $xml->getNamespaces(true);
+        foreach ($xml->channel->item as $item) {
+            $title = trim((string) ($item->title ?? ''));
+            $link = trim((string) ($item->link ?? ''));
+            $guid = trim((string) ($item->guid ?? ''));
+            $pubDate = trim((string) ($item->pubDate ?? ''));
+            $description = trim((string) ($item->description ?? ''));
+            $image = '';
+            if (isset($item->enclosure)) {
+                foreach ($item->enclosure as $enclosure) {
+                    $type = strtolower(trim((string) ($enclosure['type'] ?? '')));
+                    $candidate = trim((string) ($enclosure['url'] ?? ''));
+                    if ($candidate !== '' && ($type === '' || str_starts_with($type, 'image/'))) {
+                        $image = $candidate;
+                        break;
+                    }
+                }
+            }
+            if ($image === '' && isset($namespaces['media'])) {
+                $media = $item->children($namespaces['media']);
+                if (isset($media->content)) {
+                    foreach ($media->content as $mediaContent) {
+                        $candidate = trim((string) ($mediaContent['url'] ?? ''));
+                        $type = strtolower(trim((string) ($mediaContent['type'] ?? '')));
+                        if ($candidate !== '' && ($type === '' || str_starts_with($type, 'image/'))) {
+                            $image = $candidate;
+                            break;
+                        }
+                    }
+                }
+                if ($image === '' && isset($media->thumbnail)) {
+                    foreach ($media->thumbnail as $thumbnail) {
+                        $candidate = trim((string) ($thumbnail['url'] ?? ''));
+                        if ($candidate !== '') {
+                            $image = $candidate;
+                            break;
+                        }
+                    }
+                }
+            }
+            if ($image === '' && preg_match('/<img[^>]+src=["\']([^"\']+)["\']/i', $description, $imageMatch)) {
+                $image = trim((string) ($imageMatch[1] ?? ''));
+            }
+            $keyBase = $guid !== '' ? $guid : ($link !== '' ? $link : $title);
+            if ($keyBase === '' || $link === '') {
+                continue;
+            }
+            $items[] = [
+                'key' => sha1($keyBase),
+                'title' => $title,
+                'link' => $link,
+                'description' => $description,
+                'image' => $image,
+                'timestamp' => $pubDate !== '' ? (int) (strtotime($pubDate) ?: 0) : 0,
+            ];
+        }
+    } elseif (isset($xml->entry)) {
+        foreach ($xml->entry as $entry) {
+            $title = trim((string) ($entry->title ?? ''));
+            $link = '';
+            if (isset($entry->link)) {
+                foreach ($entry->link as $linkNode) {
+                    $href = trim((string) ($linkNode['href'] ?? ''));
+                    if ($href !== '') {
+                        $link = $href;
+                        break;
+                    }
+                }
+            }
+            $guid = trim((string) ($entry->id ?? ''));
+            $updated = trim((string) ($entry->updated ?? ''));
+            $summary = trim((string) ($entry->summary ?? ''));
+            if ($summary === '') {
+                $summary = trim((string) ($entry->content ?? ''));
+            }
+            $keyBase = $guid !== '' ? $guid : ($link !== '' ? $link : $title);
+            if ($keyBase === '' || $link === '') {
+                continue;
+            }
+            $items[] = [
+                'key' => sha1($keyBase),
+                'title' => $title,
+                'link' => $link,
+                'description' => $summary,
+                'image' => '',
+                'timestamp' => $updated !== '' ? (int) (strtotime($updated) ?: 0) : 0,
+            ];
+        }
+    }
+
+    usort($items, static function (array $a, array $b): int {
+        return ($a['timestamp'] ?? 0) <=> ($b['timestamp'] ?? 0);
+    });
+    return $items;
+}
+
 function nammu_actuality_resolve_url(string $candidate, string $baseUrl): string
 {
     $candidate = trim($candidate);
@@ -388,15 +528,15 @@ function nammu_actuality_has_feeds(array $config): bool
 
 function nammu_actuality_collect_items(array $config, string $publicBaseUrl): array
 {
-    $rssSettings = admin_social_rss_settings(['social_rss' => $config['social_rss'] ?? []]);
-    $feeds = admin_social_rss_feed_list($rssSettings['feeds']);
+    $rssSettings = nammu_actuality_rss_settings(['social_rss' => $config['social_rss'] ?? []]);
+    $feeds = nammu_actuality_rss_feed_list($rssSettings['feeds']);
     if (empty($feeds)) {
         return [];
     }
     $items = [];
     $seen = [];
     foreach ($feeds as $feedUrl) {
-        foreach (admin_fetch_social_rss_items($feedUrl) as $item) {
+        foreach (nammu_actuality_fetch_rss_items($feedUrl) as $item) {
             $key = (string) ($item['key'] ?? sha1(($item['link'] ?? '') . '|' . ($item['title'] ?? '')));
             if ($key === '' || isset($seen[$key])) {
                 continue;

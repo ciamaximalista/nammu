@@ -3277,7 +3277,7 @@ function admin_send_facebook_post(string $slug, string $title, string $descripti
     return $ok;
 }
 
-function admin_send_twitter_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = ''): bool {
+function admin_send_twitter_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = '', ?string &$error = null): bool {
     $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
     $trackedUrl = admin_add_utm_params($targetUrl, [
         'utm_source' => 'twitter',
@@ -3293,7 +3293,7 @@ function admin_send_twitter_post(string $slug, string $title, string $descriptio
         $text = substr($text, 0, 275) . '…';
     }
     $payload = ['text' => $text];
-    return admin_send_twitter_api_request($endpoint, $payload, $settings);
+    return admin_send_twitter_api_request($endpoint, $payload, $settings, $error);
 }
 
 function admin_twitter_percent_encode(string $value): string {
@@ -3359,10 +3359,25 @@ function admin_send_twitter_api_request(string $endpoint, array $payload, array 
     }
 
     $error = 'No se pudo enviar la publicación a X. Comprueba las credenciales.';
+    error_log('X post error: http=' . ($httpCode ?? 'n/a') . ' response=' . (string) $responseBody);
     if ($responseBody !== null) {
         $decoded = json_decode($responseBody, true);
         if (is_array($decoded)) {
-            $message = (string) ($decoded['detail'] ?? $decoded['title'] ?? $decoded['error'] ?? '');
+            $message = '';
+            if (isset($decoded['detail']) && is_string($decoded['detail'])) {
+                $message = $decoded['detail'];
+            } elseif (isset($decoded['title']) && is_string($decoded['title'])) {
+                $message = $decoded['title'];
+            } elseif (isset($decoded['error']) && is_string($decoded['error'])) {
+                $message = $decoded['error'];
+            } elseif (!empty($decoded['errors']) && is_array($decoded['errors'])) {
+                $firstError = $decoded['errors'][0] ?? null;
+                if (is_array($firstError)) {
+                    $message = (string) ($firstError['message'] ?? $firstError['detail'] ?? $firstError['title'] ?? '');
+                } elseif (is_string($firstError)) {
+                    $message = $firstError;
+                }
+            }
             if ($message !== '') {
                 $error = 'X: ' . $message;
             }
@@ -7410,7 +7425,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 }
                                 break;
                             case 'twitter':
-                                $sent = admin_send_twitter_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
+                                $sent = admin_send_twitter_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
                                 break;
                             case 'linkedin':
                                 $sent = admin_send_linkedin_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
@@ -7489,7 +7504,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $sent = admin_send_facebook_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
                             break;
                         case 'twitter':
-                            $sent = admin_send_twitter_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
+                            $sent = admin_send_twitter_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
                             break;
                         case 'linkedin':
                             $sent = admin_send_linkedin_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);

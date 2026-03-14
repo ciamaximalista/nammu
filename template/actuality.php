@@ -153,6 +153,7 @@ $formatDate = static function (int $timestamp): string {
     .actuality-image-link {
         display: block;
         background: <?= $highlight ?>;
+        margin-bottom: 0.95rem;
     }
     .actuality-image-link img {
         display: block;

@@ -122,7 +122,10 @@ $renderer->setGlobal('podcastIndexUrl', $publicBaseUrl !== '' ? rtrim($publicBas
 $renderer->setGlobal('lettersIndexUrl', $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/letras' : '/letras');
 $renderer->setGlobal('showLetterIndexButton', (($configData['sort_order'] ?? 'date') === 'alpha'));
 $renderer->setGlobal('newslettersIndexUrl', $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/newsletters' : '/newsletters');
-$renderer->setGlobal('hasNewsletters', nammu_newsletters_available(__DIR__ . '/content'));
+$newsletterItems = function_exists('nammu_newsletter_collect_items')
+    ? nammu_newsletter_collect_items(__DIR__ . '/content', $publicBaseUrl)
+    : [];
+$renderer->setGlobal('hasNewsletters', !empty($newsletterItems));
 $socialRssConfig = is_array($configData['social_rss'] ?? null) ? $configData['social_rss'] : [];
 $renderer->setGlobal('hasActuality', trim((string) ($socialRssConfig['feeds'] ?? '')) !== '');
 

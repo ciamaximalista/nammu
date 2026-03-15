@@ -162,41 +162,36 @@ unset($_SESSION['newsletter_custom_recipients']);
                     <tr>
                         <th>Texto</th>
                         <th>Fecha</th>
-                        <th>Nombre</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($pageNotes)): ?>
                         <tr>
-                            <td colspan="4" class="text-center text-muted">No hay notas disponibles.</td>
+                            <td colspan="3" class="text-center text-muted">No hay notas disponibles.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($pageNotes as $note): ?>
                             <?php
                             $rawText = trim((string) ($note['raw_text'] ?? ($note['description'] ?? '')));
                             $rawText = preg_replace('#https?://[^\s<>"\')]+#iu', '', $rawText) ?? $rawText;
-                            $rawText = preg_replace('/\s+/u', ' ', $rawText) ?? $rawText;
+                            $rawText = preg_replace("/[ \t]+\n/", "\n", $rawText) ?? $rawText;
+                            $rawText = preg_replace("/\n{3,}/", "\n\n", $rawText) ?? $rawText;
                             $excerpt = trim($rawText);
                             if ($excerpt === '') {
                                 $excerpt = (string) ($note['title'] ?? '');
                             }
-                            if ((function_exists('mb_strlen') ? mb_strlen($excerpt, 'UTF-8') : strlen($excerpt)) > 180) {
-                                $excerpt = function_exists('mb_substr') ? mb_substr($excerpt, 0, 177, 'UTF-8') . '…' : substr($excerpt, 0, 177) . '...';
-                            }
                             $ts = (int) ($note['timestamp'] ?? 0);
                             $formattedDate = $ts > 0 ? date('d/m/Y H:i', $ts) : '—';
-                            $noteId = (string) ($note['id'] ?? '');
                             ?>
                             <tr>
-                                <td><?= htmlspecialchars($excerpt, ENT_QUOTES, 'UTF-8') ?></td>
+                                <td style="white-space: pre-wrap; min-width: 28rem;"><?= htmlspecialchars($excerpt, ENT_QUOTES, 'UTF-8') ?></td>
                                 <td><?= htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') ?></td>
-                                <td><?= htmlspecialchars($noteId !== '' ? ('nota-' . $noteId) : 'nota', ENT_QUOTES, 'UTF-8') ?></td>
                                 <td class="text-right">
                                     <div class="d-flex flex-column align-items-end">
-                                        <a href="?page=edit-note&id=<?= urlencode($noteId) ?>" class="btn btn-sm btn-primary mb-2">Editar</a>
+                                        <a href="?page=edit-note&id=<?= urlencode((string) ($note['id'] ?? '')) ?>" class="btn btn-sm btn-primary mb-2">Editar</a>
                                         <form method="post" onsubmit="return confirm('¿Borrar esta nota definitivamente?');">
-                                            <input type="hidden" name="delete_note_id" value="<?= htmlspecialchars($noteId, ENT_QUOTES, 'UTF-8') ?>">
+                                            <input type="hidden" name="delete_note_id" value="<?= htmlspecialchars((string) ($note['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                             <button type="submit" name="delete_actuality_note" class="btn btn-sm btn-outline-danger">Borrar</button>
                                         </form>
                                     </div>

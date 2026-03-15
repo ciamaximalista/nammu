@@ -126,6 +126,7 @@ Esa tarea se encarga de:
 - publicar contenidos programados,
 - procesar colas pendientes,
 - revisar RSS externas configuradas en **Redes**,
+- refrescar actores seguidos en **Fediverso**,
 - regenerar snapshots públicos dependientes del cron.
 
 Además, Nammu incluye:
@@ -218,6 +219,14 @@ tar -xzf /var/www/html/<carpeta-publica>/backups/nammu-stats-backup-AAAA-MM-DD_H
 - `rss.xml`, `sitemap.xml`, `itinerarios.xml`, `podcast.xml`, `noticias.xml`.
 - Tarjetas Open Graph y Twitter completas con imagen, título, descripción y `alt`.
 - Canonical, datos estructurados e integración IndexNow.
+
+### 6. Fediverso y agregación
+
+- Página pública `actualidad.php` construida a partir de las RSS externas configuradas y de notas manuales.
+- Feed `noticias.xml` generado a partir de esa misma selección.
+- Módulo `Fediverso` en el admin para seguir actores ActivityPub públicos y leer sus actualizaciones.
+- Exposición básica del blog como actor ActivityPub con `WebFinger`, actor, `outbox`, `followers`, `following` e `inbox`.
+- Cron integrado para refrescar periódicamente el timeline remoto seguido desde `Fediverso`.
 - `llms.txt` para consumo por modelos de lenguaje.
 
 ### 6. Itinerarios y formación

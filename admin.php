@@ -51,9 +51,13 @@ function admin_run_scheduled_tasks(): array {
     if (!function_exists('nammu_actuality_rebuild_snapshot') && is_file(__DIR__ . '/core/actualidad.php')) {
         require_once __DIR__ . '/core/actualidad.php';
     }
+    if (!function_exists('nammu_fediverse_refresh_following') && is_file(__DIR__ . '/core/fediverso.php')) {
+        require_once __DIR__ . '/core/fediverso.php';
+    }
     $published = 0;
     $queueStats = ['processed' => 0, 'remaining' => 0];
     $rssStats = ['sent' => 0, 'checked' => 0];
+    $fediverseStats = ['checked' => 0, 'new' => 0];
     if (function_exists('nammu_publish_scheduled_posts')) {
         $published = (int) nammu_publish_scheduled_posts(CONTENT_DIR);
     }
@@ -74,12 +78,17 @@ function admin_run_scheduled_tasks(): array {
         }
         nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
     }
+    if (function_exists('nammu_fediverse_refresh_following')) {
+        $fediverseStats = nammu_fediverse_refresh_following();
+    }
     return [
         'published' => $published,
         'notifications_processed' => (int) ($queueStats['processed'] ?? 0),
         'notifications_remaining' => (int) ($queueStats['remaining'] ?? 0),
         'social_rss_sent' => (int) ($rssStats['sent'] ?? 0),
         'social_rss_checked' => (int) ($rssStats['checked'] ?? 0),
+        'fediverse_checked' => (int) ($fediverseStats['checked'] ?? 0),
+        'fediverse_new' => (int) ($fediverseStats['new'] ?? 0),
     ];
 }
 
@@ -10236,6 +10245,8 @@ $socialBroadcastText = '';
 $socialBroadcastImage = '';
 $socialBroadcastActuality = false;
 $socialBroadcastNetworks = [];
+$fediverseFeedback = null;
+$fediverseActorInput = '';
 $notesFeedback = $_SESSION['notes_feedback'] ?? null;
 if ($notesFeedback !== null) {
     unset($_SESSION['notes_feedback']);
@@ -10252,6 +10263,30 @@ if ($isLoggedIn && $page === 'redes') {
     $socialRssFeedback = $socialRssState['feedback'] ?? null;
     $socialRssFeedsRaw = (string) ($socialRssState['feeds_raw'] ?? '');
     $socialRssNetworks = is_array($socialRssState['networks'] ?? null) ? $socialRssState['networks'] : [];
+}
+if ($isLoggedIn && $page === 'fediverso') {
+    require_once __DIR__ . '/core/fediverso.php';
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['follow_fediverse_actor'])) {
+        $fediverseActorInput = trim((string) ($_POST['fediverse_actor_input'] ?? ''));
+        $followResult = nammu_fediverse_follow_actor($fediverseActorInput);
+        $fediverseFeedback = [
+            'type' => !empty($followResult['ok']) ? 'success' : 'danger',
+            'message' => (string) ($followResult['message'] ?? ''),
+        ];
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unfollow_fediverse_actor'])) {
+        $actorId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
+        $ok = $actorId !== '' && nammu_fediverse_unfollow_actor($actorId);
+        $fediverseFeedback = [
+            'type' => $ok ? 'success' : 'danger',
+            'message' => $ok ? 'Actor eliminado del Fediverso.' : 'No se pudo quitar ese actor.',
+        ];
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refresh_fediverse_timeline'])) {
+        $stats = nammu_fediverse_refresh_following();
+        $fediverseFeedback = [
+            'type' => 'info',
+            'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '.',
+        ];
+    }
 }
 $isItineraryAdminPage = in_array($page, ['itinerarios', 'itinerario', 'itinerario-tema'], true);
 
@@ -12084,6 +12119,15 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                                     </a>
                                 </li>
 
+                                <li class="nav-item <?= $page === 'fediverso' ? 'active' : '' ?>">
+                                    <a class="nav-link" href="?page=fediverso" title="Fediverso" aria-label="Fediverso">
+                                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12 3a7 7 0 0 0-7 7v1H3l3 4 3-4H7v-1a5 5 0 1 1 10 0v1h-2l3 4 3-4h-2v-1a7 7 0 0 0-7-7Z" fill="currentColor"/>
+                                            <path d="M6 17a6 6 0 0 0 12 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        </svg>
+                                    </a>
+                                </li>
+
                                 <li class="nav-item <?= $page === 'configuracion' ? 'active' : '' ?>">
                                     <a class="nav-link" href="?page=configuracion" title="Configuración" aria-label="Configuración">
                                         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -12163,6 +12207,10 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 <?php elseif ($page === 'redes'): ?>
 
     <?php include __DIR__ . '/core/admin-page-redes.php'; ?>
+
+<?php elseif ($page === 'fediverso'): ?>
+
+    <?php include __DIR__ . '/core/admin-page-fediverso.php'; ?>
 
 <?php elseif ($page === 'configuracion'): ?>
 

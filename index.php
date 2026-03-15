@@ -9,7 +9,7 @@ error_reporting(E_ALL);
 require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
 require_once __DIR__ . '/core/actualidad.php';
-require_once __DIR__ . '/core/actualidad.php';
+require_once __DIR__ . '/core/fediverso.php';
 
 use Nammu\Core\ContentRepository;
 use Nammu\Core\Itinerary;
@@ -663,6 +663,65 @@ if ($routePath === '/rss.xml') {
     if ($publicBaseUrl !== '') {
         @file_put_contents(__DIR__ . '/rss.xml', $rss);
     }
+    exit;
+}
+
+if ($routePath === '/.well-known/webfinger') {
+    $resource = trim((string) ($_GET['resource'] ?? ''));
+    $acct = nammu_fediverse_acct_uri($configData);
+    $actorUrl = nammu_fediverse_actor_url($configData);
+    if ($resource !== '' && $resource !== $acct && $resource !== $actorUrl) {
+        http_response_code(404);
+        header('Content-Type: application/jrd+json; charset=UTF-8');
+        echo json_encode(['error' => 'resource_not_found'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    header('Content-Type: application/jrd+json; charset=UTF-8');
+    echo json_encode(nammu_fediverse_webfinger_document($configData), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($routePath === '/ap/actor') {
+    header('Content-Type: application/activity+json; charset=UTF-8');
+    echo json_encode(nammu_fediverse_actor_document($configData), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($routePath === '/ap/outbox') {
+    header('Content-Type: application/activity+json; charset=UTF-8');
+    echo json_encode(nammu_fediverse_outbox_document($configData), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($routePath === '/ap/followers') {
+    header('Content-Type: application/activity+json; charset=UTF-8');
+    echo json_encode(nammu_fediverse_followers_collection($configData), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($routePath === '/ap/following') {
+    header('Content-Type: application/activity+json; charset=UTF-8');
+    echo json_encode(nammu_fediverse_following_collection($configData), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($routePath === '/ap/inbox') {
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+        http_response_code(405);
+        header('Allow: POST');
+        exit;
+    }
+    $payload = json_decode((string) file_get_contents('php://input'), true);
+    if (!is_array($payload)) {
+        http_response_code(400);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['error' => 'invalid_json'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    nammu_fediverse_store_inbox_activity($payload);
+    http_response_code(202);
+    header('Content-Type: application/activity+json; charset=UTF-8');
+    echo json_encode(['status' => 'accepted'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;
 }
 

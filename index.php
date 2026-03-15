@@ -718,10 +718,10 @@ if ($routePath === '/ap/inbox') {
         echo json_encode(['error' => 'invalid_json'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         exit;
     }
-    nammu_fediverse_store_inbox_activity($payload);
+    $result = nammu_fediverse_handle_inbox_payload($payload, $configData);
     http_response_code(202);
     header('Content-Type: application/activity+json; charset=UTF-8');
-    echo json_encode(['status' => 'accepted'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    echo json_encode(['status' => 'accepted', 'result' => $result], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;
 }
 

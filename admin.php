@@ -57,7 +57,7 @@ function admin_run_scheduled_tasks(): array {
     $published = 0;
     $queueStats = ['processed' => 0, 'remaining' => 0];
     $rssStats = ['sent' => 0, 'checked' => 0];
-    $fediverseStats = ['checked' => 0, 'new' => 0];
+    $fediverseStats = ['checked' => 0, 'new' => 0, 'followers' => 0, 'delivered' => 0];
     if (function_exists('nammu_publish_scheduled_posts')) {
         $published = (int) nammu_publish_scheduled_posts(CONTENT_DIR);
     }
@@ -80,6 +80,11 @@ function admin_run_scheduled_tasks(): array {
     }
     if (function_exists('nammu_fediverse_refresh_following')) {
         $fediverseStats = nammu_fediverse_refresh_following();
+        if (function_exists('nammu_fediverse_deliver_local_items')) {
+            $deliveryStats = nammu_fediverse_deliver_local_items($config);
+            $fediverseStats['followers'] = (int) ($deliveryStats['followers'] ?? 0);
+            $fediverseStats['delivered'] = (int) ($deliveryStats['delivered'] ?? 0);
+        }
     }
     return [
         'published' => $published,
@@ -89,6 +94,8 @@ function admin_run_scheduled_tasks(): array {
         'social_rss_checked' => (int) ($rssStats['checked'] ?? 0),
         'fediverse_checked' => (int) ($fediverseStats['checked'] ?? 0),
         'fediverse_new' => (int) ($fediverseStats['new'] ?? 0),
+        'fediverse_followers' => (int) ($fediverseStats['followers'] ?? 0),
+        'fediverse_delivered' => (int) ($fediverseStats['delivered'] ?? 0),
     ];
 }
 

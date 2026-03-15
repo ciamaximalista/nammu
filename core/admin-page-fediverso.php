@@ -9,6 +9,7 @@
     $fediverseAcct = nammu_fediverse_acct_uri($fediverseConfig);
     $fediverseFollowing = nammu_fediverse_following_store()['actors'];
     $fediverseTimeline = nammu_fediverse_timeline_store()['items'];
+    $fediverseFollowers = function_exists('nammu_fediverse_followers_store') ? nammu_fediverse_followers_store()['followers'] : [];
     ?>
     <div class="tab-pane active">
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
@@ -43,6 +44,10 @@
                     <div class="col-lg-6 mb-3">
                         <label class="font-weight-bold d-block mb-1">Outbox</label>
                         <a href="<?= htmlspecialchars(nammu_fediverse_outbox_url($fediverseConfig), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars(nammu_fediverse_outbox_url($fediverseConfig), ENT_QUOTES, 'UTF-8') ?></a>
+                    </div>
+                    <div class="col-lg-6 mb-0">
+                        <label class="font-weight-bold d-block mb-1">Seguidores federados</label>
+                        <strong><?= (int) count($fediverseFollowers) ?></strong>
                     </div>
                 </div>
             </div>

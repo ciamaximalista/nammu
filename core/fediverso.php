@@ -17,6 +17,16 @@ function nammu_fediverse_inbox_file(): string
     return dirname(__DIR__) . '/config/fediverso-inbox.json';
 }
 
+function nammu_fediverse_followers_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-followers.json';
+}
+
+function nammu_fediverse_deliveries_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-deliveries.json';
+}
+
 function nammu_fediverse_keys_file(): string
 {
     return dirname(__DIR__) . '/config/activitypub-keys.json';
@@ -136,6 +146,138 @@ function nammu_fediverse_keypair(): array
     return $result;
 }
 
+function nammu_fediverse_signature_key_id(array $config): string
+{
+    return nammu_fediverse_actor_url($config) . '#main-key';
+}
+
+function nammu_fediverse_private_key_resource(array $config)
+{
+    $keys = nammu_fediverse_keypair();
+    $private = trim((string) ($keys['private_key'] ?? ''));
+    if ($private === '' || !function_exists('openssl_pkey_get_private')) {
+        return null;
+    }
+    $resource = openssl_pkey_get_private($private);
+    return $resource === false ? null : $resource;
+}
+
+function nammu_fediverse_http_date(): string
+{
+    return gmdate('D, d M Y H:i:s \G\M\T');
+}
+
+function nammu_fediverse_digest_header(string $body): string
+{
+    return 'SHA-256=' . base64_encode(hash('sha256', $body, true));
+}
+
+function nammu_fediverse_signature_header(string $method, string $url, array $config, string $body = '', array $extraHeaders = []): ?array
+{
+    $privateKey = nammu_fediverse_private_key_resource($config);
+    if ($privateKey === null) {
+        return null;
+    }
+    $parts = parse_url($url);
+    $path = (string) ($parts['path'] ?? '/');
+    $query = isset($parts['query']) && $parts['query'] !== '' ? '?' . $parts['query'] : '';
+    $target = strtolower($method) . ' ' . $path . $query;
+    $host = (string) ($parts['host'] ?? '');
+    if ($host === '') {
+        return null;
+    }
+    if (isset($parts['port'])) {
+        $host .= ':' . $parts['port'];
+    }
+    $headers = [
+        '(request-target)' => $target,
+        'host' => $host,
+        'date' => nammu_fediverse_http_date(),
+    ];
+    if ($body !== '') {
+        $headers['digest'] = nammu_fediverse_digest_header($body);
+        $headers['content-type'] = 'application/activity+json';
+    }
+    foreach ($extraHeaders as $name => $value) {
+        $headers[strtolower((string) $name)] = (string) $value;
+    }
+    $signing = [];
+    foreach ($headers as $name => $value) {
+        $signing[] = $name . ': ' . $value;
+    }
+    $signingString = implode("\n", $signing);
+    $signature = '';
+    $ok = openssl_sign($signingString, $signature, $privateKey, OPENSSL_ALGO_SHA256);
+    if (!$ok) {
+        return null;
+    }
+    $headerNames = implode(' ', array_keys($headers));
+    $signatureHeader = sprintf(
+        'keyId="%s",algorithm="rsa-sha256",headers="%s",signature="%s"',
+        nammu_fediverse_signature_key_id($config),
+        $headerNames,
+        base64_encode($signature)
+    );
+    $result = [
+        'Date: ' . $headers['date'],
+        'Host: ' . $host,
+        'Signature: ' . $signatureHeader,
+        'Accept: application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9',
+        'User-Agent: Nammu Fediverso',
+    ];
+    if ($body !== '') {
+        $result[] = 'Digest: ' . $headers['digest'];
+        $result[] = 'Content-Type: application/activity+json';
+    }
+    return $result;
+}
+
+function nammu_fediverse_signed_fetch(string $url, array $config, string $method = 'GET', string $body = ''): array
+{
+    $headers = nammu_fediverse_signature_header($method, $url, $config, $body) ?? [
+        'User-Agent: Nammu Fediverso',
+        'Accept: application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9',
+    ];
+    $context = stream_context_create([
+        'http' => [
+            'method' => strtoupper($method),
+            'timeout' => 15,
+            'ignore_errors' => true,
+            'header' => implode("\r\n", $headers) . "\r\n",
+            'content' => $body,
+        ],
+    ]);
+    $rawHeaders = [];
+    $responseBody = @file_get_contents($url, false, $context);
+    $status = 0;
+    foreach (($http_response_header ?? []) as $line) {
+        if (preg_match('#^HTTP/\S+\s+(\d{3})#', (string) $line, $m)) {
+            $status = (int) $m[1];
+            continue;
+        }
+        if (!is_string($line) || !str_contains($line, ':')) {
+            continue;
+        }
+        [$name, $value] = explode(':', $line, 2);
+        $rawHeaders[strtolower(trim($name))] = trim($value);
+    }
+    return [
+        'status' => $status,
+        'headers' => $rawHeaders,
+        'body' => is_string($responseBody) ? $responseBody : '',
+    ];
+}
+
+function nammu_fediverse_signed_fetch_json(string $url, array $config, string $method = 'GET', string $body = ''): ?array
+{
+    $response = nammu_fediverse_signed_fetch($url, $config, $method, $body);
+    if (($response['status'] ?? 0) < 200 || ($response['status'] ?? 0) >= 400) {
+        return null;
+    }
+    $decoded = json_decode((string) ($response['body'] ?? ''), true);
+    return is_array($decoded) ? $decoded : null;
+}
+
 function nammu_fediverse_fetch(string $url, string $accept = 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9'): array
 {
     $headers = [];
@@ -177,22 +319,29 @@ function nammu_fediverse_fetch_json(string $url, string $accept = 'application/a
     return is_array($decoded) ? $decoded : null;
 }
 
-function nammu_fediverse_resolve_actor(string $input): ?array
+function nammu_fediverse_resolve_actor(string $input, ?array $config = null): ?array
 {
     $trimmed = trim($input);
     if ($trimmed === '') {
         return null;
     }
     if (preg_match('#^https?://#i', $trimmed)) {
-        $actor = nammu_fediverse_fetch_json($trimmed);
+        $actor = is_array($config)
+            ? nammu_fediverse_signed_fetch_json($trimmed, $config)
+            : nammu_fediverse_fetch_json($trimmed);
         if (!is_array($actor)) {
             return null;
+        }
+        $sharedInbox = '';
+        if (is_array($actor['endpoints'] ?? null)) {
+            $sharedInbox = trim((string) ($actor['endpoints']['sharedInbox'] ?? ''));
         }
         return [
             'id' => (string) ($actor['id'] ?? $trimmed),
             'preferredUsername' => (string) ($actor['preferredUsername'] ?? ''),
             'name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? ''))),
             'inbox' => (string) ($actor['inbox'] ?? ''),
+            'sharedInbox' => $sharedInbox,
             'outbox' => (string) ($actor['outbox'] ?? ''),
             'url' => (string) ($actor['url'] ?? ($actor['id'] ?? $trimmed)),
             'icon' => is_array($actor['icon'] ?? null) ? (string) (($actor['icon']['url'] ?? '') ?: '') : '',
@@ -233,7 +382,7 @@ function nammu_fediverse_resolve_actor(string $input): ?array
     if ($actorUrl === '') {
         return null;
     }
-    return nammu_fediverse_resolve_actor($actorUrl);
+    return nammu_fediverse_resolve_actor($actorUrl, $config);
 }
 
 function nammu_fediverse_following_store(): array
@@ -263,9 +412,34 @@ function nammu_fediverse_save_timeline_store(array $items): void
     nammu_fediverse_save_json_store(nammu_fediverse_timeline_file(), ['items' => array_slice(array_values($items), 0, 200)]);
 }
 
+function nammu_fediverse_followers_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_followers_file(), ['followers' => []]);
+    $followers = is_array($store['followers'] ?? null) ? $store['followers'] : [];
+    return ['followers' => array_values($followers)];
+}
+
+function nammu_fediverse_save_followers_store(array $followers): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_followers_file(), ['followers' => array_values($followers)]);
+}
+
+function nammu_fediverse_deliveries_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_deliveries_file(), ['followers' => []]);
+    $followers = is_array($store['followers'] ?? null) ? $store['followers'] : [];
+    return ['followers' => $followers];
+}
+
+function nammu_fediverse_save_deliveries_store(array $followers): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_deliveries_file(), ['followers' => $followers]);
+}
+
 function nammu_fediverse_follow_actor(string $input): array
 {
-    $actor = nammu_fediverse_resolve_actor($input);
+    $config = function_exists('nammu_load_config') ? nammu_load_config() : [];
+    $actor = nammu_fediverse_resolve_actor($input, $config);
     if (!is_array($actor) || trim((string) ($actor['id'] ?? '')) === '') {
         return ['ok' => false, 'message' => 'No se pudo descubrir ese actor ActivityPub.'];
     }
@@ -382,6 +556,7 @@ function nammu_fediverse_extract_outbox_items(array $outbox, array $actor): arra
 
 function nammu_fediverse_refresh_following(): array
 {
+    $config = function_exists('nammu_load_config') ? nammu_load_config() : [];
     $store = nammu_fediverse_following_store();
     $actors = $store['actors'];
     $timeline = nammu_fediverse_timeline_store()['items'];
@@ -394,13 +569,13 @@ function nammu_fediverse_refresh_following(): array
     foreach ($actors as &$actor) {
         $checked++;
         $actor['last_checked_at'] = gmdate(DATE_ATOM);
-        $actorDoc = nammu_fediverse_resolve_actor((string) ($actor['id'] ?? ''));
+        $actorDoc = nammu_fediverse_resolve_actor((string) ($actor['id'] ?? ''), $config);
         if (!is_array($actorDoc) || trim((string) ($actorDoc['outbox'] ?? '')) === '') {
             $actor['last_error'] = 'No se pudo refrescar el actor remoto.';
             continue;
         }
         $actor = array_merge($actor, $actorDoc);
-        $outbox = nammu_fediverse_fetch_json((string) $actor['outbox']);
+        $outbox = nammu_fediverse_signed_fetch_json((string) $actor['outbox'], $config);
         if (!is_array($outbox)) {
             $actor['last_error'] = 'No se pudo leer su outbox.';
             continue;
@@ -614,6 +789,7 @@ function nammu_fediverse_actor_document(array $config): array
     $actorUrl = nammu_fediverse_actor_url($config);
     $baseUrl = nammu_fediverse_base_url($config);
     $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
+    $siteDescription = trim((string) ($config['site_description'] ?? ''));
     $keys = nammu_fediverse_keypair();
     $document = [
         '@context' => [
@@ -621,16 +797,33 @@ function nammu_fediverse_actor_document(array $config): array
             'https://w3id.org/security/v1',
         ],
         'id' => $actorUrl,
-        'type' => 'Application',
+        'type' => 'Person',
         'preferredUsername' => nammu_fediverse_preferred_username($config),
         'name' => $siteName,
-        'summary' => trim((string) ($config['site_description'] ?? '')),
+        'summary' => $siteDescription,
         'url' => $baseUrl,
         'inbox' => nammu_fediverse_inbox_url($config),
         'outbox' => nammu_fediverse_outbox_url($config),
         'followers' => nammu_fediverse_followers_url($config),
         'following' => nammu_fediverse_following_url($config),
+        'discoverable' => true,
+        'manuallyApprovesFollowers' => false,
+        'published' => gmdate(DATE_ATOM, is_file(dirname(__DIR__) . '/index.php') ? ((int) @filemtime(dirname(__DIR__) . '/index.php') ?: time()) : time()),
     ];
+    $icon = '';
+    if (function_exists('nammu_template_settings')) {
+        $theme = nammu_template_settings();
+        $icon = trim((string) ($theme['logo_url'] ?? ''));
+    }
+    if ($icon === '' && !empty($config['social']['home_image'])) {
+        $icon = nammu_fediverse_asset_url((string) $config['social']['home_image'], $baseUrl);
+    }
+    if ($icon !== '') {
+        $document['icon'] = [
+            'type' => 'Image',
+            'url' => $icon,
+        ];
+    }
     if (!empty($keys['public_key'])) {
         $document['publicKey'] = [
             'id' => $actorUrl . '#main-key',
@@ -658,8 +851,9 @@ function nammu_fediverse_webfinger_document(array $config): array
 
 function nammu_fediverse_followers_collection(array $config): array
 {
-    $inbox = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['followers' => []]);
-    $followers = array_values(array_filter(array_map('strval', (array) ($inbox['followers'] ?? []))));
+    $followers = array_values(array_filter(array_map(static function (array $follower): string {
+        return (string) ($follower['id'] ?? '');
+    }, nammu_fediverse_followers_store()['followers'])));
     return [
         '@context' => 'https://www.w3.org/ns/activitystreams',
         'id' => nammu_fediverse_followers_url($config),
@@ -700,28 +894,161 @@ function nammu_fediverse_outbox_document(array $config): array
 
 function nammu_fediverse_store_inbox_activity(array $payload): void
 {
-    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => [], 'followers' => []]);
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
     $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
     $activities[] = [
         'received_at' => gmdate(DATE_ATOM),
         'payload' => $payload,
     ];
     $store['activities'] = array_slice($activities, -50);
+    nammu_fediverse_save_json_store(nammu_fediverse_inbox_file(), $store);
+}
+
+function nammu_fediverse_followers_add_or_update(array $actor): void
+{
+    $followers = nammu_fediverse_followers_store()['followers'];
+    $id = trim((string) ($actor['id'] ?? ''));
+    if ($id === '') {
+        return;
+    }
+    foreach ($followers as &$existing) {
+        if ((string) ($existing['id'] ?? '') !== $id) {
+            continue;
+        }
+        $existing = array_merge($existing, $actor, ['followed_at' => $existing['followed_at'] ?? gmdate(DATE_ATOM)]);
+        nammu_fediverse_save_followers_store($followers);
+        return;
+    }
+    unset($existing);
+    $actor['followed_at'] = gmdate(DATE_ATOM);
+    $followers[] = $actor;
+    nammu_fediverse_save_followers_store($followers);
+}
+
+function nammu_fediverse_followers_remove(string $actorId): void
+{
+    $followers = array_values(array_filter(
+        nammu_fediverse_followers_store()['followers'],
+        static fn(array $follower): bool => (string) ($follower['id'] ?? '') !== $actorId
+    ));
+    nammu_fediverse_save_followers_store($followers);
+}
+
+function nammu_fediverse_remote_inbox_for_actor(array $actor): string
+{
+    $shared = trim((string) ($actor['sharedInbox'] ?? ''));
+    if ($shared !== '') {
+        return $shared;
+    }
+    return trim((string) ($actor['inbox'] ?? ''));
+}
+
+function nammu_fediverse_post_activity(string $inboxUrl, array $activity, array $config): bool
+{
+    $body = json_encode($activity, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (!is_string($body) || $body === '') {
+        return false;
+    }
+    $response = nammu_fediverse_signed_fetch($inboxUrl, $config, 'POST', $body);
+    $status = (int) ($response['status'] ?? 0);
+    return $status >= 200 && $status < 300;
+}
+
+function nammu_fediverse_accept_follow(array $payload, array $config): bool
+{
+    $actorId = trim((string) ($payload['actor'] ?? ''));
+    $followId = trim((string) ($payload['id'] ?? ''));
+    if ($actorId === '' || $followId === '') {
+        return false;
+    }
+    $actor = nammu_fediverse_resolve_actor($actorId, $config);
+    if (!is_array($actor)) {
+        return false;
+    }
+    nammu_fediverse_followers_add_or_update($actor);
+    $inboxUrl = nammu_fediverse_remote_inbox_for_actor($actor);
+    if ($inboxUrl === '') {
+        return false;
+    }
+    $activity = [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => nammu_fediverse_actor_url($config) . '#accept-' . sha1($followId . '|' . microtime(true)),
+        'type' => 'Accept',
+        'actor' => nammu_fediverse_actor_url($config),
+        'object' => $payload,
+    ];
+    return nammu_fediverse_post_activity($inboxUrl, $activity, $config);
+}
+
+function nammu_fediverse_handle_inbox_payload(array $payload, array $config): array
+{
+    nammu_fediverse_store_inbox_activity($payload);
     $type = strtolower((string) ($payload['type'] ?? ''));
-    $actor = trim((string) ($payload['actor'] ?? ''));
-    if ($type === 'follow' && $actor !== '') {
-        $followers = array_values(array_unique(array_filter(array_map('strval', (array) ($store['followers'] ?? [])))));
-        $followers[] = $actor;
-        $store['followers'] = array_values(array_unique($followers));
+    $actorId = trim((string) ($payload['actor'] ?? ''));
+    $accepted = false;
+    if ($type === 'follow' && $actorId !== '') {
+        $accepted = nammu_fediverse_accept_follow($payload, $config);
+        return ['accepted' => $accepted, 'type' => 'follow'];
     }
     if ($type === 'undo' && is_array($payload['object'] ?? null)) {
         $object = $payload['object'];
-        if (strtolower((string) ($object['type'] ?? '')) === 'follow' && $actor !== '') {
-            $store['followers'] = array_values(array_filter(
-                array_map('strval', (array) ($store['followers'] ?? [])),
-                static fn(string $value): bool => $value !== $actor
-            ));
+        if (strtolower((string) ($object['type'] ?? '')) === 'follow' && $actorId !== '') {
+            nammu_fediverse_followers_remove($actorId);
+            return ['accepted' => true, 'type' => 'undo'];
         }
     }
-    nammu_fediverse_save_json_store(nammu_fediverse_inbox_file(), $store);
+    return ['accepted' => true, 'type' => $type !== '' ? $type : 'unknown'];
+}
+
+function nammu_fediverse_should_deliver_item_to_follower(array $item, array $follower, array $deliveryState): bool
+{
+    $itemId = trim((string) ($item['id'] ?? ''));
+    if ($itemId === '') {
+        return false;
+    }
+    $followedAt = trim((string) ($follower['followed_at'] ?? ''));
+    $published = trim((string) ($item['published'] ?? ''));
+    if ($followedAt !== '' && $published !== '' && strcmp($published, $followedAt) < 0) {
+        return false;
+    }
+    $sent = is_array($deliveryState['sent_ids'] ?? null) ? $deliveryState['sent_ids'] : [];
+    return !in_array($itemId, array_map('strval', $sent), true);
+}
+
+function nammu_fediverse_deliver_local_items(array $config): array
+{
+    $followers = nammu_fediverse_followers_store()['followers'];
+    if (empty($followers)) {
+        return ['followers' => 0, 'delivered' => 0];
+    }
+    $items = nammu_fediverse_local_content_items($config);
+    $deliveryStore = nammu_fediverse_deliveries_store();
+    $deliveryFollowers = is_array($deliveryStore['followers'] ?? null) ? $deliveryStore['followers'] : [];
+    $delivered = 0;
+    foreach ($followers as $follower) {
+        $followerId = trim((string) ($follower['id'] ?? ''));
+        $inboxUrl = nammu_fediverse_remote_inbox_for_actor($follower);
+        if ($followerId === '' || $inboxUrl === '') {
+            continue;
+        }
+        $state = is_array($deliveryFollowers[$followerId] ?? null) ? $deliveryFollowers[$followerId] : ['sent_ids' => []];
+        foreach ($items as $item) {
+            if (!nammu_fediverse_should_deliver_item_to_follower($item, $follower, $state)) {
+                continue;
+            }
+            $activity = nammu_fediverse_activity_for_local_item($item, $config);
+            if (nammu_fediverse_post_activity($inboxUrl, $activity, $config)) {
+                $state['sent_ids'][] = (string) $item['id'];
+                $state['last_success_at'] = gmdate(DATE_ATOM);
+                $delivered++;
+            } else {
+                $state['last_error_at'] = gmdate(DATE_ATOM);
+                break;
+            }
+        }
+        $state['sent_ids'] = array_slice(array_values(array_unique(array_map('strval', is_array($state['sent_ids'] ?? null) ? $state['sent_ids'] : []))), -300);
+        $deliveryFollowers[$followerId] = $state;
+    }
+    nammu_fediverse_save_deliveries_store($deliveryFollowers);
+    return ['followers' => count($followers), 'delivered' => $delivered];
 }

@@ -225,8 +225,9 @@ tar -xzf /var/www/html/<carpeta-publica>/backups/nammu-stats-backup-AAAA-MM-DD_H
 - Página pública `actualidad.php` construida a partir de las RSS externas configuradas y de notas manuales.
 - Feed `noticias.xml` generado a partir de esa misma selección.
 - Módulo `Fediverso` en el admin para seguir actores ActivityPub públicos y leer sus actualizaciones.
-- Exposición básica del blog como actor ActivityPub con `WebFinger`, actor, `outbox`, `followers`, `following` e `inbox`.
-- Cron integrado para refrescar periódicamente el timeline remoto seguido desde `Fediverso`.
+- Exposición del blog como actor ActivityPub con `WebFinger`, actor, `outbox`, `followers`, `following` e `inbox`.
+- Soporte inicial de federación servidor-servidor: recepción de `Follow`, `Undo`, respuesta `Accept` y entrega saliente firmada de publicaciones nuevas a seguidores remotos.
+- Cron integrado para refrescar periódicamente el timeline remoto seguido desde `Fediverso` y repartir nuevas publicaciones locales a seguidores federados.
 - `llms.txt` para consumo por modelos de lenguaje.
 
 ### 6. Itinerarios y formación

@@ -351,41 +351,54 @@ function nammu_actuality_manual_plain_text(string $text): string
     return trim($text);
 }
 
-function nammu_actuality_manual_title_and_description(string $text): array
+function nammu_actuality_manual_extract_links(string $text): array
 {
-    $normalized = nammu_actuality_manual_plain_text($text);
-    if ($normalized === '') {
-        return ['title' => '', 'description' => ''];
+    preg_match_all('#https?://[^\s<>"\')]+#iu', $text, $matches);
+    $links = array_values(array_unique(array_filter(array_map(static function (string $url): string {
+        $trimmed = trim($url);
+        $trimmed = rtrim($trimmed, ".,;:!?)");
+        return filter_var($trimmed, FILTER_VALIDATE_URL) ? $trimmed : '';
+    }, $matches[0] ?? []))));
+    return $links;
+}
+
+function nammu_actuality_manual_strip_links(string $text): string
+{
+    $stripped = preg_replace('#https?://[^\s<>"\')]+#iu', '', $text) ?? $text;
+    $stripped = preg_replace("/[ \t]+\n/", "\n", $stripped) ?? $stripped;
+    $stripped = preg_replace("/\n{3,}/", "\n\n", $stripped) ?? $stripped;
+    return trim($stripped);
+}
+
+function nammu_actuality_manual_title_from_content(string $content): string
+{
+    $content = trim($content);
+    if ($content === '') {
+        return '';
     }
 
-    $lines = preg_split('/\n/u', $normalized) ?: [];
-    $title = '';
-    $remaining = [];
-    $titleTaken = false;
-    foreach ($lines as $line) {
-        $trimmed = trim($line);
-        if ($trimmed === '' && !$titleTaken) {
-            continue;
-        }
-        if (!$titleTaken) {
-            $title = $trimmed;
-            $titleTaken = true;
-            continue;
-        }
-        $remaining[] = rtrim($line);
-    }
-    if ($title === '') {
-        $title = $normalized;
-    }
+    $singleLine = preg_replace('/\s+/u', ' ', $content) ?? $content;
+    $title = trim($singleLine);
     $titleChars = function_exists('mb_strlen') ? mb_strlen($title, 'UTF-8') : strlen($title);
     if ($titleChars > 120) {
         $title = function_exists('mb_substr') ? mb_substr($title, 0, 117, 'UTF-8') . '…' : substr($title, 0, 117) . '...';
     }
+    return $title;
+}
 
-    $description = trim(implode("\n", $remaining));
+function nammu_actuality_manual_content(string $text): array
+{
+    $normalized = nammu_actuality_manual_plain_text($text);
+    if ($normalized === '') {
+        return ['title' => '', 'content' => '', 'links' => []];
+    }
+
+    $links = nammu_actuality_manual_extract_links($normalized);
+    $content = nammu_actuality_manual_strip_links($normalized);
     return [
-        'title' => $title,
-        'description' => $description,
+        'title' => nammu_actuality_manual_title_from_content($content !== '' ? $content : $normalized),
+        'content' => $content,
+        'links' => $links,
     ];
 }
 
@@ -406,7 +419,7 @@ function nammu_actuality_prune_manual_items(array $items): array
 
 function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $siteTitle): array
 {
-    $parts = nammu_actuality_manual_title_and_description($text);
+    $parts = nammu_actuality_manual_content($text);
     if ($parts['title'] === '') {
         return [];
     }
@@ -417,7 +430,8 @@ function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $
     $item = [
         'id' => $id,
         'title' => $parts['title'],
-        'description' => $parts['description'],
+        'description' => $parts['content'],
+        'links' => $parts['links'],
         'timestamp' => $timestamp,
         'link' => nammu_actuality_manual_anchor_url($baseUrl, $id),
         'image' => '',
@@ -712,6 +726,7 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
             'link' => trim((string) ($item['link'] ?? nammu_actuality_manual_anchor_url($publicBaseUrl, $manualId))),
             'image' => '',
             'description' => nammu_actuality_manual_plain_text((string) ($item['description'] ?? '')),
+            'links' => array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : []))),
             'timestamp' => (int) ($item['timestamp'] ?? 0),
             'source' => trim((string) ($item['source'] ?? '')),
             'is_manual' => true,
@@ -751,11 +766,20 @@ function nammu_generate_actuality_feed(string $baseUrl, array $config, string $s
         $itemGuid = htmlspecialchars((string) ($item['link'] ?? sha1((string) ($item['title'] ?? ''))), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $pubDate = gmdate(DATE_RSS, (int) (($item['timestamp'] ?? 0) > 0 ? $item['timestamp'] : time()));
         $description = trim((string) ($item['description'] ?? ''));
+        $itemLinks = array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : [])));
         $image = trim((string) ($item['source_image'] ?? ''));
         if ($image === '') {
             $image = trim((string) ($item['image'] ?? ''));
         }
         $descriptionHtml = nammu_actuality_text_to_html($description);
+        if (!empty($itemLinks)) {
+            $linkBits = [];
+            foreach ($itemLinks as $index => $url) {
+                $label = 'Enlace ' . ($index + 1);
+                $linkBits[] = '<a href="' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">' . htmlspecialchars($label, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</a>';
+            }
+            $descriptionHtml .= '<p>' . implode(' · ', $linkBits) . '</p>';
+        }
         if ($image !== '') {
             $descriptionHtml .= '<p><img src="' . htmlspecialchars($image, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" alt="' . $itemTitle . '" /></p>';
         }

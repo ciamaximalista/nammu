@@ -125,6 +125,23 @@ function nammu_fediverse_acct_uri(array $config): string
     return 'acct:' . nammu_fediverse_preferred_username($config) . '@' . $host;
 }
 
+function nammu_fediverse_avatar_url(array $config): string
+{
+    $baseUrl = nammu_fediverse_base_url($config);
+    $avatar = '';
+    if (function_exists('nammu_template_settings')) {
+        $theme = nammu_template_settings();
+        $avatar = trim((string) (($theme['logo_url'] ?? '') ?: ''));
+        if ($avatar === '' && !empty($theme['images']['logo'])) {
+            $avatar = nammu_fediverse_asset_url((string) $theme['images']['logo'], $baseUrl);
+        }
+    }
+    if ($avatar === '' && !empty($config['social']['home_image'])) {
+        $avatar = nammu_fediverse_asset_url((string) $config['social']['home_image'], $baseUrl);
+    }
+    return trim($avatar);
+}
+
 function nammu_fediverse_keypair(): array
 {
     $default = ['private_key' => '', 'public_key' => ''];
@@ -562,10 +579,16 @@ function nammu_fediverse_unfollow_actor(string $actorId): bool
 function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?array
 {
     $type = strtolower((string) ($activity['type'] ?? ''));
+    if (in_array($type, ['like', 'announce'], true)) {
+        return null;
+    }
     $object = $activity;
     if ($type === 'create' && is_array($activity['object'] ?? null)) {
         $object = $activity['object'];
         $type = strtolower((string) ($object['type'] ?? 'note'));
+    }
+    if (in_array($type, ['like', 'announce'], true)) {
+        return null;
     }
     $id = trim((string) (($activity['id'] ?? '') ?: ($object['id'] ?? '')));
     if ($id === '') {
@@ -588,6 +611,7 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?
     }
     $published = trim((string) (($object['published'] ?? '') ?: ($activity['published'] ?? '')));
     $content = trim((string) (($object['content'] ?? '') ?: ($object['summary'] ?? '')));
+    $contentHtml = trim((string) ($object['content'] ?? ''));
     $name = trim((string) (($object['name'] ?? '') ?: ''));
     $image = '';
     if (is_array($object['image'] ?? null)) {
@@ -595,17 +619,46 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?
     } elseif (is_string($object['image'] ?? null)) {
         $image = trim((string) $object['image']);
     }
+    $attachments = [];
+    foreach ((array) ($object['attachment'] ?? []) as $attachment) {
+        if (!is_array($attachment)) {
+            continue;
+        }
+        $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
+        $attachmentUrl = trim((string) ($attachment['url'] ?? ''));
+        if ($attachmentUrl === '') {
+            continue;
+        }
+        $attachments[] = [
+            'type' => $attachmentType !== '' ? $attachmentType : 'document',
+            'url' => $attachmentUrl,
+            'name' => trim((string) ($attachment['name'] ?? '')),
+            'media_type' => trim((string) ($attachment['mediaType'] ?? '')),
+        ];
+    }
+    if ($image !== '' && empty($attachments)) {
+        $attachments[] = [
+            'type' => 'image',
+            'url' => $image,
+            'name' => '',
+            'media_type' => '',
+        ];
+    }
     return [
         'id' => $id,
         'url' => $url !== '' ? $url : $id,
         'title' => $name,
         'content' => $content,
+        'content_html' => $contentHtml,
         'published' => $published !== '' ? $published : gmdate(DATE_ATOM),
         'type' => $type !== '' ? $type : 'note',
         'image' => $image,
+        'attachments' => $attachments,
         'actor_id' => (string) ($actor['id'] ?? ''),
         'actor_name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? ''))),
+        'actor_username' => trim((string) ($actor['preferredUsername'] ?? '')),
         'actor_url' => trim((string) (($actor['url'] ?? '') ?: ($actor['id'] ?? ''))),
+        'actor_icon' => trim((string) ($actor['icon'] ?? '')),
     ];
 }
 
@@ -843,6 +896,7 @@ function nammu_fediverse_local_content_items(array $config): array
 function nammu_fediverse_activity_for_local_item(array $item, array $config): array
 {
     $actorUrl = nammu_fediverse_actor_url($config);
+    $avatarUrl = nammu_fediverse_avatar_url($config);
     $object = [
         'id' => (string) ($item['id'] ?? ''),
         'type' => (string) ($item['type'] ?? 'Article'),
@@ -855,6 +909,9 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
     $image = trim((string) ($item['image'] ?? ''));
     if ($image !== '') {
         $object['image'] = ['type' => 'Image', 'url' => $image];
+    }
+    if ($avatarUrl !== '') {
+        $object['icon'] = ['type' => 'Image', 'url' => $avatarUrl];
     }
     return [
         '@context' => 'https://www.w3.org/ns/activitystreams',
@@ -870,10 +927,10 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
 function nammu_fediverse_actor_document(array $config): array
 {
     $actorUrl = nammu_fediverse_actor_url($config);
-    $baseUrl = nammu_fediverse_base_url($config);
     $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
     $siteDescription = trim((string) ($config['site_description'] ?? ''));
     $keys = nammu_fediverse_keypair();
+    $avatarUrl = nammu_fediverse_avatar_url($config);
     $document = [
         '@context' => [
             'https://www.w3.org/ns/activitystreams',
@@ -893,18 +950,14 @@ function nammu_fediverse_actor_document(array $config): array
         'manuallyApprovesFollowers' => false,
         'published' => gmdate(DATE_ATOM, is_file(dirname(__DIR__) . '/index.php') ? ((int) @filemtime(dirname(__DIR__) . '/index.php') ?: time()) : time()),
     ];
-    $icon = '';
-    if (function_exists('nammu_template_settings')) {
-        $theme = nammu_template_settings();
-        $icon = trim((string) ($theme['logo_url'] ?? ''));
-    }
-    if ($icon === '' && !empty($config['social']['home_image'])) {
-        $icon = nammu_fediverse_asset_url((string) $config['social']['home_image'], $baseUrl);
-    }
-    if ($icon !== '') {
+    if ($avatarUrl !== '') {
         $document['icon'] = [
             'type' => 'Image',
-            'url' => $icon,
+            'url' => $avatarUrl,
+        ];
+        $document['image'] = [
+            'type' => 'Image',
+            'url' => $avatarUrl,
         ];
     }
     if (!empty($keys['public_key'])) {

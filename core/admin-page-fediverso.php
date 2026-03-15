@@ -28,7 +28,59 @@
     $buildTabUrl = static function (string $tab): string {
         return 'admin.php?page=fediverso&tab=' . rawurlencode($tab);
     };
-    $notificationLabel = static function (array $entry): string {
+    $fediverseHandle = static function (array $item): string {
+        $username = trim((string) ($item['actor_username'] ?? ''));
+        if ($username !== '') {
+            $actorUrl = trim((string) ($item['actor_id'] ?? ''));
+            $host = parse_url($actorUrl, PHP_URL_HOST);
+            if (is_string($host) && $host !== '') {
+                return '@' . $username . '@' . $host;
+            }
+            return '@' . $username;
+        }
+        return trim((string) ($item['actor_id'] ?? ''));
+    };
+    $fediverseKnownActors = function_exists('nammu_fediverse_known_actors') ? nammu_fediverse_known_actors() : [];
+    $fediverseActorsById = [];
+    foreach ($fediverseKnownActors as $fediverseKnownActor) {
+        $fediverseKnownActorId = trim((string) ($fediverseKnownActor['id'] ?? ''));
+        if ($fediverseKnownActorId !== '') {
+            $fediverseActorsById[$fediverseKnownActorId] = $fediverseKnownActor;
+        }
+    }
+    $sanitizeFediverseHtml = static function (string $html): string {
+        $html = trim($html);
+        if ($html === '') {
+            return '';
+        }
+        $allowed = '<p><br><a><strong><b><em><i><span><ul><ol><li><blockquote><code><pre>';
+        $clean = strip_tags($html, $allowed);
+        $clean = preg_replace('#<a\b([^>]*)href=(["\'])(https?://[^"\']+)\2([^>]*)>#i', '<a$1href="$3"$4 target="_blank" rel="noopener">', $clean) ?? $clean;
+        return trim($clean);
+    };
+    $notificationContext = static function (array $entry) use ($fediverseActorsById, $fediverseConfig): array {
+        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        $actorId = trim((string) ($payload['actor'] ?? ''));
+        $actor = $actorId !== '' ? ($fediverseActorsById[$actorId] ?? null) : null;
+        if (!is_array($actor) && $actorId !== '' && function_exists('nammu_fediverse_resolve_actor')) {
+            $actor = nammu_fediverse_resolve_actor($actorId, $fediverseConfig);
+        }
+        $object = $payload['object'] ?? null;
+        $targetUrl = '';
+        if (is_string($object)) {
+            $targetUrl = trim($object);
+        } elseif (is_array($object)) {
+            $targetUrl = trim((string) (($object['url'] ?? '') ?: ($object['id'] ?? '')));
+        }
+        return [
+            'actor_id' => $actorId,
+            'actor_name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
+            'actor_username' => trim((string) ($actor['preferredUsername'] ?? '')),
+            'actor_icon' => trim((string) ($actor['icon'] ?? '')),
+            'target_url' => $targetUrl,
+        ];
+    };
+    $notificationLabel = static function (array $entry) use ($notificationContext): string {
         $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
         $type = strtolower(trim((string) ($payload['type'] ?? '')));
         return match ($type) {
@@ -36,13 +88,15 @@
             'undo' => 'Dejó de seguir',
             'accept' => 'Accept recibido',
             'message' => 'Mensaje privado',
+            'like' => 'Reaccionó a una publicación',
+            'announce' => 'Compartió una publicación',
             'create' => 'Actividad remota',
             default => $type !== '' ? ucfirst($type) : 'Notificación',
         };
     };
-    $notificationActor = static function (array $entry): string {
-        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
-        return trim((string) ($payload['actor'] ?? ''));
+    $notificationActor = static function (array $entry) use ($notificationContext): string {
+        $context = $notificationContext($entry);
+        return $context['actor_id'];
     };
     ?>
     <div class="tab-pane active">
@@ -70,7 +124,7 @@
         </ul>
 
         <?php if ($fediverseTab === 'home'): ?>
-            <div class="card">
+            <div class="card fediverse-home-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                         <h3 class="h5 mb-0">Timeline</h3>
@@ -82,33 +136,84 @@
                     <?php if (empty($fediverseTimeline)): ?>
                         <p class="text-muted mb-0">Aún no hay publicaciones remotas recibidas. Sigue actores en la pestaña de configuración y luego refresca.</p>
                     <?php else: ?>
-                        <div class="list-group">
+                        <div class="fediverse-timeline">
                             <?php foreach ($fediverseTimeline as $item): ?>
-                                <div class="list-group-item">
-                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-                                        <div class="pr-3">
-                                            <strong><?= htmlspecialchars((string) (($item['actor_name'] ?? '') ?: 'Actor remoto'), ENT_QUOTES, 'UTF-8') ?></strong>
-                                            <?php if (!empty($item['published'])): ?>
-                                                <small class="text-muted d-block"><?= htmlspecialchars((string) $item['published'], ENT_QUOTES, 'UTF-8') ?></small>
-                                            <?php endif; ?>
-                                        </div>
-                                        <span class="badge badge-light text-uppercase"><?= htmlspecialchars((string) ($item['type'] ?? 'note'), ENT_QUOTES, 'UTF-8') ?></span>
+                                <article class="fediverse-status">
+                                    <div class="fediverse-status__avatar">
+                                        <?php if (!empty($item['actor_icon'])): ?>
+                                            <img src="<?= htmlspecialchars((string) $item['actor_icon'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                        <?php else: ?>
+                                            <div class="fediverse-status__avatar-fallback"><?= htmlspecialchars(mb_substr((string) (($item['actor_name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
+                                        <?php endif; ?>
                                     </div>
-                                    <?php if (!empty($item['title'])): ?>
-                                        <div class="mt-2 font-weight-bold"><?= htmlspecialchars((string) $item['title'], ENT_QUOTES, 'UTF-8') ?></div>
-                                    <?php endif; ?>
-                                    <?php if (!empty($item['content'])): ?>
-                                        <div class="mt-2 small text-body"><?= nl2br(htmlspecialchars(strip_tags((string) $item['content']), ENT_QUOTES, 'UTF-8')) ?></div>
-                                    <?php endif; ?>
-                                    <?php if (!empty($item['image'])): ?>
-                                        <div class="mt-3">
-                                            <img src="<?= htmlspecialchars((string) $item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="" style="max-width: 240px; height: auto; border-radius: 10px;">
+                                    <div class="fediverse-status__body">
+                                        <div class="fediverse-status__header">
+                                            <div class="fediverse-status__identity">
+                                                <strong><?= htmlspecialchars((string) (($item['actor_name'] ?? '') ?: 'Actor remoto'), ENT_QUOTES, 'UTF-8') ?></strong>
+                                                <span class="fediverse-status__handle"><?= htmlspecialchars($fediverseHandle($item), ENT_QUOTES, 'UTF-8') ?></span>
+                                            </div>
+                                            <div class="fediverse-status__meta">
+                                                <?php if (!empty($item['published'])): ?>
+                                                    <time datetime="<?= htmlspecialchars((string) $item['published'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $item['published'], ENT_QUOTES, 'UTF-8') ?></time>
+                                                <?php endif; ?>
+                                            </div>
                                         </div>
-                                    <?php endif; ?>
-                                    <div class="mt-3">
-                                        <a href="<?= htmlspecialchars((string) (($item['url'] ?? '') ?: ($item['id'] ?? '#')), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Abrir publicación</a>
+                                        <?php if (!empty($item['title'])): ?>
+                                            <div class="fediverse-status__title"><?= htmlspecialchars((string) $item['title'], ENT_QUOTES, 'UTF-8') ?></div>
+                                        <?php endif; ?>
+                                        <?php
+                                        $statusHtml = $sanitizeFediverseHtml((string) ($item['content_html'] ?? ''));
+                                        $statusText = trim((string) ($item['content'] ?? ''));
+                                        ?>
+                                        <?php if ($statusHtml !== ''): ?>
+                                            <div class="fediverse-status__content fediverse-status__content--html"><?= $statusHtml ?></div>
+                                        <?php elseif ($statusText !== ''): ?>
+                                            <div class="fediverse-status__content"><?= nl2br(htmlspecialchars(strip_tags($statusText), ENT_QUOTES, 'UTF-8')) ?></div>
+                                        <?php endif; ?>
+                                        <?php $attachments = is_array($item['attachments'] ?? null) ? $item['attachments'] : []; ?>
+                                        <?php if (!empty($attachments)): ?>
+                                            <div class="fediverse-status__attachments">
+                                                <?php foreach ($attachments as $attachment): ?>
+                                                    <?php $attachmentUrl = trim((string) ($attachment['url'] ?? '')); ?>
+                                                    <?php if ($attachmentUrl === '') { continue; } ?>
+                                                    <?php
+                                                    $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
+                                                    $attachmentMediaType = strtolower(trim((string) ($attachment['media_type'] ?? '')));
+                                                    $isImage = $attachmentType === 'image' || str_starts_with($attachmentMediaType, 'image/');
+                                                    $isVideo = $attachmentType === 'video' || str_starts_with($attachmentMediaType, 'video/');
+                                                    $isAudio = $attachmentType === 'audio' || str_starts_with($attachmentMediaType, 'audio/');
+                                                    ?>
+                                                    <?php if ($isImage): ?>
+                                                        <a class="fediverse-status__media" href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                            <img src="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($attachment['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                                        </a>
+                                                    <?php elseif ($isVideo): ?>
+                                                        <div class="fediverse-status__media fediverse-status__media--video">
+                                                            <video controls preload="metadata">
+                                                                <source src="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"<?= $attachmentMediaType !== '' ? ' type="' . htmlspecialchars($attachmentMediaType, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                                                            </video>
+                                                        </div>
+                                                    <?php elseif ($isAudio): ?>
+                                                        <div class="fediverse-status__file">
+                                                            <div class="fediverse-status__file-name"><?= htmlspecialchars((string) (($attachment['name'] ?? '') ?: 'Audio adjunto'), ENT_QUOTES, 'UTF-8') ?></div>
+                                                            <audio controls preload="none">
+                                                                <source src="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"<?= $attachmentMediaType !== '' ? ' type="' . htmlspecialchars($attachmentMediaType, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                                                            </audio>
+                                                        </div>
+                                                    <?php else: ?>
+                                                        <a class="fediverse-status__file" href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                            <span class="fediverse-status__file-name"><?= htmlspecialchars((string) (($attachment['name'] ?? '') ?: 'Abrir adjunto'), ENT_QUOTES, 'UTF-8') ?></span>
+                                                            <span class="fediverse-status__file-meta"><?= htmlspecialchars((string) (($attachment['media_type'] ?? '') ?: strtoupper((string) ($attachment['type'] ?? 'archivo'))), ENT_QUOTES, 'UTF-8') ?></span>
+                                                        </a>
+                                                    <?php endif; ?>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <div class="fediverse-status__footer">
+                                            <a href="<?= htmlspecialchars((string) (($item['url'] ?? '') ?: ($item['id'] ?? '#')), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Abrir publicación</a>
+                                        </div>
                                     </div>
-                                </div>
+                                </article>
                             <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
@@ -124,10 +229,33 @@
                     <?php else: ?>
                         <div class="list-group">
                             <?php foreach ($fediverseNotifications as $entry): ?>
+                                <?php
+                                $notificationMeta = $notificationContext($entry);
+                                $notificationAvatar = trim((string) ($notificationMeta['actor_icon'] ?? ''));
+                                $notificationActorName = trim((string) ($notificationMeta['actor_name'] ?? ''));
+                                $notificationTargetUrl = trim((string) ($notificationMeta['target_url'] ?? ''));
+                                ?>
                                 <div class="list-group-item">
                                     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                                         <div>
-                                            <strong><?= htmlspecialchars($notificationLabel($entry), ENT_QUOTES, 'UTF-8') ?></strong>
+                                            <div class="fediverse-notification">
+                                                <div class="fediverse-notification__avatar">
+                                                    <?php if ($notificationAvatar !== ''): ?>
+                                                        <img src="<?= htmlspecialchars($notificationAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                                    <?php else: ?>
+                                                        <div class="fediverse-notification__avatar-fallback"><?= htmlspecialchars(mb_substr($notificationActorName !== '' ? $notificationActorName : 'A', 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div class="fediverse-notification__body">
+                                                    <strong><?= htmlspecialchars($notificationLabel($entry), ENT_QUOTES, 'UTF-8') ?></strong>
+                                                    <?php if ($notificationActorName !== ''): ?>
+                                                        <div class="small text-muted mt-1"><?= htmlspecialchars($notificationActorName, ENT_QUOTES, 'UTF-8') ?></div>
+                                                    <?php endif; ?>
+                                                    <?php if ($notificationTargetUrl !== ''): ?>
+                                                        <div class="small mt-1"><a href="<?= htmlspecialchars($notificationTargetUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Ver publicación afectada</a></div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
                                             <?php $actorValue = $notificationActor($entry); ?>
                                             <?php if ($actorValue !== ''): ?>
                                                 <div class="small text-muted mt-1"><?= htmlspecialchars($actorValue, ENT_QUOTES, 'UTF-8') ?></div>
@@ -354,4 +482,169 @@
             </div>
         <?php endif; ?>
     </div>
+    <style>
+        .fediverse-timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .fediverse-status {
+            display: grid;
+            grid-template-columns: 56px minmax(0, 1fr);
+            gap: 0.9rem;
+            padding: 1rem 0;
+            border-top: 1px solid #e8edf3;
+        }
+        .fediverse-status:first-child {
+            border-top: 0;
+            padding-top: 0;
+        }
+        .fediverse-status__avatar img,
+        .fediverse-status__avatar-fallback {
+            width: 56px;
+            height: 56px;
+            border-radius: 999px;
+            display: block;
+            object-fit: cover;
+        }
+        .fediverse-status__avatar-fallback {
+            background: #dfe9f6;
+            color: #244564;
+            font-weight: 700;
+            font-size: 1.2rem;
+            line-height: 56px;
+            text-align: center;
+        }
+        .fediverse-status__body {
+            min-width: 0;
+        }
+        .fediverse-status__header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.4rem;
+        }
+        .fediverse-status__identity {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            align-items: baseline;
+            min-width: 0;
+        }
+        .fediverse-status__handle,
+        .fediverse-status__meta {
+            color: #6c757d;
+            font-size: 0.92rem;
+        }
+        .fediverse-status__title {
+            font-weight: 700;
+            margin-bottom: 0.45rem;
+        }
+        .fediverse-status__content {
+            color: #1f2933;
+            line-height: 1.55;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+        .fediverse-status__content--html p:last-child,
+        .fediverse-status__content--html ul:last-child,
+        .fediverse-status__content--html ol:last-child,
+        .fediverse-status__content--html blockquote:last-child,
+        .fediverse-status__content--html pre:last-child {
+            margin-bottom: 0;
+        }
+        .fediverse-status__content--html a {
+            text-decoration: underline;
+        }
+        .fediverse-status__attachments {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.75rem;
+            margin-top: 0.85rem;
+        }
+        .fediverse-status__media {
+            display: block;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #eef3f8;
+        }
+        .fediverse-status__media img {
+            display: block;
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+        }
+        .fediverse-status__media--video video {
+            display: block;
+            width: 100%;
+            max-height: 360px;
+            background: #000;
+        }
+        .fediverse-status__file {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            justify-content: center;
+            min-height: 104px;
+            padding: 0.95rem 1rem;
+            border-radius: 14px;
+            background: #f3f7fb;
+            color: inherit;
+            text-decoration: none;
+        }
+        .fediverse-status__file audio {
+            width: 100%;
+        }
+        .fediverse-status__file-name {
+            font-weight: 600;
+        }
+        .fediverse-status__file-meta {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .fediverse-status__footer {
+            margin-top: 0.85rem;
+        }
+        .fediverse-notification {
+            display: grid;
+            grid-template-columns: 44px minmax(0, 1fr);
+            gap: 0.8rem;
+            align-items: start;
+        }
+        .fediverse-notification__avatar img,
+        .fediverse-notification__avatar-fallback {
+            width: 44px;
+            height: 44px;
+            border-radius: 999px;
+            display: block;
+            object-fit: cover;
+        }
+        .fediverse-notification__avatar-fallback {
+            background: #e7eef6;
+            color: #294d6d;
+            font-weight: 700;
+            line-height: 44px;
+            text-align: center;
+        }
+        @media (max-width: 640px) {
+            .fediverse-status {
+                grid-template-columns: 44px minmax(0, 1fr);
+                gap: 0.75rem;
+            }
+            .fediverse-status__avatar img,
+            .fediverse-status__avatar-fallback {
+                width: 44px;
+                height: 44px;
+                line-height: 44px;
+            }
+            .fediverse-status__media img {
+                height: 180px;
+            }
+            .fediverse-status__header {
+                flex-direction: column;
+                gap: 0.2rem;
+            }
+        }
+    </style>
 <?php endif; ?>

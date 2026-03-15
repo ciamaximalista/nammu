@@ -10296,10 +10296,18 @@ if ($isLoggedIn && $page === 'fediverso') {
             'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '.',
         ];
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rebuild_fediverse_timeline'])) {
+        $config = load_config_file();
+        $siteTitle = trim((string) (($config['site_name'] ?? '') ?: ''));
+        $siteDescription = trim((string) ($config['site_description'] ?? ''));
+        $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
+        $baseUrl = rtrim((string) (($config['site_url'] ?? '') ?: nammu_base_url()), '/');
+        if (function_exists('nammu_actuality_rebuild_snapshot')) {
+            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        }
         $stats = nammu_fediverse_rebuild_timeline();
         $fediverseFeedback = [
             'type' => 'info',
-            'message' => 'Timeline del Fediverso reconstruido. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades importadas: ' . (int) ($stats['new'] ?? 0) . '.',
+            'message' => 'Timeline del Fediverso reconstruido, incluyendo la parte local. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades importadas: ' . (int) ($stats['new'] ?? 0) . '.',
         ];
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_fediverse_message'])) {
         $recipientId = trim((string) ($_POST['fediverse_message_recipient'] ?? ''));

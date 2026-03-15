@@ -735,6 +735,55 @@ function nammu_fediverse_action_state_for_item(array $item): array
     ];
 }
 
+function nammu_fediverse_public_replies_by_object(): array
+{
+    $items = nammu_fediverse_actions_store()['items'];
+    $grouped = [];
+    foreach ($items as $item) {
+        if (strtolower(trim((string) ($item['type'] ?? ''))) !== 'reply') {
+            continue;
+        }
+        $objectUrl = trim((string) ($item['object_url'] ?? ''));
+        $replyText = trim((string) ($item['reply_text'] ?? ''));
+        if ($objectUrl === '' || $replyText === '') {
+            continue;
+        }
+        if (!isset($grouped[$objectUrl])) {
+            $grouped[$objectUrl] = [];
+        }
+        $grouped[$objectUrl][] = [
+            'id' => trim((string) ($item['id'] ?? '')),
+            'published' => trim((string) ($item['published'] ?? '')),
+            'reply_text' => $replyText,
+        ];
+    }
+    foreach ($grouped as &$replies) {
+        usort($replies, static function (array $a, array $b): int {
+            return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
+        });
+    }
+    unset($replies);
+    return $grouped;
+}
+
+function nammu_fediverse_replies_for_item(array $item): array
+{
+    $repliesByObject = nammu_fediverse_public_replies_by_object();
+    $candidates = [];
+    foreach (['object_id', 'url', 'id'] as $field) {
+        $value = trim((string) ($item[$field] ?? ''));
+        if ($value !== '') {
+            $candidates[] = $value;
+        }
+    }
+    foreach ($candidates as $candidate) {
+        if (isset($repliesByObject[$candidate])) {
+            return $repliesByObject[$candidate];
+        }
+    }
+    return [];
+}
+
 function nammu_fediverse_follow_actor(string $input): array
 {
     $config = function_exists('nammu_load_config') ? nammu_load_config() : [];
@@ -1027,6 +1076,45 @@ function nammu_fediverse_parse_date(string $value): string
     return $timestamp ? gmdate(DATE_ATOM, $timestamp) : gmdate(DATE_ATOM);
 }
 
+function nammu_fediverse_parse_date_with_fallback(string $value, ?string $filePath = null): string
+{
+    $value = trim($value);
+    if ($value !== '') {
+        $timestamp = strtotime($value);
+        if ($timestamp) {
+            return gmdate(DATE_ATOM, $timestamp);
+        }
+    }
+    if (is_string($filePath) && $filePath !== '' && is_file($filePath)) {
+        $timestamp = @filemtime($filePath);
+        if ($timestamp) {
+            return gmdate(DATE_ATOM, $timestamp);
+        }
+    }
+    return gmdate(DATE_ATOM);
+}
+
+function nammu_fediverse_meta_date(array $meta, ?string $filePath = null): string
+{
+    $candidates = [
+        'Date', 'date',
+        'Published', 'published',
+        'Fecha', 'fecha',
+        'Created', 'created',
+        'Updated', 'updated',
+    ];
+    foreach ($candidates as $key) {
+        if (!array_key_exists($key, $meta)) {
+            continue;
+        }
+        $resolved = nammu_fediverse_parse_date_with_fallback((string) $meta[$key], $filePath);
+        if ($resolved !== '') {
+            return $resolved;
+        }
+    }
+    return nammu_fediverse_parse_date_with_fallback('', $filePath);
+}
+
 function nammu_fediverse_local_content_items(array $config): array
 {
     $baseUrl = nammu_fediverse_base_url($config);
@@ -1057,7 +1145,7 @@ function nammu_fediverse_local_content_items(array $config): array
             'url' => $url,
             'title' => $title,
             'content' => $description !== '' ? $description : nammu_fediverse_plain_excerpt($content),
-            'published' => nammu_fediverse_parse_date((string) (($meta['Date'] ?? $meta['date'] ?? '') ?: '')),
+            'published' => nammu_fediverse_meta_date($meta, $file),
             'type' => $objectType,
             'image' => $image,
         ];
@@ -1082,7 +1170,7 @@ function nammu_fediverse_local_content_items(array $config): array
             'url' => $baseUrl . '/itinerarios/' . rawurlencode($slug),
             'title' => $title,
             'content' => $description !== '' ? $description : nammu_fediverse_plain_excerpt($content),
-            'published' => nammu_fediverse_parse_date((string) (($meta['Date'] ?? $meta['date'] ?? '') ?: '')),
+            'published' => nammu_fediverse_meta_date($meta, $file),
             'type' => 'Article',
             'image' => $image,
         ];
@@ -1109,7 +1197,7 @@ function nammu_fediverse_local_content_items(array $config): array
     usort($items, static function (array $a, array $b): int {
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });
-    return array_slice($items, 0, 80);
+    return array_slice($items, 0, 20);
 }
 
 function nammu_fediverse_local_items_index(array $config): array
@@ -1176,6 +1264,108 @@ function nammu_fediverse_local_reaction_summary(array $config): array
         }
     }
     return $summary;
+}
+
+function nammu_fediverse_incoming_public_replies_by_object(array $config): array
+{
+    $index = nammu_fediverse_local_items_index($config);
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
+    $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
+    $grouped = [];
+    foreach ($activities as $entry) {
+        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        if (strtolower(trim((string) ($payload['type'] ?? ''))) !== 'create') {
+            continue;
+        }
+        $object = is_array($payload['object'] ?? null) ? $payload['object'] : [];
+        if (strtolower(trim((string) ($object['type'] ?? ''))) !== 'note') {
+            continue;
+        }
+        $target = trim((string) ($object['inReplyTo'] ?? ''));
+        if ($target === '' || !isset($index[$target])) {
+            continue;
+        }
+        $localItem = $index[$target];
+        $localId = trim((string) ($localItem['id'] ?? ''));
+        if ($localId === '') {
+            continue;
+        }
+        $actorId = trim((string) ($payload['actor'] ?? ''));
+        $actor = $actorId !== '' ? nammu_fediverse_resolve_actor($actorId, $config) : [];
+        $contentHtml = trim((string) ($object['content'] ?? ''));
+        $contentText = trim((string) (function_exists('nammu_fediverse_html_to_text') ? nammu_fediverse_html_to_text($contentHtml) : strip_tags($contentHtml)));
+        if ($contentText === '') {
+            continue;
+        }
+        if (!isset($grouped[$localId])) {
+            $grouped[$localId] = [];
+        }
+        $grouped[$localId][] = [
+            'id' => trim((string) (($object['id'] ?? '') ?: ($payload['id'] ?? ''))),
+            'published' => trim((string) (($object['published'] ?? '') ?: ($payload['published'] ?? '') ?: ($entry['received_at'] ?? ''))),
+            'reply_text' => $contentText,
+            'actor_id' => $actorId,
+            'actor_name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
+            'actor_icon' => trim((string) ($actor['icon'] ?? '')),
+            'verified' => !empty($entry['verified']),
+            'source' => 'incoming',
+        ];
+    }
+    foreach ($grouped as &$replies) {
+        usort($replies, static function (array $a, array $b): int {
+            return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
+        });
+    }
+    unset($replies);
+    return $grouped;
+}
+
+function nammu_fediverse_public_reply_message_entries(array $config): array
+{
+    $index = nammu_fediverse_local_items_index($config);
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
+    $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
+    $messages = [];
+    foreach ($activities as $entry) {
+        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        if (strtolower(trim((string) ($payload['type'] ?? ''))) !== 'create') {
+            continue;
+        }
+        $object = is_array($payload['object'] ?? null) ? $payload['object'] : [];
+        if (strtolower(trim((string) ($object['type'] ?? ''))) !== 'note') {
+            continue;
+        }
+        $target = trim((string) ($object['inReplyTo'] ?? ''));
+        if ($target === '' || !isset($index[$target])) {
+            continue;
+        }
+        $actorId = trim((string) ($payload['actor'] ?? ''));
+        if ($actorId === '') {
+            continue;
+        }
+        $actor = nammu_fediverse_resolve_actor($actorId, $config);
+        $contentHtml = trim((string) ($object['content'] ?? ''));
+        $contentText = trim((string) (function_exists('nammu_fediverse_html_to_text') ? nammu_fediverse_html_to_text($contentHtml) : strip_tags($contentHtml)));
+        if ($contentText === '') {
+            continue;
+        }
+        $messages[] = [
+            'id' => trim((string) (($object['id'] ?? '') ?: ($payload['id'] ?? ''))),
+            'activity_id' => trim((string) ($payload['id'] ?? '')),
+            'actor_id' => $actorId,
+            'actor_name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
+            'actor_icon' => trim((string) ($actor['icon'] ?? '')),
+            'direction' => 'incoming',
+            'content' => $contentText,
+            'published' => trim((string) (($object['published'] ?? '') ?: ($payload['published'] ?? '') ?: ($entry['received_at'] ?? ''))),
+            'url' => trim((string) (($object['url'] ?? '') ?: ($object['id'] ?? ''))),
+            'delivery_status' => '',
+            'verified' => !empty($entry['verified']),
+            'visibility' => 'public',
+            'reply_target_url' => $target,
+        ];
+    }
+    return $messages;
 }
 
 function nammu_fediverse_activity_for_local_item(array $item, array $config): array

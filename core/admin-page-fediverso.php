@@ -48,6 +48,21 @@
             $fediverseActorsById[$fediverseKnownActorId] = $fediverseKnownActor;
         }
     }
+    $fediverseLocalItems = function_exists('nammu_fediverse_local_content_items') ? nammu_fediverse_local_content_items($fediverseConfig) : [];
+    $fediverseLocalReactionSummary = function_exists('nammu_fediverse_local_reaction_summary') ? nammu_fediverse_local_reaction_summary($fediverseConfig) : [];
+    $fediverseLocalLinks = [];
+    foreach ($fediverseLocalItems as $fediverseLocalItem) {
+        $fediverseLocalId = trim((string) ($fediverseLocalItem['id'] ?? ''));
+        if ($fediverseLocalId === '') {
+            continue;
+        }
+        $fediverseLocalAnchor = 'local-' . substr(sha1($fediverseLocalId), 0, 12);
+        $fediverseLocalLinks[$fediverseLocalId] = 'admin.php?page=fediverso&tab=home#' . $fediverseLocalAnchor;
+        $fediverseLocalUrl = trim((string) ($fediverseLocalItem['url'] ?? ''));
+        if ($fediverseLocalUrl !== '') {
+            $fediverseLocalLinks[$fediverseLocalUrl] = 'admin.php?page=fediverso&tab=home#' . $fediverseLocalAnchor;
+        }
+    }
     $fediverseTimelineDisplay = [];
     foreach ($fediverseTimeline as $fediverseTimelineItem) {
         $fediverseTimelineType = strtolower(trim((string) ($fediverseTimelineItem['type'] ?? '')));
@@ -114,19 +129,27 @@
         $clean = preg_replace('#<a\b([^>]*)href=(["\'])(https?://[^"\']+)\2([^>]*)>#i', '<a$1href="$3"$4 target="_blank" rel="noopener">', $clean) ?? $clean;
         return trim($clean);
     };
-    $notificationContext = static function (array $entry) use ($fediverseActorsById, $fediverseConfig): array {
+    $notificationContext = static function (array $entry) use ($fediverseActorsById, $fediverseConfig, $fediverseLocalLinks): array {
         $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
         $actorId = trim((string) ($payload['actor'] ?? ''));
         $actor = $actorId !== '' ? ($fediverseActorsById[$actorId] ?? null) : null;
         if (!is_array($actor) && $actorId !== '' && function_exists('nammu_fediverse_resolve_actor')) {
             $actor = nammu_fediverse_resolve_actor($actorId, $fediverseConfig);
         }
+        $type = strtolower(trim((string) ($payload['type'] ?? '')));
         $object = $payload['object'] ?? null;
         $targetUrl = '';
-        if (is_string($object)) {
+        if (in_array($type, ['like', 'announce'], true) && is_string($object)) {
+            $targetUrl = trim($object);
+        } elseif ($type === 'create' && is_array($object)) {
+            $targetUrl = trim((string) (($object['inReplyTo'] ?? '') ?: ($object['url'] ?? '') ?: ($object['id'] ?? '')));
+        } elseif (is_string($object)) {
             $targetUrl = trim($object);
         } elseif (is_array($object)) {
             $targetUrl = trim((string) (($object['url'] ?? '') ?: ($object['id'] ?? '')));
+        }
+        if ($targetUrl !== '' && isset($fediverseLocalLinks[$targetUrl])) {
+            $targetUrl = $fediverseLocalLinks[$targetUrl];
         }
         return [
             'actor_id' => $actorId,
@@ -146,7 +169,7 @@
             'message' => 'Mensaje privado',
             'like' => 'Reaccionó a una publicación',
             'announce' => 'Compartió una publicación',
-            'create' => 'Actividad remota',
+            'create' => 'Respondió a una publicación',
             default => $type !== '' ? ucfirst($type) : 'Notificación',
         };
     };
@@ -195,10 +218,61 @@
                             </form>
                         </div>
                     </div>
-                    <?php if (empty($fediverseTimelineDisplay)): ?>
+                    <?php if (empty($fediverseLocalItems) && empty($fediverseTimelineDisplay)): ?>
                         <p class="text-muted mb-0">Aún no hay publicaciones remotas recibidas. Sigue actores en la pestaña de configuración y luego refresca.</p>
                     <?php else: ?>
                         <div class="fediverse-timeline">
+                            <?php foreach ($fediverseLocalItems as $localItem): ?>
+                                <?php
+                                $localId = trim((string) ($localItem['id'] ?? ''));
+                                if ($localId === '') { continue; }
+                                $localAnchor = 'local-' . substr(sha1($localId), 0, 12);
+                                $localSummary = $fediverseLocalReactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0];
+                                ?>
+                                <article class="fediverse-status fediverse-status--local" id="<?= htmlspecialchars($localAnchor, ENT_QUOTES, 'UTF-8') ?>">
+                                    <div class="fediverse-status__avatar">
+                                        <?php if (!empty($theme['logo_url'])): ?>
+                                            <img src="<?= htmlspecialchars((string) $theme['logo_url'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                        <?php else: ?>
+                                            <div class="fediverse-status__avatar-fallback"><?= htmlspecialchars(mb_substr((string) ($siteTitle ?? 'B'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="fediverse-status__body">
+                                        <div class="fediverse-status__header">
+                                            <div class="fediverse-status__identity">
+                                                <strong><?= htmlspecialchars((string) ($siteTitle ?? 'Blog'), ENT_QUOTES, 'UTF-8') ?></strong>
+                                                <span class="fediverse-status__handle"><?= htmlspecialchars($fediverseAcct, ENT_QUOTES, 'UTF-8') ?></span>
+                                            </div>
+                                            <div class="fediverse-status__meta">
+                                                <time datetime="<?= htmlspecialchars((string) ($localItem['published'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) ($localItem['published'] ?? ''), ENT_QUOTES, 'UTF-8') ?></time>
+                                            </div>
+                                        </div>
+                                        <?php if (!empty($localItem['title'])): ?>
+                                            <div class="fediverse-status__title"><?= htmlspecialchars((string) ($localItem['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                                        <?php endif; ?>
+                                        <?php if (!empty($localItem['content'])): ?>
+                                            <div class="fediverse-status__content"><?= nl2br(htmlspecialchars((string) ($localItem['content'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
+                                        <?php endif; ?>
+                                        <?php if (!empty($localItem['image'])): ?>
+                                            <div class="fediverse-status__attachments">
+                                                <a class="fediverse-status__media" href="<?= htmlspecialchars((string) $localItem['image'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                    <img src="<?= htmlspecialchars((string) $localItem['image'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                                </a>
+                                            </div>
+                                        <?php endif; ?>
+                                        <div class="fediverse-status__footer">
+                                            <a href="<?= htmlspecialchars((string) ($localItem['url'] ?? '#'), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Abrir publicación emitida</a>
+                                        </div>
+                                        <?php if (($localSummary['likes'] ?? 0) > 0 || ($localSummary['shares'] ?? 0) > 0 || ($localSummary['replies'] ?? 0) > 0): ?>
+                                            <div class="fediverse-status__history">
+                                                <?php if (($localSummary['likes'] ?? 0) > 0): ?><span><?= (int) $localSummary['likes'] ?> favorito<?= ((int) $localSummary['likes'] === 1) ? '' : 's' ?></span><?php endif; ?>
+                                                <?php if (($localSummary['shares'] ?? 0) > 0): ?><span><?= (int) $localSummary['shares'] ?> reenvío<?= ((int) $localSummary['shares'] === 1) ? '' : 's' ?></span><?php endif; ?>
+                                                <?php if (($localSummary['replies'] ?? 0) > 0): ?><span><?= (int) $localSummary['replies'] ?> respuesta<?= ((int) $localSummary['replies'] === 1) ? '' : 's' ?></span><?php endif; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </article>
+                            <?php endforeach; ?>
                             <?php foreach ($fediverseTimelineDisplay as $item): ?>
                                 <?php $itemObjectId = (string) (($item['object_id'] ?? '') ?: (($item['url'] ?? '') ?: ($item['id'] ?? ''))); ?>
                                 <?php $itemActionState = function_exists('nammu_fediverse_action_state_for_item') ? nammu_fediverse_action_state_for_item($item) : ['liked' => false, 'replied' => false, 'shared' => false, 'reply_count' => 0, 'share_count' => 0]; ?>
@@ -297,6 +371,10 @@
                                                     <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($item['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                     <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>">
                                                     <textarea name="fediverse_reply_text" class="form-control form-control-sm" rows="3" placeholder="Escribe tu respuesta"></textarea>
+                                                    <label class="fediverse-inline-check">
+                                                        <input type="checkbox" name="fediverse_reply_as_note" value="1">
+                                                        Publicar también como nota en Actualidad
+                                                    </label>
                                                     <button type="submit" name="fediverse_reply_item" class="btn btn-primary btn-sm mt-2">Enviar respuesta</button>
                                                 </form>
                                             </details>
@@ -594,6 +672,10 @@
             padding: 1rem 0;
             border-top: 1px solid #e8edf3;
         }
+        .fediverse-status--local {
+            background: #fbfdff;
+            border-top-color: #d7e6f3;
+        }
         .fediverse-status:first-child {
             border-top: 0;
             padding-top: 0;
@@ -748,6 +830,14 @@
         }
         .fediverse-inline-form form {
             margin-top: 0.7rem;
+        }
+        .fediverse-inline-check {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.7rem;
+            font-size: 0.92rem;
+            color: #516677;
         }
         .fediverse-notification {
             display: grid;

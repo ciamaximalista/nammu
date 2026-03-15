@@ -10328,8 +10328,31 @@ if ($isLoggedIn && $page === 'fediverso') {
         $recipientId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
         $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
         $replyText = trim((string) ($_POST['fediverse_reply_text'] ?? ''));
+        $replyAlsoAsNote = !empty($_POST['fediverse_reply_as_note']);
         $config = load_config_file();
         $result = nammu_fediverse_send_reply($recipientId, $objectUrl, $replyText, $config);
+        if (!empty($result['ok']) && $replyAlsoAsNote) {
+            if (!function_exists('nammu_actuality_add_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
+                require_once __DIR__ . '/core/actualidad.php';
+            }
+            $baseUrl = rtrim((string) (($config['site_url'] ?? '') ?: nammu_base_url()), '/');
+            $siteTitle = trim((string) (($config['site_name'] ?? '') ?: ''));
+            $siteDescription = trim((string) ($config['site_description'] ?? ''));
+            $siteLang = trim((string) ($config['site_lang'] ?? 'es'));
+            $noteText = $replyText;
+            if ($objectUrl !== '' && !str_contains($noteText, $objectUrl)) {
+                $noteText = trim($noteText . "\n\n" . $objectUrl);
+            }
+            if (function_exists('nammu_actuality_add_manual_item')) {
+                nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle);
+                if (function_exists('nammu_actuality_rebuild_snapshot')) {
+                    nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+                }
+                nammu_fediverse_record_action('share', '', $objectUrl, ['share_text' => $replyText, 'title' => 'reply-note']);
+                $deliveryStats = nammu_fediverse_deliver_local_items($config);
+                $result['message'] = rtrim((string) ($result['message'] ?? '')) . ' También publicada como nota. Entregas federadas: ' . (int) ($deliveryStats['delivered'] ?? 0) . '.';
+            }
+        }
         $fediverseFeedback = [
             'type' => !empty($result['ok']) ? 'success' : 'danger',
             'message' => (string) ($result['message'] ?? ''),

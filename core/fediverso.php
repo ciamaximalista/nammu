@@ -1112,6 +1112,72 @@ function nammu_fediverse_local_content_items(array $config): array
     return array_slice($items, 0, 80);
 }
 
+function nammu_fediverse_local_items_index(array $config): array
+{
+    $items = nammu_fediverse_local_content_items($config);
+    $byIdentifier = [];
+    foreach ($items as $item) {
+        $identifiers = [];
+        foreach (['id', 'url'] as $field) {
+            $value = trim((string) ($item[$field] ?? ''));
+            if ($value !== '') {
+                $identifiers[] = $value;
+            }
+        }
+        foreach (array_unique($identifiers) as $identifier) {
+            $byIdentifier[$identifier] = $item;
+        }
+    }
+    return $byIdentifier;
+}
+
+function nammu_fediverse_local_reaction_summary(array $config): array
+{
+    $index = nammu_fediverse_local_items_index($config);
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
+    $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
+    $summary = [];
+    foreach ($activities as $entry) {
+        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        $type = strtolower(trim((string) ($payload['type'] ?? '')));
+        $object = $payload['object'] ?? null;
+        $target = '';
+        if (in_array($type, ['like', 'announce'], true)) {
+            if (is_string($object)) {
+                $target = trim($object);
+            } elseif (is_array($object)) {
+                $target = trim((string) (($object['id'] ?? '') ?: ($object['url'] ?? '')));
+            }
+        } elseif ($type === 'create' && is_array($object) && strtolower(trim((string) ($object['type'] ?? ''))) === 'note') {
+            $target = trim((string) ($object['inReplyTo'] ?? ''));
+        }
+        if ($target === '' || !isset($index[$target])) {
+            continue;
+        }
+        $localItem = $index[$target];
+        $localId = trim((string) ($localItem['id'] ?? ''));
+        if ($localId === '') {
+            continue;
+        }
+        if (!isset($summary[$localId])) {
+            $summary[$localId] = [
+                'item' => $localItem,
+                'likes' => 0,
+                'shares' => 0,
+                'replies' => 0,
+            ];
+        }
+        if ($type === 'like') {
+            $summary[$localId]['likes']++;
+        } elseif ($type === 'announce') {
+            $summary[$localId]['shares']++;
+        } elseif ($type === 'create') {
+            $summary[$localId]['replies']++;
+        }
+    }
+    return $summary;
+}
+
 function nammu_fediverse_activity_for_local_item(array $item, array $config): array
 {
     $actorUrl = nammu_fediverse_actor_url($config);

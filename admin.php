@@ -8227,11 +8227,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         header('Location: ' . $redirectBase);
         exit;
+    } elseif (isset($_POST['update_actuality_note'])) {
+        if (!function_exists('nammu_actuality_update_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
+            require_once __DIR__ . '/core/actualidad.php';
+        }
+        $noteId = preg_replace('/[^a-f0-9]/i', '', (string) ($_POST['note_id'] ?? '')) ?? '';
+        $noteText = trim((string) ($_POST['note_text'] ?? ''));
+        if ($noteId === '') {
+            $_SESSION['notes_feedback'] = ['type' => 'danger', 'message' => 'No se pudo identificar la nota.'];
+            header('Location: admin.php?page=edit&template=notes');
+            exit;
+        }
+        if ($noteText === '') {
+            $_SESSION['notes_feedback'] = ['type' => 'danger', 'message' => 'La nota no puede estar vacía.'];
+            header('Location: admin.php?page=edit-note&id=' . urlencode($noteId));
+            exit;
+        }
+        $config = load_config_file();
+        $siteTitle = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
+        $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
+        $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
+        $baseUrl = trim((string) ($config['site_url'] ?? ''));
+        if ($baseUrl === '') {
+            $baseUrl = nammu_base_url();
+        }
+        if (!function_exists('nammu_actuality_update_manual_item') || !nammu_actuality_update_manual_item($noteId, $noteText, $baseUrl, $siteTitle)) {
+            $_SESSION['notes_feedback'] = ['type' => 'danger', 'message' => 'No se pudo actualizar la nota.'];
+            header('Location: admin.php?page=edit-note&id=' . urlencode($noteId));
+            exit;
+        }
+        if (function_exists('nammu_actuality_rebuild_snapshot')) {
+            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        }
+        $_SESSION['notes_feedback'] = ['type' => 'success', 'message' => 'Nota actualizada.'];
+        header('Location: admin.php?page=edit&template=notes');
+        exit;
+    } elseif (isset($_POST['delete_actuality_note'])) {
+        if (!function_exists('nammu_actuality_delete_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
+            require_once __DIR__ . '/core/actualidad.php';
+        }
+        $noteId = preg_replace('/[^a-f0-9]/i', '', (string) ($_POST['delete_note_id'] ?? '')) ?? '';
+        if ($noteId === '') {
+            $_SESSION['notes_feedback'] = ['type' => 'danger', 'message' => 'No se pudo identificar la nota para borrarla.'];
+            header('Location: admin.php?page=edit&template=notes');
+            exit;
+        }
+        $config = load_config_file();
+        $siteTitle = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
+        $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
+        $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
+        $baseUrl = trim((string) ($config['site_url'] ?? ''));
+        if ($baseUrl === '') {
+            $baseUrl = nammu_base_url();
+        }
+        if (!function_exists('nammu_actuality_delete_manual_item') || !nammu_actuality_delete_manual_item($noteId)) {
+            $_SESSION['notes_feedback'] = ['type' => 'warning', 'message' => 'La nota ya no existe o no se pudo borrar.'];
+            header('Location: admin.php?page=edit&template=notes');
+            exit;
+        }
+        if (function_exists('nammu_actuality_rebuild_snapshot')) {
+            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        }
+        $_SESSION['notes_feedback'] = ['type' => 'success', 'message' => 'Nota borrada.'];
+        header('Location: admin.php?page=edit&template=notes');
+        exit;
     } elseif (isset($_POST['delete_post'])) {
         $filename = $_POST['delete_filename'] ?? '';
         $filename = trim($filename);
         $templateTarget = $_POST['delete_template'] ?? 'single';
-        $templateTarget = in_array($templateTarget, ['single', 'page', 'draft', 'newsletter', 'podcast'], true) ? $templateTarget : 'single';
+        $templateTarget = in_array($templateTarget, ['single', 'page', 'draft', 'newsletter', 'podcast', 'notes'], true) ? $templateTarget : 'single';
         $templateParam = urlencode($templateTarget);
         if ($filename !== '') {
             // Ensure only filenames from content directory are used
@@ -10172,6 +10236,10 @@ $socialBroadcastText = '';
 $socialBroadcastImage = '';
 $socialBroadcastActuality = false;
 $socialBroadcastNetworks = [];
+$notesFeedback = $_SESSION['notes_feedback'] ?? null;
+if ($notesFeedback !== null) {
+    unset($_SESSION['notes_feedback']);
+}
 if ($isLoggedIn && $page === 'redes') {
     require_once __DIR__ . '/core/admin-redes.php';
     $socialBroadcastState = admin_handle_social_broadcast_request(get_settings());
@@ -12055,7 +12123,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                             <?php include __DIR__ . '/core/admin-page-publish.php'; ?>
 
-<?php elseif ($page === 'edit' || $page === 'edit-post'): ?>
+<?php elseif ($page === 'edit' || $page === 'edit-post' || $page === 'edit-note'): ?>
 
     <?php include __DIR__ . '/core/admin-page-edit.php'; ?>
 

@@ -1,4 +1,7 @@
 <?php
+if (!function_exists('nammu_actuality_list_manual_items') && is_file(__DIR__ . '/actualidad.php')) {
+    require_once __DIR__ . '/actualidad.php';
+}
 $editFeedback = $_SESSION['edit_feedback'] ?? null;
 if ($editFeedback !== null) {
     unset($_SESSION['edit_feedback']);
@@ -13,7 +16,7 @@ unset($_SESSION['newsletter_custom_recipients']);
 
         <?php
         $templateFilter = $_GET['template'] ?? 'single';
-        $allowedFilters = ['single', 'page', 'draft', 'newsletter', 'podcast'];
+        $allowedFilters = ['single', 'page', 'draft', 'newsletter', 'podcast', 'notes'];
         if (!in_array($templateFilter, $allowedFilters, true)) {
             $templateFilter = 'single';
         }
@@ -23,6 +26,7 @@ unset($_SESSION['newsletter_custom_recipients']);
             'draft' => 'Borradores',
             'newsletter' => 'Newsletters',
             'podcast' => 'Podcasts',
+            'notes' => 'Notas',
         ][$templateFilter];
         $searchQuery = trim($_GET['q'] ?? '');
         $searchQueryParam = $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '';
@@ -62,6 +66,7 @@ unset($_SESSION['newsletter_custom_recipients']);
             <a href="?page=edit&template=page<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'page' ? 'active' : '' ?>">Páginas</a>
             <a href="?page=edit&template=newsletter<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'newsletter' ? 'active' : '' ?>">Newsletters</a>
             <a href="?page=edit&template=podcast<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'podcast' ? 'active' : '' ?>">Podcasts</a>
+            <a href="?page=edit&template=notes<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'notes' ? 'active' : '' ?>">Notas</a>
             <a href="?page=edit&template=draft<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'draft' ? 'active' : '' ?>">Borradores</a>
         </div>
 
@@ -106,9 +111,10 @@ unset($_SESSION['newsletter_custom_recipients']);
         ?>
 
         <?php
+        $showNotesTable = ($templateFilter === 'notes');
         $showVisibilityColumn = ($templateFilter === 'page');
         $showNewsletterStatusColumn = ($templateFilter === 'newsletter');
-        $showSocialColumn = ($templateFilter !== 'newsletter' && !$showVisibilityColumn);
+        $showSocialColumn = ($templateFilter !== 'newsletter' && !$showVisibilityColumn && !$showNotesTable);
         $columnCount = 4;
         if ($showNewsletterStatusColumn) {
             $columnCount++;
@@ -119,6 +125,97 @@ unset($_SESSION['newsletter_custom_recipients']);
         }
         ?>
 
+        <?php if ($notesFeedback !== null): ?>
+            <div class="alert alert-<?= htmlspecialchars($notesFeedback['type'] ?? 'info', ENT_QUOTES, 'UTF-8') === 'success' ? 'success' : (($notesFeedback['type'] ?? 'info') === 'warning' ? 'warning' : 'danger') ?>">
+                <?= htmlspecialchars($notesFeedback['message'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($showNotesTable): ?>
+            <?php
+            $manualItems = function_exists('nammu_actuality_list_manual_items') ? nammu_actuality_list_manual_items() : [];
+            if ($searchQuery !== '') {
+                $normalizedSearch = function_exists('mb_strtolower') ? mb_strtolower($searchQuery, 'UTF-8') : strtolower($searchQuery);
+                $manualItems = array_values(array_filter($manualItems, static function (array $item) use ($normalizedSearch): bool {
+                    $haystackParts = [
+                        (string) ($item['raw_text'] ?? ''),
+                        (string) ($item['description'] ?? ''),
+                        (string) ($item['title'] ?? ''),
+                        (string) ($item['id'] ?? ''),
+                    ];
+                    $haystack = function_exists('mb_strtolower')
+                        ? mb_strtolower(implode(' ', $haystackParts), 'UTF-8')
+                        : strtolower(implode(' ', $haystackParts));
+                    return str_contains($haystack, $normalizedSearch);
+                }));
+            }
+            $current_page = max(1, (int) ($_GET['p'] ?? 1));
+            $perPage = 16;
+            $totalNotes = count($manualItems);
+            $pagesCount = max(1, (int) ceil($totalNotes / $perPage));
+            $current_page = min($current_page, $pagesCount);
+            $offset = ($current_page - 1) * $perPage;
+            $pageNotes = array_slice($manualItems, $offset, $perPage);
+            ?>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Texto</th>
+                        <th>Fecha</th>
+                        <th>Nombre</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($pageNotes)): ?>
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">No hay notas disponibles.</td>
+                        </tr>
+                    <?php else: ?>
+                        <?php foreach ($pageNotes as $note): ?>
+                            <?php
+                            $rawText = trim((string) ($note['raw_text'] ?? ($note['description'] ?? '')));
+                            $rawText = preg_replace('#https?://[^\s<>"\')]+#iu', '', $rawText) ?? $rawText;
+                            $rawText = preg_replace('/\s+/u', ' ', $rawText) ?? $rawText;
+                            $excerpt = trim($rawText);
+                            if ($excerpt === '') {
+                                $excerpt = (string) ($note['title'] ?? '');
+                            }
+                            if ((function_exists('mb_strlen') ? mb_strlen($excerpt, 'UTF-8') : strlen($excerpt)) > 180) {
+                                $excerpt = function_exists('mb_substr') ? mb_substr($excerpt, 0, 177, 'UTF-8') . '…' : substr($excerpt, 0, 177) . '...';
+                            }
+                            $ts = (int) ($note['timestamp'] ?? 0);
+                            $formattedDate = $ts > 0 ? date('d/m/Y H:i', $ts) : '—';
+                            $noteId = (string) ($note['id'] ?? '');
+                            ?>
+                            <tr>
+                                <td><?= htmlspecialchars($excerpt, ENT_QUOTES, 'UTF-8') ?></td>
+                                <td><?= htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') ?></td>
+                                <td><?= htmlspecialchars($noteId !== '' ? ('nota-' . $noteId) : 'nota', ENT_QUOTES, 'UTF-8') ?></td>
+                                <td class="text-right">
+                                    <div class="d-flex flex-column align-items-end">
+                                        <a href="?page=edit-note&id=<?= urlencode($noteId) ?>" class="btn btn-sm btn-primary mb-2">Editar</a>
+                                        <form method="post" onsubmit="return confirm('¿Borrar esta nota definitivamente?');">
+                                            <input type="hidden" name="delete_note_id" value="<?= htmlspecialchars($noteId, ENT_QUOTES, 'UTF-8') ?>">
+                                            <button type="submit" name="delete_actuality_note" class="btn btn-sm btn-outline-danger">Borrar</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+            <nav aria-label="Page navigation">
+                <ul class="pagination pagination-break">
+                    <?php for ($i = 1; $i <= $pagesCount; $i++): ?>
+                        <li class="page-item <?= $i === $current_page ? 'active' : '' ?>">
+                            <a class="page-link" href="?page=edit&template=notes&p=<?= $i ?><?= $searchQueryParam ?>"><?= $i ?></a>
+                        </li>
+                    <?php endfor; ?>
+                </ul>
+            </nav>
+        <?php else: ?>
         <table class="table table-striped">
 
             <thead>
@@ -334,6 +431,8 @@ unset($_SESSION['newsletter_custom_recipients']);
             </ul>
 
         </nav>
+
+        <?php endif; ?>
 
     </div>
 
@@ -851,6 +950,49 @@ unset($_SESSION['newsletter_custom_recipients']);
 
         <?php endif; ?>
 
+    </div>
+
+<?php elseif ($page === 'edit-note'): ?>
+
+    <div class="tab-pane active">
+        <?php
+        $requestedNoteId = preg_replace('/[^a-f0-9]/i', '', (string) ($_GET['id'] ?? '')) ?? '';
+        $noteData = ($requestedNoteId !== '' && function_exists('nammu_actuality_get_manual_item')) ? nammu_actuality_get_manual_item($requestedNoteId) : null;
+        ?>
+        <?php if ($notesFeedback !== null): ?>
+            <div class="alert alert-<?= htmlspecialchars($notesFeedback['type'] ?? 'info', ENT_QUOTES, 'UTF-8') === 'success' ? 'success' : (($notesFeedback['type'] ?? 'info') === 'warning' ? 'warning' : 'danger') ?>">
+                <?= htmlspecialchars($notesFeedback['message'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
+        <?php if ($noteData !== null): ?>
+            <?php
+            $noteRawText = trim((string) ($noteData['raw_text'] ?? ''));
+            if ($noteRawText === '') {
+                $links = is_array($noteData['links'] ?? null) ? $noteData['links'] : [];
+                $noteRawText = trim((string) ($noteData['description'] ?? ''));
+                if (!empty($links)) {
+                    $noteRawText = trim($noteRawText . "\n\n" . implode("\n", array_map('strval', $links)));
+                }
+            }
+            $noteTs = (int) ($noteData['timestamp'] ?? 0);
+            ?>
+            <h2>Editar Nota</h2>
+            <p class="text-muted">Creada el <?= htmlspecialchars($noteTs > 0 ? date('d/m/Y H:i', $noteTs) : '—', ENT_QUOTES, 'UTF-8') ?>.</p>
+            <form method="post">
+                <input type="hidden" name="note_id" value="<?= htmlspecialchars($requestedNoteId, ENT_QUOTES, 'UTF-8') ?>">
+                <div class="form-group">
+                    <label for="note_text">Texto de la nota</label>
+                    <textarea name="note_text" id="note_text" class="form-control" rows="12" required><?= htmlspecialchars($noteRawText, ENT_QUOTES, 'UTF-8') ?></textarea>
+                    <small class="form-text text-muted">Puedes incluir uno o varios enlaces dentro del texto. Nammu los pondrá al final del post-it como “Enlace”.</small>
+                </div>
+                <button type="submit" name="update_actuality_note" class="btn btn-primary">Actualizar</button>
+                <a href="?page=edit&template=notes" class="btn btn-outline-secondary ml-2">Volver</a>
+            </form>
+        <?php else: ?>
+            <div class="alert alert-warning">
+                <p>No se pudo cargar la nota solicitada.</p>
+            </div>
+        <?php endif; ?>
     </div>
 
 <?php endif; ?>

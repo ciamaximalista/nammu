@@ -114,6 +114,90 @@ function nammu_actuality_save_manual_items(array $items): void
     @chmod($file, 0664);
 }
 
+function nammu_actuality_list_manual_items(): array
+{
+    $store = nammu_actuality_load_manual_items();
+    $items = nammu_actuality_prune_manual_items(is_array($store['items'] ?? null) ? $store['items'] : []);
+    usort($items, static function (array $a, array $b): int {
+        return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
+    });
+    if (count($items) !== count((array) ($store['items'] ?? []))) {
+        nammu_actuality_save_manual_items($items);
+    }
+    return $items;
+}
+
+function nammu_actuality_get_manual_item(string $id): ?array
+{
+    $normalizedId = preg_replace('/[^a-f0-9]/i', '', trim($id)) ?? '';
+    if ($normalizedId === '') {
+        return null;
+    }
+    foreach (nammu_actuality_list_manual_items() as $item) {
+        if ((string) ($item['id'] ?? '') === $normalizedId) {
+            return $item;
+        }
+    }
+    return null;
+}
+
+function nammu_actuality_update_manual_item(string $id, string $text, string $baseUrl, string $siteTitle): bool
+{
+    $normalizedId = preg_replace('/[^a-f0-9]/i', '', trim($id)) ?? '';
+    if ($normalizedId === '') {
+        return false;
+    }
+    $parts = nammu_actuality_manual_content($text);
+    if ($parts['title'] === '') {
+        return false;
+    }
+    $store = nammu_actuality_load_manual_items();
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    $updated = false;
+    foreach ($items as &$item) {
+        if ((string) ($item['id'] ?? '') !== $normalizedId) {
+            continue;
+        }
+        $timestamp = (int) ($item['timestamp'] ?? time());
+        $item['title'] = $parts['title'];
+        $item['description'] = $parts['content'];
+        $item['raw_text'] = $parts['raw_text'];
+        $item['links'] = $parts['links'];
+        $item['link'] = nammu_actuality_manual_anchor_url($baseUrl, $normalizedId);
+        $item['source'] = $siteTitle !== '' ? $siteTitle : ((string) ($item['source'] ?? 'Actualidad'));
+        $item['timestamp'] = $timestamp > 0 ? $timestamp : time();
+        $item['is_manual'] = true;
+        $updated = true;
+        break;
+    }
+    unset($item);
+    if (!$updated) {
+        return false;
+    }
+    $items = nammu_actuality_prune_manual_items($items);
+    nammu_actuality_save_manual_items($items);
+    return true;
+}
+
+function nammu_actuality_delete_manual_item(string $id): bool
+{
+    $normalizedId = preg_replace('/[^a-f0-9]/i', '', trim($id)) ?? '';
+    if ($normalizedId === '') {
+        return false;
+    }
+    $store = nammu_actuality_load_manual_items();
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    $before = count($items);
+    $items = array_values(array_filter($items, static function (array $item) use ($normalizedId): bool {
+        return (string) ($item['id'] ?? '') !== $normalizedId;
+    }));
+    if (count($items) === $before) {
+        return false;
+    }
+    nammu_actuality_save_manual_items($items);
+    return true;
+}
+
 function nammu_actuality_fetch_url(string $url, string $accept = 'text/html,application/xhtml+xml', int $timeout = 8): array
 {
     $headers = [];

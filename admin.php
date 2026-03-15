@@ -10116,6 +10116,17 @@ if ($isLoggedIn && $page === 'fediverso') {
         if (!empty($result['ok'])) {
             $fediverseMessageText = '';
         }
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_fediverse_private_reply'])) {
+        $recipientId = trim((string) ($_POST['fediverse_message_actor_id'] ?? ''));
+        $messageText = trim((string) ($_POST['fediverse_private_reply_text'] ?? ''));
+        $fediverseMessageRecipient = $recipientId;
+        $fediverseMessageText = '';
+        $config = load_config_file();
+        $result = nammu_fediverse_send_private_message($recipientId, $messageText, $config);
+        $fediverseFeedback = [
+            'type' => !empty($result['ok']) ? 'success' : 'danger',
+            'message' => (string) ($result['message'] ?? ''),
+        ];
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_like_item'])) {
         $recipientId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
         $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));

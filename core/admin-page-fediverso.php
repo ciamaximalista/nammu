@@ -698,7 +698,7 @@
                             <input type="hidden" name="fediverse_tab" value="messages">
                             <div class="form-group">
                                 <label for="fediverse_message_recipient">Destinatario</label>
-                                <select name="fediverse_message_recipient" id="fediverse_message_recipient" class="form-control">
+                                <select name="fediverse_message_recipient" id="fediverse_message_recipient" class="form-control fediverse-recipient-select" size="<?= htmlspecialchars((string) min(10, max(4, count($fediverseRecipients))), ENT_QUOTES, 'UTF-8') ?>">
                                     <?php foreach ($fediverseRecipients as $recipient): ?>
                                         <?php $recipientId = (string) ($recipient['id'] ?? ''); ?>
                                         <?php
@@ -746,11 +746,31 @@
                     <?php else: ?>
                         <?php foreach ($fediverseMessages as $actorId => $messages): ?>
                             <?php $firstMessage = $messages[0] ?? []; ?>
+                            <?php
+                            $conversationActor = $fediverseActorsById[$actorId] ?? null;
+                            if (!is_array($conversationActor) && $actorId !== '' && function_exists('nammu_fediverse_resolve_actor')) {
+                                $conversationActor = nammu_fediverse_resolve_actor($actorId, $fediverseConfig);
+                                if (is_array($conversationActor)) {
+                                    $fediverseActorsById[$actorId] = $conversationActor;
+                                }
+                            }
+                            $conversationActorName = trim((string) (($firstMessage['actor_name'] ?? '') ?: ($conversationActor['name'] ?? '') ?: ($conversationActor['preferredUsername'] ?? '') ?: $actorId));
+                            $conversationActorIcon = trim((string) (($firstMessage['actor_icon'] ?? '') ?: ($conversationActor['icon'] ?? '')));
+                            ?>
                             <div class="border rounded p-3 mb-4">
                                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-                                    <div>
-                                        <strong><?= htmlspecialchars((string) (($firstMessage['actor_name'] ?? '') ?: $actorId), ENT_QUOTES, 'UTF-8') ?></strong>
-                                        <div class="small text-muted mt-1"><?= htmlspecialchars((string) $actorId, ENT_QUOTES, 'UTF-8') ?></div>
+                                    <div class="fediverse-message__header mb-0">
+                                        <div class="fediverse-message__avatar">
+                                            <?php if ($conversationActorIcon !== ''): ?>
+                                                <img src="<?= htmlspecialchars($conversationActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                            <?php else: ?>
+                                                <div class="fediverse-message__avatar-fallback"><?= htmlspecialchars(mb_substr($conversationActorName !== '' ? $conversationActorName : 'A', 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="fediverse-message__identity">
+                                            <strong><?= htmlspecialchars($conversationActorName, ENT_QUOTES, 'UTF-8') ?></strong>
+                                            <div class="small text-muted mt-1"><?= htmlspecialchars((string) $actorId, ENT_QUOTES, 'UTF-8') ?></div>
+                                        </div>
                                     </div>
                                 </div>
                                 <?php foreach ($messages as $message): ?>
@@ -758,6 +778,10 @@
                                     <?php
                                     $isPublicMessage = (($message['visibility'] ?? '') === 'public');
                                     $isThreadRoot = !empty($message['is_thread_root']);
+                                    $messageActorIcon = trim((string) ($message['actor_icon'] ?? ''));
+                                    if (!$isOutgoing && $messageActorIcon === '') {
+                                        $messageActorIcon = trim((string) ($conversationActor['icon'] ?? ''));
+                                    }
                                     $messageClasses = 'mb-3 p-3 rounded';
                                     if ($isPublicMessage) {
                                         $messageClasses .= $isThreadRoot ? ' fediverse-conversation__root' : ' fediverse-conversation__reply';
@@ -773,8 +797,8 @@
                                             <div class="fediverse-message__avatar">
                                                 <?php if ($isOutgoing && $fediverseLocalAvatar !== ''): ?>
                                                     <img src="<?= htmlspecialchars($fediverseLocalAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
-                                                <?php elseif (!$isOutgoing && !empty($message['actor_icon'])): ?>
-                                                    <img src="<?= htmlspecialchars((string) $message['actor_icon'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                                <?php elseif (!$isOutgoing && $messageActorIcon !== ''): ?>
+                                                    <img src="<?= htmlspecialchars($messageActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
                                                 <?php else: ?>
                                                     <div class="fediverse-message__avatar-fallback"><?= htmlspecialchars(mb_substr($isOutgoing ? $fediverseLocalHandle : (string) (($message['actor_name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
                                                 <?php endif; ?>
@@ -805,6 +829,17 @@
                                             <div class="font-weight-bold mb-2"><?= htmlspecialchars((string) $message['title'], ENT_QUOTES, 'UTF-8') ?></div>
                                         <?php endif; ?>
                                         <div><?= nl2br(htmlspecialchars((string) ($message['content'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
+                                        <?php if (!$isOutgoing && !$isPublicMessage): ?>
+                                            <details class="fediverse-inline-form mt-3">
+                                                <summary>Responder en privado</summary>
+                                                <form method="post">
+                                                    <input type="hidden" name="fediverse_tab" value="messages">
+                                                    <input type="hidden" name="fediverse_message_actor_id" value="<?= htmlspecialchars((string) ($message['actor_id'] ?? $actorId), ENT_QUOTES, 'UTF-8') ?>">
+                                                    <textarea name="fediverse_private_reply_text" class="form-control form-control-sm" rows="3" placeholder="Escribe tu respuesta privada"></textarea>
+                                                    <button type="submit" name="send_fediverse_private_reply" class="btn btn-primary btn-sm mt-2">Responder</button>
+                                                </form>
+                                            </details>
+                                        <?php endif; ?>
                                         <?php if (!$isOutgoing && (($message['visibility'] ?? '') === 'public') && !empty($message['reply_target_url'])): ?>
                                             <details class="fediverse-inline-form mt-3">
                                                 <summary>Responder como nota</summary>
@@ -1197,6 +1232,9 @@
             align-items: center;
             gap: 0.75rem;
             margin-bottom: 0.75rem;
+        }
+        .fediverse-recipient-select {
+            min-height: 12.5rem;
         }
         .fediverse-message__avatar img,
         .fediverse-message__avatar-fallback {

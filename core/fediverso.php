@@ -784,6 +784,27 @@ function nammu_fediverse_replies_for_item(array $item): array
     return [];
 }
 
+function nammu_fediverse_public_replies_for_targets(array $targets): array
+{
+    $repliesByObject = nammu_fediverse_public_replies_by_object();
+    $matches = [];
+    foreach ($targets as $target) {
+        $target = trim((string) $target);
+        if ($target === '' || empty($repliesByObject[$target])) {
+            continue;
+        }
+        foreach ($repliesByObject[$target] as $reply) {
+            $replyId = trim((string) ($reply['id'] ?? ''));
+            $key = $replyId !== '' ? $replyId : sha1(json_encode($reply));
+            $matches[$key] = $reply;
+        }
+    }
+    uasort($matches, static function (array $a, array $b): int {
+        return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
+    });
+    return array_values($matches);
+}
+
 function nammu_fediverse_follow_actor(string $input): array
 {
     $config = function_exists('nammu_load_config') ? nammu_load_config() : [];
@@ -1271,6 +1292,24 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
     $index = nammu_fediverse_local_items_index($config);
     $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
     $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
+    usort($activities, static function (array $a, array $b): int {
+        $payloadA = is_array($a['payload'] ?? null) ? $a['payload'] : [];
+        $payloadB = is_array($b['payload'] ?? null) ? $b['payload'] : [];
+        $objectA = is_array($payloadA['object'] ?? null) ? $payloadA['object'] : [];
+        $objectB = is_array($payloadB['object'] ?? null) ? $payloadB['object'] : [];
+        $publishedA = (string) (($objectA['published'] ?? '') ?: ($payloadA['published'] ?? '') ?: ($a['received_at'] ?? ''));
+        $publishedB = (string) (($objectB['published'] ?? '') ?: ($payloadB['published'] ?? '') ?: ($b['received_at'] ?? ''));
+        return strcmp($publishedA, $publishedB);
+    });
+    $localTargetMap = [];
+    foreach ($index as $identifier => $localItem) {
+        $localId = trim((string) ($localItem['id'] ?? ''));
+        if ($localId !== '') {
+            $localTargetMap[(string) $identifier] = $localId;
+        }
+    }
+    $replyRootMap = [];
+    $pendingReplies = [];
     $grouped = [];
     foreach ($activities as $entry) {
         $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
@@ -1282,12 +1321,7 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
             continue;
         }
         $target = trim((string) ($object['inReplyTo'] ?? ''));
-        if ($target === '' || !isset($index[$target])) {
-            continue;
-        }
-        $localItem = $index[$target];
-        $localId = trim((string) ($localItem['id'] ?? ''));
-        if ($localId === '') {
+        if ($target === '') {
             continue;
         }
         $actorId = trim((string) ($payload['actor'] ?? ''));
@@ -1297,19 +1331,51 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
         if ($contentText === '') {
             continue;
         }
-        if (!isset($grouped[$localId])) {
-            $grouped[$localId] = [];
-        }
-        $grouped[$localId][] = [
-            'id' => trim((string) (($object['id'] ?? '') ?: ($payload['id'] ?? ''))),
-            'published' => trim((string) (($object['published'] ?? '') ?: ($payload['published'] ?? '') ?: ($entry['received_at'] ?? ''))),
-            'reply_text' => $contentText,
-            'actor_id' => $actorId,
-            'actor_name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
-            'actor_icon' => trim((string) ($actor['icon'] ?? '')),
-            'verified' => !empty($entry['verified']),
-            'source' => 'incoming',
+        $replyId = trim((string) (($object['id'] ?? '') ?: ($payload['id'] ?? '')));
+        $replyUrl = trim((string) (($object['url'] ?? '') ?: ''));
+        $pendingReplies[] = [
+            'target' => $target,
+            'reply_id' => $replyId,
+            'reply_url' => $replyUrl,
+            'entry' => [
+                'id' => $replyId,
+                'url' => $replyUrl,
+                'target_url' => $target,
+                'published' => trim((string) (($object['published'] ?? '') ?: ($payload['published'] ?? '') ?: ($entry['received_at'] ?? ''))),
+                'reply_text' => $contentText,
+                'actor_id' => $actorId,
+                'actor_name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
+                'actor_icon' => trim((string) ($actor['icon'] ?? '')),
+                'verified' => !empty($entry['verified']),
+                'source' => 'incoming',
+            ],
         ];
+    }
+    $maxPasses = max(1, count($pendingReplies) + 1);
+    for ($pass = 0; $pass < $maxPasses; $pass++) {
+        $resolvedThisPass = 0;
+        foreach ($pendingReplies as $pendingIndex => $pendingReply) {
+            $target = (string) ($pendingReply['target'] ?? '');
+            $localId = $localTargetMap[$target] ?? $replyRootMap[$target] ?? null;
+            if (!is_string($localId) || $localId === '') {
+                continue;
+            }
+            if (!isset($grouped[$localId])) {
+                $grouped[$localId] = [];
+            }
+            $grouped[$localId][] = $pendingReply['entry'];
+            foreach (['reply_id', 'reply_url'] as $replyField) {
+                $replyIdentifier = trim((string) ($pendingReply[$replyField] ?? ''));
+                if ($replyIdentifier !== '') {
+                    $replyRootMap[$replyIdentifier] = $localId;
+                }
+            }
+            unset($pendingReplies[$pendingIndex]);
+            $resolvedThisPass++;
+        }
+        if ($resolvedThisPass === 0) {
+            break;
+        }
     }
     foreach ($grouped as &$replies) {
         usort($replies, static function (array $a, array $b): int {
@@ -1322,47 +1388,102 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
 
 function nammu_fediverse_public_reply_message_entries(array $config): array
 {
-    $index = nammu_fediverse_local_items_index($config);
-    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
-    $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
+    $groupedReplies = nammu_fediverse_incoming_public_replies_by_object($config);
     $messages = [];
-    foreach ($activities as $entry) {
-        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
-        if (strtolower(trim((string) ($payload['type'] ?? ''))) !== 'create') {
+    foreach ($groupedReplies as $localId => $replies) {
+        foreach ($replies as $reply) {
+            $actorId = trim((string) ($reply['actor_id'] ?? ''));
+            if ($actorId === '') {
+                continue;
+            }
+            $messages[] = [
+                'id' => trim((string) ($reply['id'] ?? '')),
+                'activity_id' => '',
+                'actor_id' => $actorId,
+                'actor_name' => trim((string) ($reply['actor_name'] ?? $actorId)),
+                'actor_icon' => trim((string) ($reply['actor_icon'] ?? '')),
+                'direction' => 'incoming',
+                'content' => trim((string) ($reply['reply_text'] ?? '')),
+                'published' => trim((string) ($reply['published'] ?? '')),
+                'url' => trim((string) (($reply['url'] ?? '') ?: ($reply['id'] ?? ''))),
+                'delivery_status' => '',
+                'verified' => !empty($reply['verified']),
+                'visibility' => 'public',
+                'reply_target_url' => trim((string) ($localId !== '' ? $localId : ($reply['target_url'] ?? ''))),
+            ];
+        }
+    }
+    return $messages;
+}
+
+function nammu_fediverse_outgoing_public_reply_message_entries(array $config): array
+{
+    $items = nammu_fediverse_actions_store()['items'];
+    $messages = [];
+    foreach ($items as $item) {
+        if (strtolower(trim((string) ($item['type'] ?? ''))) !== 'reply') {
             continue;
         }
-        $object = is_array($payload['object'] ?? null) ? $payload['object'] : [];
-        if (strtolower(trim((string) ($object['type'] ?? ''))) !== 'note') {
-            continue;
-        }
-        $target = trim((string) ($object['inReplyTo'] ?? ''));
-        if ($target === '' || !isset($index[$target])) {
-            continue;
-        }
-        $actorId = trim((string) ($payload['actor'] ?? ''));
-        if ($actorId === '') {
-            continue;
-        }
-        $actor = nammu_fediverse_resolve_actor($actorId, $config);
-        $contentHtml = trim((string) ($object['content'] ?? ''));
-        $contentText = trim((string) (function_exists('nammu_fediverse_html_to_text') ? nammu_fediverse_html_to_text($contentHtml) : strip_tags($contentHtml)));
-        if ($contentText === '') {
+        $actorId = trim((string) ($item['actor_id'] ?? ''));
+        $content = trim((string) ($item['reply_text'] ?? ''));
+        if ($actorId === '' || $content === '') {
             continue;
         }
         $messages[] = [
-            'id' => trim((string) (($object['id'] ?? '') ?: ($payload['id'] ?? ''))),
-            'activity_id' => trim((string) ($payload['id'] ?? '')),
+            'id' => 'outgoing-reply-' . trim((string) ($item['id'] ?? sha1(json_encode($item)))),
+            'activity_id' => '',
             'actor_id' => $actorId,
-            'actor_name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
-            'actor_icon' => trim((string) ($actor['icon'] ?? '')),
-            'direction' => 'incoming',
-            'content' => $contentText,
-            'published' => trim((string) (($object['published'] ?? '') ?: ($payload['published'] ?? '') ?: ($entry['received_at'] ?? ''))),
-            'url' => trim((string) (($object['url'] ?? '') ?: ($object['id'] ?? ''))),
+            'actor_name' => '',
+            'actor_icon' => '',
+            'direction' => 'outgoing',
+            'content' => $content,
+            'published' => trim((string) ($item['published'] ?? '')),
+            'url' => '',
+            'delivery_status' => 'delivered',
+            'visibility' => 'public',
+            'reply_target_url' => trim((string) ($item['object_url'] ?? '')),
+        ];
+    }
+    return $messages;
+}
+
+function nammu_fediverse_public_thread_root_message_entries(array $config): array
+{
+    $localIndex = nammu_fediverse_local_items_index($config);
+    $incoming = nammu_fediverse_public_reply_message_entries($config);
+    $messages = [];
+    $seen = [];
+    foreach ($incoming as $message) {
+        $actorId = trim((string) ($message['actor_id'] ?? ''));
+        $target = trim((string) ($message['reply_target_url'] ?? ''));
+        if ($actorId === '' || $target === '' || !isset($localIndex[$target])) {
+            continue;
+        }
+        $localItem = $localIndex[$target];
+        $localId = trim((string) ($localItem['id'] ?? ''));
+        if ($localId === '') {
+            continue;
+        }
+        $key = $actorId . '|' . $localId;
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+        $messages[] = [
+            'id' => 'local-root-' . substr(sha1($key), 0, 24),
+            'activity_id' => '',
+            'actor_id' => $actorId,
+            'actor_name' => '',
+            'actor_icon' => '',
+            'direction' => 'outgoing',
+            'content' => trim((string) (($localItem['content'] ?? '') ?: ($localItem['title'] ?? ''))),
+            'published' => trim((string) ($localItem['published'] ?? '')),
+            'url' => trim((string) ($localItem['url'] ?? '')),
             'delivery_status' => '',
-            'verified' => !empty($entry['verified']),
             'visibility' => 'public',
             'reply_target_url' => $target,
+            'is_thread_root' => true,
+            'title' => trim((string) ($localItem['title'] ?? '')),
         ];
     }
     return $messages;

@@ -27,6 +27,8 @@
     $fediverseRecipients = function_exists('nammu_fediverse_message_recipients') ? nammu_fediverse_message_recipients() : [];
     $fediverseMessages = function_exists('nammu_fediverse_grouped_messages') ? nammu_fediverse_grouped_messages() : [];
     $fediversePublicReplyMessages = function_exists('nammu_fediverse_public_reply_message_entries') ? nammu_fediverse_public_reply_message_entries($fediverseConfig) : [];
+    $fediverseOutgoingPublicReplyMessages = function_exists('nammu_fediverse_outgoing_public_reply_message_entries') ? nammu_fediverse_outgoing_public_reply_message_entries($fediverseConfig) : [];
+    $fediversePublicThreadRootMessages = function_exists('nammu_fediverse_public_thread_root_message_entries') ? nammu_fediverse_public_thread_root_message_entries($fediverseConfig) : [];
     $fediverseNotifications = function_exists('nammu_fediverse_notification_entries')
         ? nammu_fediverse_notification_entries($fediverseConfig)
         : [];
@@ -84,6 +86,25 @@
             $fediverseMessages[$actorId][] = $publicReplyMessage;
         }
     }
+    foreach (array_merge($fediverseOutgoingPublicReplyMessages, $fediversePublicThreadRootMessages) as $publicConversationMessage) {
+        $actorId = trim((string) ($publicConversationMessage['actor_id'] ?? ''));
+        if ($actorId === '') {
+            continue;
+        }
+        if (!isset($fediverseMessages[$actorId])) {
+            $fediverseMessages[$actorId] = [];
+        }
+        $alreadyPresent = false;
+        foreach ($fediverseMessages[$actorId] as $existingMessage) {
+            if ((string) ($existingMessage['id'] ?? '') === (string) ($publicConversationMessage['id'] ?? '')) {
+                $alreadyPresent = true;
+                break;
+            }
+        }
+        if (!$alreadyPresent) {
+            $fediverseMessages[$actorId][] = $publicConversationMessage;
+        }
+    }
     foreach ($fediverseMessages as &$fediverseMessageGroup) {
         usort($fediverseMessageGroup, static function (array $a, array $b): int {
             return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
@@ -93,6 +114,20 @@
     $fediverseLocalItems = function_exists('nammu_fediverse_local_content_items') ? nammu_fediverse_local_content_items($fediverseConfig) : [];
     $fediverseLocalReactionSummary = function_exists('nammu_fediverse_local_reaction_summary') ? nammu_fediverse_local_reaction_summary($fediverseConfig) : [];
     $fediverseIncomingReplies = function_exists('nammu_fediverse_incoming_public_replies_by_object') ? nammu_fediverse_incoming_public_replies_by_object($fediverseConfig) : [];
+    $fediverseIncomingReplyIds = [];
+    $fediverseIncomingReplyRoots = [];
+    foreach ($fediverseIncomingReplies as $fediverseIncomingLocalId => $fediverseIncomingReplyGroup) {
+        foreach ((array) $fediverseIncomingReplyGroup as $fediverseIncomingReply) {
+            foreach (['id', 'url'] as $fediverseIncomingReplyField) {
+                $fediverseIncomingReplyValue = trim((string) ($fediverseIncomingReply[$fediverseIncomingReplyField] ?? ''));
+                if ($fediverseIncomingReplyValue === '') {
+                    continue;
+                }
+                $fediverseIncomingReplyIds[$fediverseIncomingReplyValue] = true;
+                $fediverseIncomingReplyRoots[$fediverseIncomingReplyValue] = (string) $fediverseIncomingLocalId;
+            }
+        }
+    }
     $fediverseLocalLinks = [];
     foreach ($fediverseLocalItems as $fediverseLocalItem) {
         $fediverseLocalId = trim((string) ($fediverseLocalItem['id'] ?? ''));
@@ -118,6 +153,27 @@
     foreach ($fediverseTimeline as $fediverseTimelineItem) {
         $fediverseTimelineType = strtolower(trim((string) ($fediverseTimelineItem['type'] ?? '')));
         if (in_array($fediverseTimelineType, ['announce', 'like', 'delete'], true)) {
+            continue;
+        }
+        $fediverseTimelineIdentifiers = [];
+        foreach (['id', 'object_id', 'url'] as $fediverseTimelineField) {
+            $fediverseTimelineFieldValue = trim((string) ($fediverseTimelineItem[$fediverseTimelineField] ?? ''));
+            if ($fediverseTimelineFieldValue !== '') {
+                $fediverseTimelineIdentifiers[] = $fediverseTimelineFieldValue;
+            }
+        }
+        $fediverseTimelineTargetUrl = trim((string) ($fediverseTimelineItem['target_url'] ?? ''));
+        if ($fediverseTimelineTargetUrl !== '') {
+            $fediverseTimelineIdentifiers[] = $fediverseTimelineTargetUrl;
+        }
+        $fediverseSkipTimelineItem = false;
+        foreach ($fediverseTimelineIdentifiers as $fediverseTimelineIdentifier) {
+            if (isset($fediverseIncomingReplyIds[$fediverseTimelineIdentifier])) {
+                $fediverseSkipTimelineItem = true;
+                break;
+            }
+        }
+        if ($fediverseSkipTimelineItem) {
             continue;
         }
         $fediverseTimelineActorId = trim((string) ($fediverseTimelineItem['actor_id'] ?? ''));
@@ -299,8 +355,23 @@
                                 if ($localId === '') { continue; }
                                 $localAnchor = 'local-' . substr(sha1($localId), 0, 12);
                                 $localSummary = $fediverseLocalReactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0];
-                                $localReplies = function_exists('nammu_fediverse_replies_for_item') ? nammu_fediverse_replies_for_item($localItem) : [];
+                                $localReplyTargets = [];
+                                foreach (['id', 'url'] as $localReplyField) {
+                                    $localReplyValue = trim((string) ($localItem[$localReplyField] ?? ''));
+                                    if ($localReplyValue !== '') {
+                                        $localReplyTargets[] = $localReplyValue;
+                                    }
+                                }
                                 $incomingReplies = is_array($fediverseIncomingReplies[$localId] ?? null) ? $fediverseIncomingReplies[$localId] : [];
+                                foreach ($incomingReplies as $incomingReply) {
+                                    foreach (['id', 'url'] as $incomingReplyField) {
+                                        $incomingReplyValue = trim((string) ($incomingReply[$incomingReplyField] ?? ''));
+                                        if ($incomingReplyValue !== '') {
+                                            $localReplyTargets[] = $incomingReplyValue;
+                                        }
+                                    }
+                                }
+                                $localReplies = function_exists('nammu_fediverse_public_replies_for_targets') ? nammu_fediverse_public_replies_for_targets($localReplyTargets) : [];
                                 $threadReplies = [];
                                 foreach ($localReplies as $reply) {
                                     $threadReplies[] = [
@@ -701,6 +772,9 @@
                                             <?php if (!empty($message['visibility'])): ?>
                                                 · <?= htmlspecialchars((string) ($message['visibility'] === 'public' ? 'Pública' : 'Privada'), ENT_QUOTES, 'UTF-8') ?>
                                             <?php endif; ?>
+                                            <?php if (!empty($message['is_thread_root'])): ?>
+                                                · Publicación original
+                                            <?php endif; ?>
                                             <?php if (!empty($message['delivery_status'])): ?>
                                                 · <?= htmlspecialchars((string) ($message['delivery_status'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
                                             <?php endif; ?>
@@ -708,6 +782,9 @@
                                                 · <?= !empty($message['verified']) ? 'verificado' : 'no verificado' ?>
                                             <?php endif; ?>
                                         </div>
+                                        <?php if (!empty($message['title']) && !empty($message['is_thread_root'])): ?>
+                                            <div class="font-weight-bold mb-2"><?= htmlspecialchars((string) $message['title'], ENT_QUOTES, 'UTF-8') ?></div>
+                                        <?php endif; ?>
                                         <div><?= nl2br(htmlspecialchars((string) ($message['content'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
                                         <?php if (!$isOutgoing && (($message['visibility'] ?? '') === 'public') && !empty($message['reply_target_url'])): ?>
                                             <details class="fediverse-inline-form mt-3">

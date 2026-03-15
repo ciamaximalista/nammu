@@ -764,6 +764,11 @@
                                     }
                                     ?>
                                     <div class="<?= htmlspecialchars($messageClasses, ENT_QUOTES, 'UTF-8') ?>" style="background: <?= $isOutgoing ? '#eef6ff' : '#f7f7f7' ?>; border-left: 4px solid <?= $isOutgoing ? '#1b8eed' : '#999' ?>;">
+                                        <div class="fediverse-message__visibility">
+                                            <span class="fediverse-visibility-badge fediverse-visibility-badge--<?= $isPublicMessage ? 'public' : 'private' ?>">
+                                                <?= $isPublicMessage ? 'Pública' : 'Privada' ?>
+                                            </span>
+                                        </div>
                                         <div class="fediverse-message__header">
                                             <div class="fediverse-message__avatar">
                                                 <?php if ($isOutgoing && $fediverseLocalAvatar !== ''): ?>
@@ -786,9 +791,6 @@
                                         </div>
                                         <div class="small text-muted mb-2">
                                             <?= $isOutgoing ? 'Enviado' : 'Recibido' ?> · <?= htmlspecialchars((string) ($message['published'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-                                            <?php if (!empty($message['visibility'])): ?>
-                                                · <?= htmlspecialchars((string) ($message['visibility'] === 'public' ? 'Pública' : 'Privada'), ENT_QUOTES, 'UTF-8') ?>
-                                            <?php endif; ?>
                                             <?php if (!empty($message['is_thread_root'])): ?>
                                                 · Publicación original
                                             <?php endif; ?>
@@ -1213,6 +1215,28 @@
         }
         .fediverse-message__identity {
             min-width: 0;
+        }
+        .fediverse-message__visibility {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 0.55rem;
+        }
+        .fediverse-visibility-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.2rem 0.55rem;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+        .fediverse-visibility-badge--public {
+            background: #e8f6ee;
+            color: #226943;
+        }
+        .fediverse-visibility-badge--private {
+            background: #fbeceb;
+            color: #8b2d2a;
         }
         .fediverse-conversation__root {
             margin-bottom: 1rem;

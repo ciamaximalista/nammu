@@ -10295,6 +10295,12 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => 'info',
             'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '.',
         ];
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rebuild_fediverse_timeline'])) {
+        $stats = nammu_fediverse_rebuild_timeline();
+        $fediverseFeedback = [
+            'type' => 'info',
+            'message' => 'Timeline del Fediverso reconstruido. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades importadas: ' . (int) ($stats['new'] ?? 0) . '.',
+        ];
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_fediverse_message'])) {
         $recipientId = trim((string) ($_POST['fediverse_message_recipient'] ?? ''));
         $messageText = trim((string) ($_POST['fediverse_message_text'] ?? ''));

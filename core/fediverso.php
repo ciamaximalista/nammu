@@ -834,6 +834,12 @@ function nammu_fediverse_refresh_following(): array
     return ['checked' => $checked, 'new' => $newItems];
 }
 
+function nammu_fediverse_rebuild_timeline(): array
+{
+    nammu_fediverse_save_timeline_store([]);
+    return nammu_fediverse_refresh_following();
+}
+
 function nammu_fediverse_strip_front_matter(string $content): string
 {
     return (string) preg_replace('/^---\s*\R.*?\R---\s*\R?/s', '', $content);

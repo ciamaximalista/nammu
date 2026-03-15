@@ -184,10 +184,16 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                         <h3 class="h5 mb-0">Timeline</h3>
-                        <form method="post" class="mb-0">
-                            <input type="hidden" name="fediverse_tab" value="home">
-                            <button type="submit" name="refresh_fediverse_timeline" class="btn btn-outline-secondary btn-sm">Refrescar ahora</button>
-                        </form>
+                        <div class="d-flex flex-wrap gap-2">
+                            <form method="post" class="mb-0">
+                                <input type="hidden" name="fediverse_tab" value="home">
+                                <button type="submit" name="refresh_fediverse_timeline" class="btn btn-outline-secondary btn-sm">Refrescar ahora</button>
+                            </form>
+                            <form method="post" class="mb-0" onsubmit="return confirm('Esto vaciará y reconstruirá la timeline remota guardada. ¿Continuar?');">
+                                <input type="hidden" name="fediverse_tab" value="home">
+                                <button type="submit" name="rebuild_fediverse_timeline" class="btn btn-outline-secondary btn-sm">Reconstruir timeline</button>
+                            </form>
+                        </div>
                     </div>
                     <?php if (empty($fediverseTimelineDisplay)): ?>
                         <p class="text-muted mb-0">Aún no hay publicaciones remotas recibidas. Sigue actores en la pestaña de configuración y luego refresca.</p>

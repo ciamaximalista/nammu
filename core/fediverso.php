@@ -906,6 +906,21 @@ function nammu_fediverse_unfollow_actor(string $actorId): bool
     return true;
 }
 
+function nammu_fediverse_restart_follow_actor(string $actorId): array
+{
+    $actorId = trim($actorId);
+    if ($actorId === '') {
+        return ['ok' => false, 'message' => 'No se recibió el actor a reiniciar.'];
+    }
+    foreach (nammu_fediverse_following_store()['actors'] as $actor) {
+        if ((string) ($actor['id'] ?? '') !== $actorId) {
+            continue;
+        }
+        return nammu_fediverse_follow_actor($actorId);
+    }
+    return ['ok' => false, 'message' => 'Ese actor ya no figura entre los seguidos.'];
+}
+
 function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?array
 {
     $activityId = trim((string) ($activity['id'] ?? ''));

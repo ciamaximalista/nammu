@@ -10075,6 +10075,13 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => !empty($followResult['ok']) ? 'success' : 'danger',
             'message' => (string) ($followResult['message'] ?? ''),
         ];
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restart_fediverse_actor'])) {
+        $actorId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
+        $restartResult = nammu_fediverse_restart_follow_actor($actorId);
+        $fediverseFeedback = [
+            'type' => !empty($restartResult['ok']) ? 'success' : 'danger',
+            'message' => (string) ($restartResult['message'] ?? ''),
+        ];
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unfollow_fediverse_actor'])) {
         $actorId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
         $ok = $actorId !== '' && nammu_fediverse_unfollow_actor($actorId);

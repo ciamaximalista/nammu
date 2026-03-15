@@ -908,11 +908,18 @@
                                             <td><small><a href="<?= htmlspecialchars((string) ($actor['outbox'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars((string) ($actor['outbox'] ?? ''), ENT_QUOTES, 'UTF-8') ?></a></small></td>
                                             <td><small><?= htmlspecialchars((string) (($actor['last_checked_at'] ?? '') ?: 'Nunca'), ENT_QUOTES, 'UTF-8') ?></small></td>
                                             <td class="text-right">
-                                                <form method="post" onsubmit="return confirm('¿Dejar de seguir este actor?');">
-                                                    <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($actor['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                    <input type="hidden" name="fediverse_tab" value="network">
-                                                    <button type="submit" name="unfollow_fediverse_actor" class="btn btn-outline-danger btn-sm">Quitar</button>
-                                                </form>
+                                                <div class="d-inline-flex align-items-center" style="gap:0.35rem;">
+                                                    <form method="post">
+                                                        <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($actor['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                        <input type="hidden" name="fediverse_tab" value="network">
+                                                        <button type="submit" name="restart_fediverse_actor" class="btn btn-outline-secondary btn-sm">Reiniciar</button>
+                                                    </form>
+                                                    <form method="post" onsubmit="return confirm('¿Dejar de seguir este actor?');">
+                                                        <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($actor['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                        <input type="hidden" name="fediverse_tab" value="network">
+                                                        <button type="submit" name="unfollow_fediverse_actor" class="btn btn-outline-danger btn-sm">Quitar</button>
+                                                    </form>
+                                                </div>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>

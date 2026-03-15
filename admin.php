@@ -3065,24 +3065,47 @@ function admin_facebook_debug_token(string $token, string $appId, string $appSec
 }
 
 function admin_get_twitter_follower_count(array $settings): ?int {
-    $token = trim((string) ($settings['token'] ?? ''));
     $channelRaw = trim((string) ($settings['channel'] ?? ''));
-    if ($token === '' || $channelRaw === '') {
+    $apiKey = trim((string) ($settings['api_key'] ?? ''));
+    $apiSecret = trim((string) ($settings['api_secret'] ?? ''));
+    $accessToken = trim((string) ($settings['access_token'] ?? ''));
+    $accessSecret = trim((string) ($settings['access_secret'] ?? ''));
+    if ($channelRaw === '' || $apiKey === '' || $apiSecret === '' || $accessToken === '' || $accessSecret === '') {
         return null;
     }
     $channel = ltrim($channelRaw, '@');
-    $headers = ['Authorization: Bearer ' . $token];
+    $query = ['user.fields' => 'public_metrics'];
     if (preg_match('/^\d+$/', $channel)) {
-        $endpoint = 'https://api.twitter.com/2/users/' . rawurlencode($channel) . '?user.fields=public_metrics';
-        $payload = admin_http_get_json($endpoint, $headers);
+        $endpointBase = 'https://api.twitter.com/2/users/' . rawurlencode($channel);
     } else {
-        $endpoint = 'https://api.twitter.com/2/users/by/username/' . rawurlencode($channel) . '?user.fields=public_metrics';
-        $payload = admin_http_get_json($endpoint, $headers);
+        $endpointBase = 'https://api.twitter.com/2/users/by/username/' . rawurlencode($channel);
     }
+    $error = null;
+    $authorization = admin_twitter_build_oauth_header('GET', $endpointBase, $settings, $error, $query);
+    if ($authorization === null || $authorization === '') {
+        return null;
+    }
+    $endpoint = $endpointBase . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+    $payload = admin_http_get_json($endpoint, ['Authorization: ' . $authorization]);
     if (!is_array($payload) || !isset($payload['data']['public_metrics']['followers_count'])) {
         return null;
     }
     return (int) $payload['data']['public_metrics']['followers_count'];
+}
+
+function admin_get_instagram_follower_count(array $settings): ?int {
+    $token = trim((string) ($settings['token'] ?? ''));
+    $channel = trim((string) ($settings['channel'] ?? ''));
+    if ($token === '' || $channel === '') {
+        return null;
+    }
+    $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($channel)
+        . '?fields=followers_count&access_token=' . rawurlencode($token);
+    $payload = admin_http_get_json($endpoint);
+    if (!is_array($payload) || !isset($payload['followers_count'])) {
+        return null;
+    }
+    return (int) $payload['followers_count'];
 }
 
 function admin_get_bluesky_follower_count(array $settings): ?int {
@@ -3406,7 +3429,7 @@ function admin_twitter_percent_encode(string $value): string {
     return str_replace('%7E', '~', rawurlencode($value));
 }
 
-function admin_twitter_build_oauth_header(string $method, string $url, array $settings, ?string &$error = null): ?string {
+function admin_twitter_build_oauth_header(string $method, string $url, array $settings, ?string &$error = null, array $extraParams = []): ?string {
     $consumerKey = trim((string) ($settings['api_key'] ?? ''));
     $consumerSecret = trim((string) ($settings['api_secret'] ?? ''));
     $accessToken = trim((string) ($settings['access_token'] ?? ''));
@@ -3424,12 +3447,26 @@ function admin_twitter_build_oauth_header(string $method, string $url, array $se
         'oauth_token' => $accessToken,
         'oauth_version' => '1.0',
     ];
-    ksort($oauth);
+    $urlParts = parse_url($url);
+    $baseUrl = $url;
+    $queryParams = [];
+    if (is_array($urlParts)) {
+        if (isset($urlParts['scheme'], $urlParts['host'])) {
+            $baseUrl = $urlParts['scheme'] . '://' . $urlParts['host']
+                . (isset($urlParts['port']) ? ':' . $urlParts['port'] : '')
+                . ($urlParts['path'] ?? '');
+        }
+        if (!empty($urlParts['query'])) {
+            parse_str($urlParts['query'], $queryParams);
+        }
+    }
+    $signatureParams = array_merge($queryParams, $extraParams, $oauth);
+    ksort($signatureParams);
     $parameterPairs = [];
-    foreach ($oauth as $key => $value) {
+    foreach ($signatureParams as $key => $value) {
         $parameterPairs[] = admin_twitter_percent_encode((string) $key) . '=' . admin_twitter_percent_encode((string) $value);
     }
-    $baseString = strtoupper($method) . '&' . admin_twitter_percent_encode($url) . '&' . admin_twitter_percent_encode(implode('&', $parameterPairs));
+    $baseString = strtoupper($method) . '&' . admin_twitter_percent_encode($baseUrl) . '&' . admin_twitter_percent_encode(implode('&', $parameterPairs));
     $signingKey = admin_twitter_percent_encode($consumerSecret) . '&' . admin_twitter_percent_encode($accessSecret);
     $oauth['oauth_signature'] = base64_encode(hash_hmac('sha1', $baseString, $signingKey, true));
 

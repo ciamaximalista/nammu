@@ -2329,7 +2329,11 @@
         if ($facebookCount !== null) {
             $socialCounts['Facebook'] = $facebookCount;
         }
-        $twitterCount = admin_get_twitter_follower_count($settings['twitter'] ?? []);
+        $twitterSettings = is_array($settings['twitter'] ?? null) ? $settings['twitter'] : [];
+        if (trim((string) ($twitterSettings['channel'] ?? '')) === '') {
+            $twitterSettings['channel'] = trim((string) ($settings['social']['twitter'] ?? ''));
+        }
+        $twitterCount = admin_get_twitter_follower_count($twitterSettings);
         if ($twitterCount !== null) {
             $socialCounts['Twitter/X'] = $twitterCount;
         }
@@ -2340,6 +2344,10 @@
         $mastodonCount = admin_get_mastodon_follower_count($settings['mastodon'] ?? []);
         if ($mastodonCount !== null) {
             $socialCounts['Mastodon'] = $mastodonCount;
+        }
+        $instagramCount = admin_get_instagram_follower_count($settings['instagram'] ?? []);
+        if ($instagramCount !== null) {
+            $socialCounts['Instagram'] = $instagramCount;
         }
     }
     ?>

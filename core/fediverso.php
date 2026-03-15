@@ -27,6 +27,11 @@ function nammu_fediverse_deliveries_file(): string
     return dirname(__DIR__) . '/config/fediverso-deliveries.json';
 }
 
+function nammu_fediverse_messages_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-messages.json';
+}
+
 function nammu_fediverse_keys_file(): string
 {
     return dirname(__DIR__) . '/config/activitypub-keys.json';
@@ -319,6 +324,67 @@ function nammu_fediverse_fetch_json(string $url, string $accept = 'application/a
     return is_array($decoded) ? $decoded : null;
 }
 
+function nammu_fediverse_request_headers(): array
+{
+    $headers = [];
+    foreach ($_SERVER as $key => $value) {
+        if (!is_string($value)) {
+            continue;
+        }
+        if (str_starts_with($key, 'HTTP_')) {
+            $name = strtolower(str_replace('_', '-', substr($key, 5)));
+            $headers[$name] = $value;
+            continue;
+        }
+        if (in_array($key, ['CONTENT_TYPE', 'CONTENT_LENGTH', 'CONTENT_DIGEST', 'DIGEST'], true)) {
+            $name = strtolower(str_replace('_', '-', $key));
+            $headers[$name] = $value;
+        }
+    }
+    return $headers;
+}
+
+function nammu_fediverse_parse_signature_header(string $header): array
+{
+    $result = [];
+    foreach (preg_split('/\s*,\s*/', trim($header)) ?: [] as $part) {
+        if (!str_contains($part, '=')) {
+            continue;
+        }
+        [$key, $value] = explode('=', $part, 2);
+        $key = trim($key);
+        $value = trim($value, " \t\n\r\0\x0B\"");
+        if ($key !== '') {
+            $result[$key] = $value;
+        }
+    }
+    return $result;
+}
+
+function nammu_fediverse_build_incoming_signed_string(array $signatureData, array $headers, string $requestTarget): ?string
+{
+    $headerList = trim((string) ($signatureData['headers'] ?? ''));
+    if ($headerList === '') {
+        $headerList = '(request-target)';
+    }
+    $lines = [];
+    foreach (preg_split('/\s+/', $headerList) ?: [] as $headerName) {
+        $headerName = strtolower(trim($headerName));
+        if ($headerName === '') {
+            continue;
+        }
+        if ($headerName === '(request-target)') {
+            $lines[] = '(request-target): ' . $requestTarget;
+            continue;
+        }
+        if (!array_key_exists($headerName, $headers)) {
+            return null;
+        }
+        $lines[] = $headerName . ': ' . trim((string) $headers[$headerName]);
+    }
+    return implode("\n", $lines);
+}
+
 function nammu_fediverse_resolve_actor(string $input, ?array $config = null): ?array
 {
     $trimmed = trim($input);
@@ -345,6 +411,8 @@ function nammu_fediverse_resolve_actor(string $input, ?array $config = null): ?a
             'outbox' => (string) ($actor['outbox'] ?? ''),
             'url' => (string) ($actor['url'] ?? ($actor['id'] ?? $trimmed)),
             'icon' => is_array($actor['icon'] ?? null) ? (string) (($actor['icon']['url'] ?? '') ?: '') : '',
+            'public_key_id' => is_array($actor['publicKey'] ?? null) ? (string) (($actor['publicKey']['id'] ?? '') ?: '') : '',
+            'public_key_pem' => is_array($actor['publicKey'] ?? null) ? (string) (($actor['publicKey']['publicKeyPem'] ?? '') ?: '') : '',
         ];
     }
 
@@ -434,6 +502,21 @@ function nammu_fediverse_deliveries_store(): array
 function nammu_fediverse_save_deliveries_store(array $followers): void
 {
     nammu_fediverse_save_json_store(nammu_fediverse_deliveries_file(), ['followers' => $followers]);
+}
+
+function nammu_fediverse_messages_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_messages_file(), ['items' => []]);
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    return ['items' => array_values($items)];
+}
+
+function nammu_fediverse_save_messages_store(array $items): void
+{
+    usort($items, static function (array $a, array $b): int {
+        return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
+    });
+    nammu_fediverse_save_json_store(nammu_fediverse_messages_file(), ['items' => array_slice(array_values($items), 0, 500)]);
 }
 
 function nammu_fediverse_follow_actor(string $input): array
@@ -892,13 +975,17 @@ function nammu_fediverse_outbox_document(array $config): array
     ];
 }
 
-function nammu_fediverse_store_inbox_activity(array $payload): void
+function nammu_fediverse_store_inbox_activity(array $payload, array $meta = []): void
 {
     $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
     $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
     $activities[] = [
         'received_at' => gmdate(DATE_ATOM),
         'payload' => $payload,
+        'verified' => !empty($meta['verified']),
+        'verification_error' => trim((string) ($meta['verification_error'] ?? '')),
+        'signature_key_id' => trim((string) ($meta['signature_key_id'] ?? '')),
+        'signed_headers' => trim((string) ($meta['signed_headers'] ?? '')),
     ];
     $store['activities'] = array_slice($activities, -50);
     nammu_fediverse_save_json_store(nammu_fediverse_inbox_file(), $store);
@@ -943,6 +1030,112 @@ function nammu_fediverse_remote_inbox_for_actor(array $actor): string
     return trim((string) ($actor['inbox'] ?? ''));
 }
 
+function nammu_fediverse_known_actors(): array
+{
+    $actors = [];
+    foreach (nammu_fediverse_following_store()['actors'] as $actor) {
+        $id = trim((string) ($actor['id'] ?? ''));
+        if ($id !== '') {
+            $actors[$id] = $actor;
+        }
+    }
+    foreach (nammu_fediverse_followers_store()['followers'] as $actor) {
+        $id = trim((string) ($actor['id'] ?? ''));
+        if ($id === '') {
+            continue;
+        }
+        $actors[$id] = array_merge($actors[$id] ?? [], $actor);
+    }
+    ksort($actors);
+    return $actors;
+}
+
+function nammu_fediverse_message_recipients(): array
+{
+    $actors = nammu_fediverse_known_actors();
+    uasort($actors, static function (array $a, array $b): int {
+        $nameA = strtolower(trim((string) (($a['name'] ?? '') ?: ($a['preferredUsername'] ?? ''))));
+        $nameB = strtolower(trim((string) (($b['name'] ?? '') ?: ($b['preferredUsername'] ?? ''))));
+        return $nameA <=> $nameB;
+    });
+    return $actors;
+}
+
+function nammu_fediverse_store_message(array $message): void
+{
+    $items = nammu_fediverse_messages_store()['items'];
+    $id = trim((string) ($message['id'] ?? ''));
+    if ($id === '') {
+        return;
+    }
+    foreach ($items as $index => $existing) {
+        if ((string) ($existing['id'] ?? '') === $id) {
+            $items[$index] = array_merge($existing, $message);
+            nammu_fediverse_save_messages_store($items);
+            return;
+        }
+    }
+    $items[] = $message;
+    nammu_fediverse_save_messages_store($items);
+}
+
+function nammu_fediverse_grouped_messages(): array
+{
+    $items = nammu_fediverse_messages_store()['items'];
+    $groups = [];
+    foreach ($items as $item) {
+        $actorId = trim((string) ($item['actor_id'] ?? ''));
+        if ($actorId === '') {
+            continue;
+        }
+        if (!isset($groups[$actorId])) {
+            $groups[$actorId] = [];
+        }
+        $groups[$actorId][] = $item;
+    }
+    uasort($groups, static function (array $a, array $b): int {
+        $publishedA = (string) (($a[0]['published'] ?? '') ?: '');
+        $publishedB = (string) (($b[0]['published'] ?? '') ?: '');
+        return strcmp($publishedB, $publishedA);
+    });
+    return $groups;
+}
+
+function nammu_fediverse_is_direct_message_activity(array $payload, array $config): bool
+{
+    if (strtolower((string) ($payload['type'] ?? '')) !== 'create' || !is_array($payload['object'] ?? null)) {
+        return false;
+    }
+    $object = $payload['object'];
+    if (strtolower((string) ($object['type'] ?? '')) !== 'note') {
+        return false;
+    }
+    $actorUrl = nammu_fediverse_actor_url($config);
+    $recipients = [];
+    foreach ((array) ($object['to'] ?? []) as $value) {
+        if (is_string($value)) {
+            $recipients[] = trim($value);
+        }
+    }
+    foreach ((array) ($payload['to'] ?? []) as $value) {
+        if (is_string($value)) {
+            $recipients[] = trim($value);
+        }
+    }
+    return in_array($actorUrl, $recipients, true);
+}
+
+function nammu_fediverse_notification_entries(array $config): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
+    $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
+    $filtered = array_values(array_filter($activities, static function (array $entry) use ($config): bool {
+        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        return !nammu_fediverse_is_direct_message_activity($payload, $config);
+    }));
+    return array_values(array_reverse($filtered));
+}
+
 function nammu_fediverse_post_activity(string $inboxUrl, array $activity, array $config): bool
 {
     $body = json_encode($activity, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -952,6 +1145,129 @@ function nammu_fediverse_post_activity(string $inboxUrl, array $activity, array 
     $response = nammu_fediverse_signed_fetch($inboxUrl, $config, 'POST', $body);
     $status = (int) ($response['status'] ?? 0);
     return $status >= 200 && $status < 300;
+}
+
+function nammu_fediverse_verify_inbox_request(array $payload, array $headers, string $rawBody, array $config): array
+{
+    $actorId = trim((string) ($payload['actor'] ?? ''));
+    if ($actorId === '') {
+        return ['verified' => false, 'error' => 'La actividad no incluye actor.', 'key_id' => '', 'signed_headers' => ''];
+    }
+    $signatureHeader = trim((string) (($headers['signature'] ?? '') ?: ($headers['authorization'] ?? '')));
+    if ($signatureHeader === '') {
+        return ['verified' => false, 'error' => 'Falta la cabecera Signature.', 'key_id' => '', 'signed_headers' => ''];
+    }
+    if (str_starts_with(strtolower($signatureHeader), 'signature ')) {
+        $signatureHeader = trim(substr($signatureHeader, 10));
+    }
+    $signatureData = nammu_fediverse_parse_signature_header($signatureHeader);
+    $signature = trim((string) ($signatureData['signature'] ?? ''));
+    $keyId = trim((string) ($signatureData['keyId'] ?? $signatureData['keyid'] ?? ''));
+    $signedHeaders = trim((string) ($signatureData['headers'] ?? ''));
+    if ($signature === '') {
+        return ['verified' => false, 'error' => 'La cabecera Signature no contiene firma.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
+    }
+    if ($rawBody !== '') {
+        $digestHeader = trim((string) ($headers['digest'] ?? ''));
+        if ($digestHeader === '') {
+            return ['verified' => false, 'error' => 'Falta la cabecera Digest.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
+        }
+        $expectedDigest = nammu_fediverse_digest_header($rawBody);
+        if (!hash_equals($expectedDigest, $digestHeader)) {
+            return ['verified' => false, 'error' => 'Digest inválido.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
+        }
+    }
+    $method = strtolower((string) ($_SERVER['REQUEST_METHOD'] ?? 'post'));
+    $requestUri = (string) ($_SERVER['REQUEST_URI'] ?? '/ap/inbox');
+    $requestPath = parse_url($requestUri, PHP_URL_PATH) ?? '/ap/inbox';
+    $requestQuery = parse_url($requestUri, PHP_URL_QUERY);
+    $requestTarget = $method . ' ' . $requestPath . ($requestQuery ? '?' . $requestQuery : '');
+    $signingString = nammu_fediverse_build_incoming_signed_string($signatureData, $headers, $requestTarget);
+    if ($signingString === null || $signingString === '') {
+        return ['verified' => false, 'error' => 'No se pudo reconstruir la firma.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
+    }
+    $actor = nammu_fediverse_resolve_actor($actorId, $config);
+    $publicKeyPem = trim((string) ($actor['public_key_pem'] ?? ''));
+    $publicKeyId = trim((string) ($actor['public_key_id'] ?? ''));
+    if ($keyId !== '' && $publicKeyId !== '' && $keyId !== $publicKeyId) {
+        return ['verified' => false, 'error' => 'El keyId de la firma no coincide con la clave pública del actor remoto.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
+    }
+    if ($publicKeyPem === '') {
+        return ['verified' => false, 'error' => 'No se pudo obtener la clave pública del actor remoto.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
+    }
+    $publicKey = openssl_pkey_get_public($publicKeyPem);
+    if ($publicKey === false) {
+        return ['verified' => false, 'error' => 'Clave pública remota inválida.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
+    }
+    $ok = openssl_verify($signingString, base64_decode($signature, true) ?: '', $publicKey, OPENSSL_ALGO_SHA256);
+    if ($ok !== 1) {
+        return ['verified' => false, 'error' => 'Firma HTTP inválida.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
+    }
+    return ['verified' => true, 'error' => '', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
+}
+
+function nammu_fediverse_private_message_activity(array $recipient, string $text, array $config): array
+{
+    $actorUrl = nammu_fediverse_actor_url($config);
+    $messageId = $actorUrl . '/messages/' . substr(sha1($recipient['id'] . '|' . $text . '|' . microtime(true) . '|' . random_int(0, PHP_INT_MAX)), 0, 24);
+    $published = gmdate(DATE_ATOM);
+    $content = nl2br(htmlspecialchars(trim($text), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+    return [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => $messageId . '/activity',
+        'type' => 'Create',
+        'actor' => $actorUrl,
+        'to' => [(string) ($recipient['id'] ?? '')],
+        'object' => [
+            'id' => $messageId,
+            'type' => 'Note',
+            'attributedTo' => $actorUrl,
+            'to' => [(string) ($recipient['id'] ?? '')],
+            'content' => $content,
+            'published' => $published,
+        ],
+    ];
+}
+
+function nammu_fediverse_send_private_message(string $recipientId, string $text, array $config): array
+{
+    $recipientId = trim($recipientId);
+    $plainText = trim($text);
+    if ($recipientId === '' || $plainText === '') {
+        return ['ok' => false, 'message' => 'Falta el destinatario o el texto del mensaje.'];
+    }
+    $recipients = nammu_fediverse_message_recipients();
+    $recipient = $recipients[$recipientId] ?? null;
+    if (!is_array($recipient)) {
+        $recipient = nammu_fediverse_resolve_actor($recipientId, $config);
+    }
+    if (!is_array($recipient)) {
+        return ['ok' => false, 'message' => 'No se pudo resolver el destinatario.'];
+    }
+    $inboxUrl = nammu_fediverse_remote_inbox_for_actor($recipient);
+    if ($inboxUrl === '') {
+        return ['ok' => false, 'message' => 'Ese actor no expone un inbox usable.'];
+    }
+    $activity = nammu_fediverse_private_message_activity($recipient, $plainText, $config);
+    $messageRecord = [
+        'id' => (string) ($activity['object']['id'] ?? ''),
+        'activity_id' => (string) ($activity['id'] ?? ''),
+        'actor_id' => (string) ($recipient['id'] ?? ''),
+        'actor_name' => trim((string) (($recipient['name'] ?? '') ?: ($recipient['preferredUsername'] ?? ''))),
+        'direction' => 'outgoing',
+        'content' => $plainText,
+        'published' => (string) ($activity['object']['published'] ?? gmdate(DATE_ATOM)),
+        'url' => '',
+        'delivery_status' => 'pending',
+    ];
+    if (!nammu_fediverse_post_activity($inboxUrl, $activity, $config)) {
+        $messageRecord['delivery_status'] = 'failed';
+        nammu_fediverse_store_message($messageRecord);
+        return ['ok' => false, 'message' => 'No se pudo entregar el mensaje privado.'];
+    }
+    $messageRecord['delivery_status'] = 'delivered';
+    nammu_fediverse_store_message($messageRecord);
+    return ['ok' => true, 'message' => 'Mensaje privado enviado.'];
 }
 
 function nammu_fediverse_accept_follow(array $payload, array $config): bool
@@ -980,24 +1296,52 @@ function nammu_fediverse_accept_follow(array $payload, array $config): bool
     return nammu_fediverse_post_activity($inboxUrl, $activity, $config);
 }
 
-function nammu_fediverse_handle_inbox_payload(array $payload, array $config): array
+function nammu_fediverse_handle_inbox_payload(array $payload, array $config, array $headers = [], string $rawBody = ''): array
 {
-    nammu_fediverse_store_inbox_activity($payload);
+    $verification = nammu_fediverse_verify_inbox_request($payload, $headers, $rawBody, $config);
+    nammu_fediverse_store_inbox_activity($payload, [
+        'verified' => !empty($verification['verified']),
+        'verification_error' => (string) ($verification['error'] ?? ''),
+        'signature_key_id' => (string) ($verification['key_id'] ?? ''),
+        'signed_headers' => (string) ($verification['signed_headers'] ?? ''),
+    ]);
+    if (empty($verification['verified'])) {
+        return ['accepted' => false, 'type' => 'unauthorized', 'verified' => false, 'error' => (string) ($verification['error'] ?? '')];
+    }
     $type = strtolower((string) ($payload['type'] ?? ''));
     $actorId = trim((string) ($payload['actor'] ?? ''));
     $accepted = false;
     if ($type === 'follow' && $actorId !== '') {
         $accepted = nammu_fediverse_accept_follow($payload, $config);
-        return ['accepted' => $accepted, 'type' => 'follow'];
+        return ['accepted' => $accepted, 'type' => 'follow', 'verified' => true];
     }
     if ($type === 'undo' && is_array($payload['object'] ?? null)) {
         $object = $payload['object'];
         if (strtolower((string) ($object['type'] ?? '')) === 'follow' && $actorId !== '') {
             nammu_fediverse_followers_remove($actorId);
-            return ['accepted' => true, 'type' => 'undo'];
+            return ['accepted' => true, 'type' => 'undo', 'verified' => true];
         }
     }
-    return ['accepted' => true, 'type' => $type !== '' ? $type : 'unknown'];
+    if ($type === 'create' && is_array($payload['object'] ?? null)) {
+        $object = $payload['object'];
+        if ($actorId !== '' && nammu_fediverse_is_direct_message_activity($payload, $config)) {
+            $remoteActor = nammu_fediverse_resolve_actor($actorId, $config);
+            nammu_fediverse_store_message([
+                'id' => trim((string) (($object['id'] ?? '') ?: ($payload['id'] ?? sha1(json_encode($payload))))),
+                'activity_id' => trim((string) ($payload['id'] ?? '')),
+                'actor_id' => $actorId,
+                'actor_name' => trim((string) (($remoteActor['name'] ?? '') ?: ($remoteActor['preferredUsername'] ?? '') ?: $actorId)),
+                'direction' => 'incoming',
+                'content' => trim(strip_tags((string) ($object['content'] ?? ''))),
+                'published' => trim((string) (($object['published'] ?? '') ?: ($payload['published'] ?? gmdate(DATE_ATOM)))),
+                'url' => trim((string) ($object['url'] ?? '')),
+                'delivery_status' => 'received',
+                'verified' => true,
+            ]);
+            return ['accepted' => true, 'type' => 'message', 'verified' => true];
+        }
+    }
+    return ['accepted' => true, 'type' => $type !== '' ? $type : 'unknown', 'verified' => true];
 }
 
 function nammu_fediverse_should_deliver_item_to_follower(array $item, array $follower, array $deliveryState): bool

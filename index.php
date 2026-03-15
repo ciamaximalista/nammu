@@ -711,15 +711,16 @@ if ($routePath === '/ap/inbox') {
         header('Allow: POST');
         exit;
     }
-    $payload = json_decode((string) file_get_contents('php://input'), true);
+    $rawInboxBody = (string) file_get_contents('php://input');
+    $payload = json_decode($rawInboxBody, true);
     if (!is_array($payload)) {
         http_response_code(400);
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['error' => 'invalid_json'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         exit;
     }
-    $result = nammu_fediverse_handle_inbox_payload($payload, $configData);
-    http_response_code(202);
+    $result = nammu_fediverse_handle_inbox_payload($payload, $configData, nammu_fediverse_request_headers(), $rawInboxBody);
+    http_response_code(!empty($result['accepted']) ? 202 : 401);
     header('Content-Type: application/activity+json; charset=UTF-8');
     echo json_encode(['status' => 'accepted', 'result' => $result], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;

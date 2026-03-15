@@ -10254,6 +10254,8 @@ $socialBroadcastActuality = false;
 $socialBroadcastNetworks = [];
 $fediverseFeedback = null;
 $fediverseActorInput = '';
+$fediverseMessageRecipient = '';
+$fediverseMessageText = '';
 $notesFeedback = $_SESSION['notes_feedback'] ?? null;
 if ($notesFeedback !== null) {
     unset($_SESSION['notes_feedback']);
@@ -10293,6 +10295,20 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => 'info',
             'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '.',
         ];
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_fediverse_message'])) {
+        $recipientId = trim((string) ($_POST['fediverse_message_recipient'] ?? ''));
+        $messageText = trim((string) ($_POST['fediverse_message_text'] ?? ''));
+        $fediverseMessageRecipient = $recipientId;
+        $fediverseMessageText = $messageText;
+        $config = load_config_file();
+        $result = nammu_fediverse_send_private_message($recipientId, $messageText, $config);
+        $fediverseFeedback = [
+            'type' => !empty($result['ok']) ? 'success' : 'danger',
+            'message' => (string) ($result['message'] ?? ''),
+        ];
+        if (!empty($result['ok'])) {
+            $fediverseMessageText = '';
+        }
     }
 }
 $isItineraryAdminPage = in_array($page, ['itinerarios', 'itinerario', 'itinerario-tema'], true);

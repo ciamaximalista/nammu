@@ -10,10 +10,11 @@
     $fediverseFollowing = nammu_fediverse_following_store()['actors'];
     $fediverseTimeline = nammu_fediverse_timeline_store()['items'];
     $fediverseFollowers = function_exists('nammu_fediverse_followers_store') ? nammu_fediverse_followers_store()['followers'] : [];
-    $fediverseInboxStore = function_exists('nammu_fediverse_load_json_store')
-        ? nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []])
-        : ['activities' => []];
-    $fediverseNotifications = array_values(array_reverse(is_array($fediverseInboxStore['activities'] ?? null) ? $fediverseInboxStore['activities'] : []));
+    $fediverseRecipients = function_exists('nammu_fediverse_message_recipients') ? nammu_fediverse_message_recipients() : [];
+    $fediverseMessages = function_exists('nammu_fediverse_grouped_messages') ? nammu_fediverse_grouped_messages() : [];
+    $fediverseNotifications = function_exists('nammu_fediverse_notification_entries')
+        ? nammu_fediverse_notification_entries($fediverseConfig)
+        : [];
     $fediverseTab = strtolower(trim((string) ($_GET['tab'] ?? 'home')));
     if (!in_array($fediverseTab, ['home', 'notifications', 'messages', 'settings'], true)) {
         $fediverseTab = 'home';
@@ -34,6 +35,7 @@
             'follow' => 'Nuevo seguidor',
             'undo' => 'Dejó de seguir',
             'accept' => 'Accept recibido',
+            'message' => 'Mensaje privado',
             'create' => 'Actividad remota',
             default => $type !== '' ? ucfirst($type) : 'Notificación',
         };
@@ -130,6 +132,20 @@
                                             <?php if ($actorValue !== ''): ?>
                                                 <div class="small text-muted mt-1"><?= htmlspecialchars($actorValue, ENT_QUOTES, 'UTF-8') ?></div>
                                             <?php endif; ?>
+                                            <?php if (array_key_exists('verified', $entry)): ?>
+                                                <div class="small mt-1 <?= !empty($entry['verified']) ? 'text-success' : 'text-danger' ?>">
+                                                    <?= !empty($entry['verified']) ? 'Firma verificada' : 'Firma no verificada' ?>
+                                                    <?php if (empty($entry['verified']) && !empty($entry['verification_error'])): ?>
+                                                        · <?= htmlspecialchars((string) $entry['verification_error'], ENT_QUOTES, 'UTF-8') ?>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <?php if (!empty($entry['signature_key_id'])): ?>
+                                                    <div class="small text-muted mt-1">keyId: <?= htmlspecialchars((string) $entry['signature_key_id'], ENT_QUOTES, 'UTF-8') ?></div>
+                                                <?php endif; ?>
+                                                <?php if (!empty($entry['signed_headers'])): ?>
+                                                    <div class="small text-muted mt-1">headers: <?= htmlspecialchars((string) $entry['signed_headers'], ENT_QUOTES, 'UTF-8') ?></div>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
                                         </div>
                                         <small class="text-muted"><?= htmlspecialchars((string) ($entry['received_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small>
                                     </div>
@@ -141,13 +157,89 @@
             </div>
 
         <?php elseif ($fediverseTab === 'messages'): ?>
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h3 class="h5 mb-3">Enviar mensaje privado</h3>
+                    <?php if (empty($fediverseRecipients)): ?>
+                        <div class="alert alert-secondary mb-0">Necesitas al menos un actor seguido o un seguidor federado para poder enviar mensajes privados.</div>
+                    <?php else: ?>
+                        <form method="post">
+                            <input type="hidden" name="fediverse_tab" value="messages">
+                            <div class="form-group">
+                                <label for="fediverse_message_recipient">Destinatario</label>
+                                <select name="fediverse_message_recipient" id="fediverse_message_recipient" class="form-control">
+                                    <?php foreach ($fediverseRecipients as $recipient): ?>
+                                        <?php $recipientId = (string) ($recipient['id'] ?? ''); ?>
+                                        <?php
+                                        $recipientLabel = (string) (($recipient['name'] ?? '') ?: ($recipient['preferredUsername'] ?? $recipientId));
+                                        $recipientMeta = [];
+                                        if (!empty($recipient['followed_at'])) {
+                                            $recipientMeta[] = 'seguido';
+                                        }
+                                        if (!empty($recipient['followed_at']) && !empty($recipient['inbox']) && !empty($recipient['sharedInbox'])) {
+                                            $recipientMeta[] = 'seguido';
+                                        }
+                                        $isFollower = false;
+                                        foreach ($fediverseFollowers as $followerItem) {
+                                            if ((string) ($followerItem['id'] ?? '') === $recipientId) {
+                                                $isFollower = true;
+                                                break;
+                                            }
+                                        }
+                                        if ($isFollower) {
+                                            $recipientMeta[] = 'seguidor';
+                                        }
+                                        $recipientSuffix = empty($recipientMeta) ? '' : ' (' . implode(', ', array_unique($recipientMeta)) . ')';
+                                        ?>
+                                        <option value="<?= htmlspecialchars($recipientId, ENT_QUOTES, 'UTF-8') ?>" <?= ($fediverseMessageRecipient ?? '') === $recipientId ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($recipientLabel . $recipientSuffix, ENT_QUOTES, 'UTF-8') ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="fediverse_message_text">Mensaje</label>
+                                <textarea name="fediverse_message_text" id="fediverse_message_text" class="form-control" rows="6" placeholder="Escribe aquí el mensaje privado."><?= htmlspecialchars($fediverseMessageText ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
+                            </div>
+                            <button type="submit" name="send_fediverse_message" class="btn btn-primary">Enviar mensaje</button>
+                        </form>
+                    <?php endif; ?>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="card-body">
-                    <h3 class="h5 mb-3">Mensajes privados</h3>
-                    <p class="text-muted">Aquí irá la mensajería privada con otros actores del Fediverso. La estructura queda ya preparada como subpestaña independiente para no mezclarla con el timeline público.</p>
-                    <div class="alert alert-secondary mb-0">
-                        Próximo paso previsto: selector de destinatario, redacción del mensaje, bandeja de entrada privada y conversaciones.
-                    </div>
+                    <h3 class="h5 mb-3">Conversaciones</h3>
+                    <?php if (empty($fediverseMessages)): ?>
+                        <p class="text-muted mb-0">Todavía no hay conversaciones guardadas.</p>
+                    <?php else: ?>
+                        <?php foreach ($fediverseMessages as $actorId => $messages): ?>
+                            <?php $firstMessage = $messages[0] ?? []; ?>
+                            <div class="border rounded p-3 mb-4">
+                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                                    <div>
+                                        <strong><?= htmlspecialchars((string) (($firstMessage['actor_name'] ?? '') ?: $actorId), ENT_QUOTES, 'UTF-8') ?></strong>
+                                        <div class="small text-muted mt-1"><?= htmlspecialchars((string) $actorId, ENT_QUOTES, 'UTF-8') ?></div>
+                                    </div>
+                                </div>
+                                <?php foreach (array_reverse($messages) as $message): ?>
+                                    <?php $isOutgoing = (($message['direction'] ?? '') === 'outgoing'); ?>
+                                    <div class="mb-3 p-3 rounded" style="background: <?= $isOutgoing ? '#eef6ff' : '#f7f7f7' ?>; border-left: 4px solid <?= $isOutgoing ? '#1b8eed' : '#999' ?>;">
+                                        <div class="small text-muted mb-2">
+                                            <?= $isOutgoing ? 'Enviado' : 'Recibido' ?> · <?= htmlspecialchars((string) ($message['published'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                                            <?php if (!empty($message['delivery_status'])): ?>
+                                                · <?= htmlspecialchars((string) ($message['delivery_status'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                                            <?php endif; ?>
+                                            <?php if (!$isOutgoing && array_key_exists('verified', $message)): ?>
+                                                · <?= !empty($message['verified']) ? 'verificado' : 'no verificado' ?>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div><?= nl2br(htmlspecialchars((string) ($message['content'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </div>
 

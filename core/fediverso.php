@@ -812,36 +812,97 @@ function nammu_fediverse_follow_actor(string $input): array
     if (!is_array($actor) || trim((string) ($actor['id'] ?? '')) === '') {
         return ['ok' => false, 'message' => 'No se pudo descubrir ese actor ActivityPub.'];
     }
+    $actorId = trim((string) ($actor['id'] ?? ''));
+    $inboxUrl = nammu_fediverse_remote_inbox_for_actor($actor);
+    if ($inboxUrl === '') {
+        return ['ok' => false, 'message' => 'Ese actor no expone un inbox usable.'];
+    }
+    $actorUrl = nammu_fediverse_actor_url($config);
+    $followActivityId = $actorUrl . '/follows/' . substr(sha1($actorId . '|' . microtime(true) . '|' . random_int(0, PHP_INT_MAX)), 0, 24);
+    $followActivity = [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => $followActivityId,
+        'type' => 'Follow',
+        'actor' => $actorUrl,
+        'object' => $actorId,
+        'to' => [$actorId],
+        'published' => gmdate(DATE_ATOM),
+    ];
+
     $store = nammu_fediverse_following_store();
     $actors = $store['actors'];
     foreach ($actors as &$existing) {
-        if ((string) ($existing['id'] ?? '') !== (string) $actor['id']) {
+        if ((string) ($existing['id'] ?? '') !== $actorId) {
             continue;
         }
-        $existing = array_merge($existing, $actor, ['followed_at' => $existing['followed_at'] ?? gmdate(DATE_ATOM)]);
+        $existingFollowId = trim((string) ($existing['follow_activity_id'] ?? ''));
+        if ($existingFollowId === '') {
+            $delivery = nammu_fediverse_post_activity_response($inboxUrl, $followActivity, $config);
+            if (empty($delivery['ok'])) {
+                return ['ok' => false, 'message' => 'No se pudo enviar el seguimiento. ' . trim((string) ($delivery['message'] ?? ''))];
+            }
+            $existingFollowId = $followActivityId;
+        }
+        $existing = array_merge($existing, $actor, [
+            'followed_at' => $existing['followed_at'] ?? gmdate(DATE_ATOM),
+            'follow_activity_id' => $existingFollowId,
+            'last_error' => '',
+        ]);
         nammu_fediverse_save_following_store($actors);
         return ['ok' => true, 'message' => 'Ese actor ya estaba seguido y se ha actualizado su ficha.'];
     }
     unset($existing);
+
+    $delivery = nammu_fediverse_post_activity_response($inboxUrl, $followActivity, $config);
+    if (empty($delivery['ok'])) {
+        return ['ok' => false, 'message' => 'No se pudo enviar el seguimiento. ' . trim((string) ($delivery['message'] ?? ''))];
+    }
+
     $actor['followed_at'] = gmdate(DATE_ATOM);
+    $actor['follow_activity_id'] = $followActivityId;
     $actor['last_checked_at'] = '';
     $actor['last_error'] = '';
     $actors[] = $actor;
     nammu_fediverse_save_following_store($actors);
-    return ['ok' => true, 'message' => 'Actor añadido al Fediverso.'];
+    return ['ok' => true, 'message' => 'Actor seguido correctamente en el Fediverso.'];
 }
 
 function nammu_fediverse_unfollow_actor(string $actorId): bool
 {
+    $config = function_exists('nammu_load_config') ? nammu_load_config() : [];
     $actors = nammu_fediverse_following_store()['actors'];
     $before = count($actors);
-    $actors = array_values(array_filter($actors, static function (array $actor) use ($actorId): bool {
-        return (string) ($actor['id'] ?? '') !== $actorId;
-    }));
-    if ($before === count($actors)) {
+    $remaining = [];
+    foreach ($actors as $actor) {
+        if ((string) ($actor['id'] ?? '') !== $actorId) {
+            $remaining[] = $actor;
+            continue;
+        }
+        $inboxUrl = nammu_fediverse_remote_inbox_for_actor($actor);
+        $followActivityId = trim((string) ($actor['follow_activity_id'] ?? ''));
+        if ($inboxUrl !== '' && $followActivityId !== '') {
+            $localActorUrl = nammu_fediverse_actor_url($config);
+            $undoActivity = [
+                '@context' => 'https://www.w3.org/ns/activitystreams',
+                'id' => $localActorUrl . '/undo/' . substr(sha1($followActivityId . '|' . microtime(true) . '|' . random_int(0, PHP_INT_MAX)), 0, 24),
+                'type' => 'Undo',
+                'actor' => $localActorUrl,
+                'object' => [
+                    'id' => $followActivityId,
+                    'type' => 'Follow',
+                    'actor' => $localActorUrl,
+                    'object' => $actorId,
+                ],
+                'to' => [$actorId],
+                'published' => gmdate(DATE_ATOM),
+            ];
+            nammu_fediverse_post_activity($inboxUrl, $undoActivity, $config);
+        }
+    }
+    if ($before === count($remaining)) {
         return false;
     }
-    nammu_fediverse_save_following_store($actors);
+    nammu_fediverse_save_following_store($remaining);
     return true;
 }
 

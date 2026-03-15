@@ -341,6 +341,65 @@ function nammu_fediverse_fetch_json(string $url, string $accept = 'application/a
     return is_array($decoded) ? $decoded : null;
 }
 
+function nammu_fediverse_extract_url($value): string
+{
+    if (is_string($value)) {
+        return trim($value);
+    }
+    if (!is_array($value)) {
+        return '';
+    }
+    foreach (['url', 'href', 'src'] as $key) {
+        if (array_key_exists($key, $value)) {
+            $resolved = nammu_fediverse_extract_url($value[$key]);
+            if ($resolved !== '') {
+                return $resolved;
+            }
+        }
+    }
+    foreach ($value as $candidate) {
+        $resolved = nammu_fediverse_extract_url($candidate);
+        if ($resolved !== '') {
+            return $resolved;
+        }
+    }
+    return '';
+}
+
+function nammu_fediverse_extract_actor_icon(array $actor): string
+{
+    foreach (['icon', 'image'] as $field) {
+        if (!array_key_exists($field, $actor)) {
+            continue;
+        }
+        $resolved = nammu_fediverse_extract_url($actor[$field]);
+        if ($resolved !== '') {
+            return $resolved;
+        }
+    }
+    return '';
+}
+
+function nammu_fediverse_parse_digest_value(string $header): array
+{
+    $header = trim($header);
+    if ($header === '') {
+        return ['', ''];
+    }
+    foreach (preg_split('/\s*,\s*/', $header) ?: [] as $part) {
+        if (!str_contains($part, '=')) {
+            continue;
+        }
+        [$algo, $value] = explode('=', $part, 2);
+        $algo = strtolower(trim($algo));
+        $value = trim($value);
+        if ($algo !== '' && $value !== '') {
+            return [$algo, $value];
+        }
+    }
+    return ['', ''];
+}
+
 function nammu_fediverse_request_headers(): array
 {
     $headers = [];
@@ -427,9 +486,11 @@ function nammu_fediverse_resolve_actor(string $input, ?array $config = null): ?a
             'sharedInbox' => $sharedInbox,
             'outbox' => (string) ($actor['outbox'] ?? ''),
             'url' => (string) ($actor['url'] ?? ($actor['id'] ?? $trimmed)),
-            'icon' => is_array($actor['icon'] ?? null) ? (string) (($actor['icon']['url'] ?? '') ?: '') : '',
+            'icon' => nammu_fediverse_extract_actor_icon($actor),
             'public_key_id' => is_array($actor['publicKey'] ?? null) ? (string) (($actor['publicKey']['id'] ?? '') ?: '') : '',
-            'public_key_pem' => is_array($actor['publicKey'] ?? null) ? (string) (($actor['publicKey']['publicKeyPem'] ?? '') ?: '') : '',
+            'public_key_pem' => is_array($actor['publicKey'] ?? null)
+                ? (string) (($actor['publicKey']['publicKeyPem'] ?? '') ?: '')
+                : trim((string) ($actor['publicKeyPem'] ?? '')),
         ];
     }
 
@@ -594,38 +655,23 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?
     if ($id === '') {
         return null;
     }
-    $url = '';
-    if (is_string($object['url'] ?? null)) {
-        $url = trim((string) $object['url']);
-    } elseif (is_array($object['url'] ?? null)) {
-        foreach ((array) $object['url'] as $candidate) {
-            if (is_string($candidate) && trim($candidate) !== '') {
-                $url = trim($candidate);
-                break;
-            }
-            if (is_array($candidate) && trim((string) ($candidate['href'] ?? '')) !== '') {
-                $url = trim((string) $candidate['href']);
-                break;
-            }
-        }
-    }
+    $url = nammu_fediverse_extract_url($object['url'] ?? '');
     $published = trim((string) (($object['published'] ?? '') ?: ($activity['published'] ?? '')));
     $content = trim((string) (($object['content'] ?? '') ?: ($object['summary'] ?? '')));
     $contentHtml = trim((string) ($object['content'] ?? ''));
     $name = trim((string) (($object['name'] ?? '') ?: ''));
-    $image = '';
-    if (is_array($object['image'] ?? null)) {
-        $image = trim((string) (($object['image']['url'] ?? '') ?: ''));
-    } elseif (is_string($object['image'] ?? null)) {
-        $image = trim((string) $object['image']);
-    }
+    $image = nammu_fediverse_extract_url($object['image'] ?? '');
     $attachments = [];
-    foreach ((array) ($object['attachment'] ?? []) as $attachment) {
+    $attachmentList = $object['attachment'] ?? [];
+    if (is_array($attachmentList) && array_key_exists('type', $attachmentList)) {
+        $attachmentList = [$attachmentList];
+    }
+    foreach ((array) $attachmentList as $attachment) {
         if (!is_array($attachment)) {
             continue;
         }
         $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
-        $attachmentUrl = trim((string) ($attachment['url'] ?? ''));
+        $attachmentUrl = nammu_fediverse_extract_url($attachment['url'] ?? ($attachment['href'] ?? ''));
         if ($attachmentUrl === '') {
             continue;
         }
@@ -633,7 +679,7 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?
             'type' => $attachmentType !== '' ? $attachmentType : 'document',
             'url' => $attachmentUrl,
             'name' => trim((string) ($attachment['name'] ?? '')),
-            'media_type' => trim((string) ($attachment['mediaType'] ?? '')),
+            'media_type' => trim((string) (($attachment['mediaType'] ?? '') ?: ($attachment['mimeType'] ?? ''))),
         ];
     }
     if ($image !== '' && empty($attachments)) {
@@ -1221,12 +1267,19 @@ function nammu_fediverse_verify_inbox_request(array $payload, array $headers, st
         return ['verified' => false, 'error' => 'La cabecera Signature no contiene firma.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
     }
     if ($rawBody !== '') {
-        $digestHeader = trim((string) ($headers['digest'] ?? ''));
+        $digestHeader = trim((string) (($headers['digest'] ?? '') ?: ($headers['content-digest'] ?? '')));
         if ($digestHeader === '') {
             return ['verified' => false, 'error' => 'Falta la cabecera Digest.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
         }
-        $expectedDigest = nammu_fediverse_digest_header($rawBody);
-        if (!hash_equals($expectedDigest, $digestHeader)) {
+        [$digestAlgo, $digestValue] = nammu_fediverse_parse_digest_value($digestHeader);
+        $expectedDigest = base64_encode(hash('sha256', $rawBody, true));
+        $digestMatches = false;
+        if (($digestAlgo === 'sha-256' || $digestAlgo === 'sha256') && $digestValue !== '') {
+            $digestMatches = hash_equals($expectedDigest, $digestValue);
+        } elseif (hash_equals(nammu_fediverse_digest_header($rawBody), $digestHeader)) {
+            $digestMatches = true;
+        }
+        if (!$digestMatches) {
             return ['verified' => false, 'error' => 'Digest inválido.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
         }
     }
@@ -1243,7 +1296,19 @@ function nammu_fediverse_verify_inbox_request(array $payload, array $headers, st
     $publicKeyPem = trim((string) ($actor['public_key_pem'] ?? ''));
     $publicKeyId = trim((string) ($actor['public_key_id'] ?? ''));
     if ($keyId !== '' && $publicKeyId !== '' && $keyId !== $publicKeyId) {
-        return ['verified' => false, 'error' => 'El keyId de la firma no coincide con la clave pública del actor remoto.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
+        $keyDocument = nammu_fediverse_fetch_json($keyId);
+        if (is_array($keyDocument)) {
+            $fetchedPem = trim((string) (($keyDocument['publicKeyPem'] ?? '') ?: ''));
+            $fetchedOwner = trim((string) (($keyDocument['owner'] ?? '') ?: ($keyDocument['id'] ?? '')));
+            if ($fetchedPem !== '' && ($fetchedOwner === '' || $fetchedOwner === $actorId || $fetchedOwner === $keyId)) {
+                $publicKeyPem = $fetchedPem;
+                $publicKeyId = $keyId;
+            } else {
+                return ['verified' => false, 'error' => 'El keyId de la firma no coincide con la clave pública del actor remoto.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
+            }
+        } else {
+            return ['verified' => false, 'error' => 'El keyId de la firma no coincide con la clave pública del actor remoto.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
+        }
     }
     if ($publicKeyPem === '') {
         return ['verified' => false, 'error' => 'No se pudo obtener la clave pública del actor remoto.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];

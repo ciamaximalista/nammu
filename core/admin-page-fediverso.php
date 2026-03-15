@@ -48,6 +48,32 @@
             $fediverseActorsById[$fediverseKnownActorId] = $fediverseKnownActor;
         }
     }
+    $fediverseTimelineDisplay = [];
+    foreach ($fediverseTimeline as $fediverseTimelineItem) {
+        $fediverseTimelineActorId = trim((string) ($fediverseTimelineItem['actor_id'] ?? ''));
+        $fediverseTimelineActor = $fediverseTimelineActorId !== '' ? ($fediverseActorsById[$fediverseTimelineActorId] ?? null) : null;
+        if (!is_array($fediverseTimelineActor) && $fediverseTimelineActorId !== '' && function_exists('nammu_fediverse_resolve_actor')) {
+            $fediverseTimelineActor = nammu_fediverse_resolve_actor($fediverseTimelineActorId, $fediverseConfig);
+            if (is_array($fediverseTimelineActor)) {
+                $fediverseActorsById[$fediverseTimelineActorId] = $fediverseTimelineActor;
+            }
+        }
+        if (is_array($fediverseTimelineActor)) {
+            if (trim((string) ($fediverseTimelineItem['actor_name'] ?? '')) === '') {
+                $fediverseTimelineItem['actor_name'] = trim((string) (($fediverseTimelineActor['name'] ?? '') ?: ($fediverseTimelineActor['preferredUsername'] ?? '')));
+            }
+            if (trim((string) ($fediverseTimelineItem['actor_username'] ?? '')) === '') {
+                $fediverseTimelineItem['actor_username'] = trim((string) ($fediverseTimelineActor['preferredUsername'] ?? ''));
+            }
+            if (trim((string) ($fediverseTimelineItem['actor_icon'] ?? '')) === '') {
+                $fediverseTimelineItem['actor_icon'] = trim((string) ($fediverseTimelineActor['icon'] ?? ''));
+            }
+            if (trim((string) ($fediverseTimelineItem['actor_url'] ?? '')) === '') {
+                $fediverseTimelineItem['actor_url'] = trim((string) (($fediverseTimelineActor['url'] ?? '') ?: ($fediverseTimelineActor['id'] ?? '')));
+            }
+        }
+        $fediverseTimelineDisplay[] = $fediverseTimelineItem;
+    }
     $sanitizeFediverseHtml = static function (string $html): string {
         $html = trim($html);
         if ($html === '') {
@@ -133,11 +159,11 @@
                             <button type="submit" name="refresh_fediverse_timeline" class="btn btn-outline-secondary btn-sm">Refrescar ahora</button>
                         </form>
                     </div>
-                    <?php if (empty($fediverseTimeline)): ?>
+                    <?php if (empty($fediverseTimelineDisplay)): ?>
                         <p class="text-muted mb-0">Aún no hay publicaciones remotas recibidas. Sigue actores en la pestaña de configuración y luego refresca.</p>
                     <?php else: ?>
                         <div class="fediverse-timeline">
-                            <?php foreach ($fediverseTimeline as $item): ?>
+                            <?php foreach ($fediverseTimelineDisplay as $item): ?>
                                 <article class="fediverse-status">
                                     <div class="fediverse-status__avatar">
                                         <?php if (!empty($item['actor_icon'])): ?>

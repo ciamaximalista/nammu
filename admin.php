@@ -10315,6 +10315,60 @@ if ($isLoggedIn && $page === 'fediverso') {
         if (!empty($result['ok'])) {
             $fediverseMessageText = '';
         }
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_like_item'])) {
+        $recipientId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
+        $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
+        $config = load_config_file();
+        $result = nammu_fediverse_send_like($recipientId, $objectUrl, $config);
+        $fediverseFeedback = [
+            'type' => !empty($result['ok']) ? 'success' : 'danger',
+            'message' => (string) ($result['message'] ?? ''),
+        ];
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_reply_item'])) {
+        $recipientId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
+        $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
+        $replyText = trim((string) ($_POST['fediverse_reply_text'] ?? ''));
+        $config = load_config_file();
+        $result = nammu_fediverse_send_reply($recipientId, $objectUrl, $replyText, $config);
+        $fediverseFeedback = [
+            'type' => !empty($result['ok']) ? 'success' : 'danger',
+            'message' => (string) ($result['message'] ?? ''),
+        ];
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_share_note'])) {
+        if (!function_exists('nammu_actuality_add_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
+            require_once __DIR__ . '/core/actualidad.php';
+        }
+        $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
+        $shareText = trim((string) ($_POST['fediverse_share_text'] ?? ''));
+        $shareTitle = trim((string) ($_POST['fediverse_object_title'] ?? ''));
+        $config = load_config_file();
+        $baseUrl = rtrim((string) (($config['site_url'] ?? '') ?: nammu_base_url()), '/');
+        $siteTitle = trim((string) (($config['site_name'] ?? '') ?: ''));
+        $siteDescription = trim((string) ($config['site_description'] ?? ''));
+        $siteLang = trim((string) ($config['site_lang'] ?? 'es'));
+        $noteText = $shareText !== '' ? $shareText : $shareTitle;
+        if ($objectUrl !== '' && !str_contains($noteText, $objectUrl)) {
+            $noteText = trim($noteText . "\n\n" . $objectUrl);
+        }
+        if ($noteText === '' || !function_exists('nammu_actuality_add_manual_item')) {
+            $fediverseFeedback = [
+                'type' => 'danger',
+                'message' => 'No se pudo crear la nota compartida.',
+            ];
+        } else {
+            nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle);
+            if (function_exists('nammu_actuality_rebuild_snapshot')) {
+                nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+            }
+            if (function_exists('nammu_fediverse_record_action')) {
+                nammu_fediverse_record_action('share', '', $objectUrl, ['share_text' => $shareText, 'title' => $shareTitle]);
+            }
+            $deliveryStats = nammu_fediverse_deliver_local_items($config);
+            $fediverseFeedback = [
+                'type' => 'success',
+                'message' => 'Nota compartida. Entregas federadas: ' . (int) ($deliveryStats['delivered'] ?? 0) . '.',
+            ];
+        }
     }
 }
 $isItineraryAdminPage = in_array($page, ['itinerarios', 'itinerario', 'itinerario-tema'], true);

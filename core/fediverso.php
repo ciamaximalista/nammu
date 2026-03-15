@@ -32,6 +32,11 @@ function nammu_fediverse_messages_file(): string
     return dirname(__DIR__) . '/config/fediverso-messages.json';
 }
 
+function nammu_fediverse_actions_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-actions.json';
+}
+
 function nammu_fediverse_keys_file(): string
 {
     return dirname(__DIR__) . '/config/activitypub-keys.json';
@@ -627,6 +632,78 @@ function nammu_fediverse_save_messages_store(array $items): void
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });
     nammu_fediverse_save_json_store(nammu_fediverse_messages_file(), ['items' => array_slice(array_values($items), 0, 500)]);
+}
+
+function nammu_fediverse_actions_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_actions_file(), ['items' => []]);
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    return ['items' => array_values($items)];
+}
+
+function nammu_fediverse_save_actions_store(array $items): void
+{
+    usort($items, static function (array $a, array $b): int {
+        return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
+    });
+    nammu_fediverse_save_json_store(nammu_fediverse_actions_file(), ['items' => array_slice(array_values($items), 0, 1000)]);
+}
+
+function nammu_fediverse_record_action(string $type, string $actorId, string $objectUrl, array $meta = []): void
+{
+    $type = strtolower(trim($type));
+    $actorId = trim($actorId);
+    $objectUrl = trim($objectUrl);
+    if ($type === '' || $objectUrl === '') {
+        return;
+    }
+    $items = nammu_fediverse_actions_store()['items'];
+    $record = [
+        'id' => substr(sha1($type . '|' . $actorId . '|' . $objectUrl . '|' . json_encode($meta) . '|' . microtime(true)), 0, 24),
+        'type' => $type,
+        'actor_id' => $actorId,
+        'object_url' => $objectUrl,
+        'published' => gmdate(DATE_ATOM),
+    ];
+    foreach ($meta as $key => $value) {
+        if (is_scalar($value) || $value === null) {
+            $record[(string) $key] = $value;
+        }
+    }
+    $items[] = $record;
+    nammu_fediverse_save_actions_store($items);
+}
+
+function nammu_fediverse_actions_by_object(): array
+{
+    $items = nammu_fediverse_actions_store()['items'];
+    $grouped = [];
+    foreach ($items as $item) {
+        $objectUrl = trim((string) ($item['object_url'] ?? ''));
+        if ($objectUrl === '') {
+            continue;
+        }
+        if (!isset($grouped[$objectUrl])) {
+            $grouped[$objectUrl] = [
+                'liked' => false,
+                'replied' => false,
+                'shared' => false,
+                'reply_count' => 0,
+                'share_count' => 0,
+            ];
+        }
+        $type = strtolower(trim((string) ($item['type'] ?? '')));
+        if ($type === 'like') {
+            $grouped[$objectUrl]['liked'] = true;
+        } elseif ($type === 'reply') {
+            $grouped[$objectUrl]['replied'] = true;
+            $grouped[$objectUrl]['reply_count']++;
+        } elseif ($type === 'share') {
+            $grouped[$objectUrl]['shared'] = true;
+            $grouped[$objectUrl]['share_count']++;
+        }
+    }
+    return $grouped;
 }
 
 function nammu_fediverse_follow_actor(string $input): array
@@ -1474,6 +1551,83 @@ function nammu_fediverse_send_private_message(string $recipientId, string $text,
     $messageRecord['delivery_status'] = 'delivered';
     nammu_fediverse_store_message($messageRecord);
     return ['ok' => true, 'message' => 'Mensaje privado enviado.'];
+}
+
+function nammu_fediverse_send_like(string $recipientId, string $objectUrl, array $config): array
+{
+    $recipientId = trim($recipientId);
+    $objectUrl = trim($objectUrl);
+    if ($recipientId === '' || $objectUrl === '') {
+        return ['ok' => false, 'message' => 'Falta el destinatario o la publicación a marcar como favorita.'];
+    }
+    $recipient = nammu_fediverse_resolve_actor($recipientId, $config);
+    if (!is_array($recipient)) {
+        return ['ok' => false, 'message' => 'No se pudo resolver el actor remoto.'];
+    }
+    $inboxUrl = nammu_fediverse_remote_inbox_for_actor($recipient);
+    if ($inboxUrl === '') {
+        return ['ok' => false, 'message' => 'Ese actor no expone un inbox usable.'];
+    }
+    $actorUrl = nammu_fediverse_actor_url($config);
+    $activity = [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => $actorUrl . '/likes/' . substr(sha1($recipientId . '|' . $objectUrl . '|' . microtime(true)), 0, 24),
+        'type' => 'Like',
+        'actor' => $actorUrl,
+        'object' => $objectUrl,
+        'to' => [$recipientId],
+        'published' => gmdate(DATE_ATOM),
+    ];
+    if (!nammu_fediverse_post_activity($inboxUrl, $activity, $config)) {
+        return ['ok' => false, 'message' => 'No se pudo enviar el favorito.'];
+    }
+    nammu_fediverse_record_action('like', $recipientId, $objectUrl);
+    return ['ok' => true, 'message' => 'Favorito enviado.'];
+}
+
+function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, string $text, array $config): array
+{
+    $recipientId = trim($recipientId);
+    $objectUrl = trim($objectUrl);
+    $plainText = trim($text);
+    if ($recipientId === '' || $objectUrl === '' || $plainText === '') {
+        return ['ok' => false, 'message' => 'Falta el destinatario, la publicación o el texto de la respuesta.'];
+    }
+    $recipient = nammu_fediverse_resolve_actor($recipientId, $config);
+    if (!is_array($recipient)) {
+        return ['ok' => false, 'message' => 'No se pudo resolver el actor remoto.'];
+    }
+    $inboxUrl = nammu_fediverse_remote_inbox_for_actor($recipient);
+    if ($inboxUrl === '') {
+        return ['ok' => false, 'message' => 'Ese actor no expone un inbox usable.'];
+    }
+    $actorUrl = nammu_fediverse_actor_url($config);
+    $noteId = $actorUrl . '/replies/' . substr(sha1($recipientId . '|' . $objectUrl . '|' . $plainText . '|' . microtime(true)), 0, 24);
+    $published = gmdate(DATE_ATOM);
+    $activity = [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => $noteId . '/activity',
+        'type' => 'Create',
+        'actor' => $actorUrl,
+        'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+        'cc' => [$recipientId],
+        'published' => $published,
+        'object' => [
+            'id' => $noteId,
+            'type' => 'Note',
+            'attributedTo' => $actorUrl,
+            'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+            'cc' => [$recipientId],
+            'content' => nl2br(htmlspecialchars($plainText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')),
+            'published' => $published,
+            'inReplyTo' => $objectUrl,
+        ],
+    ];
+    if (!nammu_fediverse_post_activity($inboxUrl, $activity, $config)) {
+        return ['ok' => false, 'message' => 'No se pudo enviar la respuesta.'];
+    }
+    nammu_fediverse_record_action('reply', $recipientId, $objectUrl, ['reply_text' => $plainText]);
+    return ['ok' => true, 'message' => 'Respuesta enviada.'];
 }
 
 function nammu_fediverse_accept_follow(array $payload, array $config): bool

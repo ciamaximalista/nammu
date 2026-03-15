@@ -48,6 +48,7 @@
             $fediverseActorsById[$fediverseKnownActorId] = $fediverseKnownActor;
         }
     }
+    $fediverseActionState = function_exists('nammu_fediverse_actions_by_object') ? nammu_fediverse_actions_by_object() : [];
     $fediverseTimelineDisplay = [];
     foreach ($fediverseTimeline as $fediverseTimelineItem) {
         $fediverseTimelineType = strtolower(trim((string) ($fediverseTimelineItem['type'] ?? '')));
@@ -200,6 +201,8 @@
                     <?php else: ?>
                         <div class="fediverse-timeline">
                             <?php foreach ($fediverseTimelineDisplay as $item): ?>
+                                <?php $itemObjectUrl = (string) (($item['url'] ?? '') ?: ($item['id'] ?? '')); ?>
+                                <?php $itemActionState = $fediverseActionState[$itemObjectUrl] ?? ['liked' => false, 'replied' => false, 'shared' => false, 'reply_count' => 0, 'share_count' => 0]; ?>
                                 <article class="fediverse-status">
                                     <div class="fediverse-status__avatar">
                                         <?php if (!empty($item['actor_icon'])): ?>
@@ -273,6 +276,41 @@
                                         <?php endif; ?>
                                         <div class="fediverse-status__footer">
                                             <a href="<?= htmlspecialchars((string) (($item['url'] ?? '') ?: ($item['id'] ?? '#')), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Abrir publicación</a>
+                                        </div>
+                                        <?php if (!empty($itemActionState['liked']) || !empty($itemActionState['replied']) || !empty($itemActionState['shared'])): ?>
+                                            <div class="fediverse-status__history">
+                                                <?php if (!empty($itemActionState['liked'])): ?><span>Favorito enviado</span><?php endif; ?>
+                                                <?php if (!empty($itemActionState['replied'])): ?><span><?= (int) ($itemActionState['reply_count'] ?? 0) ?> respuesta<?= ((int) ($itemActionState['reply_count'] ?? 0) === 1) ? '' : 's' ?></span><?php endif; ?>
+                                                <?php if (!empty($itemActionState['shared'])): ?><span><?= (int) ($itemActionState['share_count'] ?? 0) ?> reenvío<?= ((int) ($itemActionState['share_count'] ?? 0) === 1) ? '' : 's' ?> como nota</span><?php endif; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <div class="fediverse-status__actions">
+                                            <form method="post" class="mb-0">
+                                                <input type="hidden" name="fediverse_tab" value="home">
+                                                <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($item['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                <button type="submit" name="fediverse_like_item" class="btn btn-outline-secondary btn-sm"<?= !empty($itemActionState['liked']) ? ' disabled' : '' ?>><?= !empty($itemActionState['liked']) ? 'Favorito enviado' : 'Favorito' ?></button>
+                                            </form>
+                                            <details class="fediverse-inline-form">
+                                                <summary>Responder</summary>
+                                                <form method="post">
+                                                    <input type="hidden" name="fediverse_tab" value="home">
+                                                    <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($item['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                    <textarea name="fediverse_reply_text" class="form-control form-control-sm" rows="3" placeholder="Escribe tu respuesta"></textarea>
+                                                    <button type="submit" name="fediverse_reply_item" class="btn btn-primary btn-sm mt-2">Enviar respuesta</button>
+                                                </form>
+                                            </details>
+                                            <details class="fediverse-inline-form">
+                                                <summary>Reenviar como nota</summary>
+                                                <form method="post">
+                                                    <input type="hidden" name="fediverse_tab" value="home">
+                                                    <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="fediverse_object_title" value="<?= htmlspecialchars((string) ($item['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                    <textarea name="fediverse_share_text" class="form-control form-control-sm" rows="3" placeholder="Añade un comentario opcional para tu nota"><?= htmlspecialchars((string) ($item['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
+                                                    <button type="submit" name="fediverse_share_note" class="btn btn-primary btn-sm mt-2">Publicar nota</button>
+                                                </form>
+                                            </details>
                                         </div>
                                     </div>
                                 </article>
@@ -667,6 +705,50 @@
         }
         .fediverse-status__footer {
             margin-top: 0.85rem;
+        }
+        .fediverse-status__actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.65rem;
+            align-items: flex-start;
+            margin-top: 0.9rem;
+        }
+        .fediverse-status__history {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.7rem;
+            color: #607487;
+            font-size: 0.88rem;
+        }
+        .fediverse-status__history span {
+            padding: 0.2rem 0.55rem;
+            border-radius: 999px;
+            background: #edf4fb;
+        }
+        .fediverse-inline-form {
+            min-width: min(100%, 320px);
+        }
+        .fediverse-inline-form summary {
+            cursor: pointer;
+            color: #375b7d;
+            font-size: 0.92rem;
+            font-weight: 600;
+            list-style: none;
+        }
+        .fediverse-inline-form summary::-webkit-details-marker {
+            display: none;
+        }
+        .fediverse-inline-form[open] {
+            flex-basis: 100%;
+            max-width: 560px;
+            padding: 0.8rem 0.9rem;
+            border: 1px solid #d8e3ef;
+            border-radius: 12px;
+            background: #f8fbff;
+        }
+        .fediverse-inline-form form {
+            margin-top: 0.7rem;
         }
         .fediverse-notification {
             display: grid;

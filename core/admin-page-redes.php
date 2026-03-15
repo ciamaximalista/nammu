@@ -70,7 +70,7 @@
                                     <?php $guidanceMap = admin_social_broadcast_guidance(); ?>
                                     <?php foreach ($availableNetworks as $networkKey => $networkData): ?>
                                         <div class="form-check mb-3 social-network-option" data-limit="<?= (int) $networkData['limit'] ?>" data-guidance="<?= htmlspecialchars((string) ($networkData['guidance'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                            <input class="form-check-input" type="checkbox" name="social_networks[]" id="social_network_<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>">
+                                            <input class="form-check-input" type="checkbox" name="social_networks[]" id="social_network_<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>" <?= in_array($networkKey, $socialBroadcastNetworks ?? [], true) ? 'checked' : '' ?>>
                                             <label class="form-check-label d-block" for="social_network_<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>">
                                                 <strong><?= htmlspecialchars($networkData['label'], ENT_QUOTES, 'UTF-8') ?></strong><br>
                                                 <small class="text-muted"><?= htmlspecialchars((string) ($networkData['guidance'] ?? ($guidanceMap[$networkKey] ?? '')), ENT_QUOTES, 'UTF-8') ?></small>

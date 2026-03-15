@@ -10171,6 +10171,7 @@ $socialBroadcastFeedback = null;
 $socialBroadcastText = '';
 $socialBroadcastImage = '';
 $socialBroadcastActuality = false;
+$socialBroadcastNetworks = [];
 if ($isLoggedIn && $page === 'redes') {
     require_once __DIR__ . '/core/admin-redes.php';
     $socialBroadcastState = admin_handle_social_broadcast_request(get_settings());
@@ -10178,6 +10179,7 @@ if ($isLoggedIn && $page === 'redes') {
     $socialBroadcastText = (string) ($socialBroadcastState['message_text'] ?? '');
     $socialBroadcastImage = (string) ($socialBroadcastState['image'] ?? '');
     $socialBroadcastActuality = !empty($socialBroadcastState['actuality']);
+    $socialBroadcastNetworks = is_array($socialBroadcastState['networks'] ?? null) ? $socialBroadcastState['networks'] : [];
     $socialRssState = admin_handle_social_rss_settings_request(get_settings());
     $socialRssFeedback = $socialRssState['feedback'] ?? null;
     $socialRssFeedsRaw = (string) ($socialRssState['feeds_raw'] ?? '');

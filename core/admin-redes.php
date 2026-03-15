@@ -1204,6 +1204,7 @@ function admin_handle_social_broadcast_request(array $settings): array
         'message_text' => '',
         'image' => '',
         'actuality' => false,
+        'networks' => [],
     ];
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['send_social_broadcast'])) {
         return $result;
@@ -1216,6 +1217,7 @@ function admin_handle_social_broadcast_request(array $settings): array
     $result['message_text'] = $text;
     $result['image'] = $image;
     $result['actuality'] = $sendToActuality;
+    $result['networks'] = $selected;
     $available = admin_social_broadcast_available_networks($settings);
 
     if ($text === '') {
@@ -1294,6 +1296,8 @@ function admin_handle_social_broadcast_request(array $settings): array
         ];
         $result['message_text'] = '';
         $result['image'] = '';
+        $result['actuality'] = false;
+        $result['networks'] = [];
         return $result;
     }
     if (!empty($sent) && !empty($failed)) {

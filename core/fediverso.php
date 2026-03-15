@@ -397,6 +397,21 @@ function nammu_fediverse_extract_html_image_urls(string $html): array
     return $urls;
 }
 
+function nammu_fediverse_html_to_text(string $html): string
+{
+    $html = trim($html);
+    if ($html === '') {
+        return '';
+    }
+    $html = preg_replace('#<\s*br\s*/?\s*>#i', "\n", $html) ?? $html;
+    $html = preg_replace('#</\s*(p|div|blockquote|pre|li|ul|ol|h[1-6])\s*>#i', "\n", $html) ?? $html;
+    $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = preg_replace("/\r\n|\r/u", "\n", $text) ?? $text;
+    $text = preg_replace("/[ \t]+\n/u", "\n", $text) ?? $text;
+    $text = preg_replace("/\n{3,}/u", "\n\n", $text) ?? $text;
+    return trim($text);
+}
+
 function nammu_fediverse_parse_digest_value(string $header): array
 {
     $header = trim($header);
@@ -673,9 +688,10 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?
         return null;
     }
     $url = nammu_fediverse_extract_url($object['url'] ?? '');
-    $published = trim((string) (($object['published'] ?? '') ?: ($activity['published'] ?? '')));
-    $content = trim((string) (($object['content'] ?? '') ?: ($object['summary'] ?? '')));
     $contentHtml = trim((string) ($object['content'] ?? ''));
+    $published = trim((string) (($object['published'] ?? '') ?: ($activity['published'] ?? '')));
+    $summaryText = trim((string) ($object['summary'] ?? ''));
+    $content = $contentHtml !== '' ? nammu_fediverse_html_to_text($contentHtml) : $summaryText;
     $name = trim((string) (($object['name'] ?? '') ?: ''));
     $image = nammu_fediverse_extract_url($object['image'] ?? '');
     $attachments = [];
@@ -727,6 +743,9 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?
             'name' => '',
             'media_type' => '',
         ];
+    }
+    if ($content === '' && $name === '' && empty($attachments)) {
+        return null;
     }
     return [
         'id' => $id,
@@ -1128,6 +1147,27 @@ function nammu_fediverse_store_inbox_activity(array $payload, array $meta = []):
     nammu_fediverse_save_json_store(nammu_fediverse_inbox_file(), $store);
 }
 
+function nammu_fediverse_remove_timeline_items(array $identifiers): int
+{
+    $identifiers = array_values(array_filter(array_map(static function ($value): string {
+        return trim((string) $value);
+    }, $identifiers)));
+    if (empty($identifiers)) {
+        return 0;
+    }
+    $timeline = nammu_fediverse_timeline_store()['items'];
+    $before = count($timeline);
+    $timeline = array_values(array_filter($timeline, static function (array $item) use ($identifiers): bool {
+        $id = trim((string) ($item['id'] ?? ''));
+        $url = trim((string) ($item['url'] ?? ''));
+        return !in_array($id, $identifiers, true) && !in_array($url, $identifiers, true);
+    }));
+    if ($before !== count($timeline)) {
+        nammu_fediverse_save_timeline_store($timeline);
+    }
+    return $before - count($timeline);
+}
+
 function nammu_fediverse_followers_add_or_update(array $actor): void
 {
     $followers = nammu_fediverse_followers_store()['followers'];
@@ -1268,6 +1308,10 @@ function nammu_fediverse_notification_entries(array $config): array
     $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
     $filtered = array_values(array_filter($activities, static function (array $entry) use ($config): bool {
         $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        $type = strtolower(trim((string) ($payload['type'] ?? '')));
+        if ($type === 'delete') {
+            return false;
+        }
         return !nammu_fediverse_is_direct_message_activity($payload, $config);
     }));
     return array_values(array_reverse($filtered));
@@ -1477,6 +1521,21 @@ function nammu_fediverse_handle_inbox_payload(array $payload, array $config, arr
             nammu_fediverse_followers_remove($actorId);
             return ['accepted' => true, 'type' => 'undo', 'verified' => true];
         }
+    }
+    if ($type === 'delete') {
+        $object = $payload['object'] ?? null;
+        $targets = [];
+        if (is_string($object)) {
+            $targets[] = $object;
+        } elseif (is_array($object)) {
+            $targets[] = trim((string) (($object['id'] ?? '') ?: ''));
+            $targets[] = trim((string) (($object['url'] ?? '') ?: ''));
+            if (!empty($object['atomUri'])) {
+                $targets[] = trim((string) $object['atomUri']);
+            }
+        }
+        nammu_fediverse_remove_timeline_items($targets);
+        return ['accepted' => true, 'type' => 'delete', 'verified' => true];
     }
     if ($type === 'create' && is_array($payload['object'] ?? null)) {
         $object = $payload['object'];

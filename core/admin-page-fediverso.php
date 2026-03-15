@@ -50,6 +50,10 @@
     }
     $fediverseTimelineDisplay = [];
     foreach ($fediverseTimeline as $fediverseTimelineItem) {
+        $fediverseTimelineType = strtolower(trim((string) ($fediverseTimelineItem['type'] ?? '')));
+        if (in_array($fediverseTimelineType, ['announce', 'like', 'delete'], true)) {
+            continue;
+        }
         $fediverseTimelineActorId = trim((string) ($fediverseTimelineItem['actor_id'] ?? ''));
         $fediverseTimelineActor = $fediverseTimelineActorId !== '' ? ($fediverseActorsById[$fediverseTimelineActorId] ?? null) : null;
         if (!is_array($fediverseTimelineActor) && $fediverseTimelineActorId !== '' && function_exists('nammu_fediverse_resolve_actor')) {
@@ -91,7 +95,13 @@
                 'media_type' => 'image/*',
             ];
         }
+        if (trim((string) ($fediverseTimelineItem['content'] ?? '')) === '' && trim((string) ($fediverseTimelineItem['content_html'] ?? '')) !== '' && function_exists('nammu_fediverse_html_to_text')) {
+            $fediverseTimelineItem['content'] = nammu_fediverse_html_to_text((string) $fediverseTimelineItem['content_html']);
+        }
         $fediverseTimelineItem['attachments'] = $fediverseTimelineAttachments;
+        if (trim((string) ($fediverseTimelineItem['title'] ?? '')) === '' && trim((string) ($fediverseTimelineItem['content'] ?? '')) === '' && empty($fediverseTimelineAttachments)) {
+            continue;
+        }
         $fediverseTimelineDisplay[] = $fediverseTimelineItem;
     }
     $sanitizeFediverseHtml = static function (string $html): string {

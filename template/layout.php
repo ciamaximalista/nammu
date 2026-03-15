@@ -785,26 +785,6 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             text-decoration: none;
             filter: brightness(0.96);
         }
-        .floating-fediverse__help {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 30px;
-            padding: 0.35rem 0.6rem;
-            border-radius: 10px;
-            border: 1px solid rgba(0,0,0,0.08);
-            background: rgba(255,255,255,0.82);
-            color: <?= $colorAccent ?>;
-            font-size: 0.82rem;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .floating-fediverse__meta {
-            font-size: 0.8rem;
-            color: <?= $colorText ?>;
-            text-align: center;
-            word-break: break-word;
-        }
         .fediverse-follow-dialog {
             border: none;
             border-radius: 18px;
@@ -835,11 +815,14 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             margin: 0.4rem 0 0.8rem 0;
             padding: 0.75rem 0.85rem;
             border-radius: 12px;
-            background: <?= $colorHighlight ?>;
-            border: 1px solid rgba(0,0,0,0.08);
+            background: <?= $colorCodeBackground ?>;
+            border: 1px solid rgba(0,0,0,0.12);
+            color: <?= $colorCodeText ?>;
             font-weight: 700;
             text-align: center;
             word-break: break-word;
+            font-size: 1rem;
+            line-height: 1.45;
         }
         .fediverse-follow-dialog__actions {
             display: flex;
@@ -859,6 +842,12 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             text-decoration: none;
             font-weight: 600;
             cursor: pointer;
+        }
+        .fediverse-follow-dialog__actions button[data-fediverse-follow-copy] {
+            background: <?= $colorAccent ?>;
+            color: #fff;
+            border-color: <?= $colorAccent ?>;
+            font-weight: 700;
         }
         .fediverse-follow-dialog__actions a.fediverse-follow-dialog__primary {
             background: <?= $colorAccent ?>;
@@ -1536,21 +1525,18 @@ if (!empty($baseUrl)) {
         <div class="floating-stack">
             <?php if ($fediverseCtaUrl !== '' && $fediverseCtaHandle !== ''): ?>
                 <div class="floating-fediverse">
-                    <a class="floating-fediverse__button" href="<?= htmlspecialchars($fediverseCtaUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener me" title="Sigue esta cuenta en el Fediverso desde tu servidor">
+                    <button type="button" class="floating-fediverse__button" data-fediverse-follow-open title="Sigue esta cuenta en el Fediverso desde tu servidor">
                         Síguenos en el Fediverso
-                    </a>
-                    <button type="button" class="floating-fediverse__help" data-fediverse-follow-open>Cómo seguirnos</button>
-                    <div class="floating-fediverse__meta"><?= htmlspecialchars($fediverseCtaHandle, ENT_QUOTES, 'UTF-8') ?></div>
+                    </button>
                 </div>
                 <dialog class="fediverse-follow-dialog" data-fediverse-follow-dialog>
                     <div class="fediverse-follow-dialog__card">
                         <h2>Síguenos en el Fediverso</h2>
-                        <p>Abre tu servidor Mastodon, Akkoma o compatible, busca esta cuenta y síguela como a cualquier otro perfil.</p>
+                        <p>Abre tu servidor Mastodon, Akkoma o compatible, pon el siguiente nombre de cuenta en el buscador y síguela como a cualquier otro perfil.</p>
                         <code class="fediverse-follow-dialog__handle"><?= htmlspecialchars($fediverseCtaHandle, ENT_QUOTES, 'UTF-8') ?></code>
-                        <p>Si tu servidor no encuentra la cuenta enseguida, prueba a pegar el identificador completo o abre primero el actor público.</p>
+                        <p>Si tu servidor no encuentra la cuenta enseguida, prueba a pegar el identificador completo tal cual.</p>
                         <div class="fediverse-follow-dialog__actions">
                             <button type="button" data-fediverse-follow-copy>Copiar cuenta</button>
-                            <a class="fediverse-follow-dialog__primary" href="<?= htmlspecialchars($fediverseCtaUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener me">Abrir actor</a>
                             <button type="button" data-fediverse-follow-close>Cerrar</button>
                         </div>
                     </div>

@@ -34,13 +34,14 @@
         ? nammu_fediverse_notification_entries($fediverseConfig)
         : [];
     $fediverseTab = strtolower(trim((string) ($_GET['tab'] ?? 'home')));
-    if (!in_array($fediverseTab, ['home', 'notifications', 'messages', 'settings'], true)) {
+    if (!in_array($fediverseTab, ['home', 'notifications', 'messages', 'network', 'settings'], true)) {
         $fediverseTab = 'home';
     }
     $fediverseTabs = [
         'home' => 'Inicio',
         'notifications' => 'Notificaciones',
         'messages' => 'Mensajes',
+        'network' => 'Red',
         'settings' => 'Configuración',
     ];
     $fediverseTimelinePage = max(1, (int) ($_GET['timeline_page'] ?? 1));
@@ -861,35 +862,7 @@
                 </div>
             </div>
 
-        <?php elseif ($fediverseTab === 'settings'): ?>
-            <div class="card mb-4">
-                <div class="card-body">
-                    <h3 class="h5 mb-3">Actor del blog</h3>
-                    <div class="row">
-                        <div class="col-lg-6 mb-3">
-                            <label class="font-weight-bold d-block mb-1">Cuenta ActivityPub</label>
-                            <code><?= htmlspecialchars($fediverseLocalHandle, ENT_QUOTES, 'UTF-8') ?></code>
-                        </div>
-                        <div class="col-lg-6 mb-3">
-                            <label class="font-weight-bold d-block mb-1">Actor URL</label>
-                            <a href="<?= htmlspecialchars($fediverseActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($fediverseActorUrl, ENT_QUOTES, 'UTF-8') ?></a>
-                        </div>
-                        <div class="col-lg-6 mb-3">
-                            <label class="font-weight-bold d-block mb-1">WebFinger</label>
-                            <code><?= htmlspecialchars($fediverseBaseUrl . '/.well-known/webfinger?resource=' . rawurlencode($fediverseAcct), ENT_QUOTES, 'UTF-8') ?></code>
-                        </div>
-                        <div class="col-lg-6 mb-3">
-                            <label class="font-weight-bold d-block mb-1">Outbox</label>
-                            <a href="<?= htmlspecialchars(nammu_fediverse_outbox_url($fediverseConfig), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars(nammu_fediverse_outbox_url($fediverseConfig), ENT_QUOTES, 'UTF-8') ?></a>
-                        </div>
-                        <div class="col-lg-6 mb-0">
-                            <label class="font-weight-bold d-block mb-1">Seguidores federados</label>
-                            <strong><?= (int) count($fediverseFollowers) ?></strong>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
+        <?php elseif ($fediverseTab === 'network'): ?>
             <form method="post" class="mb-4">
                 <div class="card">
                     <div class="card-body">
@@ -899,7 +872,7 @@
                             <input type="text" id="fediverse_actor_input" name="fediverse_actor_input" class="form-control" placeholder="@usuario@servidor.tld o https://servidor.tld/users/usuario" value="<?= htmlspecialchars($fediverseActorInput ?? '', ENT_QUOTES, 'UTF-8') ?>">
                             <small class="form-text text-muted">Nammu intentará resolver primero WebFinger si escribes una cuenta y, si pegas una URL, leerá el actor directamente.</small>
                         </div>
-                        <input type="hidden" name="fediverse_tab" value="settings">
+                        <input type="hidden" name="fediverse_tab" value="network">
                         <button type="submit" name="follow_fediverse_actor" class="btn btn-primary">Seguir actor</button>
                         <button type="submit" name="refresh_fediverse_timeline" class="btn btn-outline-secondary ml-2">Refrescar ahora</button>
                     </div>
@@ -937,7 +910,7 @@
                                             <td class="text-right">
                                                 <form method="post" onsubmit="return confirm('¿Dejar de seguir este actor?');">
                                                     <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($actor['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                    <input type="hidden" name="fediverse_tab" value="settings">
+                                                    <input type="hidden" name="fediverse_tab" value="network">
                                                     <button type="submit" name="unfollow_fediverse_actor" class="btn btn-outline-danger btn-sm">Quitar</button>
                                                 </form>
                                             </td>
@@ -968,6 +941,35 @@
                             <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
+                </div>
+            </div>
+
+        <?php elseif ($fediverseTab === 'settings'): ?>
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h3 class="h5 mb-3">Actor del blog</h3>
+                    <div class="row">
+                        <div class="col-lg-6 mb-3">
+                            <label class="font-weight-bold d-block mb-1">Cuenta ActivityPub</label>
+                            <code><?= htmlspecialchars($fediverseLocalHandle, ENT_QUOTES, 'UTF-8') ?></code>
+                        </div>
+                        <div class="col-lg-6 mb-3">
+                            <label class="font-weight-bold d-block mb-1">Actor URL</label>
+                            <a href="<?= htmlspecialchars($fediverseActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($fediverseActorUrl, ENT_QUOTES, 'UTF-8') ?></a>
+                        </div>
+                        <div class="col-lg-6 mb-3">
+                            <label class="font-weight-bold d-block mb-1">WebFinger</label>
+                            <code><?= htmlspecialchars($fediverseBaseUrl . '/.well-known/webfinger?resource=' . rawurlencode($fediverseAcct), ENT_QUOTES, 'UTF-8') ?></code>
+                        </div>
+                        <div class="col-lg-6 mb-3">
+                            <label class="font-weight-bold d-block mb-1">Outbox</label>
+                            <a href="<?= htmlspecialchars(nammu_fediverse_outbox_url($fediverseConfig), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars(nammu_fediverse_outbox_url($fediverseConfig), ENT_QUOTES, 'UTF-8') ?></a>
+                        </div>
+                        <div class="col-lg-6 mb-0">
+                            <label class="font-weight-bold d-block mb-1">Seguidores federados</label>
+                            <strong><?= (int) count($fediverseFollowers) ?></strong>
+                        </div>
+                    </div>
                 </div>
             </div>
         <?php endif; ?>

@@ -1,6 +1,6 @@
 <?php
 /**
- * @var array<int, array{title:string,link:string,image:string,description:string,timestamp:int,source:string,is_manual?:bool,id?:string,links?:array<int,string>}> $items
+ * @var array<int, array{title:string,link:string,image:string,description:string,timestamp:int,source:string,is_manual?:bool,id?:string,links?:array<int,string>,raw_text?:string}> $items
  * @var int $feedsCount
  * @var bool $hasActuality
  */
@@ -79,6 +79,23 @@ $renderLinks = static function (array $links): string {
     }
     return implode(', ', $bits);
 };
+$manualDisplayText = static function (array $item): string {
+    $rawText = trim((string) ($item['raw_text'] ?? ''));
+    if ($rawText !== '') {
+        $text = preg_replace('#https?://[^\s<>"\')]+#iu', '', $rawText) ?? $rawText;
+        $text = preg_replace("/[ \t]+\n/", "\n", $text) ?? $text;
+        $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
+        $text = trim($text);
+        if ($text !== '') {
+            return $text;
+        }
+    }
+    $description = trim((string) ($item['description'] ?? ''));
+    if ($description !== '') {
+        return $description;
+    }
+    return trim((string) ($item['title'] ?? ''));
+};
 ?>
 <section class="actuality-hero">
     <div class="actuality-hero-inner">
@@ -145,7 +162,7 @@ $renderLinks = static function (array $links): string {
                     <?php foreach ($leftColumnItems as $item): ?>
                         <?php $isManual = !empty($item['is_manual']); ?>
                         <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
-                        <?php $manualBody = $isManual ? trim((string) ($item['description'] !== '' ? $item['description'] : ($item['title'] ?? ''))) : ''; ?>
+                        <?php $manualBody = $isManual ? $manualDisplayText($item) : ''; ?>
                         <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                             <div class="actuality-card-body">
                                 <?php if (!$isManual): ?>
@@ -181,7 +198,7 @@ $renderLinks = static function (array $links): string {
                     <?php foreach ($rightColumnItems as $item): ?>
                         <?php $isManual = !empty($item['is_manual']); ?>
                         <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
-                        <?php $manualBody = $isManual ? trim((string) ($item['description'] !== '' ? $item['description'] : ($item['title'] ?? ''))) : ''; ?>
+                        <?php $manualBody = $isManual ? $manualDisplayText($item) : ''; ?>
                         <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                             <div class="actuality-card-body">
                                 <?php if (!$isManual): ?>

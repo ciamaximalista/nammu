@@ -390,7 +390,7 @@ function nammu_actuality_manual_content(string $text): array
 {
     $normalized = nammu_actuality_manual_plain_text($text);
     if ($normalized === '') {
-        return ['title' => '', 'content' => '', 'links' => []];
+        return ['title' => '', 'content' => '', 'links' => [], 'raw_text' => ''];
     }
 
     $links = nammu_actuality_manual_extract_links($normalized);
@@ -399,6 +399,7 @@ function nammu_actuality_manual_content(string $text): array
         'title' => nammu_actuality_manual_title_from_content($content !== '' ? $content : $normalized),
         'content' => $content,
         'links' => $links,
+        'raw_text' => $normalized,
     ];
 }
 
@@ -431,6 +432,7 @@ function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $
         'id' => $id,
         'title' => $parts['title'],
         'description' => $parts['content'],
+        'raw_text' => $parts['raw_text'],
         'links' => $parts['links'],
         'timestamp' => $timestamp,
         'link' => nammu_actuality_manual_anchor_url($baseUrl, $id),
@@ -726,6 +728,7 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
             'link' => trim((string) ($item['link'] ?? nammu_actuality_manual_anchor_url($publicBaseUrl, $manualId))),
             'image' => '',
             'description' => nammu_actuality_manual_plain_text((string) ($item['description'] ?? '')),
+            'raw_text' => nammu_actuality_manual_plain_text((string) ($item['raw_text'] ?? '')),
             'links' => array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : []))),
             'timestamp' => (int) ($item['timestamp'] ?? 0),
             'source' => trim((string) ($item['source'] ?? '')),

@@ -78,7 +78,6 @@ unset($_SESSION['newsletter_custom_recipients']);
             'twitter' => $settings['twitter'] ?? [],
             'linkedin' => $settings['linkedin'] ?? [],
             'bluesky' => $settings['bluesky'] ?? [],
-            'mastodon' => $settings['mastodon'] ?? [],
             'instagram' => $settings['instagram'] ?? [],
         ];
         $networkLabels = [
@@ -87,7 +86,6 @@ unset($_SESSION['newsletter_custom_recipients']);
             'twitter' => 'X',
             'linkedin' => 'LinkedIn',
             'bluesky' => 'Bluesky',
-            'mastodon' => 'Mastodon',
             'instagram' => 'Instagram',
         ];
         $mailingReady = admin_is_mailing_ready($settings);

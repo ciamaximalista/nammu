@@ -2341,10 +2341,6 @@
         if ($blueskyCount !== null) {
             $socialCounts['Bluesky'] = $blueskyCount;
         }
-        $mastodonCount = admin_get_mastodon_follower_count($settings['mastodon'] ?? []);
-        if ($mastodonCount !== null) {
-            $socialCounts['Mastodon'] = $mastodonCount;
-        }
         $instagramCount = admin_get_instagram_follower_count($settings['instagram'] ?? []);
         if ($instagramCount !== null) {
             $socialCounts['Instagram'] = $instagramCount;

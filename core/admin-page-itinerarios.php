@@ -25,7 +25,6 @@
                             'twitter' => $settings['twitter'] ?? [],
                             'linkedin' => $settings['linkedin'] ?? [],
                             'bluesky' => $settings['bluesky'] ?? [],
-                            'mastodon' => $settings['mastodon'] ?? [],
                             'instagram' => $settings['instagram'] ?? [],
                         ];
                         $networkLabels = [
@@ -34,7 +33,6 @@
                             'twitter' => 'X',
                             'linkedin' => 'LinkedIn',
                             'bluesky' => 'Bluesky',
-                            'mastodon' => 'Mastodon',
                             'instagram' => 'Instagram',
                         ];
                     $availableNetworks = [];

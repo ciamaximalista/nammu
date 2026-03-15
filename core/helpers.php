@@ -289,8 +289,6 @@ function nammu_detect_referrer_source(string $referer, string $host): array
         'bsky.app' => 'Bluesky',
         'go.bsky.app' => 'Bluesky',
         'bsky.social' => 'Bluesky',
-        'mastodon.' => 'Mastodon',
-        'mstdn.' => 'Mastodon',
         'linkedin.com' => 'LinkedIn',
         'pinterest.' => 'Pinterest',
     ];
@@ -351,8 +349,6 @@ function nammu_detect_user_agent_source(string $userAgent): array
         'x.com' => 'Twitter/X',
         'bluesky' => 'Bluesky',
         'bsky' => 'Bluesky',
-        'mastodon' => 'Mastodon',
-        'mstdn' => 'Mastodon',
     ];
     foreach ($uaSocial as $needle => $label) {
         if (str_contains($userAgent, $needle)) {
@@ -686,7 +682,6 @@ function nammu_record_visit(): void
         'twitter' => 'Twitter/X',
         'x' => 'Twitter/X',
         't.co' => 'Twitter/X',
-        'mastodon' => 'Mastodon',
         'linkedin' => 'LinkedIn',
         'lnkd' => 'LinkedIn',
         'pinterest' => 'Pinterest',
@@ -731,7 +726,7 @@ function nammu_record_visit(): void
             $bucket = 'push';
         } elseif (in_array($utmDetail, ['Google Search', 'Bing', 'Brave Search', 'DuckDuckGo', 'Yahoo', 'Yandex', 'Baidu', 'Ecosia', 'Startpage'], true)) {
             $bucket = 'search';
-        } elseif (in_array($utmDetail, ['Telegram', 'Instagram', 'Facebook', 'Twitter/X', 'Mastodon', 'LinkedIn', 'Pinterest', 'Reddit', 'TikTok', 'YouTube'], true)) {
+        } elseif (in_array($utmDetail, ['Telegram', 'Instagram', 'Facebook', 'Twitter/X', 'LinkedIn', 'Pinterest', 'Reddit', 'TikTok', 'YouTube'], true)) {
             $bucket = 'social';
         }
         $source = ['bucket' => $bucket, 'detail' => $utmDetail];
@@ -1648,7 +1643,7 @@ function nammu_footer_icon_svgs(): array
         'twitter' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 4h3.7l4.3 5.2L17 4h3l-6.4 7.4L20 20h-3.7l-4.8-5.9L6.2 20H3l6.9-7.9L4 4z"/></svg>',
         'linkedin' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M6.5 9H3.5v11h3zm-1.5-6a1.75 1.75 0 1 0 0 3.5A1.75 1.75 0 0 0 5 3zm4 6h2.9v1.5h.1c.4-.8 1.5-1.7 3.2-1.7 3.4 0 4 2.2 4 5.2V20h-3v-5.1c0-1.2 0-2.8-1.7-2.8s-2 1.3-2 2.7V20h-3V9z"/></svg>',
         'bluesky' => '<svg width="20" height="20" viewBox="0 0 600 600" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="m135.72 44.03c66.496 49.921 138.02 151.14 164.28 205.46 26.262-54.316 97.782-155.54 164.28-205.46 47.98-36.021 125.72-63.892 125.72 24.795 0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.3797-3.6904-10.832-3.7077-7.8964-0.0174-2.9357-1.1937 0.51669-3.7077 7.8964-13.714 40.255-67.233 197.36-189.63 71.766-64.444-66.128-34.605-132.26 82.697-152.22-67.108 11.421-142.55-7.4491-163.25-81.433-5.9562-21.282-16.111-152.36-16.111-170.07 0-88.687 77.742-60.816 125.72-24.795z" fill="currentColor"/></svg>',
-        'mastodon' => '<svg width="20" height="20" viewBox="-20 -20 520 551.476" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill-rule="evenodd" clip-rule="evenodd" shape-rendering="geometricPrecision" text-rendering="geometricPrecision" image-rendering="optimizeQuality"><defs><mask id="mastodon-mask"><rect width="100%" height="100%" fill="#fff"/><path fill="#000" d="M396.545 174.981v136.53h-54.104V179.002c0-27.896-11.625-42.124-35.272-42.124-25.996 0-39.017 16.833-39.017 50.074v72.531h-53.777v-72.531c0-33.241-13.044-50.074-39.04-50.074-23.507 0-35.248 14.228-35.248 42.124v132.509H86.006v-136.53c0-27.896 7.123-50.059 21.366-66.488 14.695-16.387 33.97-24.803 57.896-24.803 27.691 0 48.617 10.647 62.568 31.917l13.464 22.597 13.484-22.597c13.951-21.27 34.877-31.917 62.521-31.917 23.902 0 43.177 8.416 57.919 24.803 14.231 16.414 21.336 38.577 21.321 66.488z"/></mask></defs><path fill="currentColor" mask="url(#mastodon-mask)" d="M478.064 113.237c-7.393-54.954-55.29-98.266-112.071-106.656C356.413 5.163 320.121 0 236.045 0h-.628c-84.1 0-102.141 5.163-111.72 6.581C68.498 14.739 18.088 53.655 5.859 109.261c-5.883 27.385-6.51 57.747-5.416 85.596 1.555 39.939 1.859 79.806 5.487 119.581a562.694 562.694 0 0013.089 78.437c11.625 47.654 58.687 87.313 104.793 103.494a281.073 281.073 0 00153.316 8.09 224.345 224.345 0 0016.577-4.533c12.369-3.928 26.856-8.321 37.506-16.042.146-.107.265-.247.348-.407.086-.161.134-.339.14-.521v-38.543a1.187 1.187 0 00-.119-.491 1.122 1.122 0 00-.773-.604 1.139 1.139 0 00-.503 0 424.932 424.932 0 01-99.491 11.626c-57.664 0-73.171-27.361-77.611-38.752a120.09 120.09 0 01-6.745-30.546 1.123 1.123 0 01.877-1.152c.173-.035.349-.032.518.012a416.876 416.876 0 0097.864 11.623c7.929 0 15.834 0 23.763-.211 33.155-.928 68.103-2.626 100.722-8.997.815-.16 1.63-.3 2.326-.508 51.454-9.883 100.422-40.894 105.397-119.42.185-3.093.651-32.385.651-35.591.022-10.903 3.51-77.343-.511-118.165z"/></svg>',
+        'fediverse' => '<svg width="20" height="20" viewBox="0 0 200 190" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><g fill="currentColor"><path d="M47.9242 72.7966a18.2278 18.2278 0 0 1-7.7959 7.7597l42.7984 42.9653 10.3182-5.2291zm56.4524 56.6704-10.3182 5.2291 21.686 21.7708a18.2278 18.2278 0 0 1 7.7975-7.7608z"/><path d="M129.6645 102.0765l1.7865 11.4272 27.4149-13.8942a18.2278 18.2278 0 0 1-4.9719-9.8124zm-14.0658 7.1282-57.2891 29.0339a18.2278 18.2278 0 0 1 4.9728 9.8133l54.1027-27.4194z"/><path d="M69.5312 91.6539l8.1618 8.1933 29.269-57.1387a18.2278 18.2278 0 0 1-9.787-5.0219zm-7.1897 14.0363-14.0022 27.3353a18.2278 18.2278 0 0 1 9.786 5.0214l12.3775-24.1639z"/><path d="M39.8906 80.6763a18.2278 18.2278 0 0 1-10.8655 1.7198l8.1762 52.2981a18.2278 18.2278 0 0 1 10.8645-1.7198z"/><path d="M63.3259 148.3109a18.2278 18.2278 0 0 1-1.7322 10.8629l52.2893 8.3907a18.2278 18.2278 0 0 1 1.7322-10.8629z"/><path d="M134.9148 146.9182a18.2278 18.2278 0 0 1 9.788 5.0224l24.1345-47.117a18.2278 18.2278 0 0 1-9.7875-5.0229z"/><path d="M126.1329 33.1603a18.2278 18.2278 0 0 1-7.7975 7.7608l37.3765 37.5207a18.2278 18.2278 0 0 1 7.7969-7.7608z"/><path d="M44.7704 51.6279a18.2278 18.2278 0 0 1 4.9723 9.8123l47.2478-23.9453a18.2278 18.2278 0 0 1-4.9718-9.8113z"/><path d="M118.2491 40.9645a18.2278 18.2278 0 0 1-10.8511 1.8123l4.1853 26.8 11.42 1.8324zm-4.2333 44.1927 9.8955 63.3631a18.2278 18.2278 0 0 1 10.88-1.6278l-9.355-59.9035z"/><path d="M49.7763 61.6412a18.2278 18.2278 0 0 1-1.694 10.8686l26.8206 4.3077 5.2715-10.2945zm45.9677 7.382-5.272 10.2955 63.3713 10.1777a18.2278 18.2278 0 0 1 1.7606-10.8593z"/><path d="M93.4385 23.8419a1 1 0 1 0 33.0924 1.8025 1 1 0 1 0-33.0924-1.8025"/><path d="M155.314 85.957a1 1 0 1 0 33.0923 1.8025 1 1 0 1 0-33.0923-1.8025"/><path d="M115.3466 163.9824a1 1 0 1 0 33.0923 1.8025 1 1 0 1 0-33.0923-1.8025"/><path d="M28.7698 150.0898a1 1 0 1 0 33.0923 1.8025 1 1 0 1 0-33.0923-1.8025"/><path d="M15.2298 63.4781a1 1 0 1 0 33.0923 1.8025 1 1 0 1 0-33.0923-1.8025"/></g></svg>',
         'email' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2v.3l8 5.2 8-5.2V8H4z"/></svg>',
         'postal' => nammu_postal_icon_svg(),
         'rss' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M6 18a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm-2-8v-3a11 11 0 0 1 11 11h-3a8 8 0 0 0-8-8zm0-6V1a17 17 0 0 1 17 17h-3a14 14 0 0 0-14-14z"/></svg>',
@@ -1767,31 +1762,16 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
         }
     }
 
-    $mastodonProfile = trim((string) ($config['mastodon']['profile'] ?? ''));
-    $mastodonHandle = trim((string) ($config['mastodon']['handle'] ?? ''));
-    $mastodonInstance = trim((string) ($config['mastodon']['instance'] ?? ''));
-    $mastodonUrl = '';
-    if ($mastodonProfile !== '') {
-        $mastodonUrl = $normalizeExternalUrl($mastodonProfile);
-    } else {
-        if ($mastodonInstance === '' && str_contains($mastodonHandle, '@')) {
-            $parts = explode('@', ltrim($mastodonHandle, '@'));
-            if (count($parts) >= 2) {
-                $mastodonHandle = $parts[0];
-                $mastodonInstance = $parts[1];
-            }
+    if (function_exists('nammu_fediverse_actor_url')) {
+        $fediverseUrl = nammu_fediverse_actor_url($config);
+        if ($fediverseUrl !== '') {
+            $socialLinks[] = [
+                'label' => 'Fediverso',
+                'href' => '#fediverse-follow',
+                'svg' => $icons['fediverse'],
+                'modal' => 'fediverse-follow',
+            ];
         }
-        $mastodonHandle = ltrim($mastodonHandle, '@');
-        if ($mastodonHandle !== '' && $mastodonInstance !== '') {
-            $mastodonUrl = rtrim($normalizeExternalUrl($mastodonInstance), '/') . '/@' . rawurlencode($mastodonHandle);
-        }
-    }
-    if ($mastodonUrl !== '') {
-        $socialLinks[] = [
-            'label' => 'Mastodon',
-            'href' => $mastodonUrl,
-            'svg' => $icons['mastodon'],
-        ];
     }
 
     $subscriptionMode = $theme['subscription']['mode'] ?? 'none';

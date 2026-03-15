@@ -1450,7 +1450,7 @@ if (!empty($baseUrl)) {
                                         $linkHost = parse_url((string) $link['href'], PHP_URL_HOST) ?? '';
                                         $isExternal = $linkHost !== '' && $baseHost !== '' && $linkHost !== $baseHost;
                                         ?>
-                                        <a class="footer-social-link" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
+                                        <a class="footer-social-link" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= !empty($link['modal']) && $link['modal'] === 'fediverse-follow' ? ' data-fediverse-follow-open' : '' ?><?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
                                             <?= $link['svg'] ?>
                                         </a>
                                     <?php endforeach; ?>
@@ -1499,7 +1499,7 @@ if (!empty($baseUrl)) {
                                         $linkHost = parse_url((string) $link['href'], PHP_URL_HOST) ?? '';
                                         $isExternal = $linkHost !== '' && $baseHost !== '' && $linkHost !== $baseHost;
                                         ?>
-                                        <a class="footer-social-link" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
+                                        <a class="footer-social-link" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= !empty($link['modal']) && $link['modal'] === 'fediverse-follow' ? ' data-fediverse-follow-open' : '' ?><?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
                                             <?= $link['svg'] ?>
                                         </a>
                                     <?php endforeach; ?>
@@ -1532,11 +1532,12 @@ if (!empty($baseUrl)) {
                 <dialog class="fediverse-follow-dialog" data-fediverse-follow-dialog>
                     <div class="fediverse-follow-dialog__card">
                         <h2>Síguenos en el Fediverso</h2>
-                        <p>Abre tu servidor Mastodon, Akkoma o compatible, pon el siguiente nombre de cuenta en el buscador y síguela como a cualquier otro perfil.</p>
+                        <p>Abre tu servidor Mastodon, Akkoma o compatible, pega el siguiente nombre de cuenta en el buscador de usuarios o perfiles y síguela como a cualquier otro perfil.</p>
                         <code class="fediverse-follow-dialog__handle"><?= htmlspecialchars($fediverseCtaHandle, ENT_QUOTES, 'UTF-8') ?></code>
-                        <p>Si tu servidor no encuentra la cuenta enseguida, prueba a pegar el identificador completo tal cual.</p>
+                        <p>Si tu servidor no encuentra la cuenta enseguida, pega el identificador completo en ese mismo buscador.</p>
                         <div class="fediverse-follow-dialog__actions">
                             <button type="button" data-fediverse-follow-copy>Copiar cuenta</button>
+                            <button type="button" data-fediverse-follow-copy-full>Copiar identificador completo</button>
                             <button type="button" data-fediverse-follow-close>Cerrar</button>
                         </div>
                     </div>
@@ -2323,14 +2324,19 @@ if (!empty($baseUrl)) {
     </script>
     <script>
     (function() {
-        var openButton = document.querySelector('[data-fediverse-follow-open]');
+        var openButtons = document.querySelectorAll('[data-fediverse-follow-open]');
         var dialog = document.querySelector('[data-fediverse-follow-dialog]');
-        if (!openButton || !dialog || typeof dialog.showModal !== 'function') return;
+        if (!openButtons.length || !dialog || typeof dialog.showModal !== 'function') return;
         var closeButton = dialog.querySelector('[data-fediverse-follow-close]');
         var copyButton = dialog.querySelector('[data-fediverse-follow-copy]');
+        var copyFullButton = dialog.querySelector('[data-fediverse-follow-copy-full]');
         var handle = dialog.querySelector('.fediverse-follow-dialog__handle');
-        openButton.addEventListener('click', function() {
-            dialog.showModal();
+        var actorUrl = <?= json_encode((string) $fediverseCtaUrl, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        openButtons.forEach(function(openButton) {
+            openButton.addEventListener('click', function(ev) {
+                ev.preventDefault();
+                dialog.showModal();
+            });
         });
         if (closeButton) {
             closeButton.addEventListener('click', function() {
@@ -2344,16 +2350,19 @@ if (!empty($baseUrl)) {
                 dialog.close();
             }
         });
-        if (copyButton && handle && navigator.clipboard && navigator.clipboard.writeText) {
-            copyButton.addEventListener('click', function() {
-                navigator.clipboard.writeText(handle.textContent || '').then(function() {
-                    copyButton.textContent = 'Copiada';
+        function bindCopyButton(button, text, idleLabel, doneLabel) {
+            if (!button || !text || !navigator.clipboard || !navigator.clipboard.writeText) return;
+            button.addEventListener('click', function() {
+                navigator.clipboard.writeText(text).then(function() {
+                    button.textContent = doneLabel;
                     setTimeout(function() {
-                        copyButton.textContent = 'Copiar cuenta';
+                        button.textContent = idleLabel;
                     }, 1600);
                 });
             });
         }
+        bindCopyButton(copyButton, handle ? (handle.textContent || '') : '', 'Copiar cuenta', 'Cuenta copiada');
+        bindCopyButton(copyFullButton, actorUrl, 'Copiar identificador completo', 'Identificador copiado');
     })();
     </script>
     <script>

@@ -14,6 +14,8 @@ Nammu combina en una sola instalación:
 - Podcast con `podcast.xml` y páginas HTML por episodio.
 - Newsletter y lista de avisos.
 - Itinerarios, cursos y colecciones de temas.
+- Portal de Actualidad con notas manuales y agregación de RSS externas.
+- Nodo propio en el Fediverso mediante ActivityPub.
 - Biblioteca multimedia, buscador, SEO técnico, estadísticas propias y automatización social.
 
 ## Requisitos mínimos
@@ -220,50 +222,76 @@ tar -xzf /var/www/html/<carpeta-publica>/backups/nammu-stats-backup-AAAA-MM-DD_H
 - Tarjetas Open Graph y Twitter completas con imagen, título, descripción y `alt`.
 - Canonical, datos estructurados e integración IndexNow.
 
-### 6. Fediverso y agregación
+### 6. Fediverso, ActivityPub y agregación
 
-- Página pública `actualidad.php` construida a partir de las RSS externas configuradas y de notas manuales.
-- Feed `noticias.xml` generado a partir de esa misma selección.
-- Módulo `Fediverso` en el admin para seguir actores ActivityPub públicos y leer sus actualizaciones.
-- Exposición del blog como actor ActivityPub con `WebFinger`, actor, `outbox`, `followers`, `following` e `inbox`.
-- Soporte inicial de federación servidor-servidor: recepción de `Follow`, `Undo`, respuesta `Accept` y entrega saliente firmada de publicaciones nuevas a seguidores remotos.
-- Cron integrado para refrescar periódicamente el timeline remoto seguido desde `Fediverso` y repartir nuevas publicaciones locales a seguidores federados.
-- `llms.txt` para consumo por modelos de lenguaje.
+Nammu no se limita a generar feeds RSS: también convierte cada blog en un nodo propio del fediverso.
 
-### 6. Itinerarios y formación
+- El blog expone identidad ActivityPub completa con `WebFinger`, actor, clave pública, `outbox`, `followers`, `following` e `inbox`.
+- Otros servidores compatibles, como Mastodon o Akkoma, pueden seguir el blog como una cuenta más usando un identificador tipo `@nombre@dominio`.
+- Nammu firma las entregas salientes y puede repartir nuevas publicaciones a seguidores federados.
+- El inbox recibe actividades remotas y procesa acciones básicas como `Follow`, `Undo`, respuestas y otras notificaciones.
+
+#### Qué contenidos federa Nammu
+
+- Entradas del blog.
+- Itinerarios.
+- Podcasts.
+- Noticias agregadas desde RSS externas.
+- Notas manuales creadas desde la pestaña **Redes** y publicadas en **Actualidad**.
+
+#### Qué ves en el admin
+
+- Módulo **Fediverso** para seguir actores públicos y leer su timeline.
+- Pestañas de inicio, notificaciones, mensajes y configuración.
+- Conversaciones públicas y privadas con actores remotos.
+- Historial de favoritos, respuestas y reenvíos hechos desde Nammu.
+
+#### Relación con Actualidad
+
+- La página pública `actualidad.php` se construye a partir de RSS externas configuradas y de notas manuales.
+- El feed `noticias.xml` publica esa misma selección para reutilizarla fuera del blog.
+- Las notas y noticias de `Actualidad` también pueden entrar en la salida ActivityPub del sitio como contenido federable.
+
+#### Automatización
+
+- El cron integrado refresca periódicamente los actores seguidos desde **Fediverso**.
+- Ese mismo cron reparte a seguidores federados las nuevas publicaciones locales que aún no se hayan entregado.
+- `llms.txt` sigue disponible como archivo adicional para consumo por modelos de lenguaje.
+
+### 7. Itinerarios y formación
 
 - Itinerarios con portada propia, temas, imágenes y quizzes.
 - Lógicas `free`, `sequential` y `assessment`.
 - Seguimiento del progreso por cookies.
 - Estadísticas por itinerario y reseteo desde el admin.
 
-### 7. Estadísticas y RGPD
+### 8. Estadísticas y RGPD
 
 - Dashboard con usuarios únicos, páginas más vistas, búsquedas internas, orígenes y bots.
 - Integración opcional con Google Search Console y Bing Webmaster Tools.
 - Consentimiento de cookies obligatorio para usuarios humanos.
 - Sin envío de datos de analítica a terceros.
 
-### 8. Redes sociales y automatización
+### 9. Redes sociales y automatización
 
-- Integración opcional con Telegram, Facebook Pages, Twitter/X, Bluesky, Mastodon, Instagram y LinkedIn.
+- Integración opcional con Telegram, Facebook Pages, Twitter/X, Bluesky, Instagram y LinkedIn.
 - Auto-posting al publicar y envío manual desde la pestaña **Redes**.
 - Twitter/X usa OAuth 1.0a de usuario: `Consumer Key`, `Consumer Secret`, `Access Token`, `Access Token Secret`.
 - Envíos manuales con contador de caracteres y negritas básicas.
-- Telegram, Facebook, Bluesky, Instagram, Mastodon y X aceptan imágenes en los envíos manuales.
-- Telegram, Mastodon y X suben el archivo local de `assets/` cuando procede.
-- Mastodon con imagen requiere `write:statuses` y `write:media`.
+- Telegram, Facebook, Bluesky, Instagram y X aceptan imágenes en los envíos manuales.
+- Telegram y X suben el archivo local de `assets/` cuando procede.
 - Configuración de RSS externas para reenvío automático a redes.
 - Generación automática de `actualidad.php` y `noticias.xml` desde esas fuentes.
 
-### 9. Actualidad agregada
+### 10. Actualidad agregada
 
 - `actualidad.php` compone una página pública a partir de las RSS configuradas en **Redes**.
 - `noticias.xml` publica esa misma selección como feed agregada.
+- Permite añadir notas manuales desde **Redes**, que se muestran como post-it y también pueden difundirse por ActivityPub.
 - Se cachean imágenes sociales para acelerar la carga pública.
 - Si una fuente no trae imagen, Nammu intenta recuperar la imagen social o la primera imagen útil del artículo.
 
-### 10. Compatibilidad y migración
+### 11. Compatibilidad y migración
 
 - Compatible con la estructura `content/` y `assets/` de PicoCMS.
 - Parser propio robusto y uso opcional de Symfony Yaml si está disponible.
@@ -298,9 +326,10 @@ sudo find . -type f -exec chmod 664 {} \;
 - **Plantilla**: controla tipografías, colores, cabeceras, comportamiento del buscador (posición y modo flotante), TOC por defecto y número de entradas por home.
 - **Itinerarios**: crea portadas, define clase (Libro, Curso, Colección, Otros), lógica de uso, quizzes y estadísticas. Cada tema puede añadirse, duplicarse o borrarse desde la misma pestaña.
 - **Configuración**: modo blog/diccionario, búsqueda avanzada, nombre del sitio, autor, redes sociales, API de Google Fonts, correo de lista (Gmail + OAuth) y cambio de contraseña.
-- **Difusión**: credenciales y guías rápidas por red, usuario público de X para footer y `twitter:site`, App ID de Facebook, tokens de Instagram/Mastodon/LinkedIn y opciones de autoenvío.
+- **Difusión**: credenciales y guías rápidas por red, usuario público de X para footer y `twitter:site`, App ID de Facebook, tokens de Instagram y LinkedIn y opciones de autoenvío.
 - **Redes**: envío manual de mensajes a varias redes a la vez y configuración de RSS externas para reenvío automático de novedades.
-- **Actualidad**: página pública agregada desde las fuentes RSS configuradas en **Redes**, con versión RSS propia en `noticias.xml`.
+- **Actualidad**: página pública agregada desde las fuentes RSS configuradas en **Redes**, con notas manuales, versión RSS propia en `noticias.xml` e integración con el fediverso.
+- **Fediverso**: timeline remoto, notificaciones, mensajes y gestión de seguidores/seguidos para la cuenta ActivityPub del blog.
 
 El modal “Insertar recurso” que aparece en Publicar, Editar e Itinerarios comparte el mismo buscador, así que puedes localizar imágenes etiquetadas sin salir del formulario.
 

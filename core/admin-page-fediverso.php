@@ -7,6 +7,7 @@
     $fediverseBaseUrl = nammu_fediverse_base_url($fediverseConfig);
     $fediverseActorUrl = nammu_fediverse_actor_url($fediverseConfig);
     $fediverseAcct = nammu_fediverse_acct_uri($fediverseConfig);
+    $fediverseLocalName = trim((string) (($fediverseConfig['site_name'] ?? '') ?: ($siteTitle ?? 'Blog')));
     $fediverseLocalAvatar = function_exists('nammu_fediverse_avatar_url') ? nammu_fediverse_avatar_url($fediverseConfig) : '';
     $fediverseLocalHandle = '';
     if (str_starts_with($fediverseAcct, 'acct:')) {
@@ -377,7 +378,8 @@
                                     $threadReplies[] = [
                                         'published' => (string) ($reply['published'] ?? ''),
                                         'reply_text' => (string) ($reply['reply_text'] ?? ''),
-                                        'actor_name' => $fediverseLocalHandle,
+                                        'actor_name' => $fediverseLocalName,
+                                        'actor_handle' => $fediverseLocalHandle,
                                         'actor_icon' => $fediverseLocalAvatar,
                                         'source' => 'local',
                                     ];
@@ -400,6 +402,7 @@
                                     <div class="fediverse-status__body">
                                         <div class="fediverse-status__header">
                                             <div class="fediverse-status__identity">
+                                                <strong><?= htmlspecialchars($fediverseLocalName, ENT_QUOTES, 'UTF-8') ?></strong>
                                                 <span class="fediverse-status__handle"><?= htmlspecialchars($fediverseLocalHandle, ENT_QUOTES, 'UTF-8') ?></span>
                                             </div>
                                             <div class="fediverse-status__meta">
@@ -442,7 +445,10 @@
                                                         </div>
                                                         <div class="fediverse-thread__body">
                                                             <div class="fediverse-thread__header">
-                                                                <strong><?= htmlspecialchars((string) ($reply['actor_name'] ?? $fediverseLocalHandle), ENT_QUOTES, 'UTF-8') ?></strong>
+                                                                <strong><?= htmlspecialchars((string) ($reply['actor_name'] ?? $fediverseLocalName), ENT_QUOTES, 'UTF-8') ?></strong>
+                                                                <?php if (!empty($reply['actor_handle'])): ?>
+                                                                    <span><?= htmlspecialchars((string) $reply['actor_handle'], ENT_QUOTES, 'UTF-8') ?></span>
+                                                                <?php endif; ?>
                                                                 <?php if (!empty($reply['published'])): ?>
                                                                     <time datetime="<?= htmlspecialchars((string) $reply['published'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $reply['published'], ENT_QUOTES, 'UTF-8') ?></time>
                                                                 <?php endif; ?>
@@ -749,7 +755,15 @@
                                 </div>
                                 <?php foreach (array_reverse($messages) as $message): ?>
                                     <?php $isOutgoing = (($message['direction'] ?? '') === 'outgoing'); ?>
-                                    <div class="mb-3 p-3 rounded" style="background: <?= $isOutgoing ? '#eef6ff' : '#f7f7f7' ?>; border-left: 4px solid <?= $isOutgoing ? '#1b8eed' : '#999' ?>;">
+                                    <?php
+                                    $isPublicMessage = (($message['visibility'] ?? '') === 'public');
+                                    $isThreadRoot = !empty($message['is_thread_root']);
+                                    $messageClasses = 'mb-3 p-3 rounded';
+                                    if ($isPublicMessage) {
+                                        $messageClasses .= $isThreadRoot ? ' fediverse-conversation__root' : ' fediverse-conversation__reply';
+                                    }
+                                    ?>
+                                    <div class="<?= htmlspecialchars($messageClasses, ENT_QUOTES, 'UTF-8') ?>" style="background: <?= $isOutgoing ? '#eef6ff' : '#f7f7f7' ?>; border-left: 4px solid <?= $isOutgoing ? '#1b8eed' : '#999' ?>;">
                                         <div class="fediverse-message__header">
                                             <div class="fediverse-message__avatar">
                                                 <?php if ($isOutgoing && $fediverseLocalAvatar !== ''): ?>
@@ -761,7 +775,10 @@
                                                 <?php endif; ?>
                                             </div>
                                             <div class="fediverse-message__identity">
-                                                <strong><?= htmlspecialchars($isOutgoing ? $fediverseLocalHandle : (string) (($message['actor_name'] ?? '') ?: $actorId), ENT_QUOTES, 'UTF-8') ?></strong>
+                                                <strong><?= htmlspecialchars($isOutgoing ? $fediverseLocalName : (string) (($message['actor_name'] ?? '') ?: $actorId), ENT_QUOTES, 'UTF-8') ?></strong>
+                                                <?php if ($isOutgoing): ?>
+                                                    <div class="small text-muted"><?= htmlspecialchars($fediverseLocalHandle, ENT_QUOTES, 'UTF-8') ?></div>
+                                                <?php endif; ?>
                                                 <?php if (!$isOutgoing): ?>
                                                     <div class="small text-muted"><?= htmlspecialchars((string) $actorId, ENT_QUOTES, 'UTF-8') ?></div>
                                                 <?php endif; ?>
@@ -782,7 +799,7 @@
                                                 · <?= !empty($message['verified']) ? 'verificado' : 'no verificado' ?>
                                             <?php endif; ?>
                                         </div>
-                                        <?php if (!empty($message['title']) && !empty($message['is_thread_root'])): ?>
+                                        <?php if (!empty($message['title']) && $isThreadRoot): ?>
                                             <div class="font-weight-bold mb-2"><?= htmlspecialchars((string) $message['title'], ENT_QUOTES, 'UTF-8') ?></div>
                                         <?php endif; ?>
                                         <div><?= nl2br(htmlspecialchars((string) ($message['content'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
@@ -1197,6 +1214,14 @@
         .fediverse-message__identity {
             min-width: 0;
         }
+        .fediverse-conversation__root {
+            margin-bottom: 1rem;
+        }
+        .fediverse-conversation__reply {
+            margin-left: 2.2rem;
+            border-left-width: 3px !important;
+            box-shadow: inset 0 0 0 1px rgba(27, 142, 237, 0.08);
+        }
         @media (max-width: 640px) {
             .fediverse-status {
                 grid-template-columns: 44px minmax(0, 1fr);
@@ -1214,6 +1239,9 @@
             .fediverse-status__header {
                 flex-direction: column;
                 gap: 0.2rem;
+            }
+            .fediverse-conversation__reply {
+                margin-left: 0.8rem;
             }
         }
     </style>

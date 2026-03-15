@@ -1208,7 +1208,7 @@ function nammu_fediverse_local_content_items(array $config): array
         $items[] = [
             'id' => $baseUrl . '/ap/objects/actualidad-' . rawurlencode($id),
             'url' => trim((string) (($item['link'] ?? '') ?: ($baseUrl . '/actualidad.php'))),
-            'title' => $title !== '' ? $title : ($isManual ? 'Nota' : 'Noticia'),
+            'title' => $title !== '' ? $title : ($isManual ? '' : 'Noticia'),
             'content' => $content,
             'published' => gmdate(DATE_ATOM, (int) (($item['timestamp'] ?? 0) ?: time())),
             'type' => $isManual ? 'Note' : 'Article',
@@ -1537,7 +1537,7 @@ function nammu_fediverse_actor_document(array $config): array
         'type' => 'Person',
         'preferredUsername' => nammu_fediverse_preferred_username($config),
         'name' => $siteName,
-        'summary' => $siteDescription,
+        'summary' => $siteDescription !== '' ? $siteDescription : $siteName,
         'url' => $baseUrl,
         'inbox' => nammu_fediverse_inbox_url($config),
         'outbox' => nammu_fediverse_outbox_url($config),

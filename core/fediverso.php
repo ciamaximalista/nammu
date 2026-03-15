@@ -1966,19 +1966,39 @@ function nammu_fediverse_private_message_activity(array $recipient, string $text
     $actorUrl = nammu_fediverse_actor_url($config);
     $messageId = $actorUrl . '/messages/' . substr(sha1($recipient['id'] . '|' . $text . '|' . microtime(true) . '|' . random_int(0, PHP_INT_MAX)), 0, 24);
     $published = gmdate(DATE_ATOM);
-    $content = nl2br(htmlspecialchars(trim($text), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+    $recipientId = trim((string) ($recipient['id'] ?? ''));
+    $recipientName = trim((string) ($recipient['preferredUsername'] ?? ''));
+    $recipientHost = parse_url($recipientId, PHP_URL_HOST);
+    $recipientHandle = $recipientName !== '' ? '@' . $recipientName . ($recipientHost ? '@' . $recipientHost : '') : $recipientId;
+    $mentionHtml = $recipientId !== '' && $recipientHandle !== ''
+        ? '<a href="' . htmlspecialchars($recipientId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" class="mention">@' . htmlspecialchars(ltrim($recipientHandle, '@'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</a>'
+        : '';
+    $plainText = trim($text);
+    $content = trim($mentionHtml . ($plainText !== '' ? ' ' . nl2br(htmlspecialchars($plainText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) : ''));
+    $tag = [];
+    if ($recipientId !== '' && $recipientHandle !== '') {
+        $tag[] = [
+            'type' => 'Mention',
+            'href' => $recipientId,
+            'name' => $recipientHandle,
+        ];
+    }
     return [
         '@context' => 'https://www.w3.org/ns/activitystreams',
         'id' => $messageId . '/activity',
         'type' => 'Create',
         'actor' => $actorUrl,
-        'to' => [(string) ($recipient['id'] ?? '')],
+        'to' => [$recipientId],
+        'cc' => [],
         'object' => [
             'id' => $messageId,
             'type' => 'Note',
             'attributedTo' => $actorUrl,
-            'to' => [(string) ($recipient['id'] ?? '')],
+            'to' => [$recipientId],
+            'cc' => [],
             'content' => $content,
+            'tag' => $tag,
+            'url' => $messageId,
             'published' => $published,
         ],
     ];

@@ -2994,7 +2994,7 @@ function nammu_render_header_buttons(array $options): string
     $socialRssConfig = is_array($config['social_rss'] ?? null) ? $config['social_rss'] : [];
     $hasActuality = array_key_exists('has_actuality', $options)
         ? !empty($options['has_actuality'])
-        : trim((string) ($socialRssConfig['feeds'] ?? '')) !== '';
+        : (function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($config) : (trim((string) ($socialRssConfig['feeds'] ?? '')) !== ''));
     $subscriptionEnabled = !empty($options['subscription_enabled']);
     $postalEnabled = !empty($options['postal_enabled']);
 
@@ -3116,7 +3116,7 @@ function nammu_render_standard_header_buttons(array $context = []): string
         : (array_key_exists('show_letters', $context) ? !empty($context['show_letters']) : false);
     $hasActuality = array_key_exists('hasActuality', $context)
         ? !empty($context['hasActuality'])
-        : (array_key_exists('has_actuality', $context) ? !empty($context['has_actuality']) : trim((string) ($socialRssConfig['feeds'] ?? '')) !== '');
+        : (array_key_exists('has_actuality', $context) ? !empty($context['has_actuality']) : (function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($config) : (trim((string) ($socialRssConfig['feeds'] ?? '')) !== '')));
 
     return nammu_render_header_buttons([
         'accent' => $colors['accent'] ?? '#0a4c8a',

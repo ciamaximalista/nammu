@@ -188,7 +188,7 @@ $hasActuality = trim((string) ($socialRssConfig['feeds'] ?? '')) !== '';
 $newslettersIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/newsletters';
 $renderer->setGlobal('hasNewsletters', $hasNewsletters);
 $renderer->setGlobal('newslettersIndexUrl', $newslettersIndexUrl);
-$renderer->setGlobal('hasActuality', $hasActuality);
+$renderer->setGlobal('hasActuality', function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($configData) : $hasActuality);
 $GLOBALS['hasNewsletters'] = $hasNewsletters;
 $GLOBALS['newslettersIndexUrl'] = $newslettersIndexUrl;
 $GLOBALS['hasActuality'] = $hasActuality;
@@ -313,7 +313,7 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
     $entries = [];
     $config = nammu_load_config();
     $socialRssConfig = is_array($config['social_rss'] ?? null) ? $config['social_rss'] : [];
-    $hasActuality = trim((string) ($socialRssConfig['feeds'] ?? '')) !== '';
+    $hasActuality = function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($config) : (trim((string) ($socialRssConfig['feeds'] ?? '')) !== '');
     $timestampFromPost = static function (Post $post): ?int {
         $date = $post->getDate();
         if ($date) {
@@ -683,10 +683,10 @@ if ($routePath === '/podcast.xml') {
 }
 
 if ($routePath === '/noticias.xml') {
-    if (!nammu_actuality_has_feeds($config)) {
+    if (!nammu_actuality_has_content($config)) {
         header('HTTP/1.1 404 Not Found');
         header('Content-Type: text/plain; charset=UTF-8');
-        echo 'No hay fuentes de actualidad configuradas.';
+        echo 'No hay contenido de actualidad configurado.';
         exit;
     }
     $feedPath = __DIR__ . '/noticias.xml';

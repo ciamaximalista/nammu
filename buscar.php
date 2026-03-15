@@ -127,7 +127,7 @@ $newsletterItems = function_exists('nammu_newsletter_collect_items')
     : [];
 $renderer->setGlobal('hasNewsletters', !empty($newsletterItems));
 $socialRssConfig = is_array($configData['social_rss'] ?? null) ? $configData['social_rss'] : [];
-$renderer->setGlobal('hasActuality', trim((string) ($socialRssConfig['feeds'] ?? '')) !== '');
+$renderer->setGlobal('hasActuality', function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($configData) : (trim((string) ($socialRssConfig['feeds'] ?? '')) !== ''));
 
 $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseUrl): ?string {
     if ($image === null || $image === '') {

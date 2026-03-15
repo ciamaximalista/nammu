@@ -114,7 +114,7 @@ $rssSettings = admin_social_rss_settings(['social_rss' => $configData['social_rs
 $feeds = admin_social_rss_feed_list($rssSettings['feeds']);
 $snapshot = nammu_actuality_load_items_snapshot();
 $items = is_array($snapshot['items'] ?? null) ? $snapshot['items'] : [];
-if (empty($items) && !empty($feeds)) {
+if (empty($items) && function_exists('nammu_actuality_has_content') && nammu_actuality_has_content($configData)) {
     $rebuilt = nammu_actuality_rebuild_snapshot($publicBaseUrl, $configData, $siteTitle, $siteDescription, $siteLang);
     $items = is_array($rebuilt['items'] ?? null) ? $rebuilt['items'] : [];
 }
@@ -135,13 +135,13 @@ $renderer->setGlobal('actualityHeroBackground', $actualityHeroBackground);
 $content = $renderer->render('actuality', [
     'items' => $items,
     'feedsCount' => count($feeds),
-    'hasActuality' => !empty($feeds),
+    'hasActuality' => function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($configData) : !empty($feeds),
 ]);
 
 $pageTitle = 'Actualidad';
-$pageDescription = !empty($feeds)
-    ? 'Actualidad agregada desde las fuentes RSS configuradas del sitio.'
-    : 'No hay fuentes RSS automáticas configuradas todavía.';
+$pageDescription = (function_exists('nammu_actuality_has_content') && nammu_actuality_has_content($configData))
+    ? 'Actualidad agregada desde las fuentes RSS configuradas y notas manuales del sitio.'
+    : 'No hay contenido de actualidad configurado todavía.';
 $canonical = ($publicBaseUrl !== '' ? $publicBaseUrl : '') . '/actualidad.php';
 
 $socialMeta = nammu_build_social_meta([

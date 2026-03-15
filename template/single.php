@@ -69,8 +69,7 @@ $hasNewsletters = !empty($hasNewsletters ?? ($GLOBALS['hasNewsletters'] ?? false
 $hasItineraries = !empty($hasItineraries);
 $hasCategories = !empty($hasCategories);
 $actualityConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
-$actualityRssConfig = is_array($actualityConfig['social_rss'] ?? null) ? $actualityConfig['social_rss'] : [];
-$hasActuality = trim((string) ($actualityRssConfig['feeds'] ?? '')) !== '';
+$hasActuality = function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($actualityConfig) : (trim((string) (($actualityConfig['social_rss']['feeds'] ?? ''))) !== '');
 $actualityUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/actualidad.php';
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
 $currentUrl = ($baseUrl ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');

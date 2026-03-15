@@ -1,6 +1,6 @@
 <?php
 /**
- * @var array<int, array{title:string,link:string,image:string,description:string,timestamp:int,source:string}> $items
+ * @var array<int, array{title:string,link:string,image:string,description:string,timestamp:int,source:string,is_manual?:bool,id?:string}> $items
  * @var int $feedsCount
  * @var bool $hasActuality
  */
@@ -94,9 +94,11 @@ $splitColumns = static function (array $dayItems): array {
             <div class="actuality-grid<?= count($group['items']) === 1 ? ' is-single-item' : '' ?>">
                 <?php if (count($group['items']) === 1): ?>
                     <?php $item = $group['items'][0]; ?>
-                    <article class="actuality-card actuality-card--full">
+                    <?php $isManual = !empty($item['is_manual']); ?>
+                    <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
+                    <article class="actuality-card actuality-card--full<?= $isManual ? ' actuality-card--manual' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                         <div class="actuality-card-body">
-                            <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
+                            <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isManual ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
                             <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
                                 <p class="actuality-meta">
                                     <?php if ($item['timestamp'] > 0): ?>
@@ -120,9 +122,11 @@ $splitColumns = static function (array $dayItems): array {
                 <?php else: ?>
                 <div class="actuality-column">
                     <?php foreach ($leftColumnItems as $item): ?>
-                        <article class="actuality-card">
+                        <?php $isManual = !empty($item['is_manual']); ?>
+                        <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
+                        <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                             <div class="actuality-card-body">
-                                <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
+                                <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isManual ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
                                 <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
                                     <p class="actuality-meta">
                                         <?php if ($item['timestamp'] > 0): ?>
@@ -147,9 +151,11 @@ $splitColumns = static function (array $dayItems): array {
                 </div>
                 <div class="actuality-column">
                     <?php foreach ($rightColumnItems as $item): ?>
-                        <article class="actuality-card">
+                        <?php $isManual = !empty($item['is_manual']); ?>
+                        <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
+                        <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                             <div class="actuality-card-body">
-                                <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
+                                <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isManual ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
                                 <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
                                     <p class="actuality-meta">
                                         <?php if ($item['timestamp'] > 0): ?>
@@ -231,6 +237,34 @@ $splitColumns = static function (array $dayItems): array {
         border-radius: var(--nammu-radius-lg);
         overflow: hidden;
         box-shadow: 0 16px 36px rgba(0,0,0,0.06);
+    }
+    .actuality-card--manual {
+        background: #fff6a8;
+        border: 1px solid rgba(124, 92, 5, 0.24);
+        box-shadow: 0 20px 30px rgba(91, 74, 12, 0.16);
+        transform: rotate(-0.55deg);
+    }
+    .actuality-card--manual:nth-child(even) {
+        transform: rotate(0.55deg);
+    }
+    .actuality-card--manual .actuality-card-body {
+        padding-top: 1.35rem;
+    }
+    .actuality-card--manual .actuality-meta {
+        color: #7a5300;
+    }
+    .actuality-card--manual h3 a {
+        color: #6c3700;
+    }
+    .actuality-card--manual::before {
+        content: "";
+        display: block;
+        width: 64px;
+        height: 22px;
+        margin: 0.7rem auto -0.25rem;
+        border-radius: 4px;
+        background: rgba(255,255,255,0.42);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.38);
     }
     .actuality-image-link {
         display: block;

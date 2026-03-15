@@ -12,6 +12,11 @@ function nammu_actuality_items_file(): string
     return dirname(__DIR__) . '/config/actualidad-items.json';
 }
 
+function nammu_actuality_manual_items_file(): string
+{
+    return dirname(__DIR__) . '/config/actualidad-manual.json';
+}
+
 function nammu_actuality_cache_dir(): string
 {
     return dirname(__DIR__) . '/assets/actualidad-cache';
@@ -64,6 +69,39 @@ function nammu_actuality_load_items_snapshot(): array
 function nammu_actuality_save_items_snapshot(array $items): void
 {
     $file = nammu_actuality_items_file();
+    $dir = dirname($file);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $payload = [
+        'updated_at' => time(),
+        'items' => array_values($items),
+    ];
+    @file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    @chmod($file, 0664);
+}
+
+function nammu_actuality_load_manual_items(): array
+{
+    $file = nammu_actuality_manual_items_file();
+    if (!is_file($file)) {
+        return ['items' => []];
+    }
+    $raw = @file_get_contents($file);
+    if (!is_string($raw) || $raw === '') {
+        return ['items' => []];
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return ['items' => []];
+    }
+    $decoded['items'] = is_array($decoded['items'] ?? null) ? $decoded['items'] : [];
+    return $decoded;
+}
+
+function nammu_actuality_save_manual_items(array $items): void
+{
+    $file = nammu_actuality_manual_items_file();
     $dir = dirname($file);
     if (!is_dir($dir)) {
         @mkdir($dir, 0775, true);
@@ -304,6 +342,97 @@ function nammu_actuality_text_to_html(string $text): string
     return implode('', $htmlParts);
 }
 
+function nammu_actuality_manual_plain_text(string $text): string
+{
+    $text = str_replace(["\r\n", "\r"], "\n", $text);
+    $text = preg_replace('/\*\*(.+?)\*\*/su', '$1', $text) ?? $text;
+    $text = preg_replace("/[ \t]+\n/", "\n", $text) ?? $text;
+    $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
+    return trim($text);
+}
+
+function nammu_actuality_manual_title_and_description(string $text): array
+{
+    $normalized = nammu_actuality_manual_plain_text($text);
+    if ($normalized === '') {
+        return ['title' => '', 'description' => ''];
+    }
+
+    $lines = preg_split('/\n/u', $normalized) ?: [];
+    $title = '';
+    $remaining = [];
+    $titleTaken = false;
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+        if ($trimmed === '' && !$titleTaken) {
+            continue;
+        }
+        if (!$titleTaken) {
+            $title = $trimmed;
+            $titleTaken = true;
+            continue;
+        }
+        $remaining[] = rtrim($line);
+    }
+    if ($title === '') {
+        $title = $normalized;
+    }
+    $titleChars = function_exists('mb_strlen') ? mb_strlen($title, 'UTF-8') : strlen($title);
+    if ($titleChars > 120) {
+        $title = function_exists('mb_substr') ? mb_substr($title, 0, 117, 'UTF-8') . '…' : substr($title, 0, 117) . '...';
+    }
+
+    $description = trim(implode("\n", $remaining));
+    return [
+        'title' => $title,
+        'description' => $description,
+    ];
+}
+
+function nammu_actuality_manual_anchor_url(string $baseUrl, string $id): string
+{
+    $base = rtrim($baseUrl, '/');
+    return ($base !== '' ? $base : '') . '/actualidad.php#manual-' . rawurlencode($id);
+}
+
+function nammu_actuality_prune_manual_items(array $items): array
+{
+    $cutoff = time() - (60 * 86400);
+    return array_values(array_filter($items, static function (array $item) use ($cutoff): bool {
+        $timestamp = (int) ($item['timestamp'] ?? 0);
+        return $timestamp <= 0 || $timestamp >= $cutoff;
+    }));
+}
+
+function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $siteTitle): array
+{
+    $parts = nammu_actuality_manual_title_and_description($text);
+    if ($parts['title'] === '') {
+        return [];
+    }
+    $store = nammu_actuality_load_manual_items();
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    $id = substr(sha1($parts['title'] . '|' . $text . '|' . microtime(true) . '|' . random_int(0, PHP_INT_MAX)), 0, 16);
+    $timestamp = time();
+    $item = [
+        'id' => $id,
+        'title' => $parts['title'],
+        'description' => $parts['description'],
+        'timestamp' => $timestamp,
+        'link' => nammu_actuality_manual_anchor_url($baseUrl, $id),
+        'image' => '',
+        'source' => $siteTitle !== '' ? $siteTitle : 'Actualidad',
+        'is_manual' => true,
+    ];
+    $items[] = $item;
+    $items = nammu_actuality_prune_manual_items($items);
+    usort($items, static function (array $a, array $b): int {
+        return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
+    });
+    nammu_actuality_save_manual_items($items);
+    return $item;
+}
+
 function nammu_actuality_extract_social_image(string $pageUrl): string
 {
     $response = nammu_actuality_fetch_url($pageUrl);
@@ -526,13 +655,25 @@ function nammu_actuality_has_feeds(array $config): bool
     return trim((string) ($socialRssConfig['feeds'] ?? '')) !== '';
 }
 
+function nammu_actuality_has_manual_items(): bool
+{
+    $store = nammu_actuality_load_manual_items();
+    $items = nammu_actuality_prune_manual_items(is_array($store['items'] ?? null) ? $store['items'] : []);
+    if (count($items) !== count((array) ($store['items'] ?? []))) {
+        nammu_actuality_save_manual_items($items);
+    }
+    return !empty($items);
+}
+
+function nammu_actuality_has_content(array $config): bool
+{
+    return nammu_actuality_has_feeds($config) || nammu_actuality_has_manual_items();
+}
+
 function nammu_actuality_collect_items(array $config, string $publicBaseUrl): array
 {
     $rssSettings = nammu_actuality_rss_settings(['social_rss' => $config['social_rss'] ?? []]);
     $feeds = nammu_actuality_rss_feed_list($rssSettings['feeds']);
-    if (empty($feeds)) {
-        return [];
-    }
     $items = [];
     $seen = [];
     foreach ($feeds as $feedUrl) {
@@ -553,6 +694,31 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
                 'source' => parse_url((string) ($item['link'] ?? ''), PHP_URL_HOST) ?: '',
             ];
         }
+    }
+    $manualStore = nammu_actuality_load_manual_items();
+    $manualItems = nammu_actuality_prune_manual_items(is_array($manualStore['items'] ?? null) ? $manualStore['items'] : []);
+    if (count($manualItems) !== count((array) ($manualStore['items'] ?? []))) {
+        nammu_actuality_save_manual_items($manualItems);
+    }
+    foreach ($manualItems as $item) {
+        $manualId = trim((string) ($item['id'] ?? ''));
+        if ($manualId === '') {
+            continue;
+        }
+        $seen['manual:' . $manualId] = true;
+        $items[] = [
+            'id' => $manualId,
+            'title' => trim((string) ($item['title'] ?? '')),
+            'link' => trim((string) ($item['link'] ?? nammu_actuality_manual_anchor_url($publicBaseUrl, $manualId))),
+            'image' => '',
+            'description' => nammu_actuality_manual_plain_text((string) ($item['description'] ?? '')),
+            'timestamp' => (int) ($item['timestamp'] ?? 0),
+            'source' => trim((string) ($item['source'] ?? '')),
+            'is_manual' => true,
+        ];
+    }
+    if (empty($items)) {
+        return [];
     }
     usort($items, static function (array $a, array $b): int {
         return ($b['timestamp'] ?? 0) <=> ($a['timestamp'] ?? 0);
@@ -639,7 +805,7 @@ function nammu_actuality_clear_snapshot(): void
 
 function nammu_actuality_rebuild_snapshot(string $baseUrl, array $config, string $siteTitle, string $siteDescription, string $siteLang = 'es'): array
 {
-    if (!nammu_actuality_has_feeds($config)) {
+    if (!nammu_actuality_has_content($config)) {
         nammu_actuality_clear_snapshot();
         return ['updated_at' => 0, 'items' => []];
     }

@@ -57,9 +57,16 @@
                             </div>
                         </div>
                         <div class="col-lg-4">
-                            <label class="d-block">Redes configuradas</label>
+                            <label class="d-block">Destinos</label>
                             <?php if (!empty($availableNetworks)): ?>
                                 <div class="border rounded p-3 h-100">
+                                    <div class="form-check mb-3 pb-3 border-bottom">
+                                        <input class="form-check-input" type="checkbox" name="social_send_actuality" id="social_send_actuality" value="1" <?= !empty($socialBroadcastActuality) ? 'checked' : '' ?>>
+                                        <label class="form-check-label d-block" for="social_send_actuality">
+                                            <strong>Sección Actualidad</strong><br>
+                                            <small class="text-muted">Añade este mensaje a <code>noticias.xml</code> y a <code>actualidad.php</code> como una nota tipo post-it.</small>
+                                        </label>
+                                    </div>
                                     <?php $guidanceMap = admin_social_broadcast_guidance(); ?>
                                     <?php foreach ($availableNetworks as $networkKey => $networkData): ?>
                                         <div class="form-check mb-3 social-network-option" data-limit="<?= (int) $networkData['limit'] ?>" data-guidance="<?= htmlspecialchars((string) ($networkData['guidance'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
@@ -72,7 +79,15 @@
                                     <?php endforeach; ?>
                                 </div>
                             <?php else: ?>
-                                <div class="alert alert-secondary mb-0">No hay redes configuradas todavía.</div>
+                                <div class="border rounded p-3 h-100">
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input" type="checkbox" name="social_send_actuality" id="social_send_actuality" value="1" <?= !empty($socialBroadcastActuality) ? 'checked' : '' ?>>
+                                        <label class="form-check-label d-block" for="social_send_actuality">
+                                            <strong>Sección Actualidad</strong><br>
+                                            <small class="text-muted">Guarda esta nota manual en <code>noticias.xml</code> y <code>actualidad.php</code> aunque no tengas redes configuradas.</small>
+                                        </label>
+                                    </div>
+                                </div>
                             <?php endif; ?>
                         </div>
                     </div>

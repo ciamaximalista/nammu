@@ -1203,6 +1203,7 @@ function admin_handle_social_broadcast_request(array $settings): array
         'feedback' => null,
         'message_text' => '',
         'image' => '',
+        'actuality' => false,
     ];
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['send_social_broadcast'])) {
         return $result;
@@ -1210,17 +1211,19 @@ function admin_handle_social_broadcast_request(array $settings): array
 
     $text = trim((string) ($_POST['social_broadcast_text'] ?? ''));
     $image = trim((string) ($_POST['social_broadcast_image'] ?? ''));
+    $sendToActuality = !empty($_POST['social_send_actuality']);
     $selected = array_values(array_unique(array_filter(array_map('strval', $_POST['social_networks'] ?? []))));
     $result['message_text'] = $text;
     $result['image'] = $image;
+    $result['actuality'] = $sendToActuality;
     $available = admin_social_broadcast_available_networks($settings);
 
     if ($text === '') {
         $result['feedback'] = ['type' => 'danger', 'message' => 'Escribe un mensaje antes de enviarlo.'];
         return $result;
     }
-    if (empty($selected)) {
-        $result['feedback'] = ['type' => 'danger', 'message' => 'Marca al menos una red social configurada.'];
+    if (empty($selected) && !$sendToActuality) {
+        $result['feedback'] = ['type' => 'danger', 'message' => 'Marca al menos una red social configurada o la Sección Actualidad.'];
         return $result;
     }
 
@@ -1228,6 +1231,32 @@ function admin_handle_social_broadcast_request(array $settings): array
     $labels = admin_social_broadcast_labels();
     $sent = [];
     $failed = [];
+    if ($sendToActuality) {
+        if (!function_exists('nammu_actuality_add_manual_item') && is_file(__DIR__ . '/actualidad.php')) {
+            require_once __DIR__ . '/actualidad.php';
+        }
+        if (function_exists('nammu_actuality_add_manual_item')) {
+            $config = load_config_file();
+            $siteTitle = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
+            $baseUrl = trim((string) ($config['site_url'] ?? ''));
+            if ($baseUrl === '') {
+                $baseUrl = function_exists('nammu_base_url') ? nammu_base_url() : '';
+            }
+            $manualItem = nammu_actuality_add_manual_item($text, $baseUrl, $siteTitle);
+            if (!empty($manualItem)) {
+                if (function_exists('nammu_actuality_rebuild_snapshot')) {
+                    $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
+                    $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
+                    nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+                }
+                $sent[] = 'Sección Actualidad';
+            } else {
+                $failed[] = 'Sección Actualidad: no se pudo guardar la nota.';
+            }
+        } else {
+            $failed[] = 'Sección Actualidad: no está disponible.';
+        }
+    }
     foreach ($selected as $network) {
         if (!isset($available[$network])) {
             $failed[] = ($labels[$network] ?? $network) . ': no está configurada.';

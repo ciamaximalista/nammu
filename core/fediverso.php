@@ -706,6 +706,30 @@ function nammu_fediverse_actions_by_object(): array
     return $grouped;
 }
 
+function nammu_fediverse_action_state_for_item(array $item): array
+{
+    $states = nammu_fediverse_actions_by_object();
+    $candidates = [];
+    foreach (['object_id', 'url', 'id'] as $field) {
+        $value = trim((string) ($item[$field] ?? ''));
+        if ($value !== '') {
+            $candidates[] = $value;
+        }
+    }
+    foreach ($candidates as $candidate) {
+        if (isset($states[$candidate])) {
+            return $states[$candidate];
+        }
+    }
+    return [
+        'liked' => false,
+        'replied' => false,
+        'shared' => false,
+        'reply_count' => 0,
+        'share_count' => 0,
+    ];
+}
+
 function nammu_fediverse_follow_actor(string $input): array
 {
     $config = function_exists('nammu_load_config') ? nammu_load_config() : [];
@@ -748,6 +772,7 @@ function nammu_fediverse_unfollow_actor(string $actorId): bool
 
 function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?array
 {
+    $activityId = trim((string) ($activity['id'] ?? ''));
     $type = strtolower((string) ($activity['type'] ?? ''));
     if (in_array($type, ['like', 'announce'], true)) {
         return null;
@@ -760,7 +785,8 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?
     if (in_array($type, ['like', 'announce'], true)) {
         return null;
     }
-    $id = trim((string) (($activity['id'] ?? '') ?: ($object['id'] ?? '')));
+    $objectId = trim((string) (($object['id'] ?? '') ?: $activityId));
+    $id = trim((string) ($activityId !== '' ? $activityId : $objectId));
     if ($id === '') {
         return null;
     }
@@ -826,6 +852,8 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?
     }
     return [
         'id' => $id,
+        'activity_id' => $activityId !== '' ? $activityId : $id,
+        'object_id' => $objectId !== '' ? $objectId : $id,
         'url' => $url !== '' ? $url : $id,
         'title' => $name,
         'content' => $content,

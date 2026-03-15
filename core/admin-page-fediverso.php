@@ -48,7 +48,6 @@
             $fediverseActorsById[$fediverseKnownActorId] = $fediverseKnownActor;
         }
     }
-    $fediverseActionState = function_exists('nammu_fediverse_actions_by_object') ? nammu_fediverse_actions_by_object() : [];
     $fediverseTimelineDisplay = [];
     foreach ($fediverseTimeline as $fediverseTimelineItem) {
         $fediverseTimelineType = strtolower(trim((string) ($fediverseTimelineItem['type'] ?? '')));
@@ -201,8 +200,8 @@
                     <?php else: ?>
                         <div class="fediverse-timeline">
                             <?php foreach ($fediverseTimelineDisplay as $item): ?>
-                                <?php $itemObjectUrl = (string) (($item['url'] ?? '') ?: ($item['id'] ?? '')); ?>
-                                <?php $itemActionState = $fediverseActionState[$itemObjectUrl] ?? ['liked' => false, 'replied' => false, 'shared' => false, 'reply_count' => 0, 'share_count' => 0]; ?>
+                                <?php $itemObjectId = (string) (($item['object_id'] ?? '') ?: (($item['url'] ?? '') ?: ($item['id'] ?? ''))); ?>
+                                <?php $itemActionState = function_exists('nammu_fediverse_action_state_for_item') ? nammu_fediverse_action_state_for_item($item) : ['liked' => false, 'replied' => false, 'shared' => false, 'reply_count' => 0, 'share_count' => 0]; ?>
                                 <article class="fediverse-status">
                                     <div class="fediverse-status__avatar">
                                         <?php if (!empty($item['actor_icon'])): ?>
@@ -288,7 +287,7 @@
                                             <form method="post" class="mb-0">
                                                 <input type="hidden" name="fediverse_tab" value="home">
                                                 <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($item['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>">
                                                 <button type="submit" name="fediverse_like_item" class="btn btn-outline-secondary btn-sm"<?= !empty($itemActionState['liked']) ? ' disabled' : '' ?>><?= !empty($itemActionState['liked']) ? 'Favorito enviado' : 'Favorito' ?></button>
                                             </form>
                                             <details class="fediverse-inline-form">
@@ -296,7 +295,7 @@
                                                 <form method="post">
                                                     <input type="hidden" name="fediverse_tab" value="home">
                                                     <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($item['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                    <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>">
                                                     <textarea name="fediverse_reply_text" class="form-control form-control-sm" rows="3" placeholder="Escribe tu respuesta"></textarea>
                                                     <button type="submit" name="fediverse_reply_item" class="btn btn-primary btn-sm mt-2">Enviar respuesta</button>
                                                 </form>
@@ -305,7 +304,7 @@
                                                 <summary>Reenviar como nota</summary>
                                                 <form method="post">
                                                     <input type="hidden" name="fediverse_tab" value="home">
-                                                    <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>">
                                                     <input type="hidden" name="fediverse_object_title" value="<?= htmlspecialchars((string) ($item['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                     <textarea name="fediverse_share_text" class="form-control form-control-sm" rows="3" placeholder="Añade un comentario opcional para tu nota"><?= htmlspecialchars((string) ($item['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
                                                     <button type="submit" name="fediverse_share_note" class="btn btn-primary btn-sm mt-2">Publicar nota</button>

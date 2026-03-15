@@ -28,6 +28,11 @@ config/scheduled-*.json
 # Artefactos generados de Actualidad
 config/actualidad-*.json
 assets/actualidad-cache/
+# Artefactos generados de Fediverso / ActivityPub
+config/fediverso-*.json
+config/activitypub-keys.json
+# Locks y estados de runtime
+config/*.lock
 indexnow-*.txt
 vendor/
 backups/*

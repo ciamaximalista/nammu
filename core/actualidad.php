@@ -141,7 +141,7 @@ function nammu_actuality_get_manual_item(string $id): ?array
     return null;
 }
 
-function nammu_actuality_update_manual_item(string $id, string $text, string $baseUrl, string $siteTitle): bool
+function nammu_actuality_update_manual_item(string $id, string $text, string $baseUrl, string $siteTitle, ?string $image = null): bool
 {
     $normalizedId = preg_replace('/[^a-f0-9]/i', '', trim($id)) ?? '';
     if ($normalizedId === '') {
@@ -166,6 +166,9 @@ function nammu_actuality_update_manual_item(string $id, string $text, string $ba
         $item['link'] = nammu_actuality_manual_anchor_url($baseUrl, $normalizedId);
         $item['source'] = $siteTitle !== '' ? $siteTitle : ((string) ($item['source'] ?? 'Actualidad'));
         $item['timestamp'] = $timestamp > 0 ? $timestamp : time();
+        if ($image !== null) {
+            $item['image'] = trim($image);
+        }
         $item['is_manual'] = true;
         $updated = true;
         break;
@@ -493,6 +496,25 @@ function nammu_actuality_manual_anchor_url(string $baseUrl, string $id): string
     return ($base !== '' ? $base : '') . '/actualidad.php#manual-' . rawurlencode($id);
 }
 
+function nammu_actuality_manual_image_url(string $image, string $baseUrl): string
+{
+    $value = trim($image);
+    if ($value === '') {
+        return '';
+    }
+    if (preg_match('#^https?://#i', $value)) {
+        return $value;
+    }
+    $base = rtrim($baseUrl, '/');
+    if ($base === '') {
+        return $value;
+    }
+    if ($value[0] !== '/') {
+        $value = '/' . ltrim($value, '/');
+    }
+    return $base . $value;
+}
+
 function nammu_actuality_prune_manual_items(array $items): array
 {
     $cutoff = time() - (60 * 86400);
@@ -502,7 +524,7 @@ function nammu_actuality_prune_manual_items(array $items): array
     }));
 }
 
-function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $siteTitle): array
+function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $siteTitle, string $image = ''): array
 {
     $parts = nammu_actuality_manual_content($text);
     if ($parts['title'] === '') {
@@ -520,7 +542,7 @@ function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $
         'links' => $parts['links'],
         'timestamp' => $timestamp,
         'link' => nammu_actuality_manual_anchor_url($baseUrl, $id),
-        'image' => '',
+        'image' => trim($image),
         'source' => $siteTitle !== '' ? $siteTitle : 'Actualidad',
         'is_manual' => true,
     ];
@@ -810,7 +832,7 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
             'id' => $manualId,
             'title' => trim((string) ($item['title'] ?? '')),
             'link' => trim((string) ($item['link'] ?? nammu_actuality_manual_anchor_url($publicBaseUrl, $manualId))),
-            'image' => '',
+            'image' => nammu_actuality_manual_image_url((string) ($item['image'] ?? ''), $publicBaseUrl),
             'description' => nammu_actuality_manual_plain_text((string) ($item['description'] ?? '')),
             'raw_text' => nammu_actuality_manual_plain_text((string) ($item['raw_text'] ?? '')),
             'links' => array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : []))),

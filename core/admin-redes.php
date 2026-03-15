@@ -1244,7 +1244,7 @@ function admin_handle_social_broadcast_request(array $settings): array
             if ($baseUrl === '') {
                 $baseUrl = function_exists('nammu_base_url') ? nammu_base_url() : '';
             }
-            $manualItem = nammu_actuality_add_manual_item($text, $baseUrl, $siteTitle);
+            $manualItem = nammu_actuality_add_manual_item($text, $baseUrl, $siteTitle, $image);
             if (!empty($manualItem)) {
                 if (function_exists('nammu_actuality_rebuild_snapshot')) {
                     $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));

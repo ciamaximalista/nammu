@@ -294,6 +294,9 @@ function nammu_fediverse_signed_fetch_json(string $url, array $config, string $m
 {
     $response = nammu_fediverse_signed_fetch($url, $config, $method, $body);
     if (($response['status'] ?? 0) < 200 || ($response['status'] ?? 0) >= 400) {
+        if (strtoupper($method) === 'GET' && $body === '') {
+            return nammu_fediverse_fetch_json($url);
+        }
         return null;
     }
     $decoded = json_decode((string) ($response['body'] ?? ''), true);
@@ -378,6 +381,20 @@ function nammu_fediverse_extract_actor_icon(array $actor): string
         }
     }
     return '';
+}
+
+function nammu_fediverse_extract_html_image_urls(string $html): array
+{
+    $html = trim($html);
+    if ($html === '') {
+        return [];
+    }
+    $matches = [];
+    preg_match_all('/<img\b[^>]*\bsrc=(["\'])(https?:\/\/[^"\']+)\1/i', $html, $matches);
+    $urls = array_values(array_unique(array_filter(array_map('trim', $matches[2] ?? []), static function ($url): bool {
+        return is_string($url) && $url !== '';
+    })));
+    return $urls;
 }
 
 function nammu_fediverse_parse_digest_value(string $header): array
@@ -681,6 +698,27 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?
             'name' => trim((string) ($attachment['name'] ?? '')),
             'media_type' => trim((string) (($attachment['mediaType'] ?? '') ?: ($attachment['mimeType'] ?? ''))),
         ];
+    }
+    $htmlImages = nammu_fediverse_extract_html_image_urls($contentHtml);
+    foreach ($htmlImages as $htmlImageUrl) {
+        $alreadyPresent = false;
+        foreach ($attachments as $existingAttachment) {
+            if (trim((string) ($existingAttachment['url'] ?? '')) === $htmlImageUrl) {
+                $alreadyPresent = true;
+                break;
+            }
+        }
+        if (!$alreadyPresent) {
+            $attachments[] = [
+                'type' => 'image',
+                'url' => $htmlImageUrl,
+                'name' => '',
+                'media_type' => 'image/*',
+            ];
+        }
+        if ($image === '') {
+            $image = $htmlImageUrl;
+        }
     }
     if ($image !== '' && empty($attachments)) {
         $attachments[] = [

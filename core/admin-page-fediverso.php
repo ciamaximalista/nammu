@@ -72,6 +72,26 @@
                 $fediverseTimelineItem['actor_url'] = trim((string) (($fediverseTimelineActor['url'] ?? '') ?: ($fediverseTimelineActor['id'] ?? '')));
             }
         }
+        $fediverseTimelineAttachments = is_array($fediverseTimelineItem['attachments'] ?? null) ? $fediverseTimelineItem['attachments'] : [];
+        if (empty($fediverseTimelineAttachments) && function_exists('nammu_fediverse_extract_html_image_urls')) {
+            foreach (nammu_fediverse_extract_html_image_urls((string) ($fediverseTimelineItem['content_html'] ?? '')) as $fediverseTimelineImageUrl) {
+                $fediverseTimelineAttachments[] = [
+                    'type' => 'image',
+                    'url' => $fediverseTimelineImageUrl,
+                    'name' => '',
+                    'media_type' => 'image/*',
+                ];
+            }
+        }
+        if (empty($fediverseTimelineAttachments) && trim((string) ($fediverseTimelineItem['image'] ?? '')) !== '') {
+            $fediverseTimelineAttachments[] = [
+                'type' => 'image',
+                'url' => trim((string) $fediverseTimelineItem['image']),
+                'name' => '',
+                'media_type' => 'image/*',
+            ];
+        }
+        $fediverseTimelineItem['attachments'] = $fediverseTimelineAttachments;
         $fediverseTimelineDisplay[] = $fediverseTimelineItem;
     }
     $sanitizeFediverseHtml = static function (string $html): string {

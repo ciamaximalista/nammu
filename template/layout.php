@@ -1521,7 +1521,7 @@ if (!empty($baseUrl)) {
             <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
         </a>
     <?php endif; ?>
-    <?php if ($showFloatingSearch || $showFloatingSubscription): ?>
+    <?php if (($fediverseCtaUrl !== '' && $fediverseCtaHandle !== '') || $showFloatingSearch || $showFloatingSubscription): ?>
         <div class="floating-stack">
             <?php if ($fediverseCtaUrl !== '' && $fediverseCtaHandle !== ''): ?>
                 <div class="floating-fediverse">

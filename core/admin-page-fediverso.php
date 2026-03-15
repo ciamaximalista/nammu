@@ -409,7 +409,7 @@
                                                 <time datetime="<?= htmlspecialchars((string) ($localItem['published'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) ($localItem['published'] ?? ''), ENT_QUOTES, 'UTF-8') ?></time>
                                             </div>
                                         </div>
-                                        <?php if (!empty($localItem['title'])): ?>
+                                        <?php if (!empty($localItem['title']) && strcasecmp((string) ($localItem['type'] ?? ''), 'Note') !== 0): ?>
                                             <div class="fediverse-status__title"><?= htmlspecialchars((string) ($localItem['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
                                         <?php endif; ?>
                                         <?php if (!empty($localItem['content'])): ?>
@@ -486,7 +486,7 @@
                                                 <?php endif; ?>
                                             </div>
                                         </div>
-                                        <?php if (!empty($item['title'])): ?>
+                                        <?php if (!empty($item['title']) && strcasecmp((string) ($item['type'] ?? ''), 'Note') !== 0): ?>
                                             <div class="fediverse-status__title"><?= htmlspecialchars((string) $item['title'], ENT_QUOTES, 'UTF-8') ?></div>
                                         <?php endif; ?>
                                         <?php

@@ -138,6 +138,13 @@ $pushPublicKey = function_exists('nammu_push_public_key') ? nammu_push_public_ke
 $pushSubscribeUrl = $searchBaseNormalized === '' ? '/push-subscribe.php' : $searchBaseNormalized . '/push-subscribe.php';
 $pushUnsubscribeUrl = $searchBaseNormalized === '' ? '/push-unsubscribe.php' : $searchBaseNormalized . '/push-unsubscribe.php';
 $showPushPrompt = $pushEnabled && $pushPublicKey !== '' && !$isCrawler;
+$fediverseCtaHandle = '';
+$fediverseCtaUrl = '';
+if (function_exists('nammu_fediverse_actor_url') && function_exists('nammu_fediverse_acct_uri')) {
+    $fediverseCtaUrl = nammu_fediverse_actor_url($fediverseConfig ?? (function_exists('nammu_load_config') ? nammu_load_config() : []));
+    $fediverseAcctUri = nammu_fediverse_acct_uri($fediverseConfig ?? (function_exists('nammu_load_config') ? nammu_load_config() : []));
+    $fediverseCtaHandle = str_starts_with($fediverseAcctUri, 'acct:') ? '@' . substr($fediverseAcctUri, 5) : $fediverseAcctUri;
+}
 $serverDay = date('Y-m-d');
 $serverDayExpires = date(DATE_RFC2822, strtotime('today 23:59:59'));
 $serverConsentDate = date('Y-m-d');
@@ -746,6 +753,117 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             box-shadow: 0 14px 26px rgba(0,0,0,0.12);
             padding: 0.3rem 0.4rem;
             backdrop-filter: blur(6px);
+        }
+        .floating-fediverse {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            background: linear-gradient(135deg, rgba(255,255,255,0.98), <?= $colorHighlight ?>);
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: var(--nammu-radius-md);
+            box-shadow: 0 14px 26px rgba(0,0,0,0.12);
+            padding: 0.7rem 0.8rem;
+            backdrop-filter: blur(6px);
+        }
+        .floating-fediverse__button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            min-height: 38px;
+            padding: 0.55rem 0.8rem;
+            border-radius: 12px;
+            background: <?= $colorAccent ?>;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 0.9rem;
+            line-height: 1.2;
+        }
+        .floating-fediverse__button:hover {
+            color: #fff;
+            text-decoration: none;
+            filter: brightness(0.96);
+        }
+        .floating-fediverse__help {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 30px;
+            padding: 0.35rem 0.6rem;
+            border-radius: 10px;
+            border: 1px solid rgba(0,0,0,0.08);
+            background: rgba(255,255,255,0.82);
+            color: <?= $colorAccent ?>;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .floating-fediverse__meta {
+            font-size: 0.8rem;
+            color: <?= $colorText ?>;
+            text-align: center;
+            word-break: break-word;
+        }
+        .fediverse-follow-dialog {
+            border: none;
+            border-radius: 18px;
+            padding: 0;
+            width: min(92vw, 420px);
+            max-width: 420px;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.22);
+        }
+        .fediverse-follow-dialog::backdrop {
+            background: rgba(0, 0, 0, 0.45);
+        }
+        .fediverse-follow-dialog__card {
+            padding: 1.1rem 1.15rem 1rem 1.15rem;
+            background: #fff;
+        }
+        .fediverse-follow-dialog__card h2 {
+            margin: 0 0 0.55rem 0;
+            font-size: 1.15rem;
+            color: <?= $colorAccent ?>;
+        }
+        .fediverse-follow-dialog__card p {
+            margin: 0 0 0.7rem 0;
+            line-height: 1.5;
+            color: <?= $colorText ?>;
+        }
+        .fediverse-follow-dialog__handle {
+            display: block;
+            margin: 0.4rem 0 0.8rem 0;
+            padding: 0.75rem 0.85rem;
+            border-radius: 12px;
+            background: <?= $colorHighlight ?>;
+            border: 1px solid rgba(0,0,0,0.08);
+            font-weight: 700;
+            text-align: center;
+            word-break: break-word;
+        }
+        .fediverse-follow-dialog__actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            justify-content: flex-end;
+            margin-top: 0.9rem;
+        }
+        .fediverse-follow-dialog__actions a,
+        .fediverse-follow-dialog__actions button {
+            min-height: 36px;
+            padding: 0.5rem 0.8rem;
+            border-radius: 10px;
+            border: 1px solid rgba(0,0,0,0.08);
+            background: #fff;
+            color: <?= $colorAccent ?>;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .fediverse-follow-dialog__actions a.fediverse-follow-dialog__primary {
+            background: <?= $colorAccent ?>;
+            color: #fff;
+            border-color: <?= $colorAccent ?>;
         }
         .floating-search-form {
             display: flex;
@@ -1416,6 +1534,28 @@ if (!empty($baseUrl)) {
     <?php endif; ?>
     <?php if ($showFloatingSearch || $showFloatingSubscription): ?>
         <div class="floating-stack">
+            <?php if ($fediverseCtaUrl !== '' && $fediverseCtaHandle !== ''): ?>
+                <div class="floating-fediverse">
+                    <a class="floating-fediverse__button" href="<?= htmlspecialchars($fediverseCtaUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener me" title="Sigue esta cuenta en el Fediverso desde tu servidor">
+                        Síguenos en el Fediverso
+                    </a>
+                    <button type="button" class="floating-fediverse__help" data-fediverse-follow-open>Cómo seguirnos</button>
+                    <div class="floating-fediverse__meta"><?= htmlspecialchars($fediverseCtaHandle, ENT_QUOTES, 'UTF-8') ?></div>
+                </div>
+                <dialog class="fediverse-follow-dialog" data-fediverse-follow-dialog>
+                    <div class="fediverse-follow-dialog__card">
+                        <h2>Síguenos en el Fediverso</h2>
+                        <p>Abre tu servidor Mastodon, Akkoma o compatible, busca esta cuenta y síguela como a cualquier otro perfil.</p>
+                        <code class="fediverse-follow-dialog__handle"><?= htmlspecialchars($fediverseCtaHandle, ENT_QUOTES, 'UTF-8') ?></code>
+                        <p>Si tu servidor no encuentra la cuenta enseguida, prueba a pegar el identificador completo o abre primero el actor público.</p>
+                        <div class="fediverse-follow-dialog__actions">
+                            <button type="button" data-fediverse-follow-copy>Copiar cuenta</button>
+                            <a class="fediverse-follow-dialog__primary" href="<?= htmlspecialchars($fediverseCtaUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener me">Abrir actor</a>
+                            <button type="button" data-fediverse-follow-close>Cerrar</button>
+                        </div>
+                    </div>
+                </dialog>
+            <?php endif; ?>
             <?php if ($showFloatingSubscription): ?>
                 <div class="floating-search floating-subscription" data-floating-subscription>
                     <form class="floating-search-form subscription-form" method="post" action="<?= htmlspecialchars($floatingSubscriptionAction, ENT_QUOTES, 'UTF-8') ?>">
@@ -2193,6 +2333,41 @@ if (!empty($baseUrl)) {
 
             block.dataset.pdfEnhanced = '1';
         });
+    })();
+    </script>
+    <script>
+    (function() {
+        var openButton = document.querySelector('[data-fediverse-follow-open]');
+        var dialog = document.querySelector('[data-fediverse-follow-dialog]');
+        if (!openButton || !dialog || typeof dialog.showModal !== 'function') return;
+        var closeButton = dialog.querySelector('[data-fediverse-follow-close]');
+        var copyButton = dialog.querySelector('[data-fediverse-follow-copy]');
+        var handle = dialog.querySelector('.fediverse-follow-dialog__handle');
+        openButton.addEventListener('click', function() {
+            dialog.showModal();
+        });
+        if (closeButton) {
+            closeButton.addEventListener('click', function() {
+                dialog.close();
+            });
+        }
+        dialog.addEventListener('click', function(ev) {
+            var rect = dialog.getBoundingClientRect();
+            var inside = ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom;
+            if (!inside) {
+                dialog.close();
+            }
+        });
+        if (copyButton && handle && navigator.clipboard && navigator.clipboard.writeText) {
+            copyButton.addEventListener('click', function() {
+                navigator.clipboard.writeText(handle.textContent || '').then(function() {
+                    copyButton.textContent = 'Copiada';
+                    setTimeout(function() {
+                        copyButton.textContent = 'Copiar cuenta';
+                    }, 1600);
+                });
+            });
+        }
     })();
     </script>
     <script>

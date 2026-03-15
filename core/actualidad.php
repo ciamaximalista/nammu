@@ -509,10 +509,11 @@ function nammu_actuality_manual_image_url(string $image, string $baseUrl): strin
     if ($base === '') {
         return $value;
     }
-    if ($value[0] !== '/') {
-        $value = '/' . ltrim($value, '/');
+    $normalized = ltrim($value, '/');
+    if (!str_starts_with($normalized, 'assets/')) {
+        $normalized = 'assets/' . $normalized;
     }
-    return $base . $value;
+    return $base . '/' . $normalized;
 }
 
 function nammu_actuality_prune_manual_items(array $items): array

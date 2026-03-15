@@ -2315,11 +2315,23 @@
     $pushSubscriberCount = 0;
     $pushEnabled = false;
     $socialCounts = [];
+    if (!function_exists('nammu_fediverse_followers_store') && is_file(dirname(__DIR__) . '/core/fediverso.php')) {
+        require_once dirname(__DIR__) . '/core/fediverso.php';
+    }
     if (function_exists('get_settings')) {
         $settings = get_settings();
         $pushEnabled = (($settings['ads']['push_enabled'] ?? 'off') === 'on');
         if ($pushEnabled && function_exists('nammu_push_subscriber_count')) {
             $pushSubscriberCount = nammu_push_subscriber_count();
+        }
+        if (function_exists('nammu_fediverse_followers_store')) {
+            try {
+                $fediverseFollowerCount = count(nammu_fediverse_followers_store()['followers'] ?? []);
+                if ($fediverseFollowerCount > 0) {
+                    $socialCounts['Fediverso'] = $fediverseFollowerCount;
+                }
+            } catch (Throwable $e) {
+            }
         }
         $telegramCount = admin_get_telegram_follower_count($settings['telegram'] ?? []);
         if ($telegramCount !== null) {

@@ -1430,13 +1430,58 @@ function nammu_fediverse_notification_entries(array $config): array
 
 function nammu_fediverse_post_activity(string $inboxUrl, array $activity, array $config): bool
 {
+    $result = nammu_fediverse_post_activity_response($inboxUrl, $activity, $config);
+    return !empty($result['ok']);
+}
+
+function nammu_fediverse_post_activity_response(string $inboxUrl, array $activity, array $config): array
+{
     $body = json_encode($activity, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     if (!is_string($body) || $body === '') {
-        return false;
+        return ['ok' => false, 'status' => 0, 'body' => '', 'message' => 'No se pudo serializar la actividad.'];
     }
     $response = nammu_fediverse_signed_fetch($inboxUrl, $config, 'POST', $body);
     $status = (int) ($response['status'] ?? 0);
-    return $status >= 200 && $status < 300;
+    $responseBody = trim((string) ($response['body'] ?? ''));
+    if ($status >= 200 && $status < 300) {
+        return ['ok' => true, 'status' => $status, 'body' => $responseBody, 'message' => ''];
+    }
+    return [
+        'ok' => false,
+        'status' => $status,
+        'body' => $responseBody,
+        'message' => 'HTTP ' . $status . ($responseBody !== '' ? ': ' . $responseBody : ''),
+    ];
+}
+
+function nammu_fediverse_resolve_object_reference(string $candidate, array $config): string
+{
+    $candidate = trim($candidate);
+    if ($candidate === '' || !preg_match('#^https?://#i', $candidate)) {
+        return $candidate;
+    }
+    $payload = nammu_fediverse_signed_fetch_json($candidate, $config);
+    if (!is_array($payload)) {
+        $payload = nammu_fediverse_fetch_json($candidate);
+    }
+    if (!is_array($payload)) {
+        return $candidate;
+    }
+    $type = strtolower(trim((string) ($payload['type'] ?? '')));
+    if (in_array($type, ['create', 'update', 'announce'], true)) {
+        $object = $payload['object'] ?? null;
+        if (is_string($object) && trim($object) !== '') {
+            return trim($object);
+        }
+        if (is_array($object)) {
+            $objectId = trim((string) (($object['id'] ?? '') ?: ''));
+            if ($objectId !== '') {
+                return $objectId;
+            }
+        }
+    }
+    $payloadId = trim((string) (($payload['id'] ?? '') ?: ''));
+    return $payloadId !== '' ? $payloadId : $candidate;
 }
 
 function nammu_fediverse_verify_inbox_request(array $payload, array $headers, string $rawBody, array $config): array
@@ -1584,7 +1629,7 @@ function nammu_fediverse_send_private_message(string $recipientId, string $text,
 function nammu_fediverse_send_like(string $recipientId, string $objectUrl, array $config): array
 {
     $recipientId = trim($recipientId);
-    $objectUrl = trim($objectUrl);
+    $objectUrl = nammu_fediverse_resolve_object_reference(trim($objectUrl), $config);
     if ($recipientId === '' || $objectUrl === '') {
         return ['ok' => false, 'message' => 'Falta el destinatario o la publicación a marcar como favorita.'];
     }
@@ -1606,8 +1651,9 @@ function nammu_fediverse_send_like(string $recipientId, string $objectUrl, array
         'to' => [$recipientId],
         'published' => gmdate(DATE_ATOM),
     ];
-    if (!nammu_fediverse_post_activity($inboxUrl, $activity, $config)) {
-        return ['ok' => false, 'message' => 'No se pudo enviar el favorito.'];
+    $delivery = nammu_fediverse_post_activity_response($inboxUrl, $activity, $config);
+    if (empty($delivery['ok'])) {
+        return ['ok' => false, 'message' => 'No se pudo enviar el favorito. ' . trim((string) ($delivery['message'] ?? ''))];
     }
     nammu_fediverse_record_action('like', $recipientId, $objectUrl);
     return ['ok' => true, 'message' => 'Favorito enviado.'];
@@ -1616,7 +1662,7 @@ function nammu_fediverse_send_like(string $recipientId, string $objectUrl, array
 function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, string $text, array $config): array
 {
     $recipientId = trim($recipientId);
-    $objectUrl = trim($objectUrl);
+    $objectUrl = nammu_fediverse_resolve_object_reference(trim($objectUrl), $config);
     $plainText = trim($text);
     if ($recipientId === '' || $objectUrl === '' || $plainText === '') {
         return ['ok' => false, 'message' => 'Falta el destinatario, la publicación o el texto de la respuesta.'];
@@ -1651,8 +1697,9 @@ function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, stri
             'inReplyTo' => $objectUrl,
         ],
     ];
-    if (!nammu_fediverse_post_activity($inboxUrl, $activity, $config)) {
-        return ['ok' => false, 'message' => 'No se pudo enviar la respuesta.'];
+    $delivery = nammu_fediverse_post_activity_response($inboxUrl, $activity, $config);
+    if (empty($delivery['ok'])) {
+        return ['ok' => false, 'message' => 'No se pudo enviar la respuesta. ' . trim((string) ($delivery['message'] ?? ''))];
     }
     nammu_fediverse_record_action('reply', $recipientId, $objectUrl, ['reply_text' => $plainText]);
     return ['ok' => true, 'message' => 'Respuesta enviada.'];

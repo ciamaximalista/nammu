@@ -74,7 +74,8 @@ $renderLinks = static function (array $links): string {
     }
     $bits = [];
     foreach ($links as $index => $url) {
-        $bits[] = '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">Enlace ' . ($index + 1) . '</a>';
+        $label = count($links) === 1 ? 'Enlace' : ('Enlace ' . ($index + 1));
+        $bits[] = '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">' . $label . '</a>';
     }
     return implode(', ', $bits);
 };
@@ -102,10 +103,12 @@ $renderLinks = static function (array $links): string {
 <?php else: ?>
     <?php foreach ($groupedItems as $group): ?>
         <?php [$leftColumnItems, $rightColumnItems] = $splitColumns($group['items']); ?>
+        <?php $singleItem = count($group['items']) === 1 ? $group['items'][0] : null; ?>
+        <?php $singleItemIsManual = is_array($singleItem) && !empty($singleItem['is_manual']); ?>
         <section class="actuality-day">
             <h2 class="actuality-day-heading"><?= htmlspecialchars((string) $group['label'], ENT_QUOTES, 'UTF-8') ?></h2>
-            <div class="actuality-grid<?= count($group['items']) === 1 ? ' is-single-item' : '' ?>">
-                <?php if (count($group['items']) === 1): ?>
+            <div class="actuality-grid<?= (count($group['items']) === 1 && !$singleItemIsManual) ? ' is-single-item' : '' ?>">
+                <?php if (count($group['items']) === 1 && !$singleItemIsManual): ?>
                     <?php $item = $group['items'][0]; ?>
                     <?php $isManual = !empty($item['is_manual']); ?>
                     <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
@@ -142,6 +145,7 @@ $renderLinks = static function (array $links): string {
                     <?php foreach ($leftColumnItems as $item): ?>
                         <?php $isManual = !empty($item['is_manual']); ?>
                         <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
+                        <?php $manualBody = $isManual ? trim((string) ($item['description'] !== '' ? $item['description'] : ($item['title'] ?? ''))) : ''; ?>
                         <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                             <div class="actuality-card-body">
                                 <?php if (!$isManual): ?>
@@ -162,8 +166,9 @@ $renderLinks = static function (array $links): string {
                                         <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                                     </a>
                                 <?php endif; ?>
-                                <?php if ($item['description'] !== ''): ?>
-                                    <div class="actuality-description"><?= nl2br(htmlspecialchars($item['description'], ENT_QUOTES, 'UTF-8')) ?></div>
+                                <?php if ((!$isManual && $item['description'] !== '') || ($isManual && $manualBody !== '')): ?>
+                                    <?php $descriptionText = $isManual ? $manualBody : (string) $item['description']; ?>
+                                    <div class="actuality-description"><?= nl2br(htmlspecialchars($descriptionText, ENT_QUOTES, 'UTF-8')) ?></div>
                                 <?php endif; ?>
                                 <?php if ($isManual && !empty($item['links'])): ?>
                                     <p class="actuality-manual-links"><?= $renderLinks(is_array($item['links']) ? $item['links'] : []) ?></p>
@@ -176,6 +181,7 @@ $renderLinks = static function (array $links): string {
                     <?php foreach ($rightColumnItems as $item): ?>
                         <?php $isManual = !empty($item['is_manual']); ?>
                         <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
+                        <?php $manualBody = $isManual ? trim((string) ($item['description'] !== '' ? $item['description'] : ($item['title'] ?? ''))) : ''; ?>
                         <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                             <div class="actuality-card-body">
                                 <?php if (!$isManual): ?>
@@ -196,8 +202,9 @@ $renderLinks = static function (array $links): string {
                                         <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                                     </a>
                                 <?php endif; ?>
-                                <?php if ($item['description'] !== ''): ?>
-                                    <div class="actuality-description"><?= nl2br(htmlspecialchars($item['description'], ENT_QUOTES, 'UTF-8')) ?></div>
+                                <?php if ((!$isManual && $item['description'] !== '') || ($isManual && $manualBody !== '')): ?>
+                                    <?php $descriptionText = $isManual ? $manualBody : (string) $item['description']; ?>
+                                    <div class="actuality-description"><?= nl2br(htmlspecialchars($descriptionText, ENT_QUOTES, 'UTF-8')) ?></div>
                                 <?php endif; ?>
                                 <?php if ($isManual && !empty($item['links'])): ?>
                                     <p class="actuality-manual-links"><?= $renderLinks(is_array($item['links']) ? $item['links'] : []) ?></p>

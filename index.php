@@ -687,6 +687,12 @@ if ($routePath === '/ap/actor') {
     exit;
 }
 
+if ($routePath === '/ap/key') {
+    header('Content-Type: application/activity+json; charset=UTF-8');
+    echo json_encode(nammu_fediverse_public_key_document($configData), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if ($routePath === '/ap/outbox') {
     header('Content-Type: application/activity+json; charset=UTF-8');
     echo json_encode(nammu_fediverse_outbox_document($configData), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);

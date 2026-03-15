@@ -104,6 +104,11 @@ function nammu_fediverse_actor_url(array $config): string
     return nammu_fediverse_base_url($config) . '/ap/actor';
 }
 
+function nammu_fediverse_key_url(array $config): string
+{
+    return nammu_fediverse_base_url($config) . '/ap/key';
+}
+
 function nammu_fediverse_outbox_url(array $config): string
 {
     return nammu_fediverse_base_url($config) . '/ap/outbox';
@@ -175,7 +180,7 @@ function nammu_fediverse_keypair(): array
 
 function nammu_fediverse_signature_key_id(array $config): string
 {
-    return nammu_fediverse_actor_url($config) . '#main-key';
+    return nammu_fediverse_key_url($config);
 }
 
 function nammu_fediverse_private_key_resource(array $config)
@@ -1176,12 +1181,27 @@ function nammu_fediverse_actor_document(array $config): array
     }
     if (!empty($keys['public_key'])) {
         $document['publicKey'] = [
-            'id' => $actorUrl . '#main-key',
+            'id' => nammu_fediverse_key_url($config),
             'owner' => $actorUrl,
             'publicKeyPem' => $keys['public_key'],
         ];
     }
     return $document;
+}
+
+function nammu_fediverse_public_key_document(array $config): array
+{
+    $keys = nammu_fediverse_keypair();
+    return [
+        '@context' => [
+            'https://www.w3.org/ns/activitystreams',
+            'https://w3id.org/security/v1',
+        ],
+        'id' => nammu_fediverse_key_url($config),
+        'type' => 'Key',
+        'owner' => nammu_fediverse_actor_url($config),
+        'publicKeyPem' => (string) ($keys['public_key'] ?? ''),
+    ];
 }
 
 function nammu_fediverse_webfinger_document(array $config): array

@@ -1146,6 +1146,7 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
 function nammu_fediverse_actor_document(array $config): array
 {
     $actorUrl = nammu_fediverse_actor_url($config);
+    $baseUrl = nammu_fediverse_base_url($config);
     $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
     $siteDescription = trim((string) ($config['site_description'] ?? ''));
     $keys = nammu_fediverse_keypair();

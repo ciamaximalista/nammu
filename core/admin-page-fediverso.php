@@ -753,7 +753,7 @@
                                         <div class="small text-muted mt-1"><?= htmlspecialchars((string) $actorId, ENT_QUOTES, 'UTF-8') ?></div>
                                     </div>
                                 </div>
-                                <?php foreach (array_reverse($messages) as $message): ?>
+                                <?php foreach ($messages as $message): ?>
                                     <?php $isOutgoing = (($message['direction'] ?? '') === 'outgoing'); ?>
                                     <?php
                                     $isPublicMessage = (($message['visibility'] ?? '') === 'public');
@@ -799,7 +799,7 @@
                                                 · <?= !empty($message['verified']) ? 'verificado' : 'no verificado' ?>
                                             <?php endif; ?>
                                         </div>
-                                        <?php if (!empty($message['title']) && $isThreadRoot): ?>
+                                        <?php if (!empty($message['title']) && $isThreadRoot && strcasecmp((string) ($message['content_type'] ?? ''), 'Note') !== 0): ?>
                                             <div class="font-weight-bold mb-2"><?= htmlspecialchars((string) $message['title'], ENT_QUOTES, 'UTF-8') ?></div>
                                         <?php endif; ?>
                                         <div><?= nl2br(htmlspecialchars((string) ($message['content'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>

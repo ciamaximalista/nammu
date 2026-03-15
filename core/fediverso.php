@@ -1483,6 +1483,7 @@ function nammu_fediverse_public_thread_root_message_entries(array $config): arra
             'visibility' => 'public',
             'reply_target_url' => $target,
             'is_thread_root' => true,
+            'content_type' => trim((string) ($localItem['type'] ?? '')),
             'title' => trim((string) ($localItem['title'] ?? '')),
         ];
     }

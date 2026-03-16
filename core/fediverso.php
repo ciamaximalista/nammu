@@ -1954,6 +1954,35 @@ function nammu_fediverse_outbox_document(array $config): array
     ];
 }
 
+function nammu_fediverse_object_document(string $routePath, array $config): ?array
+{
+    $routePath = trim($routePath);
+    if ($routePath === '') {
+        return null;
+    }
+    $baseUrl = rtrim(nammu_fediverse_base_url($config), '/');
+    foreach (nammu_fediverse_local_content_items($config) as $item) {
+        $itemId = trim((string) ($item['id'] ?? ''));
+        if ($itemId === '') {
+            continue;
+        }
+        $itemPath = trim((string) (parse_url($itemId, PHP_URL_PATH) ?? ''));
+        if ($itemPath !== $routePath) {
+            continue;
+        }
+        $activity = nammu_fediverse_activity_for_local_item($item, $config);
+        $object = is_array($activity['object'] ?? null) ? $activity['object'] : null;
+        if (!is_array($object)) {
+            return null;
+        }
+        if (trim((string) ($object['id'] ?? '')) === '') {
+            $object['id'] = $baseUrl . $routePath;
+        }
+        return $object;
+    }
+    return null;
+}
+
 function nammu_fediverse_store_inbox_activity(array $payload, array $meta = []): void
 {
     $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);

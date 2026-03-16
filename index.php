@@ -699,6 +699,19 @@ if ($routePath === '/ap/outbox') {
     exit;
 }
 
+if (preg_match('#^/ap/objects/[^/]+$#', $routePath) === 1) {
+    $objectDocument = nammu_fediverse_object_document($routePath, $configData);
+    if (!is_array($objectDocument)) {
+        http_response_code(404);
+        header('Content-Type: application/activity+json; charset=UTF-8');
+        echo json_encode(['error' => 'object_not_found'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    header('Content-Type: application/activity+json; charset=UTF-8');
+    echo json_encode($objectDocument, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if ($routePath === '/ap/followers') {
     header('Content-Type: application/activity+json; charset=UTF-8');
     echo json_encode(nammu_fediverse_followers_collection($configData), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);

@@ -2913,6 +2913,51 @@ function nammu_fediverse_remove_inbox_activities(array $identifiers): int
     return $before - count($activities);
 }
 
+function nammu_fediverse_local_targets_for_deleted_reply(array $identifiers, array $config): array
+{
+    $identifiers = array_values(array_filter(array_map(static function ($value): string {
+        return trim((string) $value);
+    }, $identifiers)));
+    if (empty($identifiers)) {
+        return [];
+    }
+    $targets = [];
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
+    $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
+    foreach ($activities as $entry) {
+        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        if (strtolower(trim((string) ($payload['type'] ?? ''))) !== 'create') {
+            continue;
+        }
+        $object = is_array($payload['object'] ?? null) ? $payload['object'] : [];
+        if (strtolower(trim((string) ($object['type'] ?? ''))) !== 'note') {
+            continue;
+        }
+        $candidates = array_filter([
+            trim((string) ($payload['id'] ?? '')),
+            trim((string) ($object['id'] ?? '')),
+            trim((string) ($object['url'] ?? '')),
+            trim((string) ($object['atomUri'] ?? '')),
+        ]);
+        if (empty(array_intersect($candidates, $identifiers))) {
+            continue;
+        }
+        $target = trim((string) ($object['inReplyTo'] ?? ''));
+        if ($target === '') {
+            continue;
+        }
+        $localTarget = nammu_fediverse_find_local_item_for_identifier($target, $config);
+        if (!is_array($localTarget)) {
+            continue;
+        }
+        $localId = trim((string) ($localTarget['id'] ?? ''));
+        if ($localId !== '') {
+            $targets[$localId] = $localTarget;
+        }
+    }
+    return array_values($targets);
+}
+
 function nammu_fediverse_followers_add_or_update(array $actor): void
 {
     $followers = nammu_fediverse_followers_store()['followers'];
@@ -3638,8 +3683,12 @@ function nammu_fediverse_handle_inbox_payload(array $payload, array $config, arr
                 $targets[] = trim((string) $object['atomUri']);
             }
         }
+        $affectedLocalTargets = nammu_fediverse_local_targets_for_deleted_reply($targets, $config);
         nammu_fediverse_remove_timeline_items($targets);
         nammu_fediverse_remove_inbox_activities($targets);
+        foreach ($affectedLocalTargets as $affectedLocalTarget) {
+            nammu_fediverse_notify_followers_of_object_update($affectedLocalTarget, $config);
+        }
         return ['accepted' => true, 'type' => 'delete', 'verified' => true];
     }
     if ($type === 'create' && is_array($payload['object'] ?? null)) {

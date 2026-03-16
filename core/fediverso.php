@@ -897,6 +897,35 @@ function nammu_fediverse_public_action_activities(array $config): array
     $activities = [];
     foreach ($actions as $action) {
         $type = strtolower(trim((string) ($action['type'] ?? '')));
+        if ($type === 'reply_announce') {
+            $objectUrl = trim((string) ($action['reply_object_id'] ?? (($action['object_url'] ?? '') ?: '')));
+            if ($objectUrl === '') {
+                continue;
+            }
+            $published = trim((string) ($action['published'] ?? ''));
+            if ($published === '') {
+                $published = gmdate(DATE_ATOM);
+            }
+            $activityId = trim((string) ($action['activity_id'] ?? ''));
+            if ($activityId === '') {
+                $activityId = $actorUrl . '/reply-announces/' . trim((string) ($action['id'] ?? substr(sha1($objectUrl . '|' . $published), 0, 24)));
+            }
+            $cc = array_values(array_filter([
+                trim((string) ($action['reply_actor_id'] ?? '')),
+                trim((string) ($action['target_actor_id'] ?? '')),
+            ]));
+            $activities[] = [
+                '@context' => 'https://www.w3.org/ns/activitystreams',
+                'id' => $activityId,
+                'type' => 'Announce',
+                'actor' => $actorUrl,
+                'object' => $objectUrl,
+                'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+                'cc' => $cc,
+                'published' => $published,
+            ];
+            continue;
+        }
         if ($type === 'boost') {
             $objectUrl = trim((string) ($action['object_url'] ?? ''));
             if ($objectUrl === '') {
@@ -2735,11 +2764,27 @@ function nammu_fediverse_relay_public_reply_to_followers(array $payload, array $
     if ($replyObjectId === '') {
         return 0;
     }
+    $localTargetId = trim((string) (($localTarget['id'] ?? '') ?: ''));
+    if ($localTargetId === '') {
+        return 0;
+    }
+    foreach (nammu_fediverse_actions_store()['items'] as $action) {
+        if (strtolower(trim((string) ($action['type'] ?? ''))) !== 'reply_announce') {
+            continue;
+        }
+        if (
+            trim((string) ($action['reply_object_id'] ?? '')) === $replyObjectId
+            && trim((string) ($action['object_url'] ?? '')) === $localTargetId
+        ) {
+            return 0;
+        }
+    }
     $followers = nammu_fediverse_followers_store()['followers'];
     if (empty($followers)) {
         return 0;
     }
     $actorUrl = nammu_fediverse_actor_url($config);
+    $replyActorId = trim((string) ($payload['actor'] ?? ''));
     $announceActivity = [
         '@context' => 'https://www.w3.org/ns/activitystreams',
         'id' => $actorUrl . '/reply-announces/' . substr(sha1($replyObjectId . '|' . microtime(true)), 0, 24),
@@ -2747,7 +2792,10 @@ function nammu_fediverse_relay_public_reply_to_followers(array $payload, array $
         'actor' => $actorUrl,
         'object' => $replyObjectId,
         'to' => ['https://www.w3.org/ns/activitystreams#Public'],
-        'cc' => [trim((string) ($payload['actor'] ?? ''))],
+        'cc' => array_values(array_filter([
+            $replyActorId,
+            trim((string) ($localTarget['actor_id'] ?? '')),
+        ])),
         'published' => gmdate(DATE_ATOM),
     ];
     $delivered = 0;
@@ -2759,6 +2807,15 @@ function nammu_fediverse_relay_public_reply_to_followers(array $payload, array $
         if (nammu_fediverse_post_activity($inboxUrl, $announceActivity, $config)) {
             $delivered++;
         }
+    }
+    if ($delivered > 0) {
+        nammu_fediverse_record_action('reply_announce', trim((string) ($localTarget['actor_id'] ?? '')), $localTargetId, [
+            'activity_id' => (string) ($announceActivity['id'] ?? ''),
+            'published' => (string) ($announceActivity['published'] ?? gmdate(DATE_ATOM)),
+            'reply_object_id' => $replyObjectId,
+            'reply_actor_id' => $replyActorId,
+            'target_actor_id' => trim((string) ($localTarget['actor_id'] ?? '')),
+        ]);
     }
     return $delivered;
 }

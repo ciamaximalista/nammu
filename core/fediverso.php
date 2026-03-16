@@ -1611,6 +1611,12 @@ function nammu_fediverse_local_content_items(array $config): array
 function nammu_fediverse_local_items_index(array $config): array
 {
     $items = nammu_fediverse_local_content_items($config);
+    foreach (nammu_fediverse_actions_store()['items'] as $action) {
+        $resendItem = nammu_fediverse_resend_item_from_action($action);
+        if (is_array($resendItem)) {
+            $items[] = $resendItem;
+        }
+    }
     $byIdentifier = [];
     foreach ($items as $item) {
         $identifiers = [];

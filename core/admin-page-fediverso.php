@@ -242,6 +242,35 @@
             }
         }
         $fediverseTimelineAttachments = is_array($fediverseTimelineItem['attachments'] ?? null) ? $fediverseTimelineItem['attachments'] : [];
+        $fediversePrimaryLinkAttachment = null;
+        foreach ($fediverseTimelineAttachments as $fediverseTimelineAttachmentIndex => $fediverseTimelineAttachment) {
+            if (!is_array($fediverseTimelineAttachment)) {
+                continue;
+            }
+            $fediverseTimelineAttachmentType = strtolower(trim((string) ($fediverseTimelineAttachment['type'] ?? '')));
+            $fediverseTimelineAttachmentMediaType = strtolower(trim((string) ($fediverseTimelineAttachment['media_type'] ?? '')));
+            if ($fediverseTimelineAttachmentType === 'link' || $fediverseTimelineAttachmentMediaType === 'text/html' || str_starts_with($fediverseTimelineAttachmentMediaType, 'text/html')) {
+                $fediversePrimaryLinkAttachment = [
+                    'index' => $fediverseTimelineAttachmentIndex,
+                    'item' => $fediverseTimelineAttachment,
+                ];
+                break;
+            }
+        }
+        if (
+            trim((string) ($fediverseTimelineItem['image'] ?? '')) === ''
+            && is_array($fediversePrimaryLinkAttachment)
+            && function_exists('nammu_fediverse_social_image_for_url')
+        ) {
+            $fediverseTimelineLinkUrl = trim((string) ($fediversePrimaryLinkAttachment['item']['url'] ?? ''));
+            if ($fediverseTimelineLinkUrl !== '') {
+                $fediverseTimelineResolvedImage = trim((string) nammu_fediverse_social_image_for_url($fediverseTimelineLinkUrl));
+                if ($fediverseTimelineResolvedImage !== '') {
+                    $fediverseTimelineItem['image'] = $fediverseTimelineResolvedImage;
+                    $fediverseTimelineAttachments[$fediversePrimaryLinkAttachment['index']]['image'] = $fediverseTimelineResolvedImage;
+                }
+            }
+        }
         if (empty($fediverseTimelineAttachments) && function_exists('nammu_fediverse_extract_html_image_urls')) {
             foreach (nammu_fediverse_extract_html_image_urls((string) ($fediverseTimelineItem['content_html'] ?? '')) as $fediverseTimelineImageUrl) {
                 $fediverseTimelineAttachments[] = [

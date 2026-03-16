@@ -1231,7 +1231,7 @@ function nammu_fediverse_parse_date_with_fallback(string $value, ?string $filePa
             ) {
                 $fileTimestamp = @filemtime($filePath);
                 if ($fileTimestamp) {
-                    return gmdate('Y-m-d', $timestamp) . 'T' . gmdate('H:i:s', $fileTimestamp) . '+00:00';
+                    return gmdate(DATE_ATOM, $fileTimestamp);
                 }
             }
             return gmdate(DATE_ATOM, $timestamp);

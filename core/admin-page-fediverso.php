@@ -32,6 +32,13 @@
     }
     $fediverseTimeline = nammu_fediverse_timeline_store()['items'];
     $fediverseFollowers = function_exists('nammu_fediverse_followers_store') ? nammu_fediverse_followers_store()['followers'] : [];
+    $fediverseFollowerIds = [];
+    foreach ($fediverseFollowers as $fediverseFollowerActor) {
+        $fediverseFollowerActorId = trim((string) ($fediverseFollowerActor['id'] ?? ''));
+        if ($fediverseFollowerActorId !== '') {
+            $fediverseFollowerIds[$fediverseFollowerActorId] = true;
+        }
+    }
     $fediverseRecipients = function_exists('nammu_fediverse_message_recipients') ? nammu_fediverse_message_recipients() : [];
     $fediverseMessages = function_exists('nammu_fediverse_grouped_messages') ? nammu_fediverse_grouped_messages() : [];
     $fediversePublicReplyMessages = function_exists('nammu_fediverse_public_reply_message_entries') ? nammu_fediverse_public_reply_message_entries($fediverseConfig) : [];
@@ -712,20 +719,10 @@
                                         <?php
                                         $recipientLabel = (string) (($recipient['name'] ?? '') ?: ($recipient['preferredUsername'] ?? $recipientId));
                                         $recipientMeta = [];
-                                        if (!empty($recipient['followed_at'])) {
+                                        if ($recipientId !== '' && isset($fediverseFollowingIds[$recipientId])) {
                                             $recipientMeta[] = 'seguido';
                                         }
-                                        if (!empty($recipient['followed_at']) && !empty($recipient['inbox']) && !empty($recipient['sharedInbox'])) {
-                                            $recipientMeta[] = 'seguido';
-                                        }
-                                        $isFollower = false;
-                                        foreach ($fediverseFollowers as $followerItem) {
-                                            if ((string) ($followerItem['id'] ?? '') === $recipientId) {
-                                                $isFollower = true;
-                                                break;
-                                            }
-                                        }
-                                        if ($isFollower) {
+                                        if ($recipientId !== '' && isset($fediverseFollowerIds[$recipientId])) {
                                             $recipientMeta[] = 'seguidor';
                                         }
                                         $recipientSuffix = empty($recipientMeta) ? '' : ' (' . implode(', ', array_unique($recipientMeta)) . ')';

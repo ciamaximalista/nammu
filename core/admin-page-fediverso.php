@@ -656,6 +656,7 @@
                                                     $linkCardTitle = trim((string) (($attachment['name'] ?? '') ?: ($item['title'] ?? '') ?: 'Abrir enlace'));
                                                     $linkCardImage = trim((string) (($attachment['image'] ?? '') ?: ($item['image'] ?? '')));
                                                     $linkCardDescription = trim((string) (($attachment['summary'] ?? '') ?: ($item['summary'] ?? '') ?: ($item['content'] ?? '')));
+                                                    $linkCardDescription = preg_replace('#^\s*https?://\S+\s*#iu', '', $linkCardDescription) ?? $linkCardDescription;
                                                     $linkCardDescription = preg_replace('/\s+/', ' ', strip_tags($linkCardDescription)) ?? '';
                                                     ?>
                                                     <?php if ($isImage): ?>

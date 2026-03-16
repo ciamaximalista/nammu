@@ -2373,6 +2373,41 @@ function nammu_fediverse_notify_followers_of_object_update(array $item, array $c
     return $delivered;
 }
 
+function nammu_fediverse_relay_public_reply_to_followers(array $payload, array $localTarget, array $config): int
+{
+    $object = is_array($payload['object'] ?? null) ? $payload['object'] : [];
+    $replyObjectId = trim((string) (($object['id'] ?? '') ?: ''));
+    if ($replyObjectId === '') {
+        return 0;
+    }
+    $followers = nammu_fediverse_followers_store()['followers'];
+    if (empty($followers)) {
+        return 0;
+    }
+    $actorUrl = nammu_fediverse_actor_url($config);
+    $announceActivity = [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => $actorUrl . '/reply-announces/' . substr(sha1($replyObjectId . '|' . microtime(true)), 0, 24),
+        'type' => 'Announce',
+        'actor' => $actorUrl,
+        'object' => $replyObjectId,
+        'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+        'cc' => [trim((string) ($payload['actor'] ?? ''))],
+        'published' => gmdate(DATE_ATOM),
+    ];
+    $delivered = 0;
+    foreach ($followers as $follower) {
+        $inboxUrl = nammu_fediverse_remote_inbox_for_actor($follower);
+        if ($inboxUrl === '') {
+            continue;
+        }
+        if (nammu_fediverse_post_activity($inboxUrl, $announceActivity, $config)) {
+            $delivered++;
+        }
+    }
+    return $delivered;
+}
+
 function nammu_fediverse_replies_collection_document(string $routePath, array $config): ?array
 {
     $routePath = trim($routePath);
@@ -3044,6 +3079,8 @@ function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, stri
             'tag' => $tag,
             'published' => $published,
             'inReplyTo' => $objectUrl,
+            'context' => $objectUrl,
+            'conversation' => $objectUrl,
         ],
     ];
     $delivery = nammu_fediverse_post_activity_response($inboxUrl, $activity, $config);
@@ -3215,6 +3252,7 @@ function nammu_fediverse_handle_inbox_payload(array $payload, array $config, arr
             $localTarget = nammu_fediverse_find_local_item_for_identifier($replyTarget, $config);
             if (is_array($localTarget)) {
                 nammu_fediverse_notify_followers_of_object_update($localTarget, $config);
+                nammu_fediverse_relay_public_reply_to_followers($payload, $localTarget, $config);
             }
         }
     }

@@ -243,12 +243,6 @@
         }
         $fediverseTimelineActorId = trim((string) ($fediverseTimelineItem['actor_id'] ?? ''));
         $fediverseTimelineActor = $fediverseTimelineActorId !== '' ? ($fediverseActorsById[$fediverseTimelineActorId] ?? null) : null;
-        if (!is_array($fediverseTimelineActor) && $fediverseTimelineActorId !== '' && function_exists('nammu_fediverse_resolve_actor')) {
-            $fediverseTimelineActor = nammu_fediverse_resolve_actor($fediverseTimelineActorId, $fediverseConfig);
-            if (is_array($fediverseTimelineActor)) {
-                $fediverseActorsById[$fediverseTimelineActorId] = $fediverseTimelineActor;
-            }
-        }
         if (is_array($fediverseTimelineActor)) {
             if (trim((string) ($fediverseTimelineItem['actor_name'] ?? '')) === '') {
                 $fediverseTimelineItem['actor_name'] = trim((string) (($fediverseTimelineActor['name'] ?? '') ?: ($fediverseTimelineActor['preferredUsername'] ?? '')));
@@ -277,20 +271,6 @@
                     'item' => $fediverseTimelineAttachment,
                 ];
                 break;
-            }
-        }
-        if (
-            trim((string) ($fediverseTimelineItem['image'] ?? '')) === ''
-            && is_array($fediversePrimaryLinkAttachment)
-            && function_exists('nammu_fediverse_social_image_for_url')
-        ) {
-            $fediverseTimelineLinkUrl = trim((string) ($fediversePrimaryLinkAttachment['item']['url'] ?? ''));
-            if ($fediverseTimelineLinkUrl !== '') {
-                $fediverseTimelineResolvedImage = trim((string) nammu_fediverse_social_image_for_url($fediverseTimelineLinkUrl));
-                if ($fediverseTimelineResolvedImage !== '') {
-                    $fediverseTimelineItem['image'] = $fediverseTimelineResolvedImage;
-                    $fediverseTimelineAttachments[$fediversePrimaryLinkAttachment['index']]['image'] = $fediverseTimelineResolvedImage;
-                }
             }
         }
         if (empty($fediverseTimelineAttachments) && function_exists('nammu_fediverse_extract_html_image_urls')) {
@@ -352,9 +332,6 @@
         $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
         $actorId = trim((string) ($payload['actor'] ?? ''));
         $actor = $actorId !== '' ? ($fediverseActorsById[$actorId] ?? null) : null;
-        if (!is_array($actor) && $actorId !== '' && function_exists('nammu_fediverse_resolve_actor')) {
-            $actor = nammu_fediverse_resolve_actor($actorId, $fediverseConfig);
-        }
         $type = strtolower(trim((string) ($payload['type'] ?? '')));
         $object = $payload['object'] ?? null;
         $targetUrl = '';
@@ -1003,12 +980,6 @@
                             <?php $firstMessage = $messages[0] ?? []; ?>
                             <?php
                             $conversationActor = $fediverseActorsById[$actorId] ?? null;
-                            if (!is_array($conversationActor) && $actorId !== '' && function_exists('nammu_fediverse_resolve_actor')) {
-                                $conversationActor = nammu_fediverse_resolve_actor($actorId, $fediverseConfig);
-                                if (is_array($conversationActor)) {
-                                    $fediverseActorsById[$actorId] = $conversationActor;
-                                }
-                            }
                             $conversationActorName = trim((string) (($firstMessage['actor_name'] ?? '') ?: ($conversationActor['name'] ?? '') ?: ($conversationActor['preferredUsername'] ?? '') ?: $actorId));
                             $conversationActorIcon = trim((string) (($firstMessage['actor_icon'] ?? '') ?: ($conversationActor['icon'] ?? '')));
                             ?>

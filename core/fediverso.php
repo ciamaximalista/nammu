@@ -281,14 +281,16 @@ function nammu_fediverse_signature_header(string $method, string $url, array $co
 
 function nammu_fediverse_signed_fetch(string $url, array $config, string $method = 'GET', string $body = ''): array
 {
+    $method = strtoupper($method);
     $headers = nammu_fediverse_signature_header($method, $url, $config, $body) ?? [
         'User-Agent: Nammu Fediverso',
         'Accept: application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9',
     ];
+    $timeout = $method === 'POST' ? 6 : 15;
     $context = stream_context_create([
         'http' => [
-            'method' => strtoupper($method),
-            'timeout' => 15,
+            'method' => $method,
+            'timeout' => $timeout,
             'ignore_errors' => true,
             'header' => implode("\r\n", $headers) . "\r\n",
             'content' => $body,

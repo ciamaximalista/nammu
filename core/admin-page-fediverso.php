@@ -535,6 +535,10 @@
                                         <?php endif; ?>
                                         <div class="fediverse-status__footer">
                                             <a href="<?= htmlspecialchars((string) ($localItem['url'] ?? '#'), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Abrir publicación emitida</a>
+                                            <?php if (!empty($localId)): ?>
+                                                <span aria-hidden="true"> · </span>
+                                                <a href="<?= htmlspecialchars((string) $localId, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Objeto ActivityPub</a>
+                                            <?php endif; ?>
                                             <form method="post" class="d-inline-block ml-2" onsubmit="return confirm('¿Retirar esta publicación del Fediverso y enviar el borrado a otros nodos?');">
                                                 <input type="hidden" name="fediverse_tab" value="home">
                                                 <input type="hidden" name="fediverse_local_item_id" value="<?= htmlspecialchars($localId, ENT_QUOTES, 'UTF-8') ?>">
@@ -759,6 +763,10 @@
                                         <?php endif; ?>
                                         <div class="fediverse-status__footer">
                                             <a href="<?= htmlspecialchars((string) (($item['url'] ?? '') ?: ($item['id'] ?? '#')), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Abrir publicación</a>
+                                            <?php if ($itemObjectId !== ''): ?>
+                                                <span aria-hidden="true"> · </span>
+                                                <a href="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Objeto ActivityPub</a>
+                                            <?php endif; ?>
                                         </div>
                                         <?php if (($remoteBoostMeta['count'] ?? 0) > 0 || ($remoteReplyMeta['count'] ?? 0) > 0 || !empty($itemActionState['liked']) || !empty($itemActionState['boosted']) || !empty($itemActionState['replied']) || !empty($itemActionState['shared'])): ?>
                                             <div class="fediverse-status__history">

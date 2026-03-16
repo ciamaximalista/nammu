@@ -2491,6 +2491,42 @@ function nammu_fediverse_replies_collection_document(string $routePath, array $c
     ];
 }
 
+function nammu_fediverse_inspect_object(string $objectUrl, array $config): array
+{
+    $objectUrl = trim($objectUrl);
+    if ($objectUrl === '') {
+        return ['ok' => false, 'message' => 'Falta la URL del objeto ActivityPub.'];
+    }
+    $object = nammu_fediverse_signed_fetch_json($objectUrl, $config);
+    if (!is_array($object)) {
+        return ['ok' => false, 'message' => 'No se pudo obtener el objeto ActivityPub.'];
+    }
+    $repliesRef = $object['replies'] ?? null;
+    $replies = null;
+    $repliesPage = null;
+    $collectionUrl = '';
+    $pageUrl = '';
+    if (is_string($repliesRef)) {
+        $collectionUrl = trim($repliesRef);
+    } elseif (is_array($repliesRef)) {
+        $collectionUrl = trim((string) (($repliesRef['id'] ?? '') ?: ''));
+        $pageUrl = trim((string) (($repliesRef['first'] ?? '') ?: ''));
+    }
+    if ($collectionUrl !== '') {
+        $replies = nammu_fediverse_signed_fetch_json($collectionUrl, $config);
+    }
+    if ($pageUrl !== '') {
+        $repliesPage = nammu_fediverse_signed_fetch_json($pageUrl, $config);
+    }
+    return [
+        'ok' => true,
+        'object_url' => $objectUrl,
+        'object' => $object,
+        'replies' => $replies,
+        'replies_page' => $repliesPage,
+    ];
+}
+
 function nammu_fediverse_store_inbox_activity(array $payload, array $meta = []): void
 {
     $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);

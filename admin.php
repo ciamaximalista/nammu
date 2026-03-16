@@ -10083,6 +10083,8 @@ $fediverseFeedback = null;
 $fediverseActorInput = '';
 $fediverseMessageRecipient = '';
 $fediverseMessageText = '';
+$fediverseInspectUrl = '';
+$fediverseInspectResult = null;
 $notesFeedback = $_SESSION['notes_feedback'] ?? null;
 if ($notesFeedback !== null) {
     unset($_SESSION['notes_feedback']);
@@ -10142,6 +10144,14 @@ if ($isLoggedIn && $page === 'fediverso') {
         $fediverseFeedback = [
             'type' => 'info',
             'message' => 'Timeline del Fediverso reconstruido, incluyendo la parte local. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades importadas: ' . (int) ($stats['new'] ?? 0) . '.',
+        ];
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['inspect_fediverse_object'])) {
+        $fediverseInspectUrl = trim((string) ($_POST['fediverse_inspect_url'] ?? ''));
+        $config = load_config_file();
+        $fediverseInspectResult = nammu_fediverse_inspect_object($fediverseInspectUrl, $config);
+        $fediverseFeedback = [
+            'type' => !empty($fediverseInspectResult['ok']) ? 'info' : 'danger',
+            'message' => !empty($fediverseInspectResult['ok']) ? 'Inspección ActivityPub completada.' : (string) ($fediverseInspectResult['message'] ?? ''),
         ];
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_fediverse_message'])) {
         $recipientId = trim((string) ($_POST['fediverse_message_recipient'] ?? ''));

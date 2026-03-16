@@ -42,6 +42,11 @@ function nammu_fediverse_deleted_file(): string
     return dirname(__DIR__) . '/config/fediverso-deleted.json';
 }
 
+function nammu_fediverse_threads_cache_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-threads-cache.json';
+}
+
 function nammu_fediverse_keys_file(): string
 {
     return dirname(__DIR__) . '/config/activitypub-keys.json';
@@ -663,6 +668,23 @@ function nammu_fediverse_deleted_store(): array
     return ['ids' => $ids];
 }
 
+function nammu_fediverse_threads_cache_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_threads_cache_file(), ['items' => []]);
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    return ['items' => $items];
+}
+
+function nammu_fediverse_save_threads_cache_store(array $items): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_threads_cache_file(), ['items' => $items]);
+}
+
+function nammu_fediverse_clear_threads_cache(): void
+{
+    nammu_fediverse_save_threads_cache_store([]);
+}
+
 function nammu_fediverse_save_deleted_store(array $ids): void
 {
     $normalized = array_values(array_unique(array_filter(array_map('strval', $ids), static function (string $value): bool {
@@ -1084,6 +1106,38 @@ function nammu_fediverse_remote_replies_for_item(array $item, array $config): ar
         return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
     });
     $cache[$objectId] = $replies;
+    return $replies;
+}
+
+function nammu_fediverse_cached_remote_replies_for_item(array $item, array $config, int $maxAge = 300): array
+{
+    $objectId = trim((string) (($item['object_id'] ?? '') ?: ($item['id'] ?? '')));
+    if ($objectId === '') {
+        return [];
+    }
+    $cacheStore = nammu_fediverse_threads_cache_store();
+    $cacheItems = is_array($cacheStore['items'] ?? null) ? $cacheStore['items'] : [];
+    $now = time();
+    $cached = is_array($cacheItems[$objectId] ?? null) ? $cacheItems[$objectId] : null;
+    if (is_array($cached)) {
+        $fetchedAt = (int) ($cached['fetched_at'] ?? 0);
+        $replies = is_array($cached['replies'] ?? null) ? $cached['replies'] : [];
+        if ($fetchedAt > 0 && ($now - $fetchedAt) <= $maxAge) {
+            return $replies;
+        }
+    }
+    $replies = nammu_fediverse_remote_replies_for_item($item, $config);
+    $cacheItems[$objectId] = [
+        'fetched_at' => $now,
+        'replies' => $replies,
+    ];
+    if (count($cacheItems) > 300) {
+        uasort($cacheItems, static function (array $a, array $b): int {
+            return ((int) ($b['fetched_at'] ?? 0)) <=> ((int) ($a['fetched_at'] ?? 0));
+        });
+        $cacheItems = array_slice($cacheItems, 0, 300, true);
+    }
+    nammu_fediverse_save_threads_cache_store($cacheItems);
     return $replies;
 }
 

@@ -10127,6 +10127,9 @@ if ($isLoggedIn && $page === 'fediverso') {
         ];
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refresh_fediverse_timeline'])) {
         $stats = nammu_fediverse_refresh_following();
+        if (function_exists('nammu_fediverse_clear_threads_cache')) {
+            nammu_fediverse_clear_threads_cache();
+        }
         $fediverseFeedback = [
             'type' => 'info',
             'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '.',
@@ -10139,6 +10142,9 @@ if ($isLoggedIn && $page === 'fediverso') {
         $baseUrl = rtrim((string) (($config['site_url'] ?? '') ?: nammu_base_url()), '/');
         if (function_exists('nammu_actuality_rebuild_snapshot')) {
             nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        }
+        if (function_exists('nammu_fediverse_clear_threads_cache')) {
+            nammu_fediverse_clear_threads_cache();
         }
         $stats = nammu_fediverse_rebuild_timeline();
         $fediverseFeedback = [

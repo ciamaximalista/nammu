@@ -629,7 +629,7 @@
                                 <?php $itemTargetActorId = (string) (($item['target_actor_id'] ?? '') ?: ($item['actor_id'] ?? '')); ?>
                                 <?php $itemActionState = function_exists('nammu_fediverse_action_state_for_item') ? nammu_fediverse_action_state_for_item($item) : ['liked' => false, 'boosted' => false, 'replied' => false, 'shared' => false, 'boost_count' => 0, 'reply_count' => 0, 'share_count' => 0]; ?>
                                 <?php $itemReplies = function_exists('nammu_fediverse_replies_for_item') ? nammu_fediverse_replies_for_item($item) : []; ?>
-                                <?php $remoteItemReplies = function_exists('nammu_fediverse_remote_replies_for_item') ? nammu_fediverse_remote_replies_for_item($item, $fediverseConfig) : []; ?>
+                                <?php $remoteItemReplies = function_exists('nammu_fediverse_cached_remote_replies_for_item') ? nammu_fediverse_cached_remote_replies_for_item($item, $fediverseConfig) : []; ?>
                                 <?php
                                 foreach ($remoteItemReplies as $remoteItemReply) {
                                     $remoteReplyIdentifiers = array_filter([

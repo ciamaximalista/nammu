@@ -601,6 +601,8 @@
                                                 <input type="hidden" name="fediverse_tab" value="home">
                                                 <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($item['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_object_title" value="<?= htmlspecialchars((string) ($item['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_object_content" value="<?= htmlspecialchars((string) ($item['content'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                 <button type="submit" name="fediverse_boost_item" class="btn btn-outline-secondary btn-sm"<?= !empty($itemActionState['boosted']) ? ' disabled' : '' ?>><?= !empty($itemActionState['boosted']) ? 'Impulsado' : 'Impulsar' ?></button>
                                             </form>
                                             <details class="fediverse-inline-form">

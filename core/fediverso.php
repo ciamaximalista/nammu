@@ -1070,9 +1070,9 @@ function nammu_fediverse_remote_replies_for_item(array $item, array $config): ar
         return [];
     }
 
-    $collection = $firstPage;
-    if (!is_array($collection)) {
-        $collection = nammu_fediverse_signed_fetch_json($collectionUrl, $config);
+    $collection = nammu_fediverse_signed_fetch_json($collectionUrl, $config);
+    if (!is_array($collection) && is_array($firstPage)) {
+        $collection = $firstPage;
     }
     if (!is_array($collection)) {
         $cache[$objectId] = [];
@@ -1083,7 +1083,7 @@ function nammu_fediverse_remote_replies_for_item(array $item, array $config): ar
     if (empty($orderedItems) && is_array($collection['first'] ?? null)) {
         $firstObject = $collection['first'];
         $orderedItems = $firstObject['orderedItems'] ?? ($firstObject['items'] ?? []);
-        if (empty($orderedItems)) {
+        if (empty($orderedItems) || !empty($firstPage)) {
             $firstId = trim((string) ($firstObject['id'] ?? ''));
             if ($firstId !== '') {
                 $firstPageFetched = nammu_fediverse_signed_fetch_json($firstId, $config);
@@ -1093,6 +1093,17 @@ function nammu_fediverse_remote_replies_for_item(array $item, array $config): ar
                 if (is_array($firstPageFetched)) {
                     $orderedItems = $firstPageFetched['orderedItems'] ?? ($firstPageFetched['items'] ?? []);
                 }
+            }
+        }
+    } elseif (empty($orderedItems) && is_array($firstPage)) {
+        $firstId = trim((string) ($firstPage['id'] ?? ''));
+        if ($firstId !== '') {
+            $firstPageFetched = nammu_fediverse_signed_fetch_json($firstId, $config);
+            if (!is_array($firstPageFetched)) {
+                $firstPageFetched = nammu_fediverse_fetch_json($firstId);
+            }
+            if (is_array($firstPageFetched)) {
+                $orderedItems = $firstPageFetched['orderedItems'] ?? ($firstPageFetched['items'] ?? []);
             }
         }
     } elseif (empty($orderedItems) && is_string($collection['first'] ?? null)) {

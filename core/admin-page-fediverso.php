@@ -625,8 +625,39 @@
                                 <?php $itemTargetActorId = (string) (($item['target_actor_id'] ?? '') ?: ($item['actor_id'] ?? '')); ?>
                                 <?php $itemActionState = function_exists('nammu_fediverse_action_state_for_item') ? nammu_fediverse_action_state_for_item($item) : ['liked' => false, 'boosted' => false, 'replied' => false, 'shared' => false, 'boost_count' => 0, 'reply_count' => 0, 'share_count' => 0]; ?>
                                 <?php $itemReplies = function_exists('nammu_fediverse_replies_for_item') ? nammu_fediverse_replies_for_item($item) : []; ?>
+                                <?php $remoteItemReplies = function_exists('nammu_fediverse_remote_replies_for_item') ? nammu_fediverse_remote_replies_for_item($item, $fediverseConfig) : []; ?>
+                                <?php
+                                foreach ($remoteItemReplies as $remoteItemReply) {
+                                    $remoteReplyId = trim((string) ($remoteItemReply['id'] ?? ''));
+                                    $alreadyPresent = false;
+                                    foreach ($itemReplies as $existingReply) {
+                                        if ($remoteReplyId !== '' && $remoteReplyId === trim((string) ($existingReply['id'] ?? ''))) {
+                                            $alreadyPresent = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!$alreadyPresent) {
+                                        $itemReplies[] = $remoteItemReply;
+                                    }
+                                }
+                                usort($itemReplies, static function (array $a, array $b): int {
+                                    return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
+                                });
+                                ?>
                                 <?php $remoteBoostMeta = $fediverseRemoteBoostSummary[$itemObjectId] ?? ['count' => 0]; ?>
-                                <?php $remoteReplyMeta = $fediverseRemoteReplySummary[$itemObjectId] ?? ['count' => 0]; ?>
+                                <?php
+                                $remoteReplyMeta = $fediverseRemoteReplySummary[$itemObjectId] ?? ['count' => 0];
+                                if (!empty($remoteItemReplies)) {
+                                    $remoteReplyActors = [];
+                                    foreach ($remoteItemReplies as $remoteItemReply) {
+                                        $remoteReplyActorId = trim((string) ($remoteItemReply['actor_id'] ?? ''));
+                                        if ($remoteReplyActorId !== '') {
+                                            $remoteReplyActors[$remoteReplyActorId] = true;
+                                        }
+                                    }
+                                    $remoteReplyMeta['count'] = max((int) ($remoteReplyMeta['count'] ?? 0), count($remoteReplyActors) ?: count($remoteItemReplies));
+                                }
+                                ?>
                                 <article class="fediverse-status">
                                     <div class="fediverse-status__avatar">
                                         <?php if (!empty($item['actor_icon'])): ?>
@@ -735,7 +766,11 @@
                                                 <?php foreach ($itemReplies as $reply): ?>
                                                     <div class="fediverse-thread__reply">
                                                         <div class="fediverse-thread__avatar">
-                                                            <?php if ($fediverseLocalAvatar !== ''): ?>
+                                                            <?php if (!empty($reply['actor_icon'])): ?>
+                                                                <img src="<?= htmlspecialchars((string) $reply['actor_icon'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                                            <?php elseif (($reply['source'] ?? '') === 'incoming-remote'): ?>
+                                                                <div class="fediverse-thread__avatar-fallback"><?= htmlspecialchars(mb_substr((string) (($reply['actor_name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
+                                                            <?php elseif ($fediverseLocalAvatar !== ''): ?>
                                                                 <img src="<?= htmlspecialchars($fediverseLocalAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
                                                             <?php else: ?>
                                                                 <div class="fediverse-thread__avatar-fallback"><?= htmlspecialchars(mb_substr($fediverseLocalHandle, 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
@@ -743,13 +778,13 @@
                                                         </div>
                                                         <div class="fediverse-thread__body">
                                                             <div class="fediverse-thread__header">
-                                                                <strong><?= htmlspecialchars($fediverseLocalHandle, ENT_QUOTES, 'UTF-8') ?></strong>
+                                                                <strong><?= htmlspecialchars((string) (($reply['source'] ?? '') === 'incoming-remote' ? (($reply['actor_name'] ?? '') ?: 'Actor remoto') : $fediverseLocalHandle), ENT_QUOTES, 'UTF-8') ?></strong>
                                                                 <?php if (!empty($reply['published'])): ?>
                                                                     <time datetime="<?= htmlspecialchars((string) $reply['published'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $reply['published'], ENT_QUOTES, 'UTF-8') ?></time>
                                                                 <?php endif; ?>
                                                             </div>
                                                             <div class="fediverse-thread__content"><?= nl2br(htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
-                                                            <?php if (!empty($reply['id'])): ?>
+                                                            <?php if (($reply['source'] ?? '') !== 'incoming-remote' && !empty($reply['id'])): ?>
                                                                 <form method="post" class="mt-2" onsubmit="return confirm('¿Borrar esta respuesta del Fediverso?');">
                                                                     <input type="hidden" name="fediverse_tab" value="home">
                                                                     <input type="hidden" name="fediverse_reply_action_id" value="<?= htmlspecialchars((string) $reply['id'], ENT_QUOTES, 'UTF-8') ?>">

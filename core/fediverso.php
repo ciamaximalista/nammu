@@ -945,6 +945,84 @@ function nammu_fediverse_replies_for_item(array $item): array
     return [];
 }
 
+function nammu_fediverse_remote_replies_for_item(array $item, array $config): array
+{
+    static $cache = [];
+    $objectId = trim((string) (($item['object_id'] ?? '') ?: ($item['id'] ?? '')));
+    if ($objectId === '') {
+        return [];
+    }
+    if (array_key_exists($objectId, $cache)) {
+        return $cache[$objectId];
+    }
+
+    $objectDocument = nammu_fediverse_signed_fetch_json($objectId, $config);
+    if (!is_array($objectDocument)) {
+        $cache[$objectId] = [];
+        return [];
+    }
+
+    $repliesRef = $objectDocument['replies'] ?? null;
+    $collectionUrl = '';
+    if (is_string($repliesRef)) {
+        $collectionUrl = trim($repliesRef);
+    } elseif (is_array($repliesRef)) {
+        $collectionUrl = trim((string) (($repliesRef['first'] ?? '') ?: ($repliesRef['id'] ?? '')));
+    }
+    if ($collectionUrl === '') {
+        $cache[$objectId] = [];
+        return [];
+    }
+
+    $collection = nammu_fediverse_signed_fetch_json($collectionUrl, $config);
+    if (!is_array($collection)) {
+        $cache[$objectId] = [];
+        return [];
+    }
+
+    $orderedItems = $collection['orderedItems'] ?? ($collection['items'] ?? []);
+    if (is_array($orderedItems) && array_key_exists('id', $orderedItems)) {
+        $orderedItems = [$orderedItems];
+    }
+    $replies = [];
+    foreach ((array) $orderedItems as $rawReply) {
+        $replyObject = null;
+        if (is_string($rawReply)) {
+            $replyObject = nammu_fediverse_signed_fetch_json(trim($rawReply), $config);
+        } elseif (is_array($rawReply)) {
+            $replyObject = $rawReply;
+        }
+        if (!is_array($replyObject)) {
+            continue;
+        }
+        if (strtolower(trim((string) ($replyObject['type'] ?? ''))) !== 'note') {
+            continue;
+        }
+        $replyHtml = trim((string) ($replyObject['content'] ?? ''));
+        $replyText = trim((string) (function_exists('nammu_fediverse_html_to_text') ? nammu_fediverse_html_to_text($replyHtml) : strip_tags($replyHtml)));
+        if ($replyText === '') {
+            continue;
+        }
+        $actorId = trim((string) ($replyObject['attributedTo'] ?? ''));
+        $actor = $actorId !== '' ? nammu_fediverse_resolve_actor($actorId, $config) : [];
+        $replies[] = [
+            'id' => trim((string) (($replyObject['id'] ?? '') ?: sha1(json_encode($replyObject)))),
+            'url' => trim((string) (($replyObject['url'] ?? '') ?: '')),
+            'published' => trim((string) ($replyObject['published'] ?? '')),
+            'reply_text' => $replyText,
+            'actor_id' => $actorId,
+            'actor_name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
+            'actor_icon' => trim((string) ($actor['icon'] ?? '')),
+            'source' => 'incoming-remote',
+        ];
+    }
+    usort($replies, static function (array $a, array $b): int {
+        return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
+    });
+    $cache[$objectId] = $replies;
+    return $replies;
+}
+
 function nammu_fediverse_reply_collection_hash(string $objectId): string
 {
     return substr(sha1(trim($objectId)), 0, 24);

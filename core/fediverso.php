@@ -1036,8 +1036,19 @@ function nammu_fediverse_reply_collection_url(string $objectId, array $config): 
 function nammu_fediverse_reply_collection_summary(string $objectId, array $config): array
 {
     $collectionUrl = nammu_fediverse_reply_collection_url($objectId, $config);
+    $targetIdentifiers = [$objectId];
+    $localItem = nammu_fediverse_find_local_item_for_identifier($objectId, $config);
+    if (is_array($localItem)) {
+        foreach (['id', 'url'] as $field) {
+            $value = trim((string) ($localItem[$field] ?? ''));
+            if ($value !== '') {
+                $targetIdentifiers[] = $value;
+            }
+        }
+    }
+    $targetIdentifiers = array_values(array_unique($targetIdentifiers));
     $replyIds = [];
-    foreach (nammu_fediverse_public_replies_for_targets([$objectId]) as $reply) {
+    foreach (nammu_fediverse_public_replies_for_targets($targetIdentifiers) as $reply) {
         $replyId = trim((string) (($reply['note_id'] ?? '') ?: ($reply['id'] ?? '')));
         if ($replyId !== '') {
             $replyIds[$replyId] = true;
@@ -1046,7 +1057,7 @@ function nammu_fediverse_reply_collection_summary(string $objectId, array $confi
     foreach (nammu_fediverse_incoming_public_replies_by_object($config) as $localId => $replies) {
         foreach ((array) $replies as $reply) {
             $targetUrl = trim((string) ($reply['target_url'] ?? ''));
-            if ($targetUrl !== $objectId) {
+            if ($targetUrl === '' || !in_array($targetUrl, $targetIdentifiers, true)) {
                 continue;
             }
             $replyId = trim((string) (($reply['url'] ?? '') ?: ($reply['id'] ?? '')));

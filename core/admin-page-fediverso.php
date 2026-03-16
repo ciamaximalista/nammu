@@ -628,10 +628,17 @@
                                 <?php $remoteItemReplies = function_exists('nammu_fediverse_remote_replies_for_item') ? nammu_fediverse_remote_replies_for_item($item, $fediverseConfig) : []; ?>
                                 <?php
                                 foreach ($remoteItemReplies as $remoteItemReply) {
-                                    $remoteReplyId = trim((string) ($remoteItemReply['id'] ?? ''));
+                                    $remoteReplyIdentifiers = array_filter([
+                                        trim((string) ($remoteItemReply['id'] ?? '')),
+                                        trim((string) ($remoteItemReply['url'] ?? '')),
+                                    ]);
                                     $alreadyPresent = false;
                                     foreach ($itemReplies as $existingReply) {
-                                        if ($remoteReplyId !== '' && $remoteReplyId === trim((string) ($existingReply['id'] ?? ''))) {
+                                        $existingIdentifiers = array_filter([
+                                            trim((string) ($existingReply['id'] ?? '')),
+                                            trim((string) ($existingReply['url'] ?? '')),
+                                        ]);
+                                        if (!empty(array_intersect($remoteReplyIdentifiers, $existingIdentifiers))) {
                                             $alreadyPresent = true;
                                             break;
                                         }

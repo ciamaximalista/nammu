@@ -2682,7 +2682,11 @@ function nammu_fediverse_delete_public_reply(string $actionId, array $config): a
     $noteId = trim((string) ($targetAction['note_id'] ?? ''));
     $recipientId = trim((string) ($targetAction['actor_id'] ?? ''));
     if ($noteId === '' || $recipientId === '') {
-        return ['ok' => false, 'message' => 'Faltan datos para borrar esa respuesta pública.'];
+        nammu_fediverse_save_actions_store($remaining);
+        return [
+            'ok' => true,
+            'message' => 'La respuesta se retiró del timeline local, pero no pudo enviarse el borrado federado porque esa respuesta antigua no guardaba su identificador remoto.',
+        ];
     }
 
     $actorUrl = nammu_fediverse_actor_url($config);

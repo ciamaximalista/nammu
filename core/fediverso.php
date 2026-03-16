@@ -3094,14 +3094,39 @@ function nammu_fediverse_thread_grouped_messages(array $messages): array
         $groups[$threadKey][] = $message;
     }
     foreach ($groups as &$threadMessages) {
-        usort($threadMessages, static function (array $a, array $b): int {
+        $rootMessages = [];
+        $nonRootMessages = [];
+        foreach ($threadMessages as $threadMessage) {
+            if (!empty($threadMessage['is_thread_root'])) {
+                $rootMessages[] = $threadMessage;
+            } else {
+                $nonRootMessages[] = $threadMessage;
+            }
+        }
+        usort($rootMessages, static function (array $a, array $b): int {
             return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
         });
+        usort($nonRootMessages, static function (array $a, array $b): int {
+            return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
+        });
+        $threadMessages = array_merge($rootMessages, $nonRootMessages);
     }
     unset($threadMessages);
     uasort($groups, static function (array $a, array $b): int {
-        $lastA = (string) (($a[count($a) - 1]['published'] ?? '') ?: '');
-        $lastB = (string) (($b[count($b) - 1]['published'] ?? '') ?: '');
+        $lastA = '';
+        foreach ($a as $message) {
+            $published = (string) ($message['published'] ?? '');
+            if ($published > $lastA) {
+                $lastA = $published;
+            }
+        }
+        $lastB = '';
+        foreach ($b as $message) {
+            $published = (string) ($message['published'] ?? '');
+            if ($published > $lastB) {
+                $lastB = $published;
+            }
+        }
         return strcmp($lastB, $lastA);
     });
     return $groups;

@@ -447,6 +447,11 @@
                                         <?php endif; ?>
                                         <div class="fediverse-status__footer">
                                             <a href="<?= htmlspecialchars((string) ($localItem['url'] ?? '#'), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Abrir publicación emitida</a>
+                                            <form method="post" class="d-inline-block ml-2" onsubmit="return confirm('¿Retirar esta publicación del Fediverso y enviar el borrado a otros nodos?');">
+                                                <input type="hidden" name="fediverse_tab" value="home">
+                                                <input type="hidden" name="fediverse_local_item_id" value="<?= htmlspecialchars($localId, ENT_QUOTES, 'UTF-8') ?>">
+                                                <button type="submit" name="fediverse_delete_local_item" class="btn btn-outline-danger btn-sm">Borrar</button>
+                                            </form>
                                         </div>
                                         <?php if (($localSummary['likes'] ?? 0) > 0 || ($localSummary['shares'] ?? 0) > 0 || ($localSummary['replies'] ?? 0) > 0): ?>
                                             <div class="fediverse-status__history">

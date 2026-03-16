@@ -37,6 +37,11 @@ function nammu_fediverse_actions_file(): string
     return dirname(__DIR__) . '/config/fediverso-actions.json';
 }
 
+function nammu_fediverse_deleted_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-deleted.json';
+}
+
 function nammu_fediverse_keys_file(): string
 {
     return dirname(__DIR__) . '/config/activitypub-keys.json';
@@ -644,6 +649,21 @@ function nammu_fediverse_actions_store(): array
     $store = nammu_fediverse_load_json_store(nammu_fediverse_actions_file(), ['items' => []]);
     $items = is_array($store['items'] ?? null) ? $store['items'] : [];
     return ['items' => array_values($items)];
+}
+
+function nammu_fediverse_deleted_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_deleted_file(), ['ids' => []]);
+    $ids = is_array($store['ids'] ?? null) ? array_values(array_unique(array_map('strval', $store['ids']))) : [];
+    return ['ids' => $ids];
+}
+
+function nammu_fediverse_save_deleted_store(array $ids): void
+{
+    $normalized = array_values(array_unique(array_filter(array_map('strval', $ids), static function (string $value): bool {
+        return trim($value) !== '';
+    })));
+    nammu_fediverse_save_json_store(nammu_fediverse_deleted_file(), ['ids' => $normalized]);
 }
 
 function nammu_fediverse_save_actions_store(array $items): void
@@ -1322,6 +1342,7 @@ function nammu_fediverse_meta_date(array $meta, ?string $filePath = null): strin
 function nammu_fediverse_local_content_items(array $config): array
 {
     $baseUrl = nammu_fediverse_base_url($config);
+    $deletedIds = array_fill_keys(nammu_fediverse_deleted_store()['ids'], true);
     $items = [];
     foreach (glob(dirname(__DIR__) . '/content/*.md') ?: [] as $file) {
         if (!is_readable($file)) {
@@ -1344,8 +1365,12 @@ function nammu_fediverse_local_content_items(array $config): array
             ? $baseUrl . '/podcast/' . rawurlencode($slug)
             : $baseUrl . '/' . rawurlencode($slug);
         $objectType = $template === 'podcast' ? 'Article' : 'Article';
+        $itemId = $baseUrl . '/ap/objects/' . rawurlencode($template) . '-' . rawurlencode($slug);
+        if (isset($deletedIds[$itemId])) {
+            continue;
+        }
         $items[] = [
-            'id' => $baseUrl . '/ap/objects/' . rawurlencode($template) . '-' . rawurlencode($slug),
+            'id' => $itemId,
             'url' => $url,
             'title' => $title,
             'content' => $description !== '' ? $description : nammu_fediverse_plain_excerpt($content),
@@ -1370,8 +1395,12 @@ function nammu_fediverse_local_content_items(array $config): array
         $description = trim((string) (($meta['Description'] ?? $meta['description'] ?? '') ?: ''));
         $content = nammu_fediverse_strip_front_matter($raw);
         $image = nammu_fediverse_asset_url((string) (($meta['Image'] ?? $meta['image'] ?? '') ?: ''), $baseUrl);
+        $itemId = $baseUrl . '/ap/objects/itinerary-' . rawurlencode($slug);
+        if (isset($deletedIds[$itemId])) {
+            continue;
+        }
         $items[] = [
-            'id' => $baseUrl . '/ap/objects/itinerary-' . rawurlencode($slug),
+            'id' => $itemId,
             'url' => $baseUrl . '/itinerarios/' . rawurlencode($slug),
             'title' => $title,
             'content' => $description !== '' ? $description : nammu_fediverse_plain_excerpt($content),
@@ -1391,10 +1420,14 @@ function nammu_fediverse_local_content_items(array $config): array
         }
         $id = trim((string) (($item['id'] ?? '') ?: sha1(json_encode($item))));
         $isManual = !empty($item['is_manual']);
+        $itemId = $baseUrl . '/ap/objects/actualidad-' . rawurlencode($id);
+        if (isset($deletedIds[$itemId])) {
+            continue;
+        }
         $title = trim((string) ($item['title'] ?? ''));
         $content = trim((string) (($item['raw_text'] ?? '') ?: ($item['description'] ?? '')));
         $items[] = [
-            'id' => $baseUrl . '/ap/objects/actualidad-' . rawurlencode($id),
+            'id' => $itemId,
             'url' => trim((string) (($item['link'] ?? '') ?: ($baseUrl . '/actualidad.php'))),
             'title' => $title !== '' ? $title : ($isManual ? '' : 'Noticia'),
             'content' => $content,
@@ -2673,4 +2706,48 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
         'ok' => true,
         'message' => 'El contenido se reenvió al Fediverso. Entregas: ' . $delivered . '.',
     ];
+}
+
+function nammu_fediverse_delete_local_item(string $itemId, array $config): array
+{
+    $itemId = trim($itemId);
+    if ($itemId === '') {
+        return ['ok' => false, 'message' => 'No se recibió la publicación a borrar del Fediverso.'];
+    }
+    $matchedItem = null;
+    foreach (nammu_fediverse_local_content_items($config) as $item) {
+        if (trim((string) ($item['id'] ?? '')) === $itemId) {
+            $matchedItem = $item;
+            break;
+        }
+    }
+    if (!is_array($matchedItem)) {
+        return ['ok' => false, 'message' => 'No se encontró esa publicación local en el Fediverso.'];
+    }
+    $deletedIds = nammu_fediverse_deleted_store()['ids'];
+    $deletedIds[] = $itemId;
+    nammu_fediverse_save_deleted_store($deletedIds);
+
+    $actorUrl = nammu_fediverse_actor_url($config);
+    $deleteActivity = [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => $actorUrl . '/delete/' . substr(sha1($itemId . '|' . microtime(true)), 0, 24),
+        'type' => 'Delete',
+        'actor' => $actorUrl,
+        'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+        'object' => $itemId,
+        'published' => gmdate(DATE_ATOM),
+    ];
+    $followers = nammu_fediverse_followers_store()['followers'];
+    $delivered = 0;
+    foreach ($followers as $follower) {
+        $inboxUrl = nammu_fediverse_remote_inbox_for_actor($follower);
+        if ($inboxUrl === '') {
+            continue;
+        }
+        if (nammu_fediverse_post_activity($inboxUrl, $deleteActivity, $config)) {
+            $delivered++;
+        }
+    }
+    return ['ok' => true, 'message' => 'Publicación retirada del Fediverso. Entregas de borrado: ' . $delivered . '.'];
 }

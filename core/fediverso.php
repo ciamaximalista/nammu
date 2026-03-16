@@ -1051,23 +1051,62 @@ function nammu_fediverse_remote_replies_for_item(array $item, array $config): ar
 
     $repliesRef = $objectDocument['replies'] ?? null;
     $collectionUrl = '';
+    $firstPage = null;
     if (is_string($repliesRef)) {
         $collectionUrl = trim($repliesRef);
     } elseif (is_array($repliesRef)) {
-        $collectionUrl = trim((string) (($repliesRef['first'] ?? '') ?: ($repliesRef['id'] ?? '')));
+        $firstRef = $repliesRef['first'] ?? null;
+        if (is_array($firstRef)) {
+            $firstPage = $firstRef;
+            $collectionUrl = trim((string) (($repliesRef['id'] ?? '') ?: ($firstRef['partOf'] ?? '') ?: ($firstRef['id'] ?? '')));
+        } elseif (is_string($firstRef)) {
+            $collectionUrl = trim((string) (($repliesRef['id'] ?? '') ?: $firstRef));
+        } else {
+            $collectionUrl = trim((string) ($repliesRef['id'] ?? ''));
+        }
     }
     if ($collectionUrl === '') {
         $cache[$objectId] = [];
         return [];
     }
 
-    $collection = nammu_fediverse_signed_fetch_json($collectionUrl, $config);
+    $collection = $firstPage;
+    if (!is_array($collection)) {
+        $collection = nammu_fediverse_signed_fetch_json($collectionUrl, $config);
+    }
     if (!is_array($collection)) {
         $cache[$objectId] = [];
         return [];
     }
 
     $orderedItems = $collection['orderedItems'] ?? ($collection['items'] ?? []);
+    if (empty($orderedItems) && is_array($collection['first'] ?? null)) {
+        $firstObject = $collection['first'];
+        $orderedItems = $firstObject['orderedItems'] ?? ($firstObject['items'] ?? []);
+        if (empty($orderedItems)) {
+            $firstId = trim((string) ($firstObject['id'] ?? ''));
+            if ($firstId !== '') {
+                $firstPageFetched = nammu_fediverse_signed_fetch_json($firstId, $config);
+                if (!is_array($firstPageFetched)) {
+                    $firstPageFetched = nammu_fediverse_fetch_json($firstId);
+                }
+                if (is_array($firstPageFetched)) {
+                    $orderedItems = $firstPageFetched['orderedItems'] ?? ($firstPageFetched['items'] ?? []);
+                }
+            }
+        }
+    } elseif (empty($orderedItems) && is_string($collection['first'] ?? null)) {
+        $firstId = trim((string) $collection['first']);
+        if ($firstId !== '') {
+            $firstPageFetched = nammu_fediverse_signed_fetch_json($firstId, $config);
+            if (!is_array($firstPageFetched)) {
+                $firstPageFetched = nammu_fediverse_fetch_json($firstId);
+            }
+            if (is_array($firstPageFetched)) {
+                $orderedItems = $firstPageFetched['orderedItems'] ?? ($firstPageFetched['items'] ?? []);
+            }
+        }
+    }
     if (is_array($orderedItems) && array_key_exists('id', $orderedItems)) {
         $orderedItems = [$orderedItems];
     }

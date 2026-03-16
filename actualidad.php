@@ -6,6 +6,7 @@ require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
 require_once __DIR__ . '/core/admin-redes.php';
 require_once __DIR__ . '/core/actualidad.php';
+require_once __DIR__ . '/core/fediverso.php';
 
 use Nammu\Core\ContentRepository;
 use Nammu\Core\MarkdownConverter;

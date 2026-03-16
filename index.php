@@ -712,6 +712,19 @@ if (preg_match('#^/ap/objects/[^/]+$#', $routePath) === 1) {
     exit;
 }
 
+if (preg_match('#^/ap/notes/[a-f0-9]{24}$#', $routePath) === 1) {
+    $noteDocument = nammu_fediverse_reply_note_document($routePath, $configData);
+    if (!is_array($noteDocument)) {
+        http_response_code(404);
+        header('Content-Type: application/activity+json; charset=UTF-8');
+        echo json_encode(['error' => 'note_not_found'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    header('Content-Type: application/activity+json; charset=UTF-8');
+    echo json_encode($noteDocument, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (preg_match('#^/ap/replies/[a-f0-9]{24}$#', $routePath) === 1) {
     $repliesDocument = nammu_fediverse_replies_collection_document($routePath, $configData);
     if (!is_array($repliesDocument)) {

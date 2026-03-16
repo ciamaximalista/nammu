@@ -134,6 +134,11 @@ function nammu_fediverse_inbox_url(array $config): string
     return nammu_fediverse_base_url($config) . '/ap/inbox';
 }
 
+function nammu_fediverse_reply_note_url(string $hash, array $config): string
+{
+    return rtrim(nammu_fediverse_base_url($config), '/') . '/ap/notes/' . $hash;
+}
+
 function nammu_fediverse_acct_uri(array $config): string
 {
     $host = nammu_fediverse_site_host($config);
@@ -897,6 +902,64 @@ function nammu_fediverse_public_action_activities(array $config): array
             if (is_array($resendItem)) {
                 $activities[] = nammu_fediverse_activity_for_local_item($resendItem, $config);
             }
+            continue;
+        }
+        if ($type === 'reply') {
+            $noteId = trim((string) ($action['note_id'] ?? ''));
+            $objectUrl = trim((string) ($action['object_url'] ?? ''));
+            $replyText = trim((string) ($action['reply_text'] ?? ''));
+            $published = trim((string) ($action['published'] ?? ''));
+            if ($noteId === '' || $objectUrl === '' || $replyText === '') {
+                continue;
+            }
+            if ($published === '') {
+                $published = gmdate(DATE_ATOM);
+            }
+            $activityId = trim((string) ($action['activity_id'] ?? ''));
+            if ($activityId === '') {
+                $activityId = $noteId . '/activity';
+            }
+            $targetActorId = trim((string) ($action['actor_id'] ?? ''));
+            $targetActor = $targetActorId !== '' ? nammu_fediverse_resolve_actor($targetActorId, $config) : [];
+            $targetName = trim((string) ($targetActor['preferredUsername'] ?? ''));
+            $targetHost = is_string(parse_url($targetActorId, PHP_URL_HOST)) ? (string) parse_url($targetActorId, PHP_URL_HOST) : '';
+            $targetHandle = $targetName !== '' ? '@' . $targetName . ($targetHost !== '' ? '@' . $targetHost : '') : '';
+            $mentionHtml = $targetActorId !== '' && $targetHandle !== ''
+                ? '<a href="' . htmlspecialchars($targetActorId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" class="mention">' . htmlspecialchars($targetHandle, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</a>'
+                : '';
+            $contentHtml = trim($mentionHtml . ($replyText !== '' ? ' ' . nl2br(htmlspecialchars($replyText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) : ''));
+            $cc = array_values(array_filter([$targetActorId, trim((string) ($targetActor['followers'] ?? ''))]));
+            $tag = [];
+            if ($targetActorId !== '' && $targetHandle !== '') {
+                $tag[] = [
+                    'type' => 'Mention',
+                    'href' => $targetActorId,
+                    'name' => $targetHandle,
+                ];
+            }
+            $activities[] = [
+                '@context' => 'https://www.w3.org/ns/activitystreams',
+                'id' => $activityId,
+                'type' => 'Create',
+                'actor' => $actorUrl,
+                'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+                'cc' => $cc,
+                'published' => $published,
+                'object' => [
+                    'id' => $noteId,
+                    'type' => 'Note',
+                    'attributedTo' => $actorUrl,
+                    'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+                    'cc' => $cc,
+                    'content' => $contentHtml,
+                    'tag' => $tag,
+                    'published' => $published,
+                    'inReplyTo' => $objectUrl,
+                    'context' => $objectUrl,
+                    'conversation' => $objectUrl,
+                    'url' => $noteId,
+                ],
+            ];
         }
     }
     usort($activities, static function (array $a, array $b): int {
@@ -2332,6 +2395,35 @@ function nammu_fediverse_object_document(string $routePath, array $config): ?arr
     return null;
 }
 
+function nammu_fediverse_reply_note_document(string $routePath, array $config): ?array
+{
+    if (!preg_match('#^/ap/notes/([a-f0-9]{24})$#', $routePath, $matches)) {
+        return null;
+    }
+    $noteHash = trim((string) ($matches[1] ?? ''));
+    if ($noteHash === '') {
+        return null;
+    }
+    foreach (nammu_fediverse_public_action_activities($config) as $activity) {
+        $object = is_array($activity['object'] ?? null) ? $activity['object'] : null;
+        if (!is_array($object)) {
+            continue;
+        }
+        $objectId = trim((string) ($object['id'] ?? ''));
+        if ($objectId === '') {
+            continue;
+        }
+        $objectPath = trim((string) (parse_url($objectId, PHP_URL_PATH) ?? ''));
+        if ($objectPath === $routePath) {
+            return $object;
+        }
+        if (substr(sha1($objectId), 0, 24) === $noteHash) {
+            return $object;
+        }
+    }
+    return null;
+}
+
 function nammu_fediverse_notify_followers_of_object_update(array $item, array $config): int
 {
     $itemId = trim((string) ($item['id'] ?? ''));
@@ -3119,7 +3211,8 @@ function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, stri
     if ($recipientFollowers !== '' && !in_array($recipientFollowers, $cc, true)) {
         $cc[] = $recipientFollowers;
     }
-    $noteId = $actorUrl . '/replies/' . substr(sha1($recipientId . '|' . $objectUrl . '|' . $plainText . '|' . microtime(true)), 0, 24);
+    $noteHash = substr(sha1($recipientId . '|' . $objectUrl . '|' . $plainText . '|' . microtime(true)), 0, 24);
+    $noteId = nammu_fediverse_reply_note_url($noteHash, $config);
     $published = gmdate(DATE_ATOM);
     $activity = [
         '@context' => 'https://www.w3.org/ns/activitystreams',
@@ -3141,6 +3234,7 @@ function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, stri
             'inReplyTo' => $objectUrl,
             'context' => $objectUrl,
             'conversation' => $objectUrl,
+            'url' => $noteId,
         ],
     ];
     $delivery = nammu_fediverse_post_activity_response($inboxUrl, $activity, $config);

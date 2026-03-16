@@ -2760,6 +2760,37 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
         }
     }
     if (!is_array($matchedItem)) {
+        $contentFile = dirname(__DIR__) . '/content/' . $slug . '.md';
+        if (is_file($contentFile) && is_readable($contentFile)) {
+            $raw = (string) @file_get_contents($contentFile);
+            $meta = nammu_fediverse_parse_front_matter($raw);
+            $status = strtolower(trim((string) ($meta['Status'] ?? $meta['status'] ?? 'published')));
+            $rawTemplate = strtolower(trim((string) ($meta['Template'] ?? $meta['template'] ?? 'post')));
+            $visibility = strtolower(trim((string) ($meta['Visibility'] ?? $meta['visibility'] ?? 'public')));
+            $normalizedTemplate = $rawTemplate === 'single' ? 'post' : $rawTemplate;
+            if (
+                $status === 'published'
+                && $visibility !== 'private'
+                && in_array($normalizedTemplate, ['post', 'podcast'], true)
+                && $normalizedTemplate === $template
+            ) {
+                $title = trim((string) (($meta['Title'] ?? $meta['title'] ?? '') ?: $slug));
+                $description = trim((string) (($meta['Description'] ?? $meta['description'] ?? '') ?: ''));
+                $content = nammu_fediverse_strip_front_matter($raw);
+                $matchedItem = [
+                    'id' => $targetId,
+                    'url' => $targetUrl,
+                    'title' => $title,
+                    'content' => $description !== '' ? $description : nammu_fediverse_plain_excerpt($content),
+                    'summary' => $description,
+                    'published' => nammu_fediverse_meta_date($meta, $contentFile),
+                    'type' => 'Article',
+                    'image' => nammu_fediverse_asset_url((string) (($meta['Image'] ?? $meta['image'] ?? '') ?: ''), nammu_fediverse_base_url($config)),
+                ];
+            }
+        }
+    }
+    if (!is_array($matchedItem)) {
         return ['ok' => false, 'message' => 'No se encontró ese contenido publicado para enviarlo al Fediverso.'];
     }
 

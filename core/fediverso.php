@@ -955,6 +955,17 @@ function nammu_fediverse_reply_collection_url(string $objectId, array $config): 
     return rtrim(nammu_fediverse_base_url($config), '/') . '/ap/replies/' . nammu_fediverse_reply_collection_hash($objectId);
 }
 
+function nammu_fediverse_reply_collection_summary(string $objectId, array $config): array
+{
+    $collectionUrl = nammu_fediverse_reply_collection_url($objectId, $config);
+    return [
+        'id' => $collectionUrl,
+        'type' => 'Collection',
+        'totalItems' => count(nammu_fediverse_public_replies_for_targets([$objectId])),
+        'first' => $collectionUrl,
+    ];
+}
+
 function nammu_fediverse_public_replies_for_targets(array $targets): array
 {
     $repliesByObject = nammu_fediverse_public_replies_by_object();
@@ -2183,7 +2194,7 @@ function nammu_fediverse_object_document(string $routePath, array $config): ?arr
         if (trim((string) ($object['id'] ?? '')) === '') {
             $object['id'] = $baseUrl . $routePath;
         }
-        $object['replies'] = nammu_fediverse_reply_collection_url((string) $object['id'], $config);
+        $object['replies'] = nammu_fediverse_reply_collection_summary((string) $object['id'], $config);
         return $object;
     }
     foreach (nammu_fediverse_actions_store()['items'] as $action) {
@@ -2199,7 +2210,7 @@ function nammu_fediverse_object_document(string $routePath, array $config): ?arr
         $object = is_array($activity['object'] ?? null) ? $activity['object'] : null;
         if (is_array($object)) {
             if (trim((string) ($object['id'] ?? '')) !== '') {
-                $object['replies'] = nammu_fediverse_reply_collection_url((string) $object['id'], $config);
+                $object['replies'] = nammu_fediverse_reply_collection_summary((string) $object['id'], $config);
             }
             return $object;
         }
@@ -2224,7 +2235,7 @@ function nammu_fediverse_notify_followers_of_object_update(array $item, array $c
     }
     $object['updated'] = gmdate(DATE_ATOM);
     if (trim((string) ($object['id'] ?? '')) !== '') {
-        $object['replies'] = nammu_fediverse_reply_collection_url((string) $object['id'], $config);
+        $object['replies'] = nammu_fediverse_reply_collection_summary((string) $object['id'], $config);
     }
     $updateActivity = [
         '@context' => 'https://www.w3.org/ns/activitystreams',

@@ -23,6 +23,13 @@
         $fediverseLocalHandle = '@' . $fediverseLocalUsername . ($fediverseLocalHost ? '@' . $fediverseLocalHost : '');
     }
     $fediverseFollowing = nammu_fediverse_following_store()['actors'];
+    $fediverseFollowingIds = [];
+    foreach ($fediverseFollowing as $fediverseFollowingActor) {
+        $fediverseFollowingActorId = trim((string) ($fediverseFollowingActor['id'] ?? ''));
+        if ($fediverseFollowingActorId !== '') {
+            $fediverseFollowingIds[$fediverseFollowingActorId] = true;
+        }
+    }
     $fediverseTimeline = nammu_fediverse_timeline_store()['items'];
     $fediverseFollowers = function_exists('nammu_fediverse_followers_store') ? nammu_fediverse_followers_store()['followers'] : [];
     $fediverseRecipients = function_exists('nammu_fediverse_message_recipients') ? nammu_fediverse_message_recipients() : [];
@@ -879,75 +886,104 @@
                 </div>
             </form>
 
-            <div class="card mb-4">
-                <div class="card-body">
-                    <h3 class="h5 mb-3">Actores seguidos</h3>
-                    <?php if (empty($fediverseFollowing)): ?>
-                        <p class="text-muted mb-0">Todavía no sigues ningún actor.</p>
-                    <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle">
-                                <thead>
-                                    <tr>
-                                        <th>Actor</th>
-                                        <th>Outbox</th>
-                                        <th>Última revisión</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+            <div class="row">
+                <div class="col-lg-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h3 class="h5 mb-3">Actores seguidos</h3>
+                            <?php if (empty($fediverseFollowing)): ?>
+                                <p class="text-muted mb-0">Todavía no sigues ningún actor.</p>
+                            <?php else: ?>
+                                <div class="list-group list-group-flush">
                                     <?php foreach ($fediverseFollowing as $actor): ?>
-                                        <tr>
-                                            <td>
-                                                <strong><?= htmlspecialchars((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? 'Actor')), ENT_QUOTES, 'UTF-8') ?></strong><br>
-                                                <small class="text-muted"><?= htmlspecialchars((string) ($actor['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small>
-                                                <?php if (!empty($actor['last_error'])): ?>
-                                                    <div class="small text-danger mt-1"><?= htmlspecialchars((string) $actor['last_error'], ENT_QUOTES, 'UTF-8') ?></div>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td><small><a href="<?= htmlspecialchars((string) ($actor['outbox'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars((string) ($actor['outbox'] ?? ''), ENT_QUOTES, 'UTF-8') ?></a></small></td>
-                                            <td><small><?= htmlspecialchars((string) (($actor['last_checked_at'] ?? '') ?: 'Nunca'), ENT_QUOTES, 'UTF-8') ?></small></td>
-                                            <td class="text-right">
-                                                <div class="d-inline-flex align-items-center" style="gap:0.35rem;">
-                                                    <form method="post">
-                                                        <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($actor['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                        <input type="hidden" name="fediverse_tab" value="network">
-                                                        <button type="submit" name="restart_fediverse_actor" class="btn btn-outline-secondary btn-sm">Reiniciar</button>
-                                                    </form>
-                                                    <form method="post" onsubmit="return confirm('¿Dejar de seguir este actor?');">
-                                                        <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($actor['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                        <input type="hidden" name="fediverse_tab" value="network">
-                                                        <button type="submit" name="unfollow_fediverse_actor" class="btn btn-outline-danger btn-sm">Quitar</button>
-                                                    </form>
+                                        <?php
+                                        $actorName = trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? 'Actor')));
+                                        $actorId = trim((string) ($actor['id'] ?? ''));
+                                        $actorIcon = trim((string) ($actor['icon'] ?? ''));
+                                        $actorUsername = trim((string) ($actor['preferredUsername'] ?? ''));
+                                        $actorHost = is_string(parse_url($actorId, PHP_URL_HOST)) ? (string) parse_url($actorId, PHP_URL_HOST) : '';
+                                        $actorHandle = $actorUsername !== '' ? '@' . $actorUsername . ($actorHost !== '' ? '@' . $actorHost : '') : $actorId;
+                                        ?>
+                                        <div class="list-group-item px-0">
+                                            <div class="d-flex align-items-center justify-content-between" style="gap:0.75rem;">
+                                                <div class="d-flex align-items-center" style="gap:0.75rem; min-width:0;">
+                                                    <?php if ($actorIcon !== ''): ?>
+                                                        <img src="<?= htmlspecialchars($actorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="" style="width:40px;height:40px;border-radius:999px;object-fit:cover;flex:0 0 40px;">
+                                                    <?php else: ?>
+                                                        <div style="width:40px;height:40px;border-radius:999px;background:#e9ecef;flex:0 0 40px;"></div>
+                                                    <?php endif; ?>
+                                                    <div style="min-width:0;">
+                                                        <div class="font-weight-bold text-truncate"><?= htmlspecialchars($actorName, ENT_QUOTES, 'UTF-8') ?></div>
+                                                        <div class="small text-muted text-truncate"><?= htmlspecialchars($actorHandle, ENT_QUOTES, 'UTF-8') ?></div>
+                                                    </div>
                                                 </div>
-                                            </td>
-                                        </tr>
+                                                <form method="post" onsubmit="return confirm('¿Dejar de seguir este actor?');">
+                                                    <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($actorId, ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="fediverse_tab" value="network">
+                                                    <button type="submit" name="unfollow_fediverse_actor" class="btn btn-outline-danger btn-sm">Dejar de seguir</button>
+                                                </form>
+                                            </div>
+                                        </div>
                                     <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-body">
-                    <h3 class="h5 mb-3">Seguidores</h3>
-                    <?php if (empty($fediverseFollowers)): ?>
-                        <p class="text-muted mb-0">Todavía nadie sigue este actor federado.</p>
-                    <?php else: ?>
-                        <div class="list-group">
-                            <?php foreach ($fediverseFollowers as $follower): ?>
-                                <div class="list-group-item">
-                                    <strong><?= htmlspecialchars((string) (($follower['name'] ?? '') ?: ($follower['preferredUsername'] ?? 'Actor remoto')), ENT_QUOTES, 'UTF-8') ?></strong>
-                                    <div class="small text-muted mt-1"><?= htmlspecialchars((string) ($follower['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
-                                    <?php if (!empty($follower['followed_at'])): ?>
-                                        <div class="small text-muted mt-1">Desde <?= htmlspecialchars((string) $follower['followed_at'], ENT_QUOTES, 'UTF-8') ?></div>
-                                    <?php endif; ?>
                                 </div>
-                            <?php endforeach; ?>
+                            <?php endif; ?>
                         </div>
-                    <?php endif; ?>
+                    </div>
+                </div>
+
+                <div class="col-lg-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h3 class="h5 mb-3">Seguidores</h3>
+                            <?php if (empty($fediverseFollowers)): ?>
+                                <p class="text-muted mb-0">Todavía nadie sigue este actor federado.</p>
+                            <?php else: ?>
+                                <div class="list-group list-group-flush">
+                                    <?php foreach ($fediverseFollowers as $follower): ?>
+                                        <?php
+                                        $followerName = trim((string) (($follower['name'] ?? '') ?: ($follower['preferredUsername'] ?? 'Actor remoto')));
+                                        $followerId = trim((string) ($follower['id'] ?? ''));
+                                        $followerIcon = trim((string) ($follower['icon'] ?? ''));
+                                        $followerUsername = trim((string) ($follower['preferredUsername'] ?? ''));
+                                        $followerHost = is_string(parse_url($followerId, PHP_URL_HOST)) ? (string) parse_url($followerId, PHP_URL_HOST) : '';
+                                        $followerHandle = $followerUsername !== '' ? '@' . $followerUsername . ($followerHost !== '' ? '@' . $followerHost : '') : $followerId;
+                                        $isMutualFollow = $followerId !== '' && isset($fediverseFollowingIds[$followerId]);
+                                        ?>
+                                        <div class="list-group-item px-0">
+                                            <div class="d-flex align-items-center justify-content-between" style="gap:0.75rem;">
+                                                <div class="d-flex align-items-center" style="gap:0.75rem; min-width:0;">
+                                                    <?php if ($followerIcon !== ''): ?>
+                                                        <img src="<?= htmlspecialchars($followerIcon, ENT_QUOTES, 'UTF-8') ?>" alt="" style="width:40px;height:40px;border-radius:999px;object-fit:cover;flex:0 0 40px;">
+                                                    <?php else: ?>
+                                                        <div style="width:40px;height:40px;border-radius:999px;background:#e9ecef;flex:0 0 40px;"></div>
+                                                    <?php endif; ?>
+                                                    <div style="min-width:0;">
+                                                        <div class="font-weight-bold text-truncate"><?= htmlspecialchars($followerName, ENT_QUOTES, 'UTF-8') ?></div>
+                                                        <div class="small text-muted text-truncate"><?= htmlspecialchars($followerHandle, ENT_QUOTES, 'UTF-8') ?></div>
+                                                    </div>
+                                                </div>
+                                                <?php if ($followerId !== ''): ?>
+                                                    <?php if ($isMutualFollow): ?>
+                                                        <form method="post" onsubmit="return confirm('¿Dejar de seguir este actor?');">
+                                                            <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($followerId, ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="fediverse_tab" value="network">
+                                                            <button type="submit" name="unfollow_fediverse_actor" class="btn btn-outline-danger btn-sm">Dejar de seguir</button>
+                                                        </form>
+                                                    <?php else: ?>
+                                                        <form method="post">
+                                                            <input type="hidden" name="fediverse_actor_input" value="<?= htmlspecialchars($followerId, ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="fediverse_tab" value="network">
+                                                            <button type="submit" name="follow_fediverse_actor" class="btn btn-outline-primary btn-sm">Seguir</button>
+                                                        </form>
+                                                    <?php endif; ?>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                 </div>
             </div>
 

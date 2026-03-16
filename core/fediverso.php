@@ -2498,6 +2498,10 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
     $deliveryStore = nammu_fediverse_deliveries_store();
     $deliveryFollowers = is_array($deliveryStore['followers'] ?? null) ? $deliveryStore['followers'] : [];
     $activity = nammu_fediverse_activity_for_local_item($matchedItem, $config);
+    $activity['id'] = rtrim((string) ($activity['id'] ?? ((string) ($matchedItem['id'] ?? '') . '/activity')), '/') . '/resend-' . gmdate('YmdHis');
+    if (is_array($activity['object'] ?? null)) {
+        $activity['object']['updated'] = gmdate(DATE_ATOM);
+    }
     $delivered = 0;
     foreach ($followers as $follower) {
         $followerId = trim((string) ($follower['id'] ?? ''));

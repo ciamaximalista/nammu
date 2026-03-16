@@ -1887,10 +1887,11 @@ function nammu_build_social_meta(array $data, array $socialConfig): array
     $url = $data['url'] ?? '';
     $image = $data['image'] ?? '';
     $siteName = trim($data['site_name'] ?? '');
-    $twitterImage = $image;
-    if ($twitterImage !== '' && preg_match('/\.(jpe?g|png|gif)\.webp(?=$|[?#])/i', $twitterImage) === 1) {
-        $twitterImage = preg_replace('/\.webp(?=$|[?#])/i', '', $twitterImage) ?? $twitterImage;
+    $socialImage = $image;
+    if ($socialImage !== '' && preg_match('/\.(jpe?g|png|gif)\.webp(?=$|[?#])/i', $socialImage) === 1) {
+        $socialImage = preg_replace('/\.webp(?=$|[?#])/i', '', $socialImage) ?? $socialImage;
     }
+    $twitterImage = $socialImage;
 
     $properties = [
         'og:type' => $data['type'] ?? 'website',
@@ -1899,8 +1900,8 @@ function nammu_build_social_meta(array $data, array $socialConfig): array
         'og:url' => $url,
     ];
 
-    if ($image !== '') {
-        $properties['og:image'] = $image;
+    if ($socialImage !== '') {
+        $properties['og:image'] = $socialImage;
         if ($title !== '') {
             $properties['og:image:alt'] = $title;
         }

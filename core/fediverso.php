@@ -1807,7 +1807,14 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
         $object['summary'] = htmlspecialchars($summary, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
     $image = trim((string) ($item['image'] ?? ''));
-    if ($image !== '') {
+    if (strcasecmp($objectType, 'Note') !== 0 && $objectUrl !== '') {
+        $object['attachment'] = [[
+            'type' => 'Link',
+            'href' => $objectUrl,
+            'mediaType' => 'text/html',
+            'name' => trim((string) (($item['title'] ?? '') ?: $objectUrl)),
+        ]];
+    } elseif ($image !== '') {
         $object['image'] = ['type' => 'Image', 'url' => $image];
         $object['attachment'] = [[
             'type' => 'Image',
@@ -2822,6 +2829,10 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
     if (!is_array($matchedItem)) {
         return ['ok' => false, 'message' => 'No se encontró ese contenido publicado para enviarlo al Fediverso.'];
     }
+    $deletedIds = array_values(array_filter(nammu_fediverse_deleted_store()['ids'], static function (string $deletedId) use ($matchedItem): bool {
+        return $deletedId !== trim((string) ($matchedItem['id'] ?? ''));
+    }));
+    nammu_fediverse_save_deleted_store($deletedIds);
 
     $deliveryStore = nammu_fediverse_deliveries_store();
     $deliveryFollowers = is_array($deliveryStore['followers'] ?? null) ? $deliveryStore['followers'] : [];

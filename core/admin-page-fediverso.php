@@ -63,6 +63,12 @@
     $fediverseLocalReactionDetails = function_exists('nammu_fediverse_local_reaction_details')
         ? nammu_fediverse_local_reaction_details($fediverseConfig)
         : [];
+    $fediverseRemoteBoostSummary = function_exists('nammu_fediverse_remote_boost_summary')
+        ? nammu_fediverse_remote_boost_summary()
+        : [];
+    $fediverseRemoteReplySummary = function_exists('nammu_fediverse_remote_reply_summary')
+        ? nammu_fediverse_remote_reply_summary()
+        : [];
     $buildTabUrl = static function (string $tab): string {
         return 'admin.php?page=fediverso&tab=' . rawurlencode($tab);
     };
@@ -553,6 +559,8 @@
                                 <?php $itemTargetActorId = (string) (($item['target_actor_id'] ?? '') ?: ($item['actor_id'] ?? '')); ?>
                                 <?php $itemActionState = function_exists('nammu_fediverse_action_state_for_item') ? nammu_fediverse_action_state_for_item($item) : ['liked' => false, 'boosted' => false, 'replied' => false, 'shared' => false, 'boost_count' => 0, 'reply_count' => 0, 'share_count' => 0]; ?>
                                 <?php $itemReplies = function_exists('nammu_fediverse_replies_for_item') ? nammu_fediverse_replies_for_item($item) : []; ?>
+                                <?php $remoteBoostMeta = $fediverseRemoteBoostSummary[$itemObjectId] ?? ['count' => 0]; ?>
+                                <?php $remoteReplyMeta = $fediverseRemoteReplySummary[$itemObjectId] ?? ['count' => 0]; ?>
                                 <article class="fediverse-status">
                                     <div class="fediverse-status__avatar">
                                         <?php if (!empty($item['actor_icon'])): ?>
@@ -630,8 +638,10 @@
                                         <div class="fediverse-status__footer">
                                             <a href="<?= htmlspecialchars((string) (($item['url'] ?? '') ?: ($item['id'] ?? '#')), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Abrir publicación</a>
                                         </div>
-                                        <?php if (!empty($itemActionState['liked']) || !empty($itemActionState['boosted']) || !empty($itemActionState['replied']) || !empty($itemActionState['shared'])): ?>
+                                        <?php if (($remoteBoostMeta['count'] ?? 0) > 0 || ($remoteReplyMeta['count'] ?? 0) > 0 || !empty($itemActionState['liked']) || !empty($itemActionState['boosted']) || !empty($itemActionState['replied']) || !empty($itemActionState['shared'])): ?>
                                             <div class="fediverse-status__history">
+                                                <?php if (($remoteBoostMeta['count'] ?? 0) > 0): ?><span><?= (int) ($remoteBoostMeta['count'] ?? 0) ?> impulso<?= ((int) ($remoteBoostMeta['count'] ?? 0) === 1) ? '' : 's' ?></span><?php endif; ?>
+                                                <?php if (($remoteReplyMeta['count'] ?? 0) > 0): ?><span><?= (int) ($remoteReplyMeta['count'] ?? 0) ?> respuesta<?= ((int) ($remoteReplyMeta['count'] ?? 0) === 1) ? '' : 's' ?></span><?php endif; ?>
                                                 <?php if (!empty($itemActionState['liked'])): ?><span>Favorito enviado</span><?php endif; ?>
                                                 <?php if (!empty($itemActionState['boosted'])): ?><span><?= (int) ($itemActionState['boost_count'] ?? 0) ?> impulso<?= ((int) ($itemActionState['boost_count'] ?? 0) === 1) ? '' : 's' ?></span><?php endif; ?>
                                                 <?php if (!empty($itemActionState['replied'])): ?><span><?= (int) ($itemActionState['reply_count'] ?? 0) ?> respuesta<?= ((int) ($itemActionState['reply_count'] ?? 0) === 1) ? '' : 's' ?></span><?php endif; ?>
@@ -657,6 +667,13 @@
                                                                 <?php endif; ?>
                                                             </div>
                                                             <div class="fediverse-thread__content"><?= nl2br(htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
+                                                            <?php if (!empty($reply['id'])): ?>
+                                                                <form method="post" class="mt-2" onsubmit="return confirm('¿Borrar esta respuesta del Fediverso?');">
+                                                                    <input type="hidden" name="fediverse_tab" value="home">
+                                                                    <input type="hidden" name="fediverse_reply_action_id" value="<?= htmlspecialchars((string) $reply['id'], ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <button type="submit" name="fediverse_delete_reply_item" class="btn btn-outline-danger btn-sm">Borrar</button>
+                                                                </form>
+                                                            <?php endif; ?>
                                                         </div>
                                                     </div>
                                                 <?php endforeach; ?>

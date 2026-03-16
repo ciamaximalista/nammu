@@ -760,6 +760,73 @@ function nammu_fediverse_action_state_for_item(array $item): array
     ];
 }
 
+function nammu_fediverse_remote_boost_summary(): array
+{
+    $items = nammu_fediverse_timeline_store()['items'];
+    $summary = [];
+    foreach ($items as $item) {
+        if (strtolower(trim((string) ($item['type'] ?? ''))) !== 'announce') {
+            continue;
+        }
+        $actorId = trim((string) ($item['actor_id'] ?? ''));
+        $identifiers = [];
+        foreach (['object_id', 'url', 'id'] as $field) {
+            $value = trim((string) ($item[$field] ?? ''));
+            if ($value !== '') {
+                $identifiers[] = $value;
+            }
+        }
+        foreach (array_unique($identifiers) as $identifier) {
+            if (!isset($summary[$identifier])) {
+                $summary[$identifier] = [
+                    'count' => 0,
+                    'actors' => [],
+                ];
+            }
+            if ($actorId !== '' && isset($summary[$identifier]['actors'][$actorId])) {
+                continue;
+            }
+            $summary[$identifier]['count']++;
+            if ($actorId !== '') {
+                $summary[$identifier]['actors'][$actorId] = true;
+            }
+        }
+    }
+    return $summary;
+}
+
+function nammu_fediverse_remote_reply_summary(): array
+{
+    $items = nammu_fediverse_timeline_store()['items'];
+    $summary = [];
+    foreach ($items as $item) {
+        $target = trim((string) ($item['target_url'] ?? ''));
+        $type = strtolower(trim((string) ($item['type'] ?? '')));
+        $actorId = trim((string) ($item['actor_id'] ?? ''));
+        if ($target === '' || $type === 'announce' || $type === 'like' || $type === 'delete') {
+            continue;
+        }
+        $isReply = trim((string) ($item['content'] ?? '')) !== '' && trim((string) ($item['object_id'] ?? '')) !== '' && $target !== trim((string) ($item['object_id'] ?? ''));
+        if (!$isReply) {
+            continue;
+        }
+        if (!isset($summary[$target])) {
+            $summary[$target] = [
+                'count' => 0,
+                'actors' => [],
+            ];
+        }
+        if ($actorId !== '' && isset($summary[$target]['actors'][$actorId])) {
+            continue;
+        }
+        $summary[$target]['count']++;
+        if ($actorId !== '') {
+            $summary[$target]['actors'][$actorId] = true;
+        }
+    }
+    return $summary;
+}
+
 function nammu_fediverse_public_replies_by_object(): array
 {
     $items = nammu_fediverse_actions_store()['items'];

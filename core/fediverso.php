@@ -1007,6 +1007,7 @@ function nammu_fediverse_remote_replies_for_item(array $item, array $config): ar
         $actor = $actorId !== '' ? nammu_fediverse_resolve_actor($actorId, $config) : [];
         $replies[] = [
             'id' => trim((string) (($replyObject['id'] ?? '') ?: sha1(json_encode($replyObject)))),
+            'note_id' => trim((string) (($replyObject['id'] ?? '') ?: '')),
             'url' => trim((string) (($replyObject['url'] ?? '') ?: '')),
             'published' => trim((string) ($replyObject['published'] ?? '')),
             'reply_text' => $replyText,

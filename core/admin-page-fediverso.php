@@ -631,12 +631,14 @@
                                     $remoteReplyIdentifiers = array_filter([
                                         trim((string) ($remoteItemReply['id'] ?? '')),
                                         trim((string) ($remoteItemReply['url'] ?? '')),
+                                        trim((string) ($remoteItemReply['note_id'] ?? '')),
                                     ]);
                                     $alreadyPresent = false;
                                     foreach ($itemReplies as $existingReply) {
                                         $existingIdentifiers = array_filter([
                                             trim((string) ($existingReply['id'] ?? '')),
                                             trim((string) ($existingReply['url'] ?? '')),
+                                            trim((string) ($existingReply['note_id'] ?? '')),
                                         ]);
                                         if (!empty(array_intersect($remoteReplyIdentifiers, $existingIdentifiers))) {
                                             $alreadyPresent = true;

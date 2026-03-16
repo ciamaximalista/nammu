@@ -719,13 +719,19 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
     $cache['items'] = is_array($cache['items'] ?? null) ? $cache['items'] : [];
     $activeKeys = [];
     foreach ($items as $index => $item) {
-        $link = trim((string) ($item['link'] ?? ''));
-        if ($link === '') {
+        $isManual = !empty($item['is_manual']);
+        $manualLinks = array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : [])));
+        $targetLink = ($isManual && !empty($manualLinks))
+            ? trim((string) ($manualLinks[0] ?? ''))
+            : trim((string) ($item['link'] ?? ''));
+        if ($targetLink === '') {
             continue;
         }
-        $key = sha1($link);
+        $key = sha1($targetLink);
         $activeKeys[] = $key;
-        if (trim((string) ($item['image'] ?? '')) !== '') {
+        $currentImage = trim((string) ($item['image'] ?? ''));
+        $hasPreferredManualPreview = $isManual && !empty($manualLinks);
+        if ($currentImage !== '' && !$hasPreferredManualPreview) {
             continue;
         }
         $entry = is_array($cache['items'][$key] ?? null) ? $cache['items'][$key] : [];
@@ -739,7 +745,7 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
             $items[$index]['image'] = $cachedUrl;
             $cache['items'][$key]['last_used'] = time();
             if ($sourceImage === '') {
-                $refreshedSourceImage = nammu_actuality_extract_social_image($link);
+                $refreshedSourceImage = nammu_actuality_extract_social_image($targetLink);
                 if ($refreshedSourceImage !== '') {
                     $items[$index]['source_image'] = $refreshedSourceImage;
                     $cache['items'][$key]['source_image'] = $refreshedSourceImage;
@@ -747,12 +753,18 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
             }
             continue;
         }
-        $socialImage = nammu_actuality_extract_social_image($link);
+        $socialImage = nammu_actuality_extract_social_image($targetLink);
         if ($socialImage === '') {
+            if ($currentImage !== '') {
+                $items[$index]['image'] = $currentImage;
+            }
             continue;
         }
-        $cachedPublicUrl = nammu_actuality_cache_social_image($link, $socialImage, $publicBaseUrl);
+        $cachedPublicUrl = nammu_actuality_cache_social_image($targetLink, $socialImage, $publicBaseUrl);
         if ($cachedPublicUrl === '') {
+            if ($currentImage !== '') {
+                $items[$index]['image'] = $currentImage;
+            }
             continue;
         }
         $path = parse_url($cachedPublicUrl, PHP_URL_PATH);
@@ -760,7 +772,7 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
         $items[$index]['image'] = $cachedPublicUrl;
         $items[$index]['source_image'] = $socialImage;
         $cache['items'][$key] = [
-            'page_url' => $link,
+            'page_url' => $targetLink,
             'source_image' => $socialImage,
             'public_url' => $cachedPublicUrl,
             'local_path' => $localCachedPath,

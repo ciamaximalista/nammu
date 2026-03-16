@@ -115,44 +115,6 @@
             $fediverseActorsById[$fediverseKnownActorId] = $fediverseKnownActor;
         }
     }
-    foreach ($fediversePublicReplyMessages as $publicReplyMessage) {
-        $actorId = trim((string) ($publicReplyMessage['actor_id'] ?? ''));
-        if ($actorId === '') {
-            continue;
-        }
-        if (!isset($fediverseMessages[$actorId])) {
-            $fediverseMessages[$actorId] = [];
-        }
-        $alreadyPresent = false;
-        foreach ($fediverseMessages[$actorId] as $existingMessage) {
-            if ((string) ($existingMessage['id'] ?? '') === (string) ($publicReplyMessage['id'] ?? '')) {
-                $alreadyPresent = true;
-                break;
-            }
-        }
-        if (!$alreadyPresent) {
-            $fediverseMessages[$actorId][] = $publicReplyMessage;
-        }
-    }
-    foreach (array_merge($fediverseOutgoingPublicReplyMessages, $fediversePublicThreadRootMessages, $fediverseRemoteThreadRootMessages) as $publicConversationMessage) {
-        $actorId = trim((string) ($publicConversationMessage['actor_id'] ?? ''));
-        if ($actorId === '') {
-            continue;
-        }
-        if (!isset($fediverseMessages[$actorId])) {
-            $fediverseMessages[$actorId] = [];
-        }
-        $alreadyPresent = false;
-        foreach ($fediverseMessages[$actorId] as $existingMessage) {
-            if ((string) ($existingMessage['id'] ?? '') === (string) ($publicConversationMessage['id'] ?? '')) {
-                $alreadyPresent = true;
-                break;
-            }
-        }
-        if (!$alreadyPresent) {
-            $fediverseMessages[$actorId][] = $publicConversationMessage;
-        }
-    }
     foreach ($fediverseMessages as &$fediverseMessageGroup) {
         usort($fediverseMessageGroup, static function (array $a, array $b): int {
             return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
@@ -160,10 +122,34 @@
     }
     unset($fediverseMessageGroup);
     $fediverseFlatMessages = [];
+    $fediverseFlatMessageKeys = [];
     foreach ($fediverseMessages as $fediverseMessageGroupItems) {
         foreach ((array) $fediverseMessageGroupItems as $fediverseMessageItem) {
+            $fediverseMessageId = trim((string) ($fediverseMessageItem['id'] ?? ''));
+            $fediverseMessageKey = $fediverseMessageId !== '' ? 'id:' . $fediverseMessageId : 'hash:' . sha1(json_encode($fediverseMessageItem, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            if (isset($fediverseFlatMessageKeys[$fediverseMessageKey])) {
+                continue;
+            }
+            $fediverseFlatMessageKeys[$fediverseMessageKey] = true;
             $fediverseFlatMessages[] = $fediverseMessageItem;
         }
+    }
+    foreach (array_merge(
+        $fediversePublicReplyMessages,
+        $fediverseOutgoingPublicReplyMessages,
+        $fediversePublicThreadRootMessages,
+        $fediverseRemoteThreadRootMessages
+    ) as $publicConversationMessage) {
+        if (!is_array($publicConversationMessage)) {
+            continue;
+        }
+        $fediverseMessageId = trim((string) ($publicConversationMessage['id'] ?? ''));
+        $fediverseMessageKey = $fediverseMessageId !== '' ? 'id:' . $fediverseMessageId : 'hash:' . sha1(json_encode($publicConversationMessage, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        if (isset($fediverseFlatMessageKeys[$fediverseMessageKey])) {
+            continue;
+        }
+        $fediverseFlatMessageKeys[$fediverseMessageKey] = true;
+        $fediverseFlatMessages[] = $publicConversationMessage;
     }
     $fediverseMessageThreads = $isFediverseMessagesTab && function_exists('nammu_fediverse_thread_grouped_messages')
         ? nammu_fediverse_thread_grouped_messages($fediverseFlatMessages)
@@ -1069,11 +1055,19 @@
                         <?php foreach ($fediverseMessageThreads as $threadKey => $messages): ?>
                             <?php $firstMessage = $messages[0] ?? []; ?>
                             <?php
-                            $actorId = trim((string) ($firstMessage['actor_id'] ?? ''));
+                            $threadRootMessage = null;
+                            foreach ($messages as $threadCandidateMessage) {
+                                if (!empty($threadCandidateMessage['is_thread_root'])) {
+                                    $threadRootMessage = $threadCandidateMessage;
+                                    break;
+                                }
+                            }
+                            $threadHeaderMessage = is_array($threadRootMessage) ? $threadRootMessage : $firstMessage;
+                            $actorId = trim((string) ($threadHeaderMessage['actor_id'] ?? ''));
                             $conversationActor = $fediverseActorsById[$actorId] ?? null;
-                            $conversationActorName = trim((string) (($firstMessage['actor_name'] ?? '') ?: ($conversationActor['name'] ?? '') ?: ($conversationActor['preferredUsername'] ?? '') ?: $actorId));
-                            $conversationActorIcon = trim((string) (($firstMessage['actor_icon'] ?? '') ?: ($conversationActor['icon'] ?? '')));
-                            $conversationIsPublic = strtolower(trim((string) ($firstMessage['visibility'] ?? 'private'))) === 'public';
+                            $conversationActorName = trim((string) (($threadHeaderMessage['actor_name'] ?? '') ?: ($conversationActor['name'] ?? '') ?: ($conversationActor['preferredUsername'] ?? '') ?: $actorId));
+                            $conversationActorIcon = trim((string) (($threadHeaderMessage['actor_icon'] ?? '') ?: ($conversationActor['icon'] ?? '')));
+                            $conversationIsPublic = strtolower(trim((string) ($threadHeaderMessage['visibility'] ?? 'private'))) === 'public';
                             ?>
                             <div class="border rounded p-3 mb-4">
                                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">

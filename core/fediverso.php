@@ -2265,20 +2265,18 @@ function nammu_fediverse_remote_thread_root_message_entries(array $config): arra
     $seen = [];
     foreach (nammu_fediverse_outgoing_public_reply_message_entries($config) as $message) {
         $target = trim((string) ($message['reply_target_url'] ?? ''));
-        $actorId = trim((string) ($message['actor_id'] ?? ''));
-        if ($target === '' || $actorId === '' || !isset($timelineIndex[$target])) {
+        if ($target === '' || !isset($timelineIndex[$target])) {
             continue;
         }
         $rootItem = $timelineIndex[$target];
-        $key = $actorId . '|' . $target;
-        if (isset($seen[$key])) {
+        if (isset($seen[$target])) {
             continue;
         }
-        $seen[$key] = true;
+        $seen[$target] = true;
         $messages[] = [
-            'id' => 'remote-root-' . substr(sha1($key), 0, 24),
+            'id' => 'remote-root-' . substr(sha1($target), 0, 24),
             'activity_id' => '',
-            'actor_id' => $actorId,
+            'actor_id' => trim((string) (($rootItem['actor_id'] ?? '') ?: '')),
             'actor_name' => trim((string) (($rootItem['actor_name'] ?? '') ?: '')),
             'actor_icon' => trim((string) (($rootItem['actor_icon'] ?? '') ?: '')),
             'direction' => 'incoming',
@@ -2304,9 +2302,8 @@ function nammu_fediverse_public_thread_root_message_entries(array $config): arra
     $messages = [];
     $seen = [];
     foreach ($incoming as $message) {
-        $actorId = trim((string) ($message['actor_id'] ?? ''));
         $target = trim((string) ($message['reply_target_url'] ?? ''));
-        if ($actorId === '' || $target === '' || !isset($localIndex[$target])) {
+        if ($target === '' || !isset($localIndex[$target])) {
             continue;
         }
         $localItem = $localIndex[$target];
@@ -2314,17 +2311,16 @@ function nammu_fediverse_public_thread_root_message_entries(array $config): arra
         if ($localId === '') {
             continue;
         }
-        $key = $actorId . '|' . $localId;
-        if (isset($seen[$key])) {
+        if (isset($seen[$localId])) {
             continue;
         }
-        $seen[$key] = true;
+        $seen[$localId] = true;
         $messages[] = [
-            'id' => 'local-root-' . substr(sha1($key), 0, 24),
+            'id' => 'local-root-' . substr(sha1($localId), 0, 24),
             'activity_id' => '',
-            'actor_id' => $actorId,
-            'actor_name' => '',
-            'actor_icon' => '',
+            'actor_id' => trim((string) (($localItem['actor_id'] ?? '') ?: nammu_fediverse_actor_url($config))),
+            'actor_name' => trim((string) (($config['site_name'] ?? '') ?: '')),
+            'actor_icon' => trim((string) nammu_fediverse_avatar_url($config)),
             'direction' => 'outgoing',
             'content' => trim((string) (($localItem['content'] ?? '') ?: ($localItem['title'] ?? ''))),
             'published' => trim((string) ($localItem['published'] ?? '')),

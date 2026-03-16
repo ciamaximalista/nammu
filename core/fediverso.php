@@ -1297,6 +1297,7 @@ function nammu_fediverse_local_content_items(array $config): array
             'url' => $url,
             'title' => $title,
             'content' => $description !== '' ? $description : nammu_fediverse_plain_excerpt($content),
+            'summary' => $description,
             'published' => nammu_fediverse_meta_date($meta, $file),
             'type' => $objectType,
             'image' => $image,
@@ -1322,6 +1323,7 @@ function nammu_fediverse_local_content_items(array $config): array
             'url' => $baseUrl . '/itinerarios/' . rawurlencode($slug),
             'title' => $title,
             'content' => $description !== '' ? $description : nammu_fediverse_plain_excerpt($content),
+            'summary' => $description,
             'published' => nammu_fediverse_meta_date($meta, $file),
             'type' => 'Article',
             'image' => $image,
@@ -1341,6 +1343,7 @@ function nammu_fediverse_local_content_items(array $config): array
             'url' => trim((string) (($item['link'] ?? '') ?: ($baseUrl . '/actualidad.php'))),
             'title' => $title !== '' ? $title : ($isManual ? '' : 'Noticia'),
             'content' => $content,
+            'summary' => trim((string) ($item['description'] ?? '')),
             'published' => gmdate(DATE_ATOM, (int) (($item['timestamp'] ?? 0) ?: time())),
             'type' => $isManual ? 'Note' : 'Article',
             'image' => trim((string) ($item['image'] ?? '')),
@@ -1625,15 +1628,35 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
 {
     $actorUrl = nammu_fediverse_actor_url($config);
     $avatarUrl = nammu_fediverse_avatar_url($config);
+    $objectType = (string) ($item['type'] ?? 'Article');
+    $objectUrl = (string) ($item['url'] ?? '');
+    $plainContent = trim((string) ($item['content'] ?? ''));
+    if (strcasecmp($objectType, 'Note') === 0) {
+        $contentHtml = nl2br(htmlspecialchars($plainContent, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+    } else {
+        $contentParts = [];
+        if ($objectUrl !== '') {
+            $escapedUrl = htmlspecialchars($objectUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $contentParts[] = '<p><a href="' . $escapedUrl . '">' . $escapedUrl . '</a></p>';
+        }
+        if ($plainContent !== '') {
+            $contentParts[] = '<p>' . nl2br(htmlspecialchars($plainContent, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</p>';
+        }
+        $contentHtml = implode('', $contentParts);
+    }
     $object = [
         'id' => (string) ($item['id'] ?? ''),
-        'type' => (string) ($item['type'] ?? 'Article'),
+        'type' => $objectType,
         'attributedTo' => $actorUrl,
-        'url' => (string) ($item['url'] ?? ''),
+        'url' => $objectUrl,
         'name' => (string) ($item['title'] ?? ''),
-        'content' => nl2br(htmlspecialchars((string) ($item['content'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')),
+        'content' => $contentHtml,
         'published' => (string) ($item['published'] ?? gmdate(DATE_ATOM)),
     ];
+    $summary = trim((string) ($item['summary'] ?? ''));
+    if ($summary !== '') {
+        $object['summary'] = htmlspecialchars($summary, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
     $image = trim((string) ($item['image'] ?? ''));
     if ($image !== '') {
         $object['image'] = ['type' => 'Image', 'url' => $image];

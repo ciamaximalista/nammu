@@ -2450,22 +2450,46 @@ function nammu_fediverse_replies_collection_document(string $routePath, array $c
         }
     }
     $replyObjects = [];
-    foreach (nammu_fediverse_incoming_public_replies_by_object($config) as $localId => $replies) {
-        foreach ((array) $replies as $reply) {
-            if (!in_array(trim((string) ($reply['target_url'] ?? '')), $targetIdentifiers, true)) {
-                continue;
-            }
-            $replyObjects[] = [
-                'id' => trim((string) ($reply['id'] ?? '')),
-                'type' => 'Note',
-                'attributedTo' => trim((string) ($reply['actor_id'] ?? '')),
-                'content' => nl2br(htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')),
-                'published' => trim((string) ($reply['published'] ?? '')),
-                'url' => trim((string) ($reply['url'] ?? '')),
-                'inReplyTo' => trim((string) ($reply['target_url'] ?? '')),
-            ];
+    $inboxStore = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
+    foreach ((array) ($inboxStore['activities'] ?? []) as $entry) {
+        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        if (strtolower(trim((string) ($payload['type'] ?? ''))) !== 'create') {
+            continue;
         }
+        $object = is_array($payload['object'] ?? null) ? $payload['object'] : [];
+        if (strtolower(trim((string) ($object['type'] ?? ''))) !== 'note') {
+            continue;
+        }
+        $target = trim((string) ($object['inReplyTo'] ?? ''));
+        if ($target === '' || !in_array($target, $targetIdentifiers, true)) {
+            continue;
+        }
+        $replyId = trim((string) (($object['id'] ?? '') ?: ($payload['id'] ?? '')));
+        if ($replyId === '') {
+            continue;
+        }
+        $replyObject = $object;
+        if (trim((string) ($replyObject['id'] ?? '')) === '') {
+            $replyObject['id'] = $replyId;
+        }
+        if (trim((string) ($replyObject['url'] ?? '')) === '') {
+            $replyObject['url'] = $replyId;
+        }
+        if (trim((string) ($replyObject['attributedTo'] ?? '')) === '') {
+            $replyObject['attributedTo'] = trim((string) ($payload['actor'] ?? ''));
+        }
+        if (trim((string) ($replyObject['published'] ?? '')) === '') {
+            $replyObject['published'] = trim((string) (($payload['published'] ?? '') ?: ($entry['received_at'] ?? gmdate(DATE_ATOM))));
+        }
+        if (trim((string) ($replyObject['context'] ?? '')) === '') {
+            $replyObject['context'] = $target;
+        }
+        if (trim((string) ($replyObject['conversation'] ?? '')) === '') {
+            $replyObject['conversation'] = $target;
+        }
+        $replyObjects[$replyId] = $replyObject;
     }
+    $replyObjects = array_values($replyObjects);
     usort($replyObjects, static function (array $a, array $b): int {
         return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
     });

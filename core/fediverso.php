@@ -1261,6 +1261,19 @@ function nammu_fediverse_find_local_item_for_thread_hash(string $hash, array $co
             return $item;
         }
     }
+    foreach (nammu_fediverse_actions_store()['items'] as $action) {
+        $resendItem = nammu_fediverse_resend_item_from_action($action);
+        if (!is_array($resendItem)) {
+            continue;
+        }
+        $itemId = trim((string) ($resendItem['id'] ?? ''));
+        if ($itemId === '') {
+            continue;
+        }
+        if (nammu_fediverse_thread_page_hash($itemId) === $hash) {
+            return $resendItem;
+        }
+    }
     return null;
 }
 

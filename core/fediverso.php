@@ -2085,6 +2085,7 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
     $replyRootMap = [];
     $pendingReplies = [];
     $grouped = [];
+    $seenReplies = [];
     foreach ($activities as $entry) {
         $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
         if (strtolower(trim((string) ($payload['type'] ?? ''))) !== 'create') {
@@ -2137,7 +2138,30 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
             if (!isset($grouped[$localId])) {
                 $grouped[$localId] = [];
             }
-            $grouped[$localId][] = $pendingReply['entry'];
+            $replyEntry = is_array($pendingReply['entry'] ?? null) ? $pendingReply['entry'] : [];
+            $replyIdKey = trim((string) ($replyEntry['id'] ?? ''));
+            $replyUrlKey = trim((string) ($replyEntry['url'] ?? ''));
+            $replyFallbackKey = strtolower(trim((string) ($replyEntry['actor_id'] ?? ''))) . '|' .
+                trim((string) ($replyEntry['published'] ?? '')) . '|' .
+                trim((string) ($replyEntry['reply_text'] ?? ''));
+            $dedupKeys = array_filter([
+                $replyIdKey !== '' ? 'id:' . $replyIdKey : '',
+                $replyUrlKey !== '' ? 'url:' . $replyUrlKey : '',
+                $replyFallbackKey !== '||' ? 'fallback:' . $replyFallbackKey : '',
+            ]);
+            $alreadyPresent = false;
+            foreach ($dedupKeys as $dedupKey) {
+                if (isset($seenReplies[$localId][$dedupKey])) {
+                    $alreadyPresent = true;
+                    break;
+                }
+            }
+            if (!$alreadyPresent) {
+                $grouped[$localId][] = $replyEntry;
+                foreach ($dedupKeys as $dedupKey) {
+                    $seenReplies[$localId][$dedupKey] = true;
+                }
+            }
             foreach (['reply_id', 'reply_url'] as $replyField) {
                 $replyIdentifier = trim((string) ($pendingReply[$replyField] ?? ''));
                 if ($replyIdentifier !== '') {

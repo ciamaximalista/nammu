@@ -10182,6 +10182,7 @@ if ($isLoggedIn && $page === 'fediverso') {
         $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
         $objectTitle = trim((string) ($_POST['fediverse_object_title'] ?? ''));
         $objectContent = trim((string) ($_POST['fediverse_object_content'] ?? ''));
+        $objectImage = trim((string) ($_POST['fediverse_object_image'] ?? ''));
         $config = load_config_file();
         $result = nammu_fediverse_send_announce($recipientId, $objectUrl, $config);
         if (!empty($result['ok'])) {
@@ -10204,7 +10205,7 @@ if ($isLoggedIn && $page === 'fediverso') {
                 $noteText = trim($noteText . "\n\n" . $objectUrl);
             }
             if ($noteText !== '' && function_exists('nammu_actuality_add_manual_item')) {
-                nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle);
+                nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle, $objectImage);
                 if (function_exists('nammu_actuality_rebuild_snapshot')) {
                     nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
                 }

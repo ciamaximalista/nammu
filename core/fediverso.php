@@ -1698,6 +1698,12 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
     $image = trim((string) ($item['image'] ?? ''));
     if ($image !== '') {
         $object['image'] = ['type' => 'Image', 'url' => $image];
+        $object['attachment'] = [[
+            'type' => 'Image',
+            'mediaType' => 'image/*',
+            'url' => $image,
+            'name' => trim((string) ($item['title'] ?? '')),
+        ]];
     }
     if ($avatarUrl !== '') {
         $object['icon'] = ['type' => 'Image', 'url' => $avatarUrl];

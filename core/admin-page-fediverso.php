@@ -603,6 +603,21 @@
                                                 <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_title" value="<?= htmlspecialchars((string) ($item['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_content" value="<?= htmlspecialchars((string) ($item['content'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <?php
+                                                $boostImageUrl = trim((string) ($item['image'] ?? ''));
+                                                if ($boostImageUrl === '') {
+                                                    foreach ($attachments as $attachment) {
+                                                        $attachmentUrl = trim((string) ($attachment['url'] ?? ''));
+                                                        $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
+                                                        $attachmentMediaType = strtolower(trim((string) ($attachment['media_type'] ?? '')));
+                                                        if ($attachmentUrl !== '' && ($attachmentType === 'image' || str_starts_with($attachmentMediaType, 'image/'))) {
+                                                            $boostImageUrl = $attachmentUrl;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                                ?>
+                                                <input type="hidden" name="fediverse_object_image" value="<?= htmlspecialchars($boostImageUrl, ENT_QUOTES, 'UTF-8') ?>">
                                                 <button type="submit" name="fediverse_boost_item" class="btn btn-outline-secondary btn-sm"<?= !empty($itemActionState['boosted']) ? ' disabled' : '' ?>><?= !empty($itemActionState['boosted']) ? 'Impulsado' : 'Impulsar' ?></button>
                                             </form>
                                             <details class="fediverse-inline-form">

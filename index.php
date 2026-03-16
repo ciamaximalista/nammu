@@ -738,6 +738,46 @@ if (preg_match('#^/ap/replies/[a-f0-9]{24}$#', $routePath) === 1) {
     exit;
 }
 
+if (preg_match('#^/fediverso/([a-f0-9]{24})/?$#', $routePath, $fediverseThreadMatch) === 1) {
+    $threadHash = trim((string) ($fediverseThreadMatch[1] ?? ''));
+    $threadItem = nammu_fediverse_find_local_item_for_thread_hash($threadHash, $configData);
+    if (!is_array($threadItem)) {
+        $renderNotFound('Hilo federado no encontrado', 'La publicación federada solicitada no está disponible.', $routePath);
+    }
+    $threadPayload = nammu_fediverse_thread_page_payload($threadItem, $configData);
+    $threadPageTitle = trim((string) (($threadItem['title'] ?? '') ?: ($siteTitle . ' — Fediverso')));
+    $threadDescription = trim((string) (($threadItem['summary'] ?? '') ?: ($threadItem['content'] ?? '')));
+    $threadUrl = trim((string) ($threadPayload['thread_url'] ?? ''));
+    $threadImage = trim((string) ($threadItem['image'] ?? ''));
+    $threadSocialMeta = function_exists('nammu_build_social_meta')
+        ? nammu_build_social_meta([
+            'type' => 'article',
+            'title' => $threadPageTitle,
+            'description' => $threadDescription,
+            'url' => $threadUrl,
+            'image' => $threadImage,
+            'site_name' => $siteNameForMeta,
+        ], $socialConfig)
+        : [];
+    $content = $renderer->render('fediverse-thread-public', [
+        'threadItem' => $threadItem,
+        'threadPayload' => $threadPayload,
+        'fediverseLocalHandle' => '@' . substr(nammu_fediverse_acct_uri($configData), 5),
+        'fediverseLocalName' => trim((string) (($configData['site_name'] ?? '') ?: $siteTitle)),
+        'fediverseLocalAvatar' => nammu_fediverse_avatar_url($configData),
+    ]);
+    echo $renderer->render('layout', [
+        'pageTitle' => $threadPageTitle,
+        'metaDescription' => $threadDescription,
+        'content' => $content,
+        'socialMeta' => $threadSocialMeta,
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
+        'showLogo' => true,
+    ]);
+    exit;
+}
+
 if ($routePath === '/ap/followers') {
     header('Content-Type: application/activity+json; charset=UTF-8');
     echo json_encode(nammu_fediverse_followers_collection($configData), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);

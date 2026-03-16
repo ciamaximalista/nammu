@@ -10268,7 +10268,11 @@ if ($isLoggedIn && $page === 'fediverso') {
         $replyText = trim((string) ($_POST['fediverse_reply_text'] ?? ''));
         $replyAlsoAsNote = !empty($_POST['fediverse_reply_as_note']);
         $config = load_config_file();
-        $result = nammu_fediverse_send_reply($recipientId, $objectUrl, $replyText, $config);
+        if ($recipientId === '') {
+            $result = nammu_fediverse_send_local_reply($objectUrl, $replyText, $config);
+        } else {
+            $result = nammu_fediverse_send_reply($recipientId, $objectUrl, $replyText, $config);
+        }
         if (!empty($result['ok']) && $replyAlsoAsNote) {
             if (!function_exists('nammu_actuality_add_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
                 require_once __DIR__ . '/core/actualidad.php';

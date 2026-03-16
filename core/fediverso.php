@@ -973,17 +973,26 @@ function nammu_fediverse_public_action_activities(array $config): array
                 $activityId = $noteId . '/activity';
             }
             $targetActorId = trim((string) ($action['actor_id'] ?? ''));
+            $mentionActor = !isset($action['mention_actor']) || (string) ($action['mention_actor'] ?? '1') !== '0';
             $targetActor = $targetActorId !== '' ? nammu_fediverse_resolve_actor($targetActorId, $config) : [];
             $targetName = trim((string) ($targetActor['preferredUsername'] ?? ''));
             $targetHost = is_string(parse_url($targetActorId, PHP_URL_HOST)) ? (string) parse_url($targetActorId, PHP_URL_HOST) : '';
             $targetHandle = $targetName !== '' ? '@' . $targetName . ($targetHost !== '' ? '@' . $targetHost : '') : '';
-            $mentionHtml = $targetActorId !== '' && $targetHandle !== ''
+            $mentionHtml = $mentionActor && $targetActorId !== '' && $targetHandle !== ''
                 ? '<a href="' . htmlspecialchars($targetActorId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" class="mention">' . htmlspecialchars($targetHandle, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</a>'
                 : '';
             $contentHtml = trim($mentionHtml . ($replyText !== '' ? ' ' . nl2br(htmlspecialchars($replyText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) : ''));
-            $cc = array_values(array_filter([$targetActorId, trim((string) ($targetActor['followers'] ?? ''))]));
+            $cc = [];
+            if ($mentionActor && $targetActorId !== '') {
+                $cc[] = $targetActorId;
+            }
+            $targetFollowers = trim((string) ($targetActor['followers'] ?? ''));
+            if ($targetFollowers !== '') {
+                $cc[] = $targetFollowers;
+            }
+            $cc = array_values(array_unique(array_filter($cc)));
             $tag = [];
-            if ($targetActorId !== '' && $targetHandle !== '') {
+            if ($mentionActor && $targetActorId !== '' && $targetHandle !== '') {
                 $tag[] = [
                     'type' => 'Mention',
                     'href' => $targetActorId,
@@ -1225,6 +1234,98 @@ function nammu_fediverse_cached_remote_replies_for_item(array $item, array $conf
 function nammu_fediverse_reply_collection_hash(string $objectId): string
 {
     return substr(sha1(trim($objectId)), 0, 24);
+}
+
+function nammu_fediverse_thread_page_hash(string $objectId): string
+{
+    return substr(sha1(trim($objectId)), 0, 24);
+}
+
+function nammu_fediverse_thread_page_url(string $objectId, array $config): string
+{
+    return rtrim(nammu_fediverse_base_url($config), '/') . '/fediverso/' . nammu_fediverse_thread_page_hash($objectId);
+}
+
+function nammu_fediverse_find_local_item_for_thread_hash(string $hash, array $config): ?array
+{
+    $hash = trim(strtolower($hash));
+    if ($hash === '' || !preg_match('/^[a-f0-9]{24}$/', $hash)) {
+        return null;
+    }
+    foreach (nammu_fediverse_local_content_items($config) as $item) {
+        $itemId = trim((string) ($item['id'] ?? ''));
+        if ($itemId === '') {
+            continue;
+        }
+        if (nammu_fediverse_thread_page_hash($itemId) === $hash) {
+            return $item;
+        }
+    }
+    return null;
+}
+
+function nammu_fediverse_thread_page_payload(array $item, array $config): array
+{
+    $itemId = trim((string) ($item['id'] ?? ''));
+    $localReplies = nammu_fediverse_replies_for_item($item);
+    $incomingReplies = nammu_fediverse_incoming_public_replies_by_object($config);
+    $reactionSummary = nammu_fediverse_local_reaction_summary($config);
+    $reactionDetails = nammu_fediverse_local_reaction_details($config);
+    $replyKeys = [];
+    foreach ($localReplies as $reply) {
+        foreach (array_filter([
+            trim((string) ($reply['id'] ?? '')),
+            trim((string) ($reply['url'] ?? '')),
+            trim((string) ($reply['note_id'] ?? '')),
+        ]) as $identifier) {
+            $replyKeys['id:' . $identifier] = true;
+        }
+        $fallback = strtolower(trim((string) ($reply['actor_id'] ?? ''))) . '|' .
+            trim((string) ($reply['published'] ?? '')) . '|' .
+            trim((string) ($reply['reply_text'] ?? ''));
+        if ($fallback !== '||') {
+            $replyKeys['fallback:' . $fallback] = true;
+        }
+    }
+    $mergedReplies = $localReplies;
+    foreach ((array) ($incomingReplies[$itemId] ?? []) as $incomingReply) {
+        $keys = array_filter([
+            trim((string) ($incomingReply['id'] ?? '')) !== '' ? 'id:' . trim((string) $incomingReply['id']) : '',
+            trim((string) ($incomingReply['url'] ?? '')) !== '' ? 'id:' . trim((string) $incomingReply['url']) : '',
+            trim((string) ($incomingReply['note_id'] ?? '')) !== '' ? 'id:' . trim((string) $incomingReply['note_id']) : '',
+        ]);
+        $fallback = strtolower(trim((string) ($incomingReply['actor_id'] ?? ''))) . '|' .
+            trim((string) ($incomingReply['published'] ?? '')) . '|' .
+            trim((string) ($incomingReply['reply_text'] ?? ''));
+        if ($fallback !== '||') {
+            $keys[] = 'fallback:' . $fallback;
+        }
+        $alreadySeen = false;
+        foreach ($keys as $key) {
+            if (isset($replyKeys[$key])) {
+                $alreadySeen = true;
+                break;
+            }
+        }
+        if ($alreadySeen) {
+            continue;
+        }
+        foreach ($keys as $key) {
+            $replyKeys[$key] = true;
+        }
+        $mergedReplies[] = $incomingReply;
+    }
+    usort($mergedReplies, static function (array $a, array $b): int {
+        return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
+    });
+    return [
+        'item' => $item,
+        'thread_url' => nammu_fediverse_thread_page_url($itemId, $config),
+        'original_url' => trim((string) ($item['url'] ?? '')),
+        'summary' => $reactionSummary[$itemId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0],
+        'details' => $reactionDetails[$itemId] ?? ['likes' => [], 'shares' => [], 'replies' => []],
+        'replies' => $mergedReplies,
+    ];
 }
 
 function nammu_fediverse_reply_collection_url(string $objectId, array $config): string
@@ -2447,14 +2548,15 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
     $actorUrl = nammu_fediverse_actor_url($config);
     $avatarUrl = nammu_fediverse_avatar_url($config);
     $objectType = (string) ($item['type'] ?? 'Article');
-    $objectUrl = (string) ($item['url'] ?? '');
+    $originalObjectUrl = (string) ($item['url'] ?? '');
+    $objectUrl = nammu_fediverse_thread_page_url((string) ($item['id'] ?? ''), $config);
     $plainContent = trim((string) ($item['content'] ?? ''));
     if (strcasecmp($objectType, 'Note') === 0) {
         $contentHtml = nl2br(htmlspecialchars($plainContent, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
     } else {
         $contentParts = [];
-        if ($objectUrl !== '') {
-            $escapedUrl = htmlspecialchars($objectUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        if ($originalObjectUrl !== '') {
+            $escapedUrl = htmlspecialchars($originalObjectUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             $contentParts[] = '<p><a href="' . $escapedUrl . '">' . $escapedUrl . '</a></p>';
         }
         if ($plainContent !== '') {
@@ -2482,9 +2584,9 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
     if (strcasecmp($objectType, 'Note') !== 0 && $objectUrl !== '') {
         $linkAttachment = [
             'type' => 'Link',
-            'href' => $objectUrl,
+            'href' => $originalObjectUrl !== '' ? $originalObjectUrl : $objectUrl,
             'mediaType' => 'text/html',
-            'name' => trim((string) (($item['title'] ?? '') ?: $objectUrl)),
+            'name' => trim((string) (($item['title'] ?? '') ?: ($originalObjectUrl !== '' ? $originalObjectUrl : $objectUrl))),
         ];
         if ($image !== '') {
             $linkAttachment['image'] = ['type' => 'Image', 'url' => $image];
@@ -2513,6 +2615,25 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
         'to' => ['https://www.w3.org/ns/activitystreams#Public'],
         'object' => $object,
     ];
+}
+
+function nammu_fediverse_deliver_activity_to_followers(array $activity, array $config): int
+{
+    $followers = nammu_fediverse_followers_store()['followers'];
+    if (empty($followers)) {
+        return 0;
+    }
+    $delivered = 0;
+    foreach ($followers as $follower) {
+        $inboxUrl = nammu_fediverse_remote_inbox_for_actor($follower);
+        if ($inboxUrl === '') {
+            continue;
+        }
+        if (nammu_fediverse_post_activity($inboxUrl, $activity, $config)) {
+            $delivered++;
+        }
+    }
+    return $delivered;
 }
 
 function nammu_fediverse_actor_document(array $config): array
@@ -3706,8 +3827,59 @@ function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, stri
         'reply_text' => $plainText,
         'note_id' => $noteId,
         'activity_id' => (string) ($activity['id'] ?? ''),
+        'mention_actor' => 1,
     ]);
     return ['ok' => true, 'message' => 'Respuesta enviada.'];
+}
+
+function nammu_fediverse_send_local_reply(string $objectUrl, string $text, array $config): array
+{
+    $objectUrl = nammu_fediverse_resolve_object_reference(trim($objectUrl), $config);
+    $plainText = trim($text);
+    if ($objectUrl === '' || $plainText === '') {
+        return ['ok' => false, 'message' => 'Falta la publicación o el texto de la respuesta.'];
+    }
+    $localTarget = nammu_fediverse_find_local_item_for_identifier($objectUrl, $config);
+    if (!is_array($localTarget)) {
+        return ['ok' => false, 'message' => 'No se encontró la publicación local a la que responder.'];
+    }
+    $actorUrl = nammu_fediverse_actor_url($config);
+    $followersUrl = nammu_fediverse_followers_url($config);
+    $noteHash = substr(sha1($actorUrl . '|' . $objectUrl . '|' . $plainText . '|' . microtime(true)), 0, 24);
+    $noteId = nammu_fediverse_reply_note_url($noteHash, $config);
+    $published = gmdate(DATE_ATOM);
+    $activity = [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => $noteId . '/activity',
+        'type' => 'Create',
+        'actor' => $actorUrl,
+        'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+        'cc' => [$followersUrl],
+        'published' => $published,
+        'object' => [
+            'id' => $noteId,
+            'type' => 'Note',
+            'attributedTo' => $actorUrl,
+            'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+            'cc' => [$followersUrl],
+            'content' => nl2br(htmlspecialchars($plainText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')),
+            'published' => $published,
+            'inReplyTo' => (string) ($localTarget['id'] ?? $objectUrl),
+            'context' => (string) ($localTarget['id'] ?? $objectUrl),
+            'conversation' => (string) ($localTarget['id'] ?? $objectUrl),
+            'url' => $noteId,
+        ],
+    ];
+    $delivered = nammu_fediverse_deliver_activity_to_followers($activity, $config);
+    nammu_fediverse_record_action('reply', $actorUrl, (string) ($localTarget['id'] ?? $objectUrl), [
+        'reply_text' => $plainText,
+        'note_id' => $noteId,
+        'activity_id' => (string) ($activity['id'] ?? ''),
+        'mention_actor' => 0,
+        'is_local_root' => 1,
+        'published' => $published,
+    ]);
+    return ['ok' => true, 'message' => 'Respuesta enviada. Entregas: ' . $delivered . '.'];
 }
 
 function nammu_fediverse_delete_public_reply(string $actionId, array $config): array

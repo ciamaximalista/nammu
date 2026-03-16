@@ -640,6 +640,21 @@
                                                 <?php endforeach; ?>
                                             </div>
                                         <?php endif; ?>
+                                        <div class="fediverse-status__actions mt-3">
+                                            <details class="fediverse-inline-form">
+                                                <summary>Responder</summary>
+                                                <form method="post">
+                                                    <input type="hidden" name="fediverse_tab" value="home">
+                                                    <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars((string) $localId, ENT_QUOTES, 'UTF-8') ?>">
+                                                    <textarea name="fediverse_reply_text" class="form-control form-control-sm" rows="3" placeholder="Escribe tu respuesta"></textarea>
+                                                    <label class="fediverse-inline-check">
+                                                        <input type="checkbox" name="fediverse_reply_as_note" value="1">
+                                                        Publicar también como nota en Actualidad
+                                                    </label>
+                                                    <button type="submit" name="fediverse_reply_item" class="btn btn-primary btn-sm mt-2">Enviar respuesta</button>
+                                                </form>
+                                            </details>
+                                        </div>
                                     </div>
                                 </article>
                                 <?php else: ?>
@@ -1157,15 +1172,20 @@
                                                 </form>
                                             </details>
                                         <?php endif; ?>
-                                        <?php if (!$isOutgoing && (($message['visibility'] ?? '') === 'public') && !empty($message['reply_target_url'])): ?>
+                                        <?php if ((($message['visibility'] ?? '') === 'public') && !empty($message['reply_target_url']) && (!$isOutgoing || !empty($message['is_thread_root']))): ?>
                                             <details class="fediverse-inline-form mt-3">
-                                                <summary>Responder como nota</summary>
+                                                <summary>Responder</summary>
                                                 <form method="post">
-                                                    <input type="hidden" name="fediverse_tab" value="home">
-                                                    <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($message['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="fediverse_tab" value="messages">
+                                                    <?php if (!$isOutgoing): ?>
+                                                        <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($message['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                    <?php endif; ?>
                                                     <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars((string) ($message['reply_target_url'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                    <input type="hidden" name="fediverse_reply_as_note" value="1">
                                                     <textarea name="fediverse_reply_text" class="form-control form-control-sm" rows="3" placeholder="Escribe tu respuesta pública"></textarea>
+                                                    <label class="fediverse-inline-check">
+                                                        <input type="checkbox" name="fediverse_reply_as_note" value="1">
+                                                        Publicar también como nota en Actualidad
+                                                    </label>
                                                     <button type="submit" name="fediverse_reply_item" class="btn btn-primary btn-sm mt-2">Responder</button>
                                                 </form>
                                             </details>

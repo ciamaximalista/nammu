@@ -1643,6 +1643,17 @@ function nammu_fediverse_local_items_index(array $config): array
     return $byIdentifier;
 }
 
+function nammu_fediverse_find_local_item_for_identifier(string $identifier, array $config): ?array
+{
+    $identifier = trim($identifier);
+    if ($identifier === '') {
+        return null;
+    }
+    $index = nammu_fediverse_local_items_index($config);
+    $item = $index[$identifier] ?? null;
+    return is_array($item) ? $item : null;
+}
+
 function nammu_fediverse_local_reaction_summary(array $config): array
 {
     $index = nammu_fediverse_local_items_index($config);
@@ -2194,6 +2205,47 @@ function nammu_fediverse_object_document(string $routePath, array $config): ?arr
         }
     }
     return null;
+}
+
+function nammu_fediverse_notify_followers_of_object_update(array $item, array $config): int
+{
+    $itemId = trim((string) ($item['id'] ?? ''));
+    if ($itemId === '') {
+        return 0;
+    }
+    $followers = nammu_fediverse_followers_store()['followers'];
+    if (empty($followers)) {
+        return 0;
+    }
+    $activity = nammu_fediverse_activity_for_local_item($item, $config);
+    $object = is_array($activity['object'] ?? null) ? $activity['object'] : null;
+    if (!is_array($object)) {
+        return 0;
+    }
+    $object['updated'] = gmdate(DATE_ATOM);
+    if (trim((string) ($object['id'] ?? '')) !== '') {
+        $object['replies'] = nammu_fediverse_reply_collection_url((string) $object['id'], $config);
+    }
+    $updateActivity = [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => nammu_fediverse_actor_url($config) . '/updates/' . substr(sha1($itemId . '|' . microtime(true)), 0, 24),
+        'type' => 'Update',
+        'actor' => nammu_fediverse_actor_url($config),
+        'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+        'published' => gmdate(DATE_ATOM),
+        'object' => $object,
+    ];
+    $delivered = 0;
+    foreach ($followers as $follower) {
+        $inboxUrl = nammu_fediverse_remote_inbox_for_actor($follower);
+        if ($inboxUrl === '') {
+            continue;
+        }
+        if (nammu_fediverse_post_activity($inboxUrl, $updateActivity, $config)) {
+            $delivered++;
+        }
+    }
+    return $delivered;
 }
 
 function nammu_fediverse_replies_collection_document(string $routePath, array $config): ?array
@@ -3018,6 +3070,14 @@ function nammu_fediverse_handle_inbox_payload(array $payload, array $config, arr
                 'verified' => true,
             ]);
             return ['accepted' => true, 'type' => 'message', 'verified' => true];
+        }
+        $objectType = strtolower(trim((string) ($object['type'] ?? '')));
+        $replyTarget = trim((string) ($object['inReplyTo'] ?? ''));
+        if ($objectType === 'note' && $replyTarget !== '') {
+            $localTarget = nammu_fediverse_find_local_item_for_identifier($replyTarget, $config);
+            if (is_array($localTarget)) {
+                nammu_fediverse_notify_followers_of_object_update($localTarget, $config);
+            }
         }
     }
     return ['accepted' => true, 'type' => $type !== '' ? $type : 'unknown', 'verified' => true];

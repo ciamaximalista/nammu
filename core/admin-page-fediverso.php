@@ -171,10 +171,7 @@
     $fediverseTimelineDisplay = [];
     foreach ($fediverseTimeline as $fediverseTimelineItem) {
         $fediverseTimelineType = strtolower(trim((string) ($fediverseTimelineItem['type'] ?? '')));
-        if (in_array($fediverseTimelineType, ['like', 'delete'], true)) {
-            continue;
-        }
-        if ($fediverseTimelineType === 'announce' && trim((string) ($fediverseTimelineItem['actor_id'] ?? '')) === $fediverseActorUrl) {
+        if (in_array($fediverseTimelineType, ['like', 'announce', 'delete'], true)) {
             continue;
         }
         $fediverseTimelineIdentifiers = [];
@@ -398,6 +395,7 @@
                                 $threadReplies = [];
                                 foreach ($localReplies as $reply) {
                                     $threadReplies[] = [
+                                        'id' => (string) ($reply['id'] ?? ''),
                                         'published' => (string) ($reply['published'] ?? ''),
                                         'reply_text' => (string) ($reply['reply_text'] ?? ''),
                                         'actor_name' => $fediverseLocalName,
@@ -517,6 +515,13 @@
                                                                 <?php endif; ?>
                                                             </div>
                                                             <div class="fediverse-thread__content"><?= nl2br(htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
+                                                            <?php if (($reply['source'] ?? '') === 'local' && !empty($reply['id'])): ?>
+                                                                <form method="post" class="mt-2" onsubmit="return confirm('¿Borrar esta respuesta del Fediverso?');">
+                                                                    <input type="hidden" name="fediverse_tab" value="home">
+                                                                    <input type="hidden" name="fediverse_reply_action_id" value="<?= htmlspecialchars((string) $reply['id'], ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <button type="submit" name="fediverse_delete_reply_item" class="btn btn-outline-danger btn-sm">Borrar</button>
+                                                                </form>
+                                                            <?php endif; ?>
                                                         </div>
                                                     </div>
                                                 <?php endforeach; ?>

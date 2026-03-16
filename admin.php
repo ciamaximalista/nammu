@@ -10259,6 +10259,14 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => !empty($result['ok']) ? 'success' : 'danger',
             'message' => (string) ($result['message'] ?? ''),
         ];
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_delete_reply_item'])) {
+        $replyActionId = trim((string) ($_POST['fediverse_reply_action_id'] ?? ''));
+        $config = load_config_file();
+        $result = nammu_fediverse_delete_public_reply($replyActionId, $config);
+        $fediverseFeedback = [
+            'type' => !empty($result['ok']) ? 'success' : 'danger',
+            'message' => (string) ($result['message'] ?? ''),
+        ];
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_share_note'])) {
         if (!function_exists('nammu_actuality_add_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
             require_once __DIR__ . '/core/actualidad.php';

@@ -856,6 +856,7 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
             'links' => array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : []))),
             'timestamp' => (int) ($item['timestamp'] ?? 0),
             'source' => trim((string) ($item['source'] ?? '')),
+            'via' => trim((string) ($item['via'] ?? '')),
             'is_manual' => true,
         ];
     }

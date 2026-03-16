@@ -778,6 +778,9 @@ function nammu_fediverse_public_replies_by_object(): array
         }
         $grouped[$objectUrl][] = [
             'id' => trim((string) ($item['id'] ?? '')),
+            'note_id' => trim((string) ($item['note_id'] ?? '')),
+            'activity_id' => trim((string) ($item['activity_id'] ?? '')),
+            'actor_id' => trim((string) ($item['actor_id'] ?? '')),
             'published' => trim((string) ($item['published'] ?? '')),
             'reply_text' => $replyText,
         ];
@@ -2461,6 +2464,21 @@ function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, stri
         return ['ok' => false, 'message' => 'Ese actor no expone un inbox usable.'];
     }
     $actorUrl = nammu_fediverse_actor_url($config);
+    $recipientName = trim((string) ($recipient['preferredUsername'] ?? ''));
+    $recipientHost = parse_url($recipientId, PHP_URL_HOST);
+    $recipientHandle = $recipientName !== '' ? '@' . $recipientName . ($recipientHost ? '@' . $recipientHost : '') : '';
+    $mentionHtml = $recipientId !== '' && $recipientHandle !== ''
+        ? '<a href="' . htmlspecialchars($recipientId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" class="mention">' . htmlspecialchars($recipientHandle, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</a>'
+        : '';
+    $contentHtml = trim($mentionHtml . ($plainText !== '' ? ' ' . nl2br(htmlspecialchars($plainText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) : ''));
+    $tag = [];
+    if ($recipientId !== '' && $recipientHandle !== '') {
+        $tag[] = [
+            'type' => 'Mention',
+            'href' => $recipientId,
+            'name' => $recipientHandle,
+        ];
+    }
     $noteId = $actorUrl . '/replies/' . substr(sha1($recipientId . '|' . $objectUrl . '|' . $plainText . '|' . microtime(true)), 0, 24);
     $published = gmdate(DATE_ATOM);
     $activity = [
@@ -2477,7 +2495,8 @@ function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, stri
             'attributedTo' => $actorUrl,
             'to' => ['https://www.w3.org/ns/activitystreams#Public'],
             'cc' => [$recipientId],
-            'content' => nl2br(htmlspecialchars($plainText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')),
+            'content' => $contentHtml,
+            'tag' => $tag,
             'published' => $published,
             'inReplyTo' => $objectUrl,
         ],
@@ -2486,8 +2505,72 @@ function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, stri
     if (empty($delivery['ok'])) {
         return ['ok' => false, 'message' => 'No se pudo enviar la respuesta. ' . trim((string) ($delivery['message'] ?? ''))];
     }
-    nammu_fediverse_record_action('reply', $recipientId, $objectUrl, ['reply_text' => $plainText]);
+    nammu_fediverse_record_action('reply', $recipientId, $objectUrl, [
+        'reply_text' => $plainText,
+        'note_id' => $noteId,
+        'activity_id' => (string) ($activity['id'] ?? ''),
+    ]);
     return ['ok' => true, 'message' => 'Respuesta enviada.'];
+}
+
+function nammu_fediverse_delete_public_reply(string $actionId, array $config): array
+{
+    $actionId = trim($actionId);
+    if ($actionId === '') {
+        return ['ok' => false, 'message' => 'No se recibió la respuesta a borrar.'];
+    }
+    $items = nammu_fediverse_actions_store()['items'];
+    $targetAction = null;
+    $remaining = [];
+    foreach ($items as $item) {
+        if ($targetAction === null && strtolower(trim((string) ($item['type'] ?? ''))) === 'reply' && trim((string) ($item['id'] ?? '')) === $actionId) {
+            $targetAction = $item;
+            continue;
+        }
+        $remaining[] = $item;
+    }
+    if (!is_array($targetAction)) {
+        return ['ok' => false, 'message' => 'No se encontró esa respuesta pública.'];
+    }
+
+    $noteId = trim((string) ($targetAction['note_id'] ?? ''));
+    $recipientId = trim((string) ($targetAction['actor_id'] ?? ''));
+    if ($noteId === '' || $recipientId === '') {
+        return ['ok' => false, 'message' => 'Faltan datos para borrar esa respuesta pública.'];
+    }
+
+    $actorUrl = nammu_fediverse_actor_url($config);
+    $deleteActivity = [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => $actorUrl . '/delete-reply/' . substr(sha1($actionId . '|' . microtime(true)), 0, 24),
+        'type' => 'Delete',
+        'actor' => $actorUrl,
+        'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+        'cc' => [$recipientId],
+        'object' => $noteId,
+        'published' => gmdate(DATE_ATOM),
+    ];
+    $deliveries = [];
+    $recipient = nammu_fediverse_resolve_actor($recipientId, $config);
+    $recipientInbox = is_array($recipient) ? nammu_fediverse_remote_inbox_for_actor($recipient) : '';
+    if ($recipientInbox !== '') {
+        $deliveries[$recipientInbox] = nammu_fediverse_post_activity_response($recipientInbox, $deleteActivity, $config);
+    }
+    foreach (nammu_fediverse_followers_store()['followers'] as $follower) {
+        $followerInbox = nammu_fediverse_remote_inbox_for_actor($follower);
+        if ($followerInbox === '' || isset($deliveries[$followerInbox])) {
+            continue;
+        }
+        $deliveries[$followerInbox] = nammu_fediverse_post_activity_response($followerInbox, $deleteActivity, $config);
+    }
+    $successes = 0;
+    foreach ($deliveries as $delivery) {
+        if (!empty($delivery['ok'])) {
+            $successes++;
+        }
+    }
+    nammu_fediverse_save_actions_store($remaining);
+    return ['ok' => true, 'message' => 'Respuesta retirada del Fediverso. Entregas de borrado: ' . $successes . '.'];
 }
 
 function nammu_fediverse_accept_follow(array $payload, array $config): bool
@@ -2658,12 +2741,20 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
         ? nammu_fediverse_base_url($config) . '/podcast/' . rawurlencode($slug)
         : nammu_fediverse_base_url($config) . '/' . rawurlencode($slug);
     $targetId = nammu_fediverse_base_url($config) . '/ap/objects/' . rawurlencode($template) . '-' . rawurlencode($slug);
+    $targetObjectSuffix = '-' . rawurlencode($slug);
 
     $matchedItem = null;
     foreach (nammu_fediverse_local_content_items($config) as $item) {
         $itemId = trim((string) ($item['id'] ?? ''));
         $itemUrl = trim((string) ($item['url'] ?? ''));
-        if ($itemId === $targetId || $itemUrl === $targetUrl) {
+        $itemPath = trim((string) (parse_url($itemUrl, PHP_URL_PATH) ?? ''));
+        $targetPath = trim((string) (parse_url($targetUrl, PHP_URL_PATH) ?? ''));
+        if (
+            $itemId === $targetId
+            || $itemUrl === $targetUrl
+            || ($itemPath !== '' && $targetPath !== '' && rtrim($itemPath, '/') === rtrim($targetPath, '/'))
+            || str_ends_with($itemId, $targetObjectSuffix)
+        ) {
             $matchedItem = $item;
             break;
         }

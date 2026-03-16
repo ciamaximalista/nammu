@@ -168,7 +168,7 @@
     $fediverseTimelineDisplay = [];
     foreach ($fediverseTimeline as $fediverseTimelineItem) {
         $fediverseTimelineType = strtolower(trim((string) ($fediverseTimelineItem['type'] ?? '')));
-        if (in_array($fediverseTimelineType, ['announce', 'like', 'delete'], true)) {
+        if (in_array($fediverseTimelineType, ['like', 'delete'], true)) {
             continue;
         }
         $fediverseTimelineIdentifiers = [];
@@ -479,7 +479,7 @@
                                 <?php else: ?>
                                 <?php $item = is_array($timelineEntry['item'] ?? null) ? $timelineEntry['item'] : []; ?>
                                 <?php $itemObjectId = (string) (($item['object_id'] ?? '') ?: (($item['url'] ?? '') ?: ($item['id'] ?? ''))); ?>
-                                <?php $itemActionState = function_exists('nammu_fediverse_action_state_for_item') ? nammu_fediverse_action_state_for_item($item) : ['liked' => false, 'replied' => false, 'shared' => false, 'reply_count' => 0, 'share_count' => 0]; ?>
+                                <?php $itemActionState = function_exists('nammu_fediverse_action_state_for_item') ? nammu_fediverse_action_state_for_item($item) : ['liked' => false, 'boosted' => false, 'replied' => false, 'shared' => false, 'boost_count' => 0, 'reply_count' => 0, 'share_count' => 0]; ?>
                                 <?php $itemReplies = function_exists('nammu_fediverse_replies_for_item') ? nammu_fediverse_replies_for_item($item) : []; ?>
                                 <article class="fediverse-status">
                                     <div class="fediverse-status__avatar">
@@ -494,6 +494,9 @@
                                             <div class="fediverse-status__identity">
                                                 <strong><?= htmlspecialchars((string) (($item['actor_name'] ?? '') ?: 'Actor remoto'), ENT_QUOTES, 'UTF-8') ?></strong>
                                                 <span class="fediverse-status__handle"><?= htmlspecialchars($fediverseHandle($item), ENT_QUOTES, 'UTF-8') ?></span>
+                                                <?php if (strcasecmp((string) ($item['type'] ?? ''), 'announce') === 0): ?>
+                                                    <span class="fediverse-status__handle">impulsó</span>
+                                                <?php endif; ?>
                                             </div>
                                             <div class="fediverse-status__meta">
                                                 <?php if (!empty($item['published'])): ?>
@@ -555,9 +558,10 @@
                                         <div class="fediverse-status__footer">
                                             <a href="<?= htmlspecialchars((string) (($item['url'] ?? '') ?: ($item['id'] ?? '#')), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Abrir publicación</a>
                                         </div>
-                                        <?php if (!empty($itemActionState['liked']) || !empty($itemActionState['replied']) || !empty($itemActionState['shared'])): ?>
+                                        <?php if (!empty($itemActionState['liked']) || !empty($itemActionState['boosted']) || !empty($itemActionState['replied']) || !empty($itemActionState['shared'])): ?>
                                             <div class="fediverse-status__history">
                                                 <?php if (!empty($itemActionState['liked'])): ?><span>Favorito enviado</span><?php endif; ?>
+                                                <?php if (!empty($itemActionState['boosted'])): ?><span><?= (int) ($itemActionState['boost_count'] ?? 0) ?> impulso<?= ((int) ($itemActionState['boost_count'] ?? 0) === 1) ? '' : 's' ?></span><?php endif; ?>
                                                 <?php if (!empty($itemActionState['replied'])): ?><span><?= (int) ($itemActionState['reply_count'] ?? 0) ?> respuesta<?= ((int) ($itemActionState['reply_count'] ?? 0) === 1) ? '' : 's' ?></span><?php endif; ?>
                                                 <?php if (!empty($itemActionState['shared'])): ?><span><?= (int) ($itemActionState['share_count'] ?? 0) ?> reenvío<?= ((int) ($itemActionState['share_count'] ?? 0) === 1) ? '' : 's' ?> como nota</span><?php endif; ?>
                                             </div>
@@ -592,6 +596,12 @@
                                                 <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($item['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>">
                                                 <button type="submit" name="fediverse_like_item" class="btn btn-outline-secondary btn-sm"<?= !empty($itemActionState['liked']) ? ' disabled' : '' ?>><?= !empty($itemActionState['liked']) ? 'Favorito enviado' : 'Favorito' ?></button>
+                                            </form>
+                                            <form method="post" class="mb-0">
+                                                <input type="hidden" name="fediverse_tab" value="home">
+                                                <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($item['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>">
+                                                <button type="submit" name="fediverse_boost_item" class="btn btn-outline-secondary btn-sm"<?= !empty($itemActionState['boosted']) ? ' disabled' : '' ?>><?= !empty($itemActionState['boosted']) ? 'Impulsado' : 'Impulsar' ?></button>
                                             </form>
                                             <details class="fediverse-inline-form">
                                                 <summary>Responder</summary>

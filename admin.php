@@ -7468,6 +7468,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                     admin_regenerate_public_artifacts();
+                    if ($status === 'published' && function_exists('nammu_fediverse_deliver_local_items')) {
+                        try {
+                            nammu_fediverse_deliver_local_items(load_config_file());
+                        } catch (Throwable $e) {
+                            // ignore fediverse delivery errors on publish
+                        }
+                    }
                     if ($status === 'published') {
                         $shouldIndexnow = $previousStatus === 'published' || $previousStatus === 'draft' || $publishDraftAsEntry || $publishDraftAsPage || $publishDraftAsPodcast || $renameRequested;
                         if ($shouldIndexnow) {
@@ -7792,6 +7799,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'Order' => $orderInput,
             ], $content, !empty($itineraryQuizResult['data']['questions']) ? $itineraryQuizResult['data'] : null);
             admin_regenerate_public_artifacts();
+            if ($statusValue === 'published' && function_exists('nammu_fediverse_deliver_local_items')) {
+                try {
+                    nammu_fediverse_deliver_local_items(load_config_file());
+                } catch (Throwable $e) {
+                    // ignore fediverse delivery errors on publish
+                }
+            }
             $shouldAutoMail = $statusValue === 'published' && ($mode === 'new' || $previousStatus === 'draft');
             if ($shouldAutoMail) {
                 $settings = get_settings();
@@ -10139,6 +10153,15 @@ if ($isLoggedIn && $page === 'fediverso') {
         $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
         $config = load_config_file();
         $result = nammu_fediverse_send_like($recipientId, $objectUrl, $config);
+        $fediverseFeedback = [
+            'type' => !empty($result['ok']) ? 'success' : 'danger',
+            'message' => (string) ($result['message'] ?? ''),
+        ];
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_boost_item'])) {
+        $recipientId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
+        $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
+        $config = load_config_file();
+        $result = nammu_fediverse_send_announce($recipientId, $objectUrl, $config);
         $fediverseFeedback = [
             'type' => !empty($result['ok']) ? 'success' : 'danger',
             'message' => (string) ($result['message'] ?? ''),

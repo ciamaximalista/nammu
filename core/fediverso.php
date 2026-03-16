@@ -700,6 +700,9 @@ function nammu_fediverse_actions_by_object(): array
         $type = strtolower(trim((string) ($item['type'] ?? '')));
         if ($type === 'like') {
             $grouped[$objectUrl]['liked'] = true;
+        } elseif ($type === 'boost') {
+            $grouped[$objectUrl]['boosted'] = true;
+            $grouped[$objectUrl]['boost_count']++;
         } elseif ($type === 'reply') {
             $grouped[$objectUrl]['replied'] = true;
             $grouped[$objectUrl]['reply_count']++;
@@ -728,8 +731,10 @@ function nammu_fediverse_action_state_for_item(array $item): array
     }
     return [
         'liked' => false,
+        'boosted' => false,
         'replied' => false,
         'shared' => false,
+        'boost_count' => 0,
         'reply_count' => 0,
         'share_count' => 0,
     ];
@@ -921,11 +926,11 @@ function nammu_fediverse_restart_follow_actor(string $actorId): array
     return ['ok' => false, 'message' => 'Ese actor ya no figura entre los seguidos.'];
 }
 
-function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?array
+function nammu_fediverse_normalize_remote_item(array $activity, array $actor, array $config): ?array
 {
     $activityId = trim((string) ($activity['id'] ?? ''));
     $type = strtolower((string) ($activity['type'] ?? ''));
-    if (in_array($type, ['like', 'announce'], true)) {
+    if ($type === 'like') {
         return null;
     }
     $object = $activity;
@@ -933,8 +938,38 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?
         $object = $activity['object'];
         $type = strtolower((string) ($object['type'] ?? 'note'));
     }
-    if (in_array($type, ['like', 'announce'], true)) {
+    if ($type === 'like') {
         return null;
+    }
+    if ($type === 'announce') {
+        $announcedObject = $activity['object'] ?? null;
+        $objectId = '';
+        if (is_string($announcedObject)) {
+            $objectId = trim($announcedObject);
+            $resolvedObject = nammu_fediverse_signed_fetch_json($objectId, $config);
+            if (!is_array($resolvedObject)) {
+                $resolvedObject = nammu_fediverse_fetch_json($objectId);
+            }
+            if (is_array($resolvedObject)) {
+                $object = $resolvedObject;
+            }
+        } elseif (is_array($announcedObject)) {
+            $object = $announcedObject;
+            $objectId = trim((string) ($announcedObject['id'] ?? ''));
+        }
+        if ($objectId !== '' && trim((string) ($object['id'] ?? '')) === '') {
+            $object['id'] = $objectId;
+        }
+        if (trim((string) ($object['url'] ?? '')) === '' && $objectId !== '') {
+            $object['url'] = $objectId;
+        }
+        if (
+            trim((string) ($object['content'] ?? '')) === ''
+            && trim((string) ($object['summary'] ?? '')) === ''
+            && trim((string) ($object['name'] ?? '')) === ''
+        ) {
+            $object['summary'] = 'Impulsó una publicación.';
+        }
     }
     $objectId = trim((string) (($object['id'] ?? '') ?: $activityId));
     $id = trim((string) ($activityId !== '' ? $activityId : $objectId));
@@ -1021,7 +1056,7 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor): ?
     ];
 }
 
-function nammu_fediverse_extract_outbox_items(array $outbox, array $actor): array
+function nammu_fediverse_extract_outbox_items(array $outbox, array $actor, array $config): array
 {
     $payload = $outbox;
     if (!empty($outbox['first']) && is_string($outbox['first'])) {
@@ -1038,10 +1073,19 @@ function nammu_fediverse_extract_outbox_items(array $outbox, array $actor): arra
     }
     $items = [];
     foreach ($rawItems as $rawItem) {
+        if (is_string($rawItem) && preg_match('#^https?://#i', $rawItem)) {
+            $rawItemPayload = nammu_fediverse_signed_fetch_json($rawItem, $config);
+            if (!is_array($rawItemPayload)) {
+                $rawItemPayload = nammu_fediverse_fetch_json($rawItem);
+            }
+            if (is_array($rawItemPayload)) {
+                $rawItem = $rawItemPayload;
+            }
+        }
         if (!is_array($rawItem)) {
             continue;
         }
-        $normalized = nammu_fediverse_normalize_remote_item($rawItem, $actor);
+        $normalized = nammu_fediverse_normalize_remote_item($rawItem, $actor, $config);
         if ($normalized !== null) {
             $items[] = $normalized;
         }
@@ -1076,7 +1120,7 @@ function nammu_fediverse_refresh_following(): array
             continue;
         }
         $actor['last_error'] = '';
-        foreach (nammu_fediverse_extract_outbox_items($outbox, $actor) as $item) {
+        foreach (nammu_fediverse_extract_outbox_items($outbox, $actor, $config) as $item) {
             if (isset($timelineById[$item['id']])) {
                 continue;
             }
@@ -1179,6 +1223,17 @@ function nammu_fediverse_parse_date_with_fallback(string $value, ?string $filePa
     if ($value !== '') {
         $timestamp = strtotime($value);
         if ($timestamp) {
+            if (
+                is_string($filePath)
+                && $filePath !== ''
+                && is_file($filePath)
+                && preg_match('/^\d{4}[\/-]\d{2}[\/-]\d{2}$|^\d{2}[\/-]\d{2}[\/-]\d{4}$/', $value)
+            ) {
+                $fileTimestamp = @filemtime($filePath);
+                if ($fileTimestamp) {
+                    return gmdate('Y-m-d', $timestamp) . 'T' . gmdate('H:i:s', $fileTimestamp) . '+00:00';
+                }
+            }
             return gmdate(DATE_ATOM, $timestamp);
         }
     }
@@ -1294,7 +1349,7 @@ function nammu_fediverse_local_content_items(array $config): array
     usort($items, static function (array $a, array $b): int {
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });
-    return array_slice($items, 0, 20);
+    return $items;
 }
 
 function nammu_fediverse_local_items_index(array $config): array
@@ -2153,6 +2208,40 @@ function nammu_fediverse_send_like(string $recipientId, string $objectUrl, array
     }
     nammu_fediverse_record_action('like', $recipientId, $objectUrl);
     return ['ok' => true, 'message' => 'Favorito enviado.'];
+}
+
+function nammu_fediverse_send_announce(string $recipientId, string $objectUrl, array $config): array
+{
+    $recipientId = trim($recipientId);
+    $objectUrl = nammu_fediverse_resolve_object_reference(trim($objectUrl), $config);
+    if ($recipientId === '' || $objectUrl === '') {
+        return ['ok' => false, 'message' => 'Falta el destinatario o la publicación a impulsar.'];
+    }
+    $recipient = nammu_fediverse_resolve_actor($recipientId, $config);
+    if (!is_array($recipient)) {
+        return ['ok' => false, 'message' => 'No se pudo resolver el actor remoto.'];
+    }
+    $inboxUrl = nammu_fediverse_remote_inbox_for_actor($recipient);
+    if ($inboxUrl === '') {
+        return ['ok' => false, 'message' => 'Ese actor no expone un inbox usable.'];
+    }
+    $actorUrl = nammu_fediverse_actor_url($config);
+    $activity = [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => $actorUrl . '/announces/' . substr(sha1($recipientId . '|' . $objectUrl . '|' . microtime(true)), 0, 24),
+        'type' => 'Announce',
+        'actor' => $actorUrl,
+        'object' => $objectUrl,
+        'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+        'cc' => [$recipientId],
+        'published' => gmdate(DATE_ATOM),
+    ];
+    $delivery = nammu_fediverse_post_activity_response($inboxUrl, $activity, $config);
+    if (empty($delivery['ok'])) {
+        return ['ok' => false, 'message' => 'No se pudo enviar el impulso. ' . trim((string) ($delivery['message'] ?? ''))];
+    }
+    nammu_fediverse_record_action('boost', $recipientId, $objectUrl);
+    return ['ok' => true, 'message' => 'Impulso enviado.'];
 }
 
 function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, string $text, array $config): array

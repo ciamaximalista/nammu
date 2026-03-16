@@ -771,6 +771,44 @@ function nammu_fediverse_public_replies_by_object(): array
     return $grouped;
 }
 
+function nammu_fediverse_public_action_activities(array $config): array
+{
+    $actorUrl = nammu_fediverse_actor_url($config);
+    $actions = nammu_fediverse_actions_store()['items'];
+    $activities = [];
+    foreach ($actions as $action) {
+        $type = strtolower(trim((string) ($action['type'] ?? '')));
+        if ($type !== 'boost') {
+            continue;
+        }
+        $objectUrl = trim((string) ($action['object_url'] ?? ''));
+        if ($objectUrl === '') {
+            continue;
+        }
+        $published = trim((string) ($action['published'] ?? ''));
+        if ($published === '') {
+            $published = gmdate(DATE_ATOM);
+        }
+        $activityId = trim((string) ($action['activity_id'] ?? ''));
+        if ($activityId === '') {
+            $activityId = $actorUrl . '/announces/' . trim((string) ($action['id'] ?? substr(sha1($objectUrl . '|' . $published), 0, 24)));
+        }
+        $activities[] = [
+            '@context' => 'https://www.w3.org/ns/activitystreams',
+            'id' => $activityId,
+            'type' => 'Announce',
+            'actor' => $actorUrl,
+            'object' => $objectUrl,
+            'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+            'published' => $published,
+        ];
+    }
+    usort($activities, static function (array $a, array $b): int {
+        return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
+    });
+    return $activities;
+}
+
 function nammu_fediverse_replies_for_item(array $item): array
 {
     $repliesByObject = nammu_fediverse_public_replies_by_object();
@@ -1786,6 +1824,10 @@ function nammu_fediverse_outbox_document(array $config): array
     $activities = array_map(static function (array $item) use ($config): array {
         return nammu_fediverse_activity_for_local_item($item, $config);
     }, nammu_fediverse_local_content_items($config));
+    $activities = array_merge($activities, nammu_fediverse_public_action_activities($config));
+    usort($activities, static function (array $a, array $b): int {
+        return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
+    });
     return [
         '@context' => 'https://www.w3.org/ns/activitystreams',
         'id' => nammu_fediverse_outbox_url($config),
@@ -2249,9 +2291,10 @@ function nammu_fediverse_send_announce(string $recipientId, string $objectUrl, a
         return ['ok' => false, 'message' => 'Ese actor no expone un inbox usable.'];
     }
     $actorUrl = nammu_fediverse_actor_url($config);
+    $activityId = $actorUrl . '/announces/' . substr(sha1($recipientId . '|' . $objectUrl . '|' . microtime(true)), 0, 24);
     $activity = [
         '@context' => 'https://www.w3.org/ns/activitystreams',
-        'id' => $actorUrl . '/announces/' . substr(sha1($recipientId . '|' . $objectUrl . '|' . microtime(true)), 0, 24),
+        'id' => $activityId,
         'type' => 'Announce',
         'actor' => $actorUrl,
         'object' => $objectUrl,
@@ -2259,12 +2302,32 @@ function nammu_fediverse_send_announce(string $recipientId, string $objectUrl, a
         'cc' => [$recipientId],
         'published' => gmdate(DATE_ATOM),
     ];
-    $delivery = nammu_fediverse_post_activity_response($inboxUrl, $activity, $config);
-    if (empty($delivery['ok'])) {
-        return ['ok' => false, 'message' => 'No se pudo enviar el impulso. ' . trim((string) ($delivery['message'] ?? ''))];
+    $deliveries = [];
+    $deliveries[$inboxUrl] = nammu_fediverse_post_activity_response($inboxUrl, $activity, $config);
+    foreach (nammu_fediverse_followers_store()['followers'] as $follower) {
+        $followerInbox = nammu_fediverse_remote_inbox_for_actor($follower);
+        if ($followerInbox === '' || isset($deliveries[$followerInbox])) {
+            continue;
+        }
+        $deliveries[$followerInbox] = nammu_fediverse_post_activity_response($followerInbox, $activity, $config);
     }
-    nammu_fediverse_record_action('boost', $recipientId, $objectUrl);
-    return ['ok' => true, 'message' => 'Impulso enviado.'];
+    $successfulDeliveries = 0;
+    $lastError = '';
+    foreach ($deliveries as $deliveryResult) {
+        if (!empty($deliveryResult['ok'])) {
+            $successfulDeliveries++;
+            continue;
+        }
+        $lastError = trim((string) ($deliveryResult['message'] ?? ''));
+    }
+    if ($successfulDeliveries === 0) {
+        return ['ok' => false, 'message' => 'No se pudo enviar el impulso. ' . $lastError];
+    }
+    nammu_fediverse_record_action('boost', $recipientId, $objectUrl, [
+        'activity_id' => $activityId,
+        'published' => (string) ($activity['published'] ?? gmdate(DATE_ATOM)),
+    ]);
+    return ['ok' => true, 'message' => 'Impulso enviado. Entregas: ' . $successfulDeliveries . '.'];
 }
 
 function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, string $text, array $config): array

@@ -979,6 +979,9 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
     if ($type === 'like') {
         return null;
     }
+    $objectActorId = '';
+    $objectActorName = '';
+    $objectActorIcon = '';
     if ($type === 'announce') {
         $announcedObject = $activity['object'] ?? null;
         $objectId = '';
@@ -1007,6 +1010,14 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
             && trim((string) ($object['name'] ?? '')) === ''
         ) {
             $object['summary'] = 'Impulsó una publicación.';
+        }
+        $objectActorId = trim((string) (($object['attributedTo'] ?? '') ?: ($object['actor'] ?? '')));
+        if ($objectActorId !== '') {
+            $objectActor = nammu_fediverse_resolve_actor($objectActorId, $config);
+            if (is_array($objectActor)) {
+                $objectActorName = trim((string) (($objectActor['name'] ?? '') ?: ($objectActor['preferredUsername'] ?? '') ?: $objectActorId));
+                $objectActorIcon = trim((string) ($objectActor['icon'] ?? ''));
+            }
         }
     }
     $objectId = trim((string) (($object['id'] ?? '') ?: $activityId));
@@ -1091,6 +1102,9 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
         'actor_username' => trim((string) ($actor['preferredUsername'] ?? '')),
         'actor_url' => trim((string) (($actor['url'] ?? '') ?: ($actor['id'] ?? ''))),
         'actor_icon' => trim((string) ($actor['icon'] ?? '')),
+        'target_actor_id' => $objectActorId !== '' ? $objectActorId : (string) ($actor['id'] ?? ''),
+        'target_actor_name' => $objectActorName !== '' ? $objectActorName : trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? ''))),
+        'target_actor_icon' => $objectActorIcon !== '' ? $objectActorIcon : trim((string) ($actor['icon'] ?? '')),
     ];
 }
 
@@ -1372,6 +1386,9 @@ function nammu_fediverse_local_content_items(array $config): array
         if (!is_array($item)) {
             continue;
         }
+        if (!empty($item['is_manual']) && strtolower(trim((string) ($item['via'] ?? ''))) === 'boost') {
+            continue;
+        }
         $id = trim((string) (($item['id'] ?? '') ?: sha1(json_encode($item))));
         $isManual = !empty($item['is_manual']);
         $title = trim((string) ($item['title'] ?? ''));
@@ -1457,6 +1474,64 @@ function nammu_fediverse_local_reaction_summary(array $config): array
         }
     }
     return $summary;
+}
+
+function nammu_fediverse_local_reaction_details(array $config): array
+{
+    $index = nammu_fediverse_local_items_index($config);
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
+    $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
+    $details = [];
+    foreach ($activities as $entry) {
+        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        $type = strtolower(trim((string) ($payload['type'] ?? '')));
+        $object = $payload['object'] ?? null;
+        $target = '';
+        if (in_array($type, ['like', 'announce'], true)) {
+            if (is_string($object)) {
+                $target = trim($object);
+            } elseif (is_array($object)) {
+                $target = trim((string) (($object['id'] ?? '') ?: ($object['url'] ?? '')));
+            }
+        } elseif ($type === 'create' && is_array($object) && strtolower(trim((string) ($object['type'] ?? ''))) === 'note') {
+            $target = trim((string) ($object['inReplyTo'] ?? ''));
+        }
+        if ($target === '' || !isset($index[$target])) {
+            continue;
+        }
+        $localId = trim((string) (($index[$target]['id'] ?? '')));
+        if ($localId === '') {
+            continue;
+        }
+        if (!isset($details[$localId])) {
+            $details[$localId] = [
+                'likes' => [],
+                'shares' => [],
+                'replies' => [],
+            ];
+        }
+        $actorId = trim((string) ($payload['actor'] ?? ''));
+        $actor = $actorId !== '' ? nammu_fediverse_resolve_actor($actorId, $config) : [];
+        $actorEntry = [
+            'id' => $actorId,
+            'name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
+            'icon' => trim((string) ($actor['icon'] ?? '')),
+            'url' => trim((string) (($actor['url'] ?? '') ?: ($actor['id'] ?? ''))),
+            'published' => trim((string) (($payload['published'] ?? '') ?: ($entry['received_at'] ?? ''))),
+        ];
+        $bucket = $type === 'like' ? 'likes' : ($type === 'announce' ? 'shares' : 'replies');
+        $alreadyPresent = false;
+        foreach ($details[$localId][$bucket] as $existingActor) {
+            if (trim((string) ($existingActor['id'] ?? '')) !== '' && trim((string) ($existingActor['id'] ?? '')) === $actorId) {
+                $alreadyPresent = true;
+                break;
+            }
+        }
+        if (!$alreadyPresent) {
+            $details[$localId][$bucket][] = $actorEntry;
+        }
+    }
+    return $details;
 }
 
 function nammu_fediverse_incoming_public_replies_by_object(array $config): array

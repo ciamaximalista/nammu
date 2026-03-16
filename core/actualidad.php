@@ -525,7 +525,7 @@ function nammu_actuality_prune_manual_items(array $items): array
     }));
 }
 
-function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $siteTitle, string $image = ''): array
+function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $siteTitle, string $image = '', array $meta = []): array
 {
     $parts = nammu_actuality_manual_content($text);
     if ($parts['title'] === '') {
@@ -547,6 +547,11 @@ function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $
         'source' => $siteTitle !== '' ? $siteTitle : 'Actualidad',
         'is_manual' => true,
     ];
+    foreach ($meta as $metaKey => $metaValue) {
+        if (is_scalar($metaValue) || $metaValue === null) {
+            $item[(string) $metaKey] = $metaValue;
+        }
+    }
     $items[] = $item;
     $items = nammu_actuality_prune_manual_items($items);
     usort($items, static function (array $a, array $b): int {

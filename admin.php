@@ -10205,7 +10205,7 @@ if ($isLoggedIn && $page === 'fediverso') {
                 $noteText = trim($noteText . "\n\n" . $objectUrl);
             }
             if ($noteText !== '' && function_exists('nammu_actuality_add_manual_item')) {
-                nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle, $objectImage);
+                nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle, $objectImage, ['via' => 'boost']);
                 if (function_exists('nammu_actuality_rebuild_snapshot')) {
                     nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
                 }

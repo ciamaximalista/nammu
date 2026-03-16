@@ -60,6 +60,9 @@
     ];
     $fediverseTimelinePage = max(1, (int) ($_GET['timeline_page'] ?? 1));
     $fediverseTimelinePerPage = 40;
+    $fediverseLocalReactionDetails = function_exists('nammu_fediverse_local_reaction_details')
+        ? nammu_fediverse_local_reaction_details($fediverseConfig)
+        : [];
     $buildTabUrl = static function (string $tab): string {
         return 'admin.php?page=fediverso&tab=' . rawurlencode($tab);
     };
@@ -169,6 +172,9 @@
     foreach ($fediverseTimeline as $fediverseTimelineItem) {
         $fediverseTimelineType = strtolower(trim((string) ($fediverseTimelineItem['type'] ?? '')));
         if (in_array($fediverseTimelineType, ['like', 'delete'], true)) {
+            continue;
+        }
+        if ($fediverseTimelineType === 'announce' && trim((string) ($fediverseTimelineItem['actor_id'] ?? '')) === $fediverseActorUrl) {
             continue;
         }
         $fediverseTimelineIdentifiers = [];
@@ -371,6 +377,7 @@
                                 if ($localId === '') { continue; }
                                 $localAnchor = 'local-' . substr(sha1($localId), 0, 12);
                                 $localSummary = $fediverseLocalReactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0];
+                                $localReactionDetails = $fediverseLocalReactionDetails[$localId] ?? ['likes' => [], 'shares' => [], 'replies' => []];
                                 $localReplyTargets = [];
                                 foreach (['id', 'url'] as $localReplyField) {
                                     $localReplyValue = trim((string) ($localItem[$localReplyField] ?? ''));
@@ -405,6 +412,7 @@
                                 usort($threadReplies, static function (array $a, array $b): int {
                                     return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
                                 });
+                                $shareModalId = 'fediverse-share-modal-' . preg_replace('/[^a-z0-9_-]+/i', '-', $localAnchor);
                                 ?>
                                 <article class="fediverse-status fediverse-status--local" id="<?= htmlspecialchars($localAnchor, ENT_QUOTES, 'UTF-8') ?>">
                                     <div class="fediverse-status__avatar">
@@ -443,8 +451,43 @@
                                         <?php if (($localSummary['likes'] ?? 0) > 0 || ($localSummary['shares'] ?? 0) > 0 || ($localSummary['replies'] ?? 0) > 0): ?>
                                             <div class="fediverse-status__history">
                                                 <?php if (($localSummary['likes'] ?? 0) > 0): ?><span><?= (int) $localSummary['likes'] ?> favorito<?= ((int) $localSummary['likes'] === 1) ? '' : 's' ?></span><?php endif; ?>
-                                                <?php if (($localSummary['shares'] ?? 0) > 0): ?><span><?= (int) $localSummary['shares'] ?> reenvío<?= ((int) $localSummary['shares'] === 1) ? '' : 's' ?></span><?php endif; ?>
+                                                <?php if (($localSummary['shares'] ?? 0) > 0): ?>
+                                                    <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-toggle="modal" data-target="#<?= htmlspecialchars($shareModalId, ENT_QUOTES, 'UTF-8') ?>">
+                                                        <?= (int) $localSummary['shares'] ?> impulso<?= ((int) $localSummary['shares'] === 1) ? '' : 's' ?>
+                                                    </button>
+                                                <?php endif; ?>
                                                 <?php if (($localSummary['replies'] ?? 0) > 0): ?><span><?= (int) $localSummary['replies'] ?> respuesta<?= ((int) $localSummary['replies'] === 1) ? '' : 's' ?></span><?php endif; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <?php if (!empty($localReactionDetails['shares'])): ?>
+                                            <div class="modal fade" id="<?= htmlspecialchars($shareModalId, ENT_QUOTES, 'UTF-8') ?>" tabindex="-1" role="dialog" aria-labelledby="<?= htmlspecialchars($shareModalId, ENT_QUOTES, 'UTF-8') ?>-label" aria-hidden="true">
+                                                <div class="modal-dialog modal-dialog-centered" role="document">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title" id="<?= htmlspecialchars($shareModalId, ENT_QUOTES, 'UTF-8') ?>-label">Impulsaron esta publicación</h5>
+                                                            <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                                                <span aria-hidden="true">&times;</span>
+                                                            </button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            <div class="list-group list-group-flush">
+                                                                <?php foreach ($localReactionDetails['shares'] as $shareActor): ?>
+                                                                    <?php $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: '#')); ?>
+                                                                    <a class="list-group-item list-group-item-action d-flex align-items-center" href="<?= htmlspecialchars($shareActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                                        <?php if (!empty($shareActor['icon'])): ?>
+                                                                            <img src="<?= htmlspecialchars((string) $shareActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy" style="width:40px;height:40px;border-radius:999px;object-fit:cover;margin-right:0.75rem;">
+                                                                        <?php else: ?>
+                                                                            <span class="d-inline-flex align-items-center justify-content-center mr-3" style="width:40px;height:40px;border-radius:999px;background:#e9ecef;font-weight:700;">
+                                                                                <?= htmlspecialchars(mb_substr((string) (($shareActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                                                            </span>
+                                                                        <?php endif; ?>
+                                                                        <span><?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+                                                                    </a>
+                                                                <?php endforeach; ?>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         <?php endif; ?>
                                         <?php if (!empty($threadReplies)): ?>
@@ -479,6 +522,7 @@
                                 <?php else: ?>
                                 <?php $item = is_array($timelineEntry['item'] ?? null) ? $timelineEntry['item'] : []; ?>
                                 <?php $itemObjectId = (string) (($item['object_id'] ?? '') ?: (($item['url'] ?? '') ?: ($item['id'] ?? ''))); ?>
+                                <?php $itemTargetActorId = (string) (($item['target_actor_id'] ?? '') ?: ($item['actor_id'] ?? '')); ?>
                                 <?php $itemActionState = function_exists('nammu_fediverse_action_state_for_item') ? nammu_fediverse_action_state_for_item($item) : ['liked' => false, 'boosted' => false, 'replied' => false, 'shared' => false, 'boost_count' => 0, 'reply_count' => 0, 'share_count' => 0]; ?>
                                 <?php $itemReplies = function_exists('nammu_fediverse_replies_for_item') ? nammu_fediverse_replies_for_item($item) : []; ?>
                                 <article class="fediverse-status">
@@ -593,13 +637,13 @@
                                         <div class="fediverse-status__actions">
                                             <form method="post" class="mb-0">
                                                 <input type="hidden" name="fediverse_tab" value="home">
-                                                <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($item['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($itemTargetActorId, ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>">
                                                 <button type="submit" name="fediverse_like_item" class="btn btn-outline-secondary btn-sm"<?= !empty($itemActionState['liked']) ? ' disabled' : '' ?>><?= !empty($itemActionState['liked']) ? 'Favorito enviado' : 'Favorito' ?></button>
                                             </form>
                                             <form method="post" class="mb-0">
                                                 <input type="hidden" name="fediverse_tab" value="home">
-                                                <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($item['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($itemTargetActorId, ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_title" value="<?= htmlspecialchars((string) ($item['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_content" value="<?= htmlspecialchars((string) ($item['content'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
@@ -624,7 +668,7 @@
                                                 <summary>Responder</summary>
                                                 <form method="post">
                                                     <input type="hidden" name="fediverse_tab" value="home">
-                                                    <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($item['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($itemTargetActorId, ENT_QUOTES, 'UTF-8') ?>">
                                                     <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>">
                                                     <textarea name="fediverse_reply_text" class="form-control form-control-sm" rows="3" placeholder="Escribe tu respuesta"></textarea>
                                                     <label class="fediverse-inline-check">

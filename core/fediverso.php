@@ -1242,9 +1242,11 @@ function nammu_fediverse_reply_collection_summary(string $objectId, array $confi
             }
         }
     }
+    $totalItems = count($replyIds);
     return [
         'id' => $collectionUrl,
         'type' => 'Collection',
+        'totalItems' => $totalItems,
         'first' => [
             'id' => $pageUrl,
             'type' => 'CollectionPage',
@@ -2758,6 +2760,7 @@ function nammu_fediverse_replies_collection_document(string $routePath, array $c
             'id' => $pageUrl,
             'type' => 'CollectionPage',
             'partOf' => $collectionUrl,
+            'totalItems' => count($replyObjects),
             'items' => $replyObjects,
         ];
     }
@@ -2765,6 +2768,7 @@ function nammu_fediverse_replies_collection_document(string $routePath, array $c
         '@context' => 'https://www.w3.org/ns/activitystreams',
         'id' => $collectionUrl,
         'type' => 'Collection',
+        'totalItems' => count($replyObjects),
         'first' => [
             'id' => $pageUrl,
             'type' => 'CollectionPage',

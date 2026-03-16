@@ -660,6 +660,26 @@
                                 <?php $itemReplies = function_exists('nammu_fediverse_replies_for_item') ? nammu_fediverse_replies_for_item($item) : []; ?>
                                 <?php $remoteItemReplies = function_exists('nammu_fediverse_cached_remote_replies_for_item') ? nammu_fediverse_cached_remote_replies_for_item($item, $fediverseConfig) : []; ?>
                                 <?php
+                                $replyDedupKeys = [];
+                                $registerReplyKey = static function (array $reply) use (&$replyDedupKeys): void {
+                                    $identityCandidates = array_filter([
+                                        trim((string) ($reply['id'] ?? '')),
+                                        trim((string) ($reply['url'] ?? '')),
+                                        trim((string) ($reply['note_id'] ?? '')),
+                                    ]);
+                                    foreach ($identityCandidates as $identityCandidate) {
+                                        $replyDedupKeys['id:' . $identityCandidate] = true;
+                                    }
+                                    $fallbackKey = strtolower(trim((string) ($reply['actor_id'] ?? ''))) . '|' .
+                                        trim((string) ($reply['published'] ?? '')) . '|' .
+                                        trim((string) ($reply['reply_text'] ?? ''));
+                                    if ($fallbackKey !== '||') {
+                                        $replyDedupKeys['fallback:' . $fallbackKey] = true;
+                                    }
+                                };
+                                foreach ($itemReplies as $existingReply) {
+                                    $registerReplyKey($existingReply);
+                                }
                                 $storedRemoteReplies = [];
                                 foreach (array_filter([
                                     trim((string) ($item['object_id'] ?? '')),
@@ -671,47 +691,33 @@
                                     }
                                 }
                                 foreach ($storedRemoteReplies as $remoteItemReply) {
+                                    $remoteReplyFallbackKey = strtolower(trim((string) ($remoteItemReply['actor_id'] ?? ''))) . '|' .
+                                        trim((string) ($remoteItemReply['published'] ?? '')) . '|' .
+                                        trim((string) ($remoteItemReply['reply_text'] ?? ''));
                                     $remoteReplyIdentifiers = array_filter([
-                                        trim((string) ($remoteItemReply['id'] ?? '')),
-                                        trim((string) ($remoteItemReply['url'] ?? '')),
-                                        trim((string) ($remoteItemReply['note_id'] ?? '')),
-                                    ]);
-                                    $alreadyPresent = false;
-                                    foreach ($itemReplies as $existingReply) {
-                                        $existingIdentifiers = array_filter([
-                                            trim((string) ($existingReply['id'] ?? '')),
-                                            trim((string) ($existingReply['url'] ?? '')),
-                                            trim((string) ($existingReply['note_id'] ?? '')),
-                                        ]);
-                                        if (!empty(array_intersect($remoteReplyIdentifiers, $existingIdentifiers))) {
-                                            $alreadyPresent = true;
-                                            break;
-                                        }
-                                    }
-                                    if (!$alreadyPresent) {
+                                        'fallback:' . $remoteReplyFallbackKey,
+                                        'id:' . trim((string) ($remoteItemReply['id'] ?? '')),
+                                        'id:' . trim((string) ($remoteItemReply['url'] ?? '')),
+                                        'id:' . trim((string) ($remoteItemReply['note_id'] ?? '')),
+                                    ], static fn(string $value): bool => $value !== 'id:' && $value !== 'fallback:||');
+                                    if (empty(array_intersect_key(array_flip($remoteReplyIdentifiers), $replyDedupKeys))) {
                                         $itemReplies[] = $remoteItemReply;
+                                        $registerReplyKey($remoteItemReply);
                                     }
                                 }
                                 foreach ($remoteItemReplies as $remoteItemReply) {
+                                    $remoteReplyFallbackKey = strtolower(trim((string) ($remoteItemReply['actor_id'] ?? ''))) . '|' .
+                                        trim((string) ($remoteItemReply['published'] ?? '')) . '|' .
+                                        trim((string) ($remoteItemReply['reply_text'] ?? ''));
                                     $remoteReplyIdentifiers = array_filter([
-                                        trim((string) ($remoteItemReply['id'] ?? '')),
-                                        trim((string) ($remoteItemReply['url'] ?? '')),
-                                        trim((string) ($remoteItemReply['note_id'] ?? '')),
-                                    ]);
-                                    $alreadyPresent = false;
-                                    foreach ($itemReplies as $existingReply) {
-                                        $existingIdentifiers = array_filter([
-                                            trim((string) ($existingReply['id'] ?? '')),
-                                            trim((string) ($existingReply['url'] ?? '')),
-                                            trim((string) ($existingReply['note_id'] ?? '')),
-                                        ]);
-                                        if (!empty(array_intersect($remoteReplyIdentifiers, $existingIdentifiers))) {
-                                            $alreadyPresent = true;
-                                            break;
-                                        }
-                                    }
-                                    if (!$alreadyPresent) {
+                                        'fallback:' . $remoteReplyFallbackKey,
+                                        'id:' . trim((string) ($remoteItemReply['id'] ?? '')),
+                                        'id:' . trim((string) ($remoteItemReply['url'] ?? '')),
+                                        'id:' . trim((string) ($remoteItemReply['note_id'] ?? '')),
+                                    ], static fn(string $value): bool => $value !== 'id:' && $value !== 'fallback:||');
+                                    if (empty(array_intersect_key(array_flip($remoteReplyIdentifiers), $replyDedupKeys))) {
                                         $itemReplies[] = $remoteItemReply;
+                                        $registerReplyKey($remoteItemReply);
                                     }
                                 }
                                 usort($itemReplies, static function (array $a, array $b): int {

@@ -2707,6 +2707,11 @@ function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, stri
             'name' => $recipientHandle,
         ];
     }
+    $cc = [$recipientId];
+    $recipientFollowers = trim((string) ($recipient['followers'] ?? ''));
+    if ($recipientFollowers !== '' && !in_array($recipientFollowers, $cc, true)) {
+        $cc[] = $recipientFollowers;
+    }
     $noteId = $actorUrl . '/replies/' . substr(sha1($recipientId . '|' . $objectUrl . '|' . $plainText . '|' . microtime(true)), 0, 24);
     $published = gmdate(DATE_ATOM);
     $activity = [
@@ -2715,14 +2720,14 @@ function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, stri
         'type' => 'Create',
         'actor' => $actorUrl,
         'to' => ['https://www.w3.org/ns/activitystreams#Public'],
-        'cc' => [$recipientId],
+        'cc' => $cc,
         'published' => $published,
         'object' => [
             'id' => $noteId,
             'type' => 'Note',
             'attributedTo' => $actorUrl,
             'to' => ['https://www.w3.org/ns/activitystreams#Public'],
-            'cc' => [$recipientId],
+            'cc' => $cc,
             'content' => $contentHtml,
             'tag' => $tag,
             'published' => $published,

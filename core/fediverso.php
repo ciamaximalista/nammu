@@ -1105,6 +1105,7 @@ function nammu_fediverse_reply_collection_page_url(string $objectId, array $conf
 function nammu_fediverse_reply_collection_summary(string $objectId, array $config): array
 {
     $collectionUrl = nammu_fediverse_reply_collection_url($objectId, $config);
+    $pageUrl = nammu_fediverse_reply_collection_page_url($objectId, $config);
     $targetIdentifiers = [$objectId];
     $localItem = nammu_fediverse_find_local_item_for_identifier($objectId, $config);
     if (is_array($localItem)) {
@@ -1137,9 +1138,13 @@ function nammu_fediverse_reply_collection_summary(string $objectId, array $confi
     }
     return [
         'id' => $collectionUrl,
-        'type' => 'OrderedCollection',
-        'totalItems' => count($replyIds),
-        'first' => nammu_fediverse_reply_collection_page_url($objectId, $config),
+        'type' => 'Collection',
+        'first' => [
+            'id' => $pageUrl,
+            'type' => 'CollectionPage',
+            'partOf' => $collectionUrl,
+            'items' => [],
+        ],
     ];
 }
 
@@ -2592,18 +2597,21 @@ function nammu_fediverse_replies_collection_document(string $routePath, array $c
         return [
             '@context' => 'https://www.w3.org/ns/activitystreams',
             'id' => $pageUrl,
-            'type' => 'OrderedCollectionPage',
+            'type' => 'CollectionPage',
             'partOf' => $collectionUrl,
-            'totalItems' => count($replyObjects),
-            'orderedItems' => $replyObjects,
+            'items' => $replyObjects,
         ];
     }
     return [
         '@context' => 'https://www.w3.org/ns/activitystreams',
         'id' => $collectionUrl,
-        'type' => 'OrderedCollection',
-        'totalItems' => count($replyObjects),
-        'first' => $pageUrl,
+        'type' => 'Collection',
+        'first' => [
+            'id' => $pageUrl,
+            'type' => 'CollectionPage',
+            'partOf' => $collectionUrl,
+            'items' => [],
+        ],
     ];
 }
 

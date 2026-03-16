@@ -48,6 +48,11 @@ $fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
 .fediverse-public-status__footer { margin-top: .9rem; display: flex; flex-wrap: wrap; gap: .6rem 1rem; font-size: .95rem; }
 .fediverse-public-status__metrics { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: .65rem; }
 .fediverse-public-status__metrics span { background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 999px; padding: .38rem .7rem; font-size: .92rem; }
+.fediverse-public-status__metric-group { display: inline-flex; align-items: center; gap: .5rem; background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 999px; padding: .3rem .45rem .3rem .7rem; font-size: .92rem; }
+.fediverse-public-status__metric-group > span { background: transparent; border: 0; padding: 0; }
+.fediverse-public-status__actor-icons { display: inline-flex; align-items: center; gap: .25rem; }
+.fediverse-public-status__actor-icons a { width: 28px; height: 28px; border-radius: 999px; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; background: #dfe7ef; text-decoration: none; color: inherit; border: 1px solid rgba(0,0,0,.08); }
+.fediverse-public-status__actor-icons img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .fediverse-public-section h2 { margin: 0 0 1rem; font-size: 1.15rem; }
 .fediverse-public-thread { display: grid; gap: .9rem; }
 .fediverse-public-reply { background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 16px; padding: 1rem; }
@@ -123,7 +128,23 @@ $fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
 
                 <div class="fediverse-public-status__metrics">
                     <span><?= (int) ($threadSummary['replies'] ?? 0) ?> respuesta<?= ((int) ($threadSummary['replies'] ?? 0) === 1) ? '' : 's' ?></span>
-                    <span><?= (int) ($threadSummary['shares'] ?? 0) ?> impulso<?= ((int) ($threadSummary['shares'] ?? 0) === 1) ? '' : 's' ?></span>
+                    <div class="fediverse-public-status__metric-group">
+                        <span><?= (int) ($threadSummary['shares'] ?? 0) ?> impulso<?= ((int) ($threadSummary['shares'] ?? 0) === 1) ? '' : 's' ?></span>
+                        <?php if (!empty($threadDetails['shares'])): ?>
+                            <span class="fediverse-public-status__actor-icons">
+                                <?php foreach ($threadDetails['shares'] as $shareActor): ?>
+                                    <?php $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: '#')); ?>
+                                    <a href="<?= htmlspecialchars($shareActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                        <?php if (!empty($shareActor['icon'])): ?>
+                                            <img src="<?= htmlspecialchars((string) $shareActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                        <?php else: ?>
+                                            <?= htmlspecialchars(mb_substr((string) (($shareActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                        <?php endif; ?>
+                                    </a>
+                                <?php endforeach; ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
                     <span><?= (int) ($threadSummary['likes'] ?? 0) ?> favorito<?= ((int) ($threadSummary['likes'] ?? 0) === 1) ? '' : 's' ?></span>
                 </div>
             </div>
@@ -139,12 +160,16 @@ $fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
                     $replyIsRemote = ($reply['source'] ?? '') === 'incoming-remote';
                     $replyName = trim((string) ($replyIsRemote ? (($reply['actor_name'] ?? '') ?: 'Actor remoto') : $fediverseLocalName));
                     $replyHandle = trim((string) ($reply['actor_handle'] ?? ($replyIsRemote ? ($reply['actor_id'] ?? '') : $fediverseLocalHandle)));
+                    $replyAvatar = trim((string) ($reply['actor_icon'] ?? ''));
+                    if (!$replyIsRemote && $replyAvatar === '') {
+                        $replyAvatar = $fediverseLocalAvatar;
+                    }
                     ?>
                     <article class="fediverse-public-reply">
                         <div class="fediverse-public-reply__top">
                             <div class="fediverse-public-reply__avatar">
-                                <?php if (!empty($reply['actor_icon'])): ?>
-                                    <img src="<?= htmlspecialchars((string) $reply['actor_icon'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                <?php if ($replyAvatar !== ''): ?>
+                                    <img src="<?= htmlspecialchars($replyAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
                                 <?php else: ?>
                                     <?= htmlspecialchars(mb_substr($replyName !== '' ? $replyName : 'A', 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
                                 <?php endif; ?>
@@ -168,29 +193,4 @@ $fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
         </section>
     <?php endif; ?>
 
-    <?php if (!empty($threadDetails['shares'])): ?>
-        <section class="fediverse-public-section">
-            <h2>Impulsos recibidos</h2>
-            <div class="fediverse-public-actors">
-                <?php foreach ($threadDetails['shares'] as $shareActor): ?>
-                    <?php $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: '#')); ?>
-                    <a class="fediverse-public-actor" href="<?= htmlspecialchars($shareActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                        <div class="fediverse-public-actor__avatar">
-                            <?php if (!empty($shareActor['icon'])): ?>
-                                <img src="<?= htmlspecialchars((string) $shareActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
-                            <?php else: ?>
-                                <?= htmlspecialchars(mb_substr((string) (($shareActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
-                            <?php endif; ?>
-                        </div>
-                        <div class="fediverse-public-actor__body">
-                            <strong><?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
-                            <?php if (!empty($shareActor['published'])): ?>
-                                <span><?= htmlspecialchars((string) $shareActor['published'], ENT_QUOTES, 'UTF-8') ?></span>
-                            <?php endif; ?>
-                        </div>
-                    </a>
-                <?php endforeach; ?>
-            </div>
-        </section>
-    <?php endif; ?>
 </div>

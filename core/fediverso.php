@@ -1169,6 +1169,8 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
             'url' => $attachmentUrl,
             'name' => trim((string) ($attachment['name'] ?? '')),
             'media_type' => trim((string) (($attachment['mediaType'] ?? '') ?: ($attachment['mimeType'] ?? ''))),
+            'image' => nammu_fediverse_extract_url($attachment['image'] ?? ''),
+            'summary' => trim((string) ($attachment['summary'] ?? '')),
         ];
     }
     $htmlImages = nammu_fediverse_extract_html_image_urls($contentHtml);
@@ -1361,6 +1363,53 @@ function nammu_fediverse_plain_excerpt(string $content, int $max = 320): string
     return $text;
 }
 
+function nammu_fediverse_first_markdown_image(string $content, string $baseUrl): string
+{
+    if (preg_match('/!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/u', $content, $matches)) {
+        return nammu_fediverse_asset_url((string) ($matches[1] ?? ''), $baseUrl);
+    }
+    return '';
+}
+
+function nammu_fediverse_social_image_for_url(string $url): string
+{
+    $url = trim($url);
+    if ($url === '') {
+        return '';
+    }
+    if (function_exists('nammu_actuality_extract_social_image')) {
+        return trim((string) nammu_actuality_extract_social_image($url));
+    }
+    $response = nammu_fediverse_fetch($url, 'text/html,application/xhtml+xml');
+    if ((int) ($response['status'] ?? 0) < 200 || (int) ($response['status'] ?? 0) >= 400) {
+        return '';
+    }
+    $html = trim((string) ($response['body'] ?? ''));
+    if ($html === '') {
+        return '';
+    }
+    $dom = new DOMDocument();
+    @$dom->loadHTML($html);
+    $xpath = new DOMXPath($dom);
+    foreach ([
+        '//meta[@property="og:image"]/@content',
+        '//meta[@property="twitter:image"]/@content',
+        '//meta[@property="twitter:image:src"]/@content',
+        '//meta[@name="twitter:image"]/@content',
+        '//meta[@name="twitter:image:src"]/@content',
+    ] as $query) {
+        $nodes = @$xpath->query($query);
+        if (!$nodes instanceof DOMNodeList || $nodes->length === 0) {
+            continue;
+        }
+        $value = trim((string) $nodes->item(0)?->nodeValue);
+        if ($value !== '') {
+            return $value;
+        }
+    }
+    return '';
+}
+
 function nammu_fediverse_asset_url(string $image, string $baseUrl): string
 {
     $value = trim($image);
@@ -1462,6 +1511,15 @@ function nammu_fediverse_local_content_items(array $config): array
         $url = $template === 'podcast'
             ? $baseUrl . '/podcast/' . rawurlencode($slug)
             : $baseUrl . '/' . rawurlencode($slug);
+        if ($image === '') {
+            $image = nammu_fediverse_first_markdown_image($content, $baseUrl);
+        }
+        if ($image === '' && !empty($config['social']['home_image'])) {
+            $image = nammu_fediverse_asset_url((string) $config['social']['home_image'], $baseUrl);
+        }
+        if ($image === '') {
+            $image = nammu_fediverse_social_image_for_url($url);
+        }
         $objectType = $template === 'podcast' ? 'Article' : 'Article';
         $itemId = $baseUrl . '/ap/objects/' . rawurlencode($template) . '-' . rawurlencode($slug);
         if (isset($deletedIds[$itemId])) {
@@ -1493,6 +1551,15 @@ function nammu_fediverse_local_content_items(array $config): array
         $description = trim((string) (($meta['Description'] ?? $meta['description'] ?? '') ?: ''));
         $content = nammu_fediverse_strip_front_matter($raw);
         $image = nammu_fediverse_asset_url((string) (($meta['Image'] ?? $meta['image'] ?? '') ?: ''), $baseUrl);
+        if ($image === '') {
+            $image = nammu_fediverse_first_markdown_image($content, $baseUrl);
+        }
+        if ($image === '' && !empty($config['social']['home_image'])) {
+            $image = nammu_fediverse_asset_url((string) $config['social']['home_image'], $baseUrl);
+        }
+        if ($image === '') {
+            $image = nammu_fediverse_social_image_for_url($baseUrl . '/itinerarios/' . rawurlencode($slug));
+        }
         $itemId = $baseUrl . '/ap/objects/itinerary-' . rawurlencode($slug);
         if (isset($deletedIds[$itemId])) {
             continue;
@@ -1532,7 +1599,7 @@ function nammu_fediverse_local_content_items(array $config): array
             'summary' => trim((string) ($item['description'] ?? '')),
             'published' => gmdate(DATE_ATOM, (int) (($item['timestamp'] ?? 0) ?: time())),
             'type' => $isManual ? 'Note' : 'Article',
-            'image' => trim((string) ($item['image'] ?? '')),
+            'image' => trim((string) (($item['source_image'] ?? '') ?: ($item['image'] ?? ''))),
         ];
     }
     usort($items, static function (array $a, array $b): int {
@@ -1902,15 +1969,24 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
         $object['summary'] = htmlspecialchars($summary, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
     $image = trim((string) ($item['image'] ?? ''));
+    if ($image !== '') {
+        $object['image'] = ['type' => 'Image', 'url' => $image];
+    }
     if (strcasecmp($objectType, 'Note') !== 0 && $objectUrl !== '') {
-        $object['attachment'] = [[
+        $linkAttachment = [
             'type' => 'Link',
             'href' => $objectUrl,
             'mediaType' => 'text/html',
             'name' => trim((string) (($item['title'] ?? '') ?: $objectUrl)),
-        ]];
+        ];
+        if ($image !== '') {
+            $linkAttachment['image'] = ['type' => 'Image', 'url' => $image];
+        }
+        if ($summary !== '') {
+            $linkAttachment['summary'] = htmlspecialchars($summary, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        }
+        $object['attachment'] = [$linkAttachment];
     } elseif ($image !== '') {
-        $object['image'] = ['type' => 'Image', 'url' => $image];
         $object['attachment'] = [[
             'type' => 'Image',
             'mediaType' => 'image/*',

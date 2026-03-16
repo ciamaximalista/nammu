@@ -72,6 +72,9 @@
     $fediversePublicThreadRootMessages = $isFediverseMessagesTab && function_exists('nammu_fediverse_public_thread_root_message_entries')
         ? nammu_fediverse_public_thread_root_message_entries($fediverseConfig)
         : [];
+    $fediverseRemoteThreadRootMessages = $isFediverseMessagesTab && function_exists('nammu_fediverse_remote_thread_root_message_entries')
+        ? nammu_fediverse_remote_thread_root_message_entries($fediverseConfig)
+        : [];
     $fediverseNotifications = $isFediverseNotificationsTab && function_exists('nammu_fediverse_notification_entries')
         ? nammu_fediverse_notification_entries($fediverseConfig)
         : [];
@@ -131,7 +134,7 @@
             $fediverseMessages[$actorId][] = $publicReplyMessage;
         }
     }
-    foreach (array_merge($fediverseOutgoingPublicReplyMessages, $fediversePublicThreadRootMessages) as $publicConversationMessage) {
+    foreach (array_merge($fediverseOutgoingPublicReplyMessages, $fediversePublicThreadRootMessages, $fediverseRemoteThreadRootMessages) as $publicConversationMessage) {
         $actorId = trim((string) ($publicConversationMessage['actor_id'] ?? ''));
         if ($actorId === '') {
             continue;
@@ -156,6 +159,15 @@
         });
     }
     unset($fediverseMessageGroup);
+    $fediverseFlatMessages = [];
+    foreach ($fediverseMessages as $fediverseMessageGroupItems) {
+        foreach ((array) $fediverseMessageGroupItems as $fediverseMessageItem) {
+            $fediverseFlatMessages[] = $fediverseMessageItem;
+        }
+    }
+    $fediverseMessageThreads = $isFediverseMessagesTab && function_exists('nammu_fediverse_thread_grouped_messages')
+        ? nammu_fediverse_thread_grouped_messages($fediverseFlatMessages)
+        : [];
     $fediverseLocalItems = $isFediverseHomeTab && function_exists('nammu_fediverse_local_content_items')
         ? nammu_fediverse_local_content_items($fediverseConfig)
         : [];
@@ -171,6 +183,7 @@
     $fediverseIncomingReplies = $isFediverseHomeTab && function_exists('nammu_fediverse_incoming_public_replies_by_object') ? nammu_fediverse_incoming_public_replies_by_object($fediverseConfig) : [];
     $fediverseIncomingReplyIds = [];
     $fediverseIncomingReplyRoots = [];
+    $fediverseRemoteRepliesByTarget = [];
     foreach ($fediverseIncomingReplies as $fediverseIncomingLocalId => $fediverseIncomingReplyGroup) {
         foreach ((array) $fediverseIncomingReplyGroup as $fediverseIncomingReply) {
             foreach (['id', 'url'] as $fediverseIncomingReplyField) {
@@ -181,6 +194,42 @@
                 $fediverseIncomingReplyIds[$fediverseIncomingReplyValue] = true;
                 $fediverseIncomingReplyRoots[$fediverseIncomingReplyValue] = (string) $fediverseIncomingLocalId;
             }
+        }
+    }
+    if ($isFediverseHomeTab) {
+        foreach ($fediverseTimeline as $fediverseTimelineReplyCandidate) {
+            if (!is_array($fediverseTimelineReplyCandidate)) {
+                continue;
+            }
+            $fediverseTimelineReplyTarget = trim((string) ($fediverseTimelineReplyCandidate['target_url'] ?? ''));
+            if ($fediverseTimelineReplyTarget === '') {
+                continue;
+            }
+            $fediverseTimelineReplyType = strtolower(trim((string) ($fediverseTimelineReplyCandidate['type'] ?? '')));
+            if (!in_array($fediverseTimelineReplyType, ['note', 'create'], true)) {
+                continue;
+            }
+            $fediverseTimelineReplyText = trim((string) ($fediverseTimelineReplyCandidate['content'] ?? ''));
+            if ($fediverseTimelineReplyText === '' && trim((string) ($fediverseTimelineReplyCandidate['content_html'] ?? '')) !== '' && function_exists('nammu_fediverse_html_to_text')) {
+                $fediverseTimelineReplyText = nammu_fediverse_html_to_text((string) $fediverseTimelineReplyCandidate['content_html']);
+            }
+            if ($fediverseTimelineReplyText === '') {
+                continue;
+            }
+            if (!isset($fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTarget])) {
+                $fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTarget] = [];
+            }
+            $fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTarget][] = [
+                'id' => trim((string) ($fediverseTimelineReplyCandidate['id'] ?? '')),
+                'note_id' => trim((string) (($fediverseTimelineReplyCandidate['object_id'] ?? '') ?: ($fediverseTimelineReplyCandidate['id'] ?? ''))),
+                'url' => trim((string) ($fediverseTimelineReplyCandidate['url'] ?? '')),
+                'published' => trim((string) ($fediverseTimelineReplyCandidate['published'] ?? '')),
+                'reply_text' => $fediverseTimelineReplyText,
+                'actor_id' => trim((string) ($fediverseTimelineReplyCandidate['actor_id'] ?? '')),
+                'actor_name' => trim((string) ($fediverseTimelineReplyCandidate['actor_name'] ?? '')),
+                'actor_icon' => trim((string) ($fediverseTimelineReplyCandidate['actor_icon'] ?? '')),
+                'source' => 'incoming-remote',
+            ];
         }
     }
     $fediverseLocalLinks = [];
@@ -230,6 +279,9 @@
         $fediverseTimelineTargetUrl = trim((string) ($fediverseTimelineItem['target_url'] ?? ''));
         if ($fediverseTimelineTargetUrl !== '') {
             $fediverseTimelineIdentifiers[] = $fediverseTimelineTargetUrl;
+        }
+        if ($fediverseTimelineTargetUrl !== '') {
+            continue;
         }
         $fediverseSkipTimelineItem = false;
         foreach ($fediverseTimelineIdentifiers as $fediverseTimelineIdentifier) {
@@ -608,6 +660,38 @@
                                 <?php $itemReplies = function_exists('nammu_fediverse_replies_for_item') ? nammu_fediverse_replies_for_item($item) : []; ?>
                                 <?php $remoteItemReplies = function_exists('nammu_fediverse_cached_remote_replies_for_item') ? nammu_fediverse_cached_remote_replies_for_item($item, $fediverseConfig) : []; ?>
                                 <?php
+                                $storedRemoteReplies = [];
+                                foreach (array_filter([
+                                    trim((string) ($item['object_id'] ?? '')),
+                                    trim((string) ($item['url'] ?? '')),
+                                    trim((string) ($item['id'] ?? '')),
+                                ]) as $itemReplyTargetIdentifier) {
+                                    foreach ((array) ($fediverseRemoteRepliesByTarget[$itemReplyTargetIdentifier] ?? []) as $storedRemoteReply) {
+                                        $storedRemoteReplies[] = $storedRemoteReply;
+                                    }
+                                }
+                                foreach ($storedRemoteReplies as $remoteItemReply) {
+                                    $remoteReplyIdentifiers = array_filter([
+                                        trim((string) ($remoteItemReply['id'] ?? '')),
+                                        trim((string) ($remoteItemReply['url'] ?? '')),
+                                        trim((string) ($remoteItemReply['note_id'] ?? '')),
+                                    ]);
+                                    $alreadyPresent = false;
+                                    foreach ($itemReplies as $existingReply) {
+                                        $existingIdentifiers = array_filter([
+                                            trim((string) ($existingReply['id'] ?? '')),
+                                            trim((string) ($existingReply['url'] ?? '')),
+                                            trim((string) ($existingReply['note_id'] ?? '')),
+                                        ]);
+                                        if (!empty(array_intersect($remoteReplyIdentifiers, $existingIdentifiers))) {
+                                            $alreadyPresent = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!$alreadyPresent) {
+                                        $itemReplies[] = $remoteItemReply;
+                                    }
+                                }
                                 foreach ($remoteItemReplies as $remoteItemReply) {
                                     $remoteReplyIdentifiers = array_filter([
                                         trim((string) ($remoteItemReply['id'] ?? '')),
@@ -973,15 +1057,17 @@
             <div class="card">
                 <div class="card-body">
                     <h3 class="h5 mb-3">Conversaciones</h3>
-                    <?php if (empty($fediverseMessages)): ?>
+                    <?php if (empty($fediverseMessageThreads)): ?>
                         <p class="text-muted mb-0">Todavía no hay conversaciones guardadas.</p>
                     <?php else: ?>
-                        <?php foreach ($fediverseMessages as $actorId => $messages): ?>
+                        <?php foreach ($fediverseMessageThreads as $threadKey => $messages): ?>
                             <?php $firstMessage = $messages[0] ?? []; ?>
                             <?php
+                            $actorId = trim((string) ($firstMessage['actor_id'] ?? ''));
                             $conversationActor = $fediverseActorsById[$actorId] ?? null;
                             $conversationActorName = trim((string) (($firstMessage['actor_name'] ?? '') ?: ($conversationActor['name'] ?? '') ?: ($conversationActor['preferredUsername'] ?? '') ?: $actorId));
                             $conversationActorIcon = trim((string) (($firstMessage['actor_icon'] ?? '') ?: ($conversationActor['icon'] ?? '')));
+                            $conversationIsPublic = strtolower(trim((string) ($firstMessage['visibility'] ?? 'private'))) === 'public';
                             ?>
                             <div class="border rounded p-3 mb-4">
                                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
@@ -996,6 +1082,7 @@
                                         <div class="fediverse-message__identity">
                                             <strong><?= htmlspecialchars($conversationActorName, ENT_QUOTES, 'UTF-8') ?></strong>
                                             <div class="small text-muted mt-1"><?= htmlspecialchars((string) $actorId, ENT_QUOTES, 'UTF-8') ?></div>
+                                            <div class="small text-muted mt-1"><?= $conversationIsPublic ? 'Hilo público' : 'Conversación privada' ?></div>
                                         </div>
                                     </div>
                                 </div>

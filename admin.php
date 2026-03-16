@@ -10085,9 +10085,22 @@ $fediverseMessageRecipient = '';
 $fediverseMessageText = '';
 $fediverseInspectUrl = '';
 $fediverseInspectResult = null;
+$fediverseRedirect = false;
+$fediverseRedirectState = [];
 $notesFeedback = $_SESSION['notes_feedback'] ?? null;
 if ($notesFeedback !== null) {
     unset($_SESSION['notes_feedback']);
+}
+if (!empty($_SESSION['fediverse_feedback'])) {
+    $fediverseFeedback = is_array($_SESSION['fediverse_feedback']) ? $_SESSION['fediverse_feedback'] : null;
+    unset($_SESSION['fediverse_feedback']);
+}
+if (!empty($_SESSION['fediverse_state']) && is_array($_SESSION['fediverse_state'])) {
+    $fediverseRedirectState = $_SESSION['fediverse_state'];
+    unset($_SESSION['fediverse_state']);
+    $fediverseActorInput = (string) ($fediverseRedirectState['actor_input'] ?? $fediverseActorInput);
+    $fediverseMessageRecipient = (string) ($fediverseRedirectState['message_recipient'] ?? $fediverseMessageRecipient);
+    $fediverseMessageText = (string) ($fediverseRedirectState['message_text'] ?? $fediverseMessageText);
 }
 if ($isLoggedIn && $page === 'redes') {
     require_once __DIR__ . '/core/admin-redes.php';
@@ -10111,6 +10124,8 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => !empty($followResult['ok']) ? 'success' : 'danger',
             'message' => (string) ($followResult['message'] ?? ''),
         ];
+        $fediverseRedirect = true;
+        $fediverseRedirectState = ['actor_input' => empty($followResult['ok']) ? $fediverseActorInput : ''];
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restart_fediverse_actor'])) {
         $actorId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
         $restartResult = nammu_fediverse_restart_follow_actor($actorId);
@@ -10118,6 +10133,7 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => !empty($restartResult['ok']) ? 'success' : 'danger',
             'message' => (string) ($restartResult['message'] ?? ''),
         ];
+        $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unfollow_fediverse_actor'])) {
         $actorId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
         $ok = $actorId !== '' && nammu_fediverse_unfollow_actor($actorId);
@@ -10125,6 +10141,7 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => $ok ? 'success' : 'danger',
             'message' => $ok ? 'Actor eliminado del Fediverso.' : 'No se pudo quitar ese actor.',
         ];
+        $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refresh_fediverse_timeline'])) {
         $stats = nammu_fediverse_refresh_following();
         if (function_exists('nammu_fediverse_clear_threads_cache')) {
@@ -10134,6 +10151,7 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => 'info',
             'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '.',
         ];
+        $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rebuild_fediverse_timeline'])) {
         $config = load_config_file();
         $siteTitle = trim((string) (($config['site_name'] ?? '') ?: ''));
@@ -10151,6 +10169,7 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => 'info',
             'message' => 'Timeline del Fediverso reconstruido, incluyendo la parte local. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades importadas: ' . (int) ($stats['new'] ?? 0) . '.',
         ];
+        $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['inspect_fediverse_object'])) {
         $fediverseInspectUrl = trim((string) ($_POST['fediverse_inspect_url'] ?? ''));
         $config = load_config_file();
@@ -10170,9 +10189,11 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => !empty($result['ok']) ? 'success' : 'danger',
             'message' => (string) ($result['message'] ?? ''),
         ];
-        if (!empty($result['ok'])) {
-            $fediverseMessageText = '';
-        }
+        $fediverseRedirect = true;
+        $fediverseRedirectState = [
+            'message_recipient' => $fediverseMessageRecipient,
+            'message_text' => !empty($result['ok']) ? '' : $messageText,
+        ];
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_fediverse_private_reply'])) {
         $recipientId = trim((string) ($_POST['fediverse_message_actor_id'] ?? ''));
         $messageText = trim((string) ($_POST['fediverse_private_reply_text'] ?? ''));
@@ -10184,6 +10205,11 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => !empty($result['ok']) ? 'success' : 'danger',
             'message' => (string) ($result['message'] ?? ''),
         ];
+        $fediverseRedirect = true;
+        $fediverseRedirectState = [
+            'message_recipient' => $fediverseMessageRecipient,
+            'message_text' => !empty($result['ok']) ? '' : $messageText,
+        ];
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_like_item'])) {
         $recipientId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
         $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
@@ -10193,6 +10219,7 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => !empty($result['ok']) ? 'success' : 'danger',
             'message' => (string) ($result['message'] ?? ''),
         ];
+        $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_boost_item'])) {
         $recipientId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
         $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
@@ -10234,6 +10261,7 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => !empty($result['ok']) ? 'success' : 'danger',
             'message' => (string) ($result['message'] ?? ''),
         ];
+        $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_reply_item'])) {
         $recipientId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
         $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
@@ -10267,6 +10295,7 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => !empty($result['ok']) ? 'success' : 'danger',
             'message' => (string) ($result['message'] ?? ''),
         ];
+        $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_delete_local_item'])) {
         $itemId = trim((string) ($_POST['fediverse_local_item_id'] ?? ''));
         $config = load_config_file();
@@ -10275,6 +10304,7 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => !empty($result['ok']) ? 'success' : 'danger',
             'message' => (string) ($result['message'] ?? ''),
         ];
+        $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_delete_reply_item'])) {
         $replyActionId = trim((string) ($_POST['fediverse_reply_action_id'] ?? ''));
         $config = load_config_file();
@@ -10283,6 +10313,7 @@ if ($isLoggedIn && $page === 'fediverso') {
             'type' => !empty($result['ok']) ? 'success' : 'danger',
             'message' => (string) ($result['message'] ?? ''),
         ];
+        $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_share_note'])) {
         if (!function_exists('nammu_actuality_add_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
             require_once __DIR__ . '/core/actualidad.php';
@@ -10304,6 +10335,7 @@ if ($isLoggedIn && $page === 'fediverso') {
                 'type' => 'danger',
                 'message' => 'No se pudo crear la nota compartida.',
             ];
+            $fediverseRedirect = true;
         } else {
             nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle);
             if (function_exists('nammu_actuality_rebuild_snapshot')) {
@@ -10317,7 +10349,25 @@ if ($isLoggedIn && $page === 'fediverso') {
                 'type' => 'success',
                 'message' => 'Nota compartida. Entregas federadas: ' . (int) ($deliveryStats['delivered'] ?? 0) . '.',
             ];
+            $fediverseRedirect = true;
         }
+    }
+    if ($fediverseRedirect) {
+        $_SESSION['fediverse_feedback'] = $fediverseFeedback;
+        $_SESSION['fediverse_state'] = $fediverseRedirectState;
+        $redirectTab = strtolower(trim((string) ($_POST['fediverse_tab'] ?? ($_GET['tab'] ?? 'home'))));
+        if (!in_array($redirectTab, ['home', 'notifications', 'messages', 'network', 'settings'], true)) {
+            $redirectTab = 'home';
+        }
+        $redirectUrl = 'admin.php?page=fediverso&tab=' . rawurlencode($redirectTab);
+        if ($redirectTab === 'home') {
+            $timelinePage = max(1, (int) ($_POST['timeline_page'] ?? ($_GET['timeline_page'] ?? 1)));
+            if ($timelinePage > 1) {
+                $redirectUrl .= '&timeline_page=' . $timelinePage;
+            }
+        }
+        header('Location: ' . $redirectUrl);
+        exit;
     }
 }
 $isItineraryAdminPage = in_array($page, ['itinerarios', 'itinerario', 'itinerario-tema'], true);

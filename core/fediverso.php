@@ -1469,6 +1469,7 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
         'activity_id' => $activityId !== '' ? $activityId : $id,
         'object_id' => $objectId !== '' ? $objectId : $id,
         'url' => $url !== '' ? $url : $id,
+        'target_url' => trim((string) ($object['inReplyTo'] ?? '')),
         'title' => $name,
         'content' => $content,
         'content_html' => $contentHtml,
@@ -2163,6 +2164,58 @@ function nammu_fediverse_outgoing_public_reply_message_entries(array $config): a
             'delivery_status' => 'delivered',
             'visibility' => 'public',
             'reply_target_url' => trim((string) ($item['object_url'] ?? '')),
+        ];
+    }
+    return $messages;
+}
+
+function nammu_fediverse_remote_thread_root_message_entries(array $config): array
+{
+    $timelineItems = nammu_fediverse_timeline_store()['items'];
+    $timelineIndex = [];
+    foreach ($timelineItems as $timelineItem) {
+        if (!is_array($timelineItem)) {
+            continue;
+        }
+        foreach (['id', 'object_id', 'url'] as $field) {
+            $value = trim((string) ($timelineItem[$field] ?? ''));
+            if ($value !== '') {
+                $timelineIndex[$value] = $timelineItem;
+            }
+        }
+    }
+
+    $messages = [];
+    $seen = [];
+    foreach (nammu_fediverse_outgoing_public_reply_message_entries($config) as $message) {
+        $target = trim((string) ($message['reply_target_url'] ?? ''));
+        $actorId = trim((string) ($message['actor_id'] ?? ''));
+        if ($target === '' || $actorId === '' || !isset($timelineIndex[$target])) {
+            continue;
+        }
+        $rootItem = $timelineIndex[$target];
+        $key = $actorId . '|' . $target;
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+        $messages[] = [
+            'id' => 'remote-root-' . substr(sha1($key), 0, 24),
+            'activity_id' => '',
+            'actor_id' => $actorId,
+            'actor_name' => trim((string) (($rootItem['actor_name'] ?? '') ?: '')),
+            'actor_icon' => trim((string) (($rootItem['actor_icon'] ?? '') ?: '')),
+            'direction' => 'incoming',
+            'content' => trim((string) (($rootItem['content'] ?? '') ?: ($rootItem['title'] ?? ''))),
+            'published' => trim((string) ($rootItem['published'] ?? '')),
+            'url' => trim((string) (($rootItem['url'] ?? '') ?: ($rootItem['id'] ?? ''))),
+            'delivery_status' => '',
+            'verified' => true,
+            'visibility' => 'public',
+            'reply_target_url' => $target,
+            'is_thread_root' => true,
+            'content_type' => trim((string) ($rootItem['type'] ?? '')),
+            'title' => trim((string) ($rootItem['title'] ?? '')),
         ];
     }
     return $messages;
@@ -2888,6 +2941,45 @@ function nammu_fediverse_grouped_messages(): array
         $publishedA = (string) (($a[0]['published'] ?? '') ?: '');
         $publishedB = (string) (($b[0]['published'] ?? '') ?: '');
         return strcmp($publishedB, $publishedA);
+    });
+    return $groups;
+}
+
+function nammu_fediverse_thread_grouped_messages(array $messages): array
+{
+    $groups = [];
+    foreach ($messages as $message) {
+        if (!is_array($message)) {
+            continue;
+        }
+        $visibility = strtolower(trim((string) ($message['visibility'] ?? 'private')));
+        $threadKey = '';
+        if ($visibility === 'public') {
+            $threadKey = trim((string) ($message['reply_target_url'] ?? ''));
+            if ($threadKey === '') {
+                $threadKey = 'public:' . trim((string) (($message['actor_id'] ?? '') ?: ($message['id'] ?? '')));
+            }
+        } else {
+            $threadKey = 'private:' . trim((string) ($message['actor_id'] ?? ''));
+        }
+        if ($threadKey === '') {
+            continue;
+        }
+        if (!isset($groups[$threadKey])) {
+            $groups[$threadKey] = [];
+        }
+        $groups[$threadKey][] = $message;
+    }
+    foreach ($groups as &$threadMessages) {
+        usort($threadMessages, static function (array $a, array $b): int {
+            return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
+        });
+    }
+    unset($threadMessages);
+    uasort($groups, static function (array $a, array $b): int {
+        $lastA = (string) (($a[count($a) - 1]['published'] ?? '') ?: '');
+        $lastB = (string) (($b[count($b) - 1]['published'] ?? '') ?: '');
+        return strcmp($lastB, $lastA);
     });
     return $groups;
 }

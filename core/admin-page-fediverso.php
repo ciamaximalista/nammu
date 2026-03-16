@@ -179,8 +179,18 @@
     $fediverseTimelineDisplay = [];
     foreach ($fediverseTimeline as $fediverseTimelineItem) {
         $fediverseTimelineType = strtolower(trim((string) ($fediverseTimelineItem['type'] ?? '')));
-        if (in_array($fediverseTimelineType, ['like', 'announce', 'delete'], true)) {
+        if (in_array($fediverseTimelineType, ['like', 'delete'], true)) {
             continue;
+        }
+        if ($fediverseTimelineType === 'announce') {
+            $announceHasContent = trim((string) ($fediverseTimelineItem['content'] ?? '')) !== ''
+                || trim((string) ($fediverseTimelineItem['content_html'] ?? '')) !== ''
+                || trim((string) ($fediverseTimelineItem['title'] ?? '')) !== ''
+                || trim((string) ($fediverseTimelineItem['image'] ?? '')) !== ''
+                || !empty($fediverseTimelineItem['attachments']);
+            if (!$announceHasContent) {
+                continue;
+            }
         }
         $fediverseTimelineIdentifiers = [];
         foreach (['id', 'object_id', 'url'] as $fediverseTimelineField) {

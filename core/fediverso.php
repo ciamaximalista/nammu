@@ -2245,6 +2245,83 @@ function nammu_fediverse_outgoing_public_reply_message_entries(array $config): a
     return $messages;
 }
 
+function nammu_fediverse_remote_public_reply_message_entries(array $config): array
+{
+    $timelineItems = nammu_fediverse_timeline_store()['items'];
+    $timelineIndex = [];
+    foreach ($timelineItems as $timelineItem) {
+        if (!is_array($timelineItem)) {
+            continue;
+        }
+        foreach (['id', 'object_id', 'url'] as $field) {
+            $value = trim((string) ($timelineItem[$field] ?? ''));
+            if ($value !== '') {
+                $timelineIndex[$value] = $timelineItem;
+            }
+        }
+    }
+
+    $messages = [];
+    $seen = [];
+    foreach (nammu_fediverse_outgoing_public_reply_message_entries($config) as $message) {
+        $target = trim((string) ($message['reply_target_url'] ?? ''));
+        if ($target === '' || !isset($timelineIndex[$target])) {
+            continue;
+        }
+        $rootItem = $timelineIndex[$target];
+        $replies = function_exists('nammu_fediverse_cached_remote_replies_for_item')
+            ? nammu_fediverse_cached_remote_replies_for_item($rootItem, $config)
+            : [];
+        foreach ($replies as $reply) {
+            if (!is_array($reply)) {
+                continue;
+            }
+            $replyId = trim((string) ($reply['id'] ?? ''));
+            $replyUrl = trim((string) ($reply['url'] ?? ''));
+            $replyNoteId = trim((string) ($reply['note_id'] ?? ''));
+            $replyFallback = strtolower(trim((string) ($reply['actor_id'] ?? ''))) . '|' .
+                trim((string) ($reply['published'] ?? '')) . '|' .
+                trim((string) ($reply['reply_text'] ?? ''));
+            $replyKeys = array_filter([
+                $replyId !== '' ? 'id:' . $replyId : '',
+                $replyUrl !== '' ? 'url:' . $replyUrl : '',
+                $replyNoteId !== '' ? 'note:' . $replyNoteId : '',
+                $replyFallback !== '||' ? 'fallback:' . $replyFallback : '',
+            ]);
+            $alreadySeen = false;
+            foreach ($replyKeys as $replyKey) {
+                if (isset($seen[$target][$replyKey])) {
+                    $alreadySeen = true;
+                    break;
+                }
+            }
+            if ($alreadySeen) {
+                continue;
+            }
+            foreach ($replyKeys as $replyKey) {
+                $seen[$target][$replyKey] = true;
+            }
+            $messages[] = [
+                'id' => $replyId,
+                'activity_id' => '',
+                'actor_id' => trim((string) ($reply['actor_id'] ?? '')),
+                'actor_name' => trim((string) ($reply['actor_name'] ?? ($reply['actor_id'] ?? ''))),
+                'actor_icon' => trim((string) ($reply['actor_icon'] ?? '')),
+                'direction' => 'incoming',
+                'content' => trim((string) ($reply['reply_text'] ?? '')),
+                'published' => trim((string) ($reply['published'] ?? '')),
+                'url' => trim((string) (($reply['url'] ?? '') ?: ($reply['id'] ?? ''))),
+                'delivery_status' => '',
+                'verified' => !empty($reply['verified']),
+                'visibility' => 'public',
+                'reply_target_url' => $target,
+            ];
+        }
+    }
+
+    return $messages;
+}
+
 function nammu_fediverse_remote_thread_root_message_entries(array $config): array
 {
     $timelineItems = nammu_fediverse_timeline_store()['items'];

@@ -69,6 +69,9 @@
     $fediverseOutgoingPublicReplyMessages = $isFediverseMessagesTab && function_exists('nammu_fediverse_outgoing_public_reply_message_entries')
         ? nammu_fediverse_outgoing_public_reply_message_entries($fediverseConfig)
         : [];
+    $fediverseRemotePublicReplyMessages = $isFediverseMessagesTab && function_exists('nammu_fediverse_remote_public_reply_message_entries')
+        ? nammu_fediverse_remote_public_reply_message_entries($fediverseConfig)
+        : [];
     $fediversePublicThreadRootMessages = $isFediverseMessagesTab && function_exists('nammu_fediverse_public_thread_root_message_entries')
         ? nammu_fediverse_public_thread_root_message_entries($fediverseConfig)
         : [];
@@ -137,6 +140,7 @@
     foreach (array_merge(
         $fediversePublicReplyMessages,
         $fediverseOutgoingPublicReplyMessages,
+        $fediverseRemotePublicReplyMessages,
         $fediversePublicThreadRootMessages,
         $fediverseRemoteThreadRootMessages
     ) as $publicConversationMessage) {

@@ -131,6 +131,14 @@
     }
     unset($fediverseMessageGroup);
     $fediverseLocalItems = function_exists('nammu_fediverse_local_content_items') ? nammu_fediverse_local_content_items($fediverseConfig) : [];
+    if (function_exists('nammu_fediverse_actions_store') && function_exists('nammu_fediverse_resend_item_from_action')) {
+        foreach (nammu_fediverse_actions_store()['items'] as $fediverseAction) {
+            $fediverseResendItem = nammu_fediverse_resend_item_from_action($fediverseAction);
+            if (is_array($fediverseResendItem)) {
+                $fediverseLocalItems[] = $fediverseResendItem;
+            }
+        }
+    }
     $fediverseLocalReactionSummary = function_exists('nammu_fediverse_local_reaction_summary') ? nammu_fediverse_local_reaction_summary($fediverseConfig) : [];
     $fediverseIncomingReplies = function_exists('nammu_fediverse_incoming_public_replies_by_object') ? nammu_fediverse_incoming_public_replies_by_object($fediverseConfig) : [];
     $fediverseIncomingReplyIds = [];

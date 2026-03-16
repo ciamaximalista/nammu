@@ -801,35 +801,63 @@ function nammu_fediverse_public_action_activities(array $config): array
     $activities = [];
     foreach ($actions as $action) {
         $type = strtolower(trim((string) ($action['type'] ?? '')));
-        if ($type !== 'boost') {
+        if ($type === 'boost') {
+            $objectUrl = trim((string) ($action['object_url'] ?? ''));
+            if ($objectUrl === '') {
+                continue;
+            }
+            $published = trim((string) ($action['published'] ?? ''));
+            if ($published === '') {
+                $published = gmdate(DATE_ATOM);
+            }
+            $activityId = trim((string) ($action['activity_id'] ?? ''));
+            if ($activityId === '') {
+                $activityId = $actorUrl . '/announces/' . trim((string) ($action['id'] ?? substr(sha1($objectUrl . '|' . $published), 0, 24)));
+            }
+            $activities[] = [
+                '@context' => 'https://www.w3.org/ns/activitystreams',
+                'id' => $activityId,
+                'type' => 'Announce',
+                'actor' => $actorUrl,
+                'object' => $objectUrl,
+                'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+                'published' => $published,
+            ];
             continue;
         }
-        $objectUrl = trim((string) ($action['object_url'] ?? ''));
-        if ($objectUrl === '') {
-            continue;
+        if ($type === 'resend') {
+            $resendItem = nammu_fediverse_resend_item_from_action($action);
+            if (is_array($resendItem)) {
+                $activities[] = nammu_fediverse_activity_for_local_item($resendItem, $config);
+            }
         }
-        $published = trim((string) ($action['published'] ?? ''));
-        if ($published === '') {
-            $published = gmdate(DATE_ATOM);
-        }
-        $activityId = trim((string) ($action['activity_id'] ?? ''));
-        if ($activityId === '') {
-            $activityId = $actorUrl . '/announces/' . trim((string) ($action['id'] ?? substr(sha1($objectUrl . '|' . $published), 0, 24)));
-        }
-        $activities[] = [
-            '@context' => 'https://www.w3.org/ns/activitystreams',
-            'id' => $activityId,
-            'type' => 'Announce',
-            'actor' => $actorUrl,
-            'object' => $objectUrl,
-            'to' => ['https://www.w3.org/ns/activitystreams#Public'],
-            'published' => $published,
-        ];
     }
     usort($activities, static function (array $a, array $b): int {
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });
     return $activities;
+}
+
+function nammu_fediverse_resend_item_from_action(array $action): ?array
+{
+    if (strtolower(trim((string) ($action['type'] ?? ''))) !== 'resend') {
+        return null;
+    }
+    $objectId = trim((string) ($action['resend_object_id'] ?? ''));
+    $objectUrl = trim((string) ($action['object_url'] ?? ''));
+    if ($objectId === '' || $objectUrl === '') {
+        return null;
+    }
+    return [
+        'id' => $objectId,
+        'url' => $objectUrl,
+        'title' => trim((string) ($action['title'] ?? '')),
+        'content' => trim((string) ($action['content'] ?? '')),
+        'summary' => trim((string) ($action['summary'] ?? '')),
+        'published' => trim((string) ($action['published'] ?? gmdate(DATE_ATOM))),
+        'type' => trim((string) ($action['object_type'] ?? 'Article')) ?: 'Article',
+        'image' => trim((string) ($action['image'] ?? '')),
+    ];
 }
 
 function nammu_fediverse_replies_for_item(array $item): array
@@ -1987,6 +2015,21 @@ function nammu_fediverse_object_document(string $routePath, array $config): ?arr
         }
         return $object;
     }
+    foreach (nammu_fediverse_actions_store()['items'] as $action) {
+        $resendItem = nammu_fediverse_resend_item_from_action($action);
+        if (!is_array($resendItem)) {
+            continue;
+        }
+        $itemPath = trim((string) (parse_url((string) ($resendItem['id'] ?? ''), PHP_URL_PATH) ?? ''));
+        if ($itemPath !== $routePath) {
+            continue;
+        }
+        $activity = nammu_fediverse_activity_for_local_item($resendItem, $config);
+        $object = is_array($activity['object'] ?? null) ? $activity['object'] : null;
+        if (is_array($object)) {
+            return $object;
+        }
+    }
     return null;
 }
 
@@ -2836,11 +2879,12 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
 
     $deliveryStore = nammu_fediverse_deliveries_store();
     $deliveryFollowers = is_array($deliveryStore['followers'] ?? null) ? $deliveryStore['followers'] : [];
-    $activity = nammu_fediverse_activity_for_local_item($matchedItem, $config);
-    $activity['id'] = rtrim((string) ($activity['id'] ?? ((string) ($matchedItem['id'] ?? '') . '/activity')), '/') . '/resend-' . gmdate('YmdHis');
-    if (is_array($activity['object'] ?? null)) {
-        $activity['object']['updated'] = gmdate(DATE_ATOM);
-    }
+    $resendPublished = gmdate(DATE_ATOM);
+    $resendId = nammu_fediverse_base_url($config) . '/ap/objects/resend-' . substr(sha1($slug . '|' . $template . '|' . microtime(true)), 0, 24);
+    $resendItem = $matchedItem;
+    $resendItem['id'] = $resendId;
+    $resendItem['published'] = $resendPublished;
+    $activity = nammu_fediverse_activity_for_local_item($resendItem, $config);
     $delivered = 0;
     foreach ($followers as $follower) {
         $followerId = trim((string) ($follower['id'] ?? ''));
@@ -2860,6 +2904,16 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
         $deliveryFollowers[$followerId] = $state;
     }
     nammu_fediverse_save_deliveries_store($deliveryFollowers);
+    nammu_fediverse_record_action('resend', '', (string) ($matchedItem['url'] ?? ''), [
+        'resend_object_id' => $resendId,
+        'activity_id' => (string) ($activity['id'] ?? ''),
+        'title' => trim((string) ($matchedItem['title'] ?? '')),
+        'content' => trim((string) ($matchedItem['content'] ?? '')),
+        'summary' => trim((string) ($matchedItem['summary'] ?? '')),
+        'image' => trim((string) ($matchedItem['image'] ?? '')),
+        'object_type' => trim((string) ($matchedItem['type'] ?? 'Article')),
+        'published' => $resendPublished,
+    ]);
 
     if ($delivered === 0) {
         return ['ok' => false, 'message' => 'No se pudo reenviar el contenido al Fediverso.'];

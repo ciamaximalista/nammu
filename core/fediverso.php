@@ -2303,6 +2303,44 @@ function nammu_fediverse_remove_timeline_items(array $identifiers): int
     return $before - count($timeline);
 }
 
+function nammu_fediverse_remove_inbox_activities(array $identifiers): int
+{
+    $identifiers = array_values(array_filter(array_map(static function ($value): string {
+        return trim((string) $value);
+    }, $identifiers)));
+    if (empty($identifiers)) {
+        return 0;
+    }
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
+    $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
+    $before = count($activities);
+    $activities = array_values(array_filter($activities, static function (array $entry) use ($identifiers): bool {
+        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        $object = $payload['object'] ?? null;
+        $candidates = [
+            trim((string) ($payload['id'] ?? '')),
+        ];
+        if (is_string($object)) {
+            $candidates[] = trim($object);
+        } elseif (is_array($object)) {
+            $candidates[] = trim((string) (($object['id'] ?? '') ?: ''));
+            $candidates[] = trim((string) (($object['url'] ?? '') ?: ''));
+            $candidates[] = trim((string) (($object['atomUri'] ?? '') ?: ''));
+        }
+        foreach ($candidates as $candidate) {
+            if ($candidate !== '' && in_array($candidate, $identifiers, true)) {
+                return false;
+            }
+        }
+        return true;
+    }));
+    if ($before !== count($activities)) {
+        $store['activities'] = $activities;
+        nammu_fediverse_save_json_store(nammu_fediverse_inbox_file(), $store);
+    }
+    return $before - count($activities);
+}
+
 function nammu_fediverse_followers_add_or_update(array $actor): void
 {
     $followers = nammu_fediverse_followers_store()['followers'];
@@ -2959,6 +2997,7 @@ function nammu_fediverse_handle_inbox_payload(array $payload, array $config, arr
             }
         }
         nammu_fediverse_remove_timeline_items($targets);
+        nammu_fediverse_remove_inbox_activities($targets);
         return ['accepted' => true, 'type' => 'delete', 'verified' => true];
     }
     if ($type === 'create' && is_array($payload['object'] ?? null)) {

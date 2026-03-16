@@ -945,6 +945,16 @@ function nammu_fediverse_replies_for_item(array $item): array
     return [];
 }
 
+function nammu_fediverse_reply_collection_hash(string $objectId): string
+{
+    return substr(sha1(trim($objectId)), 0, 24);
+}
+
+function nammu_fediverse_reply_collection_url(string $objectId, array $config): string
+{
+    return rtrim(nammu_fediverse_base_url($config), '/') . '/ap/replies/' . nammu_fediverse_reply_collection_hash($objectId);
+}
+
 function nammu_fediverse_public_replies_for_targets(array $targets): array
 {
     $repliesByObject = nammu_fediverse_public_replies_by_object();
@@ -2162,6 +2172,7 @@ function nammu_fediverse_object_document(string $routePath, array $config): ?arr
         if (trim((string) ($object['id'] ?? '')) === '') {
             $object['id'] = $baseUrl . $routePath;
         }
+        $object['replies'] = nammu_fediverse_reply_collection_url((string) $object['id'], $config);
         return $object;
     }
     foreach (nammu_fediverse_actions_store()['items'] as $action) {
@@ -2176,10 +2187,83 @@ function nammu_fediverse_object_document(string $routePath, array $config): ?arr
         $activity = nammu_fediverse_activity_for_local_item($resendItem, $config);
         $object = is_array($activity['object'] ?? null) ? $activity['object'] : null;
         if (is_array($object)) {
+            if (trim((string) ($object['id'] ?? '')) !== '') {
+                $object['replies'] = nammu_fediverse_reply_collection_url((string) $object['id'], $config);
+            }
             return $object;
         }
     }
     return null;
+}
+
+function nammu_fediverse_replies_collection_document(string $routePath, array $config): ?array
+{
+    $routePath = trim($routePath);
+    if (!preg_match('#^/ap/replies/([a-f0-9]{24})$#', $routePath, $matches)) {
+        return null;
+    }
+    $targetHash = trim((string) ($matches[1] ?? ''));
+    if ($targetHash === '') {
+        return null;
+    }
+    $targetItem = null;
+    foreach (nammu_fediverse_local_content_items($config) as $item) {
+        $itemId = trim((string) ($item['id'] ?? ''));
+        if ($itemId !== '' && nammu_fediverse_reply_collection_hash($itemId) === $targetHash) {
+            $targetItem = $item;
+            break;
+        }
+    }
+    if (!is_array($targetItem)) {
+        foreach (nammu_fediverse_actions_store()['items'] as $action) {
+            $resendItem = nammu_fediverse_resend_item_from_action($action);
+            if (!is_array($resendItem)) {
+                continue;
+            }
+            $itemId = trim((string) ($resendItem['id'] ?? ''));
+            if ($itemId !== '' && nammu_fediverse_reply_collection_hash($itemId) === $targetHash) {
+                $targetItem = $resendItem;
+                break;
+            }
+        }
+    }
+    if (!is_array($targetItem)) {
+        return null;
+    }
+    $targetIdentifiers = [];
+    foreach (['id', 'url'] as $field) {
+        $value = trim((string) ($targetItem[$field] ?? ''));
+        if ($value !== '') {
+            $targetIdentifiers[] = $value;
+        }
+    }
+    $replyObjects = [];
+    foreach (nammu_fediverse_incoming_public_replies_by_object($config) as $localId => $replies) {
+        foreach ((array) $replies as $reply) {
+            if (!in_array(trim((string) ($reply['target_url'] ?? '')), $targetIdentifiers, true)) {
+                continue;
+            }
+            $replyObjects[] = [
+                'id' => trim((string) ($reply['id'] ?? '')),
+                'type' => 'Note',
+                'attributedTo' => trim((string) ($reply['actor_id'] ?? '')),
+                'content' => nl2br(htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')),
+                'published' => trim((string) ($reply['published'] ?? '')),
+                'url' => trim((string) ($reply['url'] ?? '')),
+                'inReplyTo' => trim((string) ($reply['target_url'] ?? '')),
+            ];
+        }
+    }
+    usort($replyObjects, static function (array $a, array $b): int {
+        return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
+    });
+    return [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => rtrim(nammu_fediverse_base_url($config), '/') . $routePath,
+        'type' => 'OrderedCollection',
+        'totalItems' => count($replyObjects),
+        'orderedItems' => $replyObjects,
+    ];
 }
 
 function nammu_fediverse_store_inbox_activity(array $payload, array $meta = []): void

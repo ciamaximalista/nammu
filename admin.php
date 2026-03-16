@@ -7547,6 +7547,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'linkedin' => 'LinkedIn',
             'bluesky' => 'Bluesky',
             'instagram' => 'Instagram',
+            'fediverse' => 'Fediverso',
         ];
         if (!isset($networkLabels[$networkKey])) {
             $_SESSION['social_feedback'] = ['type' => 'danger', 'message' => 'Red social no válida.'];
@@ -7571,6 +7572,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $image = $metadata['Image'] ?? '';
                     $imageUrl = admin_public_asset_url((string) $image);
                     $customUrl = '';
+                    if ($networkKey === 'fediverse') {
+                        if (!function_exists('nammu_fediverse_deliver_named_local_item') && is_file(__DIR__ . '/core/fediverso.php')) {
+                            require_once __DIR__ . '/core/fediverso.php';
+                        }
+                        if (!function_exists('nammu_fediverse_deliver_named_local_item')) {
+                            $feedback['message'] = 'La integración con Fediverso no está disponible en esta instalación.';
+                            $_SESSION['social_feedback'] = $feedback;
+                            header('Location: admin.php?page=edit&template=' . $redirectTemplate);
+                            exit;
+                        }
+                        $fediverseResult = nammu_fediverse_deliver_named_local_item($slug, $template, load_config_file());
+                        $feedback = [
+                            'type' => !empty($fediverseResult['ok']) ? 'success' : 'danger',
+                            'message' => (string) ($fediverseResult['message'] ?? 'No se pudo reenviar el contenido al Fediverso.'),
+                        ];
+                        $_SESSION['social_feedback'] = $feedback;
+                        header('Location: admin.php?page=edit&template=' . $redirectTemplate);
+                        exit;
+                    }
                     if ($template === 'podcast') {
                         $customUrl = admin_public_podcast_url($slug);
                         $imagePath = (string) ($metadata['Image'] ?? '');

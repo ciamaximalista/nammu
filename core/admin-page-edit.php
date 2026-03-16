@@ -79,6 +79,7 @@ unset($_SESSION['newsletter_custom_recipients']);
             'linkedin' => $settings['linkedin'] ?? [],
             'bluesky' => $settings['bluesky'] ?? [],
             'instagram' => $settings['instagram'] ?? [],
+            'fediverse' => [],
         ];
         $networkLabels = [
             'telegram' => 'Telegram',
@@ -87,6 +88,7 @@ unset($_SESSION['newsletter_custom_recipients']);
             'linkedin' => 'LinkedIn',
             'bluesky' => 'Bluesky',
             'instagram' => 'Instagram',
+            'fediverse' => 'Fediverso',
         ];
         $mailingReady = admin_is_mailing_ready($settings);
         $mailingSettings = $settings['mailing'] ?? (function_exists('get_settings') ? (get_settings()['mailing'] ?? []) : []);
@@ -328,10 +330,15 @@ unset($_SESSION['newsletter_custom_recipients']);
                             <?php
                             $availableNetworks = [];
                             foreach ($networkConfigs as $key => $cfg) {
+                                if ($key === 'fediverse') {
+                                    continue;
+                                }
                                 if (admin_is_social_network_configured($key, $cfg)) {
                                     $availableNetworks[] = $key;
                                 }
                             }
+                            $showFediverseResend = in_array($templateFilter, ['single', 'podcast'], true)
+                                && (function_exists('nammu_fediverse_actor_url') || is_file(dirname(__DIR__) . '/core/fediverso.php'));
                             ?>
                             <?php if (in_array($templateFilter, ['single', 'draft', 'podcast'], true)): ?>
                                 <?php foreach ($availableNetworks as $networkKey): ?>
@@ -344,6 +351,16 @@ unset($_SESSION['newsletter_custom_recipients']);
                                         </button>
                                     </form>
                                 <?php endforeach; ?>
+                                <?php if ($showFediverseResend): ?>
+                                    <form method="post" class="d-inline-block mb-1">
+                                        <input type="hidden" name="social_network" value="fediverse">
+                                        <input type="hidden" name="social_filename" value="<?= htmlspecialchars($post['filename'], ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="social_template" value="<?= htmlspecialchars($templateFilter, ENT_QUOTES, 'UTF-8') ?>">
+                                        <button type="submit" name="send_social_post" class="btn btn-sm btn-outline-primary">
+                                            Fediverso
+                                        </button>
+                                    </form>
+                                <?php endif; ?>
                                 <?php if ($mailingReady): ?>
                                     <form method="post" class="d-inline-block mb-1">
                                         <input type="hidden" name="mailing_filename" value="<?= htmlspecialchars($post['filename'], ENT_QUOTES, 'UTF-8') ?>">
@@ -351,7 +368,7 @@ unset($_SESSION['newsletter_custom_recipients']);
                                         <button type="submit" name="send_mailing_post" class="btn btn-sm btn-outline-success">Lista</button>
                                     </form>
                                 <?php endif; ?>
-                                <?php if (empty($availableNetworks) && !$mailingReady): ?>
+                                <?php if (empty($availableNetworks) && !$mailingReady && !$showFediverseResend): ?>
                                     <span class="text-muted">—</span>
                                 <?php endif; ?>
                             <?php else: ?>

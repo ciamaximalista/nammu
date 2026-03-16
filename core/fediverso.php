@@ -1034,6 +1034,11 @@ function nammu_fediverse_reply_collection_url(string $objectId, array $config): 
     return rtrim(nammu_fediverse_base_url($config), '/') . '/ap/replies/' . nammu_fediverse_reply_collection_hash($objectId);
 }
 
+function nammu_fediverse_reply_collection_page_url(string $objectId, array $config): string
+{
+    return nammu_fediverse_reply_collection_url($objectId, $config) . '?page=true';
+}
+
 function nammu_fediverse_reply_collection_summary(string $objectId, array $config): array
 {
     $collectionUrl = nammu_fediverse_reply_collection_url($objectId, $config);
@@ -1069,9 +1074,9 @@ function nammu_fediverse_reply_collection_summary(string $objectId, array $confi
     }
     return [
         'id' => $collectionUrl,
-        'type' => 'Collection',
+        'type' => 'OrderedCollection',
         'totalItems' => count($replyIds),
-        'first' => $collectionUrl,
+        'first' => nammu_fediverse_reply_collection_page_url($objectId, $config),
     ];
 }
 
@@ -2429,12 +2434,25 @@ function nammu_fediverse_replies_collection_document(string $routePath, array $c
     usort($replyObjects, static function (array $a, array $b): int {
         return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
     });
+    $collectionUrl = rtrim(nammu_fediverse_base_url($config), '/') . $routePath;
+    $pageUrl = $collectionUrl . '?page=true';
+    $isPage = strtolower(trim((string) ($_GET['page'] ?? ''))) === 'true';
+    if ($isPage) {
+        return [
+            '@context' => 'https://www.w3.org/ns/activitystreams',
+            'id' => $pageUrl,
+            'type' => 'OrderedCollectionPage',
+            'partOf' => $collectionUrl,
+            'totalItems' => count($replyObjects),
+            'orderedItems' => $replyObjects,
+        ];
+    }
     return [
         '@context' => 'https://www.w3.org/ns/activitystreams',
-        'id' => rtrim(nammu_fediverse_base_url($config), '/') . $routePath,
+        'id' => $collectionUrl,
         'type' => 'OrderedCollection',
         'totalItems' => count($replyObjects),
-        'orderedItems' => $replyObjects,
+        'first' => $pageUrl,
     ];
 }
 

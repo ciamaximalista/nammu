@@ -279,14 +279,14 @@ function nammu_fediverse_signature_header(string $method, string $url, array $co
     return $result;
 }
 
-function nammu_fediverse_signed_fetch(string $url, array $config, string $method = 'GET', string $body = ''): array
+function nammu_fediverse_signed_fetch(string $url, array $config, string $method = 'GET', string $body = '', ?int $timeoutOverride = null): array
 {
     $method = strtoupper($method);
     $headers = nammu_fediverse_signature_header($method, $url, $config, $body) ?? [
         'User-Agent: Nammu Fediverso',
         'Accept: application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9',
     ];
-    $timeout = $method === 'POST' ? 6 : 15;
+    $timeout = $timeoutOverride ?? ($method === 'POST' ? 6 : 15);
     $context = stream_context_create([
         'http' => [
             'method' => $method,
@@ -3085,7 +3085,34 @@ function nammu_fediverse_post_activity_response(string $inboxUrl, array $activit
     if (!is_string($body) || $body === '') {
         return ['ok' => false, 'status' => 0, 'body' => '', 'message' => 'No se pudo serializar la actividad.'];
     }
-    $response = nammu_fediverse_signed_fetch($inboxUrl, $config, 'POST', $body);
+    $lastPhpError = null;
+    set_error_handler(static function (int $severity, string $message) use (&$lastPhpError): bool {
+        $lastPhpError = $message;
+        return false;
+    });
+    try {
+        $response = nammu_fediverse_signed_fetch($inboxUrl, $config, 'POST', $body);
+    } finally {
+        restore_error_handler();
+    }
+    if ((int) ($response['status'] ?? 0) === 0) {
+        $retryError = null;
+        set_error_handler(static function (int $severity, string $message) use (&$retryError): bool {
+            $retryError = $message;
+            return false;
+        });
+        try {
+            $retryResponse = nammu_fediverse_signed_fetch($inboxUrl, $config, 'POST', $body, 12);
+        } finally {
+            restore_error_handler();
+        }
+        if ((int) ($retryResponse['status'] ?? 0) > 0) {
+            $response = $retryResponse;
+            $lastPhpError = $retryError;
+        } elseif ($retryError !== null && $retryError !== '') {
+            $lastPhpError = $retryError;
+        }
+    }
     $status = (int) ($response['status'] ?? 0);
     $responseBody = trim((string) ($response['body'] ?? ''));
     if ($status >= 200 && $status < 300) {
@@ -3095,7 +3122,7 @@ function nammu_fediverse_post_activity_response(string $inboxUrl, array $activit
         'ok' => false,
         'status' => $status,
         'body' => $responseBody,
-        'message' => 'HTTP ' . $status . ($responseBody !== '' ? ': ' . $responseBody : ''),
+        'message' => 'HTTP ' . $status . ($responseBody !== '' ? ': ' . $responseBody : '') . ($lastPhpError ? ' (' . trim($lastPhpError) . ')' : ''),
     ];
 }
 

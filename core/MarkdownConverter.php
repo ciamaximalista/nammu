@@ -244,6 +244,15 @@ class MarkdownConverter
                 continue;
             }
 
+            $peerTubeEmbed = $this->extractPeerTubeEmbedData($trimmed);
+            if ($peerTubeEmbed !== null) {
+                $flushParagraph();
+                $closeAllLists();
+                $flushBlockquote();
+                $html[] = $this->renderPeerTubeEmbed($peerTubeEmbed['base'], $peerTubeEmbed['id'], $peerTubeEmbed['start']);
+                continue;
+            }
+
             if (preg_match('/^(#{1,6})\s+(.+)$/', $trimmed, $matches)) {
                 $flushParagraph();
                 $closeAllLists();
@@ -666,6 +675,70 @@ class MarkdownConverter
             $src .= '?start=' . $startSeconds;
         }
         return '<div class="embedded-video"><iframe src="' . $src . '" title="YouTube video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>';
+    }
+
+    private function extractPeerTubeEmbedData(string $line): ?array
+    {
+        $candidate = trim($line);
+        if ($candidate === '' || !preg_match('#^https?://#i', $candidate)) {
+            return null;
+        }
+
+        $parsed = parse_url($candidate);
+        if (!is_array($parsed)) {
+            return null;
+        }
+
+        $scheme = strtolower((string) ($parsed['scheme'] ?? ''));
+        $host = strtolower((string) ($parsed['host'] ?? ''));
+        $path = (string) ($parsed['path'] ?? '');
+        if ($scheme === '' || $host === '' || $path === '') {
+            return null;
+        }
+
+        $id = null;
+        if (preg_match('#^/videos/watch/([^/?#]+)#', $path, $matches)) {
+            $id = $matches[1];
+        } elseif (preg_match('#^/videos/embed/([^/?#]+)#', $path, $matches)) {
+            $id = $matches[1];
+        } elseif (preg_match('#^/w/([^/?#]+)#', $path, $matches)) {
+            $id = $matches[1];
+        }
+
+        if ($id === null || $id === '') {
+            return null;
+        }
+
+        $start = 0;
+        if (isset($parsed['query'])) {
+            parse_str($parsed['query'], $query);
+            $start = $this->parseYoutubeStartValue($query['start'] ?? $query['t'] ?? null);
+        }
+        if ($start <= 0 && isset($parsed['fragment'])) {
+            parse_str($parsed['fragment'], $fragmentQuery);
+            $fragmentValue = $fragmentQuery['start'] ?? $fragmentQuery['t'] ?? $parsed['fragment'];
+            $start = $this->parseYoutubeStartValue($fragmentValue);
+        }
+
+        $base = $scheme . '://' . $host;
+        if (isset($parsed['port']) && (int) $parsed['port'] > 0) {
+            $base .= ':' . (int) $parsed['port'];
+        }
+
+        return [
+            'base' => $base,
+            'id' => rawurlencode($id),
+            'start' => max(0, $start),
+        ];
+    }
+
+    private function renderPeerTubeEmbed(string $baseUrl, string $videoId, int $startSeconds = 0): string
+    {
+        $src = htmlspecialchars(rtrim($baseUrl, '/') . '/videos/embed/' . $videoId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        if ($startSeconds > 0) {
+            $src .= '?start=' . $startSeconds;
+        }
+        return '<div class="embedded-video"><iframe src="' . $src . '" title="PeerTube video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe></div>';
     }
 
     private function orderedListTypeForLevel(int $level): string

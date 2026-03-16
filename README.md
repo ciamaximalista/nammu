@@ -187,6 +187,7 @@ tar -xzf /var/www/html/<carpeta-publica>/backups/nammu-stats-backup-AAAA-MM-DD_H
 - Panel `admin.php` con sesión propia y creación del primer usuario en el onboarding.
 - Entradas, páginas, newsletters y podcasts en Markdown con front matter YAML.
 - Soporte para `[toc]`, tablas, superíndices, bloques de código, callouts y TOC automático configurable.
+- Incrustación automática de vídeos de YouTube y PeerTube pegando su URL, incluso en instancias PeerTube con dominio propio.
 - Borradores, publicación directa, paso a borrador y previsualización.
 - Publicaciones programadas con fecha y hora.
 - Entradas relacionadas en posts y podcasts, incluyendo páginas de itinerario.

@@ -697,11 +697,11 @@ class MarkdownConverter
         }
 
         $id = null;
-        if (preg_match('#^/videos/watch/([^/?#]+)#', $path, $matches)) {
+        if (preg_match('~^/videos/watch/([^/?#]+)~', $path, $matches)) {
             $id = $matches[1];
-        } elseif (preg_match('#^/videos/embed/([^/?#]+)#', $path, $matches)) {
+        } elseif (preg_match('~^/videos/embed/([^/?#]+)~', $path, $matches)) {
             $id = $matches[1];
-        } elseif (preg_match('#^/w/([^/?#]+)#', $path, $matches)) {
+        } elseif (preg_match('~^/w/([^/?#]+)~', $path, $matches)) {
             $id = $matches[1];
         }
 

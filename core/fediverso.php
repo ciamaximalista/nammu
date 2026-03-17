@@ -2399,6 +2399,36 @@ function nammu_fediverse_primary_local_item_by_url(string $url, array $config): 
     return null;
 }
 
+function nammu_fediverse_equivalent_local_items_by_url(string $url, array $config): array
+{
+    $url = trim($url);
+    if ($url === '') {
+        return [];
+    }
+    $items = [];
+    foreach (nammu_fediverse_local_content_items($config) as $item) {
+        if (trim((string) ($item['url'] ?? '')) === $url) {
+            $items[] = $item;
+        }
+    }
+    foreach (nammu_fediverse_actions_store()['items'] as $action) {
+        $resendItem = nammu_fediverse_resend_item_from_action($action);
+        if (!is_array($resendItem)) {
+            continue;
+        }
+        if (trim((string) ($resendItem['url'] ?? '')) === $url) {
+            $items[] = $resendItem;
+        }
+    }
+    $unique = [];
+    foreach ($items as $item) {
+        $itemId = trim((string) ($item['id'] ?? ''));
+        $key = $itemId !== '' ? $itemId : sha1(json_encode($item, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        $unique[$key] = $item;
+    }
+    return array_values($unique);
+}
+
 function nammu_fediverse_canonical_local_item(array $item, array $config): array
 {
     $url = trim((string) ($item['url'] ?? ''));
@@ -2429,6 +2459,12 @@ function nammu_fediverse_item_identifiers_with_canonical(array $item, array $con
     $canonicalItem = nammu_fediverse_canonical_local_item($item, $config);
     foreach (nammu_fediverse_item_identifiers($canonicalItem) as $identifier) {
         $identifiers[] = $identifier;
+    }
+    $url = trim((string) (($canonicalItem['url'] ?? '') ?: ($item['url'] ?? '')));
+    foreach (nammu_fediverse_equivalent_local_items_by_url($url, $config) as $equivalentItem) {
+        foreach (nammu_fediverse_item_identifiers($equivalentItem) as $identifier) {
+            $identifiers[] = $identifier;
+        }
     }
     return array_values(array_unique($identifiers));
 }

@@ -797,6 +797,15 @@
                                 <?php $itemReplies = function_exists('nammu_fediverse_replies_for_item') ? nammu_fediverse_replies_for_item($item) : []; ?>
                                 <?php $remoteItemReplies = function_exists('nammu_fediverse_cached_remote_replies_snapshot_for_item') ? nammu_fediverse_cached_remote_replies_snapshot_for_item($item) : []; ?>
                                 <?php
+                                $itemTargetIdentifiers = function_exists('nammu_fediverse_item_identifiers_with_canonical')
+                                    ? nammu_fediverse_item_identifiers_with_canonical($item, $fediverseConfig)
+                                    : array_values(array_filter([
+                                        trim((string) ($item['object_id'] ?? '')),
+                                        trim((string) ($item['url'] ?? '')),
+                                        trim((string) ($item['id'] ?? '')),
+                                    ]));
+                                ?>
+                                <?php
                                 $replyDedupKeys = [];
                                 $registerReplyKey = static function (array $reply) use (&$replyDedupKeys): void {
                                     $identityCandidates = array_filter([
@@ -818,11 +827,7 @@
                                     $registerReplyKey($existingReply);
                                 }
                                 $storedRemoteReplies = [];
-                                foreach (array_filter([
-                                    trim((string) ($item['object_id'] ?? '')),
-                                    trim((string) ($item['url'] ?? '')),
-                                    trim((string) ($item['id'] ?? '')),
-                                ]) as $itemReplyTargetIdentifier) {
+                                foreach ($itemTargetIdentifiers as $itemReplyTargetIdentifier) {
                                     foreach ((array) ($fediverseRemoteRepliesByTarget[$itemReplyTargetIdentifier] ?? []) as $storedRemoteReply) {
                                         $storedRemoteReplies[] = $storedRemoteReply;
                                     }
@@ -861,10 +866,30 @@
                                     return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
                                 });
                                 ?>
-                                <?php $remoteBoostMeta = $fediverseRemoteBoostSummary[$itemObjectId] ?? ['count' => 0]; ?>
-                                <?php $remoteBoostActors = $fediverseRemoteBoostDetails[$itemObjectId] ?? []; ?>
                                 <?php
-                                $remoteReplyMeta = $fediverseRemoteReplySummary[$itemObjectId] ?? ['count' => 0];
+                                $remoteBoostMeta = ['count' => 0];
+                                $remoteBoostActorMap = [];
+                                foreach ($itemTargetIdentifiers as $itemTargetIdentifier) {
+                                    $candidateMeta = $fediverseRemoteBoostSummary[$itemTargetIdentifier] ?? null;
+                                    if (is_array($candidateMeta)) {
+                                        $remoteBoostMeta['count'] = max($remoteBoostMeta['count'], (int) ($candidateMeta['count'] ?? 0));
+                                    }
+                                    foreach ((array) ($fediverseRemoteBoostDetails[$itemTargetIdentifier] ?? []) as $boostActor) {
+                                        if (!is_array($boostActor)) {
+                                            continue;
+                                        }
+                                        $boostActorId = trim((string) (($boostActor['id'] ?? '') ?: sha1(json_encode($boostActor, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE))));
+                                        $remoteBoostActorMap[$boostActorId] = $boostActor;
+                                    }
+                                }
+                                $remoteBoostActors = array_values($remoteBoostActorMap);
+                                $remoteReplyMeta = ['count' => 0];
+                                foreach ($itemTargetIdentifiers as $itemTargetIdentifier) {
+                                    $candidateMeta = $fediverseRemoteReplySummary[$itemTargetIdentifier] ?? null;
+                                    if (is_array($candidateMeta)) {
+                                        $remoteReplyMeta['count'] = max($remoteReplyMeta['count'], (int) ($candidateMeta['count'] ?? 0));
+                                    }
+                                }
                                 if (!empty($remoteItemReplies)) {
                                     $remoteReplyActors = [];
                                     foreach ($remoteItemReplies as $remoteItemReply) {

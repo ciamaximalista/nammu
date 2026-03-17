@@ -14,6 +14,23 @@ $threadPublished = trim((string) ($threadItem['published'] ?? ''));
 $fediverseLocalName = trim((string) ($fediverseLocalName ?? 'Blog'));
 $fediverseLocalHandle = trim((string) ($fediverseLocalHandle ?? ''));
 $fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
+$renderFediversePublicText = static function (string $text, string $className = ''): string {
+    $text = trim($text);
+    if ($text === '') {
+        return '';
+    }
+    $paragraphs = preg_split("/(?:\r?\n){2,}/", $text) ?: [];
+    $classAttr = $className !== '' ? ' class="' . htmlspecialchars($className, ENT_QUOTES, 'UTF-8') . '"' : '';
+    $html = '';
+    foreach ($paragraphs as $paragraph) {
+        $paragraph = trim($paragraph);
+        if ($paragraph === '') {
+            continue;
+        }
+        $html .= '<p' . $classAttr . '>' . nl2br(htmlspecialchars($paragraph, ENT_QUOTES, 'UTF-8')) . '</p>';
+    }
+    return $html;
+};
 ?>
 <style>
 .fediverse-public-page { max-width: 860px; margin: 0 auto; }
@@ -49,6 +66,8 @@ $fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
 .fediverse-public-status__card-body { padding: 1rem; }
 .fediverse-public-status__card-title { display: block; font-weight: 700; margin-bottom: .45rem; }
 .fediverse-public-status__card-description { display: block; color: rgba(0,0,0,.7); line-height: 1.5; }
+.fediverse-public-status__card-description p { margin: 0 0 .7rem; }
+.fediverse-public-status__card-description p:last-child { margin-bottom: 0; }
 .fediverse-public-status__footer { margin-top: .9rem; display: flex; flex-wrap: wrap; gap: .6rem 1rem; font-size: .95rem; }
 .fediverse-public-status__metrics { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: .65rem; }
 .fediverse-public-status__metrics span { background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 999px; padding: .38rem .7rem; font-size: .92rem; }
@@ -116,9 +135,9 @@ $fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
                         <div class="fediverse-public-status__card-body">
                             <span class="fediverse-public-status__card-title"><?= htmlspecialchars((string) ($threadTitle !== '' ? $threadTitle : $threadOriginalUrl), ENT_QUOTES, 'UTF-8') ?></span>
                             <?php if ($threadSummaryText !== ''): ?>
-                                <span class="fediverse-public-status__card-description"><?= htmlspecialchars($threadSummaryText, ENT_QUOTES, 'UTF-8') ?></span>
+                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadSummaryText) ?></div>
                             <?php elseif ($threadContent !== ''): ?>
-                                <span class="fediverse-public-status__card-description"><?= htmlspecialchars($threadContent, ENT_QUOTES, 'UTF-8') ?></span>
+                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadContent) ?></div>
                             <?php endif; ?>
                         </div>
                     </a>

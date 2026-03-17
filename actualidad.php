@@ -139,7 +139,7 @@ $content = $renderer->render('actuality', [
     'hasActuality' => function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($configData) : !empty($feeds),
 ]);
 
-$pageTitle = 'Actualidad';
+$pageTitle = 'Fediverso';
 $pageDescription = (function_exists('nammu_actuality_has_content') && nammu_actuality_has_content($configData))
     ? 'Actualidad agregada desde las fuentes RSS configuradas y notas manuales del sitio.'
     : 'No hay contenido de actualidad configurado todavía.';

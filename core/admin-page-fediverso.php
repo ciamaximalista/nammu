@@ -312,17 +312,22 @@
     $fediverseTimelineEntries = [];
     foreach ($fediverseLocalItems as $fediverseLocalItem) {
         $fediverseLocalId = trim((string) ($fediverseLocalItem['id'] ?? ''));
-        $fediverseLocalItemSummary = is_array($fediverseLocalReactionSummary[$fediverseLocalId] ?? null)
-            ? $fediverseLocalReactionSummary[$fediverseLocalId]
-            : [];
-        $fediverseLocalActivityPriority = 0;
-        if ((int) ($fediverseLocalItemSummary['replies'] ?? 0) > 0 || (int) ($fediverseLocalItemSummary['shares'] ?? 0) > 0) {
-            $fediverseLocalActivityPriority = 1;
+        $fediverseLocalSortKey = (string) ($fediverseLocalItem['published'] ?? '');
+        $fediverseLocalDetail = is_array($fediverseLocalReactionDetails[$fediverseLocalId] ?? null)
+            ? $fediverseLocalReactionDetails[$fediverseLocalId]
+            : ['shares' => [], 'replies' => []];
+        foreach (['shares', 'replies'] as $fediverseLocalBucket) {
+            foreach ((array) ($fediverseLocalDetail[$fediverseLocalBucket] ?? []) as $fediverseLocalActivityEntry) {
+                $fediverseActivityPublished = trim((string) ($fediverseLocalActivityEntry['published'] ?? ''));
+                if ($fediverseActivityPublished !== '' && strcmp($fediverseActivityPublished, $fediverseLocalSortKey) > 0) {
+                    $fediverseLocalSortKey = $fediverseActivityPublished;
+                }
+            }
         }
         $fediverseTimelineEntries[] = [
             'kind' => 'local',
             'published' => (string) ($fediverseLocalItem['published'] ?? ''),
-            'priority' => $fediverseLocalActivityPriority,
+            'sort_key' => $fediverseLocalSortKey,
             'item' => $fediverseLocalItem,
         ];
     }
@@ -473,14 +478,14 @@
         $fediverseTimelineEntries[] = [
             'kind' => 'remote',
             'published' => (string) ($fediverseTimelineItem['published'] ?? ''),
-            'priority' => 0,
+            'sort_key' => (string) ($fediverseTimelineItem['published'] ?? ''),
             'item' => $fediverseTimelineItem,
         ];
     }
     usort($fediverseTimelineEntries, static function (array $a, array $b): int {
-        $priorityCompare = ((int) ($b['priority'] ?? 0)) <=> ((int) ($a['priority'] ?? 0));
-        if ($priorityCompare !== 0) {
-            return $priorityCompare;
+        $sortCompare = strcmp((string) ($b['sort_key'] ?? ''), (string) ($a['sort_key'] ?? ''));
+        if ($sortCompare !== 0) {
+            return $sortCompare;
         }
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });

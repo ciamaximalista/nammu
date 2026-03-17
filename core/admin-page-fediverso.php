@@ -154,6 +154,21 @@
         }
         return $actorId;
     };
+    $fediverseFormatDate = static function (?string $value): string {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return '';
+        }
+        if (function_exists('nammu_format_date_spanish')) {
+            try {
+                $date = new DateTimeImmutable($value);
+                $dateLabel = nammu_format_date_spanish($date, $value);
+                return trim($dateLabel . ' · ' . $date->format('H:i'));
+            } catch (Throwable $exception) {
+            }
+        }
+        return $value;
+    };
     $fediverseKnownActors = ($isFediverseHomeTab || $isFediverseNotificationsTab || $isFediverseMessagesTab)
         && $fediverseNeedsLivePanel
         && function_exists('nammu_fediverse_known_actors')
@@ -584,39 +599,40 @@
                                 $localId = trim((string) ($localItem['id'] ?? ''));
                                 if ($localId === '') { continue; }
                                 $localAnchor = 'local-' . substr(sha1($localId), 0, 12);
-                                $localSummary = $fediverseLocalReactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0];
-                                $localReactionDetails = $fediverseLocalReactionDetails[$localId] ?? ['likes' => [], 'shares' => [], 'replies' => []];
-                                $localReplyTargets = [];
-                                foreach (['id', 'url'] as $localReplyField) {
-                                    $localReplyValue = trim((string) ($localItem[$localReplyField] ?? ''));
-                                    if ($localReplyValue !== '') {
-                                        $localReplyTargets[] = $localReplyValue;
-                                    }
-                                }
-                                $incomingReplies = is_array($fediverseIncomingReplies[$localId] ?? null) ? $fediverseIncomingReplies[$localId] : [];
-                                foreach ($incomingReplies as $incomingReply) {
-                                    foreach (['id', 'url'] as $incomingReplyField) {
-                                        $incomingReplyValue = trim((string) ($incomingReply[$incomingReplyField] ?? ''));
-                                        if ($incomingReplyValue !== '') {
-                                            $localReplyTargets[] = $incomingReplyValue;
-                                        }
-                                    }
-                                }
-                                $localReplies = function_exists('nammu_fediverse_public_replies_for_targets') ? nammu_fediverse_public_replies_for_targets($localReplyTargets) : [];
+                                $localThreadPayload = function_exists('nammu_fediverse_thread_page_payload')
+                                    ? nammu_fediverse_thread_page_payload($localItem, $fediverseConfig)
+                                    : ['summary' => [], 'details' => [], 'replies' => []];
+                                $localSummary = is_array($localThreadPayload['summary'] ?? null)
+                                    ? $localThreadPayload['summary']
+                                    : ($fediverseLocalReactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0]);
+                                $localReactionDetails = is_array($localThreadPayload['details'] ?? null)
+                                    ? $localThreadPayload['details']
+                                    : ($fediverseLocalReactionDetails[$localId] ?? ['likes' => [], 'shares' => [], 'replies' => []]);
                                 $threadReplies = [];
-                                foreach ($localReplies as $reply) {
+                                foreach ((array) ($localThreadPayload['replies'] ?? []) as $reply) {
+                                    if (!is_array($reply)) {
+                                        continue;
+                                    }
+                                    $replySource = (string) ($reply['source'] ?? 'local');
+                                    $replyActorId = trim((string) ($reply['actor_id'] ?? ''));
+                                    $replyActorHandle = $replySource === 'local'
+                                        ? $fediverseLocalHandle
+                                        : $fediverseActorHandleFor([
+                                            'actor_id' => $replyActorId,
+                                            'actor_username' => trim((string) ($reply['actor_username'] ?? '')),
+                                        ]);
                                     $threadReplies[] = [
                                         'id' => (string) ($reply['id'] ?? ''),
+                                        'url' => (string) ($reply['url'] ?? ''),
+                                        'target_url' => (string) ($reply['target_url'] ?? $localId),
                                         'published' => (string) ($reply['published'] ?? ''),
                                         'reply_text' => (string) ($reply['reply_text'] ?? ''),
-                                        'actor_name' => $fediverseLocalName,
-                                        'actor_handle' => $fediverseLocalHandle,
-                                        'actor_icon' => $fediverseLocalAvatar,
-                                        'source' => 'local',
+                                        'actor_id' => $replyActorId,
+                                        'actor_name' => (string) (($reply['actor_name'] ?? '') ?: ($replySource === 'local' ? $fediverseLocalName : 'Actor remoto')),
+                                        'actor_handle' => $replyActorHandle,
+                                        'actor_icon' => (string) (($reply['actor_icon'] ?? '') ?: ($replySource === 'local' ? $fediverseLocalAvatar : '')),
+                                        'source' => $replySource,
                                     ];
-                                }
-                                foreach ($incomingReplies as $reply) {
-                                    $threadReplies[] = $reply;
                                 }
                                 usort($threadReplies, static function (array $a, array $b): int {
                                     return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
@@ -641,7 +657,7 @@
                                                 <span class="fediverse-status__handle"><?= htmlspecialchars($fediverseLocalHandle, ENT_QUOTES, 'UTF-8') ?></span>
                                             </div>
                                             <div class="fediverse-status__meta">
-                                                <time datetime="<?= htmlspecialchars((string) ($localItem['published'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) ($localItem['published'] ?? ''), ENT_QUOTES, 'UTF-8') ?></time>
+                                                <time datetime="<?= htmlspecialchars((string) ($localItem['published'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($fediverseFormatDate((string) ($localItem['published'] ?? '')), ENT_QUOTES, 'UTF-8') ?></time>
                                             </div>
                                         </div>
                                         <?php if (!empty($localItem['title']) && !$localIsNote): ?>
@@ -745,7 +761,7 @@
                                                                     <span><?= htmlspecialchars((string) $reply['actor_handle'], ENT_QUOTES, 'UTF-8') ?></span>
                                                                 <?php endif; ?>
                                                                 <?php if (!empty($reply['published'])): ?>
-                                                                    <time datetime="<?= htmlspecialchars((string) $reply['published'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $reply['published'], ENT_QUOTES, 'UTF-8') ?></time>
+                                                                    <time datetime="<?= htmlspecialchars((string) $reply['published'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($fediverseFormatDate((string) $reply['published']), ENT_QUOTES, 'UTF-8') ?></time>
                                                                 <?php endif; ?>
                                                             </div>
                                                             <div class="fediverse-thread__content"><?= nl2br(htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
@@ -755,7 +771,7 @@
                                                                     <input type="hidden" name="fediverse_reply_action_id" value="<?= htmlspecialchars((string) $reply['id'], ENT_QUOTES, 'UTF-8') ?>">
                                                                     <button type="submit" name="fediverse_delete_reply_item" class="btn btn-outline-danger btn-sm">Borrar</button>
                                                                 </form>
-                                                            <?php elseif (($reply['source'] ?? '') === 'incoming'): ?>
+                                                            <?php elseif (in_array((string) ($reply['source'] ?? ''), ['incoming', 'incoming-remote'], true)): ?>
                                                                 <form method="post" class="mt-2" onsubmit="return confirm('¿Ocultar esta respuesta en el blog y dejar de mostrarla públicamente?');">
                                                                     <input type="hidden" name="fediverse_tab" value="home">
                                                                     <input type="hidden" name="fediverse_incoming_reply_id" value="<?= htmlspecialchars((string) ($reply['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
@@ -920,7 +936,7 @@
                                             </div>
                                             <div class="fediverse-status__meta">
                                                 <?php if (!empty($item['published'])): ?>
-                                                    <time datetime="<?= htmlspecialchars((string) $item['published'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $item['published'], ENT_QUOTES, 'UTF-8') ?></time>
+                                                    <time datetime="<?= htmlspecialchars((string) $item['published'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($fediverseFormatDate((string) $item['published']), ENT_QUOTES, 'UTF-8') ?></time>
                                                 <?php endif; ?>
                                             </div>
                                         </div>
@@ -1047,7 +1063,7 @@
                                                             <div class="fediverse-thread__header">
                                                                 <strong><?= htmlspecialchars((string) (($reply['source'] ?? '') === 'incoming-remote' ? (($reply['actor_name'] ?? '') ?: 'Actor remoto') : $fediverseLocalHandle), ENT_QUOTES, 'UTF-8') ?></strong>
                                                                 <?php if (!empty($reply['published'])): ?>
-                                                                    <time datetime="<?= htmlspecialchars((string) $reply['published'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $reply['published'], ENT_QUOTES, 'UTF-8') ?></time>
+                                                                    <time datetime="<?= htmlspecialchars((string) $reply['published'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($fediverseFormatDate((string) $reply['published']), ENT_QUOTES, 'UTF-8') ?></time>
                                                                 <?php endif; ?>
                                                             </div>
                                                             <div class="fediverse-thread__content"><?= nl2br(htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
@@ -1348,7 +1364,7 @@
                                             </div>
                                         </div>
                                         <div class="small text-muted mb-2">
-                                            <?= $isOutgoing ? 'Enviado' : 'Recibido' ?> · <?= htmlspecialchars((string) ($message['published'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                                            <?= $isOutgoing ? 'Enviado' : 'Recibido' ?> · <?= htmlspecialchars($fediverseFormatDate((string) ($message['published'] ?? '')), ENT_QUOTES, 'UTF-8') ?>
                                             <?php if (!empty($message['is_thread_root'])): ?>
                                                 · Publicación original
                                             <?php endif; ?>

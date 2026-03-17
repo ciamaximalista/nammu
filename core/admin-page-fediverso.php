@@ -296,7 +296,7 @@
         if ($fediverseTimelineTargetUrl !== '') {
             $fediverseTimelineIdentifiers[] = $fediverseTimelineTargetUrl;
         }
-        if ($fediverseTimelineTargetUrl !== '') {
+        if ($fediverseTimelineTargetUrl !== '' && $fediverseTimelineType !== 'announce') {
             continue;
         }
         $fediverseSkipTimelineItem = false;

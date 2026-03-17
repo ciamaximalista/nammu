@@ -615,6 +615,10 @@
                                 <input type="hidden" name="fediverse_tab" value="home">
                                 <button type="submit" name="refresh_fediverse_timeline" class="btn btn-outline-secondary btn-sm">Refrescar ahora</button>
                             </form>
+                            <form method="post" class="mb-0">
+                                <input type="hidden" name="fediverse_tab" value="home">
+                                <button type="submit" name="refresh_fediverse_threads" class="btn btn-outline-secondary btn-sm">Actualizar hilos</button>
+                            </form>
                             <form method="post" class="mb-0" onsubmit="return confirm('Esto vaciará y reconstruirá la timeline remota guardada. ¿Continuar?');">
                                 <input type="hidden" name="fediverse_tab" value="home">
                                 <button type="submit" name="rebuild_fediverse_timeline" class="btn btn-outline-secondary btn-sm">Reconstruir timeline</button>
@@ -1476,6 +1480,7 @@
                         <input type="hidden" name="fediverse_tab" value="network">
                         <button type="submit" name="follow_fediverse_actor" class="btn btn-primary">Seguir actor</button>
                         <button type="submit" name="refresh_fediverse_timeline" class="btn btn-outline-secondary ml-2">Refrescar ahora</button>
+                        <button type="submit" name="refresh_fediverse_threads" class="btn btn-outline-secondary ml-2">Actualizar hilos</button>
                     </div>
                 </div>
             </form>

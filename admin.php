@@ -10166,13 +10166,20 @@ if ($isLoggedIn && $page === 'fediverso') {
         ];
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refresh_fediverse_timeline'])) {
-        $config = load_config_file();
         $stats = nammu_fediverse_refresh_following();
-        if (function_exists('nammu_fediverse_clear_threads_cache')) {
-            nammu_fediverse_clear_threads_cache();
-        }
         if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
             nammu_fediverse_save_fragments_cache_store([]);
+        }
+        $fediverseFeedback = [
+            'type' => 'info',
+            'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '.',
+        ];
+        $fediverseRedirect = true;
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refresh_fediverse_threads'])) {
+        $config = load_config_file();
+        $stats = ['threads_warmed' => 0];
+        if (function_exists('nammu_fediverse_clear_threads_cache')) {
+            nammu_fediverse_clear_threads_cache();
         }
         if (function_exists('nammu_fediverse_warm_threads_cache')) {
             $stats['threads_warmed'] = (int) nammu_fediverse_warm_threads_cache($config, 20);
@@ -10180,9 +10187,12 @@ if ($isLoggedIn && $page === 'fediverso') {
         if (function_exists('nammu_fediverse_rebuild_snapshots')) {
             nammu_fediverse_rebuild_snapshots($config);
         }
+        if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
+            nammu_fediverse_save_fragments_cache_store([]);
+        }
         $fediverseFeedback = [
             'type' => 'info',
-            'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '. Hilos precalentados: ' . (int) ($stats['threads_warmed'] ?? 0) . '.',
+            'message' => 'Hilos del Fediverso actualizados. Hilos precalentados: ' . (int) ($stats['threads_warmed'] ?? 0) . '.',
         ];
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rebuild_fediverse_timeline'])) {

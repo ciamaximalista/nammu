@@ -114,10 +114,10 @@ $manualDisplayText = static function (array $item): string {
 ?>
 <section class="actuality-hero">
     <div class="actuality-hero-inner">
-        <h1>Actualidad</h1>
+        <h1>Fediverso</h1>
         <p>
             <?php if ($feedsCount > 0): ?>
-                Ultimas fuentes compartidas
+                Todo lo que enviamos al Fediverso que no son entradas, podcasts o itinerarios
             <?php elseif ($hasActuality): ?>
                 Notas y fuentes compartidas
             <?php else: ?>

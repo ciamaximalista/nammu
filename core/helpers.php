@@ -3014,10 +3014,11 @@ function nammu_render_header_buttons(array $options): string
         ];
     }
     if ($hasActuality && $actualityUrl !== '') {
+        $footerIcons = nammu_footer_icon_svgs();
         $items[] = [
             'label' => 'Actualidad',
             'href' => $actualityUrl,
-            'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="13" r="1.8" fill="#fff"/><path d="M12 4v3" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M5.64 6.64l2.12 2.12" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M18.36 6.64l-2.12 2.12" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M4 13h3" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M17 13h3" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M6.3 18.2C7.86 16.29 9.79 15.33 12 15.33c2.21 0 4.14.96 5.7 2.87" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M3.7 20.6C5.9 17.92 8.66 16.58 12 16.58c3.34 0 6.1 1.34 8.3 4.02" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+            'svg' => (string) ($footerIcons['fediverse'] ?? ''),
         ];
     }
     if ($hasNewsletters) {

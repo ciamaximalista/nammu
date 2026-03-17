@@ -311,6 +311,15 @@ if (!$isLettersIndex && preg_match('#^/letra/([^/]+)/?$#i', $routePath, $matchLe
 }
 $buildSitemapEntries = static function (array $posts, array $theme, string $publicBaseUrl) use ($itineraryListing, $buildItineraryUrl, $buildItineraryTopicUrl, $isAlphabeticalOrder, $hasPodcast, $podcastItems): array {
     $entries = [];
+    $seenLocs = [];
+    $pushEntry = static function (array $entry) use (&$entries, &$seenLocs): void {
+        $loc = trim((string) ($entry['loc'] ?? ''));
+        if ($loc === '' || isset($seenLocs[$loc])) {
+            return;
+        }
+        $seenLocs[$loc] = true;
+        $entries[] = $entry;
+    };
     $config = nammu_load_config();
     $socialRssConfig = is_array($config['social_rss'] ?? null) ? $config['social_rss'] : [];
     $hasActuality = function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($config) : (trim((string) ($socialRssConfig['feeds'] ?? '')) !== '');
@@ -337,12 +346,12 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
         }
     }
 
-    $entries[] = [
+    $pushEntry([
         'loc' => '/',
         'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
         'changefreq' => 'daily',
         'priority' => 1.0,
-    ];
+    ]);
 
     foreach ($posts as $post) {
         $postTemplate = strtolower($post->getTemplate());
@@ -355,13 +364,13 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
         }
         $postTimestamp = $timestampFromPost($post);
         $imageUrl = nammu_resolve_asset($post->getImage(), $publicBaseUrl);
-        $entries[] = [
+        $pushEntry([
             'loc' => '/' . rawurlencode($post->getSlug()),
             'lastmod' => $postTimestamp !== null ? gmdate('c', $postTimestamp) : null,
             'changefreq' => 'weekly',
             'priority' => 0.8,
             'image' => $imageUrl ?: null,
-        ];
+        ]);
     }
 
     $categories = nammu_collect_categories_from_posts($posts);
@@ -380,20 +389,20 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
         if ($categoryTimestamp !== null) {
             $latestCategoryTimestamp = $latestCategoryTimestamp === null ? $categoryTimestamp : max($latestCategoryTimestamp, $categoryTimestamp);
         }
-        $entries[] = [
+        $pushEntry([
             'loc' => '/categoria/' . rawurlencode($slug),
             'lastmod' => $categoryTimestamp !== null ? gmdate('c', $categoryTimestamp) : null,
             'changefreq' => 'weekly',
             'priority' => 0.7,
-        ];
+        ]);
     }
     if (!empty($categories)) {
-        $entries[] = [
+        $pushEntry([
             'loc' => '/categorias',
             'lastmod' => $latestCategoryTimestamp !== null ? gmdate('c', $latestCategoryTimestamp) : ($latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null),
             'changefreq' => 'weekly',
             'priority' => 0.7,
-        ];
+        ]);
     }
 
     $homeSettings = $theme['home'] ?? [];
@@ -415,12 +424,12 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
     if ($perPage !== null && $perPage > 0) {
         $totalPages = max(1, (int) ceil(count($posts) / $perPage));
         for ($page = 2; $page <= $totalPages; $page++) {
-            $entries[] = [
+            $pushEntry([
                 'loc' => '/pagina/' . $page,
                 'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
                 'changefreq' => 'weekly',
                 'priority' => 0.6,
-            ];
+            ]);
         }
     }
 
@@ -437,31 +446,31 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
                 $latestItineraryTimestamp = $latestItineraryTimestamp === null ? $ts : max($latestItineraryTimestamp, $ts);
             }
             $imageUrl = nammu_resolve_asset($itineraryItem->getImage(), $publicBaseUrl);
-            $entries[] = [
+            $pushEntry([
                 'loc' => $buildItineraryUrl($itineraryItem),
                 'lastmod' => $ts !== false && $ts !== null ? gmdate('c', $ts) : null,
                 'changefreq' => 'weekly',
                 'priority' => 0.7,
                 'image' => $imageUrl ?: null,
-            ];
+            ]);
             foreach ($itineraryItem->getTopics() as $topicItem) {
                 if (!$topicItem instanceof \Nammu\Core\ItineraryTopic) {
                     continue;
                 }
-                $entries[] = [
+                $pushEntry([
                     'loc' => $buildItineraryTopicUrl($itineraryItem, $topicItem),
                     'lastmod' => $ts !== false && $ts !== null ? gmdate('c', $ts) : null,
                     'changefreq' => 'weekly',
                     'priority' => 0.6,
-                ];
+                ]);
             }
         }
-        $entries[] = [
+        $pushEntry([
             'loc' => '/itinerarios',
             'lastmod' => $latestItineraryTimestamp !== null ? gmdate('c', $latestItineraryTimestamp) : null,
             'changefreq' => 'weekly',
             'priority' => 0.7,
-        ];
+        ]);
     }
 
     if ($hasPodcast) {
@@ -476,30 +485,30 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
             }
             $episodeUrl = trim((string) ($item['page_url'] ?? ''));
             if ($episodeUrl !== '') {
-                $entries[] = [
+                $pushEntry([
                     'loc' => $episodeUrl,
                     'lastmod' => $ts !== null && $ts > 0 ? gmdate('c', $ts) : null,
                     'changefreq' => 'weekly',
                     'priority' => 0.7,
                     'image' => !empty($item['image']) ? (string) $item['image'] : null,
-                ];
+                ]);
             }
         }
-        $entries[] = [
+        $pushEntry([
             'loc' => '/podcast',
             'lastmod' => $latestPodcastTimestamp !== null ? gmdate('c', $latestPodcastTimestamp) : ($latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null),
             'changefreq' => 'weekly',
             'priority' => 0.7,
-        ];
+        ]);
     }
 
     if ($hasActuality) {
-        $entries[] = [
+        $pushEntry([
             'loc' => '/actualidad.php',
             'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
             'changefreq' => 'hourly',
             'priority' => 0.6,
-        ];
+        ]);
     }
 
     $analytics = function_exists('nammu_load_analytics') ? nammu_load_analytics() : [];
@@ -510,12 +519,12 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
     } else {
         $searchPageLastMod = $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null;
     }
-    $entries[] = [
+    $pushEntry([
         'loc' => '/buscar.php',
         'lastmod' => $searchPageLastMod,
         'changefreq' => 'weekly',
         'priority' => 0.6,
-    ];
+    ]);
 
     $searchTermCounts = [];
     $searchTermLatest = [];
@@ -561,30 +570,49 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
         foreach ($searchList as $item) {
             $term = $item['term'];
             $termLast = $searchTermLatest[$term] ?? null;
-            $entries[] = [
+            $pushEntry([
                 'loc' => '/buscar.php?q=' . rawurlencode($term),
                 'lastmod' => $termLast !== null ? gmdate('c', $termLast) : $searchPageLastMod,
                 'changefreq' => 'weekly',
                 'priority' => 0.5,
-            ];
+            ]);
         }
     }
 
     if ($isAlphabeticalOrder) {
         $letterGroups = nammu_group_items_by_letter($posts);
-        $entries[] = [
+        $pushEntry([
             'loc' => '/letras',
             'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
             'changefreq' => 'weekly',
             'priority' => 0.6,
-        ];
+        ]);
         foreach ($letterGroups as $letter => $groupPosts) {
-            $entries[] = [
+            $pushEntry([
                 'loc' => '/letra/' . rawurlencode(nammu_letter_slug($letter)),
                 'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
                 'changefreq' => 'weekly',
                 'priority' => 0.5,
-            ];
+            ]);
+        }
+    }
+
+    if (function_exists('nammu_fediverse_local_content_items') && function_exists('nammu_fediverse_thread_page_url')) {
+        foreach (nammu_fediverse_local_content_items($config) as $fediverseItem) {
+            if (!is_array($fediverseItem)) {
+                continue;
+            }
+            $fediverseItemId = trim((string) ($fediverseItem['id'] ?? ''));
+            if ($fediverseItemId === '') {
+                continue;
+            }
+            $pushEntry([
+                'loc' => nammu_fediverse_thread_page_url($fediverseItemId, $config),
+                'lastmod' => trim((string) ($fediverseItem['published'] ?? '')) ?: null,
+                'changefreq' => 'weekly',
+                'priority' => 0.6,
+                'image' => !empty($fediverseItem['image']) ? (string) $fediverseItem['image'] : null,
+            ]);
         }
     }
 

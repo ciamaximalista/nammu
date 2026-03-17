@@ -10142,6 +10142,23 @@ if ($isLoggedIn && $page === 'fediverso') {
             'message' => $ok ? 'Actor eliminado del Fediverso.' : 'No se pudo quitar ese actor.',
         ];
         $fediverseRedirect = true;
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['block_fediverse_follower'])) {
+        $actorId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
+        $config = load_config_file();
+        $result = nammu_fediverse_block_actor($actorId, $config);
+        $fediverseFeedback = [
+            'type' => !empty($result['ok']) ? 'success' : 'danger',
+            'message' => (string) ($result['message'] ?? ''),
+        ];
+        $fediverseRedirect = true;
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unblock_fediverse_actor'])) {
+        $actorId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
+        $result = nammu_fediverse_unblock_actor($actorId);
+        $fediverseFeedback = [
+            'type' => !empty($result['ok']) ? 'success' : 'danger',
+            'message' => (string) ($result['message'] ?? ''),
+        ];
+        $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refresh_fediverse_timeline'])) {
         $stats = nammu_fediverse_refresh_following();
         if (function_exists('nammu_fediverse_clear_threads_cache')) {
@@ -10313,6 +10330,22 @@ if ($isLoggedIn && $page === 'fediverso') {
         $replyActionId = trim((string) ($_POST['fediverse_reply_action_id'] ?? ''));
         $config = load_config_file();
         $result = nammu_fediverse_delete_public_reply($replyActionId, $config);
+        $fediverseFeedback = [
+            'type' => !empty($result['ok']) ? 'success' : 'danger',
+            'message' => (string) ($result['message'] ?? ''),
+        ];
+        $fediverseRedirect = true;
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_hide_incoming_reply'])) {
+        $config = load_config_file();
+        $reply = [
+            'id' => trim((string) ($_POST['fediverse_incoming_reply_id'] ?? '')),
+            'url' => trim((string) ($_POST['fediverse_incoming_reply_url'] ?? '')),
+            'target_url' => trim((string) ($_POST['fediverse_incoming_reply_target'] ?? '')),
+            'published' => trim((string) ($_POST['fediverse_incoming_reply_published'] ?? '')),
+            'reply_text' => trim((string) ($_POST['fediverse_incoming_reply_text'] ?? '')),
+            'actor_id' => trim((string) ($_POST['fediverse_incoming_reply_actor'] ?? '')),
+        ];
+        $result = nammu_fediverse_hide_incoming_reply($reply, $config);
         $fediverseFeedback = [
             'type' => !empty($result['ok']) ? 'success' : 'danger',
             'message' => (string) ($result['message'] ?? ''),

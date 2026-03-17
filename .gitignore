@@ -30,6 +30,8 @@ config/actualidad-*.json
 assets/actualidad-cache/
 # Artefactos generados de Fediverso / ActivityPub
 config/fediverso-*.json
+config/fediverso-hidden-replies.json
+config/fediverso-blocked.json
 config/activitypub-keys.json
 # Locks y estados de runtime
 config/*.lock

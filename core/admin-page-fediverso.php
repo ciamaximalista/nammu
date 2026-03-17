@@ -55,6 +55,14 @@
             $fediverseFollowerIds[$fediverseFollowerActorId] = true;
         }
     }
+    $fediverseBlocked = function_exists('nammu_fediverse_blocked_store') ? nammu_fediverse_blocked_store()['actors'] : [];
+    $fediverseBlockedIds = [];
+    foreach ($fediverseBlocked as $fediverseBlockedActor) {
+        $fediverseBlockedActorId = trim((string) ($fediverseBlockedActor['id'] ?? ''));
+        if ($fediverseBlockedActorId !== '') {
+            $fediverseBlockedIds[$fediverseBlockedActorId] = true;
+        }
+    }
     $fediverseTimeline = $isFediverseHomeTab ? nammu_fediverse_timeline_store()['items'] : [];
     $fediverseRecipients = ($isFediverseMessagesTab || $isFediverseNetworkTab)
         && function_exists('nammu_fediverse_message_recipients')
@@ -106,6 +114,24 @@
             return '@' . $username;
         }
         return trim((string) ($item['actor_id'] ?? ''));
+    };
+    $fediverseActorHandleFor = static function (array $item) use ($fediverseActorsById, $fediverseActorUrl, $fediverseLocalHandle): string {
+        $actorId = trim((string) ($item['actor_id'] ?? ''));
+        if ($actorId !== '' && $actorId === $fediverseActorUrl) {
+            return $fediverseLocalHandle;
+        }
+        $username = trim((string) ($item['actor_username'] ?? ''));
+        if ($username === '' && $actorId !== '' && isset($fediverseActorsById[$actorId])) {
+            $username = trim((string) ($fediverseActorsById[$actorId]['preferredUsername'] ?? ''));
+        }
+        if ($username !== '') {
+            $host = parse_url($actorId, PHP_URL_HOST);
+            if (is_string($host) && $host !== '') {
+                return '@' . $username . '@' . $host;
+            }
+            return '@' . $username;
+        }
+        return $actorId;
     };
     $fediverseKnownActors = ($isFediverseHomeTab || $isFediverseNotificationsTab || $isFediverseMessagesTab)
         && function_exists('nammu_fediverse_known_actors')
@@ -370,7 +396,7 @@
         $clean = preg_replace('#<a\b([^>]*)href=(["\'])(https?://[^"\']+)\2([^>]*)>#i', '<a$1href="$3"$4 target="_blank" rel="noopener">', $clean) ?? $clean;
         return trim($clean);
     };
-    $notificationContext = static function (array $entry) use ($fediverseActorsById, $fediverseConfig, $fediverseLocalLinks): array {
+    $notificationContext = static function (array $entry) use ($fediverseActorsById, $fediverseConfig, $fediverseLocalLinks, $fediverseActorUrl, $fediverseLocalHandle): array {
         $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
         $actorId = trim((string) ($payload['actor'] ?? ''));
         $actor = $actorId !== '' ? ($fediverseActorsById[$actorId] ?? null) : null;
@@ -389,9 +415,22 @@
         if ($targetUrl !== '' && isset($fediverseLocalLinks[$targetUrl])) {
             $targetUrl = $fediverseLocalLinks[$targetUrl];
         }
+        $actorUsername = trim((string) (($actor['preferredUsername'] ?? '') ?: ''));
+        $actorHandle = $actorId;
+        if ($actorId !== '' && $actorId === $fediverseActorUrl) {
+            $actorHandle = $fediverseLocalHandle;
+        } elseif ($actorUsername !== '') {
+            $actorHost = parse_url($actorId, PHP_URL_HOST);
+            if (is_string($actorHost) && $actorHost !== '') {
+                $actorHandle = '@' . $actorUsername . '@' . $actorHost;
+            } else {
+                $actorHandle = '@' . $actorUsername;
+            }
+        }
         return [
             'actor_id' => $actorId,
             'actor_name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
+            'actor_handle' => $actorHandle,
             'actor_username' => trim((string) ($actor['preferredUsername'] ?? '')),
             'actor_icon' => trim((string) ($actor['icon'] ?? '')),
             'target_url' => $targetUrl,
@@ -413,7 +452,7 @@
     };
     $notificationActor = static function (array $entry) use ($notificationContext): string {
         $context = $notificationContext($entry);
-        return $context['actor_id'];
+        return (string) ($context['actor_handle'] ?? ($context['actor_id'] ?? ''));
     };
     ?>
     <div class="tab-pane active">
@@ -557,6 +596,10 @@
                                             <?php if (!empty($localId)): ?>
                                                 <span aria-hidden="true"> · </span>
                                                 <a href="<?= htmlspecialchars((string) $localId, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Objeto ActivityPub</a>
+                                                <?php if (function_exists('nammu_fediverse_thread_page_url')): ?>
+                                                    <span aria-hidden="true"> · </span>
+                                                    <a href="<?= htmlspecialchars((string) nammu_fediverse_thread_page_url((string) $localId, $fediverseConfig), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Enlace a la página pública</a>
+                                                <?php endif; ?>
                                             <?php endif; ?>
                                             <form method="post" class="d-inline-block ml-2" onsubmit="return confirm('¿Retirar esta publicación del Fediverso y enviar el borrado a otros nodos?');">
                                                 <input type="hidden" name="fediverse_tab" value="home">
@@ -633,6 +676,17 @@
                                                                     <input type="hidden" name="fediverse_tab" value="home">
                                                                     <input type="hidden" name="fediverse_reply_action_id" value="<?= htmlspecialchars((string) $reply['id'], ENT_QUOTES, 'UTF-8') ?>">
                                                                     <button type="submit" name="fediverse_delete_reply_item" class="btn btn-outline-danger btn-sm">Borrar</button>
+                                                                </form>
+                                                            <?php elseif (($reply['source'] ?? '') === 'incoming'): ?>
+                                                                <form method="post" class="mt-2" onsubmit="return confirm('¿Ocultar esta respuesta en el blog y dejar de mostrarla públicamente?');">
+                                                                    <input type="hidden" name="fediverse_tab" value="home">
+                                                                    <input type="hidden" name="fediverse_incoming_reply_id" value="<?= htmlspecialchars((string) ($reply['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <input type="hidden" name="fediverse_incoming_reply_url" value="<?= htmlspecialchars((string) ($reply['url'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <input type="hidden" name="fediverse_incoming_reply_target" value="<?= htmlspecialchars((string) ($reply['target_url'] ?? $localId), ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <input type="hidden" name="fediverse_incoming_reply_published" value="<?= htmlspecialchars((string) ($reply['published'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <input type="hidden" name="fediverse_incoming_reply_actor" value="<?= htmlspecialchars((string) ($reply['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <input type="hidden" name="fediverse_incoming_reply_text" value="<?= htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <button type="submit" name="fediverse_hide_incoming_reply" class="btn btn-outline-danger btn-sm">Eliminar respuesta</button>
                                                                 </form>
                                                             <?php endif; ?>
                                                         </div>
@@ -838,6 +892,10 @@
                                             <?php if ($itemObjectId !== ''): ?>
                                                 <span aria-hidden="true"> · </span>
                                                 <a href="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Objeto ActivityPub</a>
+                                                <?php if (!empty($item['url'])): ?>
+                                                    <span aria-hidden="true"> · </span>
+                                                    <a href="<?= htmlspecialchars((string) $item['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Enlace a la página pública</a>
+                                                <?php endif; ?>
                                             <?php endif; ?>
                                         </div>
                                         <?php if (($remoteBoostMeta['count'] ?? 0) > 0 || ($remoteReplyMeta['count'] ?? 0) > 0 || !empty($itemActionState['liked']) || !empty($itemActionState['boosted']) || !empty($itemActionState['replied']) || !empty($itemActionState['shared'])): ?>
@@ -1040,6 +1098,10 @@
                                         <?php $recipientId = (string) ($recipient['id'] ?? ''); ?>
                                         <?php
                                         $recipientLabel = (string) (($recipient['name'] ?? '') ?: ($recipient['preferredUsername'] ?? $recipientId));
+                                        $recipientHandle = $fediverseActorHandleFor([
+                                            'actor_id' => $recipientId,
+                                            'actor_username' => trim((string) ($recipient['preferredUsername'] ?? '')),
+                                        ]);
                                         $recipientMeta = [];
                                         if ($recipientId !== '' && isset($fediverseFollowingIds[$recipientId])) {
                                             $recipientMeta[] = 'seguido';
@@ -1050,7 +1112,7 @@
                                         $recipientSuffix = empty($recipientMeta) ? '' : ' (' . implode(', ', array_unique($recipientMeta)) . ')';
                                         ?>
                                         <option value="<?= htmlspecialchars($recipientId, ENT_QUOTES, 'UTF-8') ?>" <?= ($fediverseMessageRecipient ?? '') === $recipientId ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($recipientLabel . $recipientSuffix, ENT_QUOTES, 'UTF-8') ?>
+                                            <?= htmlspecialchars($recipientLabel . ' · ' . $recipientHandle . $recipientSuffix, ENT_QUOTES, 'UTF-8') ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -1086,7 +1148,20 @@
                             $conversationActor = $fediverseActorsById[$actorId] ?? null;
                             $conversationActorName = trim((string) (($threadHeaderMessage['actor_name'] ?? '') ?: ($conversationActor['name'] ?? '') ?: ($conversationActor['preferredUsername'] ?? '') ?: $actorId));
                             $conversationActorIcon = trim((string) (($threadHeaderMessage['actor_icon'] ?? '') ?: ($conversationActor['icon'] ?? '')));
+                            $conversationActorHandle = $fediverseActorHandleFor($threadHeaderMessage);
                             $conversationIsPublic = strtolower(trim((string) ($threadHeaderMessage['visibility'] ?? 'private'))) === 'public';
+                            $threadHasLocalRoot = is_array($threadRootMessage) && (($threadRootMessage['direction'] ?? '') === 'outgoing');
+                            $threadDisplayMessages = [];
+                            $threadRootSeen = false;
+                            foreach ($messages as $threadMessage) {
+                                if (!empty($threadMessage['is_thread_root'])) {
+                                    if ($threadRootSeen) {
+                                        continue;
+                                    }
+                                    $threadRootSeen = true;
+                                }
+                                $threadDisplayMessages[] = $threadMessage;
+                            }
                             ?>
                             <div class="border rounded p-3 mb-4">
                                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
@@ -1100,19 +1175,26 @@
                                         </div>
                                         <div class="fediverse-message__identity">
                                             <strong><?= htmlspecialchars($conversationActorName, ENT_QUOTES, 'UTF-8') ?></strong>
-                                            <div class="small text-muted mt-1"><?= htmlspecialchars((string) $actorId, ENT_QUOTES, 'UTF-8') ?></div>
+                                            <div class="small text-muted mt-1"><?= htmlspecialchars($conversationActorHandle, ENT_QUOTES, 'UTF-8') ?></div>
                                             <div class="small text-muted mt-1"><?= $conversationIsPublic ? 'Hilo público' : 'Conversación privada' ?></div>
                                         </div>
                                     </div>
                                 </div>
-                                <?php foreach ($messages as $message): ?>
+                                <?php foreach ($threadDisplayMessages as $message): ?>
                                     <?php $isOutgoing = (($message['direction'] ?? '') === 'outgoing'); ?>
                                     <?php
                                     $isPublicMessage = (($message['visibility'] ?? '') === 'public');
                                     $isThreadRoot = !empty($message['is_thread_root']);
+                                    $messageActorId = trim((string) ($message['actor_id'] ?? ''));
+                                    $messageActor = $messageActorId !== '' ? ($fediverseActorsById[$messageActorId] ?? null) : null;
+                                    $messageActorName = trim((string) (($message['actor_name'] ?? '') ?: ($messageActor['name'] ?? '') ?: ($messageActor['preferredUsername'] ?? '') ?: $messageActorId));
+                                    $messageActorHandle = $fediverseActorHandleFor([
+                                        'actor_id' => $messageActorId,
+                                        'actor_username' => trim((string) (($message['actor_username'] ?? '') ?: ($messageActor['preferredUsername'] ?? ''))),
+                                    ]);
                                     $messageActorIcon = trim((string) ($message['actor_icon'] ?? ''));
                                     if (!$isOutgoing && $messageActorIcon === '') {
-                                        $messageActorIcon = trim((string) ($conversationActor['icon'] ?? ''));
+                                        $messageActorIcon = trim((string) (($messageActor['icon'] ?? '') ?: ($conversationActor['icon'] ?? '')));
                                     }
                                     $messageClasses = 'mb-3 p-3 rounded';
                                     if ($isPublicMessage) {
@@ -1136,12 +1218,12 @@
                                                 <?php endif; ?>
                                             </div>
                                             <div class="fediverse-message__identity">
-                                                <strong><?= htmlspecialchars($isOutgoing ? $fediverseLocalName : (string) (($message['actor_name'] ?? '') ?: $actorId), ENT_QUOTES, 'UTF-8') ?></strong>
+                                                <strong><?= htmlspecialchars($isOutgoing ? $fediverseLocalName : $messageActorName, ENT_QUOTES, 'UTF-8') ?></strong>
                                                 <?php if ($isOutgoing): ?>
                                                     <div class="small text-muted"><?= htmlspecialchars($fediverseLocalHandle, ENT_QUOTES, 'UTF-8') ?></div>
                                                 <?php endif; ?>
                                                 <?php if (!$isOutgoing): ?>
-                                                    <div class="small text-muted"><?= htmlspecialchars((string) $actorId, ENT_QUOTES, 'UTF-8') ?></div>
+                                                    <div class="small text-muted"><?= htmlspecialchars($messageActorHandle, ENT_QUOTES, 'UTF-8') ?></div>
                                                 <?php endif; ?>
                                             </div>
                                         </div>
@@ -1161,6 +1243,18 @@
                                             <div class="font-weight-bold mb-2"><?= htmlspecialchars((string) $message['title'], ENT_QUOTES, 'UTF-8') ?></div>
                                         <?php endif; ?>
                                         <div><?= nl2br(htmlspecialchars((string) ($message['content'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
+                                        <?php if (!$isOutgoing && $isPublicMessage && !$isThreadRoot && $threadHasLocalRoot): ?>
+                                            <form method="post" class="mt-2" onsubmit="return confirm('¿Ocultar esta respuesta en el blog y dejar de mostrarla públicamente?');">
+                                                <input type="hidden" name="fediverse_tab" value="messages">
+                                                <input type="hidden" name="fediverse_incoming_reply_id" value="<?= htmlspecialchars((string) ($message['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_incoming_reply_url" value="<?= htmlspecialchars((string) ($message['url'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_incoming_reply_target" value="<?= htmlspecialchars((string) ($message['reply_target_url'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_incoming_reply_published" value="<?= htmlspecialchars((string) ($message['published'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_incoming_reply_actor" value="<?= htmlspecialchars((string) ($message['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_incoming_reply_text" value="<?= htmlspecialchars((string) ($message['content'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <button type="submit" name="fediverse_hide_incoming_reply" class="btn btn-outline-danger btn-sm">Eliminar respuesta</button>
+                                            </form>
+                                        <?php endif; ?>
                                         <?php if (!$isOutgoing && !$isPublicMessage): ?>
                                             <details class="fediverse-inline-form mt-3">
                                                 <summary>Responder en privado</summary>
@@ -1292,19 +1386,26 @@
                                                     </div>
                                                 </div>
                                                 <?php if ($followerId !== ''): ?>
-                                                    <?php if ($isMutualFollow): ?>
-                                                        <form method="post" onsubmit="return confirm('¿Dejar de seguir este actor?');">
+                                                    <div class="d-flex align-items-center" style="gap:0.5rem;">
+                                                        <?php if ($isMutualFollow): ?>
+                                                            <form method="post" onsubmit="return confirm('¿Dejar de seguir este actor?');">
+                                                                <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($followerId, ENT_QUOTES, 'UTF-8') ?>">
+                                                                <input type="hidden" name="fediverse_tab" value="network">
+                                                                <button type="submit" name="unfollow_fediverse_actor" class="btn btn-outline-danger btn-sm">Dejar de seguir</button>
+                                                            </form>
+                                                        <?php else: ?>
+                                                            <form method="post">
+                                                                <input type="hidden" name="fediverse_actor_input" value="<?= htmlspecialchars($followerId, ENT_QUOTES, 'UTF-8') ?>">
+                                                                <input type="hidden" name="fediverse_tab" value="network">
+                                                                <button type="submit" name="follow_fediverse_actor" class="btn btn-outline-primary btn-sm">Seguir</button>
+                                                            </form>
+                                                        <?php endif; ?>
+                                                        <form method="post" onsubmit="return confirm('¿Bloquear este seguidor? No recibirá actualizaciones futuras.');">
                                                             <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($followerId, ENT_QUOTES, 'UTF-8') ?>">
                                                             <input type="hidden" name="fediverse_tab" value="network">
-                                                            <button type="submit" name="unfollow_fediverse_actor" class="btn btn-outline-danger btn-sm">Dejar de seguir</button>
+                                                            <button type="submit" name="block_fediverse_follower" class="btn btn-outline-dark btn-sm">Bloquear</button>
                                                         </form>
-                                                    <?php else: ?>
-                                                        <form method="post">
-                                                            <input type="hidden" name="fediverse_actor_input" value="<?= htmlspecialchars($followerId, ENT_QUOTES, 'UTF-8') ?>">
-                                                            <input type="hidden" name="fediverse_tab" value="network">
-                                                            <button type="submit" name="follow_fediverse_actor" class="btn btn-outline-primary btn-sm">Seguir</button>
-                                                        </form>
-                                                    <?php endif; ?>
+                                                    </div>
                                                 <?php endif; ?>
                                             </div>
                                         </div>
@@ -1313,6 +1414,50 @@
                             <?php endif; ?>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h3 class="h5 mb-3">Bloqueados</h3>
+                    <?php if (empty($fediverseBlocked)): ?>
+                        <p class="text-muted mb-0">No hay actores bloqueados.</p>
+                    <?php else: ?>
+                        <div class="list-group list-group-flush">
+                            <?php foreach ($fediverseBlocked as $blockedActor): ?>
+                                <?php
+                                $blockedName = trim((string) (($blockedActor['name'] ?? '') ?: ($blockedActor['preferredUsername'] ?? 'Actor remoto')));
+                                $blockedId = trim((string) ($blockedActor['id'] ?? ''));
+                                $blockedIcon = trim((string) ($blockedActor['icon'] ?? ''));
+                                $blockedUsername = trim((string) ($blockedActor['preferredUsername'] ?? ''));
+                                $blockedHost = is_string(parse_url($blockedId, PHP_URL_HOST)) ? (string) parse_url($blockedId, PHP_URL_HOST) : '';
+                                $blockedHandle = $blockedUsername !== '' ? '@' . $blockedUsername . ($blockedHost !== '' ? '@' . $blockedHost : '') : $blockedId;
+                                ?>
+                                <div class="list-group-item px-0">
+                                    <div class="d-flex align-items-center justify-content-between" style="gap:0.75rem;">
+                                        <div class="d-flex align-items-center" style="gap:0.75rem; min-width:0;">
+                                            <?php if ($blockedIcon !== ''): ?>
+                                                <img src="<?= htmlspecialchars($blockedIcon, ENT_QUOTES, 'UTF-8') ?>" alt="" style="width:40px;height:40px;border-radius:999px;object-fit:cover;flex:0 0 40px;">
+                                            <?php else: ?>
+                                                <div style="width:40px;height:40px;border-radius:999px;background:#e9ecef;flex:0 0 40px;"></div>
+                                            <?php endif; ?>
+                                            <div style="min-width:0;">
+                                                <div class="font-weight-bold text-truncate"><?= htmlspecialchars($blockedName, ENT_QUOTES, 'UTF-8') ?></div>
+                                                <div class="small text-muted text-truncate"><?= htmlspecialchars($blockedHandle, ENT_QUOTES, 'UTF-8') ?></div>
+                                            </div>
+                                        </div>
+                                        <?php if ($blockedId !== ''): ?>
+                                            <form method="post">
+                                                <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($blockedId, ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_tab" value="network">
+                                                <button type="submit" name="unblock_fediverse_actor" class="btn btn-outline-secondary btn-sm">Desbloquear</button>
+                                            </form>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
 

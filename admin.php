@@ -10166,6 +10166,14 @@ if ($isLoggedIn && $page === 'fediverso') {
         ];
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refresh_fediverse_timeline'])) {
+        $config = load_config_file();
+        $siteTitle = trim((string) (($config['site_name'] ?? '') ?: ''));
+        $siteDescription = trim((string) ($config['site_description'] ?? ''));
+        $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
+        $baseUrl = rtrim((string) (($config['site_url'] ?? '') ?: nammu_base_url()), '/');
+        if (function_exists('nammu_actuality_rebuild_snapshot')) {
+            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        }
         $stats = nammu_fediverse_refresh_following();
         if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
             nammu_fediverse_save_fragments_cache_store([]);
@@ -10177,6 +10185,13 @@ if ($isLoggedIn && $page === 'fediverso') {
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refresh_fediverse_threads'])) {
         $config = load_config_file();
+        $siteTitle = trim((string) (($config['site_name'] ?? '') ?: ''));
+        $siteDescription = trim((string) ($config['site_description'] ?? ''));
+        $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
+        $baseUrl = rtrim((string) (($config['site_url'] ?? '') ?: nammu_base_url()), '/');
+        if (function_exists('nammu_actuality_rebuild_snapshot')) {
+            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        }
         $stats = ['threads_warmed' => 0];
         if (function_exists('nammu_fediverse_clear_threads_cache')) {
             nammu_fediverse_clear_threads_cache();

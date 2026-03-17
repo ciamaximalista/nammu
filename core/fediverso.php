@@ -57,6 +57,11 @@ function nammu_fediverse_hidden_replies_file(): string
     return dirname(__DIR__) . '/config/fediverso-hidden-replies.json';
 }
 
+function nammu_fediverse_fragments_cache_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-fragments-cache.json';
+}
+
 function nammu_fediverse_keys_file(): string
 {
     return dirname(__DIR__) . '/config/activitypub-keys.json';
@@ -78,6 +83,18 @@ function nammu_fediverse_save_json_store(string $file, array $payload): void
         nammu_ensure_directory($dir);
     }
     file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+}
+
+function nammu_fediverse_fragments_cache_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_fragments_cache_file(), ['items' => []]);
+    $store['items'] = is_array($store['items'] ?? null) ? $store['items'] : [];
+    return $store;
+}
+
+function nammu_fediverse_save_fragments_cache_store(array $items): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_fragments_cache_file(), ['items' => $items]);
 }
 
 function nammu_fediverse_base_url(array $config): string
@@ -907,6 +924,50 @@ function nammu_fediverse_remote_boost_summary(): array
     return $summary;
 }
 
+function nammu_fediverse_remote_boost_details(array $config): array
+{
+    $items = nammu_fediverse_timeline_store()['items'];
+    $details = [];
+    foreach ($items as $item) {
+        if (strtolower(trim((string) ($item['type'] ?? ''))) !== 'announce') {
+            continue;
+        }
+        $actorId = trim((string) ($item['actor_id'] ?? ''));
+        $actorEntry = [
+            'id' => $actorId,
+            'name' => trim((string) (($item['actor_name'] ?? '') ?: $actorId)),
+            'icon' => trim((string) ($item['actor_icon'] ?? '')),
+            'url' => trim((string) (($item['actor_url'] ?? '') ?: $actorId)),
+        ];
+        if ($actorId !== '' && ($actorEntry['name'] === $actorId || $actorEntry['icon'] === '' || $actorEntry['url'] === '')) {
+            $actor = nammu_fediverse_resolve_actor($actorId, $config);
+            if (is_array($actor)) {
+                $actorEntry['name'] = trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId));
+                $actorEntry['icon'] = trim((string) (($actor['icon'] ?? '') ?: $actorEntry['icon']));
+                $actorEntry['url'] = trim((string) (($actor['url'] ?? '') ?: ($actor['id'] ?? '') ?: $actorEntry['url']));
+            }
+        }
+        $identifiers = [];
+        foreach (['object_id', 'url', 'id'] as $field) {
+            $value = trim((string) ($item[$field] ?? ''));
+            if ($value !== '') {
+                $identifiers[] = $value;
+            }
+        }
+        foreach (array_unique($identifiers) as $identifier) {
+            if (!isset($details[$identifier])) {
+                $details[$identifier] = [];
+            }
+            $actorKey = $actorId !== '' ? $actorId : sha1(json_encode($actorEntry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            $details[$identifier][$actorKey] = $actorEntry;
+        }
+    }
+    foreach ($details as $identifier => $actors) {
+        $details[$identifier] = array_values($actors);
+    }
+    return $details;
+}
+
 function nammu_fediverse_remote_reply_summary(): array
 {
     $items = nammu_fediverse_timeline_store()['items'];
@@ -1326,6 +1387,31 @@ function nammu_fediverse_cached_remote_replies_snapshot_for_item(array $item): a
     return is_array($cached['replies'] ?? null) ? $cached['replies'] : [];
 }
 
+function nammu_fediverse_warm_threads_cache(array $config, int $limit = 20): int
+{
+    $timelineItems = nammu_fediverse_timeline_store()['items'];
+    $warmed = 0;
+    foreach ($timelineItems as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $type = strtolower(trim((string) ($item['type'] ?? '')));
+        if (in_array($type, ['like', 'delete'], true)) {
+            continue;
+        }
+        $objectId = trim((string) (($item['object_id'] ?? '') ?: ($item['id'] ?? '')));
+        if ($objectId === '') {
+            continue;
+        }
+        nammu_fediverse_cached_remote_replies_for_item($item, $config);
+        $warmed++;
+        if ($warmed >= max(1, $limit)) {
+            break;
+        }
+    }
+    return $warmed;
+}
+
 function nammu_fediverse_store_files_for_tab(string $tab): array
 {
     $tab = strtolower(trim($tab));
@@ -1399,6 +1485,55 @@ function nammu_fediverse_stream_state(array $tabs = ['home', 'notifications', 'm
         $state[$tabKey] = nammu_fediverse_tab_version($tabKey);
     }
     return $state;
+}
+
+function nammu_fediverse_fragment_cache_key(string $tab, array $context = []): string
+{
+    $tab = strtolower(trim($tab));
+    ksort($context);
+    return $tab . ':' . sha1(json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+}
+
+function nammu_fediverse_get_cached_fragment(string $tab, string $version, array $context = [], int $ttl = 15): string
+{
+    $key = nammu_fediverse_fragment_cache_key($tab, $context);
+    $store = nammu_fediverse_fragments_cache_store()['items'];
+    $item = is_array($store[$key] ?? null) ? $store[$key] : null;
+    if (!is_array($item)) {
+        return '';
+    }
+    $cachedVersion = trim((string) ($item['version'] ?? ''));
+    $cachedHtml = (string) ($item['html'] ?? '');
+    $cachedAt = (int) ($item['cached_at'] ?? 0);
+    if ($cachedVersion === '' || $cachedHtml === '' || $cachedVersion !== $version) {
+        return '';
+    }
+    if ($cachedAt <= 0 || (time() - $cachedAt) > max(1, $ttl)) {
+        return '';
+    }
+    return $cachedHtml;
+}
+
+function nammu_fediverse_store_cached_fragment(string $tab, string $version, array $context, string $html, int $maxItems = 60): void
+{
+    $html = trim($html);
+    if ($html === '' || $version === '') {
+        return;
+    }
+    $key = nammu_fediverse_fragment_cache_key($tab, $context);
+    $store = nammu_fediverse_fragments_cache_store()['items'];
+    $store[$key] = [
+        'version' => $version,
+        'cached_at' => time(),
+        'html' => $html,
+    ];
+    uasort($store, static function (array $a, array $b): int {
+        return ((int) ($b['cached_at'] ?? 0)) <=> ((int) ($a['cached_at'] ?? 0));
+    });
+    if (count($store) > $maxItems) {
+        $store = array_slice($store, 0, $maxItems, true);
+    }
+    nammu_fediverse_save_fragments_cache_store($store);
 }
 
 function nammu_fediverse_reply_collection_hash(string $objectId): string

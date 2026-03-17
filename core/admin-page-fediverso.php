@@ -38,6 +38,25 @@
     $isFediverseMessagesTab = $fediverseTab === 'messages';
     $isFediverseNetworkTab = $fediverseTab === 'network';
     $isFediverseSettingsTab = $fediverseTab === 'settings';
+    $fediverseTimelinePage = max(1, (int) ($_GET['timeline_page'] ?? 1));
+    $fediverseTimelinePerPage = 20;
+    $fediverseFragmentContext = [];
+    if ($fediverseTab === 'home' && $fediverseTimelinePage > 1) {
+        $fediverseFragmentContext['timeline_page'] = $fediverseTimelinePage;
+    }
+    $fediverseFastVersion = function_exists('nammu_fediverse_tab_version') ? nammu_fediverse_tab_version($fediverseTab) : '';
+    $fediverseCachedPanelHtml = '';
+    $fediverseCanUseCachedPanel = $_SERVER['REQUEST_METHOD'] === 'GET'
+        && empty($fediverseFeedback)
+        && empty($fediverseInspectResult)
+        && empty($fediverseActorInput)
+        && empty($fediverseMessageText)
+        && empty($fediverseMessageRecipient)
+        && function_exists('nammu_fediverse_get_cached_fragment');
+    if ($fediverseCanUseCachedPanel) {
+        $fediverseCachedPanelHtml = nammu_fediverse_get_cached_fragment($fediverseTab, $fediverseFastVersion, $fediverseFragmentContext);
+    }
+    $fediverseNeedsLivePanel = $fediverseCachedPanelHtml === '';
 
     $fediverseFollowing = nammu_fediverse_following_store()['actors'];
     $fediverseFollowingIds = [];
@@ -63,41 +82,43 @@
             $fediverseBlockedIds[$fediverseBlockedActorId] = true;
         }
     }
-    $fediverseTimeline = $isFediverseHomeTab ? nammu_fediverse_timeline_store()['items'] : [];
+    $fediverseTimeline = ($isFediverseHomeTab && $fediverseNeedsLivePanel) ? nammu_fediverse_timeline_store()['items'] : [];
     $fediverseRecipients = ($isFediverseMessagesTab || $isFediverseNetworkTab)
+        && $fediverseNeedsLivePanel
         && function_exists('nammu_fediverse_message_recipients')
         ? nammu_fediverse_message_recipients()
         : [];
-    $fediverseMessages = $isFediverseMessagesTab && function_exists('nammu_fediverse_grouped_messages')
+    $fediverseMessages = $isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_grouped_messages')
         ? nammu_fediverse_grouped_messages()
         : [];
-    $fediversePublicReplyMessages = $isFediverseMessagesTab && function_exists('nammu_fediverse_public_reply_message_entries')
+    $fediversePublicReplyMessages = $isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_public_reply_message_entries')
         ? nammu_fediverse_public_reply_message_entries($fediverseConfig)
         : [];
-    $fediverseOutgoingPublicReplyMessages = $isFediverseMessagesTab && function_exists('nammu_fediverse_outgoing_public_reply_message_entries')
+    $fediverseOutgoingPublicReplyMessages = $isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_outgoing_public_reply_message_entries')
         ? nammu_fediverse_outgoing_public_reply_message_entries($fediverseConfig)
         : [];
-    $fediverseRemotePublicReplyMessages = $isFediverseMessagesTab && function_exists('nammu_fediverse_remote_public_reply_message_entries')
+    $fediverseRemotePublicReplyMessages = $isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_remote_public_reply_message_entries')
         ? nammu_fediverse_remote_public_reply_message_entries($fediverseConfig)
         : [];
-    $fediversePublicThreadRootMessages = $isFediverseMessagesTab && function_exists('nammu_fediverse_public_thread_root_message_entries')
+    $fediversePublicThreadRootMessages = $isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_public_thread_root_message_entries')
         ? nammu_fediverse_public_thread_root_message_entries($fediverseConfig)
         : [];
-    $fediverseRemoteThreadRootMessages = $isFediverseMessagesTab && function_exists('nammu_fediverse_remote_thread_root_message_entries')
+    $fediverseRemoteThreadRootMessages = $isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_remote_thread_root_message_entries')
         ? nammu_fediverse_remote_thread_root_message_entries($fediverseConfig)
         : [];
-    $fediverseNotifications = $isFediverseNotificationsTab && function_exists('nammu_fediverse_notification_entries')
+    $fediverseNotifications = $isFediverseNotificationsTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_notification_entries')
         ? nammu_fediverse_notification_entries($fediverseConfig)
         : [];
-    $fediverseTimelinePage = max(1, (int) ($_GET['timeline_page'] ?? 1));
-    $fediverseTimelinePerPage = 40;
-    $fediverseLocalReactionDetails = $isFediverseHomeTab && function_exists('nammu_fediverse_local_reaction_details')
+    $fediverseLocalReactionDetails = $isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_local_reaction_details')
         ? nammu_fediverse_local_reaction_details($fediverseConfig)
         : [];
-    $fediverseRemoteBoostSummary = $isFediverseHomeTab && function_exists('nammu_fediverse_remote_boost_summary')
+    $fediverseRemoteBoostSummary = $isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_remote_boost_summary')
         ? nammu_fediverse_remote_boost_summary()
         : [];
-    $fediverseRemoteReplySummary = $isFediverseHomeTab && function_exists('nammu_fediverse_remote_reply_summary')
+    $fediverseRemoteBoostDetails = $isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_remote_boost_details')
+        ? nammu_fediverse_remote_boost_details($fediverseConfig)
+        : [];
+    $fediverseRemoteReplySummary = $isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_remote_reply_summary')
         ? nammu_fediverse_remote_reply_summary()
         : [];
     $buildTabUrl = static function (string $tab): string {
@@ -134,6 +155,7 @@
         return $actorId;
     };
     $fediverseKnownActors = ($isFediverseHomeTab || $isFediverseNotificationsTab || $isFediverseMessagesTab)
+        && $fediverseNeedsLivePanel
         && function_exists('nammu_fediverse_known_actors')
         ? nammu_fediverse_known_actors()
         : [];
@@ -181,13 +203,13 @@
         $fediverseFlatMessageKeys[$fediverseMessageKey] = true;
         $fediverseFlatMessages[] = $publicConversationMessage;
     }
-    $fediverseMessageThreads = $isFediverseMessagesTab && function_exists('nammu_fediverse_thread_grouped_messages')
+    $fediverseMessageThreads = $isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_thread_grouped_messages')
         ? nammu_fediverse_thread_grouped_messages($fediverseFlatMessages)
         : [];
-    $fediverseLocalItems = $isFediverseHomeTab && function_exists('nammu_fediverse_local_content_items')
+    $fediverseLocalItems = $isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_local_content_items')
         ? nammu_fediverse_local_content_items($fediverseConfig)
         : [];
-    if ($isFediverseHomeTab && function_exists('nammu_fediverse_actions_store') && function_exists('nammu_fediverse_resend_item_from_action')) {
+    if ($isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_actions_store') && function_exists('nammu_fediverse_resend_item_from_action')) {
         foreach (nammu_fediverse_actions_store()['items'] as $fediverseAction) {
             $fediverseResendItem = nammu_fediverse_resend_item_from_action($fediverseAction);
             if (is_array($fediverseResendItem)) {
@@ -195,8 +217,8 @@
             }
         }
     }
-    $fediverseLocalReactionSummary = $isFediverseHomeTab && function_exists('nammu_fediverse_local_reaction_summary') ? nammu_fediverse_local_reaction_summary($fediverseConfig) : [];
-    $fediverseIncomingReplies = $isFediverseHomeTab && function_exists('nammu_fediverse_incoming_public_replies_by_object') ? nammu_fediverse_incoming_public_replies_by_object($fediverseConfig) : [];
+    $fediverseLocalReactionSummary = $isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_local_reaction_summary') ? nammu_fediverse_local_reaction_summary($fediverseConfig) : [];
+    $fediverseIncomingReplies = $isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_incoming_public_replies_by_object') ? nammu_fediverse_incoming_public_replies_by_object($fediverseConfig) : [];
     $fediverseIncomingReplyIds = [];
     $fediverseIncomingReplyRoots = [];
     $fediverseRemoteRepliesByTarget = [];
@@ -270,6 +292,21 @@
         ];
     }
     $fediverseTimelineDisplay = [];
+    $fediverseRemoteCanonicalItems = [];
+    foreach ($fediverseTimeline as $fediverseTimelineCandidate) {
+        if (!is_array($fediverseTimelineCandidate)) {
+            continue;
+        }
+        if (strtolower(trim((string) ($fediverseTimelineCandidate['type'] ?? ''))) === 'announce') {
+            continue;
+        }
+        foreach (['object_id', 'url', 'id'] as $fediverseCanonicalField) {
+            $fediverseCanonicalValue = trim((string) ($fediverseTimelineCandidate[$fediverseCanonicalField] ?? ''));
+            if ($fediverseCanonicalValue !== '') {
+                $fediverseRemoteCanonicalItems[$fediverseCanonicalValue] = true;
+            }
+        }
+    }
     foreach ($fediverseTimeline as $fediverseTimelineItem) {
         $fediverseTimelineType = strtolower(trim((string) ($fediverseTimelineItem['type'] ?? '')));
         if (in_array($fediverseTimelineType, ['like', 'delete'], true)) {
@@ -290,6 +327,18 @@
             $fediverseTimelineFieldValue = trim((string) ($fediverseTimelineItem[$fediverseTimelineField] ?? ''));
             if ($fediverseTimelineFieldValue !== '') {
                 $fediverseTimelineIdentifiers[] = $fediverseTimelineFieldValue;
+            }
+        }
+        if ($fediverseTimelineType === 'announce') {
+            $fediverseAnnounceDuplicatesExisting = false;
+            foreach ($fediverseTimelineIdentifiers as $fediverseTimelineIdentifier) {
+                if (isset($fediverseRemoteCanonicalItems[$fediverseTimelineIdentifier])) {
+                    $fediverseAnnounceDuplicatesExisting = true;
+                    break;
+                }
+            }
+            if ($fediverseAnnounceDuplicatesExisting) {
+                continue;
             }
         }
         $fediverseTimelineTargetUrl = trim((string) ($fediverseTimelineItem['target_url'] ?? ''));
@@ -482,7 +531,9 @@
 
         <div id="fediverse-tab-panel" data-fediverse-tab-panel data-fediverse-tab="<?= htmlspecialchars($fediverseTab, ENT_QUOTES, 'UTF-8') ?>">
         <!-- FEDIVERSE_TAB_PANEL_START -->
-        <?php if ($fediverseTab === 'home'): ?>
+        <?php if ($fediverseCachedPanelHtml !== ''): ?>
+            <?= $fediverseCachedPanelHtml ?>
+        <?php elseif ($fediverseTab === 'home'): ?>
             <div class="card fediverse-home-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
@@ -787,6 +838,7 @@
                                 });
                                 ?>
                                 <?php $remoteBoostMeta = $fediverseRemoteBoostSummary[$itemObjectId] ?? ['count' => 0]; ?>
+                                <?php $remoteBoostActors = $fediverseRemoteBoostDetails[$itemObjectId] ?? []; ?>
                                 <?php
                                 $remoteReplyMeta = $fediverseRemoteReplySummary[$itemObjectId] ?? ['count' => 0];
                                 if (!empty($remoteItemReplies)) {
@@ -903,7 +955,23 @@
                                         </div>
                                         <?php if (($remoteBoostMeta['count'] ?? 0) > 0 || ($remoteReplyMeta['count'] ?? 0) > 0 || !empty($itemActionState['liked']) || !empty($itemActionState['boosted']) || !empty($itemActionState['replied']) || !empty($itemActionState['shared'])): ?>
                                             <div class="fediverse-status__history">
-                                                <?php if (($remoteBoostMeta['count'] ?? 0) > 0): ?><span><?= (int) ($remoteBoostMeta['count'] ?? 0) ?> impulso<?= ((int) ($remoteBoostMeta['count'] ?? 0) === 1) ? '' : 's' ?></span><?php endif; ?>
+                                                <?php if (($remoteBoostMeta['count'] ?? 0) > 0): ?>
+                                                    <span><?= (int) ($remoteBoostMeta['count'] ?? 0) ?> impulso<?= ((int) ($remoteBoostMeta['count'] ?? 0) === 1) ? '' : 's' ?></span>
+                                                    <?php if (!empty($remoteBoostActors)): ?>
+                                                        <span class="fediverse-status__actor-icons">
+                                                            <?php foreach ($remoteBoostActors as $remoteBoostActor): ?>
+                                                                <?php $remoteBoostActorUrl = trim((string) (($remoteBoostActor['url'] ?? '') ?: '#')); ?>
+                                                                <a href="<?= htmlspecialchars($remoteBoostActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($remoteBoostActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <?php if (!empty($remoteBoostActor['icon'])): ?>
+                                                                        <img src="<?= htmlspecialchars((string) $remoteBoostActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($remoteBoostActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                                                    <?php else: ?>
+                                                                        <?= htmlspecialchars(mb_substr((string) (($remoteBoostActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                                                    <?php endif; ?>
+                                                                </a>
+                                                            <?php endforeach; ?>
+                                                        </span>
+                                                    <?php endif; ?>
+                                                <?php endif; ?>
                                                 <?php if (($remoteReplyMeta['count'] ?? 0) > 0): ?><span><?= (int) ($remoteReplyMeta['count'] ?? 0) ?> respuesta<?= ((int) ($remoteReplyMeta['count'] ?? 0) === 1) ? '' : 's' ?></span><?php endif; ?>
                                                 <?php if (!empty($itemActionState['liked'])): ?><span>Favorito enviado</span><?php endif; ?>
                                                 <?php if (!empty($itemActionState['boosted'])): ?><span><?= (int) ($itemActionState['boost_count'] ?? 0) ?> impulso<?= ((int) ($itemActionState['boost_count'] ?? 0) === 1) ? '' : 's' ?></span><?php endif; ?>

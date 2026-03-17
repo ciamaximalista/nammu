@@ -129,6 +129,7 @@ Esa tarea se encarga de:
 - procesar colas pendientes,
 - revisar RSS externas configuradas en **Redes**,
 - refrescar actores seguidos en **Fediverso**,
+- precalentar la caché local de hilos y stores de **Fediverso** para acelerar el admin,
 - regenerar snapshots públicos dependientes del cron.
 
 Además, Nammu incluye:
@@ -146,10 +147,12 @@ sudo crontab -u www-data -e
 
 Si usas ese comando, las líneas van **sin** la columna `www-data`.
 
+Para que **Fediverso** cargue ágilmente en el admin, conviene ejecutar `admin.php --run-scheduled` cada minuto con el usuario del servidor web. Ese proceso refresca actores seguidos, entrega publicaciones pendientes y precalienta la caché local de hilos remotos, de modo que `Inicio`, `Mensajes` y `Notificaciones` lean datos ya preparados en vez de reconstruirlos al abrir el panel.
+
 ### Bloque de cron recomendado
 
 ```bash
-*/5 * * * * php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
+* * * * * php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
 15 3 * * * php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
 30 3 * * 0 php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
 45 3 * * 0 php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> /var/www/html/<carpeta-publica>/backups/backup-full.log 2>&1

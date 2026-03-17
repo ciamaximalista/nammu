@@ -85,6 +85,9 @@ function admin_run_scheduled_tasks(): array {
             $fediverseStats['followers'] = (int) ($deliveryStats['followers'] ?? 0);
             $fediverseStats['delivered'] = (int) ($deliveryStats['delivered'] ?? 0);
         }
+        if (function_exists('nammu_fediverse_warm_threads_cache')) {
+            $fediverseStats['threads_warmed'] = (int) nammu_fediverse_warm_threads_cache($config, 20);
+        }
     }
     return [
         'published' => $published,
@@ -10160,13 +10163,17 @@ if ($isLoggedIn && $page === 'fediverso') {
         ];
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refresh_fediverse_timeline'])) {
+        $config = load_config_file();
         $stats = nammu_fediverse_refresh_following();
         if (function_exists('nammu_fediverse_clear_threads_cache')) {
             nammu_fediverse_clear_threads_cache();
         }
+        if (function_exists('nammu_fediverse_warm_threads_cache')) {
+            $stats['threads_warmed'] = (int) nammu_fediverse_warm_threads_cache($config, 20);
+        }
         $fediverseFeedback = [
             'type' => 'info',
-            'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '.',
+            'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '. Hilos precalentados: ' . (int) ($stats['threads_warmed'] ?? 0) . '.',
         ];
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rebuild_fediverse_timeline'])) {
@@ -10182,9 +10189,12 @@ if ($isLoggedIn && $page === 'fediverso') {
             nammu_fediverse_clear_threads_cache();
         }
         $stats = nammu_fediverse_rebuild_timeline();
+        if (function_exists('nammu_fediverse_warm_threads_cache')) {
+            $stats['threads_warmed'] = (int) nammu_fediverse_warm_threads_cache($config, 20);
+        }
         $fediverseFeedback = [
             'type' => 'info',
-            'message' => 'Timeline del Fediverso reconstruido, incluyendo la parte local. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades importadas: ' . (int) ($stats['new'] ?? 0) . '.',
+            'message' => 'Timeline del Fediverso reconstruido, incluyendo la parte local. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades importadas: ' . (int) ($stats['new'] ?? 0) . '. Hilos precalentados: ' . (int) ($stats['threads_warmed'] ?? 0) . '.',
         ];
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['inspect_fediverse_object'])) {
@@ -10409,6 +10419,23 @@ if ($isLoggedIn && $page === 'fediverso') {
 }
 
 if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fediverse_fragment'])) {
+    $fediverseFragmentTab = strtolower(trim((string) ($_GET['tab'] ?? 'home')));
+    if (!in_array($fediverseFragmentTab, ['home', 'notifications', 'messages', 'network', 'settings'], true)) {
+        $fediverseFragmentTab = 'home';
+    }
+    $fediverseFragmentContext = [];
+    if ($fediverseFragmentTab === 'home') {
+        $fediverseFragmentContext['timeline_page'] = max(1, (int) ($_GET['timeline_page'] ?? 1));
+    }
+    $fediverseFragmentVersion = nammu_fediverse_tab_version($fediverseFragmentTab);
+    $fediverseCachedFragment = nammu_fediverse_get_cached_fragment($fediverseFragmentTab, $fediverseFragmentVersion, $fediverseFragmentContext, 20);
+    if ($fediverseCachedFragment !== '') {
+        header('Content-Type: text/html; charset=UTF-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        header('Pragma: no-cache');
+        echo $fediverseCachedFragment;
+        exit;
+    }
     ob_start();
     include __DIR__ . '/core/admin-page-fediverso.php';
     $fediverseHtml = (string) ob_get_clean();
@@ -10419,6 +10446,7 @@ if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET'
     if ($startPos !== false && $endPos !== false && $endPos > $startPos) {
         $fediverseHtml = trim(substr($fediverseHtml, $startPos + strlen($startMarker), $endPos - ($startPos + strlen($startMarker))));
     }
+    nammu_fediverse_store_cached_fragment($fediverseFragmentTab, $fediverseFragmentVersion, $fediverseFragmentContext, $fediverseHtml);
     header('Content-Type: text/html; charset=UTF-8');
     header('Cache-Control: no-store, no-cache, must-revalidate');
     header('Pragma: no-cache');

@@ -37,6 +37,21 @@ $headerButtonsHtml = '';
 if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons')) {
     $headerButtonsHtml = nammu_render_standard_header_buttons(get_defined_vars());
 }
+$fediverseIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';
+$actualityFediverseLink = static function (array $item) use ($config): string {
+    if (!function_exists('nammu_fediverse_public_thread_url_for_actuality_item')) {
+        return '';
+    }
+    return trim((string) nammu_fediverse_public_thread_url_for_actuality_item($item, is_array($config ?? null) ? $config : []));
+};
+$renderActualityText = static function (string $text, array $item) use ($fediverseIcon, $actualityFediverseLink): string {
+    $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
+    $fediverseUrl = $actualityFediverseLink($item);
+    if ($fediverseUrl !== '' && $fediverseIcon !== '') {
+        $html .= ' <a class="actuality-fediverse-inline" href="' . htmlspecialchars($fediverseUrl, ENT_QUOTES, 'UTF-8') . '" title="En el Fediverso" aria-label="En el Fediverso">' . $fediverseIcon . '</a>';
+    }
+    return $html;
+};
 $formatDate = static function (int $timestamp): string {
     if ($timestamp <= 0) {
         return '';
@@ -150,7 +165,7 @@ $manualDisplayText = static function (array $item): string {
                                 </a>
                             <?php endif; ?>
                             <?php if ($item['description'] !== ''): ?>
-                                <div class="actuality-description"><?= nl2br(htmlspecialchars($item['description'], ENT_QUOTES, 'UTF-8')) ?></div>
+                                <div class="actuality-description"><?= $renderActualityText((string) $item['description'], $item) ?></div>
                             <?php endif; ?>
                             <?php if ($isManual && !empty($item['links'])): ?>
                                 <p class="actuality-manual-links"><?= $renderLinks(is_array($item['links']) ? $item['links'] : []) ?></p>
@@ -185,7 +200,7 @@ $manualDisplayText = static function (array $item): string {
                                 <?php endif; ?>
                                 <?php if ((!$isManual && $item['description'] !== '') || ($isManual && $manualBody !== '')): ?>
                                     <?php $descriptionText = $isManual ? $manualBody : (string) $item['description']; ?>
-                                    <div class="actuality-description"><?= nl2br(htmlspecialchars($descriptionText, ENT_QUOTES, 'UTF-8')) ?></div>
+                                    <div class="actuality-description"><?= $renderActualityText($descriptionText, $item) ?></div>
                                 <?php endif; ?>
                                 <?php if ($isManual && !empty($item['links'])): ?>
                                     <p class="actuality-manual-links"><?= $renderLinks(is_array($item['links']) ? $item['links'] : []) ?></p>
@@ -221,7 +236,7 @@ $manualDisplayText = static function (array $item): string {
                                 <?php endif; ?>
                                 <?php if ((!$isManual && $item['description'] !== '') || ($isManual && $manualBody !== '')): ?>
                                     <?php $descriptionText = $isManual ? $manualBody : (string) $item['description']; ?>
-                                    <div class="actuality-description"><?= nl2br(htmlspecialchars($descriptionText, ENT_QUOTES, 'UTF-8')) ?></div>
+                                    <div class="actuality-description"><?= $renderActualityText($descriptionText, $item) ?></div>
                                 <?php endif; ?>
                                 <?php if ($isManual && !empty($item['links'])): ?>
                                     <p class="actuality-manual-links"><?= $renderLinks(is_array($item['links']) ? $item['links'] : []) ?></p>
@@ -359,6 +374,18 @@ $manualDisplayText = static function (array $item): string {
         margin: 0;
         color: <?= $textColor ?>;
         line-height: 1.6;
+    }
+    .actuality-fediverse-inline {
+        display: inline-flex;
+        width: 0.95rem;
+        height: 0.95rem;
+        vertical-align: text-bottom;
+        color: <?= $accentColor ?>;
+    }
+    .actuality-fediverse-inline svg {
+        width: 100%;
+        height: 100%;
+        display: block;
     }
     .actuality-manual-links {
         margin: 1rem 0 0 0;

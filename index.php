@@ -1164,6 +1164,7 @@ if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
         'hidePostIntro' => true,
         'relatedPosts' => $relatedPosts,
         'podcastEpisodesIndexUrl' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/podcast',
+        'fediverseThreadUrl' => nammu_fediverse_public_thread_url_for_named_local_item($episode->getSlug(), 'podcast', $config),
         'customMetaBand' => $episodeDateDisplay !== '' ? 'Emitido el ' . $episodeDateDisplay : '',
         'editButtonHref' => $isAdminLogged
             ? (($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/admin.php?page=edit-post&file=' . rawurlencode($episode->getSlug() . '.md'))
@@ -1900,6 +1901,15 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
                     >Comenzar itinerario</a>
                 </div>
             <?php endif; ?>
+            <?php $itineraryFediverseThreadUrl = nammu_fediverse_public_thread_url_for_named_local_item($itinerary->getSlug(), 'itinerary', $config); ?>
+            <?php if ($itineraryFediverseThreadUrl !== ''): ?>
+                <div class="itinerary-topics__cta">
+                    <a class="button button-secondary" href="<?= htmlspecialchars($itineraryFediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="En el Fediverso" aria-label="En el Fediverso" style="display:inline-flex;align-items:center;gap:0.7rem;">
+                        <span>En el Fediverso</span>
+                        <span aria-hidden="true" style="display:inline-flex;width:1.2rem;height:1.2rem;"><?= nammu_footer_icon_svgs()['fediverse'] ?? '' ?></span>
+                    </a>
+                </div>
+            <?php endif; ?>
             <?php if ($usageNotice !== ''): ?>
                 <div class="itinerary-usage-alert" role="note">
                     <?= htmlspecialchars($usageNotice, ENT_QUOTES, 'UTF-8') ?>
@@ -2576,6 +2586,7 @@ if ($slug !== null && $slug !== '') {
         'postFilePath' => $postFilePath,
         'autoTocHtml' => $autoTocHtml,
         'relatedPosts' => $relatedPosts,
+        'fediverseThreadUrl' => nammu_fediverse_public_thread_url_for_named_local_item($post->getSlug(), 'post', $config),
         'editButtonHref' => $isAdminLogged
             ? (($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/admin.php?page=edit-post&file=' . rawurlencode($post->getSlug() . '.md'))
             : '',

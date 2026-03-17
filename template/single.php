@@ -25,6 +25,8 @@ $relatedHeadingColorEsc = htmlspecialchars($relatedHeadingColor, ENT_QUOTES, 'UT
 $fonts = $theme['fonts'] ?? [];
 $codeFont = htmlspecialchars($fonts['code'] ?? 'VT323', ENT_QUOTES, 'UTF-8');
 $quoteFont = htmlspecialchars($fonts['quote'] ?? 'Castoro', ENT_QUOTES, 'UTF-8');
+$fediverseThreadUrl = trim((string) ($fediverseThreadUrl ?? ''));
+$fediverseIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';
 $searchSettings = $theme['search'] ?? [];
 $searchMode = in_array($searchSettings['mode'] ?? 'none', ['none', 'home', 'single', 'both'], true) ? $searchSettings['mode'] : 'none';
 $searchPositionSetting = in_array($searchSettings['position'] ?? 'title', ['title', 'footer'], true) ? $searchSettings['position'] : 'title';
@@ -415,6 +417,16 @@ if ($isPageTemplate && $formattedDate !== '') {
                 <a class="podcast-index-cta-btn" href="<?= htmlspecialchars($podcastEpisodesIndexUrl, ENT_QUOTES, 'UTF-8') ?>">Índice de episodios</a>
             </div>
         <?php endif; ?>
+        <?php if ($fediverseThreadUrl !== ''): ?>
+            <div class="fediverse-object-cta">
+                <a class="fediverse-object-cta-btn" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="En el Fediverso" aria-label="En el Fediverso">
+                    <span class="fediverse-object-cta-label">En el Fediverso</span>
+                    <?php if ($fediverseIcon !== ''): ?>
+                        <span class="fediverse-object-cta-icon" aria-hidden="true"><?= $fediverseIcon ?></span>
+                    <?php endif; ?>
+                </a>
+            </div>
+        <?php endif; ?>
     </div>
     <?php if ($bottomMetaText !== ''): ?>
         <div class="post-meta-update"><?= $bottomMetaText ?></div>
@@ -450,6 +462,39 @@ if ($isPageTemplate && $formattedDate !== '') {
         width: min(960px, 100%);
         display: block;
         margin: 0.35rem auto 1rem;
+    }
+    .fediverse-object-cta {
+        display: flex;
+        justify-content: center;
+        margin: 1.5rem auto 0;
+    }
+    .fediverse-object-cta-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.8rem 1.1rem;
+        border-radius: 999px;
+        border: 1px solid rgba(0,0,0,0.12);
+        background: rgba(255,255,255,0.88);
+        color: inherit;
+        text-decoration: none;
+        font-weight: 700;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
+    .fediverse-object-cta-btn:hover {
+        text-decoration: none;
+        transform: translateY(-1px);
+    }
+    .fediverse-object-cta-icon {
+        display: inline-flex;
+        width: 1.4rem;
+        height: 1.4rem;
+        color: var(--color-link, currentColor);
+    }
+    .fediverse-object-cta-icon svg {
+        width: 100%;
+        height: 100%;
+        display: block;
     }
     .post-body .podcast-video-single {
         width: min(960px, 100%);

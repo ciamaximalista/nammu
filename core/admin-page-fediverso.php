@@ -85,15 +85,9 @@
     $fediverseHomeSnapshot = ($isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_home_snapshot_store'))
         ? (nammu_fediverse_home_snapshot_store()['data'] ?? [])
         : [];
-    if ($isFediverseHomeTab && $fediverseNeedsLivePanel && empty($fediverseHomeSnapshot) && function_exists('nammu_fediverse_rebuild_home_snapshot')) {
-        $fediverseHomeSnapshot = nammu_fediverse_rebuild_home_snapshot($fediverseConfig);
-    }
     $fediverseMessagesSnapshot = ($isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_messages_snapshot_store'))
         ? (nammu_fediverse_messages_snapshot_store()['data'] ?? [])
         : [];
-    if ($isFediverseMessagesTab && $fediverseNeedsLivePanel && empty($fediverseMessagesSnapshot) && function_exists('nammu_fediverse_rebuild_messages_snapshot')) {
-        $fediverseMessagesSnapshot = nammu_fediverse_rebuild_messages_snapshot($fediverseConfig);
-    }
     $fediverseTimeline = ($isFediverseHomeTab && $fediverseNeedsLivePanel)
         ? (is_array($fediverseHomeSnapshot['timeline'] ?? null) ? $fediverseHomeSnapshot['timeline'] : nammu_fediverse_timeline_store()['items'])
         : [];

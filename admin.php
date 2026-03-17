@@ -10407,6 +10407,52 @@ if ($isLoggedIn && $page === 'fediverso') {
         exit;
     }
 }
+
+if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fediverse_fragment'])) {
+    ob_start();
+    include __DIR__ . '/core/admin-page-fediverso.php';
+    $fediverseHtml = (string) ob_get_clean();
+    $startMarker = '<!-- FEDIVERSE_TAB_PANEL_START -->';
+    $endMarker = '<!-- FEDIVERSE_TAB_PANEL_END -->';
+    $startPos = strpos($fediverseHtml, $startMarker);
+    $endPos = strpos($fediverseHtml, $endMarker);
+    if ($startPos !== false && $endPos !== false && $endPos > $startPos) {
+        $fediverseHtml = trim(substr($fediverseHtml, $startPos + strlen($startMarker), $endPos - ($startPos + strlen($startMarker))));
+    }
+    header('Content-Type: text/html; charset=UTF-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Pragma: no-cache');
+    echo $fediverseHtml;
+    exit;
+}
+
+if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fediverse_stream'])) {
+    require_once __DIR__ . '/core/fediverso.php';
+    @set_time_limit(0);
+    header('Content-Type: text/event-stream; charset=UTF-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Pragma: no-cache');
+    header('X-Accel-Buffering: no');
+    $tabs = ['home', 'notifications', 'messages', 'network', 'settings'];
+    $lastState = [];
+    $startedAt = time();
+    while (!connection_aborted() && (time() - $startedAt) < 20) {
+        $state = nammu_fediverse_stream_state($tabs);
+        if ($state !== $lastState) {
+            echo "event: state\n";
+            echo 'data: ' . json_encode(['versions' => $state], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
+            @ob_flush();
+            @flush();
+            $lastState = $state;
+        } else {
+            echo ": ping\n\n";
+            @ob_flush();
+            @flush();
+        }
+        sleep(2);
+    }
+    exit;
+}
 $isItineraryAdminPage = in_array($page, ['itinerarios', 'itinerario', 'itinerario-tema'], true);
 
 if ($isLoggedIn && isset($_GET['download_full_backup'])) {

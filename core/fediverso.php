@@ -1314,6 +1314,93 @@ function nammu_fediverse_cached_remote_replies_for_item(array $item, array $conf
     return $replies;
 }
 
+function nammu_fediverse_cached_remote_replies_snapshot_for_item(array $item): array
+{
+    $objectId = trim((string) (($item['object_id'] ?? '') ?: ($item['id'] ?? '')));
+    if ($objectId === '') {
+        return [];
+    }
+    $cacheStore = nammu_fediverse_threads_cache_store();
+    $cacheItems = is_array($cacheStore['items'] ?? null) ? $cacheStore['items'] : [];
+    $cached = is_array($cacheItems[$objectId] ?? null) ? $cacheItems[$objectId] : null;
+    return is_array($cached['replies'] ?? null) ? $cached['replies'] : [];
+}
+
+function nammu_fediverse_store_files_for_tab(string $tab): array
+{
+    $tab = strtolower(trim($tab));
+    $files = match ($tab) {
+        'home' => [
+            nammu_fediverse_timeline_file(),
+            nammu_fediverse_actions_file(),
+            nammu_fediverse_inbox_file(),
+            nammu_fediverse_threads_cache_file(),
+            nammu_fediverse_deleted_file(),
+            nammu_fediverse_hidden_replies_file(),
+            nammu_fediverse_followers_file(),
+        ],
+        'notifications' => [
+            nammu_fediverse_inbox_file(),
+            nammu_fediverse_hidden_replies_file(),
+        ],
+        'messages' => [
+            nammu_fediverse_messages_file(),
+            nammu_fediverse_actions_file(),
+            nammu_fediverse_inbox_file(),
+            nammu_fediverse_threads_cache_file(),
+            nammu_fediverse_following_file(),
+            nammu_fediverse_followers_file(),
+            nammu_fediverse_hidden_replies_file(),
+        ],
+        'network' => [
+            nammu_fediverse_following_file(),
+            nammu_fediverse_followers_file(),
+            nammu_fediverse_blocked_file(),
+        ],
+        'settings' => [
+            nammu_fediverse_followers_file(),
+            nammu_fediverse_keys_file(),
+            nammu_fediverse_actions_file(),
+        ],
+        default => [
+            nammu_fediverse_timeline_file(),
+            nammu_fediverse_inbox_file(),
+            nammu_fediverse_messages_file(),
+            nammu_fediverse_following_file(),
+            nammu_fediverse_followers_file(),
+            nammu_fediverse_actions_file(),
+            nammu_fediverse_threads_cache_file(),
+            nammu_fediverse_hidden_replies_file(),
+            nammu_fediverse_blocked_file(),
+        ],
+    };
+    return array_values(array_unique($files));
+}
+
+function nammu_fediverse_tab_version(string $tab): string
+{
+    $parts = [strtolower(trim($tab))];
+    foreach (nammu_fediverse_store_files_for_tab($tab) as $file) {
+        $mtime = is_file($file) ? (string) ((int) @filemtime($file)) : '0';
+        $size = is_file($file) ? (string) ((int) @filesize($file)) : '0';
+        $parts[] = basename($file) . ':' . $mtime . ':' . $size;
+    }
+    return substr(sha1(implode('|', $parts)), 0, 20);
+}
+
+function nammu_fediverse_stream_state(array $tabs = ['home', 'notifications', 'messages', 'network', 'settings']): array
+{
+    $state = [];
+    foreach ($tabs as $tab) {
+        $tabKey = strtolower(trim((string) $tab));
+        if ($tabKey === '') {
+            continue;
+        }
+        $state[$tabKey] = nammu_fediverse_tab_version($tabKey);
+    }
+    return $state;
+}
+
 function nammu_fediverse_reply_collection_hash(string $objectId): string
 {
     return substr(sha1(trim($objectId)), 0, 24);
@@ -2526,8 +2613,8 @@ function nammu_fediverse_remote_public_reply_message_entries(array $config): arr
             continue;
         }
         $rootItem = $timelineIndex[$target];
-        $replies = function_exists('nammu_fediverse_cached_remote_replies_for_item')
-            ? nammu_fediverse_cached_remote_replies_for_item($rootItem, $config)
+        $replies = function_exists('nammu_fediverse_cached_remote_replies_snapshot_for_item')
+            ? nammu_fediverse_cached_remote_replies_snapshot_for_item($rootItem)
             : [];
         foreach ($replies as $reply) {
             if (!is_array($reply)) {

@@ -455,7 +455,8 @@
         return (string) ($context['actor_handle'] ?? ($context['actor_id'] ?? ''));
     };
     ?>
-    <div class="tab-pane active">
+    <?php $fediverseInitialVersion = function_exists('nammu_fediverse_tab_version') ? nammu_fediverse_tab_version($fediverseTab) : ''; ?>
+    <div class="tab-pane active" id="fediverse-admin-root" data-fediverse-admin data-active-tab="<?= htmlspecialchars($fediverseTab, ENT_QUOTES, 'UTF-8') ?>" data-active-version="<?= htmlspecialchars($fediverseInitialVersion, ENT_QUOTES, 'UTF-8') ?>">
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
             <div>
                 <h2 class="mb-1">Fediverso</h2>
@@ -472,13 +473,15 @@
         <ul class="nav nav-tabs mb-4">
             <?php foreach ($fediverseTabs as $tabKey => $tabLabel): ?>
                 <li class="nav-item">
-                    <a class="nav-link <?= $fediverseTab === $tabKey ? 'active' : '' ?>" href="<?= htmlspecialchars($buildTabUrl($tabKey), ENT_QUOTES, 'UTF-8') ?>">
+                    <a class="nav-link <?= $fediverseTab === $tabKey ? 'active' : '' ?>" href="<?= htmlspecialchars($buildTabUrl($tabKey), ENT_QUOTES, 'UTF-8') ?>" data-fediverse-tab-link="<?= htmlspecialchars($tabKey, ENT_QUOTES, 'UTF-8') ?>">
                         <?= htmlspecialchars($tabLabel, ENT_QUOTES, 'UTF-8') ?>
                     </a>
                 </li>
             <?php endforeach; ?>
         </ul>
 
+        <div id="fediverse-tab-panel" data-fediverse-tab-panel data-fediverse-tab="<?= htmlspecialchars($fediverseTab, ENT_QUOTES, 'UTF-8') ?>">
+        <!-- FEDIVERSE_TAB_PANEL_START -->
         <?php if ($fediverseTab === 'home'): ?>
             <div class="card fediverse-home-card">
                 <div class="card-body">
@@ -717,7 +720,7 @@
                                 <?php $itemTargetActorId = (string) (($item['target_actor_id'] ?? '') ?: ($item['actor_id'] ?? '')); ?>
                                 <?php $itemActionState = function_exists('nammu_fediverse_action_state_for_item') ? nammu_fediverse_action_state_for_item($item) : ['liked' => false, 'boosted' => false, 'replied' => false, 'shared' => false, 'boost_count' => 0, 'reply_count' => 0, 'share_count' => 0]; ?>
                                 <?php $itemReplies = function_exists('nammu_fediverse_replies_for_item') ? nammu_fediverse_replies_for_item($item) : []; ?>
-                                <?php $remoteItemReplies = function_exists('nammu_fediverse_cached_remote_replies_for_item') ? nammu_fediverse_cached_remote_replies_for_item($item, $fediverseConfig) : []; ?>
+                                <?php $remoteItemReplies = function_exists('nammu_fediverse_cached_remote_replies_snapshot_for_item') ? nammu_fediverse_cached_remote_replies_snapshot_for_item($item) : []; ?>
                                 <?php
                                 $replyDedupKeys = [];
                                 $registerReplyKey = static function (array $reply) use (&$replyDedupKeys): void {
@@ -1523,6 +1526,8 @@
                 </div>
             </div>
         <?php endif; ?>
+        <!-- FEDIVERSE_TAB_PANEL_END -->
+        </div>
     </div>
     <style>
         .fediverse-timeline {
@@ -1900,4 +1905,155 @@
             }
         }
     </style>
+    <script>
+    (function () {
+        var root = document.querySelector('[data-fediverse-admin]');
+        if (!root || root.dataset.fediverseBound === '1') {
+            return;
+        }
+        root.dataset.fediverseBound = '1';
+
+        var panel = root.querySelector('[data-fediverse-tab-panel]');
+        var stream = null;
+        var reconnectTimer = null;
+
+        function currentTab() {
+            return root.getAttribute('data-active-tab') || 'home';
+        }
+
+        function setActiveTab(tab) {
+            root.setAttribute('data-active-tab', tab);
+            if (panel) {
+                panel.setAttribute('data-fediverse-tab', tab);
+            }
+            root.querySelectorAll('[data-fediverse-tab-link]').forEach(function (link) {
+                link.classList.toggle('active', link.getAttribute('data-fediverse-tab-link') === tab);
+            });
+        }
+
+        function extractPanel(html) {
+            var startMarker = '<!-- FEDIVERSE_TAB_PANEL_START -->';
+            var endMarker = '<!-- FEDIVERSE_TAB_PANEL_END -->';
+            var start = html.indexOf(startMarker);
+            var end = html.indexOf(endMarker);
+            if (start === -1 || end === -1 || end <= start) {
+                return html;
+            }
+            return html.slice(start + startMarker.length, end).trim();
+        }
+
+        function buildUrl(tab, extraParams) {
+            var url = new URL(window.location.href);
+            url.searchParams.set('page', 'fediverso');
+            url.searchParams.set('tab', tab);
+            Object.keys(extraParams || {}).forEach(function (key) {
+                if (extraParams[key] === null) {
+                    url.searchParams.delete(key);
+                } else {
+                    url.searchParams.set(key, extraParams[key]);
+                }
+            });
+            return url.toString();
+        }
+
+        function loadTab(tab, pushState, extraParams, knownVersion) {
+            if (!panel) {
+                return;
+            }
+            panel.setAttribute('aria-busy', 'true');
+            var params = Object.assign({fediverse_fragment: '1'}, extraParams || {});
+            fetch(buildUrl(tab, params), {
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                credentials: 'same-origin'
+            }).then(function (response) {
+                return response.text();
+            }).then(function (html) {
+                panel.innerHTML = extractPanel(html);
+                panel.setAttribute('aria-busy', 'false');
+                setActiveTab(tab);
+                root.setAttribute('data-active-version', knownVersion || '');
+                if (pushState) {
+                    var nextUrl = new URL(window.location.href);
+                    nextUrl.searchParams.set('page', 'fediverso');
+                    nextUrl.searchParams.set('tab', tab);
+                    if (extraParams && extraParams.timeline_page) {
+                        nextUrl.searchParams.set('timeline_page', extraParams.timeline_page);
+                    } else {
+                        nextUrl.searchParams.delete('timeline_page');
+                    }
+                    window.history.pushState({fediverseTab: tab, fediverseParams: extraParams || {}}, '', nextUrl.toString());
+                }
+            }).catch(function () {
+                panel.setAttribute('aria-busy', 'false');
+            });
+        }
+
+        function connectStream() {
+            if (stream) {
+                stream.close();
+                stream = null;
+            }
+            stream = new EventSource(buildUrl(currentTab(), {fediverse_stream: '1'}));
+            stream.addEventListener('state', function (event) {
+                try {
+                    var payload = JSON.parse(event.data || '{}');
+                    var versions = payload.versions || {};
+                    var tab = currentTab();
+                    if (!versions[tab]) {
+                        return;
+                    }
+                    var currentVersion = root.getAttribute('data-active-version') || '';
+                    if (currentVersion !== versions[tab]) {
+                        var pageParam = null;
+                        if (tab === 'home') {
+                            var url = new URL(window.location.href);
+                            pageParam = url.searchParams.get('timeline_page') || null;
+                        }
+                        loadTab(tab, false, pageParam ? {timeline_page: pageParam} : {}, versions[tab]);
+                    }
+                } catch (error) {
+                }
+            });
+            stream.onerror = function () {
+                if (stream) {
+                    stream.close();
+                    stream = null;
+                }
+                window.clearTimeout(reconnectTimer);
+                reconnectTimer = window.setTimeout(connectStream, 3000);
+            };
+        }
+
+        root.addEventListener('click', function (event) {
+            var tabLink = event.target.closest('[data-fediverse-tab-link]');
+            if (tabLink) {
+                event.preventDefault();
+                loadTab(tabLink.getAttribute('data-fediverse-tab-link') || 'home', true, {});
+                return;
+            }
+            var paginationLink = event.target.closest('.fediverse-pagination a');
+            if (paginationLink && panel && currentTab() === 'home') {
+                event.preventDefault();
+                var pageUrl = new URL(paginationLink.href, window.location.origin);
+                var timelinePage = pageUrl.searchParams.get('timeline_page') || '1';
+                loadTab('home', true, {timeline_page: timelinePage});
+            }
+        });
+
+        window.addEventListener('popstate', function () {
+            var url = new URL(window.location.href);
+            if (url.searchParams.get('page') !== 'fediverso') {
+                return;
+            }
+            var tab = url.searchParams.get('tab') || 'home';
+            var extraParams = {};
+            if (tab === 'home' && url.searchParams.get('timeline_page')) {
+                extraParams.timeline_page = url.searchParams.get('timeline_page');
+            }
+            loadTab(tab, false, extraParams);
+        });
+
+        connectStream();
+    })();
+    </script>
 <?php endif; ?>

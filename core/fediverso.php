@@ -682,7 +682,6 @@ function nammu_fediverse_save_timeline_store(array $items): void
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });
     nammu_fediverse_save_json_store(nammu_fediverse_timeline_file(), ['items' => array_slice(array_values($items), 0, 200)]);
-    nammu_fediverse_rebuild_snapshots_if_possible();
 }
 
 function nammu_fediverse_followers_store(): array
@@ -734,7 +733,6 @@ function nammu_fediverse_save_messages_store(array $items): void
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });
     nammu_fediverse_save_json_store(nammu_fediverse_messages_file(), ['items' => array_slice(array_values($items), 0, 500)]);
-    nammu_fediverse_rebuild_snapshots_if_possible();
 }
 
 function nammu_fediverse_actions_store(): array
@@ -797,7 +795,6 @@ function nammu_fediverse_save_actions_store(array $items): void
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });
     nammu_fediverse_save_json_store(nammu_fediverse_actions_file(), ['items' => array_slice(array_values($items), 0, 1000)]);
-    nammu_fediverse_rebuild_snapshots_if_possible();
 }
 
 function nammu_fediverse_record_action(string $type, string $actorId, string $objectUrl, array $meta = []): void
@@ -1653,28 +1650,6 @@ function nammu_fediverse_rebuild_snapshots(array $config): array
     $home = nammu_fediverse_rebuild_home_snapshot($config);
     $messages = nammu_fediverse_rebuild_messages_snapshot($config);
     return ['home' => $home, 'messages' => $messages];
-}
-
-function nammu_fediverse_rebuild_snapshots_if_possible(): void
-{
-    static $running = false;
-    if ($running) {
-        return;
-    }
-    if (!function_exists('nammu_load_config')) {
-        return;
-    }
-    $running = true;
-    try {
-        $config = nammu_load_config();
-        if (!is_array($config)) {
-            $config = [];
-        }
-        nammu_fediverse_rebuild_snapshots($config);
-    } catch (Throwable $exception) {
-    } finally {
-        $running = false;
-    }
 }
 
 function nammu_fediverse_stream_state(array $tabs = ['home', 'notifications', 'messages', 'network', 'settings']): array
@@ -3917,7 +3892,6 @@ function nammu_fediverse_store_inbox_activity(array $payload, array $meta = []):
     ];
     $store['activities'] = array_slice($activities, -1000);
     nammu_fediverse_save_json_store(nammu_fediverse_inbox_file(), $store);
-    nammu_fediverse_rebuild_snapshots_if_possible();
 }
 
 function nammu_fediverse_remove_timeline_items(array $identifiers): int

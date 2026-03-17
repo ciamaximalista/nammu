@@ -1774,6 +1774,34 @@
             border-radius: 999px;
             background: #edf4fb;
         }
+        .fediverse-status__actor-icons {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.22rem;
+            padding: 0.1rem 0.18rem !important;
+        }
+        .fediverse-status__actor-icons a {
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            overflow: hidden;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #dbe7f3;
+            color: #375b7d;
+            text-decoration: none;
+            flex: 0 0 22px;
+            font-size: 0.72rem;
+            font-weight: 700;
+        }
+        .fediverse-status__actor-icons img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            border-radius: 999px;
+        }
         .fediverse-inline-form {
             min-width: min(100%, 320px);
         }

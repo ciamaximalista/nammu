@@ -40,6 +40,10 @@ $fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
 .fediverse-public-status__title { font-size: 1.35rem; font-weight: 700; margin: 0 0 .85rem; line-height: 1.15; }
 .fediverse-public-status__text,
 .fediverse-public-reply__text { font-size: 1rem; line-height: 1.6; }
+.fediverse-public-status__media,
+.fediverse-public-reply__media { margin-top: .9rem; }
+.fediverse-public-status__media img,
+.fediverse-public-reply__media img { width: 100%; max-height: 720px; object-fit: cover; display: block; border-radius: 16px; background: #fff; border: 1px solid rgba(0,0,0,.08); }
 .fediverse-public-status__card { display: block; margin-top: .9rem; border-radius: 16px; overflow: hidden; background: #fff; border: 1px solid rgba(0,0,0,.08); color: inherit; text-decoration: none; }
 .fediverse-public-status__card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
 .fediverse-public-status__card-body { padding: 1rem; }
@@ -99,6 +103,11 @@ $fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
 
                 <?php if ($threadIsNote): ?>
                     <div class="fediverse-public-status__text"><?= nl2br(htmlspecialchars($threadContent, ENT_QUOTES, 'UTF-8')) ?></div>
+                    <?php if (!empty($threadItem['image'])): ?>
+                        <div class="fediverse-public-status__media">
+                            <img src="<?= htmlspecialchars((string) $threadItem['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($threadTitle !== '' ? $threadTitle : 'Imagen adjunta'), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                        </div>
+                    <?php endif; ?>
                 <?php elseif ($threadOriginalUrl !== ''): ?>
                     <a class="fediverse-public-status__card" href="<?= htmlspecialchars($threadOriginalUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
                         <?php if (!empty($threadItem['image'])): ?>
@@ -185,6 +194,11 @@ $fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
                                     <?php endif; ?>
                                 </div>
                                 <div class="fediverse-public-reply__text"><?= nl2br(htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
+                                <?php if (!empty($reply['image'])): ?>
+                                    <div class="fediverse-public-reply__media">
+                                        <img src="<?= htmlspecialchars((string) $reply['image'], ENT_QUOTES, 'UTF-8') ?>" alt="Imagen adjunta" loading="lazy">
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </article>

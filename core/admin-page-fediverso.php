@@ -210,9 +210,20 @@
         ? nammu_fediverse_local_content_items($fediverseConfig)
         : [];
     if ($isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_actions_store') && function_exists('nammu_fediverse_resend_item_from_action')) {
+        $fediverseLocalUrls = [];
+        foreach ($fediverseLocalItems as $fediverseLocalBaseItem) {
+            $fediverseLocalBaseUrl = trim((string) ($fediverseLocalBaseItem['url'] ?? ''));
+            if ($fediverseLocalBaseUrl !== '') {
+                $fediverseLocalUrls[$fediverseLocalBaseUrl] = true;
+            }
+        }
         foreach (nammu_fediverse_actions_store()['items'] as $fediverseAction) {
             $fediverseResendItem = nammu_fediverse_resend_item_from_action($fediverseAction);
             if (is_array($fediverseResendItem)) {
+                $fediverseResendUrl = trim((string) ($fediverseResendItem['url'] ?? ''));
+                if ($fediverseResendUrl !== '' && isset($fediverseLocalUrls[$fediverseResendUrl])) {
+                    continue;
+                }
                 $fediverseLocalItems[] = $fediverseResendItem;
             }
         }
@@ -330,6 +341,19 @@
             }
         }
         if ($fediverseTimelineType === 'announce') {
+            $fediverseAnnounceTargetsLocal = false;
+            foreach ($fediverseTimelineIdentifiers as $fediverseTimelineIdentifier) {
+                if ($fediverseTimelineIdentifier !== '' && function_exists('nammu_fediverse_canonical_local_id_for_identifier')) {
+                    $fediverseCanonicalLocalId = nammu_fediverse_canonical_local_id_for_identifier($fediverseTimelineIdentifier, $fediverseConfig);
+                    if ($fediverseCanonicalLocalId !== '') {
+                        $fediverseAnnounceTargetsLocal = true;
+                        break;
+                    }
+                }
+            }
+            if ($fediverseAnnounceTargetsLocal) {
+                continue;
+            }
             $fediverseAnnounceDuplicatesExisting = false;
             foreach ($fediverseTimelineIdentifiers as $fediverseTimelineIdentifier) {
                 if (isset($fediverseRemoteCanonicalItems[$fediverseTimelineIdentifier])) {

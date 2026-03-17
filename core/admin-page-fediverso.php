@@ -340,6 +340,10 @@
                 $fediverseTimelineIdentifiers[] = $fediverseTimelineFieldValue;
             }
         }
+        $fediverseTimelineTargetUrl = trim((string) ($fediverseTimelineItem['target_url'] ?? ''));
+        if ($fediverseTimelineTargetUrl !== '') {
+            $fediverseTimelineIdentifiers[] = $fediverseTimelineTargetUrl;
+        }
         if ($fediverseTimelineType === 'announce') {
             $fediverseAnnounceTargetsLocal = false;
             foreach ($fediverseTimelineIdentifiers as $fediverseTimelineIdentifier) {
@@ -364,10 +368,6 @@
             if ($fediverseAnnounceDuplicatesExisting) {
                 continue;
             }
-        }
-        $fediverseTimelineTargetUrl = trim((string) ($fediverseTimelineItem['target_url'] ?? ''));
-        if ($fediverseTimelineTargetUrl !== '') {
-            $fediverseTimelineIdentifiers[] = $fediverseTimelineTargetUrl;
         }
         if ($fediverseTimelineTargetUrl !== '' && $fediverseTimelineType !== 'announce') {
             continue;

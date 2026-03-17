@@ -5016,24 +5016,27 @@ function nammu_fediverse_find_named_local_item(string $slug, string $template, a
 function nammu_fediverse_public_thread_url_for_named_local_item(string $slug, string $template, array $config): string
 {
     $item = nammu_fediverse_find_named_local_item($slug, $template, $config);
-    if (!is_array($item)) {
-        return '';
-    }
-    $itemId = trim((string) ($item['id'] ?? ''));
-    $itemUrl = trim((string) ($item['url'] ?? ''));
-    if ($itemId === '' || $itemUrl === '') {
-        return '';
-    }
+    $baseUrl = nammu_fediverse_base_url($config);
+    $normalizedTemplate = nammu_fediverse_normalize_named_template($template);
+    $fallbackObjectId = match ($normalizedTemplate) {
+        'podcast' => $baseUrl . '/ap/objects/podcast-' . rawurlencode(trim($slug)),
+        'itinerary' => $baseUrl . '/ap/objects/itinerary-' . rawurlencode(trim($slug)),
+        default => $baseUrl . '/ap/objects/post-' . rawurlencode(trim($slug)),
+    };
+    $itemId = is_array($item) ? trim((string) ($item['id'] ?? '')) : $fallbackObjectId;
+    $itemUrl = is_array($item) ? trim((string) ($item['url'] ?? '')) : '';
     $latestResend = null;
-    foreach (nammu_fediverse_actions_store()['items'] as $action) {
-        if (strtolower(trim((string) ($action['type'] ?? ''))) !== 'resend') {
-            continue;
-        }
-        if (trim((string) ($action['object_url'] ?? '')) !== $itemUrl) {
-            continue;
-        }
-        if (!is_array($latestResend) || strcmp((string) ($action['published'] ?? ''), (string) ($latestResend['published'] ?? '')) > 0) {
-            $latestResend = $action;
+    if ($itemUrl !== '') {
+        foreach (nammu_fediverse_actions_store()['items'] as $action) {
+            if (strtolower(trim((string) ($action['type'] ?? ''))) !== 'resend') {
+                continue;
+            }
+            if (trim((string) ($action['object_url'] ?? '')) !== $itemUrl) {
+                continue;
+            }
+            if (!is_array($latestResend) || strcmp((string) ($action['published'] ?? ''), (string) ($latestResend['published'] ?? '')) > 0) {
+                $latestResend = $action;
+            }
         }
     }
     if (is_array($latestResend)) {
@@ -5042,16 +5045,10 @@ function nammu_fediverse_public_thread_url_for_named_local_item(string $slug, st
             return nammu_fediverse_thread_page_url($resendObjectId, $config);
         }
     }
-    if (in_array($itemId, nammu_fediverse_deleted_store()['ids'], true)) {
+    if ($itemId === '' || in_array($itemId, nammu_fediverse_deleted_store()['ids'], true)) {
         return '';
     }
-    foreach (nammu_fediverse_deliveries_store()['followers'] as $deliveryState) {
-        $sentIds = array_map('strval', is_array($deliveryState['sent_ids'] ?? null) ? $deliveryState['sent_ids'] : []);
-        if (in_array($itemId, $sentIds, true)) {
-            return nammu_fediverse_thread_page_url($itemId, $config);
-        }
-    }
-    return '';
+    return nammu_fediverse_thread_page_url($itemId, $config);
 }
 
 function nammu_fediverse_public_thread_url_for_actuality_item(array $actualityItem, array $config): string

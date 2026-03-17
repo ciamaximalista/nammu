@@ -370,6 +370,12 @@
                     }
                 }
             }
+            if (!$fediverseAnnounceTargetsLocal) {
+                $fediverseTimelineItemUrl = trim((string) ($fediverseTimelineItem['url'] ?? ''));
+                if ($fediverseTimelineItemUrl !== '' && function_exists('nammu_fediverse_equivalent_local_items_by_url')) {
+                    $fediverseAnnounceTargetsLocal = !empty(nammu_fediverse_equivalent_local_items_by_url($fediverseTimelineItemUrl, $fediverseConfig));
+                }
+            }
             if ($fediverseAnnounceTargetsLocal) {
                 continue;
             }

@@ -62,6 +62,16 @@ function nammu_fediverse_fragments_cache_file(): string
     return dirname(__DIR__) . '/config/fediverso-fragments-cache.json';
 }
 
+function nammu_fediverse_home_snapshot_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-home.json';
+}
+
+function nammu_fediverse_messages_snapshot_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-threads.json';
+}
+
 function nammu_fediverse_keys_file(): string
 {
     return dirname(__DIR__) . '/config/activitypub-keys.json';
@@ -95,6 +105,36 @@ function nammu_fediverse_fragments_cache_store(): array
 function nammu_fediverse_save_fragments_cache_store(array $items): void
 {
     nammu_fediverse_save_json_store(nammu_fediverse_fragments_cache_file(), ['items' => $items]);
+}
+
+function nammu_fediverse_home_snapshot_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_home_snapshot_file(), ['generated_at' => '', 'data' => []]);
+    $store['data'] = is_array($store['data'] ?? null) ? $store['data'] : [];
+    return $store;
+}
+
+function nammu_fediverse_messages_snapshot_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_messages_snapshot_file(), ['generated_at' => '', 'data' => []]);
+    $store['data'] = is_array($store['data'] ?? null) ? $store['data'] : [];
+    return $store;
+}
+
+function nammu_fediverse_save_home_snapshot_store(array $data): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_home_snapshot_file(), [
+        'generated_at' => gmdate(DATE_ATOM),
+        'data' => $data,
+    ]);
+}
+
+function nammu_fediverse_save_messages_snapshot_store(array $data): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_messages_snapshot_file(), [
+        'generated_at' => gmdate(DATE_ATOM),
+        'data' => $data,
+    ]);
 }
 
 function nammu_fediverse_base_url(array $config): string
@@ -642,6 +682,7 @@ function nammu_fediverse_save_timeline_store(array $items): void
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });
     nammu_fediverse_save_json_store(nammu_fediverse_timeline_file(), ['items' => array_slice(array_values($items), 0, 200)]);
+    nammu_fediverse_rebuild_snapshots_if_possible();
 }
 
 function nammu_fediverse_followers_store(): array
@@ -693,6 +734,7 @@ function nammu_fediverse_save_messages_store(array $items): void
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });
     nammu_fediverse_save_json_store(nammu_fediverse_messages_file(), ['items' => array_slice(array_values($items), 0, 500)]);
+    nammu_fediverse_rebuild_snapshots_if_possible();
 }
 
 function nammu_fediverse_actions_store(): array
@@ -755,6 +797,7 @@ function nammu_fediverse_save_actions_store(array $items): void
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });
     nammu_fediverse_save_json_store(nammu_fediverse_actions_file(), ['items' => array_slice(array_values($items), 0, 1000)]);
+    nammu_fediverse_rebuild_snapshots_if_possible();
 }
 
 function nammu_fediverse_record_action(string $type, string $actorId, string $objectUrl, array $meta = []): void
@@ -1438,6 +1481,7 @@ function nammu_fediverse_store_files_for_tab(string $tab): array
     $tab = strtolower(trim($tab));
     $files = match ($tab) {
         'home' => [
+            nammu_fediverse_home_snapshot_file(),
             nammu_fediverse_timeline_file(),
             nammu_fediverse_actions_file(),
             nammu_fediverse_inbox_file(),
@@ -1451,6 +1495,7 @@ function nammu_fediverse_store_files_for_tab(string $tab): array
             nammu_fediverse_hidden_replies_file(),
         ],
         'messages' => [
+            nammu_fediverse_messages_snapshot_file(),
             nammu_fediverse_messages_file(),
             nammu_fediverse_actions_file(),
             nammu_fediverse_inbox_file(),
@@ -1498,6 +1543,138 @@ function nammu_fediverse_tab_version(string $tab): string
         $parts[] = basename($codeFile) . ':' . $mtime . ':' . $size;
     }
     return substr(sha1(implode('|', $parts)), 0, 20);
+}
+
+function nammu_fediverse_rebuild_home_snapshot(array $config): array
+{
+    $knownActors = nammu_fediverse_known_actors();
+    $actorsById = [];
+    foreach ($knownActors as $actor) {
+        $actorId = trim((string) ($actor['id'] ?? ''));
+        if ($actorId !== '') {
+            $actorsById[$actorId] = $actor;
+        }
+    }
+    $localItems = nammu_fediverse_local_content_items($config);
+    foreach (nammu_fediverse_actions_store()['items'] as $action) {
+        $resendItem = nammu_fediverse_resend_item_from_action($action);
+        if (!is_array($resendItem)) {
+            continue;
+        }
+        $resendUrl = trim((string) ($resendItem['url'] ?? ''));
+        $duplicate = false;
+        foreach ($localItems as $existingLocalItem) {
+            if ($resendUrl !== '' && $resendUrl === trim((string) ($existingLocalItem['url'] ?? ''))) {
+                $duplicate = true;
+                break;
+            }
+        }
+        if (!$duplicate) {
+            $localItems[] = $resendItem;
+        }
+    }
+    $threadPayloads = [];
+    foreach ($localItems as $localItem) {
+        $localId = trim((string) ($localItem['id'] ?? ''));
+        if ($localId === '') {
+            continue;
+        }
+        $threadPayloads[$localId] = nammu_fediverse_thread_page_payload($localItem, $config);
+    }
+    $data = [
+        'actors_by_id' => $actorsById,
+        'timeline' => nammu_fediverse_timeline_store()['items'],
+        'local_items' => $localItems,
+        'local_reaction_summary' => nammu_fediverse_local_reaction_summary($config),
+        'local_reaction_details' => nammu_fediverse_local_reaction_details($config),
+        'remote_boost_summary' => nammu_fediverse_remote_boost_summary(),
+        'remote_boost_details' => nammu_fediverse_remote_boost_details($config),
+        'remote_reply_summary' => nammu_fediverse_remote_reply_summary(),
+        'incoming_replies' => nammu_fediverse_incoming_public_replies_by_object($config),
+        'thread_payloads' => $threadPayloads,
+    ];
+    nammu_fediverse_save_home_snapshot_store($data);
+    return $data;
+}
+
+function nammu_fediverse_rebuild_messages_snapshot(array $config): array
+{
+    $knownActors = nammu_fediverse_known_actors();
+    $actorsById = [];
+    foreach ($knownActors as $actor) {
+        $actorId = trim((string) ($actor['id'] ?? ''));
+        if ($actorId !== '') {
+            $actorsById[$actorId] = $actor;
+        }
+    }
+    $messages = nammu_fediverse_grouped_messages();
+    $flatMessages = [];
+    $flatMessageKeys = [];
+    foreach ($messages as $groupItems) {
+        foreach ((array) $groupItems as $messageItem) {
+            $messageId = trim((string) ($messageItem['id'] ?? ''));
+            $messageKey = $messageId !== '' ? 'id:' . $messageId : 'hash:' . sha1(json_encode($messageItem, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            if (isset($flatMessageKeys[$messageKey])) {
+                continue;
+            }
+            $flatMessageKeys[$messageKey] = true;
+            $flatMessages[] = $messageItem;
+        }
+    }
+    foreach (array_merge(
+        nammu_fediverse_public_reply_message_entries($config),
+        nammu_fediverse_outgoing_public_reply_message_entries($config),
+        nammu_fediverse_remote_public_reply_message_entries($config),
+        nammu_fediverse_public_thread_root_message_entries($config),
+        nammu_fediverse_remote_thread_root_message_entries($config)
+    ) as $messageItem) {
+        if (!is_array($messageItem)) {
+            continue;
+        }
+        $messageId = trim((string) ($messageItem['id'] ?? ''));
+        $messageKey = $messageId !== '' ? 'id:' . $messageId : 'hash:' . sha1(json_encode($messageItem, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        if (isset($flatMessageKeys[$messageKey])) {
+            continue;
+        }
+        $flatMessageKeys[$messageKey] = true;
+        $flatMessages[] = $messageItem;
+    }
+    $data = [
+        'actors_by_id' => $actorsById,
+        'recipients' => nammu_fediverse_message_recipients(),
+        'message_threads' => nammu_fediverse_thread_grouped_messages($flatMessages),
+    ];
+    nammu_fediverse_save_messages_snapshot_store($data);
+    return $data;
+}
+
+function nammu_fediverse_rebuild_snapshots(array $config): array
+{
+    $home = nammu_fediverse_rebuild_home_snapshot($config);
+    $messages = nammu_fediverse_rebuild_messages_snapshot($config);
+    return ['home' => $home, 'messages' => $messages];
+}
+
+function nammu_fediverse_rebuild_snapshots_if_possible(): void
+{
+    static $running = false;
+    if ($running) {
+        return;
+    }
+    if (!function_exists('nammu_load_config')) {
+        return;
+    }
+    $running = true;
+    try {
+        $config = nammu_load_config();
+        if (!is_array($config)) {
+            $config = [];
+        }
+        nammu_fediverse_rebuild_snapshots($config);
+    } catch (Throwable $exception) {
+    } finally {
+        $running = false;
+    }
 }
 
 function nammu_fediverse_stream_state(array $tabs = ['home', 'notifications', 'messages', 'network', 'settings']): array
@@ -3740,6 +3917,7 @@ function nammu_fediverse_store_inbox_activity(array $payload, array $meta = []):
     ];
     $store['activities'] = array_slice($activities, -1000);
     nammu_fediverse_save_json_store(nammu_fediverse_inbox_file(), $store);
+    nammu_fediverse_rebuild_snapshots_if_possible();
 }
 
 function nammu_fediverse_remove_timeline_items(array $identifiers): int

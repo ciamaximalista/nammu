@@ -82,44 +82,47 @@
             $fediverseBlockedIds[$fediverseBlockedActorId] = true;
         }
     }
-    $fediverseTimeline = ($isFediverseHomeTab && $fediverseNeedsLivePanel) ? nammu_fediverse_timeline_store()['items'] : [];
+    $fediverseHomeSnapshot = ($isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_home_snapshot_store'))
+        ? (nammu_fediverse_home_snapshot_store()['data'] ?? [])
+        : [];
+    if ($isFediverseHomeTab && $fediverseNeedsLivePanel && empty($fediverseHomeSnapshot) && function_exists('nammu_fediverse_rebuild_home_snapshot')) {
+        $fediverseHomeSnapshot = nammu_fediverse_rebuild_home_snapshot($fediverseConfig);
+    }
+    $fediverseMessagesSnapshot = ($isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_messages_snapshot_store'))
+        ? (nammu_fediverse_messages_snapshot_store()['data'] ?? [])
+        : [];
+    if ($isFediverseMessagesTab && $fediverseNeedsLivePanel && empty($fediverseMessagesSnapshot) && function_exists('nammu_fediverse_rebuild_messages_snapshot')) {
+        $fediverseMessagesSnapshot = nammu_fediverse_rebuild_messages_snapshot($fediverseConfig);
+    }
+    $fediverseTimeline = ($isFediverseHomeTab && $fediverseNeedsLivePanel)
+        ? (is_array($fediverseHomeSnapshot['timeline'] ?? null) ? $fediverseHomeSnapshot['timeline'] : nammu_fediverse_timeline_store()['items'])
+        : [];
     $fediverseRecipients = ($isFediverseMessagesTab || $isFediverseNetworkTab)
         && $fediverseNeedsLivePanel
-        && function_exists('nammu_fediverse_message_recipients')
-        ? nammu_fediverse_message_recipients()
+        ? (($isFediverseMessagesTab && is_array($fediverseMessagesSnapshot['recipients'] ?? null))
+            ? $fediverseMessagesSnapshot['recipients']
+            : (function_exists('nammu_fediverse_message_recipients') ? nammu_fediverse_message_recipients() : []))
         : [];
-    $fediverseMessages = $isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_grouped_messages')
-        ? nammu_fediverse_grouped_messages()
-        : [];
-    $fediversePublicReplyMessages = $isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_public_reply_message_entries')
-        ? nammu_fediverse_public_reply_message_entries($fediverseConfig)
-        : [];
-    $fediverseOutgoingPublicReplyMessages = $isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_outgoing_public_reply_message_entries')
-        ? nammu_fediverse_outgoing_public_reply_message_entries($fediverseConfig)
-        : [];
-    $fediverseRemotePublicReplyMessages = $isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_remote_public_reply_message_entries')
-        ? nammu_fediverse_remote_public_reply_message_entries($fediverseConfig)
-        : [];
-    $fediversePublicThreadRootMessages = $isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_public_thread_root_message_entries')
-        ? nammu_fediverse_public_thread_root_message_entries($fediverseConfig)
-        : [];
-    $fediverseRemoteThreadRootMessages = $isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_remote_thread_root_message_entries')
-        ? nammu_fediverse_remote_thread_root_message_entries($fediverseConfig)
-        : [];
+    $fediverseMessages = [];
+    $fediversePublicReplyMessages = [];
+    $fediverseOutgoingPublicReplyMessages = [];
+    $fediverseRemotePublicReplyMessages = [];
+    $fediversePublicThreadRootMessages = [];
+    $fediverseRemoteThreadRootMessages = [];
     $fediverseNotifications = $isFediverseNotificationsTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_notification_entries')
         ? nammu_fediverse_notification_entries($fediverseConfig)
         : [];
-    $fediverseLocalReactionDetails = $isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_local_reaction_details')
-        ? nammu_fediverse_local_reaction_details($fediverseConfig)
+    $fediverseLocalReactionDetails = $isFediverseHomeTab && $fediverseNeedsLivePanel
+        ? (is_array($fediverseHomeSnapshot['local_reaction_details'] ?? null) ? $fediverseHomeSnapshot['local_reaction_details'] : (function_exists('nammu_fediverse_local_reaction_details') ? nammu_fediverse_local_reaction_details($fediverseConfig) : []))
         : [];
-    $fediverseRemoteBoostSummary = $isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_remote_boost_summary')
-        ? nammu_fediverse_remote_boost_summary()
+    $fediverseRemoteBoostSummary = $isFediverseHomeTab && $fediverseNeedsLivePanel
+        ? (is_array($fediverseHomeSnapshot['remote_boost_summary'] ?? null) ? $fediverseHomeSnapshot['remote_boost_summary'] : (function_exists('nammu_fediverse_remote_boost_summary') ? nammu_fediverse_remote_boost_summary() : []))
         : [];
-    $fediverseRemoteBoostDetails = $isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_remote_boost_details')
-        ? nammu_fediverse_remote_boost_details($fediverseConfig)
+    $fediverseRemoteBoostDetails = $isFediverseHomeTab && $fediverseNeedsLivePanel
+        ? (is_array($fediverseHomeSnapshot['remote_boost_details'] ?? null) ? $fediverseHomeSnapshot['remote_boost_details'] : (function_exists('nammu_fediverse_remote_boost_details') ? nammu_fediverse_remote_boost_details($fediverseConfig) : []))
         : [];
-    $fediverseRemoteReplySummary = $isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_remote_reply_summary')
-        ? nammu_fediverse_remote_reply_summary()
+    $fediverseRemoteReplySummary = $isFediverseHomeTab && $fediverseNeedsLivePanel
+        ? (is_array($fediverseHomeSnapshot['remote_reply_summary'] ?? null) ? $fediverseHomeSnapshot['remote_reply_summary'] : (function_exists('nammu_fediverse_remote_reply_summary') ? nammu_fediverse_remote_reply_summary() : []))
         : [];
     $buildTabUrl = static function (string $tab): string {
         return 'admin.php?page=fediverso&tab=' . rawurlencode($tab);
@@ -169,11 +172,16 @@
         }
         return $value;
     };
-    $fediverseKnownActors = ($isFediverseHomeTab || $isFediverseNotificationsTab || $isFediverseMessagesTab)
-        && $fediverseNeedsLivePanel
-        && function_exists('nammu_fediverse_known_actors')
-        ? nammu_fediverse_known_actors()
-        : [];
+    $fediverseKnownActors = [];
+    if (($isFediverseHomeTab || $isFediverseNotificationsTab || $isFediverseMessagesTab) && $fediverseNeedsLivePanel) {
+        if ($isFediverseHomeTab && is_array($fediverseHomeSnapshot['actors_by_id'] ?? null)) {
+            $fediverseKnownActors = array_values($fediverseHomeSnapshot['actors_by_id']);
+        } elseif ($isFediverseMessagesTab && is_array($fediverseMessagesSnapshot['actors_by_id'] ?? null)) {
+            $fediverseKnownActors = array_values($fediverseMessagesSnapshot['actors_by_id']);
+        } elseif (function_exists('nammu_fediverse_known_actors')) {
+            $fediverseKnownActors = nammu_fediverse_known_actors();
+        }
+    }
     $fediverseActorsById = [];
     foreach ($fediverseKnownActors as $fediverseKnownActor) {
         $fediverseKnownActorId = trim((string) ($fediverseKnownActor['id'] ?? ''));
@@ -218,11 +226,13 @@
         $fediverseFlatMessageKeys[$fediverseMessageKey] = true;
         $fediverseFlatMessages[] = $publicConversationMessage;
     }
-    $fediverseMessageThreads = $isFediverseMessagesTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_thread_grouped_messages')
-        ? nammu_fediverse_thread_grouped_messages($fediverseFlatMessages)
+    $fediverseMessageThreads = $isFediverseMessagesTab && $fediverseNeedsLivePanel
+        ? (is_array($fediverseMessagesSnapshot['message_threads'] ?? null)
+            ? $fediverseMessagesSnapshot['message_threads']
+            : (function_exists('nammu_fediverse_thread_grouped_messages') ? nammu_fediverse_thread_grouped_messages($fediverseFlatMessages) : []))
         : [];
-    $fediverseLocalItems = $isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_local_content_items')
-        ? nammu_fediverse_local_content_items($fediverseConfig)
+    $fediverseLocalItems = $isFediverseHomeTab && $fediverseNeedsLivePanel
+        ? (is_array($fediverseHomeSnapshot['local_items'] ?? null) ? $fediverseHomeSnapshot['local_items'] : (function_exists('nammu_fediverse_local_content_items') ? nammu_fediverse_local_content_items($fediverseConfig) : []))
         : [];
     if ($isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_actions_store') && function_exists('nammu_fediverse_resend_item_from_action')) {
         $fediverseLocalUrls = [];
@@ -243,8 +253,12 @@
             }
         }
     }
-    $fediverseLocalReactionSummary = $isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_local_reaction_summary') ? nammu_fediverse_local_reaction_summary($fediverseConfig) : [];
-    $fediverseIncomingReplies = $isFediverseHomeTab && $fediverseNeedsLivePanel && function_exists('nammu_fediverse_incoming_public_replies_by_object') ? nammu_fediverse_incoming_public_replies_by_object($fediverseConfig) : [];
+    $fediverseLocalReactionSummary = $isFediverseHomeTab && $fediverseNeedsLivePanel
+        ? (is_array($fediverseHomeSnapshot['local_reaction_summary'] ?? null) ? $fediverseHomeSnapshot['local_reaction_summary'] : (function_exists('nammu_fediverse_local_reaction_summary') ? nammu_fediverse_local_reaction_summary($fediverseConfig) : []))
+        : [];
+    $fediverseIncomingReplies = $isFediverseHomeTab && $fediverseNeedsLivePanel
+        ? (is_array($fediverseHomeSnapshot['incoming_replies'] ?? null) ? $fediverseHomeSnapshot['incoming_replies'] : (function_exists('nammu_fediverse_incoming_public_replies_by_object') ? nammu_fediverse_incoming_public_replies_by_object($fediverseConfig) : []))
+        : [];
     $fediverseIncomingReplyIds = [];
     $fediverseIncomingReplyRoots = [];
     $fediverseRemoteRepliesByTarget = [];
@@ -624,9 +638,11 @@
                                 $localId = trim((string) ($localItem['id'] ?? ''));
                                 if ($localId === '') { continue; }
                                 $localAnchor = 'local-' . substr(sha1($localId), 0, 12);
-                                $localThreadPayload = function_exists('nammu_fediverse_thread_page_payload')
-                                    ? nammu_fediverse_thread_page_payload($localItem, $fediverseConfig)
-                                    : ['summary' => [], 'details' => [], 'replies' => []];
+                                $localThreadPayload = is_array($fediverseHomeSnapshot['thread_payloads'][$localId] ?? null)
+                                    ? $fediverseHomeSnapshot['thread_payloads'][$localId]
+                                    : (function_exists('nammu_fediverse_thread_page_payload')
+                                        ? nammu_fediverse_thread_page_payload($localItem, $fediverseConfig)
+                                        : ['summary' => [], 'details' => [], 'replies' => []]);
                                 $localSummary = is_array($localThreadPayload['summary'] ?? null)
                                     ? $localThreadPayload['summary']
                                     : ($fediverseLocalReactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0]);

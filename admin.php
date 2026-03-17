@@ -88,6 +88,9 @@ function admin_run_scheduled_tasks(): array {
         if (function_exists('nammu_fediverse_warm_threads_cache')) {
             $fediverseStats['threads_warmed'] = (int) nammu_fediverse_warm_threads_cache($config, 20);
         }
+        if (function_exists('nammu_fediverse_rebuild_snapshots')) {
+            nammu_fediverse_rebuild_snapshots($config);
+        }
     }
     return [
         'published' => $published,
@@ -10174,6 +10177,9 @@ if ($isLoggedIn && $page === 'fediverso') {
         if (function_exists('nammu_fediverse_warm_threads_cache')) {
             $stats['threads_warmed'] = (int) nammu_fediverse_warm_threads_cache($config, 20);
         }
+        if (function_exists('nammu_fediverse_rebuild_snapshots')) {
+            nammu_fediverse_rebuild_snapshots($config);
+        }
         $fediverseFeedback = [
             'type' => 'info',
             'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '. Hilos precalentados: ' . (int) ($stats['threads_warmed'] ?? 0) . '.',
@@ -10197,6 +10203,9 @@ if ($isLoggedIn && $page === 'fediverso') {
         $stats = nammu_fediverse_rebuild_timeline();
         if (function_exists('nammu_fediverse_warm_threads_cache')) {
             $stats['threads_warmed'] = (int) nammu_fediverse_warm_threads_cache($config, 20);
+        }
+        if (function_exists('nammu_fediverse_rebuild_snapshots')) {
+            nammu_fediverse_rebuild_snapshots($config);
         }
         $fediverseFeedback = [
             'type' => 'info',

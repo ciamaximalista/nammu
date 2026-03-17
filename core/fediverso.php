@@ -1492,6 +1492,11 @@ function nammu_fediverse_tab_version(string $tab): string
         $size = is_file($file) ? (string) ((int) @filesize($file)) : '0';
         $parts[] = basename($file) . ':' . $mtime . ':' . $size;
     }
+    foreach ([__FILE__, dirname(__DIR__) . '/core/admin-page-fediverso.php', dirname(__DIR__) . '/admin.php'] as $codeFile) {
+        $mtime = is_file($codeFile) ? (string) ((int) @filemtime($codeFile)) : '0';
+        $size = is_file($codeFile) ? (string) ((int) @filesize($codeFile)) : '0';
+        $parts[] = basename($codeFile) . ':' . $mtime . ':' . $size;
+    }
     return substr(sha1(implode('|', $parts)), 0, 20);
 }
 
@@ -5018,13 +5023,18 @@ function nammu_fediverse_public_thread_url_for_named_local_item(string $slug, st
     $item = nammu_fediverse_find_named_local_item($slug, $template, $config);
     $baseUrl = nammu_fediverse_base_url($config);
     $normalizedTemplate = nammu_fediverse_normalize_named_template($template);
+    $fallbackUrl = match ($normalizedTemplate) {
+        'podcast' => $baseUrl . '/podcast/' . rawurlencode(trim($slug)),
+        'itinerary' => $baseUrl . '/itinerarios/' . rawurlencode(trim($slug)),
+        default => $baseUrl . '/' . rawurlencode(trim($slug)),
+    };
     $fallbackObjectId = match ($normalizedTemplate) {
         'podcast' => $baseUrl . '/ap/objects/podcast-' . rawurlencode(trim($slug)),
         'itinerary' => $baseUrl . '/ap/objects/itinerary-' . rawurlencode(trim($slug)),
         default => $baseUrl . '/ap/objects/post-' . rawurlencode(trim($slug)),
     };
     $itemId = is_array($item) ? trim((string) ($item['id'] ?? '')) : $fallbackObjectId;
-    $itemUrl = is_array($item) ? trim((string) ($item['url'] ?? '')) : '';
+    $itemUrl = is_array($item) ? trim((string) ($item['url'] ?? '')) : $fallbackUrl;
     $latestResend = null;
     if ($itemUrl !== '') {
         foreach (nammu_fediverse_actions_store()['items'] as $action) {

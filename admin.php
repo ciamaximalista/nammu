@@ -10168,6 +10168,9 @@ if ($isLoggedIn && $page === 'fediverso') {
         if (function_exists('nammu_fediverse_clear_threads_cache')) {
             nammu_fediverse_clear_threads_cache();
         }
+        if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
+            nammu_fediverse_save_fragments_cache_store([]);
+        }
         if (function_exists('nammu_fediverse_warm_threads_cache')) {
             $stats['threads_warmed'] = (int) nammu_fediverse_warm_threads_cache($config, 20);
         }
@@ -10187,6 +10190,9 @@ if ($isLoggedIn && $page === 'fediverso') {
         }
         if (function_exists('nammu_fediverse_clear_threads_cache')) {
             nammu_fediverse_clear_threads_cache();
+        }
+        if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
+            nammu_fediverse_save_fragments_cache_store([]);
         }
         $stats = nammu_fediverse_rebuild_timeline();
         if (function_exists('nammu_fediverse_warm_threads_cache')) {

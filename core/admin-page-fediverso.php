@@ -311,10 +311,21 @@
     }
     $fediverseTimelineEntries = [];
     foreach ($fediverseLocalItems as $fediverseLocalItem) {
+        $fediverseLocalItemPayload = ['summary' => [], 'details' => [], 'replies' => []];
+        if ($isFediverseHomeTab && function_exists('nammu_fediverse_thread_page_payload')) {
+            $fediverseLocalItemPayload = nammu_fediverse_thread_page_payload($fediverseLocalItem, $fediverseConfig);
+        }
+        $fediverseLocalItemSummary = is_array($fediverseLocalItemPayload['summary'] ?? null) ? $fediverseLocalItemPayload['summary'] : [];
+        $fediverseLocalActivityPriority = 0;
+        if ((int) ($fediverseLocalItemSummary['replies'] ?? 0) > 0 || (int) ($fediverseLocalItemSummary['shares'] ?? 0) > 0) {
+            $fediverseLocalActivityPriority = 1;
+        }
         $fediverseTimelineEntries[] = [
             'kind' => 'local',
             'published' => (string) ($fediverseLocalItem['published'] ?? ''),
+            'priority' => $fediverseLocalActivityPriority,
             'item' => $fediverseLocalItem,
+            'thread_payload' => $fediverseLocalItemPayload,
         ];
     }
     $fediverseTimelineDisplay = [];
@@ -464,10 +475,15 @@
         $fediverseTimelineEntries[] = [
             'kind' => 'remote',
             'published' => (string) ($fediverseTimelineItem['published'] ?? ''),
+            'priority' => 0,
             'item' => $fediverseTimelineItem,
         ];
     }
     usort($fediverseTimelineEntries, static function (array $a, array $b): int {
+        $priorityCompare = ((int) ($b['priority'] ?? 0)) <=> ((int) ($a['priority'] ?? 0));
+        if ($priorityCompare !== 0) {
+            return $priorityCompare;
+        }
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });
     $fediverseTimelineTotal = count($fediverseTimelineEntries);
@@ -605,9 +621,11 @@
                                 $localId = trim((string) ($localItem['id'] ?? ''));
                                 if ($localId === '') { continue; }
                                 $localAnchor = 'local-' . substr(sha1($localId), 0, 12);
-                                $localThreadPayload = function_exists('nammu_fediverse_thread_page_payload')
-                                    ? nammu_fediverse_thread_page_payload($localItem, $fediverseConfig)
-                                    : ['summary' => [], 'details' => [], 'replies' => []];
+                                $localThreadPayload = is_array($timelineEntry['thread_payload'] ?? null)
+                                    ? $timelineEntry['thread_payload']
+                                    : (function_exists('nammu_fediverse_thread_page_payload')
+                                        ? nammu_fediverse_thread_page_payload($localItem, $fediverseConfig)
+                                        : ['summary' => [], 'details' => [], 'replies' => []]);
                                 $localSummary = is_array($localThreadPayload['summary'] ?? null)
                                     ? $localThreadPayload['summary']
                                     : ($fediverseLocalReactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0]);

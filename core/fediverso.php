@@ -1570,14 +1570,6 @@ function nammu_fediverse_rebuild_home_snapshot(array $config): array
             $localItems[] = $resendItem;
         }
     }
-    $threadPayloads = [];
-    foreach ($localItems as $localItem) {
-        $localId = trim((string) ($localItem['id'] ?? ''));
-        if ($localId === '') {
-            continue;
-        }
-        $threadPayloads[$localId] = nammu_fediverse_thread_page_payload($localItem, $config);
-    }
     $data = [
         'actors_by_id' => $actorsById,
         'timeline' => nammu_fediverse_timeline_store()['items'],
@@ -1588,7 +1580,6 @@ function nammu_fediverse_rebuild_home_snapshot(array $config): array
         'remote_boost_details' => nammu_fediverse_remote_boost_details($config),
         'remote_reply_summary' => nammu_fediverse_remote_reply_summary(),
         'incoming_replies' => nammu_fediverse_incoming_public_replies_by_object($config),
-        'thread_payloads' => $threadPayloads,
     ];
     nammu_fediverse_save_home_snapshot_store($data);
     return $data;

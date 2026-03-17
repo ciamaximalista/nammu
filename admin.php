@@ -10433,6 +10433,7 @@ if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET'
         header('Content-Type: text/html; charset=UTF-8');
         header('Cache-Control: no-store, no-cache, must-revalidate');
         header('Pragma: no-cache');
+        header('X-Fediverse-Version: ' . $fediverseFragmentVersion);
         echo $fediverseCachedFragment;
         exit;
     }
@@ -10450,35 +10451,18 @@ if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET'
     header('Content-Type: text/html; charset=UTF-8');
     header('Cache-Control: no-store, no-cache, must-revalidate');
     header('Pragma: no-cache');
+    header('X-Fediverse-Version: ' . $fediverseFragmentVersion);
     echo $fediverseHtml;
     exit;
 }
 
-if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fediverse_stream'])) {
+if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fediverse_state'])) {
     require_once __DIR__ . '/core/fediverso.php';
-    @set_time_limit(0);
-    header('Content-Type: text/event-stream; charset=UTF-8');
+    header('Content-Type: application/json; charset=UTF-8');
     header('Cache-Control: no-store, no-cache, must-revalidate');
     header('Pragma: no-cache');
-    header('X-Accel-Buffering: no');
     $tabs = ['home', 'notifications', 'messages', 'network', 'settings'];
-    $lastState = [];
-    $startedAt = time();
-    while (!connection_aborted() && (time() - $startedAt) < 20) {
-        $state = nammu_fediverse_stream_state($tabs);
-        if ($state !== $lastState) {
-            echo "event: state\n";
-            echo 'data: ' . json_encode(['versions' => $state], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
-            @ob_flush();
-            @flush();
-            $lastState = $state;
-        } else {
-            echo ": ping\n\n";
-            @ob_flush();
-            @flush();
-        }
-        sleep(2);
-    }
+    echo json_encode(['versions' => nammu_fediverse_stream_state($tabs)], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;
 }
 $isItineraryAdminPage = in_array($page, ['itinerarios', 'itinerario', 'itinerario-tema'], true);

@@ -2010,8 +2010,7 @@
         root.dataset.fediverseBound = '1';
 
         var panel = root.querySelector('[data-fediverse-tab-panel]');
-        var stream = null;
-        var reconnectTimer = null;
+        var pollTimer = null;
 
         function currentTab() {
             return root.getAttribute('data-active-tab') || 'home';
@@ -2062,12 +2061,14 @@
                 headers: {'X-Requested-With': 'XMLHttpRequest'},
                 credentials: 'same-origin'
             }).then(function (response) {
-                return response.text();
-            }).then(function (html) {
+                return Promise.all([response.text(), response.headers.get('X-Fediverse-Version') || knownVersion || '']);
+            }).then(function (payload) {
+                var html = payload[0];
+                var responseVersion = payload[1];
                 panel.innerHTML = extractPanel(html);
                 panel.setAttribute('aria-busy', 'false');
                 setActiveTab(tab);
-                root.setAttribute('data-active-version', knownVersion || '');
+                root.setAttribute('data-active-version', responseVersion || '');
                 if (pushState) {
                     var nextUrl = new URL(window.location.href);
                     nextUrl.searchParams.set('page', 'fediverso');
@@ -2084,40 +2085,32 @@
             });
         }
 
-        function connectStream() {
-            if (stream) {
-                stream.close();
-                stream = null;
-            }
-            stream = new EventSource(buildUrl(currentTab(), {fediverse_stream: '1'}));
-            stream.addEventListener('state', function (event) {
-                try {
-                    var payload = JSON.parse(event.data || '{}');
-                    var versions = payload.versions || {};
-                    var tab = currentTab();
-                    if (!versions[tab]) {
-                        return;
-                    }
-                    var currentVersion = root.getAttribute('data-active-version') || '';
-                    if (currentVersion !== versions[tab]) {
-                        var pageParam = null;
-                        if (tab === 'home') {
-                            var url = new URL(window.location.href);
-                            pageParam = url.searchParams.get('timeline_page') || null;
-                        }
-                        loadTab(tab, false, pageParam ? {timeline_page: pageParam} : {}, versions[tab]);
-                    }
-                } catch (error) {
+        function pollState() {
+            fetch(buildUrl(currentTab(), {fediverse_state: '1'}), {
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                credentials: 'same-origin'
+            }).then(function (response) {
+                return response.json();
+            }).then(function (payload) {
+                var versions = payload.versions || {};
+                var tab = currentTab();
+                if (!versions[tab]) {
+                    return;
                 }
+                var currentVersion = root.getAttribute('data-active-version') || '';
+                if (currentVersion !== versions[tab]) {
+                    var pageParam = null;
+                    if (tab === 'home') {
+                        var url = new URL(window.location.href);
+                        pageParam = url.searchParams.get('timeline_page') || null;
+                    }
+                    loadTab(tab, false, pageParam ? {timeline_page: pageParam} : {}, versions[tab]);
+                }
+            }).catch(function () {
+            }).finally(function () {
+                window.clearTimeout(pollTimer);
+                pollTimer = window.setTimeout(pollState, 12000);
             });
-            stream.onerror = function () {
-                if (stream) {
-                    stream.close();
-                    stream = null;
-                }
-                window.clearTimeout(reconnectTimer);
-                reconnectTimer = window.setTimeout(connectStream, 3000);
-            };
         }
 
         root.addEventListener('click', function (event) {
@@ -2149,7 +2142,7 @@
             loadTab(tab, false, extraParams);
         });
 
-        connectStream();
+        pollState();
     })();
     </script>
 <?php endif; ?>

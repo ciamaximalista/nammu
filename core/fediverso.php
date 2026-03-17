@@ -2751,6 +2751,9 @@ function nammu_fediverse_remote_public_reply_message_entries(array $config): arr
         $replies = function_exists('nammu_fediverse_cached_remote_replies_snapshot_for_item')
             ? nammu_fediverse_cached_remote_replies_snapshot_for_item($rootItem)
             : [];
+        if (empty($replies) && function_exists('nammu_fediverse_cached_remote_replies_for_item')) {
+            $replies = nammu_fediverse_cached_remote_replies_for_item($rootItem, $config);
+        }
         foreach ($replies as $reply) {
             if (!is_array($reply)) {
                 continue;

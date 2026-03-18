@@ -281,9 +281,20 @@ $routePath = nammu_route_path();
 $fediverseProfileAliasPath = function_exists('nammu_fediverse_profile_alias_path')
     ? nammu_fediverse_profile_alias_path($configData, $publicBaseUrl)
     : '/actualidad.php';
-if ($fediverseProfileAliasPath !== '/actualidad.php' && preg_match('#^' . preg_quote($fediverseProfileAliasPath, '#') . '/?$#i', $routePath) === 1) {
-    require __DIR__ . '/actualidad.php';
-    exit;
+if ($fediverseProfileAliasPath !== '/actualidad.php') {
+    $normalizedAliasPath = rtrim(strtolower(rawurldecode($fediverseProfileAliasPath)), '/');
+    $routeCandidates = array_unique([
+        rtrim(strtolower($routePath), '/'),
+        rtrim(strtolower(rawurldecode($routePath)), '/'),
+        rtrim(strtolower($requestPath), '/'),
+        rtrim(strtolower(rawurldecode($requestPath)), '/'),
+    ]);
+    foreach ($routeCandidates as $routeCandidate) {
+        if ($routeCandidate === $normalizedAliasPath) {
+            require __DIR__ . '/actualidad.php';
+            exit;
+        }
+    }
 }
 $alphabeticalSorter = static function (Post $a, Post $b): int {
     $letterA = nammu_letter_key_from_title($a->getTitle());

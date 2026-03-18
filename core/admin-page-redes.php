@@ -5,6 +5,7 @@
     $labels = admin_social_broadcast_labels();
     $rssConfig = admin_social_rss_settings($settings);
     $cronCommand = '*/5 * * * * php ' . __DIR__ . '/../admin.php --run-scheduled >> ' . __DIR__ . '/../backups/cron.log 2>&1';
+    $siteName = trim((string) (($settings['site_name'] ?? '') ?: 'Nammu Blog'));
     ?>
     <div class="tab-pane active">
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
@@ -24,6 +25,7 @@
             <div class="card mb-4">
                 <div class="card-body">
                     <h3 class="h5 mb-3">Enviar mensaje</h3>
+                    <p class="text-muted small mb-3">Este mensaje se enviará al Fediverso y aparecerá en <code>noticias.xml</code> y en la página de perfil como una nota tipo post-it.</p>
                     <div class="row">
                         <div class="col-lg-8 mb-3 mb-lg-0">
                             <label for="social_broadcast_text">Mensaje</label>
@@ -57,16 +59,9 @@
                             </div>
                         </div>
                         <div class="col-lg-4">
-                            <label class="d-block">Destinos</label>
+                            <label class="d-block">Enviar también a</label>
                             <?php if (!empty($availableNetworks)): ?>
                                 <div class="border rounded p-3 h-100">
-                                    <div class="form-check mb-3 pb-3 border-bottom">
-                                        <input class="form-check-input" type="checkbox" name="social_send_actuality" id="social_send_actuality" value="1" <?= !empty($socialBroadcastActuality) ? 'checked' : '' ?>>
-                                        <label class="form-check-label d-block" for="social_send_actuality">
-                                            <strong>Sección Actualidad</strong><br>
-                                            <small class="text-muted">Añade este mensaje a <code>noticias.xml</code> y a <code>actualidad.php</code> como una nota tipo post-it.</small>
-                                        </label>
-                                    </div>
                                     <?php $guidanceMap = admin_social_broadcast_guidance(); ?>
                                     <?php foreach ($availableNetworks as $networkKey => $networkData): ?>
                                         <div class="form-check mb-3 social-network-option" data-limit="<?= (int) $networkData['limit'] ?>" data-guidance="<?= htmlspecialchars((string) ($networkData['guidance'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
@@ -80,13 +75,7 @@
                                 </div>
                             <?php else: ?>
                                 <div class="border rounded p-3 h-100">
-                                    <div class="form-check mb-0">
-                                        <input class="form-check-input" type="checkbox" name="social_send_actuality" id="social_send_actuality" value="1" <?= !empty($socialBroadcastActuality) ? 'checked' : '' ?>>
-                                        <label class="form-check-label d-block" for="social_send_actuality">
-                                            <strong>Sección Actualidad</strong><br>
-                                            <small class="text-muted">Guarda esta nota manual en <code>noticias.xml</code> y <code>actualidad.php</code> aunque no tengas redes configuradas.</small>
-                                        </label>
-                                    </div>
+                                    <small class="text-muted d-block">Aunque no tengas redes adicionales configuradas, esta nota se guardará igualmente en el perfil del Fediverso y en <code>noticias.xml</code>.</small>
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -129,7 +118,8 @@
         <form method="post" class="mt-4">
             <div class="card">
                 <div class="card-body">
-                    <h3 class="h5 mb-3">RSS automáticas</h3>
+                    <h3 class="h5 mb-2">Integración con Nisaba, Telex, etc.</h3>
+                    <p class="text-muted small mb-3">Agrega las RSS de tus notas en Nisaba, tus selecciones en Telex u otros servicios similares, para centralizar en <?= htmlspecialchars($siteName, ENT_QUOTES, 'UTF-8') ?> los contenidos que selecciones con los comentarios y descripciones que les agregues. Se enviarán al fediverso, aparecerán en <code>noticias.xml</code> y tendrán un tratamiento gráfico distintivo en tu página de perfil.</p>
                     <?php if (!empty($socialRssFeedback)): ?>
                         <div class="alert alert-<?= htmlspecialchars($socialRssFeedback['type'] ?? 'info', ENT_QUOTES, 'UTF-8') ?>">
                             <?= htmlspecialchars($socialRssFeedback['message'] ?? '', ENT_QUOTES, 'UTF-8') ?>
@@ -147,7 +137,7 @@
                         <small class="form-text text-muted">Añade una URL RSS o Atom por línea. Cuando aparezca una entrada nueva, Nammu enviará automáticamente su título y su enlace.</small>
                     </div>
 
-                    <label class="d-block">Redes de destino</label>
+                    <label class="d-block">También puedes enviar tus contenidos seleccionados a...</label>
                     <?php if (!empty($availableNetworks)): ?>
                         <div class="row">
                             <?php foreach ($availableNetworks as $networkKey => $networkData): ?>
@@ -173,7 +163,7 @@
                         <small class="form-text text-muted">Edita el cron con <code>sudo crontab -u www-data -e</code> y añade esta línea. Como estás editando el crontab de <code>www-data</code>, la línea no debe incluir la columna <code>www-data</code>. Así el chequeo y el envío se ejecutarán cada 5 minutos.</small>
                     </div>
 
-                    <button type="submit" name="save_social_rss_settings" class="btn btn-outline-primary">Guardar RSS automáticas</button>
+                    <button type="submit" name="save_social_rss_settings" class="btn btn-outline-primary">Guardar RSS de enlaces seleccionados y comentados por ti</button>
                 </div>
             </div>
         </form>

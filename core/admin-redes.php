@@ -1007,7 +1007,7 @@ function admin_handle_social_broadcast_request(array $settings): array
 
     $text = trim((string) ($_POST['social_broadcast_text'] ?? ''));
     $image = trim((string) ($_POST['social_broadcast_image'] ?? ''));
-    $sendToActuality = !empty($_POST['social_send_actuality']);
+    $sendToActuality = true;
     $selected = array_values(array_unique(array_filter(array_map('strval', $_POST['social_networks'] ?? []))));
     $result['message_text'] = $text;
     $result['image'] = $image;
@@ -1019,11 +1019,6 @@ function admin_handle_social_broadcast_request(array $settings): array
         $result['feedback'] = ['type' => 'danger', 'message' => 'Escribe un mensaje antes de enviarlo.'];
         return $result;
     }
-    if (empty($selected) && !$sendToActuality) {
-        $result['feedback'] = ['type' => 'danger', 'message' => 'Marca al menos una red social configurada o la Sección Actualidad.'];
-        return $result;
-    }
-
     $limits = admin_social_broadcast_limits();
     $labels = admin_social_broadcast_labels();
     $sent = [];
@@ -1046,12 +1041,12 @@ function admin_handle_social_broadcast_request(array $settings): array
                     $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
                     nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
                 }
-                $sent[] = 'Sección Actualidad';
+                $sent[] = 'Perfil del Fediverso';
             } else {
-                $failed[] = 'Sección Actualidad: no se pudo guardar la nota.';
+                $failed[] = 'Perfil del Fediverso: no se pudo guardar la nota.';
             }
         } else {
-            $failed[] = 'Sección Actualidad: no está disponible.';
+            $failed[] = 'Perfil del Fediverso: no está disponible.';
         }
     }
     foreach ($selected as $network) {

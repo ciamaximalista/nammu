@@ -14,7 +14,7 @@ Nammu combina en una sola instalación:
 - Podcast con `podcast.xml` y páginas HTML por episodio.
 - Newsletter y lista de avisos.
 - Itinerarios, cursos y colecciones de temas.
-- Portal de Actualidad con notas manuales y agregación de RSS externas.
+- Perfil del fediverso con notas manuales y agregación de RSS externas.
 - Nodo propio en el Fediverso mediante ActivityPub.
 - Biblioteca multimedia, buscador, SEO técnico, estadísticas propias y automatización social.
 
@@ -327,11 +327,11 @@ Nammu no se limita a generar RSS: también convierte cada blog en una cuenta pro
 - Telegram, Facebook, Bluesky, Instagram y X aceptan imágenes en los envíos manuales.
 - Telegram y X suben el archivo local de `assets/` cuando procede.
 - Configuración de RSS externas para reenvío automático a redes.
-- Generación automática de `actualidad.php` y `noticias.xml` desde esas fuentes.
+- Generación automática del perfil del fediverso y de `noticias.xml` desde esas fuentes.
 
-### 10. Actualidad agregada
+### 10. Perfil del fediverso y agregación
 
-- `actualidad.php` compone una página pública a partir de las RSS configuradas en **Redes**.
+- El perfil del fediverso compone una página pública a partir de las RSS configuradas en **Redes**.
 - `noticias.xml` publica esa misma selección como feed agregada.
 - Permite añadir notas manuales desde **Redes**, que se muestran como post-it y también pueden difundirse por ActivityPub.
 - Se cachean imágenes sociales para acelerar la carga pública.
@@ -374,7 +374,7 @@ sudo find . -type f -exec chmod 664 {} \;
 - **Configuración**: modo blog/diccionario, búsqueda avanzada, nombre del sitio, autor, redes sociales, API de Google Fonts, correo de lista (Gmail + OAuth) y cambio de contraseña.
 - **Difusión**: credenciales y guías rápidas por red, usuario público de X para footer y `twitter:site`, App ID de Facebook, tokens de Instagram y LinkedIn y opciones de autoenvío.
 - **Redes**: envío manual de mensajes a varias redes a la vez y configuración de RSS externas para reenvío automático de novedades.
-- **Actualidad / Perfil Fediverso**: página pública agregada desde las fuentes RSS configuradas en **Redes**, con notas manuales, entradas, podcasts e itinerarios, versión RSS propia en `noticias.xml`, feed de hilos en `fediverso.xml` e integración con el fediverso.
+- **Perfil del Fediverso**: página pública agregada desde las fuentes RSS configuradas en **Redes**, con notas manuales, entradas, podcasts e itinerarios, versión RSS propia en `noticias.xml`, feed de hilos en `fediverso.xml` e integración con el fediverso.
 - **Fediverso**: timeline remoto, notificaciones, mensajes y gestión de seguidores/seguidos para la cuenta ActivityPub del blog.
 
 El modal “Insertar recurso” que aparece en Publicar, Editar e Itinerarios comparte el mismo buscador, así que puedes localizar imágenes etiquetadas sin salir del formulario.

@@ -3044,7 +3044,7 @@ function nammu_render_header_buttons(array $options): string
     if ($hasActuality && $actualityUrl !== '') {
         $footerIcons = nammu_footer_icon_svgs();
         $items[] = [
-            'label' => 'Actualidad',
+            'label' => 'Fediverso',
             'href' => $actualityUrl,
             'svg' => (string) ($footerIcons['fediverse'] ?? ''),
         ];

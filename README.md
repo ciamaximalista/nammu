@@ -226,44 +226,82 @@ tar -xzf /var/www/html/<carpeta-publica>/backups/nammu-stats-backup-AAAA-MM-DD_H
 - Tarjetas Open Graph y Twitter completas con imagen, título, descripción y `alt`.
 - Canonical, datos estructurados e integración IndexNow.
 
-### 6. Fediverso, ActivityPub y agregación
+### 6. Fediverso, ActivityPub y perfil público
 
-Nammu no se limita a generar feeds RSS: también convierte cada blog en un nodo propio del fediverso.
+Nammu no se limita a generar RSS: también convierte cada blog en una cuenta propia del fediverso y en un pequeño servidor ActivityPub.
 
-- El blog expone identidad ActivityPub completa con `WebFinger`, actor, clave pública, `outbox`, `followers`, `following` e `inbox`.
-- Otros servidores compatibles, como Mastodon o Akkoma, pueden seguir el blog como una cuenta más usando un identificador tipo `@nombre@dominio`.
-- Nammu firma las entregas salientes y puede repartir nuevas publicaciones a seguidores federados.
-- El inbox recibe actividades remotas y procesa acciones básicas como `Follow`, `Undo`, respuestas y otras notificaciones.
-- El perfil público federado del blog puede publicarse además en una ruta legible tipo `https://dominio/@usuario@dominio`.
-- Cada objeto federado local puede tener su propia página pública de hilo, con respuestas e impulsos visibles en web.
+#### Identidad federada del blog
+
+- El blog expone `WebFinger`, actor, clave pública, `outbox`, `followers`, `following` e `inbox`.
+- Otros servidores compatibles, como Mastodon, Akkoma, Pixelfed o GoToSocial, pueden seguir el blog como una cuenta más usando un identificador tipo `@nombre@dominio`.
+- El actor federado publica nombre visible, handle, avatar, resumen y clave pública verificable.
+- La firma HTTP se usa en envíos salientes para `Follow`, respuestas, favoritos, impulsos, mensajes privados y entregas de publicaciones.
+
+#### Perfil público Fediverso
+
+- El perfil federado del blog puede exponerse en una ruta legible tipo `https://dominio/@usuario@dominio`.
+- Esa página sustituye de facto a la antigua vista de `actualidad.php` como perfil visible del blog en el fediverso.
+- La URL antigua puede seguir existiendo por compatibilidad, pero la canónica pública puede ser ya la ruta `@usuario@dominio`.
+- Esa página actúa como escaparate del blog en el fediverso y como página de destino cuando otros nodos abren el perfil o los objetos del blog.
 
 #### Qué contenidos federa Nammu
 
 - Entradas del blog.
-- Itinerarios.
-- Podcasts.
+- Episodios de podcast.
+- Páginas de presentación de itinerarios.
 - Noticias agregadas desde RSS externas.
-- Notas manuales creadas desde la pestaña **Redes** y publicadas en **Actualidad**.
+- Notas manuales creadas desde la pestaña **Redes**.
+- Reenvíos como nota cuando el usuario decide publicar una interacción remota también dentro del blog.
+
+#### Cómo se presentan esos contenidos
+
+- Cada contenido local federable genera un objeto ActivityPub propio.
+- Cada objeto local puede tener además su propia página pública de hilo.
+- Esa página pública muestra la publicación raíz, sus respuestas y sus impulsos recibidos.
+- Las páginas públicas de hilo pueden enlazarse desde el timeline del admin, desde la propia web y desde feeds.
+
+#### Interacciones soportadas
+
+- Seguir y dejar de seguir actores remotos.
+- Recibir seguidores y bloquear seguidores concretos para que no vuelvan a recibir actualizaciones.
+- Marcar publicaciones remotas como favorito.
+- Impulsar publicaciones remotas.
+- Responder públicamente a publicaciones remotas o locales.
+- Enviar mensajes privados.
+- Reenviar una publicación remota como nota local.
+- Borrar publicaciones locales federadas.
+- Borrar respuestas propias.
+- Ocultar localmente respuestas de terceros en publicaciones propias para que no aparezcan en el blog ni en las páginas públicas del hilo.
 
 #### Qué ves en el admin
 
-- Módulo **Fediverso** para seguir actores públicos y leer su timeline.
-- Pestañas de inicio, notificaciones, mensajes y configuración.
-- Conversaciones públicas y privadas con actores remotos.
-- Historial de favoritos, respuestas y reenvíos hechos desde Nammu.
+- Módulo **Fediverso** con pestañas de `Inicio`, `Notificaciones`, `Mensajes`, `Red` y `Configuración`.
+- Timeline remoto con publicaciones locales y remotas.
+- Hilos públicos bajo cada publicación cuando hay respuestas.
+- Notificaciones de favoritos, impulsos, follows y otras actividades remotas.
+- Conversaciones públicas y privadas agrupadas por hilo.
+- Gestión de actores seguidos, seguidores y bloqueados.
+- Historial local de favoritos, respuestas, impulsos, reenvíos y borrados hechos desde Nammu.
 
-#### Relación con Actualidad y perfil público
+#### Relación con la página de perfil y con Actualidad
 
-- La página pública de perfil Fediverso puede exponerse como `actualidad.php` o como una ruta tipo `@usuario@dominio`.
-- Esa página reúne RSS externas, notas manuales y también contenidos publicados del propio blog como entradas, podcasts e itinerarios.
-- El feed `noticias.xml` publica esa misma selección para reutilizarla fuera del blog.
-- Las notas y noticias de `Actualidad` también pueden entrar en la salida ActivityPub del sitio como contenido federable.
-- `fediverso.xml` publica las páginas públicas de hilo asociadas a los contenidos visibles en esa página de perfil.
+- La página de perfil Fediverso reúne RSS externas, notas manuales y también contenidos publicados del propio blog como entradas, podcasts e itinerarios.
+- Las notas y noticias de `Actualidad` pueden entrar en la salida ActivityPub del sitio como contenido federable.
+- Los contenidos federados visibles en esa página pueden enlazar a su página pública de hilo correspondiente.
+- El perfil público puede funcionar como página de presentación del blog dentro del fediverso, no solo como agregador de noticias.
 
-#### Automatización
+#### Feeds asociados al Fediverso
 
-- El cron integrado refresca periódicamente los actores seguidos desde **Fediverso**.
+- `noticias.xml` publica la selección agregada de noticias y notas.
+- `fediverso.xml` publica las páginas públicas de hilo Fediverso asociadas a los contenidos visibles en la página de perfil.
+- `rss.xml`, `podcast.xml` e `itinerarios.xml` siguen coexistiendo como feeds específicos del resto del sitio.
+
+#### Automatización y rendimiento
+
+- El cron integrado refresca periódicamente actores seguidos y actividades remotas.
 - Ese mismo cron reparte a seguidores federados las nuevas publicaciones locales que aún no se hayan entregado.
+- El admin puede separar refrescos ligeros y recalculado de hilos para evitar operaciones pesadas en una sola petición.
+- Parte del estado del Fediverso se guarda en stores locales para acelerar timeline, mensajes y notificaciones.
 - `llms.txt` sigue disponible como archivo adicional para consumo por modelos de lenguaje.
 
 ### 7. Itinerarios y formación

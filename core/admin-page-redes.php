@@ -6,6 +6,10 @@
     $rssConfig = admin_social_rss_settings($settings);
     $cronCommand = '*/5 * * * * php ' . __DIR__ . '/../admin.php --run-scheduled >> ' . __DIR__ . '/../backups/cron.log 2>&1';
     $siteName = trim((string) (($settings['site_name'] ?? '') ?: 'Nammu Blog'));
+    $baseUrl = function_exists('nammu_base_url') ? rtrim((string) nammu_base_url(), '/') : '';
+    $fediverseProfileUrl = function_exists('nammu_fediverse_profile_page_url') ? nammu_fediverse_profile_page_url($settings) : ($baseUrl . '/actualidad.php');
+    $newsFeedUrl = ($baseUrl !== '' ? $baseUrl : '') . '/noticias.xml';
+    $fediverseIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';
     ?>
     <div class="tab-pane active">
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
@@ -25,7 +29,7 @@
             <div class="card mb-4">
                 <div class="card-body">
                     <h3 class="h5 mb-3">Enviar mensaje</h3>
-                    <p class="text-muted small mb-3">Este mensaje se enviará al Fediverso y aparecerá en <code>noticias.xml</code> y en la página de perfil como una nota tipo post-it.</p>
+                    <p class="text-muted small mb-3">Este mensaje se enviará al <strong>Fediverso</strong> <span class="align-middle d-inline-block social-fediverse-inline-icon"><?= $fediverseIcon ?></span> y aparecerá en <a href="<?= htmlspecialchars($newsFeedUrl, ENT_QUOTES, 'UTF-8') ?>"><code>noticias.xml</code></a> y en <a href="<?= htmlspecialchars($fediverseProfileUrl, ENT_QUOTES, 'UTF-8') ?>">tu página de perfil del Fediverso</a> como una nota tipo post-it.</p>
                     <div class="row">
                         <div class="col-lg-8 mb-3 mb-lg-0">
                             <label for="social_broadcast_text">Mensaje</label>
@@ -170,6 +174,17 @@
     </div>
 
     <style>
+        .social-fediverse-inline-icon {
+            width: 0.95rem;
+            height: 0.95rem;
+            line-height: 1;
+            vertical-align: -0.1em;
+        }
+        .social-fediverse-inline-icon svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
         .social-network-option.is-over-limit {
             opacity: 0.55;
         }

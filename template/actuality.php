@@ -333,6 +333,15 @@ $manualDisplayText = static function (array $item): string {
         overflow: hidden;
         box-shadow: 0 16px 36px rgba(0,0,0,0.06);
     }
+    .actuality-card--site {
+        background: <?= $highlight ?>;
+        border: 1px solid rgba(0,0,0,0.05);
+        border-radius: var(--nammu-radius-md);
+        color: <?= $textColor ?>;
+        position: relative;
+        overflow: hidden;
+        box-sizing: border-box;
+    }
     .actuality-card--manual {
         background: #fff6a8;
         border: 1px solid rgba(124, 92, 5, 0.24);
@@ -383,6 +392,9 @@ $manualDisplayText = static function (array $item): string {
         color: <?= $headingSecondaryColor ?>;
         text-decoration: none;
         transition: color 0.2s ease;
+    }
+    .actuality-card--site .actuality-image-link {
+        background: transparent;
     }
     .actuality-card h3 a:hover {
         color: <?= $accentColor ?>;

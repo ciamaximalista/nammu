@@ -42,11 +42,12 @@ if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons'
     $headerButtonsHtml = nammu_render_standard_header_buttons(get_defined_vars());
 }
 $fediverseIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';
-$actualityFediverseLink = static function (array $item) use ($config): string {
+$actualityFediverseLink = static function (array $item): string {
     if (!function_exists('nammu_fediverse_public_thread_url_for_actuality_item')) {
         return '';
     }
-    return trim((string) nammu_fediverse_public_thread_url_for_actuality_item($item, is_array($config ?? null) ? $config : []));
+    $fediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
+    return trim((string) nammu_fediverse_public_thread_url_for_actuality_item($item, is_array($fediverseConfig) ? $fediverseConfig : []));
 };
 $renderActualityText = static function (string $text, array $item) use ($fediverseIcon, $actualityFediverseLink): string {
     $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
@@ -264,15 +265,15 @@ $manualDisplayText = static function (array $item): string {
         <nav class="actuality-pagination" aria-label="Paginación de Fediverso">
             <div class="actuality-pagination__inner">
                 <?php if ($prevPageUrl !== ''): ?>
-                    <a class="actuality-pagination__link" href="<?= htmlspecialchars($prevPageUrl, ENT_QUOTES, 'UTF-8') ?>">&larr; Días anteriores</a>
+                    <a class="actuality-pagination__link" href="<?= htmlspecialchars($prevPageUrl, ENT_QUOTES, 'UTF-8') ?>">&larr; Días posteriores</a>
                 <?php else: ?>
-                    <span class="actuality-pagination__link actuality-pagination__link--disabled">&larr; Días anteriores</span>
+                    <span class="actuality-pagination__link actuality-pagination__link--disabled">&larr; Días posteriores</span>
                 <?php endif; ?>
                 <span class="actuality-pagination__status">Página <?= $currentPage ?> de <?= $totalPages ?></span>
                 <?php if ($nextPageUrl !== ''): ?>
-                    <a class="actuality-pagination__link" href="<?= htmlspecialchars($nextPageUrl, ENT_QUOTES, 'UTF-8') ?>">Días posteriores &rarr;</a>
+                    <a class="actuality-pagination__link" href="<?= htmlspecialchars($nextPageUrl, ENT_QUOTES, 'UTF-8') ?>">Días anteriores &rarr;</a>
                 <?php else: ?>
-                    <span class="actuality-pagination__link actuality-pagination__link--disabled">Días posteriores &rarr;</span>
+                    <span class="actuality-pagination__link actuality-pagination__link--disabled">Días anteriores &rarr;</span>
                 <?php endif; ?>
             </div>
         </nav>

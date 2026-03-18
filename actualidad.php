@@ -63,6 +63,15 @@ $siteLang = $configData['site_lang'] ?? 'es';
 if (!is_string($siteLang) || $siteLang === '') {
     $siteLang = 'es';
 }
+$fediverseProfileAliasPath = function_exists('nammu_fediverse_profile_alias_path')
+    ? nammu_fediverse_profile_alias_path($configData, $publicBaseUrl)
+    : '/actualidad.php';
+$fediverseProfileAliasUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . $fediverseProfileAliasPath;
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+if ($requestPath === '/actualidad.php' && $fediverseProfileAliasPath !== '/actualidad.php' && !headers_sent()) {
+    header('Location: ' . $fediverseProfileAliasUrl, true, 302);
+    exit;
+}
 $postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
 $postalLogoSvg = nammu_postal_icon_svg();
 $hasItineraries = !empty(is_dir(__DIR__ . '/itinerarios') ? glob(__DIR__ . '/itinerarios/*') : []);
@@ -113,43 +122,9 @@ $renderer->setGlobal('baseUrl', $publicBaseUrl !== '' ? $publicBaseUrl : '/');
 
 $rssSettings = admin_social_rss_settings(['social_rss' => $configData['social_rss'] ?? []]);
 $feeds = admin_social_rss_feed_list($rssSettings['feeds']);
-$snapshot = nammu_actuality_load_items_snapshot();
-$items = is_array($snapshot['items'] ?? null) ? $snapshot['items'] : [];
-if (empty($items) && function_exists('nammu_actuality_has_content') && nammu_actuality_has_content($configData)) {
-    $rebuilt = nammu_actuality_rebuild_snapshot($publicBaseUrl, $configData, $siteTitle, $siteDescription, $siteLang);
-    $items = is_array($rebuilt['items'] ?? null) ? $rebuilt['items'] : [];
-}
-$publishedSiteItems = function_exists('nammu_actuality_collect_published_site_items')
-    ? nammu_actuality_collect_published_site_items($contentDir, $itinerariesDir, $publicBaseUrl, $siteTitle)
+$items = function_exists('nammu_actuality_page_items')
+    ? nammu_actuality_page_items($configData, $contentDir, $itinerariesDir, $publicBaseUrl, $siteTitle, $siteDescription, $siteLang)
     : [];
-if (!empty($publishedSiteItems)) {
-    $merged = [];
-    $seenActualityKeys = [];
-    foreach ($items as $item) {
-        if (!is_array($item)) {
-            continue;
-        }
-        $key = trim((string) ($item['link'] ?? ''));
-        if ($key === '') {
-            $key = 'manual:' . trim((string) ($item['id'] ?? ''));
-        }
-        if ($key !== '') {
-            $seenActualityKeys[$key] = true;
-        }
-        $merged[] = $item;
-    }
-    foreach ($publishedSiteItems as $item) {
-        $key = trim((string) ($item['link'] ?? ''));
-        if ($key !== '' && isset($seenActualityKeys[$key])) {
-            continue;
-        }
-        $merged[] = $item;
-    }
-    usort($merged, static function (array $a, array $b): int {
-        return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
-    });
-    $items = $merged;
-}
 
 $actualityHeroBackground = '';
 $actualityCache = nammu_actuality_load_cache();
@@ -186,8 +161,8 @@ $pagedItems = array_values(array_filter($items, static function (array $item) us
     $dayKey = $timestamp > 0 ? date('Y-m-d', $timestamp) : 'sin-fecha';
     return isset($visibleActualityDayLookup[$dayKey]);
 }));
-$actualityPageUrl = static function (int $page) use ($publicBaseUrl): string {
-    $base = ($publicBaseUrl !== '' ? $publicBaseUrl : '') . '/actualidad.php';
+$actualityPageUrl = static function (int $page) use ($fediverseProfileAliasUrl): string {
+    $base = $fediverseProfileAliasUrl;
     return $page <= 1 ? $base : ($base . '?pagina=' . $page);
 };
 $actualityPrevPageUrl = $currentActualityPage > 1 ? $actualityPageUrl($currentActualityPage - 1) : '';

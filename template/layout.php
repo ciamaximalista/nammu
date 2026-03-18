@@ -194,6 +194,7 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
     <?php if (trim((string) ((nammu_load_config()['social_rss']['feeds'] ?? ''))) !== ''): ?>
         <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Noticias" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/noticias.xml' : $searchBaseNormalized . '/noticias.xml', ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
+    <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Fediverso" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/fediverso.xml' : $searchBaseNormalized . '/fediverso.xml', ENT_QUOTES, 'UTF-8') ?>">
     <?php if (function_exists('nammu_fediverse_actor_url') && function_exists('nammu_fediverse_acct_uri') && function_exists('nammu_fediverse_base_url')): ?>
         <?php $fediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : []; ?>
         <link rel="alternate" type="application/activity+json" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — ActivityPub" href="<?= htmlspecialchars(nammu_fediverse_actor_url($fediverseConfig), ENT_QUOTES, 'UTF-8') ?>">

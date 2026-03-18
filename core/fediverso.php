@@ -181,6 +181,18 @@ function nammu_fediverse_actor_url(array $config): string
     return nammu_fediverse_base_url($config) . '/ap/actor';
 }
 
+function nammu_fediverse_profile_page_url(array $config): string
+{
+    $baseUrl = rtrim(nammu_fediverse_base_url($config), '/');
+    if (function_exists('nammu_fediverse_profile_alias_path')) {
+        $path = (string) nammu_fediverse_profile_alias_path($config, $baseUrl);
+        if ($path !== '') {
+            return $baseUrl . $path;
+        }
+    }
+    return $baseUrl . '/actualidad.php';
+}
+
 function nammu_fediverse_key_url(array $config): string
 {
     return nammu_fediverse_base_url($config) . '/ap/key';
@@ -3419,7 +3431,7 @@ function nammu_fediverse_deliver_activity_to_followers(array $activity, array $c
 function nammu_fediverse_actor_document(array $config): array
 {
     $actorUrl = nammu_fediverse_actor_url($config);
-    $baseUrl = nammu_fediverse_base_url($config);
+    $profilePageUrl = nammu_fediverse_profile_page_url($config);
     $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
     $siteDescription = trim((string) ($config['site_description'] ?? ''));
     $keys = nammu_fediverse_keypair();
@@ -3434,7 +3446,7 @@ function nammu_fediverse_actor_document(array $config): array
         'preferredUsername' => nammu_fediverse_preferred_username($config),
         'name' => $siteName,
         'summary' => $siteDescription !== '' ? $siteDescription : $siteName,
-        'url' => $baseUrl,
+        'url' => $profilePageUrl,
         'inbox' => nammu_fediverse_inbox_url($config),
         'outbox' => nammu_fediverse_outbox_url($config),
         'followers' => nammu_fediverse_followers_url($config),

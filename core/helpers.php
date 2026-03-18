@@ -1655,6 +1655,28 @@ function nammu_footer_icon_svgs(): array
     ];
 }
 
+function nammu_fediverse_profile_alias_path(array $config = [], string $baseUrl = ''): string
+{
+    $config = !empty($config) ? $config : nammu_load_config();
+    $preferredUsername = trim((string) (($config['fediverse']['preferred_username'] ?? $config['blog_slug'] ?? 'blog')));
+    $preferredUsername = preg_replace('/[^a-z0-9._-]+/i', '', $preferredUsername) ?? 'blog';
+    if ($preferredUsername === '') {
+        $preferredUsername = 'blog';
+    }
+    $base = trim($baseUrl);
+    if ($base === '' && function_exists('nammu_base_url')) {
+        $base = (string) nammu_base_url();
+    }
+    $host = trim((string) parse_url($base, PHP_URL_HOST));
+    if ($host === '') {
+        $host = trim((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    }
+    if ($host === '') {
+        return '/actualidad.php';
+    }
+    return '/@' . $preferredUsername . '@' . $host;
+}
+
 function nammu_build_footer_links(array $config, array $theme, string $baseUrl, string $postalUrl, bool $hasItineraries = false, bool $hasPodcast = false): array
 {
     $icons = nammu_footer_icon_svgs();
@@ -1818,6 +1840,11 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
             'svg' => $icons['rss'],
         ];
     }
+    $links[] = [
+        'label' => 'RSS Fediverso',
+        'href' => $baseRoot . '/fediverso.xml',
+        'svg' => $icons['rss'],
+    ];
 
     $podcastServices = $config['podcast_services'] ?? [];
     if ($hasPodcast) {
@@ -2938,6 +2965,7 @@ function nammu_set_itinerary_progress(string $slug, array $progress): void
 function nammu_render_header_buttons(array $options): string
 {
     $accent = (string) ($options['accent'] ?? '#0a4c8a');
+    $config = nammu_load_config();
     $searchUrl = (string) ($options['search_url'] ?? '/buscar.php');
     $homeUrl = (string) ($options['home_url'] ?? '');
     if ($homeUrl === '') {
@@ -2953,7 +2981,7 @@ function nammu_render_header_buttons(array $options): string
     $podcastUrl = (string) ($options['podcast_url'] ?? '/podcast');
     $lettersUrl = (string) ($options['letters_url'] ?? ($GLOBALS['lettersIndexUrl'] ?? '/letras'));
     $newslettersUrl = (string) ($options['newsletters_url'] ?? ($GLOBALS['newslettersIndexUrl'] ?? '/newsletters'));
-    $actualityUrl = (string) ($options['actuality_url'] ?? ($homeUrl !== '' ? rtrim($homeUrl, '/') . '/actualidad.php' : '/actualidad.php'));
+    $actualityUrl = (string) ($options['actuality_url'] ?? (($homeUrl !== '' ? rtrim($homeUrl, '/') : '') . nammu_fediverse_profile_alias_path($config, $homeUrl)));
     $avisosUrl = (string) ($options['avisos_url'] ?? '/avisos.php');
     $postalUrl = (string) ($options['postal_url'] ?? '/correos.php');
     $postalLogoSvg = (string) ($options['postal_svg'] ?? '');
@@ -2964,14 +2992,12 @@ function nammu_render_header_buttons(array $options): string
     if (array_key_exists('is_dictionary_mode', $options)) {
         $isDictionaryMode = !empty($options['is_dictionary_mode']);
     } else {
-        $config = nammu_load_config();
         $isDictionaryMode = (($config['sort_order'] ?? 'date') === 'alpha');
     }
     $showLetters = array_key_exists('show_letters', $options)
         ? !empty($options['show_letters'])
         : ($isDictionaryMode && $lettersUrl !== '');
     $hasNewsletters = !empty($options['has_newsletters'] ?? ($GLOBALS['hasNewsletters'] ?? $GLOBALS['has_newsletters'] ?? false));
-    $config = $config ?? nammu_load_config();
     $socialRssConfig = is_array($config['social_rss'] ?? null) ? $config['social_rss'] : [];
     $hasActuality = array_key_exists('has_actuality', $options)
         ? !empty($options['has_actuality'])
@@ -3072,6 +3098,7 @@ function nammu_render_standard_header_buttons(array $context = []): string
 {
     $theme = is_array($context['theme'] ?? null) ? $context['theme'] : [];
     $colors = is_array($theme['colors'] ?? null) ? $theme['colors'] : [];
+    $config = nammu_load_config();
     $baseUrl = (string) ($context['baseUrl'] ?? $context['base_url'] ?? ($GLOBALS['baseUrl'] ?? '/'));
     $baseNormalized = rtrim($baseUrl === '' ? '/' : $baseUrl, '/');
     if ($baseNormalized === '') {
@@ -3084,12 +3111,11 @@ function nammu_render_standard_header_buttons(array $context = []): string
     $podcastUrl = (string) ($context['podcastIndexUrl'] ?? $context['podcast_url'] ?? ($GLOBALS['podcastIndexUrl'] ?? ($baseNormalized === '/' ? '/podcast' : $baseNormalized . '/podcast')));
     $lettersUrl = (string) ($context['letterIndexUrlValue'] ?? $context['lettersIndexUrl'] ?? $context['letters_url'] ?? ($GLOBALS['lettersIndexUrl'] ?? ($baseNormalized === '/' ? '/letras' : $baseNormalized . '/letras')));
     $newslettersUrl = (string) ($context['newslettersIndexUrl'] ?? $context['newsletters_url'] ?? ($GLOBALS['newslettersIndexUrl'] ?? ($baseNormalized === '/' ? '/newsletters' : $baseNormalized . '/newsletters')));
-    $actualityUrl = (string) ($context['actualityUrl'] ?? $context['actuality_url'] ?? ($baseNormalized === '/' ? '/actualidad.php' : $baseNormalized . '/actualidad.php'));
+    $actualityUrl = (string) ($context['actualityUrl'] ?? $context['actuality_url'] ?? (($baseNormalized === '/' ? '' : $baseNormalized) . nammu_fediverse_profile_alias_path($config, $baseNormalized === '/' ? '' : $baseNormalized)));
     $avisosUrl = (string) ($context['avisosUrl'] ?? $context['avisos_url'] ?? ($baseNormalized === '/' ? '/avisos.php' : $baseNormalized . '/avisos.php'));
     $postalUrl = (string) ($context['postalUrl'] ?? $context['postal_url'] ?? '/correos.php');
     $postalSvg = (string) ($context['postalLogoSvg'] ?? $context['postal_svg'] ?? '');
 
-    $config = nammu_load_config();
     $socialRssConfig = is_array($config['social_rss'] ?? null) ? $config['social_rss'] : [];
     $subscriptionConfig = is_array($theme['subscription'] ?? null) ? $theme['subscription'] : [];
 

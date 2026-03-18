@@ -933,6 +933,48 @@ function nammu_actuality_collect_published_site_items(string $contentDir, string
     return $items;
 }
 
+function nammu_actuality_page_items(array $config, string $contentDir, string $itinerariesDir, string $publicBaseUrl, string $siteTitle, string $siteDescription = '', string $siteLang = 'es'): array
+{
+    $snapshot = nammu_actuality_load_items_snapshot();
+    $items = is_array($snapshot['items'] ?? null) ? $snapshot['items'] : [];
+    if (empty($items) && function_exists('nammu_actuality_has_content') && nammu_actuality_has_content($config)) {
+        $rebuilt = nammu_actuality_rebuild_snapshot($publicBaseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        $items = is_array($rebuilt['items'] ?? null) ? $rebuilt['items'] : [];
+    }
+
+    $publishedSiteItems = nammu_actuality_collect_published_site_items($contentDir, $itinerariesDir, $publicBaseUrl, $siteTitle);
+    if (empty($publishedSiteItems)) {
+        return $items;
+    }
+
+    $merged = [];
+    $seenActualityKeys = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $key = trim((string) ($item['link'] ?? ''));
+        if ($key === '') {
+            $key = 'manual:' . trim((string) ($item['id'] ?? ''));
+        }
+        if ($key !== '') {
+            $seenActualityKeys[$key] = true;
+        }
+        $merged[] = $item;
+    }
+    foreach ($publishedSiteItems as $item) {
+        $key = trim((string) ($item['link'] ?? ''));
+        if ($key !== '' && isset($seenActualityKeys[$key])) {
+            continue;
+        }
+        $merged[] = $item;
+    }
+    usort($merged, static function (array $a, array $b): int {
+        return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
+    });
+    return $merged;
+}
+
 function nammu_actuality_collect_items(array $config, string $publicBaseUrl): array
 {
     $rssSettings = nammu_actuality_rss_settings(['social_rss' => $config['social_rss'] ?? []]);
@@ -1059,6 +1101,75 @@ XML;
     <atom:link xmlns:atom="http://www.w3.org/2005/Atom" href="{$feedUrlEsc}" rel="self" type="application/rss+xml" />
 {$itemsBlock}
   </channel>
+</rss>
+XML;
+}
+
+function nammu_generate_fediverse_threads_feed(string $baseUrl, array $config, string $siteTitle, string $siteDescription, string $siteLang = 'es'): string
+{
+    $items = nammu_actuality_page_items($config, dirname(__DIR__) . '/content', dirname(__DIR__) . '/itinerarios', $baseUrl, $siteTitle, $siteDescription, $siteLang);
+    $feedItems = [];
+    foreach ($items as $item) {
+        if (!is_array($item) || !function_exists('nammu_fediverse_public_thread_url_for_actuality_item')) {
+            continue;
+        }
+        $threadUrl = trim((string) nammu_fediverse_public_thread_url_for_actuality_item($item, $config));
+        if ($threadUrl === '') {
+            continue;
+        }
+        $title = trim((string) ($item['title'] ?? ''));
+        $description = trim((string) (($item['raw_text'] ?? '') ?: ($item['description'] ?? '')));
+        $timestamp = (int) ($item['timestamp'] ?? 0);
+        $feedItems[] = [
+            'title' => $title !== '' ? $title : nammu_excerpt_text($description, 120),
+            'link' => $threadUrl,
+            'description' => $description,
+            'timestamp' => $timestamp > 0 ? $timestamp : time(),
+        ];
+    }
+
+    usort($feedItems, static function (array $a, array $b): int {
+        return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
+    });
+
+    $lastBuild = gmdate(DATE_RSS, !empty($feedItems) ? (int) $feedItems[0]['timestamp'] : time());
+    $feedTitle = htmlspecialchars(trim($siteTitle) !== '' ? ($siteTitle . ' — Fediverso') : 'Fediverso', ENT_XML1 | ENT_COMPAT, 'UTF-8');
+    $feedDescription = htmlspecialchars(trim($siteDescription) !== '' ? $siteDescription : 'Páginas públicas de hilo Fediverso asociadas al perfil del blog.', ENT_XML1 | ENT_COMPAT, 'UTF-8');
+    $feedLink = htmlspecialchars(rtrim($baseUrl, '/') . (function_exists('nammu_fediverse_profile_alias_path') ? nammu_fediverse_profile_alias_path($config, $baseUrl) : '/actualidad.php'), ENT_XML1 | ENT_COMPAT, 'UTF-8');
+    $selfUrl = htmlspecialchars(rtrim($baseUrl, '/') . '/fediverso.xml', ENT_XML1 | ENT_COMPAT, 'UTF-8');
+
+    $itemsXml = [];
+    foreach ($feedItems as $item) {
+        $title = htmlspecialchars((string) ($item['title'] ?? ''), ENT_XML1 | ENT_COMPAT, 'UTF-8');
+        $link = htmlspecialchars((string) ($item['link'] ?? ''), ENT_XML1 | ENT_COMPAT, 'UTF-8');
+        $guid = $link;
+        $descriptionHtml = nammu_actuality_text_to_html((string) ($item['description'] ?? ''));
+        $descriptionEscaped = htmlspecialchars($descriptionHtml, ENT_XML1 | ENT_COMPAT, 'UTF-8');
+        $pubDate = gmdate(DATE_RSS, (int) ($item['timestamp'] ?? time()));
+        $itemsXml[] = <<<XML
+<item>
+  <title>{$title}</title>
+  <link>{$link}</link>
+  <guid isPermaLink="true">{$guid}</guid>
+  <pubDate>{$pubDate}</pubDate>
+  <description>{$descriptionEscaped}</description>
+</item>
+XML;
+    }
+    $itemsBlock = implode("\n", $itemsXml);
+
+    return <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<channel>
+  <title>{$feedTitle}</title>
+  <link>{$feedLink}</link>
+  <description>{$feedDescription}</description>
+  <language>{$siteLang}</language>
+  <lastBuildDate>{$lastBuild}</lastBuildDate>
+  <atom:link href="{$selfUrl}" rel="self" type="application/rss+xml" />
+{$itemsBlock}
+</channel>
 </rss>
 XML;
 }

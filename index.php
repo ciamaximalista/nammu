@@ -278,6 +278,13 @@ $renderer->setGlobal('isAlphabeticalOrder', $isAlphabeticalOrder);
 $renderer->setGlobal('isAdminLogged', $isAdminLogged);
 
 $routePath = nammu_route_path();
+$fediverseProfileAliasPath = function_exists('nammu_fediverse_profile_alias_path')
+    ? nammu_fediverse_profile_alias_path($configData, $publicBaseUrl)
+    : '/actualidad.php';
+if ($fediverseProfileAliasPath !== '/actualidad.php' && preg_match('#^' . preg_quote($fediverseProfileAliasPath, '#') . '/?$#i', $routePath) === 1) {
+    require __DIR__ . '/actualidad.php';
+    exit;
+}
 $alphabeticalSorter = static function (Post $a, Post $b): int {
     $letterA = nammu_letter_key_from_title($a->getTitle());
     $letterB = nammu_letter_key_from_title($b->getTitle());
@@ -503,8 +510,17 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
     }
 
     if ($hasActuality) {
+        $fediverseProfileAliasPath = function_exists('nammu_fediverse_profile_alias_path')
+            ? nammu_fediverse_profile_alias_path($config, $publicBaseUrl)
+            : '/actualidad.php';
         $pushEntry([
             'loc' => '/actualidad.php',
+            'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
+            'changefreq' => 'hourly',
+            'priority' => 0.6,
+        ]);
+        $pushEntry([
+            'loc' => $fediverseProfileAliasPath,
             'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
             'changefreq' => 'hourly',
             'priority' => 0.6,
@@ -872,6 +888,15 @@ if ($routePath === '/noticias.xml') {
     }
     header('Content-Type: application/rss+xml; charset=UTF-8');
     echo $actualityFeed;
+    exit;
+}
+
+if ($routePath === '/fediverso.xml') {
+    $fediverseFeed = function_exists('nammu_generate_fediverse_threads_feed')
+        ? nammu_generate_fediverse_threads_feed($publicBaseUrl, $config, $siteTitle, $siteDescription, $siteLang)
+        : '';
+    header('Content-Type: application/rss+xml; charset=UTF-8');
+    echo $fediverseFeed;
     exit;
 }
 

@@ -15,7 +15,7 @@
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
             <div>
                 <h2 class="mb-1">Redes</h2>
-                <p class="text-muted mb-0">Escribe un mensaje manual y envíalo a las redes sociales que ya tengas configuradas.</p>
+                <p class="text-muted mb-0">Escribe un mensaje y envíalo al <strong>Fediverso</strong> <span class="align-middle d-inline-block social-fediverse-inline-icon"><?= $fediverseIcon ?></span> y, opcionalmente, a las redes sociales que quieras entre las que ya tengas configuradas.</p>
             </div>
         </div>
 

@@ -44,7 +44,7 @@
                                 class="form-control"
                                 rows="10"
                                 maxlength="63206"
-                                placeholder="Escribe aquí el mensaje para tus redes sociales."
+                                placeholder="Escribe aquí tu mensaje"
                             ><?= htmlspecialchars($socialBroadcastText ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
                             <div class="d-flex justify-content-end mt-2">
                                 <small class="text-muted">

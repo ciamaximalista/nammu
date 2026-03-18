@@ -133,17 +133,50 @@ if (!empty($cacheItems)) {
 }
 $renderer->setGlobal('actualityHeroBackground', $actualityHeroBackground);
 
+$actualityDaysPerPage = 8;
+$requestedActualityPage = isset($_GET['pagina']) ? (int) $_GET['pagina'] : (isset($_GET['page']) ? (int) $_GET['page'] : 1);
+$currentActualityPage = max(1, $requestedActualityPage);
+$actualityDayKeys = [];
+foreach ($items as $item) {
+    $timestamp = (int) ($item['timestamp'] ?? 0);
+    $dayKey = $timestamp > 0 ? date('Y-m-d', $timestamp) : 'sin-fecha';
+    if (!in_array($dayKey, $actualityDayKeys, true)) {
+        $actualityDayKeys[] = $dayKey;
+    }
+}
+$actualityTotalPages = max(1, (int) ceil(count($actualityDayKeys) / $actualityDaysPerPage));
+if ($currentActualityPage > $actualityTotalPages) {
+    $currentActualityPage = $actualityTotalPages;
+}
+$visibleActualityDayKeys = array_slice($actualityDayKeys, ($currentActualityPage - 1) * $actualityDaysPerPage, $actualityDaysPerPage);
+$visibleActualityDayLookup = array_fill_keys($visibleActualityDayKeys, true);
+$pagedItems = array_values(array_filter($items, static function (array $item) use ($visibleActualityDayLookup): bool {
+    $timestamp = (int) ($item['timestamp'] ?? 0);
+    $dayKey = $timestamp > 0 ? date('Y-m-d', $timestamp) : 'sin-fecha';
+    return isset($visibleActualityDayLookup[$dayKey]);
+}));
+$actualityPageUrl = static function (int $page) use ($publicBaseUrl): string {
+    $base = ($publicBaseUrl !== '' ? $publicBaseUrl : '') . '/actualidad.php';
+    return $page <= 1 ? $base : ($base . '?pagina=' . $page);
+};
+$actualityPrevPageUrl = $currentActualityPage > 1 ? $actualityPageUrl($currentActualityPage - 1) : '';
+$actualityNextPageUrl = $currentActualityPage < $actualityTotalPages ? $actualityPageUrl($currentActualityPage + 1) : '';
+
 $content = $renderer->render('actuality', [
-    'items' => $items,
+    'items' => $pagedItems,
     'feedsCount' => count($feeds),
     'hasActuality' => function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($configData) : !empty($feeds),
+    'currentPage' => $currentActualityPage,
+    'totalPages' => $actualityTotalPages,
+    'prevPageUrl' => $actualityPrevPageUrl,
+    'nextPageUrl' => $actualityNextPageUrl,
 ]);
 
 $pageTitle = 'Fediverso';
 $pageDescription = (function_exists('nammu_actuality_has_content') && nammu_actuality_has_content($configData))
     ? 'Actualidad agregada desde las fuentes RSS configuradas y notas manuales del sitio.'
     : 'No hay contenido de actualidad configurado todavía.';
-$canonical = ($publicBaseUrl !== '' ? $publicBaseUrl : '') . '/actualidad.php';
+$canonical = $actualityPageUrl($currentActualityPage);
 
 $socialMeta = nammu_build_social_meta([
     'type' => 'website',

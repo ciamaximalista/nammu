@@ -3,6 +3,10 @@
  * @var array<int, array{title:string,link:string,image:string,description:string,timestamp:int,source:string,is_manual?:bool,id?:string,links?:array<int,string>,raw_text?:string}> $items
  * @var int $feedsCount
  * @var bool $hasActuality
+ * @var int $currentPage
+ * @var int $totalPages
+ * @var string $prevPageUrl
+ * @var string $nextPageUrl
  */
 $colors = $theme['colors'] ?? [];
 $highlight = htmlspecialchars($colors['highlight'] ?? '#f3f6f9', ENT_QUOTES, 'UTF-8');
@@ -94,6 +98,10 @@ $renderLinks = static function (array $links): string {
     }
     return implode(', ', $bits);
 };
+$currentPage = max(1, (int) ($currentPage ?? 1));
+$totalPages = max(1, (int) ($totalPages ?? 1));
+$prevPageUrl = trim((string) ($prevPageUrl ?? ''));
+$nextPageUrl = trim((string) ($nextPageUrl ?? ''));
 $manualDisplayText = static function (array $item): string {
     $rawText = trim((string) ($item['raw_text'] ?? ''));
     if ($rawText !== '') {
@@ -249,6 +257,23 @@ $manualDisplayText = static function (array $item): string {
             </div>
         </section>
     <?php endforeach; ?>
+    <?php if ($totalPages > 1): ?>
+        <nav class="actuality-pagination" aria-label="Paginación de Fediverso">
+            <div class="actuality-pagination__inner">
+                <?php if ($prevPageUrl !== ''): ?>
+                    <a class="actuality-pagination__link" href="<?= htmlspecialchars($prevPageUrl, ENT_QUOTES, 'UTF-8') ?>">&larr; Días anteriores</a>
+                <?php else: ?>
+                    <span class="actuality-pagination__link actuality-pagination__link--disabled">&larr; Días anteriores</span>
+                <?php endif; ?>
+                <span class="actuality-pagination__status">Página <?= $currentPage ?> de <?= $totalPages ?></span>
+                <?php if ($nextPageUrl !== ''): ?>
+                    <a class="actuality-pagination__link" href="<?= htmlspecialchars($nextPageUrl, ENT_QUOTES, 'UTF-8') ?>">Días posteriores &rarr;</a>
+                <?php else: ?>
+                    <span class="actuality-pagination__link actuality-pagination__link--disabled">Días posteriores &rarr;</span>
+                <?php endif; ?>
+            </div>
+        </nav>
+    <?php endif; ?>
 <?php endif; ?>
 
 <style>
@@ -402,9 +427,38 @@ $manualDisplayText = static function (array $item): string {
         padding: 1.5rem;
         color: <?= $textColor ?>;
     }
+    .actuality-pagination {
+        margin-top: 2rem;
+    }
+    .actuality-pagination__inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem 1.25rem;
+        border-radius: var(--nammu-radius-lg);
+        background: <?= $highlight ?>;
+    }
+    .actuality-pagination__link {
+        color: <?= $accentColor ?>;
+        text-decoration: none;
+        font-weight: 700;
+    }
+    .actuality-pagination__link--disabled {
+        color: rgba(0, 0, 0, 0.35);
+        pointer-events: none;
+    }
+    .actuality-pagination__status {
+        color: <?= $textColor ?>;
+        font-weight: 600;
+    }
     @media (max-width: 760px) {
         .actuality-grid {
             grid-template-columns: minmax(0, 1fr);
+        }
+        .actuality-pagination__inner {
+            flex-direction: column;
+            text-align: center;
         }
     }
 </style>

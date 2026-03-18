@@ -234,6 +234,8 @@ Nammu no se limita a generar feeds RSS: también convierte cada blog en un nodo 
 - Otros servidores compatibles, como Mastodon o Akkoma, pueden seguir el blog como una cuenta más usando un identificador tipo `@nombre@dominio`.
 - Nammu firma las entregas salientes y puede repartir nuevas publicaciones a seguidores federados.
 - El inbox recibe actividades remotas y procesa acciones básicas como `Follow`, `Undo`, respuestas y otras notificaciones.
+- El perfil público federado del blog puede publicarse además en una ruta legible tipo `https://dominio/@usuario@dominio`.
+- Cada objeto federado local puede tener su propia página pública de hilo, con respuestas e impulsos visibles en web.
 
 #### Qué contenidos federa Nammu
 
@@ -250,11 +252,13 @@ Nammu no se limita a generar feeds RSS: también convierte cada blog en un nodo 
 - Conversaciones públicas y privadas con actores remotos.
 - Historial de favoritos, respuestas y reenvíos hechos desde Nammu.
 
-#### Relación con Actualidad
+#### Relación con Actualidad y perfil público
 
-- La página pública `actualidad.php` se construye a partir de RSS externas configuradas y de notas manuales.
+- La página pública de perfil Fediverso puede exponerse como `actualidad.php` o como una ruta tipo `@usuario@dominio`.
+- Esa página reúne RSS externas, notas manuales y también contenidos publicados del propio blog como entradas, podcasts e itinerarios.
 - El feed `noticias.xml` publica esa misma selección para reutilizarla fuera del blog.
 - Las notas y noticias de `Actualidad` también pueden entrar en la salida ActivityPub del sitio como contenido federable.
+- `fediverso.xml` publica las páginas públicas de hilo asociadas a los contenidos visibles en esa página de perfil.
 
 #### Automatización
 
@@ -332,7 +336,7 @@ sudo find . -type f -exec chmod 664 {} \;
 - **Configuración**: modo blog/diccionario, búsqueda avanzada, nombre del sitio, autor, redes sociales, API de Google Fonts, correo de lista (Gmail + OAuth) y cambio de contraseña.
 - **Difusión**: credenciales y guías rápidas por red, usuario público de X para footer y `twitter:site`, App ID de Facebook, tokens de Instagram y LinkedIn y opciones de autoenvío.
 - **Redes**: envío manual de mensajes a varias redes a la vez y configuración de RSS externas para reenvío automático de novedades.
-- **Actualidad**: página pública agregada desde las fuentes RSS configuradas en **Redes**, con notas manuales, versión RSS propia en `noticias.xml` e integración con el fediverso.
+- **Actualidad / Perfil Fediverso**: página pública agregada desde las fuentes RSS configuradas en **Redes**, con notas manuales, entradas, podcasts e itinerarios, versión RSS propia en `noticias.xml`, feed de hilos en `fediverso.xml` e integración con el fediverso.
 - **Fediverso**: timeline remoto, notificaciones, mensajes y gestión de seguidores/seguidos para la cuenta ActivityPub del blog.
 
 El modal “Insertar recurso” que aparece en Publicar, Editar e Itinerarios comparte el mismo buscador, así que puedes localizar imágenes etiquetadas sin salir del formulario.
@@ -390,6 +394,8 @@ Ejemplo rápido:
 - `sitemap.xml`: inventario de entradas, páginas e itinerarios para buscadores.
 - `itinerarios.xml`: feed específico de cursos/libros para reutilizar el contenido en otras plataformas.
 - `podcast.xml`: feed RSS de podcast con metadatos iTunes, duración y archivo mp3.
+- `noticias.xml`: feed de la página pública de perfil/actualidad con noticias externas y notas manuales.
+- `fediverso.xml`: feed de las páginas públicas de hilo Fediverso asociadas a lo visible en la página de perfil.
 - `llms.txt`: resumen y enlaces clave para facilitar el consumo por modelos de lenguaje.
 
 ## Licencia y soporte

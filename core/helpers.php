@@ -1658,7 +1658,9 @@ function nammu_footer_icon_svgs(): array
 function nammu_fediverse_profile_alias_path(array $config = [], string $baseUrl = ''): string
 {
     $config = !empty($config) ? $config : nammu_load_config();
-    $preferredUsername = trim((string) (($config['fediverse']['preferred_username'] ?? $config['blog_slug'] ?? 'blog')));
+    $preferredUsername = function_exists('nammu_fediverse_preferred_username')
+        ? trim((string) nammu_fediverse_preferred_username($config))
+        : trim((string) (($config['fediverse']['preferred_username'] ?? $config['blog_slug'] ?? 'blog')));
     $preferredUsername = preg_replace('/[^a-z0-9._-]+/i', '', $preferredUsername) ?? 'blog';
     if ($preferredUsername === '') {
         $preferredUsername = 'blog';

@@ -14,6 +14,14 @@ $threadPublished = trim((string) ($threadItem['published'] ?? ''));
 $fediverseLocalName = trim((string) ($fediverseLocalName ?? 'Blog'));
 $fediverseLocalHandle = trim((string) ($fediverseLocalHandle ?? ''));
 $fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
+$baseUrlValue = trim((string) ($baseUrl ?? ''));
+$fediverseProfileUrl = '';
+if ($fediverseLocalHandle !== '') {
+    $profilePath = '/' . ltrim($fediverseLocalHandle, '/');
+    $fediverseProfileUrl = ($baseUrlValue !== '' && $baseUrlValue !== '/')
+        ? rtrim($baseUrlValue, '/') . $profilePath
+        : $profilePath;
+}
 $renderFediversePublicText = static function (string $text, string $className = ''): string {
     $text = trim($text);
     if ($text === '') {
@@ -94,7 +102,12 @@ $renderFediversePublicText = static function (string $text, string $className = 
 </style>
 
 <div class="fediverse-public-page">
-    <p class="fediverse-public-page__eyebrow">Hilo del Fediverso</p>
+    <p class="fediverse-public-page__eyebrow">
+        Hilo del Fediverso
+        <?php if ($fediverseProfileUrl !== '' && $fediverseLocalHandle !== ''): ?>
+            · publicado por <a href="<?= htmlspecialchars($fediverseProfileUrl, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($fediverseLocalHandle, ENT_QUOTES, 'UTF-8') ?></a>
+        <?php endif; ?>
+    </p>
 
     <article class="fediverse-public-status">
         <div class="fediverse-public-status__top">

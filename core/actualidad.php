@@ -735,8 +735,7 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
         $key = sha1($targetLink);
         $activeKeys[] = $key;
         $currentImage = trim((string) ($item['image'] ?? ''));
-        $hasPreferredManualPreview = $isManual && !empty($manualLinks);
-        if ($currentImage !== '' && !$hasPreferredManualPreview) {
+        if ($currentImage !== '') {
             continue;
         }
         $entry = is_array($cache['items'][$key] ?? null) ? $cache['items'][$key] : [];

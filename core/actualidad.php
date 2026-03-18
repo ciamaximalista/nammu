@@ -810,6 +810,129 @@ function nammu_actuality_has_content(array $config): bool
     return nammu_actuality_has_feeds($config) || nammu_actuality_has_manual_items();
 }
 
+function nammu_actuality_collect_published_site_items(string $contentDir, string $itinerariesDir, string $publicBaseUrl, string $siteTitle): array
+{
+    $items = [];
+    $seen = [];
+    $base = rtrim($publicBaseUrl, '/');
+    $markdown = class_exists(\Nammu\Core\MarkdownConverter::class) ? new \Nammu\Core\MarkdownConverter() : null;
+    $repository = new \Nammu\Core\ContentRepository($contentDir);
+    foreach ($repository->all() as $post) {
+        if (!$post instanceof \Nammu\Core\Post || $post->isDraft()) {
+            continue;
+        }
+        $slug = trim((string) $post->getSlug());
+        if ($slug === '') {
+            continue;
+        }
+        $url = ($base !== '' ? $base : '') . '/' . rawurlencode($slug);
+        $key = 'post:' . $slug;
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+        $description = trim((string) $post->getDescription());
+        if ($description === '' && $markdown instanceof \Nammu\Core\MarkdownConverter) {
+            $document = $markdown->convertDocument($post->getContent());
+            $description = nammu_excerpt_text((string) ($document['html'] ?? ''), 260);
+        }
+        $timestamp = $post->getDate() instanceof \DateTimeImmutable ? $post->getDate()->getTimestamp() : 0;
+        if ($timestamp <= 0) {
+            $file = rtrim($contentDir, '/') . '/' . $slug . '.md';
+            $timestamp = is_file($file) ? ((int) @filemtime($file) ?: 0) : 0;
+        }
+        $items[] = [
+            'title' => trim((string) $post->getTitle()),
+            'link' => $url,
+            'image' => (string) (nammu_resolve_asset($post->getImage(), $publicBaseUrl) ?? ''),
+            'description' => $description,
+            'timestamp' => $timestamp,
+            'source' => 'Entrada',
+            'is_site_content' => true,
+            'site_content_type' => 'post',
+            'site_content_label' => $siteTitle !== '' ? $siteTitle : 'Blog',
+        ];
+    }
+
+    foreach (nammu_collect_podcast_items($contentDir, $publicBaseUrl) as $episode) {
+        $slug = trim((string) ($episode['slug'] ?? ''));
+        $url = trim((string) ($episode['page_url'] ?? ''));
+        if ($slug === '' || $url === '') {
+            continue;
+        }
+        $key = 'podcast:' . $slug;
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+        $items[] = [
+            'title' => trim((string) ($episode['title'] ?? '')),
+            'link' => $url,
+            'image' => trim((string) ($episode['image'] ?? '')),
+            'description' => trim((string) ($episode['description'] ?? '')),
+            'timestamp' => (int) ($episode['timestamp'] ?? 0),
+            'source' => 'Podcast',
+            'is_site_content' => true,
+            'site_content_type' => 'podcast',
+            'site_content_label' => $siteTitle !== '' ? $siteTitle : 'Podcast',
+        ];
+    }
+
+    if (is_dir($itinerariesDir) && class_exists(\Nammu\Core\ItineraryRepository::class)) {
+        $itineraryRepository = new \Nammu\Core\ItineraryRepository($itinerariesDir);
+        foreach ($itineraryRepository->all() as $itinerary) {
+            if (!$itinerary instanceof \Nammu\Core\Itinerary || !$itinerary->isPublished()) {
+                continue;
+            }
+            $slug = trim((string) $itinerary->getSlug());
+            if ($slug === '') {
+                continue;
+            }
+            $key = 'itinerary:' . $slug;
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $url = ($base !== '' ? $base : '') . '/itinerarios/' . rawurlencode($slug);
+            $description = trim((string) $itinerary->getDescription());
+            if ($description === '' && $markdown instanceof \Nammu\Core\MarkdownConverter) {
+                $document = $markdown->convertDocument($itinerary->getContent());
+                $description = nammu_excerpt_text((string) ($document['html'] ?? ''), 260);
+            }
+            $metadata = method_exists($itinerary, 'getMetadata') ? $itinerary->getMetadata() : [];
+            $timestamp = 0;
+            $dateRaw = trim((string) ($metadata['Date'] ?? $metadata['Updated'] ?? ''));
+            if ($dateRaw !== '') {
+                $parsed = strtotime($dateRaw);
+                if ($parsed !== false) {
+                    $timestamp = (int) $parsed;
+                }
+            }
+            if ($timestamp <= 0) {
+                $indexFile = rtrim($itinerariesDir, '/') . '/' . $slug . '/index.md';
+                $timestamp = is_file($indexFile) ? ((int) @filemtime($indexFile) ?: 0) : 0;
+            }
+            $items[] = [
+                'title' => trim((string) $itinerary->getTitle()),
+                'link' => $url,
+                'image' => (string) (nammu_resolve_asset($itinerary->getImage(), $publicBaseUrl) ?? ''),
+                'description' => $description,
+                'timestamp' => $timestamp,
+                'source' => 'Itinerario',
+                'is_site_content' => true,
+                'site_content_type' => 'itinerary',
+                'site_content_label' => $siteTitle !== '' ? $siteTitle : 'Itinerario',
+            ];
+        }
+    }
+
+    usort($items, static function (array $a, array $b): int {
+        return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
+    });
+
+    return $items;
+}
+
 function nammu_actuality_collect_items(array $config, string $publicBaseUrl): array
 {
     $rssSettings = nammu_actuality_rss_settings(['social_rss' => $config['social_rss'] ?? []]);

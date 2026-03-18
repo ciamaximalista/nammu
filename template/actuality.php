@@ -125,7 +125,7 @@ $manualDisplayText = static function (array $item): string {
         <h1>Fediverso</h1>
         <p>
             <?php if ($feedsCount > 0): ?>
-                Todo lo que enviamos al Fediverso que no son entradas, podcasts o itinerarios
+                Página de perfil de @<?= htmlspecialchars((string) ($config['fediverse']['preferred_username'] ?? $config['blog_slug'] ?? 'blog'), ENT_QUOTES, 'UTF-8') ?>@<?= htmlspecialchars((string) preg_replace('#^https?://#i', '', rtrim((string) ($baseUrl ?? ''), '/')), ENT_QUOTES, 'UTF-8') ?>
             <?php elseif ($hasActuality): ?>
                 Notas y fuentes compartidas
             <?php else: ?>
@@ -151,11 +151,12 @@ $manualDisplayText = static function (array $item): string {
                 <?php if (count($group['items']) === 1 && !$singleItemIsManual): ?>
                     <?php $item = $group['items'][0]; ?>
                     <?php $isManual = !empty($item['is_manual']); ?>
+                    <?php $isSiteContent = !empty($item['is_site_content']); ?>
                     <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
-                    <article class="actuality-card actuality-card--full<?= $isManual ? ' actuality-card--manual' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                    <article class="actuality-card actuality-card--full<?= $isManual ? ' actuality-card--manual' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                         <div class="actuality-card-body">
                             <?php if (!$isManual): ?>
-                                <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
+                                <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
                             <?php endif; ?>
                             <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
                                 <p class="actuality-meta">
@@ -168,7 +169,7 @@ $manualDisplayText = static function (array $item): string {
                                 </p>
                             <?php endif; ?>
                             <?php if ($item['image'] !== ''): ?>
-                                <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>>
                                     <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                                 </a>
                             <?php endif; ?>
@@ -184,12 +185,13 @@ $manualDisplayText = static function (array $item): string {
                 <div class="actuality-column">
                     <?php foreach ($leftColumnItems as $item): ?>
                         <?php $isManual = !empty($item['is_manual']); ?>
+                        <?php $isSiteContent = !empty($item['is_site_content']); ?>
                         <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
                         <?php $manualBody = $isManual ? $manualDisplayText($item) : ''; ?>
-                        <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                        <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                             <div class="actuality-card-body">
                                 <?php if (!$isManual): ?>
-                                    <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
+                                    <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
                                 <?php endif; ?>
                                 <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
                                     <p class="actuality-meta">
@@ -202,7 +204,7 @@ $manualDisplayText = static function (array $item): string {
                                     </p>
                                 <?php endif; ?>
                                 <?php if ($item['image'] !== ''): ?>
-                                    <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                    <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>>
                                         <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                                     </a>
                                 <?php endif; ?>
@@ -220,12 +222,13 @@ $manualDisplayText = static function (array $item): string {
                 <div class="actuality-column">
                     <?php foreach ($rightColumnItems as $item): ?>
                         <?php $isManual = !empty($item['is_manual']); ?>
+                        <?php $isSiteContent = !empty($item['is_site_content']); ?>
                         <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
                         <?php $manualBody = $isManual ? $manualDisplayText($item) : ''; ?>
-                        <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                        <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                             <div class="actuality-card-body">
                                 <?php if (!$isManual): ?>
-                                    <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
+                                    <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
                                 <?php endif; ?>
                                 <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
                                     <p class="actuality-meta">
@@ -238,7 +241,7 @@ $manualDisplayText = static function (array $item): string {
                                     </p>
                                 <?php endif; ?>
                                 <?php if ($item['image'] !== ''): ?>
-                                    <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                    <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>>
                                         <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                                     </a>
                                 <?php endif; ?>

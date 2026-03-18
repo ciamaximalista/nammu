@@ -119,6 +119,37 @@ if (empty($items) && function_exists('nammu_actuality_has_content') && nammu_act
     $rebuilt = nammu_actuality_rebuild_snapshot($publicBaseUrl, $configData, $siteTitle, $siteDescription, $siteLang);
     $items = is_array($rebuilt['items'] ?? null) ? $rebuilt['items'] : [];
 }
+$publishedSiteItems = function_exists('nammu_actuality_collect_published_site_items')
+    ? nammu_actuality_collect_published_site_items($contentDir, $itinerariesDir, $publicBaseUrl, $siteTitle)
+    : [];
+if (!empty($publishedSiteItems)) {
+    $merged = [];
+    $seenActualityKeys = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $key = trim((string) ($item['link'] ?? ''));
+        if ($key === '') {
+            $key = 'manual:' . trim((string) ($item['id'] ?? ''));
+        }
+        if ($key !== '') {
+            $seenActualityKeys[$key] = true;
+        }
+        $merged[] = $item;
+    }
+    foreach ($publishedSiteItems as $item) {
+        $key = trim((string) ($item['link'] ?? ''));
+        if ($key !== '' && isset($seenActualityKeys[$key])) {
+            continue;
+        }
+        $merged[] = $item;
+    }
+    usort($merged, static function (array $a, array $b): int {
+        return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
+    });
+    $items = $merged;
+}
 
 $actualityHeroBackground = '';
 $actualityCache = nammu_actuality_load_cache();

@@ -387,6 +387,16 @@ if ($isPageTemplate && $formattedDate !== '') {
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
+        <?php if ($fediverseThreadUrl !== ''): ?>
+            <div class="fediverse-object-cta">
+                <a class="fediverse-object-cta-btn" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="Comentarios y reacciones a este post en el Fediverso" aria-label="Comentarios y reacciones a este post en el Fediverso">
+                    <span class="fediverse-object-cta-label">Comentarios y reacciones a este post en el Fediverso</span>
+                    <?php if ($fediverseIcon !== ''): ?>
+                        <span class="fediverse-object-cta-icon" aria-hidden="true"><?= $fediverseIcon ?></span>
+                    <?php endif; ?>
+                </a>
+            </div>
+        <?php endif; ?>
         <?php if (!empty($relatedPosts)): ?>
             <section class="post-related" aria-label="Entradas o itinerarios relacionados">
                 <div class="post-related-heading">Descubre ahora</div>

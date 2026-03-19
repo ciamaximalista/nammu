@@ -10484,6 +10484,16 @@ if ($isLoggedIn && $page === 'fediverso') {
 }
 
 if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fediverse_fragment'])) {
+    $normalizeFediversePanelFragment = static function (string $html): string {
+        $startMarker = '<!-- FEDIVERSE_TAB_PANEL_START -->';
+        $endMarker = '<!-- FEDIVERSE_TAB_PANEL_END -->';
+        $startPos = strpos($html, $startMarker);
+        $endPos = strpos($html, $endMarker);
+        if ($startPos !== false && $endPos !== false && $endPos > $startPos) {
+            return trim(substr($html, $startPos + strlen($startMarker), $endPos - ($startPos + strlen($startMarker))));
+        }
+        return trim($html);
+    };
     $fediverseFragmentTab = strtolower(trim((string) ($_GET['tab'] ?? 'home')));
     if (!in_array($fediverseFragmentTab, ['home', 'notifications', 'messages', 'network', 'settings'], true)) {
         $fediverseFragmentTab = 'home';
@@ -10495,6 +10505,7 @@ if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET'
     $fediverseFragmentVersion = nammu_fediverse_tab_version($fediverseFragmentTab);
     $fediverseCachedFragment = nammu_fediverse_get_cached_fragment($fediverseFragmentTab, $fediverseFragmentVersion, $fediverseFragmentContext, 20);
     if ($fediverseCachedFragment !== '') {
+        $fediverseCachedFragment = $normalizeFediversePanelFragment($fediverseCachedFragment);
         header('Content-Type: text/html; charset=UTF-8');
         header('Cache-Control: no-store, no-cache, must-revalidate');
         header('Pragma: no-cache');
@@ -10505,13 +10516,7 @@ if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET'
     ob_start();
     include __DIR__ . '/core/admin-page-fediverso.php';
     $fediverseHtml = (string) ob_get_clean();
-    $startMarker = '<!-- FEDIVERSE_TAB_PANEL_START -->';
-    $endMarker = '<!-- FEDIVERSE_TAB_PANEL_END -->';
-    $startPos = strpos($fediverseHtml, $startMarker);
-    $endPos = strpos($fediverseHtml, $endMarker);
-    if ($startPos !== false && $endPos !== false && $endPos > $startPos) {
-        $fediverseHtml = trim(substr($fediverseHtml, $startPos + strlen($startMarker), $endPos - ($startPos + strlen($startMarker))));
-    }
+    $fediverseHtml = $normalizeFediversePanelFragment($fediverseHtml);
     nammu_fediverse_store_cached_fragment($fediverseFragmentTab, $fediverseFragmentVersion, $fediverseFragmentContext, $fediverseHtml);
     header('Content-Type: text/html; charset=UTF-8');
     header('Cache-Control: no-store, no-cache, must-revalidate');

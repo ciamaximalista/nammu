@@ -4022,6 +4022,163 @@ function nammu_fediverse_followers_add_or_update(array $actor): void
     nammu_fediverse_save_followers_store($followers);
 }
 
+function nammu_fediverse_pending_follow_payloads(array $config): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
+    $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
+    $followers = nammu_fediverse_followers_store()['followers'];
+    $followersById = [];
+    foreach ($followers as $follower) {
+        $followerId = trim((string) ($follower['id'] ?? ''));
+        if ($followerId !== '') {
+            $followersById[$followerId] = $follower;
+        }
+    }
+    $pendingByActor = [];
+    foreach ($activities as $entry) {
+        if (empty($entry['verified'])) {
+            continue;
+        }
+        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        $type = strtolower(trim((string) ($payload['type'] ?? '')));
+        if ($type === 'follow') {
+            $actorId = trim((string) ($payload['actor'] ?? ''));
+            $followId = trim((string) ($payload['id'] ?? ''));
+            if ($actorId === '' || $followId === '' || nammu_fediverse_is_blocked_actor($actorId)) {
+                continue;
+            }
+            $pendingByActor[$actorId] = $payload;
+            continue;
+        }
+        if ($type !== 'undo' || !is_array($payload['object'] ?? null)) {
+            continue;
+        }
+        $actorId = trim((string) ($payload['actor'] ?? ''));
+        $object = $payload['object'];
+        if (strtolower(trim((string) ($object['type'] ?? ''))) !== 'follow' || $actorId === '') {
+            continue;
+        }
+        $followId = trim((string) ($object['id'] ?? ''));
+        if (!isset($pendingByActor[$actorId])) {
+            continue;
+        }
+        $pendingFollowId = trim((string) ($pendingByActor[$actorId]['id'] ?? ''));
+        if ($followId === '' || $pendingFollowId === '' || $followId === $pendingFollowId) {
+            unset($pendingByActor[$actorId]);
+        }
+    }
+    $pending = [];
+    foreach ($pendingByActor as $actorId => $payload) {
+        $followId = trim((string) ($payload['id'] ?? ''));
+        if ($followId === '') {
+            continue;
+        }
+        $follower = is_array($followersById[$actorId] ?? null) ? $followersById[$actorId] : [];
+        $acceptedFollowId = trim((string) ($follower['follow_activity_id'] ?? ''));
+        $acceptSentAt = trim((string) ($follower['accept_sent_at'] ?? ''));
+        $acceptPending = !empty($follower['accept_pending']);
+        if ($acceptedFollowId === $followId && $acceptSentAt !== '' && !$acceptPending) {
+            continue;
+        }
+        $pending[] = $payload;
+    }
+    return $pending;
+}
+
+function nammu_fediverse_accept_follow_response(array $payload, array $config): array
+{
+    $actorId = trim((string) ($payload['actor'] ?? ''));
+    $followId = trim((string) ($payload['id'] ?? ''));
+    if ($actorId === '' || $followId === '') {
+        return ['ok' => false, 'message' => 'La actividad Follow no trae actor o id.'];
+    }
+    if (nammu_fediverse_is_blocked_actor($actorId)) {
+        return ['ok' => false, 'message' => 'El actor está bloqueado.', 'actor_id' => $actorId, 'follow_id' => $followId];
+    }
+    $attemptAt = gmdate(DATE_ATOM);
+    $actor = nammu_fediverse_resolve_actor($actorId, $config);
+    if (!is_array($actor)) {
+        nammu_fediverse_followers_add_or_update([
+            'id' => $actorId,
+            'follow_activity_id' => $followId,
+            'accept_pending' => true,
+            'accept_last_attempt_at' => $attemptAt,
+            'accept_last_error' => 'No se pudo resolver el actor remoto.',
+        ]);
+        return [
+            'ok' => false,
+            'message' => 'No se pudo resolver el actor remoto.',
+            'actor_id' => $actorId,
+            'follow_id' => $followId,
+        ];
+    }
+    nammu_fediverse_followers_add_or_update(array_merge($actor, [
+        'follow_activity_id' => $followId,
+        'accept_pending' => true,
+        'accept_last_attempt_at' => $attemptAt,
+        'accept_last_error' => '',
+    ]));
+    $inboxUrl = nammu_fediverse_remote_inbox_for_actor($actor);
+    if ($inboxUrl === '') {
+        nammu_fediverse_followers_add_or_update([
+            'id' => $actorId,
+            'follow_activity_id' => $followId,
+            'accept_pending' => true,
+            'accept_last_attempt_at' => $attemptAt,
+            'accept_last_error' => 'El actor remoto no publica inbox.',
+        ]);
+        return [
+            'ok' => false,
+            'message' => 'El actor remoto no publica inbox.',
+            'actor_id' => $actorId,
+            'follow_id' => $followId,
+        ];
+    }
+    $activity = [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => nammu_fediverse_actor_url($config) . '#accept-' . sha1($followId . '|' . microtime(true)),
+        'type' => 'Accept',
+        'actor' => nammu_fediverse_actor_url($config),
+        'object' => $payload,
+    ];
+    $result = nammu_fediverse_post_activity_response($inboxUrl, $activity, $config);
+    $updates = [
+        'id' => $actorId,
+        'follow_activity_id' => $followId,
+        'accept_activity_id' => trim((string) ($activity['id'] ?? '')),
+        'accept_pending' => empty($result['ok']),
+        'accept_last_attempt_at' => $attemptAt,
+        'accept_last_error' => trim((string) ($result['message'] ?? '')),
+    ];
+    if (!empty($result['ok'])) {
+        $updates['accept_sent_at'] = $attemptAt;
+        $updates['accept_last_error'] = '';
+    }
+    nammu_fediverse_followers_add_or_update($updates);
+    $result['actor_id'] = $actorId;
+    $result['follow_id'] = $followId;
+    $result['accept_activity_id'] = (string) ($activity['id'] ?? '');
+    return $result;
+}
+
+function nammu_fediverse_retry_pending_follower_accepts(array $config, int $limit = 100): array
+{
+    $pending = nammu_fediverse_pending_follow_payloads($config);
+    if ($limit > 0) {
+        $pending = array_slice($pending, 0, $limit);
+    }
+    $stats = ['checked' => count($pending), 'accepted' => 0, 'failed' => 0];
+    foreach ($pending as $payload) {
+        $result = nammu_fediverse_accept_follow_response($payload, $config);
+        if (!empty($result['ok'])) {
+            $stats['accepted']++;
+        } else {
+            $stats['failed']++;
+        }
+    }
+    return $stats;
+}
+
 function nammu_fediverse_followers_remove(string $actorId): void
 {
     $followers = array_values(array_filter(
@@ -4840,31 +4997,8 @@ function nammu_fediverse_hide_incoming_reply(array $reply, array $config): array
 
 function nammu_fediverse_accept_follow(array $payload, array $config): bool
 {
-    $actorId = trim((string) ($payload['actor'] ?? ''));
-    $followId = trim((string) ($payload['id'] ?? ''));
-    if ($actorId === '' || $followId === '') {
-        return false;
-    }
-    if (nammu_fediverse_is_blocked_actor($actorId)) {
-        return false;
-    }
-    $actor = nammu_fediverse_resolve_actor($actorId, $config);
-    if (!is_array($actor)) {
-        return false;
-    }
-    nammu_fediverse_followers_add_or_update($actor);
-    $inboxUrl = nammu_fediverse_remote_inbox_for_actor($actor);
-    if ($inboxUrl === '') {
-        return false;
-    }
-    $activity = [
-        '@context' => 'https://www.w3.org/ns/activitystreams',
-        'id' => nammu_fediverse_actor_url($config) . '#accept-' . sha1($followId . '|' . microtime(true)),
-        'type' => 'Accept',
-        'actor' => nammu_fediverse_actor_url($config),
-        'object' => $payload,
-    ];
-    return nammu_fediverse_post_activity($inboxUrl, $activity, $config);
+    $result = nammu_fediverse_accept_follow_response($payload, $config);
+    return !empty($result['ok']);
 }
 
 function nammu_fediverse_handle_inbox_payload(array $payload, array $config, array $headers = [], string $rawBody = ''): array

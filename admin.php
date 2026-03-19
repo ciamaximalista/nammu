@@ -45,6 +45,7 @@ $runScheduledOnly = $__nammuRunScheduledOnly;
  * @return array{published:int,notifications_processed:int,notifications_remaining:int}
  */
 function admin_run_scheduled_tasks(): array {
+    $config = nammu_load_config();
     if (!function_exists('admin_process_social_rss_feeds') && is_file(__DIR__ . '/core/admin-redes.php')) {
         require_once __DIR__ . '/core/admin-redes.php';
     }
@@ -80,6 +81,12 @@ function admin_run_scheduled_tasks(): array {
     }
     if (function_exists('nammu_fediverse_refresh_following')) {
         $fediverseStats = nammu_fediverse_refresh_following();
+        if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
+            $acceptStats = nammu_fediverse_retry_pending_follower_accepts($config);
+            $fediverseStats['follow_accepts_checked'] = (int) ($acceptStats['checked'] ?? 0);
+            $fediverseStats['follow_accepts_sent'] = (int) ($acceptStats['accepted'] ?? 0);
+            $fediverseStats['follow_accepts_failed'] = (int) ($acceptStats['failed'] ?? 0);
+        }
         if (function_exists('nammu_fediverse_deliver_local_items')) {
             $deliveryStats = nammu_fediverse_deliver_local_items($config);
             $fediverseStats['followers'] = (int) ($deliveryStats['followers'] ?? 0);
@@ -10175,12 +10182,17 @@ if ($isLoggedIn && $page === 'fediverso') {
             nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
         }
         $stats = nammu_fediverse_refresh_following();
+        if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
+            $acceptStats = nammu_fediverse_retry_pending_follower_accepts($config);
+            $stats['follow_accepts_checked'] = (int) ($acceptStats['checked'] ?? 0);
+            $stats['follow_accepts_sent'] = (int) ($acceptStats['accepted'] ?? 0);
+        }
         if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
             nammu_fediverse_save_fragments_cache_store([]);
         }
         $fediverseFeedback = [
             'type' => 'info',
-            'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '.',
+            'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '. Accept enviados: ' . (int) ($stats['follow_accepts_sent'] ?? 0) . '.',
         ];
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refresh_fediverse_threads'])) {
@@ -10193,6 +10205,11 @@ if ($isLoggedIn && $page === 'fediverso') {
             nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
         }
         $stats = ['threads_warmed' => 0];
+        if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
+            $acceptStats = nammu_fediverse_retry_pending_follower_accepts($config);
+            $stats['follow_accepts_checked'] = (int) ($acceptStats['checked'] ?? 0);
+            $stats['follow_accepts_sent'] = (int) ($acceptStats['accepted'] ?? 0);
+        }
         if (function_exists('nammu_fediverse_clear_threads_cache')) {
             nammu_fediverse_clear_threads_cache();
         }
@@ -10207,7 +10224,7 @@ if ($isLoggedIn && $page === 'fediverso') {
         }
         $fediverseFeedback = [
             'type' => 'info',
-            'message' => 'Hilos del Fediverso actualizados. Hilos precalentados: ' . (int) ($stats['threads_warmed'] ?? 0) . '.',
+            'message' => 'Hilos del Fediverso actualizados. Hilos precalentados: ' . (int) ($stats['threads_warmed'] ?? 0) . '. Accept enviados: ' . (int) ($stats['follow_accepts_sent'] ?? 0) . '.',
         ];
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rebuild_fediverse_timeline'])) {
@@ -10226,6 +10243,11 @@ if ($isLoggedIn && $page === 'fediverso') {
             nammu_fediverse_save_fragments_cache_store([]);
         }
         $stats = nammu_fediverse_rebuild_timeline();
+        if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
+            $acceptStats = nammu_fediverse_retry_pending_follower_accepts($config);
+            $stats['follow_accepts_checked'] = (int) ($acceptStats['checked'] ?? 0);
+            $stats['follow_accepts_sent'] = (int) ($acceptStats['accepted'] ?? 0);
+        }
         if (function_exists('nammu_fediverse_warm_threads_cache')) {
             $stats['threads_warmed'] = (int) nammu_fediverse_warm_threads_cache($config, 20);
         }
@@ -10234,7 +10256,7 @@ if ($isLoggedIn && $page === 'fediverso') {
         }
         $fediverseFeedback = [
             'type' => 'info',
-            'message' => 'Timeline del Fediverso reconstruido, incluyendo la parte local. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades importadas: ' . (int) ($stats['new'] ?? 0) . '. Hilos precalentados: ' . (int) ($stats['threads_warmed'] ?? 0) . '.',
+            'message' => 'Timeline del Fediverso reconstruido, incluyendo la parte local. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades importadas: ' . (int) ($stats['new'] ?? 0) . '. Hilos precalentados: ' . (int) ($stats['threads_warmed'] ?? 0) . '. Accept enviados: ' . (int) ($stats['follow_accepts_sent'] ?? 0) . '.',
         ];
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['inspect_fediverse_object'])) {

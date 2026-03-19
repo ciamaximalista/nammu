@@ -1940,8 +1940,8 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
             <?php $itineraryFediverseThreadUrl = nammu_fediverse_public_thread_url_for_named_local_item($itinerary->getSlug(), 'itinerary', $config); ?>
             <?php if ($itineraryFediverseThreadUrl !== ''): ?>
                 <div class="itinerary-topics__cta">
-                    <a class="button button-secondary" href="<?= htmlspecialchars($itineraryFediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="En el Fediverso" aria-label="En el Fediverso" style="display:inline-flex;align-items:center;gap:0.7rem;">
-                        <span>En el Fediverso</span>
+                    <a class="button button-secondary" href="<?= htmlspecialchars($itineraryFediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="Comentarios y reacciones a este itinerario en el Fediverso" aria-label="Comentarios y reacciones a este itinerario en el Fediverso" style="display:inline-flex;align-items:center;gap:0.7rem;">
+                        <span>Comentarios y reacciones a este itinerario en el Fediverso</span>
                         <span aria-hidden="true" style="display:inline-flex;width:1.2rem;height:1.2rem;"><?= nammu_footer_icon_svgs()['fediverse'] ?? '' ?></span>
                     </a>
                 </div>

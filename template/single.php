@@ -103,6 +103,8 @@ $isAdminLogged = !empty($isAdminLogged ?? false);
 $editButtonHref = trim((string) ($editButtonHref ?? ''));
 $hidePostIntro = !empty($hidePostIntro ?? false);
 $isPodcastTemplate = ($postTemplate === 'podcast');
+$isItineraryTemplate = in_array($postTemplate, ['itinerary', 'itinerario'], true);
+$isBlogEntryTemplate = !$isPodcastTemplate && !$isItineraryTemplate;
 $podcastEpisodesIndexUrl = trim((string) ($podcastEpisodesIndexUrl ?? (($baseUrl ?? '') !== '' ? rtrim((string) $baseUrl, '/') . '/podcast' : '/podcast')));
 $homeUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/';
 $renderSearchBox = static function (string $variant) use ($searchAction, $colorHighlight, $colorAccent, $colorText, $searchActionBase, $letterIndexUrlValue, $showLetterButton, $hasItineraries, $itinerariesIndexUrl, $hasCategories, $hasPodcast, $podcastIndexUrl): string {
@@ -389,8 +391,15 @@ if ($isPageTemplate && $formattedDate !== '') {
         <?php endif; ?>
         <?php if ($fediverseThreadUrl !== ''): ?>
             <div class="fediverse-object-cta">
-                <a class="fediverse-object-cta-btn" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="Comentarios y reacciones a este post en el Fediverso" aria-label="Comentarios y reacciones a este post en el Fediverso">
-                    <span class="fediverse-object-cta-label">Comentarios y reacciones a este post en el Fediverso</span>
+                <?php
+                $fediverseButtonLabel = $isItineraryTemplate
+                    ? 'Comentarios y reacciones en el Fediverso'
+                    : ($isPodcastTemplate
+                        ? 'Comentarios y reacciones a este episodio en el Fediverso'
+                        : 'Comentarios y reacciones a esta entrada en el Fediverso');
+                ?>
+                <a class="fediverse-object-cta-btn" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($fediverseButtonLabel, ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($fediverseButtonLabel, ENT_QUOTES, 'UTF-8') ?>">
+                    <span class="fediverse-object-cta-label"><?= htmlspecialchars($fediverseButtonLabel, ENT_QUOTES, 'UTF-8') ?></span>
                     <?php if ($fediverseIcon !== ''): ?>
                         <span class="fediverse-object-cta-icon" aria-hidden="true"><?= $fediverseIcon ?></span>
                     <?php endif; ?>
@@ -425,16 +434,6 @@ if ($isPageTemplate && $formattedDate !== '') {
         <?php if ($isPodcastTemplate && $podcastEpisodesIndexUrl !== ''): ?>
             <div class="podcast-index-cta">
                 <a class="podcast-index-cta-btn" href="<?= htmlspecialchars($podcastEpisodesIndexUrl, ENT_QUOTES, 'UTF-8') ?>">Índice de episodios</a>
-            </div>
-        <?php endif; ?>
-        <?php if ($fediverseThreadUrl !== ''): ?>
-            <div class="fediverse-object-cta">
-                <a class="fediverse-object-cta-btn" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="En el Fediverso" aria-label="En el Fediverso">
-                    <span class="fediverse-object-cta-label">En el Fediverso</span>
-                    <?php if ($fediverseIcon !== ''): ?>
-                        <span class="fediverse-object-cta-icon" aria-hidden="true"><?= $fediverseIcon ?></span>
-                    <?php endif; ?>
-                </a>
             </div>
         <?php endif; ?>
     </div>

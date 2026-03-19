@@ -9,6 +9,7 @@ $colorBrand = htmlspecialchars($colors['brand'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8
 $colorCodeBg = htmlspecialchars($colors['code_background'] ?? '#000000', ENT_QUOTES, 'UTF-8');
 $colorCodeText = htmlspecialchars($colors['code_text'] ?? '#90ee90', ENT_QUOTES, 'UTF-8');
 $h1ColorRaw = trim((string) ($colors['h1'] ?? '#1b8eed'));
+$fediverseButtonTextColor = htmlspecialchars($h1ColorRaw, ENT_QUOTES, 'UTF-8');
 $relatedHeadingColor = '#6f8295';
 if (preg_match('/^#([a-f0-9]{6})$/i', $h1ColorRaw, $m) === 1) {
     $hex = $m[1];
@@ -504,6 +505,9 @@ if ($isPageTemplate && $formattedDate !== '') {
         width: 100%;
         height: 100%;
         display: block;
+    }
+    .fediverse-object-cta-label {
+        color: <?= $fediverseButtonTextColor ?>;
     }
     .post-body .podcast-video-single {
         width: min(960px, 100%);

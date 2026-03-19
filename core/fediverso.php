@@ -4184,41 +4184,6 @@ function nammu_fediverse_retry_pending_follower_accepts(array $config, int $limi
     return $stats;
 }
 
-function nammu_fediverse_accept_all_followers(array $config, int $limit = 0): array
-{
-    $followers = nammu_fediverse_followers_store()['followers'];
-    if ($limit > 0) {
-        $followers = array_slice($followers, 0, $limit);
-    }
-    $actorUrl = nammu_fediverse_actor_url($config);
-    $stats = ['checked' => 0, 'accepted' => 0, 'failed' => 0];
-    foreach ($followers as $follower) {
-        $actorId = trim((string) ($follower['id'] ?? ''));
-        if ($actorId === '' || nammu_fediverse_is_blocked_actor($actorId)) {
-            continue;
-        }
-        $stats['checked']++;
-        $followId = trim((string) ($follower['follow_activity_id'] ?? ''));
-        if ($followId === '') {
-            $followId = $actorUrl . '#follow-reconstructed-' . sha1($actorId . '|' . $actorUrl);
-        }
-        $payload = [
-            '@context' => 'https://www.w3.org/ns/activitystreams',
-            'id' => $followId,
-            'type' => 'Follow',
-            'actor' => $actorId,
-            'object' => $actorUrl,
-        ];
-        $result = nammu_fediverse_accept_follow_response($payload, $config);
-        if (!empty($result['ok'])) {
-            $stats['accepted']++;
-        } else {
-            $stats['failed']++;
-        }
-    }
-    return $stats;
-}
-
 function nammu_fediverse_followers_remove(string $actorId): void
 {
     $followers = array_values(array_filter(

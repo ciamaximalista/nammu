@@ -727,8 +727,6 @@
                                         <div class="fediverse-status__footer">
                                             <a href="<?= htmlspecialchars((string) ($localItem['url'] ?? '#'), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Abrir publicación emitida</a>
                                             <?php if (!empty($localId)): ?>
-                                                <span aria-hidden="true"> · </span>
-                                                <a href="<?= htmlspecialchars((string) $localId, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Objeto ActivityPub</a>
                                                 <?php if (function_exists('nammu_fediverse_thread_page_url')): ?>
                                                     <span aria-hidden="true"> · </span>
                                                     <a href="<?= htmlspecialchars((string) nammu_fediverse_thread_page_url((string) $localId, $fediverseConfig), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Enlace a la página pública</a>
@@ -829,7 +827,7 @@
                                         <?php endif; ?>
                                         <div class="fediverse-status__actions mt-3">
                                             <details class="fediverse-inline-form">
-                                                <summary>Responder</summary>
+                                                <summary class="fediverse-inline-form__summary-button">Responder</summary>
                                                 <form method="post">
                                                     <input type="hidden" name="fediverse_tab" value="home">
                                                     <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars((string) $localId, ENT_QUOTES, 'UTF-8') ?>">
@@ -1049,8 +1047,6 @@
                                         <div class="fediverse-status__footer">
                                             <a href="<?= htmlspecialchars((string) (($item['url'] ?? '') ?: ($item['id'] ?? '#')), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Abrir publicación</a>
                                             <?php if ($itemObjectId !== ''): ?>
-                                                <span aria-hidden="true"> · </span>
-                                                <a href="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Objeto ActivityPub</a>
                                                 <?php if (!empty($item['url'])): ?>
                                                     <span aria-hidden="true"> · </span>
                                                     <a href="<?= htmlspecialchars((string) $item['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Enlace a la página pública</a>
@@ -1149,7 +1145,7 @@
                                                 <button type="submit" name="fediverse_boost_item" class="btn btn-outline-secondary btn-sm"<?= !empty($itemActionState['boosted']) ? ' disabled' : '' ?>><?= !empty($itemActionState['boosted']) ? 'Impulsado' : 'Impulsar' ?></button>
                                             </form>
                                             <details class="fediverse-inline-form">
-                                                <summary>Responder</summary>
+                                                <summary class="fediverse-inline-form__summary-button">Responder</summary>
                                                 <form method="post">
                                                     <input type="hidden" name="fediverse_tab" value="home">
                                                     <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($itemTargetActorId, ENT_QUOTES, 'UTF-8') ?>">
@@ -1160,16 +1156,6 @@
                                                         Publicar también como nota en Actualidad
                                                     </label>
                                                     <button type="submit" name="fediverse_reply_item" class="btn btn-primary btn-sm mt-2">Enviar respuesta</button>
-                                                </form>
-                                            </details>
-                                            <details class="fediverse-inline-form">
-                                                <summary>Reenviar como nota</summary>
-                                                <form method="post">
-                                                    <input type="hidden" name="fediverse_tab" value="home">
-                                                    <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>">
-                                                    <input type="hidden" name="fediverse_object_title" value="<?= htmlspecialchars((string) ($item['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                    <textarea name="fediverse_share_text" class="form-control form-control-sm" rows="3" placeholder="Añade un comentario opcional para tu nota"><?= htmlspecialchars((string) ($item['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
-                                                    <button type="submit" name="fediverse_share_note" class="btn btn-primary btn-sm mt-2">Publicar nota</button>
                                                 </form>
                                             </details>
                                         </div>
@@ -1481,7 +1467,6 @@
                         <button type="submit" name="follow_fediverse_actor" class="btn btn-primary">Seguir actor</button>
                         <button type="submit" name="refresh_fediverse_timeline" class="btn btn-outline-secondary ml-2">Refrescar ahora</button>
                         <button type="submit" name="refresh_fediverse_threads" class="btn btn-outline-secondary ml-2">Actualizar hilos</button>
-                        <button type="submit" name="accept_all_fediverse_followers" class="btn btn-outline-success ml-2" onclick="return confirm('Esto reenviará un Accept a todos los seguidores actuales. Es un botón temporal. ¿Continuar?');">Enviar Accept a todos</button>
                     </div>
                 </div>
             </form>
@@ -1917,6 +1902,22 @@
             font-size: 0.92rem;
             font-weight: 600;
             list-style: none;
+        }
+        .fediverse-inline-form__summary-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(1.5em + 0.5rem + 2px);
+            padding: 0.25rem 0.5rem;
+            border: 1px solid #6c757d;
+            border-radius: 0.2rem;
+            background: #fff;
+            color: #495057;
+            line-height: 1.5;
+        }
+        .fediverse-inline-form__summary-button:hover {
+            background: #f8f9fa;
+            color: #343a40;
         }
         .fediverse-inline-form summary::-webkit-details-marker {
             display: none;

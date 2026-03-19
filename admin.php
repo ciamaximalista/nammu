@@ -109,6 +109,9 @@ function admin_run_scheduled_tasks(): array {
         'fediverse_new' => (int) ($fediverseStats['new'] ?? 0),
         'fediverse_followers' => (int) ($fediverseStats['followers'] ?? 0),
         'fediverse_delivered' => (int) ($fediverseStats['delivered'] ?? 0),
+        'fediverse_follow_accepts_checked' => (int) ($fediverseStats['follow_accepts_checked'] ?? 0),
+        'fediverse_follow_accepts_sent' => (int) ($fediverseStats['follow_accepts_sent'] ?? 0),
+        'fediverse_follow_accepts_failed' => (int) ($fediverseStats['follow_accepts_failed'] ?? 0),
     ];
 }
 

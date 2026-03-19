@@ -3334,6 +3334,7 @@ function nammu_fediverse_public_thread_root_message_entries(array $config): arra
 function nammu_fediverse_activity_for_local_item(array $item, array $config): array
 {
     $actorUrl = nammu_fediverse_actor_url($config);
+    $followersUrl = nammu_fediverse_followers_url($config);
     $avatarUrl = nammu_fediverse_avatar_url($config);
     $objectType = (string) ($item['type'] ?? 'Article');
     $originalObjectUrl = (string) ($item['url'] ?? '');
@@ -3356,6 +3357,8 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
         'id' => (string) ($item['id'] ?? ''),
         'type' => $objectType,
         'attributedTo' => $actorUrl,
+        'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+        'cc' => [$followersUrl],
         'url' => $objectUrl,
         'name' => (string) ($item['title'] ?? ''),
         'content' => $contentHtml,
@@ -3401,6 +3404,7 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
         'actor' => $actorUrl,
         'published' => (string) ($item['published'] ?? gmdate(DATE_ATOM)),
         'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+        'cc' => [$followersUrl],
         'object' => $object,
     ];
 }
@@ -3654,6 +3658,7 @@ function nammu_fediverse_notify_followers_of_object_update(array $item, array $c
         'type' => 'Update',
         'actor' => nammu_fediverse_actor_url($config),
         'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+        'cc' => [nammu_fediverse_followers_url($config)],
         'published' => gmdate(DATE_ATOM),
         'object' => $object,
     ];

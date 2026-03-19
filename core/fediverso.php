@@ -195,7 +195,7 @@ function nammu_fediverse_profile_page_url(array $config): string
 
 function nammu_fediverse_key_url(array $config): string
 {
-    return nammu_fediverse_base_url($config) . '/ap/key';
+    return nammu_fediverse_actor_url($config) . '#main-key';
 }
 
 function nammu_fediverse_outbox_url(array $config): string
@@ -3484,7 +3484,7 @@ function nammu_fediverse_public_key_document(array $config): array
             'https://w3id.org/security/v1',
         ],
         'id' => nammu_fediverse_key_url($config),
-        'type' => 'Key',
+        'type' => 'CryptographicKey',
         'owner' => nammu_fediverse_actor_url($config),
         'publicKeyPem' => (string) ($keys['public_key'] ?? ''),
     ];

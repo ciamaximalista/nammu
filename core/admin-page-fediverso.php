@@ -1053,13 +1053,33 @@
                                                 <?php endif; ?>
                                             <?php endif; ?>
                                         </div>
-                                        <?php if (($remoteBoostMeta['count'] ?? 0) > 0 || ($remoteReplyMeta['count'] ?? 0) > 0 || !empty($itemActionState['liked']) || !empty($itemActionState['boosted']) || !empty($itemActionState['replied']) || !empty($itemActionState['shared'])): ?>
+                                        <?php
+                                        $historyBoostCount = (int) ($remoteBoostMeta['count'] ?? 0) + (!empty($itemActionState['boosted']) ? 1 : 0);
+                                        $historyBoostActors = $remoteBoostActors;
+                                        if (!empty($itemActionState['boosted'])) {
+                                            $historyBoostActors[] = [
+                                                'name' => $fediverseLocalName,
+                                                'icon' => $fediverseLocalAvatar,
+                                                'url' => $fediverseBaseUrl,
+                                            ];
+                                        }
+                                        $historyFavoriteCount = !empty($itemActionState['liked']) ? 1 : 0;
+                                        $historyFavoriteActors = [];
+                                        if (!empty($itemActionState['liked'])) {
+                                            $historyFavoriteActors[] = [
+                                                'name' => $fediverseLocalName,
+                                                'icon' => $fediverseLocalAvatar,
+                                                'url' => $fediverseBaseUrl,
+                                            ];
+                                        }
+                                        ?>
+                                        <?php if ($historyBoostCount > 0 || ($remoteReplyMeta['count'] ?? 0) > 0 || $historyFavoriteCount > 0 || !empty($itemActionState['replied'])): ?>
                                             <div class="fediverse-status__history">
-                                                <?php if (($remoteBoostMeta['count'] ?? 0) > 0): ?>
-                                                    <span><?= (int) ($remoteBoostMeta['count'] ?? 0) ?> impulso<?= ((int) ($remoteBoostMeta['count'] ?? 0) === 1) ? '' : 's' ?></span>
-                                                    <?php if (!empty($remoteBoostActors)): ?>
+                                                <?php if ($historyBoostCount > 0): ?>
+                                                    <span><?= (int) $historyBoostCount ?> impulso<?= ((int) $historyBoostCount === 1) ? '' : 's' ?></span>
+                                                    <?php if (!empty($historyBoostActors)): ?>
                                                         <span class="fediverse-status__actor-icons">
-                                                            <?php foreach ($remoteBoostActors as $remoteBoostActor): ?>
+                                                            <?php foreach ($historyBoostActors as $remoteBoostActor): ?>
                                                                 <?php $remoteBoostActorUrl = trim((string) (($remoteBoostActor['url'] ?? '') ?: '#')); ?>
                                                                 <a href="<?= htmlspecialchars($remoteBoostActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($remoteBoostActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                                     <?php if (!empty($remoteBoostActor['icon'])): ?>
@@ -1072,11 +1092,25 @@
                                                         </span>
                                                     <?php endif; ?>
                                                 <?php endif; ?>
+                                                <?php if ($historyFavoriteCount > 0): ?>
+                                                    <span><?= (int) $historyFavoriteCount ?> favorito<?= ((int) $historyFavoriteCount === 1) ? '' : 's' ?></span>
+                                                    <?php if (!empty($historyFavoriteActors)): ?>
+                                                        <span class="fediverse-status__actor-icons">
+                                                            <?php foreach ($historyFavoriteActors as $historyFavoriteActor): ?>
+                                                                <?php $historyFavoriteActorUrl = trim((string) (($historyFavoriteActor['url'] ?? '') ?: '#')); ?>
+                                                                <a href="<?= htmlspecialchars($historyFavoriteActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($historyFavoriteActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <?php if (!empty($historyFavoriteActor['icon'])): ?>
+                                                                        <img src="<?= htmlspecialchars((string) $historyFavoriteActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($historyFavoriteActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                                                    <?php else: ?>
+                                                                        <?= htmlspecialchars(mb_substr((string) (($historyFavoriteActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                                                    <?php endif; ?>
+                                                                </a>
+                                                            <?php endforeach; ?>
+                                                        </span>
+                                                    <?php endif; ?>
+                                                <?php endif; ?>
                                                 <?php if (($remoteReplyMeta['count'] ?? 0) > 0): ?><span><?= (int) ($remoteReplyMeta['count'] ?? 0) ?> respuesta<?= ((int) ($remoteReplyMeta['count'] ?? 0) === 1) ? '' : 's' ?></span><?php endif; ?>
-                                                <?php if (!empty($itemActionState['liked'])): ?><span>Favorito enviado</span><?php endif; ?>
-                                                <?php if (!empty($itemActionState['boosted'])): ?><span><?= (int) ($itemActionState['boost_count'] ?? 0) ?> impulso<?= ((int) ($itemActionState['boost_count'] ?? 0) === 1) ? '' : 's' ?></span><?php endif; ?>
                                                 <?php if (!empty($itemActionState['replied'])): ?><span><?= (int) ($itemActionState['reply_count'] ?? 0) ?> respuesta<?= ((int) ($itemActionState['reply_count'] ?? 0) === 1) ? '' : 's' ?></span><?php endif; ?>
-                                                <?php if (!empty($itemActionState['shared'])): ?><span><?= (int) ($itemActionState['share_count'] ?? 0) ?> reenvío<?= ((int) ($itemActionState['share_count'] ?? 0) === 1) ? '' : 's' ?> como nota</span><?php endif; ?>
                                             </div>
                                         <?php endif; ?>
                                         <?php if (!empty($itemReplies)): ?>

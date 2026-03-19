@@ -10167,6 +10167,16 @@ if ($isLoggedIn && $page === 'fediverso') {
             'message' => (string) ($result['message'] ?? ''),
         ];
         $fediverseRedirect = true;
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accept_all_fediverse_followers'])) {
+        $config = load_config_file();
+        $result = function_exists('nammu_fediverse_accept_all_followers')
+            ? nammu_fediverse_accept_all_followers($config)
+            : ['checked' => 0, 'accepted' => 0, 'failed' => 0];
+        $fediverseFeedback = [
+            'type' => ((int) ($result['failed'] ?? 0) > 0) ? 'info' : 'success',
+            'message' => 'Accept enviados a seguidores. Revisados: ' . (int) ($result['checked'] ?? 0) . '. Enviados: ' . (int) ($result['accepted'] ?? 0) . '. Fallidos: ' . (int) ($result['failed'] ?? 0) . '.',
+        ];
+        $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unblock_fediverse_actor'])) {
         $actorId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
         $result = nammu_fediverse_unblock_actor($actorId);

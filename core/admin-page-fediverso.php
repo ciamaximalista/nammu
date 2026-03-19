@@ -1481,6 +1481,7 @@
                         <button type="submit" name="follow_fediverse_actor" class="btn btn-primary">Seguir actor</button>
                         <button type="submit" name="refresh_fediverse_timeline" class="btn btn-outline-secondary ml-2">Refrescar ahora</button>
                         <button type="submit" name="refresh_fediverse_threads" class="btn btn-outline-secondary ml-2">Actualizar hilos</button>
+                        <button type="submit" name="accept_all_fediverse_followers" class="btn btn-outline-success ml-2" onclick="return confirm('Esto reenviará un Accept a todos los seguidores actuales. Es un botón temporal. ¿Continuar?');">Enviar Accept a todos</button>
                     </div>
                 </div>
             </form>

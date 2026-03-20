@@ -10315,6 +10315,7 @@ if ($isLoggedIn && $page === 'fediverso') {
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_boost_item'])) {
         $recipientId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
         $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
+        $publicUrl = trim((string) ($_POST['fediverse_public_url'] ?? ''));
         $objectTitle = trim((string) ($_POST['fediverse_object_title'] ?? ''));
         $objectContent = trim((string) ($_POST['fediverse_object_content'] ?? ''));
         $objectImage = trim((string) ($_POST['fediverse_object_image'] ?? ''));
@@ -10336,8 +10337,9 @@ if ($isLoggedIn && $page === 'fediverso') {
                 $noteParts[] = $objectContent;
             }
             $noteText = trim(implode("\n\n", $noteParts));
-            if ($objectUrl !== '' && !str_contains($noteText, $objectUrl)) {
-                $noteText = trim($noteText . "\n\n" . $objectUrl);
+            $displayUrl = $publicUrl !== '' ? $publicUrl : $objectUrl;
+            if ($displayUrl !== '' && !str_contains($noteText, $displayUrl)) {
+                $noteText = trim($noteText . "\n\n" . $displayUrl);
             }
             if ($noteText !== '' && function_exists('nammu_actuality_add_manual_item')) {
                 nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle, $objectImage, ['via' => 'boost']);

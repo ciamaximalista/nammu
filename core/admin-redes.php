@@ -407,6 +407,55 @@ function admin_social_broadcast_available_networks(array $settings): array
     return $available;
 }
 
+function admin_send_social_broadcast_to_configured_networks(string $text, string $image = '', ?array $settings = null): array
+{
+    $text = trim($text);
+    $image = trim($image);
+    $settings = is_array($settings) ? $settings : get_settings();
+    $available = admin_social_broadcast_available_networks($settings);
+    $limits = admin_social_broadcast_limits();
+    $sent = [];
+    $failed = [];
+
+    if ($text === '') {
+        return [
+            'sent' => [],
+            'failed' => ['Mensaje vacío.'],
+        ];
+    }
+
+    foreach ($available as $network => $networkMeta) {
+        $limit = (int) ($limits[$network] ?? 0);
+        if ($network === 'telegram' && $image !== '') {
+            $limit = 1024;
+        }
+        $measureText = $network === 'telegram'
+            ? admin_social_broadcast_plain_without_markup($text)
+            : admin_social_broadcast_plain_text($text);
+        $length = function_exists('mb_strlen') ? mb_strlen($measureText, 'UTF-8') : strlen($measureText);
+        if ($limit > 0 && $length > $limit) {
+            $failed[] = $networkMeta['label'] . ': el mensaje supera el máximo de ' . $limit . ' caracteres.';
+            continue;
+        }
+        if ($network === 'instagram' && $image === '') {
+            $failed[] = 'Instagram: debes elegir una imagen.';
+            continue;
+        }
+        $error = null;
+        $ok = admin_send_social_broadcast_message($network, $text, $networkMeta['settings'], $image, $error);
+        if ($ok) {
+            $sent[] = $networkMeta['label'];
+        } else {
+            $failed[] = $networkMeta['label'] . ': ' . ($error ?: 'no se pudo enviar.');
+        }
+    }
+
+    return [
+        'sent' => $sent,
+        'failed' => $failed,
+    ];
+}
+
 function admin_social_broadcast_unicode_bold_char(string $char): string
 {
     $upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -1019,7 +1068,6 @@ function admin_handle_social_broadcast_request(array $settings): array
         $result['feedback'] = ['type' => 'danger', 'message' => 'Escribe un mensaje antes de enviarlo.'];
         return $result;
     }
-    $limits = admin_social_broadcast_limits();
     $labels = admin_social_broadcast_labels();
     $sent = [];
     $failed = [];
@@ -1049,34 +1097,18 @@ function admin_handle_social_broadcast_request(array $settings): array
             $failed[] = 'Perfil del Fediverso: no está disponible.';
         }
     }
-    foreach ($selected as $network) {
-        if (!isset($available[$network])) {
-            $failed[] = ($labels[$network] ?? $network) . ': no está configurada.';
-            continue;
+    if (!empty($selected)) {
+        $selectedSettings = [];
+        foreach ($selected as $network) {
+            if (!isset($available[$network])) {
+                $failed[] = ($labels[$network] ?? $network) . ': no está configurada.';
+                continue;
+            }
+            $selectedSettings[$network] = $settings[$network] ?? [];
         }
-        $limit = (int) ($limits[$network] ?? 0);
-        if ($network === 'telegram' && $image !== '') {
-            $limit = 1024;
-        }
-        $measureText = $network === 'telegram'
-            ? admin_social_broadcast_plain_without_markup($text)
-            : admin_social_broadcast_plain_text($text);
-        $length = function_exists('mb_strlen') ? mb_strlen($measureText, 'UTF-8') : strlen($measureText);
-        if ($limit > 0 && $length > $limit) {
-            $failed[] = $available[$network]['label'] . ': el mensaje supera el máximo de ' . $limit . ' caracteres.';
-            continue;
-        }
-        if ($network === 'instagram' && $image === '') {
-            $failed[] = 'Instagram: debes elegir una imagen.';
-            continue;
-        }
-        $error = null;
-        $ok = admin_send_social_broadcast_message($network, $text, $available[$network]['settings'], $image, $error);
-        if ($ok) {
-            $sent[] = $available[$network]['label'];
-        } else {
-            $failed[] = $available[$network]['label'] . ': ' . ($error ?: 'no se pudo enviar.');
-        }
+        $networkResult = admin_send_social_broadcast_to_configured_networks($text, $image, $selectedSettings);
+        $sent = array_merge($sent, $networkResult['sent']);
+        $failed = array_merge($failed, $networkResult['failed']);
     }
 
     if (!empty($sent) && empty($failed)) {

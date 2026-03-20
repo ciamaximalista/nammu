@@ -10322,6 +10322,9 @@ if ($isLoggedIn && $page === 'fediverso') {
         $config = load_config_file();
         $result = nammu_fediverse_send_announce($recipientId, $objectUrl, $config);
         if (!empty($result['ok'])) {
+            if (!function_exists('admin_send_social_broadcast_to_configured_networks') && is_file(__DIR__ . '/core/admin-redes.php')) {
+                require_once __DIR__ . '/core/admin-redes.php';
+            }
             if (!function_exists('nammu_actuality_add_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
                 require_once __DIR__ . '/core/actualidad.php';
             }
@@ -10349,6 +10352,17 @@ if ($isLoggedIn && $page === 'fediverso') {
                 nammu_fediverse_record_action('share', '', $objectUrl, ['share_text' => $objectContent, 'title' => $objectTitle, 'via' => 'boost']);
                 $deliveryStats = nammu_fediverse_deliver_local_items($config);
                 $result['message'] = rtrim((string) ($result['message'] ?? '')) . ' También publicada como nota. Entregas federadas: ' . (int) ($deliveryStats['delivered'] ?? 0) . '.';
+                if (function_exists('admin_send_social_broadcast_to_configured_networks')) {
+                    $socialResult = admin_send_social_broadcast_to_configured_networks($noteText, $objectImage, get_settings());
+                    $sentNetworks = is_array($socialResult['sent'] ?? null) ? $socialResult['sent'] : [];
+                    $failedNetworks = is_array($socialResult['failed'] ?? null) ? $socialResult['failed'] : [];
+                    if (!empty($sentNetworks)) {
+                        $result['message'] .= ' Redes: ' . implode(', ', $sentNetworks) . '.';
+                    }
+                    if (!empty($failedNetworks)) {
+                        $result['message'] .= ' Errores en redes: ' . implode(' | ', $failedNetworks);
+                    }
+                }
             }
         }
         $fediverseFeedback = [

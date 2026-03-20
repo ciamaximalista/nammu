@@ -1732,6 +1732,33 @@ function nammu_fediverse_thread_page_url(string $objectId, array $config): strin
     return rtrim(nammu_fediverse_base_url($config), '/') . '/fediverso/' . nammu_fediverse_thread_page_hash($objectId);
 }
 
+function nammu_fediverse_remote_thread_page_url(string $objectId): string
+{
+    $objectId = trim($objectId);
+    if ($objectId === '') {
+        return '';
+    }
+    $parts = @parse_url($objectId);
+    if (!is_array($parts)) {
+        return '';
+    }
+    $scheme = trim((string) ($parts['scheme'] ?? ''));
+    $host = trim((string) ($parts['host'] ?? ''));
+    $path = trim((string) ($parts['path'] ?? ''));
+    if ($scheme === '' || $host === '' || $path === '') {
+        return '';
+    }
+    if (!preg_match('#^/ap/objects/#', $path)) {
+        return '';
+    }
+    $baseUrl = $scheme . '://' . $host;
+    $port = (int) ($parts['port'] ?? 0);
+    if ($port > 0) {
+        $baseUrl .= ':' . $port;
+    }
+    return rtrim($baseUrl, '/') . '/fediverso/' . nammu_fediverse_thread_page_hash($objectId);
+}
+
 function nammu_fediverse_find_local_item_for_thread_hash(string $hash, array $config): ?array
 {
     $hash = trim(strtolower($hash));
@@ -2064,7 +2091,10 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
             $object['id'] = $objectId;
         }
         if (trim((string) ($object['url'] ?? '')) === '' && $objectId !== '') {
-            $object['url'] = $objectId;
+            $object['url'] = nammu_fediverse_remote_thread_page_url($objectId);
+            if (trim((string) ($object['url'] ?? '')) === '') {
+                $object['url'] = $objectId;
+            }
         }
         if (
             trim((string) ($object['content'] ?? '')) === ''
@@ -2088,6 +2118,12 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
         return null;
     }
     $url = nammu_fediverse_extract_url($object['url'] ?? '');
+    if (($url === '' || $url === $objectId) && $objectId !== '') {
+        $threadUrl = nammu_fediverse_remote_thread_page_url($objectId);
+        if ($threadUrl !== '') {
+            $url = $threadUrl;
+        }
+    }
     $contentHtml = trim((string) ($object['content'] ?? ''));
     $published = trim((string) (($object['published'] ?? '') ?: ($activity['published'] ?? '')));
     $summaryText = trim((string) ($object['summary'] ?? ''));

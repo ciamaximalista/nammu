@@ -67,6 +67,12 @@ $fediverseProfileAliasPath = function_exists('nammu_fediverse_profile_alias_path
     ? nammu_fediverse_profile_alias_path($configData, $publicBaseUrl)
     : '/actualidad.php';
 $fediverseProfileAliasUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . $fediverseProfileAliasPath;
+$fediverseUsername = function_exists('nammu_fediverse_preferred_username')
+    ? trim((string) nammu_fediverse_preferred_username($configData))
+    : trim((string) ($configData['fediverse']['username'] ?? ''));
+if ($fediverseUsername === '') {
+    $fediverseUsername = trim((string) (explode('.', strtolower((string) parse_url($publicBaseUrl, PHP_URL_HOST)))[0] ?? 'blog'));
+}
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
 if ($requestPath === '/actualidad.php' && $fediverseProfileAliasPath !== '/actualidad.php' && !headers_sent()) {
     header('Location: ' . $fediverseProfileAliasUrl, true, 302);
@@ -172,6 +178,7 @@ $content = $renderer->render('actuality', [
     'items' => $pagedItems,
     'feedsCount' => count($feeds),
     'hasActuality' => function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($configData) : !empty($feeds),
+    'fediverseUsername' => $fediverseUsername,
     'currentPage' => $currentActualityPage,
     'totalPages' => $actualityTotalPages,
     'prevPageUrl' => $actualityPrevPageUrl,

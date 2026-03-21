@@ -123,6 +123,10 @@ $currentPage = max(1, (int) ($currentPage ?? 1));
 $totalPages = max(1, (int) ($totalPages ?? 1));
 $prevPageUrl = trim((string) ($prevPageUrl ?? ''));
 $nextPageUrl = trim((string) ($nextPageUrl ?? ''));
+$fediverseUsername = trim((string) ($fediverseUsername ?? ''));
+if ($fediverseUsername === '') {
+    $fediverseUsername = trim((string) (explode('.', strtolower((string) parse_url((string) ($baseUrl ?? ''), PHP_URL_HOST)))[0] ?? 'blog'));
+}
 $manualDisplayText = static function (array $item): string {
     $rawText = trim((string) ($item['raw_text'] ?? ''));
     if ($rawText !== '') {
@@ -146,7 +150,7 @@ $manualDisplayText = static function (array $item): string {
         <h1>Fediverso</h1>
         <p>
             <?php if ($feedsCount > 0): ?>
-                Página de perfil de @<?= htmlspecialchars((string) (function_exists('nammu_fediverse_preferred_username') ? nammu_fediverse_preferred_username($config) : (((string) ($config['fediverse']['username'] ?? '')) !== '' ? (string) ($config['fediverse']['username'] ?? '') : ((string) (explode('.', strtolower((string) parse_url((string) ($baseUrl ?? ''), PHP_URL_HOST)))[0] ?? 'blog')))), ENT_QUOTES, 'UTF-8') ?>@<?= htmlspecialchars((string) preg_replace('#^https?://#i', '', rtrim((string) ($baseUrl ?? ''), '/')), ENT_QUOTES, 'UTF-8') ?>
+                Página de perfil de @<?= htmlspecialchars($fediverseUsername, ENT_QUOTES, 'UTF-8') ?>@<?= htmlspecialchars((string) preg_replace('#^https?://#i', '', rtrim((string) ($baseUrl ?? ''), '/')), ENT_QUOTES, 'UTF-8') ?>
             <?php elseif ($hasActuality): ?>
                 Notas y fuentes compartidas
             <?php else: ?>

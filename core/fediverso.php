@@ -72,6 +72,11 @@ function nammu_fediverse_messages_snapshot_file(): string
     return dirname(__DIR__) . '/config/fediverso-threads.json';
 }
 
+function nammu_fediverse_notifications_snapshot_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-notifications.json';
+}
+
 function nammu_fediverse_keys_file(): string
 {
     return dirname(__DIR__) . '/config/activitypub-keys.json';
@@ -121,6 +126,13 @@ function nammu_fediverse_messages_snapshot_store(): array
     return $store;
 }
 
+function nammu_fediverse_notifications_snapshot_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_notifications_snapshot_file(), ['generated_at' => '', 'data' => []]);
+    $store['data'] = is_array($store['data'] ?? null) ? $store['data'] : [];
+    return $store;
+}
+
 function nammu_fediverse_save_home_snapshot_store(array $data): void
 {
     nammu_fediverse_save_json_store(nammu_fediverse_home_snapshot_file(), [
@@ -132,6 +144,14 @@ function nammu_fediverse_save_home_snapshot_store(array $data): void
 function nammu_fediverse_save_messages_snapshot_store(array $data): void
 {
     nammu_fediverse_save_json_store(nammu_fediverse_messages_snapshot_file(), [
+        'generated_at' => gmdate(DATE_ATOM),
+        'data' => $data,
+    ]);
+}
+
+function nammu_fediverse_save_notifications_snapshot_store(array $data): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_notifications_snapshot_file(), [
         'generated_at' => gmdate(DATE_ATOM),
         'data' => $data,
     ]);
@@ -1500,6 +1520,7 @@ function nammu_fediverse_store_files_for_tab(string $tab): array
             nammu_fediverse_followers_file(),
         ],
         'notifications' => [
+            nammu_fediverse_notifications_snapshot_file(),
             nammu_fediverse_inbox_file(),
             nammu_fediverse_hidden_replies_file(),
         ],
@@ -1593,6 +1614,28 @@ function nammu_fediverse_rebuild_home_snapshot(array $config): array
         'remote_reply_summary' => nammu_fediverse_remote_reply_summary(),
         'incoming_replies' => nammu_fediverse_incoming_public_replies_by_object($config),
     ];
+    $threadPayloads = [];
+    $activeLocalIds = [];
+    foreach ((array) ($data['local_reaction_summary'] ?? []) as $localId => $summary) {
+        $localId = trim((string) $localId);
+        if ($localId !== '') {
+            $activeLocalIds[$localId] = true;
+        }
+    }
+    foreach ((array) ($data['incoming_replies'] ?? []) as $localId => $replyGroup) {
+        $localId = trim((string) $localId);
+        if ($localId !== '') {
+            $activeLocalIds[$localId] = true;
+        }
+    }
+    foreach ($localItems as $localItem) {
+        $localId = trim((string) ($localItem['id'] ?? ''));
+        if ($localId === '' || !isset($activeLocalIds[$localId])) {
+            continue;
+        }
+        $threadPayloads[$localId] = nammu_fediverse_thread_page_payload($localItem, $config);
+    }
+    $data['thread_payloads'] = $threadPayloads;
     nammu_fediverse_save_home_snapshot_store($data);
     return $data;
 }
@@ -1648,11 +1691,30 @@ function nammu_fediverse_rebuild_messages_snapshot(array $config): array
     return $data;
 }
 
+function nammu_fediverse_rebuild_notifications_snapshot(array $config): array
+{
+    $knownActors = nammu_fediverse_known_actors();
+    $actorsById = [];
+    foreach ($knownActors as $actor) {
+        $actorId = trim((string) ($actor['id'] ?? ''));
+        if ($actorId !== '') {
+            $actorsById[$actorId] = $actor;
+        }
+    }
+    $data = [
+        'actors_by_id' => $actorsById,
+        'notifications' => nammu_fediverse_notification_entries($config),
+    ];
+    nammu_fediverse_save_notifications_snapshot_store($data);
+    return $data;
+}
+
 function nammu_fediverse_rebuild_snapshots(array $config): array
 {
     $home = nammu_fediverse_rebuild_home_snapshot($config);
     $messages = nammu_fediverse_rebuild_messages_snapshot($config);
-    return ['home' => $home, 'messages' => $messages];
+    $notifications = nammu_fediverse_rebuild_notifications_snapshot($config);
+    return ['home' => $home, 'messages' => $messages, 'notifications' => $notifications];
 }
 
 function nammu_fediverse_stream_state(array $tabs = ['home', 'notifications', 'messages', 'network', 'settings']): array

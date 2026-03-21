@@ -87,12 +87,28 @@ $splitColumns = static function (array $dayItems): array {
     }
     return [$left, $right];
 };
-$renderLinks = static function (array $links): string {
+$renderLinks = static function (array $links, array $item = []) use ($fediverseIcon): string {
     $links = array_values(array_filter(array_map('strval', $links)));
     if (empty($links)) {
         return '';
     }
+    $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
     $bits = [];
+    if ($isBoost) {
+        $originalUrl = array_pop($links);
+        if ($originalUrl !== null && trim($originalUrl) !== '') {
+            if ($fediverseIcon !== '') {
+                $bits[] = '<a class="actuality-fediverse-inline" href="' . htmlspecialchars($originalUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" title="Publicación original en el Fediverso" aria-label="Publicación original en el Fediverso">' . $fediverseIcon . '</a>';
+            } else {
+                $bits[] = '<a href="' . htmlspecialchars($originalUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">En el Fediverso</a>';
+            }
+        }
+        foreach ($links as $index => $url) {
+            $label = count($links) === 1 ? 'Enlace relacionado' : ('Enlace relacionado ' . ($index + 1));
+            $bits[] = '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">' . $label . '</a>';
+        }
+        return implode(', ', array_values(array_filter($bits)));
+    }
     foreach ($links as $index => $url) {
         $label = count($links) === 1 ? 'Enlace' : ('Enlace ' . ($index + 1));
         $bits[] = '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">' . $label . '</a>';
@@ -178,7 +194,7 @@ $manualDisplayText = static function (array $item): string {
                                 <div class="actuality-description"><?= $renderActualityText((string) $item['description'], $item) ?></div>
                             <?php endif; ?>
                             <?php if ($isManual && !empty($item['links'])): ?>
-                                <p class="actuality-manual-links"><?= $renderLinks(is_array($item['links']) ? $item['links'] : []) ?></p>
+                                <p class="actuality-manual-links"><?= $renderLinks(is_array($item['links']) ? $item['links'] : [], $item) ?></p>
                             <?php endif; ?>
                         </div>
                     </article>
@@ -214,7 +230,7 @@ $manualDisplayText = static function (array $item): string {
                                     <div class="actuality-description"><?= $renderActualityText($descriptionText, $item) ?></div>
                                 <?php endif; ?>
                                 <?php if ($isManual && !empty($item['links'])): ?>
-                                    <p class="actuality-manual-links"><?= $renderLinks(is_array($item['links']) ? $item['links'] : []) ?></p>
+                                    <p class="actuality-manual-links"><?= $renderLinks(is_array($item['links']) ? $item['links'] : [], $item) ?></p>
                                 <?php endif; ?>
                             </div>
                         </article>
@@ -251,7 +267,7 @@ $manualDisplayText = static function (array $item): string {
                                     <div class="actuality-description"><?= $renderActualityText($descriptionText, $item) ?></div>
                                 <?php endif; ?>
                                 <?php if ($isManual && !empty($item['links'])): ?>
-                                    <p class="actuality-manual-links"><?= $renderLinks(is_array($item['links']) ? $item['links'] : []) ?></p>
+                                    <p class="actuality-manual-links"><?= $renderLinks(is_array($item['links']) ? $item['links'] : [], $item) ?></p>
                                 <?php endif; ?>
                             </div>
                         </article>

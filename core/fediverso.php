@@ -470,6 +470,27 @@ function nammu_fediverse_fetch_json(string $url, string $accept = 'application/a
     return is_array($decoded) ? $decoded : null;
 }
 
+function nammu_fediverse_fetch_actor_document_status(string $url, array $config): array
+{
+    $url = trim($url);
+    if ($url === '') {
+        return ['status' => 0, 'body' => null];
+    }
+    $response = nammu_fediverse_signed_fetch($url, $config);
+    $status = (int) ($response['status'] ?? 0);
+    $body = json_decode((string) ($response['body'] ?? ''), true);
+    if ($status >= 200 && $status < 400 && is_array($body)) {
+        return ['status' => $status, 'body' => $body];
+    }
+    $fallback = nammu_fediverse_fetch($url);
+    $fallbackStatus = (int) ($fallback['status'] ?? 0);
+    $fallbackBody = json_decode((string) ($fallback['body'] ?? ''), true);
+    return [
+        'status' => $fallbackStatus > 0 ? $fallbackStatus : $status,
+        'body' => is_array($fallbackBody) ? $fallbackBody : (is_array($body) ? $body : null),
+    ];
+}
+
 function nammu_fediverse_extract_url($value): string
 {
     if (is_string($value)) {
@@ -2346,7 +2367,55 @@ function nammu_fediverse_refresh_following(): array
     unset($actor);
     nammu_fediverse_save_following_store($actors);
     nammu_fediverse_save_timeline_store(array_values($timelineById));
-    return ['checked' => $checked, 'new' => $newItems];
+    $followerStats = nammu_fediverse_refresh_followers($config);
+    return [
+        'checked' => $checked,
+        'new' => $newItems,
+        'followers_checked' => (int) ($followerStats['checked'] ?? 0),
+        'followers_removed' => (int) ($followerStats['removed'] ?? 0),
+    ];
+}
+
+function nammu_fediverse_refresh_followers(array $config): array
+{
+    $followers = nammu_fediverse_followers_store()['followers'];
+    $checked = 0;
+    $removed = 0;
+    $kept = [];
+    foreach ($followers as $follower) {
+        $actorId = trim((string) ($follower['id'] ?? ''));
+        if ($actorId === '') {
+            continue;
+        }
+        $checked++;
+        $follower['last_checked_at'] = gmdate(DATE_ATOM);
+        $actorStatus = nammu_fediverse_fetch_actor_document_status($actorId, $config);
+        $status = (int) ($actorStatus['status'] ?? 0);
+        $body = is_array($actorStatus['body'] ?? null) ? $actorStatus['body'] : null;
+        $bodyType = strtolower(trim((string) ($body['type'] ?? '')));
+        if (in_array($status, [404, 410], true) || $bodyType === 'tombstone') {
+            $removed++;
+            continue;
+        }
+        $actorDoc = nammu_fediverse_resolve_actor($actorId, $config);
+        if (!is_array($actorDoc)) {
+            $failureCount = (int) ($follower['refresh_failures'] ?? 0) + 1;
+            $follower['refresh_failures'] = $failureCount;
+            $follower['last_error'] = 'No se pudo refrescar el seguidor remoto.';
+            if ($failureCount >= 3) {
+                $removed++;
+                continue;
+            }
+            $kept[] = $follower;
+            continue;
+        }
+        $follower = array_merge($follower, $actorDoc);
+        $follower['refresh_failures'] = 0;
+        $follower['last_error'] = '';
+        $kept[] = $follower;
+    }
+    nammu_fediverse_save_followers_store($kept);
+    return ['checked' => $checked, 'removed' => $removed];
 }
 
 function nammu_fediverse_rebuild_timeline(): array

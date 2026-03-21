@@ -108,6 +108,8 @@ function admin_run_scheduled_tasks(): array {
         'fediverse_checked' => (int) ($fediverseStats['checked'] ?? 0),
         'fediverse_new' => (int) ($fediverseStats['new'] ?? 0),
         'fediverse_followers' => (int) ($fediverseStats['followers'] ?? 0),
+        'fediverse_followers_checked' => (int) ($fediverseStats['followers_checked'] ?? 0),
+        'fediverse_followers_removed' => (int) ($fediverseStats['followers_removed'] ?? 0),
         'fediverse_delivered' => (int) ($fediverseStats['delivered'] ?? 0),
         'fediverse_follow_accepts_checked' => (int) ($fediverseStats['follow_accepts_checked'] ?? 0),
         'fediverse_follow_accepts_sent' => (int) ($fediverseStats['follow_accepts_sent'] ?? 0),
@@ -10195,7 +10197,7 @@ if ($isLoggedIn && $page === 'fediverso') {
         }
         $fediverseFeedback = [
             'type' => 'info',
-            'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '. Accept enviados: ' . (int) ($stats['follow_accepts_sent'] ?? 0) . '.',
+            'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '. Seguidores revisados: ' . (int) ($stats['followers_checked'] ?? 0) . '. Seguidores eliminados: ' . (int) ($stats['followers_removed'] ?? 0) . '. Accept enviados: ' . (int) ($stats['follow_accepts_sent'] ?? 0) . '.',
         ];
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refresh_fediverse_threads'])) {

@@ -51,6 +51,14 @@ $actualityFediverseLink = static function (array $item): string {
 };
 $renderActualityText = static function (string $text, array $item) use ($fediverseIcon, $actualityFediverseLink): string {
     $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
+    $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
+    $boostLinks = array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : [])));
+    if ($isBoost && !empty($boostLinks) && $fediverseIcon !== '') {
+        $originalUrl = trim((string) end($boostLinks));
+        if ($originalUrl !== '') {
+            $html .= ' <a class="actuality-fediverse-inline" href="' . htmlspecialchars($originalUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" title="Publicación original en el Fediverso" aria-label="Publicación original en el Fediverso">' . $fediverseIcon . '</a>';
+        }
+    }
     $fediverseUrl = $actualityFediverseLink($item);
     if ($fediverseUrl !== '' && $fediverseIcon !== '') {
         $html .= ' <a class="actuality-fediverse-inline" href="' . htmlspecialchars($fediverseUrl, ENT_QUOTES, 'UTF-8') . '" title="En el Fediverso" aria-label="En el Fediverso">' . $fediverseIcon . '</a>';
@@ -97,11 +105,7 @@ $renderLinks = static function (array $links, array $item = []) use ($fediverseI
     if ($isBoost) {
         $originalUrl = array_pop($links);
         if ($originalUrl !== null && trim($originalUrl) !== '') {
-            if ($fediverseIcon !== '') {
-                $bits[] = '<a class="actuality-fediverse-inline" href="' . htmlspecialchars($originalUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" title="Publicación original en el Fediverso" aria-label="Publicación original en el Fediverso">' . $fediverseIcon . '</a>';
-            } else {
-                $bits[] = '<a href="' . htmlspecialchars($originalUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">En el Fediverso</a>';
-            }
+            // The original boosted post is rendered inline next to the text.
         }
         foreach ($links as $index => $url) {
             $label = count($links) === 1 ? 'Enlace relacionado' : ('Enlace relacionado ' . ($index + 1));

@@ -1030,12 +1030,7 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
     usort($items, static function (array $a, array $b): int {
         return ($b['timestamp'] ?? 0) <=> ($a['timestamp'] ?? 0);
     });
-    $cutoffTimestamp = time() - (8 * 86400);
-    $recentItems = array_values(array_filter($items, static function (array $item) use ($cutoffTimestamp): bool {
-        $timestamp = (int) ($item['timestamp'] ?? 0);
-        return $timestamp <= 0 || $timestamp >= $cutoffTimestamp;
-    }));
-    return nammu_actuality_enrich_items($recentItems, $publicBaseUrl);
+    return nammu_actuality_enrich_items($items, $publicBaseUrl);
 }
 
 function nammu_generate_actuality_feed(string $baseUrl, array $config, string $siteTitle, string $siteDescription, string $siteLang = 'es'): string

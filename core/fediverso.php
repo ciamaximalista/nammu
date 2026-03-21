@@ -875,6 +875,111 @@ function nammu_fediverse_record_action(string $type, string $actorId, string $ob
     nammu_fediverse_save_actions_store($items);
 }
 
+function nammu_fediverse_remove_action_by_id(string $actionId): bool
+{
+    $actionId = trim($actionId);
+    if ($actionId === '') {
+        return false;
+    }
+    $items = nammu_fediverse_actions_store()['items'];
+    $before = count($items);
+    $items = array_values(array_filter($items, static function (array $item) use ($actionId): bool {
+        return trim((string) ($item['id'] ?? '')) !== $actionId;
+    }));
+    if (count($items) === $before) {
+        return false;
+    }
+    nammu_fediverse_save_actions_store($items);
+    return true;
+}
+
+function nammu_fediverse_item_action_candidates(array $item): array
+{
+    return array_values(array_unique(array_filter([
+        trim((string) ($item['object_id'] ?? '')),
+        trim((string) ($item['url'] ?? '')),
+        trim((string) ($item['id'] ?? '')),
+    ], static fn(string $value): bool => $value !== '')));
+}
+
+function nammu_fediverse_latest_action_for_item(array $item, string $type): ?array
+{
+    $type = strtolower(trim($type));
+    if ($type === '') {
+        return null;
+    }
+    $candidates = nammu_fediverse_item_action_candidates($item);
+    if (empty($candidates)) {
+        return null;
+    }
+    foreach (nammu_fediverse_actions_store()['items'] as $action) {
+        if (strtolower(trim((string) ($action['type'] ?? ''))) !== $type) {
+            continue;
+        }
+        if (in_array(trim((string) ($action['object_url'] ?? '')), $candidates, true)) {
+            return $action;
+        }
+    }
+    return null;
+}
+
+function nammu_fediverse_find_related_boost_share_action(array $boostAction): ?array
+{
+    $objectUrl = trim((string) ($boostAction['object_url'] ?? ''));
+    if ($objectUrl === '') {
+        return null;
+    }
+    foreach (nammu_fediverse_actions_store()['items'] as $action) {
+        if (strtolower(trim((string) ($action['type'] ?? ''))) !== 'share') {
+            continue;
+        }
+        if (strtolower(trim((string) ($action['via'] ?? ''))) !== 'boost') {
+            continue;
+        }
+        if (trim((string) ($action['object_url'] ?? '')) !== $objectUrl) {
+            continue;
+        }
+        return $action;
+    }
+    return null;
+}
+
+function nammu_fediverse_find_manual_boost_item(array $boostAction): ?array
+{
+    $manualId = trim((string) ($boostAction['manual_item_id'] ?? ''));
+    if ($manualId !== '' && function_exists('nammu_actuality_get_manual_item')) {
+        $manualItem = nammu_actuality_get_manual_item($manualId);
+        if (is_array($manualItem)) {
+            return $manualItem;
+        }
+    }
+    $shareAction = nammu_fediverse_find_related_boost_share_action($boostAction);
+    if (is_array($shareAction)) {
+        $shareManualId = trim((string) ($shareAction['manual_item_id'] ?? ''));
+        if ($shareManualId !== '' && function_exists('nammu_actuality_get_manual_item')) {
+            $manualItem = nammu_actuality_get_manual_item($shareManualId);
+            if (is_array($manualItem)) {
+                return $manualItem;
+            }
+        }
+    }
+    if (!function_exists('nammu_actuality_list_manual_items')) {
+        return null;
+    }
+    $objectUrl = trim((string) ($boostAction['object_url'] ?? ''));
+    $publicUrl = trim((string) ($boostAction['public_url'] ?? ''));
+    foreach (nammu_actuality_list_manual_items() as $manualItem) {
+        if (strtolower(trim((string) ($manualItem['via'] ?? ''))) !== 'boost') {
+            continue;
+        }
+        $links = array_map('strval', is_array($manualItem['links'] ?? null) ? $manualItem['links'] : []);
+        if (($objectUrl !== '' && in_array($objectUrl, $links, true)) || ($publicUrl !== '' && in_array($publicUrl, $links, true))) {
+            return $manualItem;
+        }
+    }
+    return null;
+}
+
 function nammu_fediverse_hidden_reply_keys(array $reply): array
 {
     $keys = [];
@@ -4884,7 +4989,10 @@ function nammu_fediverse_send_like(string $recipientId, string $objectUrl, array
     if (empty($delivery['ok'])) {
         return ['ok' => false, 'message' => 'No se pudo enviar el favorito. ' . trim((string) ($delivery['message'] ?? ''))];
     }
-    nammu_fediverse_record_action('like', $recipientId, $objectUrl);
+    nammu_fediverse_record_action('like', $recipientId, $objectUrl, [
+        'activity_id' => (string) ($activity['id'] ?? ''),
+        'published' => (string) ($activity['published'] ?? gmdate(DATE_ATOM)),
+    ]);
     return ['ok' => true, 'message' => 'Favorito enviado.'];
 }
 
@@ -4941,6 +5049,152 @@ function nammu_fediverse_send_announce(string $recipientId, string $objectUrl, a
         'published' => (string) ($activity['published'] ?? gmdate(DATE_ATOM)),
     ]);
     return ['ok' => true, 'message' => 'Impulso enviado. Entregas: ' . $successfulDeliveries . '.'];
+}
+
+function nammu_fediverse_send_undo_like_for_item(array $item, array $config): array
+{
+    $likeAction = nammu_fediverse_latest_action_for_item($item, 'like');
+    if (!is_array($likeAction)) {
+        return ['ok' => false, 'message' => 'No se encontró un favorito local para esa publicación.'];
+    }
+    $recipientId = trim((string) ($likeAction['actor_id'] ?? ''));
+    $objectUrl = nammu_fediverse_resolve_object_reference(trim((string) ($likeAction['object_url'] ?? '')), $config);
+    if ($recipientId === '' || $objectUrl === '') {
+        return ['ok' => false, 'message' => 'Faltan datos para retirar ese favorito.'];
+    }
+    $recipient = nammu_fediverse_resolve_actor($recipientId, $config);
+    if (!is_array($recipient)) {
+        return ['ok' => false, 'message' => 'No se pudo resolver el actor remoto.'];
+    }
+    $inboxUrl = nammu_fediverse_remote_inbox_for_actor($recipient);
+    if ($inboxUrl === '') {
+        return ['ok' => false, 'message' => 'Ese actor no expone un inbox usable.'];
+    }
+    $actorUrl = nammu_fediverse_actor_url($config);
+    $likeObject = [
+        'id' => trim((string) ($likeAction['activity_id'] ?? '')),
+        'type' => 'Like',
+        'actor' => $actorUrl,
+        'object' => $objectUrl,
+        'to' => [$recipientId],
+    ];
+    if ($likeObject['id'] === '') {
+        unset($likeObject['id']);
+    }
+    $undoActivity = [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => $actorUrl . '/undo-like/' . substr(sha1($objectUrl . '|' . microtime(true)), 0, 24),
+        'type' => 'Undo',
+        'actor' => $actorUrl,
+        'to' => [$recipientId],
+        'object' => $likeObject,
+        'published' => gmdate(DATE_ATOM),
+    ];
+    $delivery = nammu_fediverse_post_activity_response($inboxUrl, $undoActivity, $config);
+    if (empty($delivery['ok'])) {
+        return ['ok' => false, 'message' => 'No se pudo retirar el favorito. ' . trim((string) ($delivery['message'] ?? ''))];
+    }
+    nammu_fediverse_remove_action_by_id((string) ($likeAction['id'] ?? ''));
+    return ['ok' => true, 'message' => 'Favorito retirado.'];
+}
+
+function nammu_fediverse_send_undo_announce_for_item(array $item, array $config): array
+{
+    if (!function_exists('nammu_actuality_delete_manual_item') && is_file(dirname(__DIR__) . '/core/actualidad.php')) {
+        require_once dirname(__DIR__) . '/core/actualidad.php';
+    }
+    $boostAction = nammu_fediverse_latest_action_for_item($item, 'boost');
+    if (!is_array($boostAction)) {
+        return ['ok' => false, 'message' => 'No se encontró un impulso local para esa publicación.'];
+    }
+    $recipientId = trim((string) ($boostAction['actor_id'] ?? ''));
+    $objectUrl = nammu_fediverse_resolve_object_reference(trim((string) ($boostAction['object_url'] ?? '')), $config);
+    if ($recipientId === '' || $objectUrl === '') {
+        return ['ok' => false, 'message' => 'Faltan datos para retirar ese impulso.'];
+    }
+    $recipient = nammu_fediverse_resolve_actor($recipientId, $config);
+    if (!is_array($recipient)) {
+        return ['ok' => false, 'message' => 'No se pudo resolver el actor remoto.'];
+    }
+    $inboxTargets = [];
+    $recipientInbox = nammu_fediverse_remote_inbox_for_actor($recipient);
+    if ($recipientInbox !== '') {
+        $inboxTargets[$recipientInbox] = true;
+    }
+    foreach (nammu_fediverse_followers_store()['followers'] as $follower) {
+        $followerInbox = nammu_fediverse_remote_inbox_for_actor($follower);
+        if ($followerInbox !== '') {
+            $inboxTargets[$followerInbox] = true;
+        }
+    }
+    if (empty($inboxTargets)) {
+        return ['ok' => false, 'message' => 'No se encontraron inboxes remotos para retirar el impulso.'];
+    }
+    $actorUrl = nammu_fediverse_actor_url($config);
+    $announceObject = [
+        'id' => trim((string) ($boostAction['activity_id'] ?? '')),
+        'type' => 'Announce',
+        'actor' => $actorUrl,
+        'object' => $objectUrl,
+        'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+        'cc' => [$recipientId],
+    ];
+    if ($announceObject['id'] === '') {
+        unset($announceObject['id']);
+    }
+    $undoActivity = [
+        '@context' => 'https://www.w3.org/ns/activitystreams',
+        'id' => $actorUrl . '/undo-announce/' . substr(sha1($objectUrl . '|' . microtime(true)), 0, 24),
+        'type' => 'Undo',
+        'actor' => $actorUrl,
+        'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+        'cc' => [$recipientId],
+        'object' => $announceObject,
+        'published' => gmdate(DATE_ATOM),
+    ];
+    $successfulDeliveries = 0;
+    $lastError = '';
+    foreach (array_keys($inboxTargets) as $inboxUrl) {
+        $delivery = nammu_fediverse_post_activity_response($inboxUrl, $undoActivity, $config);
+        if (!empty($delivery['ok'])) {
+            $successfulDeliveries++;
+        } else {
+            $lastError = trim((string) ($delivery['message'] ?? ''));
+        }
+    }
+    if ($successfulDeliveries === 0) {
+        return ['ok' => false, 'message' => 'No se pudo retirar el impulso. ' . $lastError];
+    }
+
+    $messageParts = ['Impulso retirado. Entregas: ' . $successfulDeliveries . '.'];
+    $manualItem = nammu_fediverse_find_manual_boost_item($boostAction);
+    if (is_array($manualItem)) {
+        $manualId = trim((string) ($manualItem['id'] ?? ''));
+        $manualObjectId = '';
+        if ($manualId !== '') {
+            $manualIdentifier = nammu_fediverse_base_url($config) . '/ap/objects/actualidad-' . rawurlencode($manualId);
+            $localItem = nammu_fediverse_find_local_item_for_identifier($manualIdentifier, $config);
+            if (is_array($localItem)) {
+                $manualObjectId = trim((string) ($localItem['id'] ?? ''));
+            }
+        }
+        if ($manualObjectId !== '') {
+            $deleteResult = nammu_fediverse_delete_local_item($manualObjectId, $config);
+            if (!empty($deleteResult['ok'])) {
+                $messageParts[] = trim((string) ($deleteResult['message'] ?? ''));
+            }
+        }
+        if ($manualId !== '' && function_exists('nammu_actuality_delete_manual_item')) {
+            nammu_actuality_delete_manual_item($manualId);
+        }
+    }
+
+    nammu_fediverse_remove_action_by_id((string) ($boostAction['id'] ?? ''));
+    $shareAction = nammu_fediverse_find_related_boost_share_action($boostAction);
+    if (is_array($shareAction)) {
+        nammu_fediverse_remove_action_by_id((string) ($shareAction['id'] ?? ''));
+    }
+    return ['ok' => true, 'message' => implode(' ', array_filter($messageParts, static fn(string $part): bool => trim($part) !== ''))];
 }
 
 function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, string $text, array $config): array

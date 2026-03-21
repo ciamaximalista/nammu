@@ -228,7 +228,7 @@ function admin_build_social_rss_message(string $network, string $title, string $
 
     $baseParts = [];
     if ($title !== '') {
-        $baseParts[] = $title;
+        $baseParts[] = '**' . $title . '**';
     }
     if ($link !== '') {
         $baseParts[] = $link;
@@ -263,6 +263,32 @@ function admin_build_social_rss_message(string $network, string $title, string $
     }
 
     return $current;
+}
+
+function admin_social_broadcast_fediverse_url_for_actuality_item(array $item): string
+{
+    if (!function_exists('nammu_fediverse_public_thread_url_for_actuality_item') && is_file(__DIR__ . '/fediverso.php')) {
+        require_once __DIR__ . '/fediverso.php';
+    }
+    if (!function_exists('nammu_fediverse_public_thread_url_for_actuality_item')) {
+        return '';
+    }
+    $config = load_config_file();
+    return trim((string) nammu_fediverse_public_thread_url_for_actuality_item($item, $config));
+}
+
+function admin_social_broadcast_append_fediverse_link(string $text, string $fediverseUrl): string
+{
+    $text = trim($text);
+    $fediverseUrl = trim($fediverseUrl);
+    if ($fediverseUrl === '') {
+        return $text;
+    }
+    $appendix = 'Fediverso: ' . $fediverseUrl;
+    if ($text === '') {
+        return $appendix;
+    }
+    return $text . "\n\n" . $appendix;
 }
 
 function admin_handle_social_rss_settings_request(array $settings): array
@@ -348,6 +374,7 @@ function admin_process_social_rss_feeds(): array
             if (isset($feedState['seen'][$item['key']])) {
                 continue;
             }
+            $fediverseUrl = admin_social_broadcast_fediverse_url_for_actuality_item($item);
             foreach ($networks as $network) {
                 $error = null;
                 $image = trim((string) ($item['image'] ?? ''));
@@ -358,6 +385,7 @@ function admin_process_social_rss_feeds(): array
                     (string) ($item['description'] ?? ''),
                     $image !== ''
                 );
+                $message = admin_social_broadcast_append_fediverse_link($message, $fediverseUrl);
                 admin_send_social_broadcast_message($network, $message, $availableNetworks[$network]['settings'], $image, $error);
             }
             $feedState['seen'][$item['key']] = time();
@@ -407,10 +435,11 @@ function admin_social_broadcast_available_networks(array $settings): array
     return $available;
 }
 
-function admin_send_social_broadcast_to_configured_networks(string $text, string $image = '', ?array $settings = null): array
+function admin_send_social_broadcast_to_configured_networks(string $text, string $image = '', ?array $settings = null, string $fediverseUrl = ''): array
 {
     $text = trim($text);
     $image = trim($image);
+    $text = admin_social_broadcast_append_fediverse_link($text, $fediverseUrl);
     $settings = is_array($settings) ? $settings : get_settings();
     $available = admin_social_broadcast_available_networks($settings);
     $limits = admin_social_broadcast_limits();
@@ -1071,6 +1100,7 @@ function admin_handle_social_broadcast_request(array $settings): array
     $labels = admin_social_broadcast_labels();
     $sent = [];
     $failed = [];
+    $fediverseUrl = '';
     if ($sendToActuality) {
         if (!function_exists('nammu_actuality_add_manual_item') && is_file(__DIR__ . '/actualidad.php')) {
             require_once __DIR__ . '/actualidad.php';
@@ -1089,6 +1119,7 @@ function admin_handle_social_broadcast_request(array $settings): array
                     $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
                     nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
                 }
+                $fediverseUrl = admin_social_broadcast_fediverse_url_for_actuality_item($manualItem);
                 $sent[] = 'Perfil del Fediverso';
             } else {
                 $failed[] = 'Perfil del Fediverso: no se pudo guardar la nota.';
@@ -1106,7 +1137,7 @@ function admin_handle_social_broadcast_request(array $settings): array
             }
             $selectedSettings[$network] = $settings[$network] ?? [];
         }
-        $networkResult = admin_send_social_broadcast_to_configured_networks($text, $image, $selectedSettings);
+        $networkResult = admin_send_social_broadcast_to_configured_networks($text, $image, $selectedSettings, $fediverseUrl);
         $sent = array_merge($sent, $networkResult['sent']);
         $failed = array_merge($failed, $networkResult['failed']);
     }

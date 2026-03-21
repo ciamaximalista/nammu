@@ -65,9 +65,6 @@ function admin_run_scheduled_tasks(): array {
     if (function_exists('nammu_process_scheduled_notifications_queue')) {
         $queueStats = nammu_process_scheduled_notifications_queue();
     }
-    if (function_exists('admin_process_social_rss_feeds')) {
-        $rssStats = admin_process_social_rss_feeds();
-    }
     if (function_exists('nammu_actuality_rebuild_snapshot')) {
         $config = nammu_load_config();
         $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
@@ -78,6 +75,9 @@ function admin_run_scheduled_tasks(): array {
             $baseUrl = nammu_base_url();
         }
         nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
+    }
+    if (function_exists('admin_process_social_rss_feeds')) {
+        $rssStats = admin_process_social_rss_feeds();
     }
     if (function_exists('nammu_fediverse_refresh_following')) {
         $fediverseStats = nammu_fediverse_refresh_following();
@@ -3182,7 +3182,8 @@ function admin_send_post_to_telegram(string $slug, string $title, string $descri
         'utm_source' => 'telegram',
         'utm_medium' => 'social',
     ]);
-    $message = admin_build_telegram_message($slug, $title, $description, $trackedUrl);
+    $fediverseUrl = admin_social_fediverse_thread_url($slug, admin_social_fediverse_template($slug, $urlOverride));
+    $message = admin_build_telegram_message($slug, $title, $description, $trackedUrl, $fediverseUrl);
     $imageUrl = trim($imageUrl);
     if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
         $sentWithPhoto = admin_send_telegram_photo($token, $channel, $imageUrl, $message);
@@ -3193,6 +3194,52 @@ function admin_send_post_to_telegram(string $slug, string $title, string $descri
         return admin_send_telegram_message($token, $channel, $message, 'HTML');
     }
     return admin_send_telegram_message($token, $channel, $message, 'HTML');
+}
+
+function admin_social_fediverse_thread_url(string $slug, string $template = 'post'): string
+{
+    if (!function_exists('nammu_fediverse_public_thread_url_for_named_local_item') && is_file(__DIR__ . '/core/fediverso.php')) {
+        require_once __DIR__ . '/core/fediverso.php';
+    }
+    if (!function_exists('nammu_fediverse_public_thread_url_for_named_local_item')) {
+        return '';
+    }
+    $config = load_config_file();
+    return trim((string) nammu_fediverse_public_thread_url_for_named_local_item($slug, $template, $config));
+}
+
+function admin_social_fediverse_template(string $slug, string $urlOverride = ''): string
+{
+    $path = strtolower(trim((string) parse_url($urlOverride, PHP_URL_PATH)));
+    if ($path !== '') {
+        if (str_contains($path, '/podcast/')) {
+            return 'podcast';
+        }
+        if (str_contains($path, '/itinerarios/')) {
+            return 'itinerary';
+        }
+        return 'post';
+    }
+    return 'post';
+}
+
+function admin_social_appendix_text(string $fediverseUrl): string
+{
+    $fediverseUrl = trim($fediverseUrl);
+    if ($fediverseUrl === '') {
+        return '';
+    }
+    return 'Fediverso: ' . $fediverseUrl;
+}
+
+function admin_social_appendix_html(string $fediverseUrl): string
+{
+    $fediverseUrl = trim($fediverseUrl);
+    if ($fediverseUrl === '') {
+        return '';
+    }
+    $safeUrl = admin_telegram_escape($fediverseUrl);
+    return '<a href="' . $safeUrl . '">Comentarios y reacciones en el Fediverso</a>';
 }
 
 function admin_telegram_escape(string $text): string {
@@ -3263,7 +3310,8 @@ function admin_build_sentence_limited_social_message(
     string $description,
     string $url,
     int $maxLen,
-    ?callable $titleFormatter = null
+    ?callable $titleFormatter = null,
+    string $appendix = ''
 ): string {
     $title = trim($title);
     $description = trim($description);
@@ -3277,20 +3325,26 @@ function admin_build_sentence_limited_social_message(
         $parts[] = $url;
     }
     $base = $parts !== [] ? implode("\n\n", $parts) : 'Nueva publicación disponible';
+    $appendix = trim($appendix);
+    $appendixSuffix = $appendix !== '' ? ("\n\n" . $appendix) : '';
 
     $sentences = admin_social_sentences_from_text($description);
     foreach ($sentences as $sentence) {
-        $candidate = $base . "\n\n" . $sentence;
+        $candidate = $base . "\n\n" . $sentence . $appendixSuffix;
         if (function_exists('mb_strlen')) {
             if (mb_strlen($candidate, 'UTF-8') <= $maxLen) {
-                $base = $candidate;
+                $base .= "\n\n" . $sentence;
                 continue;
             }
         } elseif (strlen($candidate) <= $maxLen) {
-            $base = $candidate;
+            $base .= "\n\n" . $sentence;
             continue;
         }
         break;
+    }
+
+    if ($appendixSuffix !== '') {
+        $base .= $appendixSuffix;
     }
 
     if (function_exists('mb_strlen')) {
@@ -3309,7 +3363,7 @@ function admin_build_twitter_post_message(string $title, string $description, st
     return admin_build_sentence_limited_social_message($title, $description, $url, 280, 'admin_bold_unicode_text');
 }
 
-function admin_build_telegram_message(string $slug, string $title, string $description, string $urlOverride = ''): string {
+function admin_build_telegram_message(string $slug, string $title, string $description, string $urlOverride = '', string $fediverseUrl = ''): string {
     $parts = [];
     $titleTrim = trim($title);
     if ($titleTrim !== '') {
@@ -3323,6 +3377,10 @@ function admin_build_telegram_message(string $slug, string $title, string $descr
     if ($url !== '') {
         $safeUrl = admin_telegram_escape($url);
         $parts[] = '<a href="' . $safeUrl . '">Lee el artículo</a>';
+    }
+    $fediverseAppendix = admin_social_appendix_html($fediverseUrl);
+    if ($fediverseAppendix !== '') {
+        $parts[] = $fediverseAppendix;
     }
     if (empty($parts)) {
         $parts[] = admin_telegram_escape('Nueva publicación disponible');
@@ -3342,7 +3400,8 @@ function admin_send_facebook_post(string $slug, string $title, string $descripti
         'utm_source' => 'facebook',
         'utm_medium' => 'social',
     ]);
-    $message = admin_build_sentence_limited_social_message($title, $description, $trackedUrl, 5000, 'admin_bold_unicode_text');
+    $fediverseUrl = admin_social_fediverse_thread_url($slug, admin_social_fediverse_template($slug, $urlOverride));
+    $message = admin_build_sentence_limited_social_message($title, $description, $trackedUrl, 5000, 'admin_bold_unicode_text', admin_social_appendix_text($fediverseUrl));
     $imageUrl = trim($imageUrl);
     if ($imageUrl !== '' && preg_match('#^https?://#i', $imageUrl)) {
         $endpoint = 'https://graph.facebook.com/v17.0/' . rawurlencode($pageId) . '/photos';
@@ -3393,7 +3452,8 @@ function admin_send_twitter_post(string $slug, string $title, string $descriptio
         'utm_medium' => 'social',
     ]);
     $endpoint = 'https://api.twitter.com/2/tweets';
-    $text = admin_build_twitter_post_message($title, $description, $trackedUrl);
+    $fediverseUrl = admin_social_fediverse_thread_url($slug, admin_social_fediverse_template($slug, $urlOverride));
+    $text = admin_build_sentence_limited_social_message($title, $description, $trackedUrl, 280, 'admin_bold_unicode_text', admin_social_appendix_text($fediverseUrl));
     $payload = ['text' => $text];
     return admin_send_twitter_api_request($endpoint, $payload, $settings, $error);
 }
@@ -3642,6 +3702,7 @@ function admin_send_linkedin_post(string $slug, string $title, string $descripti
         'utm_source' => 'linkedin',
         'utm_medium' => 'social',
     ]);
+    $fediverseUrl = admin_social_fediverse_thread_url($slug, admin_social_fediverse_template($slug, $urlOverride));
     $messageTitle = trim($title) !== '' ? trim($title) : $slug;
     $normalizedAuthor = $author;
     if (preg_match('/^urn:li:member:(.+)$/', $normalizedAuthor, $match) === 1) {
@@ -3653,7 +3714,7 @@ function admin_send_linkedin_post(string $slug, string $title, string $descripti
         $error = 'LinkedIn: el Author URN debe ser urn:li:person:ID o urn:li:organization:ID.';
         return false;
     }
-    $commentary = admin_build_sentence_limited_social_message($messageTitle, $description, $trackedUrl, 3000, 'admin_bold_unicode_text');
+    $commentary = admin_build_sentence_limited_social_message($messageTitle, $description, $trackedUrl, 3000, 'admin_bold_unicode_text', admin_social_appendix_text($fediverseUrl));
     $legacyAuthor = $normalizedAuthor;
     if (preg_match('/^urn:li:person:(.+)$/', $legacyAuthor, $match) === 1) {
         $legacyAuthor = 'urn:li:member:' . $match[1];
@@ -3817,16 +3878,45 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
         'utm_source' => 'bluesky',
         'utm_medium' => 'social',
     ]);
-    $text = trim($title);
-    if ($text === '') {
-        $text = 'Nueva publicación disponible';
+    $fediverseUrl = admin_social_fediverse_thread_url($slug, admin_social_fediverse_template($slug, $urlOverride));
+    $textParts = [];
+    $titleTrim = trim($title);
+    if ($titleTrim !== '') {
+        $textParts[] = admin_bold_unicode_text($titleTrim);
+    } else {
+        $textParts[] = 'Nueva publicación disponible';
     }
+    $appendix = admin_social_appendix_text($fediverseUrl);
+    if ($appendix !== '') {
+        $textParts[] = $appendix;
+    }
+    $text = implode("\n\n", array_filter($textParts, static fn(string $part): bool => trim($part) !== ''));
     if (function_exists('mb_strlen')) {
         if (mb_strlen($text, 'UTF-8') > 300) {
-            $text = mb_substr($text, 0, 299, 'UTF-8') . '…';
+            if ($appendix !== '') {
+                $reserved = mb_strlen("\n\n" . $appendix, 'UTF-8');
+                $available = max(1, 300 - $reserved - 1);
+                $titleOnly = $titleTrim !== '' ? admin_bold_unicode_text($titleTrim) : 'Nueva publicación disponible';
+                if (mb_strlen($titleOnly, 'UTF-8') > $available) {
+                    $titleOnly = rtrim(mb_substr($titleOnly, 0, $available, 'UTF-8')) . '…';
+                }
+                $text = $titleOnly . "\n\n" . $appendix;
+            } else {
+                $text = mb_substr($text, 0, 299, 'UTF-8') . '…';
+            }
         }
     } elseif (strlen($text) > 300) {
-        $text = substr($text, 0, 299) . '…';
+        if ($appendix !== '') {
+            $reserved = strlen("\n\n" . $appendix);
+            $available = max(1, 300 - $reserved - 1);
+            $titleOnly = $titleTrim !== '' ? admin_bold_unicode_text($titleTrim) : 'Nueva publicación disponible';
+            if (strlen($titleOnly) > $available) {
+                $titleOnly = rtrim(substr($titleOnly, 0, $available)) . '…';
+            }
+            $text = $titleOnly . "\n\n" . $appendix;
+        } else {
+            $text = substr($text, 0, 299) . '…';
+        }
     }
     $record = [
         '$type' => 'app.bsky.feed.post',
@@ -4037,7 +4127,7 @@ function admin_build_instagram_caption(string $slug, string $title, string $desc
     $parts = [];
     $titleTrim = trim($title);
     if ($titleTrim !== '') {
-        $parts[] = $titleTrim;
+        $parts[] = admin_bold_unicode_text($titleTrim);
     }
     $descriptionTrim = trim($description);
     if ($descriptionTrim !== '') {
@@ -4046,6 +4136,11 @@ function admin_build_instagram_caption(string $slug, string $title, string $desc
     $url = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
     if ($url !== '') {
         $parts[] = 'Lee el artículo: ' . $url;
+    }
+    $fediverseUrl = admin_social_fediverse_thread_url($slug, admin_social_fediverse_template($slug, $urlOverride));
+    $appendix = admin_social_appendix_text($fediverseUrl);
+    if ($appendix !== '') {
+        $parts[] = $appendix;
     }
     return implode("\n\n", $parts);
 }
@@ -10314,6 +10409,25 @@ if ($isLoggedIn && $page === 'fediverso') {
             'message' => (string) ($result['message'] ?? ''),
         ];
         $fediverseRedirect = true;
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_unlike_item'])) {
+        $item = [
+            'object_id' => trim((string) ($_POST['fediverse_object_url'] ?? '')),
+            'url' => trim((string) ($_POST['fediverse_public_url'] ?? '')),
+            'id' => trim((string) ($_POST['fediverse_item_id'] ?? '')),
+        ];
+        $config = load_config_file();
+        $result = nammu_fediverse_send_undo_like_for_item($item, $config);
+        if (!empty($result['ok']) && function_exists('nammu_fediverse_rebuild_snapshots')) {
+            nammu_fediverse_rebuild_snapshots($config);
+        }
+        if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
+            nammu_fediverse_save_fragments_cache_store([]);
+        }
+        $fediverseFeedback = [
+            'type' => !empty($result['ok']) ? 'success' : 'danger',
+            'message' => (string) ($result['message'] ?? ''),
+        ];
+        $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_boost_item'])) {
         $recipientId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
         $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
@@ -10347,15 +10461,41 @@ if ($isLoggedIn && $page === 'fediverso') {
                 $noteText = trim($noteText . "\n\n" . $displayUrl);
             }
             if ($noteText !== '' && function_exists('nammu_actuality_add_manual_item')) {
-                nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle, $objectImage, ['via' => 'boost']);
+                $manualItem = nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle, $objectImage, ['via' => 'boost']);
                 if (function_exists('nammu_actuality_rebuild_snapshot')) {
                     nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
                 }
-                nammu_fediverse_record_action('share', '', $objectUrl, ['share_text' => $objectContent, 'title' => $objectTitle, 'via' => 'boost']);
+                nammu_fediverse_record_action('share', '', $objectUrl, [
+                    'share_text' => $objectContent,
+                    'title' => $objectTitle,
+                    'via' => 'boost',
+                    'manual_item_id' => (string) ($manualItem['id'] ?? ''),
+                    'public_url' => $displayUrl,
+                ]);
                 $deliveryStats = nammu_fediverse_deliver_local_items($config);
                 $result['message'] = rtrim((string) ($result['message'] ?? '')) . ' También publicada como nota. Entregas federadas: ' . (int) ($deliveryStats['delivered'] ?? 0) . '.';
                 if (function_exists('admin_send_social_broadcast_to_configured_networks')) {
-                    $socialResult = admin_send_social_broadcast_to_configured_networks($noteText, $objectImage, get_settings());
+                    $socialTextParts = [];
+                    if ($objectTitle !== '') {
+                        $socialTextParts[] = '**' . $objectTitle . '**';
+                    }
+                    if ($objectContent !== '' && $objectContent !== $objectTitle) {
+                        $socialTextParts[] = $objectContent;
+                    }
+                    if ($displayUrl !== '' && !in_array($displayUrl, $socialTextParts, true)) {
+                        $socialTextParts[] = $displayUrl;
+                    }
+                    $socialText = trim(implode("\n\n", array_filter($socialTextParts, static fn(string $part): bool => trim($part) !== '')));
+                    $fediverseUrl = '';
+                    if (is_array($manualItem ?? null) && !empty($manualItem)) {
+                        if (!function_exists('nammu_fediverse_public_thread_url_for_actuality_item') && is_file(__DIR__ . '/core/fediverso.php')) {
+                            require_once __DIR__ . '/core/fediverso.php';
+                        }
+                        if (function_exists('nammu_fediverse_public_thread_url_for_actuality_item')) {
+                            $fediverseUrl = trim((string) nammu_fediverse_public_thread_url_for_actuality_item($manualItem, $config));
+                        }
+                    }
+                    $socialResult = admin_send_social_broadcast_to_configured_networks($socialText !== '' ? $socialText : $noteText, $objectImage, get_settings(), $fediverseUrl);
                     $sentNetworks = is_array($socialResult['sent'] ?? null) ? $socialResult['sent'] : [];
                     $failedNetworks = is_array($socialResult['failed'] ?? null) ? $socialResult['failed'] : [];
                     if (!empty($sentNetworks)) {
@@ -10366,6 +10506,35 @@ if ($isLoggedIn && $page === 'fediverso') {
                     }
                 }
             }
+        }
+        $fediverseFeedback = [
+            'type' => !empty($result['ok']) ? 'success' : 'danger',
+            'message' => (string) ($result['message'] ?? ''),
+        ];
+        $fediverseRedirect = true;
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_unboost_item'])) {
+        $item = [
+            'object_id' => trim((string) ($_POST['fediverse_object_url'] ?? '')),
+            'url' => trim((string) ($_POST['fediverse_public_url'] ?? '')),
+            'id' => trim((string) ($_POST['fediverse_item_id'] ?? '')),
+        ];
+        $config = load_config_file();
+        $result = nammu_fediverse_send_undo_announce_for_item($item, $config);
+        if (!function_exists('nammu_actuality_rebuild_snapshot') && is_file(__DIR__ . '/core/actualidad.php')) {
+            require_once __DIR__ . '/core/actualidad.php';
+        }
+        if (!empty($result['ok']) && function_exists('nammu_actuality_rebuild_snapshot')) {
+            $baseUrl = rtrim((string) (($config['site_url'] ?? '') ?: nammu_base_url()), '/');
+            $siteTitle = trim((string) (($config['site_name'] ?? '') ?: ''));
+            $siteDescription = trim((string) ($config['site_description'] ?? ''));
+            $siteLang = trim((string) ($config['site_lang'] ?? 'es'));
+            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        }
+        if (!empty($result['ok']) && function_exists('nammu_fediverse_rebuild_snapshots')) {
+            nammu_fediverse_rebuild_snapshots($config);
+        }
+        if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
+            nammu_fediverse_save_fragments_cache_store([]);
         }
         $fediverseFeedback = [
             'type' => !empty($result['ok']) ? 'success' : 'danger',

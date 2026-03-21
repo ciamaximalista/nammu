@@ -1154,13 +1154,16 @@
                                                 <input type="hidden" name="fediverse_tab" value="home">
                                                 <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($itemTargetActorId, ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>">
-                                                <button type="submit" name="fediverse_like_item" class="btn btn-outline-secondary btn-sm"<?= !empty($itemActionState['liked']) ? ' disabled' : '' ?>><?= !empty($itemActionState['liked']) ? 'Favorito enviado' : 'Favorito' ?></button>
+                                                <input type="hidden" name="fediverse_public_url" value="<?= htmlspecialchars((string) (($item['url'] ?? '') ?: ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_item_id" value="<?= htmlspecialchars((string) ($item['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <button type="submit" name="<?= !empty($itemActionState['liked']) ? 'fediverse_unlike_item' : 'fediverse_like_item' ?>" class="btn btn-outline-secondary btn-sm"><?= !empty($itemActionState['liked']) ? 'Quitar favorito' : 'Favorito' ?></button>
                                             </form>
                                             <form method="post" class="mb-0">
                                                 <input type="hidden" name="fediverse_tab" value="home">
                                                 <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($itemTargetActorId, ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($itemObjectId, ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_public_url" value="<?= htmlspecialchars((string) (($item['url'] ?? '') ?: ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_item_id" value="<?= htmlspecialchars((string) ($item['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_title" value="<?= htmlspecialchars((string) ($item['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_content" value="<?= htmlspecialchars((string) ($item['content'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                 <?php
@@ -1178,7 +1181,7 @@
                                                 }
                                                 ?>
                                                 <input type="hidden" name="fediverse_object_image" value="<?= htmlspecialchars($boostImageUrl, ENT_QUOTES, 'UTF-8') ?>">
-                                                <button type="submit" name="fediverse_boost_item" class="btn btn-outline-secondary btn-sm"<?= !empty($itemActionState['boosted']) ? ' disabled' : '' ?>><?= !empty($itemActionState['boosted']) ? 'Impulsado' : 'Impulsar' ?></button>
+                                                <button type="submit" name="<?= !empty($itemActionState['boosted']) ? 'fediverse_unboost_item' : 'fediverse_boost_item' ?>" class="btn btn-outline-secondary btn-sm"<?= !empty($itemActionState['boosted']) ? ' onclick="return confirm(\'¿Quitar este impulso y borrar la nota local asociada?\');"' : '' ?>><?= !empty($itemActionState['boosted']) ? 'Quitar impulso' : 'Impulsar' ?></button>
                                             </form>
                                             <details class="fediverse-inline-form">
                                                 <summary class="fediverse-inline-form__summary-button">Responder</summary>

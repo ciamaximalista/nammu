@@ -1658,9 +1658,23 @@ function nammu_footer_icon_svgs(): array
 function nammu_fediverse_profile_alias_path(array $config = [], string $baseUrl = ''): string
 {
     $config = !empty($config) ? $config : nammu_load_config();
-    $preferredUsername = function_exists('nammu_fediverse_preferred_username')
-        ? trim((string) nammu_fediverse_preferred_username($config))
-        : trim((string) (($config['fediverse']['preferred_username'] ?? $config['blog_slug'] ?? 'blog')));
+    $preferredUsername = '';
+    if (function_exists('nammu_fediverse_preferred_username')) {
+        $preferredUsername = trim((string) nammu_fediverse_preferred_username($config));
+    }
+    if ($preferredUsername === '') {
+        $preferredUsername = trim((string) ($config['fediverse']['username'] ?? ''));
+    }
+    if ($preferredUsername === '') {
+        $hostCandidate = trim((string) parse_url((string) ($config['site_url'] ?? ''), PHP_URL_HOST));
+        if ($hostCandidate !== '') {
+            $preferredUsername = trim((string) (explode('.', strtolower($hostCandidate))[0] ?? ''));
+        }
+    }
+    if ($preferredUsername === '') {
+        $siteName = trim((string) (($config['site_name'] ?? '') ?: 'blog'));
+        $preferredUsername = preg_replace('/[^a-z0-9_.-]+/i', '-', strtolower($siteName)) ?? 'blog';
+    }
     $preferredUsername = preg_replace('/[^a-z0-9._-]+/i', '', $preferredUsername) ?? 'blog';
     if ($preferredUsername === '') {
         $preferredUsername = 'blog';

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
+require_once __DIR__ . '/core/actualidad.php';
+require_once __DIR__ . '/core/fediverso.php';
 
 use Nammu\Core\ContentRepository;
 use Nammu\Core\Itinerary;
@@ -200,6 +202,7 @@ if ($performSearch) {
     if (!empty($loadedItineraries)) {
         $documents = array_merge($documents, nammu_collect_itinerary_documents($loadedItineraries, $markdown));
     }
+    $documents = array_merge($documents, nammu_collect_actuality_documents($configData, $publicBaseUrl));
     $conditions = nammu_parse_search_query($queryRaw);
     if (!empty($conditions['type']) && $conditions['type'] !== 'todo') {
         $typeFilter = $conditions['type'];
@@ -220,9 +223,12 @@ $resultsForView = [];
 foreach ($results as $item) {
     $relativeUrl = $item['relative_url'] ?? '/' . rawurlencode($item['slug']);
     $baseForUrl = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '';
+    $resultUrl = preg_match('#^https?://#i', (string) $relativeUrl)
+        ? (string) $relativeUrl
+        : $baseForUrl . $relativeUrl;
     $resultsForView[] = [
         'slug' => $item['slug'],
-        'url' => $baseForUrl . $relativeUrl,
+        'url' => $resultUrl,
         'title' => nammu_highlight_terms($item['title'], $item['highlight_terms']),
         'description' => $item['description'] !== '' ? nammu_highlight_terms($item['description'], $item['highlight_terms']) : '',
         'snippet' => $item['snippet'],
@@ -389,6 +395,81 @@ function nammu_collect_documents(string $contentDir, MarkdownConverter $markdown
 }
 
 /**
+ * @return array<int, array<string, mixed>>
+ */
+function nammu_collect_actuality_documents(array $config, string $publicBaseUrl): array
+{
+    if (!function_exists('nammu_actuality_load_items_snapshot')) {
+        return [];
+    }
+
+    $snapshot = nammu_actuality_load_items_snapshot();
+    $items = is_array($snapshot['items'] ?? null) ? $snapshot['items'] : [];
+    $documents = [];
+    $seen = [];
+
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+
+        $slugBase = trim((string) ($item['id'] ?? ''));
+        $link = trim((string) ($item['link'] ?? ''));
+        if ($slugBase === '') {
+            $slugBase = $link !== '' ? sha1($link) : sha1(json_encode($item, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '');
+        }
+        $slug = 'fediverso/' . $slugBase;
+        if (isset($seen[$slug])) {
+            continue;
+        }
+        $seen[$slug] = true;
+
+        $title = trim((string) ($item['title'] ?? ''));
+        $description = trim((string) ($item['description'] ?? ''));
+        $rawText = trim((string) ($item['raw_text'] ?? ''));
+        $source = trim((string) ($item['source'] ?? ''));
+        $links = array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : [])));
+        $threadUrl = trim((string) nammu_fediverse_public_thread_url_for_actuality_item($item, $config));
+        $relativeUrl = $threadUrl !== '' ? nammu_search_relative_or_absolute_url($threadUrl, $publicBaseUrl) : nammu_search_relative_or_absolute_url($link, $publicBaseUrl);
+        if ($relativeUrl === '') {
+            $relativeUrl = function_exists('nammu_fediverse_profile_alias_path')
+                ? nammu_fediverse_profile_alias_path($config, $publicBaseUrl)
+                : '/actualidad.php';
+        }
+
+        $bodyParts = [$description, $rawText, $source, $link, implode("\n", $links)];
+        $bodyText = trim(preg_replace('/\s+/u', ' ', implode("\n\n", array_filter($bodyParts, static fn(string $value): bool => trim($value) !== ''))));
+
+        $documents[] = [
+            'slug' => $slug,
+            'title' => $title !== '' ? $title : ($source !== '' ? $source : 'Fediverso'),
+            'description' => $description !== '' ? $description : $rawText,
+            'category' => $source !== '' ? $source : 'Fediverso',
+            'template' => 'fediverse',
+            'type' => 'fediverse',
+            'date_raw' => '',
+            'date_iso' => '',
+            'date_display' => isset($item['timestamp']) && (int) $item['timestamp'] > 0
+                ? nammu_format_date_spanish((new DateTimeImmutable())->setTimestamp((int) $item['timestamp']))
+                : '',
+            'body_html' => '',
+            'body_text' => $bodyText,
+            'relative_url' => $relativeUrl,
+            'fields' => [
+                'title' => $title,
+                'description' => trim($description . "\n" . $rawText),
+                'category' => $source !== '' ? $source : 'Fediverso',
+                'content' => $bodyText,
+                'slug' => $slug . ' ' . $link . ' ' . implode(' ', $links),
+            ],
+            'type_label_override' => 'Fediverso',
+        ];
+    }
+
+    return $documents;
+}
+
+/**
  * @return array{array<string, mixed>, string}
  */
 function nammu_extract_document(string $raw): array
@@ -426,6 +507,22 @@ function nammu_build_audio_url(string $path): string
     }
     $relative = '/assets/' . $normalized;
     return $publicBaseUrl !== '' ? $publicBaseUrl . $relative : $relative;
+}
+
+function nammu_search_relative_or_absolute_url(string $candidateUrl, string $publicBaseUrl): string
+{
+    $candidateUrl = trim($candidateUrl);
+    if ($candidateUrl === '') {
+        return '';
+    }
+    if (!preg_match('#^https?://#i', $candidateUrl)) {
+        return $candidateUrl;
+    }
+    $base = rtrim($publicBaseUrl, '/');
+    if ($base !== '' && str_starts_with($candidateUrl, $base . '/')) {
+        return substr($candidateUrl, strlen($base));
+    }
+    return $candidateUrl;
 }
 
 function nammu_meta_value_to_string(mixed $value): string

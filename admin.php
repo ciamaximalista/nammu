@@ -10475,6 +10475,11 @@ if ($isLoggedIn && $page === 'fediverso') {
         $objectTitle = trim((string) ($_POST['fediverse_object_title'] ?? ''));
         $objectContent = trim((string) ($_POST['fediverse_object_content'] ?? ''));
         $objectImage = trim((string) ($_POST['fediverse_object_image'] ?? ''));
+        $objectImages = json_decode((string) ($_POST['fediverse_object_images'] ?? '[]'), true);
+        $objectImages = array_values(array_unique(array_filter(array_map('strval', is_array($objectImages) ? $objectImages : []))));
+        if ($objectImage !== '' && !in_array($objectImage, $objectImages, true)) {
+            array_unshift($objectImages, $objectImage);
+        }
         $config = load_config_file();
         $result = nammu_fediverse_send_announce($recipientId, $objectUrl, $config);
         if (!empty($result['ok'])) {
@@ -10501,7 +10506,10 @@ if ($isLoggedIn && $page === 'fediverso') {
                 $noteText = trim($noteText . "\n\n" . $displayUrl);
             }
             if ($noteText !== '' && function_exists('nammu_actuality_add_manual_item')) {
-                $manualItem = nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle, $objectImage, ['via' => 'boost']);
+                $manualItem = nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle, $objectImage, [
+                    'via' => 'boost',
+                    'images' => $objectImages,
+                ]);
                 if (function_exists('nammu_actuality_rebuild_snapshot')) {
                     nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
                 }
@@ -10509,6 +10517,8 @@ if ($isLoggedIn && $page === 'fediverso') {
                     'share_text' => $objectContent,
                     'title' => $objectTitle,
                     'via' => 'boost',
+                    'image' => $objectImage,
+                    'images' => $objectImages,
                     'manual_item_id' => (string) ($manualItem['id'] ?? ''),
                     'public_url' => $displayUrl,
                 ]);

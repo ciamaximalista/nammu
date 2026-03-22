@@ -1443,6 +1443,7 @@ function nammu_fediverse_resend_item_from_action(array $action): ?array
         'published' => trim((string) ($action['published'] ?? gmdate(DATE_ATOM))),
         'type' => trim((string) ($action['object_type'] ?? 'Article')) ?: 'Article',
         'image' => trim((string) ($action['image'] ?? '')),
+        'images' => array_values(array_filter(array_map('strval', is_array($action['images'] ?? null) ? $action['images'] : []))),
     ];
 }
 
@@ -6043,6 +6044,7 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
         'content' => trim((string) ($matchedItem['content'] ?? '')),
         'summary' => trim((string) ($matchedItem['summary'] ?? '')),
         'image' => trim((string) ($matchedItem['image'] ?? '')),
+        'images' => array_values(array_filter(array_map('strval', is_array($matchedItem['images'] ?? null) ? $matchedItem['images'] : []))),
         'object_type' => trim((string) ($matchedItem['type'] ?? 'Article')),
         'published' => $resendPublished,
     ]);

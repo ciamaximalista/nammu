@@ -76,6 +76,18 @@ $threadImageAttachments = array_values(array_filter((array) ($threadItem['attach
     $mediaType = strtolower(trim((string) ($attachment['media_type'] ?? '')));
     return ($type === 'image' || str_starts_with($mediaType, 'image/')) && trim((string) ($attachment['url'] ?? '')) !== '';
 }));
+foreach (array_values(array_unique(array_filter(array_map('strval', is_array($threadItem['images'] ?? null) ? $threadItem['images'] : [])))) as $threadImageUrl) {
+    $alreadyPresent = false;
+    foreach ($threadImageAttachments as $existingThreadImageAttachment) {
+        if (trim((string) ($existingThreadImageAttachment['url'] ?? '')) === $threadImageUrl) {
+            $alreadyPresent = true;
+            break;
+        }
+    }
+    if (!$alreadyPresent) {
+        $threadImageAttachments[] = ['url' => $threadImageUrl];
+    }
+}
 if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
     $threadImageAttachments[] = ['url' => (string) $threadItem['image']];
 }

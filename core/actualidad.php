@@ -542,6 +542,116 @@ function nammu_actuality_prune_manual_items(array $items): array
     }));
 }
 
+function nammu_actuality_images_from_fediverse_attachments(array $attachments): array
+{
+    $images = [];
+    foreach ($attachments as $attachment) {
+        if (!is_array($attachment)) {
+            continue;
+        }
+        $url = trim((string) ($attachment['url'] ?? ''));
+        $type = strtolower(trim((string) ($attachment['type'] ?? '')));
+        $mediaType = strtolower(trim((string) ($attachment['media_type'] ?? ($attachment['mediaType'] ?? ''))));
+        if ($url === '') {
+            continue;
+        }
+        if ($type === 'image' || str_starts_with($mediaType, 'image/')) {
+            $images[] = $url;
+        }
+    }
+    return array_values(array_unique(array_filter($images)));
+}
+
+function nammu_actuality_enrich_manual_boost_item_images(array $item): array
+{
+    if (strtolower(trim((string) ($item['via'] ?? ''))) !== 'boost') {
+        return $item;
+    }
+    if (!function_exists('nammu_fediverse_actions_store') && is_file(__DIR__ . '/fediverso.php')) {
+        require_once __DIR__ . '/fediverso.php';
+    }
+    if (!function_exists('nammu_fediverse_actions_store') || !function_exists('nammu_fediverse_timeline_store')) {
+        return $item;
+    }
+
+    $images = array_values(array_unique(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))));
+    $primaryImage = trim((string) ($item['image'] ?? ''));
+    if ($primaryImage !== '' && !in_array($primaryImage, $images, true)) {
+        array_unshift($images, $primaryImage);
+    }
+
+    $manualId = trim((string) ($item['id'] ?? ''));
+    $candidateIdentifiers = array_values(array_filter(array_map('strval', array_merge(
+        [(string) ($item['link'] ?? '')],
+        is_array($item['links'] ?? null) ? $item['links'] : []
+    ))));
+    foreach ((array) (nammu_fediverse_actions_store()['items'] ?? []) as $action) {
+        if (!is_array($action)) {
+            continue;
+        }
+        if (strtolower(trim((string) ($action['type'] ?? ''))) !== 'share') {
+            continue;
+        }
+        if (strtolower(trim((string) ($action['via'] ?? ''))) !== 'boost') {
+            continue;
+        }
+        $actionManualId = trim((string) ($action['manual_item_id'] ?? ''));
+        $actionObjectUrl = trim((string) ($action['object_url'] ?? ''));
+        $actionPublicUrl = trim((string) ($action['public_url'] ?? ''));
+        if (
+            ($manualId !== '' && $actionManualId === $manualId)
+            || ($actionObjectUrl !== '' && in_array($actionObjectUrl, $candidateIdentifiers, true))
+            || ($actionPublicUrl !== '' && in_array($actionPublicUrl, $candidateIdentifiers, true))
+        ) {
+            foreach (array_filter([
+                trim((string) ($action['image'] ?? '')),
+                ...array_map('strval', is_array($action['images'] ?? null) ? $action['images'] : []),
+            ]) as $imageUrl) {
+                if (!in_array($imageUrl, $images, true)) {
+                    $images[] = $imageUrl;
+                }
+            }
+            foreach (array_filter([$actionObjectUrl, $actionPublicUrl]) as $identifier) {
+                if (!in_array($identifier, $candidateIdentifiers, true)) {
+                    $candidateIdentifiers[] = $identifier;
+                }
+            }
+        }
+    }
+
+    foreach ((array) (nammu_fediverse_timeline_store()['items'] ?? []) as $timelineItem) {
+        if (!is_array($timelineItem)) {
+            continue;
+        }
+        $matchesCandidate = false;
+        foreach (['id', 'url', 'object_id'] as $field) {
+            $value = trim((string) ($timelineItem[$field] ?? ''));
+            if ($value !== '' && in_array($value, $candidateIdentifiers, true)) {
+                $matchesCandidate = true;
+                break;
+            }
+        }
+        if (!$matchesCandidate) {
+            continue;
+        }
+        foreach (nammu_actuality_images_from_fediverse_attachments((array) ($timelineItem['attachments'] ?? [])) as $imageUrl) {
+            if (!in_array($imageUrl, $images, true)) {
+                $images[] = $imageUrl;
+            }
+        }
+        $timelineImage = trim((string) ($timelineItem['image'] ?? ''));
+        if ($timelineImage !== '' && !in_array($timelineImage, $images, true)) {
+            $images[] = $timelineImage;
+        }
+    }
+
+    if (!empty($images)) {
+        $item['images'] = array_values($images);
+        $item['image'] = (string) ($images[0] ?? '');
+    }
+    return $item;
+}
+
 function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $siteTitle, string $image = '', array $meta = []): array
 {
     $parts = nammu_actuality_manual_content($text);
@@ -1037,6 +1147,7 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
         if ($manualId === '') {
             continue;
         }
+        $item = nammu_actuality_enrich_manual_boost_item_images($item);
         $seen['manual:' . $manualId] = true;
         $items[] = [
             'id' => $manualId,

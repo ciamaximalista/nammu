@@ -276,6 +276,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var imageGroup = document.querySelector('.image-group');
     var messageImagesGroup = document.querySelector('.message-images-group');
     var slugGroup = document.querySelector('.slug-group');
+    var markdownToolbar = document.querySelector('.markdown-toolbar[data-markdown-toolbar]');
     var titleLabel = document.querySelector('label[for="title"]');
     var descriptionLabel = document.querySelector('label[for="description"]');
     var descriptionGroup = document.querySelector('.description-group');
@@ -401,6 +402,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (slugGroup) {
             slugGroup.classList.toggle('d-none', isMessage);
+        }
+        if (markdownToolbar) {
+            markdownToolbar.classList.toggle('d-none', isMessage);
         }
         if (titleLabel && titleLabel.dataset.podcastLabel && titleLabel.dataset.postLabel) {
             titleLabel.textContent = isPodcast ? titleLabel.dataset.podcastLabel : titleLabel.dataset.postLabel;

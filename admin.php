@@ -8409,6 +8409,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!function_exists('nammu_actuality_delete_news_item') && is_file(__DIR__ . '/core/actualidad.php')) {
             require_once __DIR__ . '/core/actualidad.php';
         }
+        if (!function_exists('nammu_fediverse_delete_local_item') && is_file(__DIR__ . '/core/fediverso.php')) {
+            require_once __DIR__ . '/core/fediverso.php';
+        }
         $newsId = preg_replace('/[^a-f0-9]/i', '', (string) ($_POST['delete_news_id'] ?? '')) ?? '';
         if ($newsId === '') {
             $_SESSION['news_feedback'] = ['type' => 'danger', 'message' => 'No se pudo identificar la noticia para borrarla.'];
@@ -8423,6 +8426,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($baseUrl === '') {
             $baseUrl = nammu_base_url();
         }
+        $deleteMessages = [];
+        if (function_exists('nammu_fediverse_delete_local_item')) {
+            $fediverseItemId = rtrim($baseUrl, '/') . '/ap/objects/actualidad-' . rawurlencode($newsId);
+            $fediverseDelete = nammu_fediverse_delete_local_item($fediverseItemId, $config);
+            if (!empty($fediverseDelete['message'])) {
+                $deleteMessages[] = trim((string) $fediverseDelete['message']);
+            }
+        }
         if (!function_exists('nammu_actuality_delete_news_item') || !nammu_actuality_delete_news_item($newsId)) {
             $_SESSION['news_feedback'] = ['type' => 'warning', 'message' => 'La noticia ya no existe o no se pudo borrar.'];
             header('Location: admin.php?page=edit&template=news');
@@ -8431,7 +8442,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (function_exists('nammu_actuality_rebuild_snapshot')) {
             nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
         }
-        $_SESSION['news_feedback'] = ['type' => 'success', 'message' => 'Noticia borrada.'];
+        if (function_exists('nammu_fediverse_rebuild_snapshots')) {
+            nammu_fediverse_rebuild_snapshots($config);
+        }
+        if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
+            nammu_fediverse_save_fragments_cache_store([]);
+        }
+        $_SESSION['news_feedback'] = ['type' => 'success', 'message' => trim('Noticia borrada. ' . implode(' ', array_filter($deleteMessages)))];
         header('Location: admin.php?page=edit&template=news');
         exit;
     } elseif (isset($_POST['delete_post'])) {

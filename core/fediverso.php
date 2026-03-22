@@ -1057,6 +1057,8 @@ function nammu_fediverse_actions_by_object(): array
                 'liked' => false,
                 'replied' => false,
                 'shared' => false,
+                'boosted' => false,
+                'boost_count' => 0,
                 'reply_count' => 0,
                 'share_count' => 0,
             ];

@@ -141,7 +141,7 @@ function nammu_actuality_get_manual_item(string $id): ?array
     return null;
 }
 
-function nammu_actuality_update_manual_item(string $id, string $text, string $baseUrl, string $siteTitle, ?string $image = null): bool
+function nammu_actuality_update_manual_item(string $id, string $text, string $baseUrl, string $siteTitle, ?string $image = null, ?array $images = null): bool
 {
     $normalizedId = preg_replace('/[^a-f0-9]/i', '', trim($id)) ?? '';
     if ($normalizedId === '') {
@@ -166,12 +166,17 @@ function nammu_actuality_update_manual_item(string $id, string $text, string $ba
         $item['link'] = nammu_actuality_manual_anchor_url($baseUrl, $normalizedId);
         $item['source'] = $siteTitle !== '' ? $siteTitle : ((string) ($item['source'] ?? 'Actualidad'));
         $item['timestamp'] = $timestamp > 0 ? $timestamp : time();
-        if ($image !== null) {
-            $item['image'] = trim($image);
-            $item['images'] = array_values(array_unique(array_filter([
-                trim($image),
-                ...array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []),
-            ])));
+        if ($image !== null || $images !== null) {
+            $normalizedImages = $images !== null
+                ? nammu_actuality_manual_images($images, $baseUrl)
+                : nammu_actuality_manual_images((array) ($item['images'] ?? []), $baseUrl);
+            $primaryImage = $image !== null ? nammu_actuality_manual_image_url(trim($image), $baseUrl) : '';
+            if ($primaryImage !== '') {
+                array_unshift($normalizedImages, $primaryImage);
+            }
+            $normalizedImages = array_values(array_unique(array_filter($normalizedImages)));
+            $item['images'] = $normalizedImages;
+            $item['image'] = $normalizedImages[0] ?? '';
         }
         $item['is_manual'] = true;
         $updated = true;

@@ -50,7 +50,7 @@
                 <button type="button" class="btn btn-outline-primary" data-type-option="Página" aria-pressed="false">Página</button>
                 <button type="button" class="btn btn-outline-primary" data-type-option="Newsletter" aria-pressed="false">Newsletter</button>
                 <button type="button" class="btn btn-outline-primary" data-type-option="Podcast" aria-pressed="false">Podcast</button>
-                <button type="button" class="btn btn-outline-primary" data-type-option="Mensaje" aria-pressed="false">Mensaje</button>
+                <button type="button" class="btn btn-outline-primary" data-type-option="Nota" aria-pressed="false">Nota</button>
             </div>
         </div>
 
@@ -179,7 +179,7 @@
 
         <div class="form-group non-podcast">
 
-            <label for="content_publish" data-message-label="Mensaje" data-default-label="Contenido (Markdown)">Contenido (Markdown)</label>
+            <label for="content_publish" data-message-label="Nota" data-default-label="Contenido (Markdown)">Contenido (Markdown)</label>
             <p class="text-muted small mb-3 message-help d-none">Este mensaje se enviará al <strong>Fediverso</strong> <span class="align-middle d-inline-block social-fediverse-inline-icon"><?= $fediverseIcon ?></span> y aparecerá en <a href="<?= htmlspecialchars($newsFeedUrl, ENT_QUOTES, 'UTF-8') ?>"><code>noticias.xml</code></a> y en <a href="<?= htmlspecialchars($fediverseProfileUrl, ENT_QUOTES, 'UTF-8') ?>">tu página de perfil del Fediverso</a> como una nota tipo post-it.</p>
             <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#content_publish">
                 <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
@@ -365,7 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var isEntry = typeValue === 'Entrada';
         var isPage = typeValue === 'Página';
         var isNewsletter = typeValue === 'Newsletter';
-        var isMessage = typeValue === 'Mensaje';
+        var isMessage = typeValue === 'Nota';
         podcastOnly.forEach(function(el) {
             el.classList.toggle('d-none', !isPodcast);
         });
@@ -406,7 +406,7 @@ document.addEventListener('DOMContentLoaded', function() {
             titleLabel.textContent = isPodcast ? titleLabel.dataset.podcastLabel : titleLabel.dataset.postLabel;
         }
         if (contentLabel) {
-            contentLabel.textContent = isMessage ? (contentLabel.dataset.messageLabel || 'Mensaje') : (contentLabel.dataset.defaultLabel || 'Contenido (Markdown)');
+            contentLabel.textContent = isMessage ? (contentLabel.dataset.messageLabel || 'Nota') : (contentLabel.dataset.defaultLabel || 'Contenido (Markdown)');
         }
         if (descriptionLabel && descriptionLabel.dataset.podcastLabel && descriptionLabel.dataset.postLabel) {
             descriptionLabel.textContent = isPodcast ? descriptionLabel.dataset.podcastLabel : descriptionLabel.dataset.postLabel;

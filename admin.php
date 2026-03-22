@@ -6798,12 +6798,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $type = 'Podcast';
         } elseif ($type === 'Newsletter') {
             $type = 'Newsletter';
-        } elseif ($type === 'Mensaje') {
-            $type = 'Mensaje';
+        } elseif ($type === 'Nota') {
+            $type = 'Nota';
         } else {
             $type = 'Entrada';
         }
-        if ($type === 'Mensaje') {
+        if ($type === 'Nota') {
             require_once __DIR__ . '/core/admin-redes.php';
             $messageText = trim((string) ($_POST['content'] ?? ''));
             $messageImages = trim((string) ($_POST['social_broadcast_image'] ?? ''));
@@ -8270,6 +8270,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $noteId = preg_replace('/[^a-f0-9]/i', '', (string) ($_POST['note_id'] ?? '')) ?? '';
         $noteText = trim((string) ($_POST['note_text'] ?? ''));
+        $noteImagesRaw = trim((string) ($_POST['note_images'] ?? ''));
+        $noteImages = array_values(array_filter(array_map('trim', preg_split('/\R+/', $noteImagesRaw) ?: [])));
         if ($noteId === '') {
             $_SESSION['notes_feedback'] = ['type' => 'danger', 'message' => 'No se pudo identificar la nota.'];
             header('Location: admin.php?page=edit&template=notes');
@@ -8288,7 +8290,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($baseUrl === '') {
             $baseUrl = nammu_base_url();
         }
-        if (!function_exists('nammu_actuality_update_manual_item') || !nammu_actuality_update_manual_item($noteId, $noteText, $baseUrl, $siteTitle)) {
+        if (!function_exists('nammu_actuality_update_manual_item') || !nammu_actuality_update_manual_item($noteId, $noteText, $baseUrl, $siteTitle, $noteImages[0] ?? '', $noteImages)) {
             $_SESSION['notes_feedback'] = ['type' => 'danger', 'message' => 'No se pudo actualizar la nota.'];
             header('Location: admin.php?page=edit-note&id=' . urlencode($noteId));
             exit;

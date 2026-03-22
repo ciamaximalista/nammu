@@ -984,6 +984,8 @@ unset($_SESSION['newsletter_custom_recipients']);
                     $noteRawText = trim($noteRawText . "\n\n" . implode("\n", array_map('strval', $links)));
                 }
             }
+            $noteImages = is_array($noteData['images'] ?? null) ? $noteData['images'] : [];
+            $noteImagesValue = implode("\n", array_map('strval', $noteImages));
             $noteTs = (int) ($noteData['timestamp'] ?? 0);
             ?>
             <h2>Editar Nota</h2>
@@ -994,6 +996,16 @@ unset($_SESSION['newsletter_custom_recipients']);
                     <label for="note_text">Texto de la nota</label>
                     <textarea name="note_text" id="note_text" class="form-control" rows="12" required><?= htmlspecialchars($noteRawText, ENT_QUOTES, 'UTF-8') ?></textarea>
                     <small class="form-text text-muted">Puedes incluir uno o varios enlaces dentro del texto. Nammu los pondrá al final del post-it como “Enlace”.</small>
+                </div>
+                <div class="form-group">
+                    <label for="note_images">Imágenes</label>
+                    <div class="input-group">
+                        <textarea name="note_images" id="note_images" class="form-control" rows="4" readonly><?= htmlspecialchars($noteImagesValue, ENT_QUOTES, 'UTF-8') ?></textarea>
+                        <div class="input-group-append">
+                            <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="note_images" data-target-prefix="" data-target-multi="1" data-target-max-items="4">Añadir imagen</button>
+                        </div>
+                    </div>
+                    <small class="form-text text-muted">Puedes añadir o quitar imágenes dejando una URL por línea.</small>
                 </div>
                 <button type="submit" name="update_actuality_note" class="btn btn-primary">Actualizar</button>
                 <a href="?page=edit&template=notes" class="btn btn-outline-secondary ml-2">Volver</a>

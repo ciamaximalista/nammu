@@ -6798,8 +6798,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $type = 'Podcast';
         } elseif ($type === 'Newsletter') {
             $type = 'Newsletter';
+        } elseif ($type === 'Mensaje') {
+            $type = 'Mensaje';
         } else {
             $type = 'Entrada';
+        }
+        if ($type === 'Mensaje') {
+            require_once __DIR__ . '/core/admin-redes.php';
+            $messageText = trim((string) ($_POST['content'] ?? ''));
+            $messageImages = trim((string) ($_POST['social_broadcast_image'] ?? ''));
+            $socialBroadcastState = admin_handle_social_broadcast_submission(get_settings(), $messageText, $messageImages);
+            $_SESSION['social_broadcast_feedback'] = $socialBroadcastState['feedback'] ?? null;
+            $_SESSION['social_broadcast_state'] = [
+                'message_text' => (($socialBroadcastState['feedback']['type'] ?? '') === 'success') ? '' : (string) ($socialBroadcastState['message_text'] ?? $messageText),
+                'image' => (($socialBroadcastState['feedback']['type'] ?? '') === 'success') ? '' : (string) ($socialBroadcastState['image'] ?? $messageImages),
+                'actuality' => !empty($socialBroadcastState['actuality']),
+                'networks' => is_array($socialBroadcastState['networks'] ?? null) ? $socialBroadcastState['networks'] : [],
+            ];
+            header('Location: admin.php?page=publish');
+            exit;
         }
         $pageVisibility = ($type === 'Página' && $pageVisibilityInput === 'private') ? 'private' : 'public';
         $filenameInput = trim($_POST['filename'] ?? '');
@@ -10236,6 +10253,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 $isLoggedIn = is_logged_in();
 if ($isLoggedIn) {
     $page = $_GET['page'] ?? 'dashboard';
+    if ($page === 'redes') {
+        header('Location: admin.php?page=publish');
+        exit;
+    }
 } else {
     $page = $user_exists ? 'login' : 'register';
 }
@@ -10267,14 +10288,20 @@ if (!empty($_SESSION['fediverse_state']) && is_array($_SESSION['fediverse_state'
     $fediverseMessageRecipient = (string) ($fediverseRedirectState['message_recipient'] ?? $fediverseMessageRecipient);
     $fediverseMessageText = (string) ($fediverseRedirectState['message_text'] ?? $fediverseMessageText);
 }
-if ($isLoggedIn && $page === 'redes') {
+if ($isLoggedIn && $page === 'publish') {
     require_once __DIR__ . '/core/admin-redes.php';
-    $socialBroadcastState = admin_handle_social_broadcast_request(get_settings());
-    $socialBroadcastFeedback = $socialBroadcastState['feedback'] ?? null;
-    $socialBroadcastText = (string) ($socialBroadcastState['message_text'] ?? '');
-    $socialBroadcastImage = (string) ($socialBroadcastState['image'] ?? '');
-    $socialBroadcastActuality = !empty($socialBroadcastState['actuality']);
-    $socialBroadcastNetworks = is_array($socialBroadcastState['networks'] ?? null) ? $socialBroadcastState['networks'] : [];
+    if (!empty($_SESSION['social_broadcast_feedback'])) {
+        $socialBroadcastFeedback = is_array($_SESSION['social_broadcast_feedback']) ? $_SESSION['social_broadcast_feedback'] : null;
+        unset($_SESSION['social_broadcast_feedback']);
+    }
+    if (!empty($_SESSION['social_broadcast_state']) && is_array($_SESSION['social_broadcast_state'])) {
+        $socialBroadcastState = $_SESSION['social_broadcast_state'];
+        unset($_SESSION['social_broadcast_state']);
+        $socialBroadcastText = (string) ($socialBroadcastState['message_text'] ?? '');
+        $socialBroadcastImage = (string) ($socialBroadcastState['image'] ?? '');
+        $socialBroadcastActuality = !empty($socialBroadcastState['actuality']);
+        $socialBroadcastNetworks = is_array($socialBroadcastState['networks'] ?? null) ? $socialBroadcastState['networks'] : [];
+    }
 }
 if ($isLoggedIn && $page === 'fediverso') {
     require_once __DIR__ . '/core/fediverso.php';
@@ -12606,17 +12633,6 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                                     </a>
                                 </li>
 
-                                <li class="nav-item <?= $page === 'redes' ? 'active' : '' ?>">
-                                    <a class="nav-link" href="?page=redes" title="Redes" aria-label="Redes">
-                                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-                                            <circle cx="6" cy="12" r="2" fill="currentColor"/>
-                                            <circle cx="18" cy="6" r="2" fill="currentColor"/>
-                                            <circle cx="18" cy="18" r="2" fill="currentColor"/>
-                                            <path d="M7.8 11.1l8.4-4.2M7.8 12.9l8.4 4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                        </svg>
-                                    </a>
-                                </li>
-
                                 <li class="nav-item <?= $page === 'fediverso' ? 'active' : '' ?>">
                                     <a class="nav-link" href="?page=fediverso" title="Fediverso" aria-label="Fediverso">
                                         <svg width="44" height="44" viewBox="0 0 200 190" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -12716,10 +12732,6 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 <?php elseif ($page === 'anuncios'): ?>
 
     <?php include __DIR__ . '/core/admin-page-anuncios.php'; ?>
-
-<?php elseif ($page === 'redes'): ?>
-
-    <?php include __DIR__ . '/core/admin-page-redes.php'; ?>
 
 <?php elseif ($page === 'fediverso'): ?>
 

@@ -6,6 +6,9 @@
     <?php if (!empty($error)): ?>
         <div class="alert alert-danger"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
     <?php endif; ?>
+    <?php if (!empty($socialBroadcastFeedback)): ?>
+        <div class="alert alert-<?= htmlspecialchars($socialBroadcastFeedback['type'] ?? 'info', ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($socialBroadcastFeedback['message'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
+    <?php endif; ?>
 
     <?php
     $mailingNewsletterEnabled = isset($settings['mailing'])
@@ -22,11 +25,16 @@
         'pt' => 'Português',
         'de' => 'Deutsch',
     ];
+    $baseUrl = function_exists('nammu_base_url') ? rtrim((string) nammu_base_url(), '/') : '';
+    $fediverseProfileUrl = function_exists('nammu_fediverse_profile_page_url') ? nammu_fediverse_profile_page_url($settings) : ($baseUrl . '/actualidad.php');
+    $newsFeedUrl = ($baseUrl !== '' ? $baseUrl : '') . '/noticias.xml';
+    $fediverseIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';
+    $socialBroadcastMaxImages = function_exists('admin_social_broadcast_max_images') ? (int) admin_social_broadcast_max_images() : 4;
     ?>
 
     <form method="post">
 
-        <div class="form-group">
+        <div class="form-group title-group">
 
             <label for="title" data-podcast-label="Título del episodio" data-post-label="Título">Título</label>
 
@@ -42,6 +50,7 @@
                 <button type="button" class="btn btn-outline-primary" data-type-option="Página" aria-pressed="false">Página</button>
                 <button type="button" class="btn btn-outline-primary" data-type-option="Newsletter" aria-pressed="false">Newsletter</button>
                 <button type="button" class="btn btn-outline-primary" data-type-option="Podcast" aria-pressed="false">Podcast</button>
+                <button type="button" class="btn btn-outline-primary" data-type-option="Mensaje" aria-pressed="false">Mensaje</button>
             </div>
         </div>
 
@@ -93,7 +102,7 @@
             </select>
         </div>
 
-        <div class="form-group">
+        <div class="form-group date-group">
 
             <label for="date">Fecha</label>
 
@@ -101,7 +110,7 @@
 
         </div>
 
-        <div class="form-group">
+        <div class="form-group lang-group">
             <label for="lang">Lengua de la entrada</label>
             <select name="lang" id="lang" class="form-control">
                 <?php foreach ($languageOptions as $code => $label): ?>
@@ -112,7 +121,7 @@
             </select>
         </div>
 
-        <div class="form-group">
+        <div class="form-group schedule-group">
             <label>Programar publicación (borradores)</label>
             <div class="form-row">
                 <div class="col-md-6">
@@ -125,7 +134,7 @@
             <small class="form-text text-muted">Si guardas como borrador, se publicará automáticamente en esa fecha y hora.</small>
         </div>
 
-        <div class="form-group">
+        <div class="form-group image-group">
 
             <label for="image" data-podcast-label="Imagen asociada al episodio" data-post-label="Imagen">Imagen</label>
 
@@ -141,6 +150,17 @@
 
             </div>
 
+        </div>
+
+        <div class="form-group message-images-group d-none">
+            <label for="social_broadcast_image">Imágenes opcionales</label>
+            <div class="input-group">
+                <textarea name="social_broadcast_image" id="social_broadcast_image" class="form-control" rows="4" readonly><?= htmlspecialchars($socialBroadcastImage ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="social_broadcast_image" data-target-prefix="" data-target-multi="1" data-target-max-items="<?= $socialBroadcastMaxImages ?>">Añadir imagen</button>
+                </div>
+            </div>
+            <small class="form-text text-muted">Puedes añadir hasta <?= $socialBroadcastMaxImages ?> imágenes, una por línea. X y Bluesky usarán varias; en las demás redes Nammu usará la primera cuando haga falta.</small>
         </div>
 
         <div class="form-group description-group">
@@ -159,7 +179,8 @@
 
         <div class="form-group non-podcast">
 
-            <label for="content_publish">Contenido (Markdown)</label>
+            <label for="content_publish" data-message-label="Mensaje" data-default-label="Contenido (Markdown)">Contenido (Markdown)</label>
+            <p class="text-muted small mb-3 message-help d-none">Este mensaje se enviará al <strong>Fediverso</strong> <span class="align-middle d-inline-block social-fediverse-inline-icon"><?= $fediverseIcon ?></span> y aparecerá en <a href="<?= htmlspecialchars($newsFeedUrl, ENT_QUOTES, 'UTF-8') ?>"><code>noticias.xml</code></a> y en <a href="<?= htmlspecialchars($fediverseProfileUrl, ENT_QUOTES, 'UTF-8') ?>">tu página de perfil del Fediverso</a> como una nota tipo post-it.</p>
             <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#content_publish">
                 <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
                     <button type="button" class="btn btn-outline-secondary" data-md-action="bold" title="Negrita" aria-label="Negrita"><strong>B</strong></button>
@@ -196,14 +217,14 @@
                 </div>
             </div>
 
-            <textarea name="content" id="content_publish" class="form-control" rows="15" data-markdown-editor="1"></textarea>
+            <textarea name="content" id="content_publish" class="form-control" rows="15" data-markdown-editor="1"><?= htmlspecialchars($socialBroadcastText ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
 
             <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#content_publish">Insertar recurso</button>
             <small class="form-text text-muted mt-1">Inserta en la entrada imágenes, vídeos o archivos PDF.</small>
 
         </div>
 
-        <div class="form-group">
+        <div class="form-group slug-group">
 
             <label for="filename" data-podcast-label="Slug" data-post-label="Slug del post (nombre de archivo sin .md)">Slug del post (nombre de archivo sin .md)</label>
 
@@ -224,9 +245,9 @@
 
         <div class="mt-3">
             <div class="alert alert-warning d-none" data-publish-cancelled>Los cambios no se han guardado.</div>
-            <button type="submit" name="publish" class="btn btn-primary mr-2" data-confirm-publish="1" data-podcast-label="Emitir" data-post-label="Publicar" data-publish-button="1">Publicar</button>
-            <button type="submit" name="save_draft" value="1" class="btn btn-outline-secondary" data-confirm-publish="1">Guardar como borrador</button>
-            <button type="submit" name="publish_and_view" value="1" class="btn btn-outline-primary ml-2" data-confirm-publish="1">Ver en la web</button>
+            <button type="submit" name="publish" class="btn btn-primary mr-2" data-confirm-publish="1" data-podcast-label="Emitir" data-post-label="Publicar" data-message-label="Enviar" data-publish-button="1">Publicar</button>
+            <button type="submit" name="save_draft" value="1" class="btn btn-outline-secondary" data-confirm-publish="1" data-draft-button="1">Guardar como borrador</button>
+            <button type="submit" name="publish_and_view" value="1" class="btn btn-outline-primary ml-2" data-confirm-publish="1" data-view-button="1">Ver en la web</button>
             <?php if ($mailingNewsletterEnabled): ?>
                 <button type="submit" name="send_newsletter" value="1" class="btn btn-primary mr-2 d-none" data-confirm-publish="1" data-newsletter-button="1">Enviar</button>
             <?php endif; ?>
@@ -248,16 +269,28 @@ document.addEventListener('DOMContentLoaded', function() {
     var entryOnly = document.querySelectorAll('.entry-only');
     var pageOnly = document.querySelectorAll('.page-only');
     var entryPodcastOnly = document.querySelectorAll('.entry-podcast-only');
+    var titleGroup = document.querySelector('.title-group');
+    var dateGroup = document.querySelector('.date-group');
+    var langGroup = document.querySelector('.lang-group');
+    var scheduleGroup = document.querySelector('.schedule-group');
+    var imageGroup = document.querySelector('.image-group');
+    var messageImagesGroup = document.querySelector('.message-images-group');
+    var slugGroup = document.querySelector('.slug-group');
     var titleLabel = document.querySelector('label[for="title"]');
     var descriptionLabel = document.querySelector('label[for="description"]');
     var descriptionGroup = document.querySelector('.description-group');
+    var messageHelp = document.querySelector('.message-help');
     var imageLabel = document.querySelector('label[for="image"]');
     var slugLabel = document.querySelector('label[for="filename"]');
     var publishButton = document.querySelector('[data-publish-button]');
+    var draftButton = document.querySelector('[data-draft-button="1"]');
+    var viewButton = document.querySelector('[data-view-button="1"]');
     var audioInput = document.getElementById('audio');
     var durationInput = document.getElementById('audio_duration');
     var lengthInput = document.getElementById('audio_length');
     var newsletterButton = document.querySelector('[data-newsletter-button="1"]');
+    var contentLabel = document.querySelector('label[for="content_publish"]');
+    var titleInput = document.getElementById('title');
 
     function formatDuration(seconds) {
         if (!Number.isFinite(seconds) || seconds <= 0) {
@@ -332,6 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var isEntry = typeValue === 'Entrada';
         var isPage = typeValue === 'Página';
         var isNewsletter = typeValue === 'Newsletter';
+        var isMessage = typeValue === 'Mensaje';
         podcastOnly.forEach(function(el) {
             el.classList.toggle('d-none', !isPodcast);
         });
@@ -347,14 +381,41 @@ document.addEventListener('DOMContentLoaded', function() {
         entryPodcastOnly.forEach(function(el) {
             el.classList.toggle('d-none', !(isEntry || isPodcast));
         });
+        if (titleGroup) {
+            titleGroup.classList.toggle('d-none', isMessage);
+        }
+        if (dateGroup) {
+            dateGroup.classList.toggle('d-none', isMessage);
+        }
+        if (langGroup) {
+            langGroup.classList.toggle('d-none', isMessage);
+        }
+        if (scheduleGroup) {
+            scheduleGroup.classList.toggle('d-none', isMessage);
+        }
+        if (imageGroup) {
+            imageGroup.classList.toggle('d-none', isMessage);
+        }
+        if (messageImagesGroup) {
+            messageImagesGroup.classList.toggle('d-none', !isMessage);
+        }
+        if (slugGroup) {
+            slugGroup.classList.toggle('d-none', isMessage);
+        }
         if (titleLabel && titleLabel.dataset.podcastLabel && titleLabel.dataset.postLabel) {
             titleLabel.textContent = isPodcast ? titleLabel.dataset.podcastLabel : titleLabel.dataset.postLabel;
+        }
+        if (contentLabel) {
+            contentLabel.textContent = isMessage ? (contentLabel.dataset.messageLabel || 'Mensaje') : (contentLabel.dataset.defaultLabel || 'Contenido (Markdown)');
         }
         if (descriptionLabel && descriptionLabel.dataset.podcastLabel && descriptionLabel.dataset.postLabel) {
             descriptionLabel.textContent = isPodcast ? descriptionLabel.dataset.podcastLabel : descriptionLabel.dataset.postLabel;
         }
         if (descriptionGroup) {
-            descriptionGroup.classList.toggle('d-none', isNewsletter);
+            descriptionGroup.classList.toggle('d-none', isNewsletter || isMessage);
+        }
+        if (messageHelp) {
+            messageHelp.classList.toggle('d-none', !isMessage);
         }
         if (imageLabel && imageLabel.dataset.podcastLabel && imageLabel.dataset.postLabel) {
             imageLabel.textContent = isPodcast ? imageLabel.dataset.podcastLabel : imageLabel.dataset.postLabel;
@@ -362,14 +423,23 @@ document.addEventListener('DOMContentLoaded', function() {
         if (slugLabel && slugLabel.dataset.podcastLabel && slugLabel.dataset.postLabel) {
             slugLabel.textContent = isPodcast ? slugLabel.dataset.podcastLabel : slugLabel.dataset.postLabel;
         }
-        if (publishButton && publishButton.dataset.podcastLabel && publishButton.dataset.postLabel) {
-            publishButton.textContent = isPodcast ? publishButton.dataset.podcastLabel : publishButton.dataset.postLabel;
+        if (publishButton && publishButton.dataset.podcastLabel && publishButton.dataset.postLabel && publishButton.dataset.messageLabel) {
+            publishButton.textContent = isMessage ? publishButton.dataset.messageLabel : (isPodcast ? publishButton.dataset.podcastLabel : publishButton.dataset.postLabel);
         }
         if (publishButton) {
             publishButton.classList.toggle('d-none', isNewsletter);
         }
+        if (draftButton) {
+            draftButton.classList.toggle('d-none', isMessage);
+        }
+        if (viewButton) {
+            viewButton.classList.toggle('d-none', isMessage);
+        }
         if (newsletterButton) {
             newsletterButton.classList.toggle('d-none', !isNewsletter);
+        }
+        if (titleInput) {
+            titleInput.required = !isMessage;
         }
         if (audioInput) {
             audioInput.required = isPodcast;

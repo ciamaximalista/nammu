@@ -1447,12 +1447,23 @@ function admin_handle_social_broadcast_request(array $settings): array
 
     $text = trim((string) ($_POST['social_broadcast_text'] ?? ''));
     $image = trim((string) ($_POST['social_broadcast_image'] ?? ''));
+    return admin_handle_social_broadcast_submission($settings, $text, $image);
+}
+
+function admin_handle_social_broadcast_submission(array $settings, string $text, string $image = ''): array
+{
+    $result = [
+        'feedback' => null,
+        'message_text' => trim($text),
+        'image' => trim($image),
+        'actuality' => false,
+        'networks' => [],
+    ];
+
     $imageItems = admin_social_broadcast_parse_images($image);
     $primaryImage = $imageItems[0] ?? '';
     $sendToActuality = true;
     $available = admin_social_broadcast_available_networks($settings);
-    $result['message_text'] = $text;
-    $result['image'] = $image;
     $result['actuality'] = $sendToActuality;
     $result['networks'] = array_keys($available);
 

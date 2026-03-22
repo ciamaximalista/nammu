@@ -47,6 +47,11 @@ function nammu_fediverse_deleted_file(): string
     return dirname(__DIR__) . '/config/fediverso-deleted.json';
 }
 
+function nammu_fediverse_delete_queue_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-delete-queue.json';
+}
+
 function nammu_fediverse_threads_cache_file(): string
 {
     return dirname(__DIR__) . '/config/fediverso-threads-cache.json';
@@ -819,6 +824,28 @@ function nammu_fediverse_deleted_store(): array
     return ['ids' => $ids];
 }
 
+function nammu_fediverse_delete_queue_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_delete_queue_file(), ['items' => []]);
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    $normalized = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $itemId = trim((string) ($item['item_id'] ?? ''));
+        if ($itemId === '') {
+            continue;
+        }
+        $normalized[] = [
+            'item_id' => $itemId,
+            'created_at' => trim((string) ($item['created_at'] ?? '')) ?: gmdate(DATE_ATOM),
+            'attempts' => (int) ($item['attempts'] ?? 0),
+        ];
+    }
+    return ['items' => $normalized];
+}
+
 function nammu_fediverse_threads_cache_store(): array
 {
     $store = nammu_fediverse_load_json_store(nammu_fediverse_threads_cache_file(), ['items' => []]);
@@ -857,6 +884,11 @@ function nammu_fediverse_save_deleted_store(array $ids): void
         return trim($value) !== '';
     })));
     nammu_fediverse_save_json_store(nammu_fediverse_deleted_file(), ['ids' => $normalized]);
+}
+
+function nammu_fediverse_save_delete_queue_store(array $items): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_delete_queue_file(), ['items' => array_values($items)]);
 }
 
 function nammu_fediverse_save_actions_store(array $items): void
@@ -6343,6 +6375,15 @@ function nammu_fediverse_public_thread_meta_for_actuality_item(array $actualityI
 
 function nammu_fediverse_delete_local_item(string $itemId, array $config): array
 {
+    $mark = nammu_fediverse_mark_local_item_deleted($itemId, $config);
+    if (empty($mark['ok'])) {
+        return $mark;
+    }
+    return nammu_fediverse_deliver_delete_activity($itemId, $config);
+}
+
+function nammu_fediverse_mark_local_item_deleted(string $itemId, array $config): array
+{
     $itemId = trim($itemId);
     if ($itemId === '') {
         return ['ok' => false, 'message' => 'No se recibió la publicación a borrar del Fediverso.'];
@@ -6358,11 +6399,17 @@ function nammu_fediverse_delete_local_item(string $itemId, array $config): array
         return ['ok' => false, 'message' => 'No se encontró esa publicación local en el Fediverso.'];
     }
     $deletedIds = nammu_fediverse_deleted_store()['ids'];
-    $deletedIds[] = $itemId;
-    nammu_fediverse_save_deleted_store($deletedIds);
+    if (!in_array($itemId, $deletedIds, true)) {
+        $deletedIds[] = $itemId;
+        nammu_fediverse_save_deleted_store($deletedIds);
+    }
+    return ['ok' => true, 'message' => 'Publicación marcada para borrado en el Fediverso.'];
+}
 
+function nammu_fediverse_build_delete_activity(string $itemId, array $config): array
+{
     $actorUrl = nammu_fediverse_actor_url($config);
-    $deleteActivity = [
+    return [
         '@context' => 'https://www.w3.org/ns/activitystreams',
         'id' => $actorUrl . '/delete/' . substr(sha1($itemId . '|' . microtime(true)), 0, 24),
         'type' => 'Delete',
@@ -6371,6 +6418,15 @@ function nammu_fediverse_delete_local_item(string $itemId, array $config): array
         'object' => $itemId,
         'published' => gmdate(DATE_ATOM),
     ];
+}
+
+function nammu_fediverse_deliver_delete_activity(string $itemId, array $config): array
+{
+    $itemId = trim($itemId);
+    if ($itemId === '') {
+        return ['ok' => false, 'delivered' => 0, 'message' => 'No se recibió la publicación a borrar del Fediverso.'];
+    }
+    $deleteActivity = nammu_fediverse_build_delete_activity($itemId, $config);
     $followers = nammu_fediverse_followers_store()['followers'];
     $delivered = 0;
     foreach ($followers as $follower) {
@@ -6382,5 +6438,71 @@ function nammu_fediverse_delete_local_item(string $itemId, array $config): array
             $delivered++;
         }
     }
-    return ['ok' => true, 'message' => 'Publicación retirada del Fediverso. Entregas de borrado: ' . $delivered . '.'];
+    return ['ok' => true, 'delivered' => $delivered, 'message' => 'Publicación retirada del Fediverso. Entregas de borrado: ' . $delivered . '.'];
+}
+
+function nammu_fediverse_enqueue_delete_local_item(string $itemId, array $config): array
+{
+    $mark = nammu_fediverse_mark_local_item_deleted($itemId, $config);
+    if (empty($mark['ok'])) {
+        return $mark;
+    }
+    $queue = nammu_fediverse_delete_queue_store();
+    $items = is_array($queue['items'] ?? null) ? $queue['items'] : [];
+    foreach ($items as $queued) {
+        if (trim((string) ($queued['item_id'] ?? '')) === $itemId) {
+            return ['ok' => true, 'queued' => count($items), 'message' => 'Publicación borrada localmente y ya en cola de borrado federado.'];
+        }
+    }
+    $items[] = [
+        'item_id' => $itemId,
+        'created_at' => gmdate(DATE_ATOM),
+        'attempts' => 0,
+    ];
+    nammu_fediverse_save_delete_queue_store($items);
+    return ['ok' => true, 'queued' => count($items), 'message' => 'Publicación borrada localmente y encolada para borrado federado.'];
+}
+
+function nammu_fediverse_process_delete_queue(array $config, int $maxJobs = 3): array
+{
+    $queue = nammu_fediverse_delete_queue_store();
+    $items = is_array($queue['items'] ?? null) ? array_values($queue['items']) : [];
+    if ($maxJobs < 1) {
+        $maxJobs = 1;
+    }
+    $processed = 0;
+    $sent = 0;
+    $failed = 0;
+    $remaining = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $itemId = trim((string) ($item['item_id'] ?? ''));
+        if ($itemId === '') {
+            continue;
+        }
+        if ($processed >= $maxJobs) {
+            $remaining[] = $item;
+            continue;
+        }
+        $processed++;
+        $result = nammu_fediverse_deliver_delete_activity($itemId, $config);
+        if (!empty($result['ok'])) {
+            $sent++;
+            continue;
+        }
+        $item['attempts'] = (int) ($item['attempts'] ?? 0) + 1;
+        $failed++;
+        if ((int) $item['attempts'] < 5) {
+            $remaining[] = $item;
+        }
+    }
+    nammu_fediverse_save_delete_queue_store($remaining);
+    return [
+        'processed' => $processed,
+        'sent' => $sent,
+        'failed' => $failed,
+        'remaining' => count($remaining),
+    ];
 }

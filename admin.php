@@ -62,6 +62,7 @@ function admin_run_scheduled_tasks(): array {
     $rssStats = ['sent' => 0, 'checked' => 0];
     $rssPublished = false;
     $socialBroadcastQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
+    $fediverseDeleteQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $fediverseStats = ['checked' => 0, 'new' => 0, 'followers' => 0, 'delivered' => 0];
     if (function_exists('nammu_publish_scheduled_posts')) {
         $published = (int) nammu_publish_scheduled_posts(CONTENT_DIR);
@@ -100,6 +101,9 @@ function admin_run_scheduled_tasks(): array {
     }
     if (function_exists('nammu_fediverse_refresh_following')) {
         $fediverseStats = nammu_fediverse_refresh_following();
+        if (function_exists('nammu_fediverse_process_delete_queue')) {
+            $fediverseDeleteQueueStats = nammu_fediverse_process_delete_queue($config, 2);
+        }
         if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
             $acceptStats = nammu_fediverse_retry_pending_follower_accepts($config);
             $fediverseStats['follow_accepts_checked'] = (int) ($acceptStats['checked'] ?? 0);
@@ -154,6 +158,10 @@ function admin_run_scheduled_tasks(): array {
         'fediverse_follow_accepts_checked' => (int) ($fediverseStats['follow_accepts_checked'] ?? 0),
         'fediverse_follow_accepts_sent' => (int) ($fediverseStats['follow_accepts_sent'] ?? 0),
         'fediverse_follow_accepts_failed' => (int) ($fediverseStats['follow_accepts_failed'] ?? 0),
+        'fediverse_delete_queue_processed' => (int) ($fediverseDeleteQueueStats['processed'] ?? 0),
+        'fediverse_delete_queue_sent' => (int) ($fediverseDeleteQueueStats['sent'] ?? 0),
+        'fediverse_delete_queue_failed' => (int) ($fediverseDeleteQueueStats['failed'] ?? 0),
+        'fediverse_delete_queue_remaining' => (int) ($fediverseDeleteQueueStats['remaining'] ?? 0),
     ];
 }
 
@@ -8409,7 +8417,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!function_exists('nammu_actuality_delete_news_item') && is_file(__DIR__ . '/core/actualidad.php')) {
             require_once __DIR__ . '/core/actualidad.php';
         }
-        if (!function_exists('nammu_fediverse_delete_local_item') && is_file(__DIR__ . '/core/fediverso.php')) {
+        if (!function_exists('nammu_fediverse_enqueue_delete_local_item') && is_file(__DIR__ . '/core/fediverso.php')) {
             require_once __DIR__ . '/core/fediverso.php';
         }
         $newsId = preg_replace('/[^a-f0-9]/i', '', (string) ($_POST['delete_news_id'] ?? '')) ?? '';
@@ -8427,9 +8435,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $baseUrl = nammu_base_url();
         }
         $deleteMessages = [];
-        if (function_exists('nammu_fediverse_delete_local_item')) {
+        if (function_exists('nammu_fediverse_enqueue_delete_local_item')) {
             $fediverseItemId = rtrim($baseUrl, '/') . '/ap/objects/actualidad-' . rawurlencode($newsId);
-            $fediverseDelete = nammu_fediverse_delete_local_item($fediverseItemId, $config);
+            $fediverseDelete = nammu_fediverse_enqueue_delete_local_item($fediverseItemId, $config);
             if (!empty($fediverseDelete['message'])) {
                 $deleteMessages[] = trim((string) $fediverseDelete['message']);
             }

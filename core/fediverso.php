@@ -3184,6 +3184,7 @@ function nammu_fediverse_local_reaction_summary(array $config): array
     $hiddenLookup = nammu_fediverse_hidden_reply_lookup();
     $summary = [];
     $seenActors = [];
+    $seenReplies = [];
     foreach ($activities as $entry) {
         $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
         $type = strtolower(trim((string) ($payload['type'] ?? '')));
@@ -3240,7 +3241,29 @@ function nammu_fediverse_local_reaction_summary(array $config): array
                 $summary[$localId]['shares']++;
             }
         } elseif ($type === 'create') {
-            $summary[$localId]['replies']++;
+            $replyKeys = array_filter([
+                trim((string) ($replyEntry['id'] ?? '')) !== '' ? 'id:' . trim((string) $replyEntry['id']) : '',
+                trim((string) ($replyEntry['url'] ?? '')) !== '' ? 'id:' . trim((string) $replyEntry['url']) : '',
+            ]);
+            $replyFallback = strtolower(trim((string) ($replyEntry['actor_id'] ?? ''))) . '|' .
+                trim((string) ($replyEntry['published'] ?? '')) . '|' .
+                trim((string) ($replyEntry['reply_text'] ?? ''));
+            if ($replyFallback !== '||') {
+                $replyKeys[] = 'fallback:' . $replyFallback;
+            }
+            $alreadySeenReply = false;
+            foreach ($replyKeys as $replyKey) {
+                if (isset($seenReplies[$localId][$replyKey])) {
+                    $alreadySeenReply = true;
+                    break;
+                }
+            }
+            if (!$alreadySeenReply) {
+                foreach ($replyKeys as $replyKey) {
+                    $seenReplies[$localId][$replyKey] = true;
+                }
+                $summary[$localId]['replies']++;
+            }
         }
     }
     foreach (nammu_fediverse_timeline_entries_targeting_local_items($config) as $timelineEntry) {
@@ -3277,6 +3300,29 @@ function nammu_fediverse_local_reaction_summary(array $config): array
         ];
         if ($replyEntry['reply_text'] === '' || nammu_fediverse_is_hidden_reply($replyEntry, $hiddenLookup)) {
             continue;
+        }
+        $replyKeys = array_filter([
+            trim((string) ($replyEntry['id'] ?? '')) !== '' ? 'id:' . trim((string) $replyEntry['id']) : '',
+            trim((string) ($replyEntry['url'] ?? '')) !== '' ? 'id:' . trim((string) $replyEntry['url']) : '',
+        ]);
+        $replyFallback = strtolower(trim((string) ($replyEntry['actor_id'] ?? ''))) . '|' .
+            trim((string) ($replyEntry['published'] ?? '')) . '|' .
+            trim((string) ($replyEntry['reply_text'] ?? ''));
+        if ($replyFallback !== '||') {
+            $replyKeys[] = 'fallback:' . $replyFallback;
+        }
+        $alreadySeenReply = false;
+        foreach ($replyKeys as $replyKey) {
+            if (isset($seenReplies[$localId][$replyKey])) {
+                $alreadySeenReply = true;
+                break;
+            }
+        }
+        if ($alreadySeenReply) {
+            continue;
+        }
+        foreach ($replyKeys as $replyKey) {
+            $seenReplies[$localId][$replyKey] = true;
         }
         $summary[$localId]['replies']++;
     }

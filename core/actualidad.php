@@ -22,6 +22,16 @@ function nammu_actuality_news_overrides_file(): string
     return dirname(__DIR__) . '/config/actualidad-news-overrides.json';
 }
 
+function nammu_actuality_news_store_file(): string
+{
+    return dirname(__DIR__) . '/config/actualidad-news-store.json';
+}
+
+function nammu_actuality_social_rss_state_file(): string
+{
+    return dirname(__DIR__) . '/config/social-rss-state.json';
+}
+
 function nammu_actuality_cache_dir(): string
 {
     return dirname(__DIR__) . '/assets/actualidad-cache';
@@ -152,6 +162,75 @@ function nammu_actuality_save_news_overrides(array $items): void
     @chmod($file, 0664);
 }
 
+function nammu_actuality_load_news_store(): array
+{
+    $file = nammu_actuality_news_store_file();
+    if (!is_file($file)) {
+        return ['items' => []];
+    }
+    $raw = @file_get_contents($file);
+    if (!is_string($raw) || $raw === '') {
+        return ['items' => []];
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return ['items' => []];
+    }
+    $decoded['items'] = is_array($decoded['items'] ?? null) ? $decoded['items'] : [];
+    return $decoded;
+}
+
+function nammu_actuality_save_news_store(array $items): void
+{
+    $file = nammu_actuality_news_store_file();
+    $dir = dirname($file);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $payload = [
+        'updated_at' => time(),
+        'items' => array_values($items),
+    ];
+    @file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    @chmod($file, 0664);
+}
+
+function nammu_actuality_load_social_rss_state(): array
+{
+    $file = nammu_actuality_social_rss_state_file();
+    if (!is_file($file)) {
+        return ['feeds' => []];
+    }
+    $raw = @file_get_contents($file);
+    if (!is_string($raw) || $raw === '') {
+        return ['feeds' => []];
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return ['feeds' => []];
+    }
+    $decoded['feeds'] = is_array($decoded['feeds'] ?? null) ? $decoded['feeds'] : [];
+    return $decoded;
+}
+
+function nammu_actuality_social_rss_seen_by_url(): array
+{
+    $state = nammu_actuality_load_social_rss_state();
+    $feeds = [];
+    foreach ((array) ($state['feeds'] ?? []) as $feedState) {
+        if (!is_array($feedState)) {
+            continue;
+        }
+        $url = trim((string) ($feedState['url'] ?? ''));
+        if ($url === '') {
+            continue;
+        }
+        $seen = is_array($feedState['seen'] ?? null) ? $feedState['seen'] : [];
+        $feeds[$url] = $seen;
+    }
+    return $feeds;
+}
+
 function nammu_actuality_news_item_id(array $item): string
 {
     $base = trim((string) ($item['feed_item_key'] ?? ''));
@@ -169,9 +248,9 @@ function nammu_actuality_news_item_id(array $item): string
 
 function nammu_actuality_list_news_items(): array
 {
-    $snapshot = nammu_actuality_load_items_snapshot();
+    $newsStore = nammu_actuality_load_news_store();
     $items = [];
-    foreach ((array) ($snapshot['items'] ?? []) as $item) {
+    foreach ((array) ($newsStore['items'] ?? []) as $item) {
         if (!is_array($item)) {
             continue;
         }
@@ -1392,23 +1471,26 @@ function nammu_actuality_page_items(array $config, string $contentDir, string $i
 function nammu_actuality_collect_items(array $config, string $publicBaseUrl): array
 {
     $feeds = nammu_actuality_feed_urls($config);
+    $configuredFeeds = array_fill_keys($feeds, true);
+    $seenRssByUrl = nammu_actuality_social_rss_seen_by_url();
+    $feeds = array_values(array_unique(array_merge($feeds, array_keys($seenRssByUrl))));
     $items = [];
     $seen = [];
     $seenNewsIds = [];
     $persistedNewsById = [];
-    $snapshot = nammu_actuality_load_items_snapshot();
-    foreach ((array) ($snapshot['items'] ?? []) as $snapshotItem) {
-        if (!is_array($snapshotItem)) {
+    $newsStore = nammu_actuality_load_news_store();
+    foreach ((array) ($newsStore['items'] ?? []) as $storedItem) {
+        if (!is_array($storedItem)) {
             continue;
         }
-        if (trim((string) ($snapshotItem['source_kind'] ?? '')) !== 'news') {
+        if (trim((string) ($storedItem['source_kind'] ?? '')) !== 'news') {
             continue;
         }
-        $snapshotId = trim((string) ($snapshotItem['id'] ?? ''));
-        if ($snapshotId === '') {
+        $storedId = trim((string) ($storedItem['id'] ?? ''));
+        if ($storedId === '') {
             continue;
         }
-        $persistedNewsById[$snapshotId] = $snapshotItem;
+        $persistedNewsById[$storedId] = $storedItem;
     }
     $newsOverridesStore = nammu_actuality_load_news_overrides();
     $newsOverrides = [];
@@ -1453,9 +1535,17 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
         return $newsItem;
     };
     foreach ($feeds as $feedUrl) {
+        $legacyFeedOnly = !isset($configuredFeeds[$feedUrl]);
+        $feedSeenState = is_array($seenRssByUrl[$feedUrl] ?? null) ? $seenRssByUrl[$feedUrl] : [];
+        if ($legacyFeedOnly && empty($feedSeenState)) {
+            continue;
+        }
         foreach (nammu_actuality_fetch_rss_items($feedUrl) as $item) {
             $key = (string) ($item['key'] ?? sha1(($item['link'] ?? '') . '|' . ($item['title'] ?? '')));
             if ($key === '' || isset($seen[$key])) {
+                continue;
+            }
+            if ($legacyFeedOnly && !isset($feedSeenState[$key])) {
                 continue;
             }
             $seen[$key] = true;
@@ -1503,6 +1593,13 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
             continue;
         }
         $items[] = $persistedNewsItem;
+    }
+    if (!empty($persistedNewsById)) {
+        $persistedNews = array_values($persistedNewsById);
+        usort($persistedNews, static function (array $a, array $b): int {
+            return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
+        });
+        nammu_actuality_save_news_store($persistedNews);
     }
     $manualStore = nammu_actuality_load_manual_items();
     $manualItems = nammu_actuality_prune_manual_items(is_array($manualStore['items'] ?? null) ? $manualStore['items'] : []);

@@ -1960,66 +1960,85 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
                 </div>
             <?php endif; ?>
             <?php if (!empty($itineraryFediverseThreadMeta['thread_url'])): ?>
+                <?php
+                $itineraryRepliesCount = max(0, (int) ($itineraryFediverseThreadMeta['summary']['replies'] ?? 0));
+                $itineraryLikesCount = max(0, (int) ($itineraryFediverseThreadMeta['summary']['likes'] ?? 0));
+                $itinerarySharesCount = max(0, (int) ($itineraryFediverseThreadMeta['summary']['shares'] ?? 0));
+                $itineraryHasFediverseMetrics = ($itineraryRepliesCount + $itineraryLikesCount + $itinerarySharesCount) > 0;
+                ?>
                 <div class="itinerary-topics__cta">
-                    <div class="post-related-heading">
-                        <a href="<?= htmlspecialchars((string) $itineraryFediverseThreadMeta['thread_url'], ENT_QUOTES, 'UTF-8') ?>" title="Comentarios y reacciones a este itinerario en el Fediverso" aria-label="Comentarios y reacciones a este itinerario en el Fediverso" style="display:inline-flex;align-items:center;gap:0.55rem;text-decoration:none;color:inherit;">
-                            <span>Comentarios y reacciones a este itinerario en el Fediverso</span>
-                            <span aria-hidden="true" style="display:inline-flex;width:1.1rem;height:1.1rem;"><?= nammu_footer_icon_svgs()['fediverse'] ?? '' ?></span>
+                    <?php if ($itineraryHasFediverseMetrics): ?>
+                        <div class="post-related-heading">
+                            <a href="<?= htmlspecialchars((string) $itineraryFediverseThreadMeta['thread_url'], ENT_QUOTES, 'UTF-8') ?>" title="Comentarios y reacciones a este itinerario en el Fediverso" aria-label="Comentarios y reacciones a este itinerario en el Fediverso" style="display:inline-flex;align-items:center;gap:0.55rem;text-decoration:none;color:inherit;">
+                                <span>Comentarios y reacciones a este itinerario en el Fediverso</span>
+                                <span aria-hidden="true" style="display:inline-flex;width:1.1rem;height:1.1rem;"><?= nammu_footer_icon_svgs()['fediverse'] ?? '' ?></span>
+                            </a>
+                        </div>
+                        <div class="fediverse-inline-metrics">
+                            <?php if ($itineraryRepliesCount > 0): ?>
+                                <div class="fediverse-inline-metric-group">
+                                    <a class="fediverse-inline-metric-label" href="<?= htmlspecialchars((string) $itineraryFediverseThreadMeta['thread_url'], ENT_QUOTES, 'UTF-8') ?>"><?= $itineraryRepliesCount ?> respuesta<?= ($itineraryRepliesCount === 1) ? '' : 's' ?></a>
+                                    <?php if (!empty($itineraryFediverseThreadMeta['details']['replies'])): ?>
+                                        <span class="fediverse-inline-actor-icons">
+                                            <?php foreach ((array) $itineraryFediverseThreadMeta['details']['replies'] as $replyActor): ?>
+                                                <?php $replyActorUrl = trim((string) (($replyActor['url'] ?? '') ?: ((string) $itineraryFediverseThreadMeta['thread_url']))); ?>
+                                                <a href="<?= htmlspecialchars($replyActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                    <?php if (!empty($replyActor['icon'])): ?>
+                                                        <img src="<?= htmlspecialchars((string) $replyActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                                    <?php else: ?>
+                                                        <?= htmlspecialchars(mb_substr((string) (($replyActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                                    <?php endif; ?>
+                                                </a>
+                                            <?php endforeach; ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                            <?php if ($itineraryLikesCount > 0): ?>
+                                <div class="fediverse-inline-metric-group">
+                                    <a class="fediverse-inline-metric-label" href="<?= htmlspecialchars((string) $itineraryFediverseThreadMeta['thread_url'], ENT_QUOTES, 'UTF-8') ?>"><?= $itineraryLikesCount ?> favorito<?= ($itineraryLikesCount === 1) ? '' : 's' ?></a>
+                                    <?php if (!empty($itineraryFediverseThreadMeta['details']['likes'])): ?>
+                                        <span class="fediverse-inline-actor-icons">
+                                            <?php foreach ((array) $itineraryFediverseThreadMeta['details']['likes'] as $likeActor): ?>
+                                                <?php $likeActorUrl = trim((string) (($likeActor['url'] ?? '') ?: ((string) $itineraryFediverseThreadMeta['thread_url']))); ?>
+                                                <a href="<?= htmlspecialchars($likeActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                    <?php if (!empty($likeActor['icon'])): ?>
+                                                        <img src="<?= htmlspecialchars((string) $likeActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                                    <?php else: ?>
+                                                        <?= htmlspecialchars(mb_substr((string) (($likeActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                                    <?php endif; ?>
+                                                </a>
+                                            <?php endforeach; ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                            <?php if ($itinerarySharesCount > 0): ?>
+                                <div class="fediverse-inline-metric-group">
+                                    <a class="fediverse-inline-metric-label" href="<?= htmlspecialchars((string) $itineraryFediverseThreadMeta['thread_url'], ENT_QUOTES, 'UTF-8') ?>"><?= $itinerarySharesCount ?> impulso<?= ($itinerarySharesCount === 1) ? '' : 's' ?></a>
+                                    <?php if (!empty($itineraryFediverseThreadMeta['details']['shares'])): ?>
+                                        <span class="fediverse-inline-actor-icons">
+                                            <?php foreach ((array) $itineraryFediverseThreadMeta['details']['shares'] as $shareActor): ?>
+                                                <?php $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: ((string) $itineraryFediverseThreadMeta['thread_url']))); ?>
+                                                <a href="<?= htmlspecialchars($shareActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                    <?php if (!empty($shareActor['icon'])): ?>
+                                                        <img src="<?= htmlspecialchars((string) $shareActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                                    <?php else: ?>
+                                                        <?= htmlspecialchars(mb_substr((string) (($shareActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                                    <?php endif; ?>
+                                                </a>
+                                            <?php endforeach; ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php else: ?>
+                        <a class="fediverse-object-empty-btn" href="<?= htmlspecialchars((string) $itineraryFediverseThreadMeta['thread_url'], ENT_QUOTES, 'UTF-8') ?>" title="Este itinerario en el Fediverso" aria-label="Este itinerario en el Fediverso">
+                            <span>Este itinerario en el Fediverso</span>
+                            <span aria-hidden="true" style="display:inline-flex;width:1.2rem;height:1.2rem;"><?= nammu_footer_icon_svgs()['fediverse'] ?? '' ?></span>
                         </a>
-                    </div>
-                    <div class="fediverse-inline-metrics">
-                        <div class="fediverse-inline-metric-group">
-                            <span><?= (int) (($itineraryFediverseThreadMeta['summary']['replies'] ?? 0)) ?> respuesta<?= ((int) (($itineraryFediverseThreadMeta['summary']['replies'] ?? 0)) === 1) ? '' : 's' ?></span>
-                            <?php if (!empty($itineraryFediverseThreadMeta['details']['replies'])): ?>
-                                <span class="fediverse-inline-actor-icons">
-                                    <?php foreach ((array) $itineraryFediverseThreadMeta['details']['replies'] as $replyActor): ?>
-                                        <?php $replyActorUrl = trim((string) (($replyActor['url'] ?? '') ?: ((string) $itineraryFediverseThreadMeta['thread_url']))); ?>
-                                        <a href="<?= htmlspecialchars($replyActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                            <?php if (!empty($replyActor['icon'])): ?>
-                                                <img src="<?= htmlspecialchars((string) $replyActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                                            <?php else: ?>
-                                                <?= htmlspecialchars(mb_substr((string) (($replyActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
-                                            <?php endif; ?>
-                                        </a>
-                                    <?php endforeach; ?>
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                        <div class="fediverse-inline-metric-group">
-                            <span><?= (int) (($itineraryFediverseThreadMeta['summary']['likes'] ?? 0)) ?> favorito<?= ((int) (($itineraryFediverseThreadMeta['summary']['likes'] ?? 0)) === 1) ? '' : 's' ?></span>
-                            <?php if (!empty($itineraryFediverseThreadMeta['details']['likes'])): ?>
-                                <span class="fediverse-inline-actor-icons">
-                                    <?php foreach ((array) $itineraryFediverseThreadMeta['details']['likes'] as $likeActor): ?>
-                                        <?php $likeActorUrl = trim((string) (($likeActor['url'] ?? '') ?: ((string) $itineraryFediverseThreadMeta['thread_url']))); ?>
-                                        <a href="<?= htmlspecialchars($likeActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                            <?php if (!empty($likeActor['icon'])): ?>
-                                                <img src="<?= htmlspecialchars((string) $likeActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                                            <?php else: ?>
-                                                <?= htmlspecialchars(mb_substr((string) (($likeActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
-                                            <?php endif; ?>
-                                        </a>
-                                    <?php endforeach; ?>
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                        <div class="fediverse-inline-metric-group">
-                            <span><?= (int) (($itineraryFediverseThreadMeta['summary']['shares'] ?? 0)) ?> impulso<?= ((int) (($itineraryFediverseThreadMeta['summary']['shares'] ?? 0)) === 1) ? '' : 's' ?></span>
-                            <?php if (!empty($itineraryFediverseThreadMeta['details']['shares'])): ?>
-                                <span class="fediverse-inline-actor-icons">
-                                    <?php foreach ((array) $itineraryFediverseThreadMeta['details']['shares'] as $shareActor): ?>
-                                        <?php $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: ((string) $itineraryFediverseThreadMeta['thread_url']))); ?>
-                                        <a href="<?= htmlspecialchars($shareActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                            <?php if (!empty($shareActor['icon'])): ?>
-                                                <img src="<?= htmlspecialchars((string) $shareActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                                            <?php else: ?>
-                                                <?= htmlspecialchars(mb_substr((string) (($shareActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
-                                            <?php endif; ?>
-                                        </a>
-                                    <?php endforeach; ?>
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
             <?php if ($usageNotice !== ''): ?>

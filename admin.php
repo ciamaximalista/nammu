@@ -111,10 +111,27 @@ function admin_run_scheduled_tasks(): array {
             $fediverseStats['followers'] = (int) ($deliveryStats['followers'] ?? 0);
             $fediverseStats['delivered'] = (int) ($deliveryStats['delivered'] ?? 0);
         }
+        if (
+            (
+                $rssPublished
+                || (int) ($fediverseStats['new'] ?? 0) > 0
+                || (int) ($fediverseStats['delivered'] ?? 0) > 0
+            )
+            && function_exists('nammu_fediverse_rebuild_home_snapshot')
+        ) {
+            nammu_fediverse_rebuild_home_snapshot($config);
+        }
         if ($rssPublished && function_exists('nammu_fediverse_rebuild_snapshots')) {
             nammu_fediverse_rebuild_snapshots($config);
         }
-        if ($rssPublished && function_exists('nammu_fediverse_save_fragments_cache_store')) {
+        if (
+            (
+                $rssPublished
+                || (int) ($fediverseStats['new'] ?? 0) > 0
+                || (int) ($fediverseStats['delivered'] ?? 0) > 0
+            )
+            && function_exists('nammu_fediverse_save_fragments_cache_store')
+        ) {
             nammu_fediverse_save_fragments_cache_store([]);
         }
     }
@@ -10450,6 +10467,9 @@ if ($isLoggedIn && $page === 'fediverso') {
             nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
         }
         $stats = nammu_fediverse_refresh_following();
+        if (function_exists('nammu_fediverse_rebuild_home_snapshot')) {
+            nammu_fediverse_rebuild_home_snapshot($config);
+        }
         if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
             $acceptStats = nammu_fediverse_retry_pending_follower_accepts($config);
             $stats['follow_accepts_checked'] = (int) ($acceptStats['checked'] ?? 0);

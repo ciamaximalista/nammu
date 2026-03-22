@@ -122,6 +122,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
 .fediverse-public-status__media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin-top: .9rem; }
 .fediverse-public-status__media img,
 .fediverse-public-reply__media img { width: 100%; max-height: 720px; object-fit: cover; display: block; border-radius: 16px; background: #fff; border: 1px solid rgba(0,0,0,.08); }
+.fediverse-public-status__media-grid img { width: 100%; height: 100%; max-height: 420px; object-fit: cover; display: block; border-radius: 16px; background: #fff; border: 1px solid rgba(0,0,0,.08); }
 .fediverse-public-status__card { display: block; margin-top: .9rem; border-radius: 16px; overflow: hidden; background: #fff; border: 1px solid rgba(0,0,0,.08); color: inherit; text-decoration: none; }
 .fediverse-public-status__card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
 .fediverse-public-status__card-body { padding: 1rem; }

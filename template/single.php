@@ -659,6 +659,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         height: 100%;
         object-fit: cover;
         display: block;
+        filter: grayscale(1) brightness(1.18);
     }
     .post-body .podcast-video-single {
         width: min(960px, 100%);

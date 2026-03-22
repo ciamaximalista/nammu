@@ -281,7 +281,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     <?php
     return (string) ob_get_clean();
 };
-$renderPostCards = static function (array $subset, bool $hideMeta = false) use ($postUrl, $resolveImage, $cardStyle, $fullImageMode, $blocksMode, $baseHref, $headingSecondaryColor, $accentColor, $accentBackground, $accentBorder): string {
+$renderPostCards = static function (array $subset, bool $hideMeta = false) use ($postUrl, $resolveImage, $cardStyle, $fullImageMode, $blocksMode, $baseHref, $headingSecondaryColor, $accentColor, $accentBackground, $accentBorder, $renderFediverseInlineMeta): string {
     ob_start();
     $imageIndex = 0;
     foreach ($subset as $post) {

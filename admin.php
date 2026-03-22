@@ -8312,6 +8312,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['notes_feedback'] = ['type' => 'success', 'message' => 'Nota actualizada.'];
         header('Location: admin.php?page=edit&template=notes');
         exit;
+    } elseif (isset($_POST['update_actuality_news'])) {
+        if (!function_exists('nammu_actuality_update_news_item') && is_file(__DIR__ . '/core/actualidad.php')) {
+            require_once __DIR__ . '/core/actualidad.php';
+        }
+        $newsId = preg_replace('/[^a-f0-9]/i', '', (string) ($_POST['news_id'] ?? '')) ?? '';
+        $newsTitle = trim((string) ($_POST['news_title'] ?? ''));
+        $newsText = trim((string) ($_POST['news_text'] ?? ''));
+        $newsLink = trim((string) ($_POST['news_link'] ?? ''));
+        $newsImagesRaw = trim((string) ($_POST['news_images'] ?? ''));
+        $newsImages = array_values(array_filter(array_map('trim', preg_split('/\R+/', $newsImagesRaw) ?: [])));
+        if ($newsId === '') {
+            $_SESSION['news_feedback'] = ['type' => 'danger', 'message' => 'No se pudo identificar la noticia.'];
+            header('Location: admin.php?page=edit&template=news');
+            exit;
+        }
+        if ($newsTitle === '' || $newsText === '' || $newsLink === '') {
+            $_SESSION['news_feedback'] = ['type' => 'danger', 'message' => 'La noticia debe tener título, texto y enlace.'];
+            header('Location: admin.php?page=edit-news&id=' . urlencode($newsId));
+            exit;
+        }
+        $config = load_config_file();
+        $siteTitle = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
+        $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
+        $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
+        $baseUrl = trim((string) ($config['site_url'] ?? ''));
+        if ($baseUrl === '') {
+            $baseUrl = nammu_base_url();
+        }
+        if (!function_exists('nammu_actuality_update_news_item') || !nammu_actuality_update_news_item($newsId, $newsTitle, $newsText, $newsLink, $baseUrl, $newsImages[0] ?? '', $newsImages)) {
+            $_SESSION['news_feedback'] = ['type' => 'danger', 'message' => 'No se pudo actualizar la noticia.'];
+            header('Location: admin.php?page=edit-news&id=' . urlencode($newsId));
+            exit;
+        }
+        if (function_exists('nammu_actuality_rebuild_snapshot')) {
+            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        }
+        $_SESSION['news_feedback'] = ['type' => 'success', 'message' => 'Noticia actualizada.'];
+        header('Location: admin.php?page=edit&template=news');
+        exit;
     } elseif (isset($_POST['delete_actuality_note'])) {
         if (!function_exists('nammu_actuality_delete_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
             require_once __DIR__ . '/core/actualidad.php';
@@ -8341,11 +8380,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['notes_feedback'] = ['type' => 'success', 'message' => 'Nota borrada.'];
         header('Location: admin.php?page=edit&template=notes');
         exit;
+    } elseif (isset($_POST['delete_actuality_news'])) {
+        if (!function_exists('nammu_actuality_delete_news_item') && is_file(__DIR__ . '/core/actualidad.php')) {
+            require_once __DIR__ . '/core/actualidad.php';
+        }
+        $newsId = preg_replace('/[^a-f0-9]/i', '', (string) ($_POST['delete_news_id'] ?? '')) ?? '';
+        if ($newsId === '') {
+            $_SESSION['news_feedback'] = ['type' => 'danger', 'message' => 'No se pudo identificar la noticia para borrarla.'];
+            header('Location: admin.php?page=edit&template=news');
+            exit;
+        }
+        $config = load_config_file();
+        $siteTitle = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
+        $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
+        $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
+        $baseUrl = trim((string) ($config['site_url'] ?? ''));
+        if ($baseUrl === '') {
+            $baseUrl = nammu_base_url();
+        }
+        if (!function_exists('nammu_actuality_delete_news_item') || !nammu_actuality_delete_news_item($newsId)) {
+            $_SESSION['news_feedback'] = ['type' => 'warning', 'message' => 'La noticia ya no existe o no se pudo borrar.'];
+            header('Location: admin.php?page=edit&template=news');
+            exit;
+        }
+        if (function_exists('nammu_actuality_rebuild_snapshot')) {
+            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        }
+        $_SESSION['news_feedback'] = ['type' => 'success', 'message' => 'Noticia borrada.'];
+        header('Location: admin.php?page=edit&template=news');
+        exit;
     } elseif (isset($_POST['delete_post'])) {
         $filename = $_POST['delete_filename'] ?? '';
         $filename = trim($filename);
         $templateTarget = $_POST['delete_template'] ?? 'single';
-        $templateTarget = in_array($templateTarget, ['single', 'page', 'draft', 'newsletter', 'podcast', 'notes'], true) ? $templateTarget : 'single';
+        $templateTarget = in_array($templateTarget, ['single', 'page', 'draft', 'newsletter', 'podcast', 'notes', 'news'], true) ? $templateTarget : 'single';
         $templateParam = urlencode($templateTarget);
         if ($filename !== '') {
             // Ensure only filenames from content directory are used
@@ -10289,6 +10357,10 @@ $fediverseRedirectState = [];
 $notesFeedback = $_SESSION['notes_feedback'] ?? null;
 if ($notesFeedback !== null) {
     unset($_SESSION['notes_feedback']);
+}
+$newsFeedback = $_SESSION['news_feedback'] ?? null;
+if ($newsFeedback !== null) {
+    unset($_SESSION['news_feedback']);
 }
 if (!empty($_SESSION['fediverse_feedback'])) {
     $fediverseFeedback = is_array($_SESSION['fediverse_feedback']) ? $_SESSION['fediverse_feedback'] : null;
@@ -12580,7 +12652,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                                     </a>
                                 </li>
 
-                                <li class="nav-item <?= $page === 'edit' ? 'active' : '' ?>">
+                                <li class="nav-item <?= in_array($page, ['edit', 'edit-post', 'edit-note', 'edit-news'], true) ? 'active' : '' ?>">
                                     <a class="nav-link" href="?page=edit" title="Editar" aria-label="Editar">
                                         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
                                             <path d="M4 20h4l10-10-4-4L4 16v4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
@@ -12709,7 +12781,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                             <?php include __DIR__ . '/core/admin-page-publish.php'; ?>
 
-<?php elseif ($page === 'edit' || $page === 'edit-post' || $page === 'edit-note'): ?>
+<?php elseif ($page === 'edit' || $page === 'edit-post' || $page === 'edit-note' || $page === 'edit-news'): ?>
 
     <?php include __DIR__ . '/core/admin-page-edit.php'; ?>
 

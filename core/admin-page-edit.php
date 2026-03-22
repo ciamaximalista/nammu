@@ -16,7 +16,7 @@ unset($_SESSION['newsletter_custom_recipients']);
 
         <?php
         $templateFilter = $_GET['template'] ?? 'single';
-        $allowedFilters = ['single', 'page', 'draft', 'newsletter', 'podcast', 'notes'];
+        $allowedFilters = ['single', 'page', 'draft', 'newsletter', 'podcast', 'notes', 'news'];
         if (!in_array($templateFilter, $allowedFilters, true)) {
             $templateFilter = 'single';
         }
@@ -27,6 +27,7 @@ unset($_SESSION['newsletter_custom_recipients']);
             'newsletter' => 'Newsletters',
             'podcast' => 'Podcasts',
             'notes' => 'Notas',
+            'news' => 'Noticias',
         ][$templateFilter];
         $searchQuery = trim($_GET['q'] ?? '');
         $searchQueryParam = $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '';
@@ -67,6 +68,7 @@ unset($_SESSION['newsletter_custom_recipients']);
             <a href="?page=edit&template=newsletter<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'newsletter' ? 'active' : '' ?>">Newsletters</a>
             <a href="?page=edit&template=podcast<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'podcast' ? 'active' : '' ?>">Podcasts</a>
             <a href="?page=edit&template=notes<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'notes' ? 'active' : '' ?>">Notas</a>
+            <a href="?page=edit&template=news<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'news' ? 'active' : '' ?>">Noticias</a>
             <a href="?page=edit&template=draft<?= $searchQueryParam ?>" class="btn btn-sm btn-outline-primary <?= $templateFilter === 'draft' ? 'active' : '' ?>">Borradores</a>
         </div>
 
@@ -112,9 +114,10 @@ unset($_SESSION['newsletter_custom_recipients']);
 
         <?php
         $showNotesTable = ($templateFilter === 'notes');
+        $showNewsTable = ($templateFilter === 'news');
         $showVisibilityColumn = ($templateFilter === 'page');
         $showNewsletterStatusColumn = ($templateFilter === 'newsletter');
-        $showSocialColumn = ($templateFilter !== 'newsletter' && !$showVisibilityColumn && !$showNotesTable);
+        $showSocialColumn = ($templateFilter !== 'newsletter' && !$showVisibilityColumn && !$showNotesTable && !$showNewsTable);
         $columnCount = 4;
         if ($showNewsletterStatusColumn) {
             $columnCount++;
@@ -128,6 +131,11 @@ unset($_SESSION['newsletter_custom_recipients']);
         <?php if ($notesFeedback !== null): ?>
             <div class="alert alert-<?= htmlspecialchars($notesFeedback['type'] ?? 'info', ENT_QUOTES, 'UTF-8') === 'success' ? 'success' : (($notesFeedback['type'] ?? 'info') === 'warning' ? 'warning' : 'danger') ?>">
                 <?= htmlspecialchars($notesFeedback['message'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
+        <?php if ($newsFeedback !== null): ?>
+            <div class="alert alert-<?= htmlspecialchars($newsFeedback['type'] ?? 'info', ENT_QUOTES, 'UTF-8') === 'success' ? 'success' : (($newsFeedback['type'] ?? 'info') === 'warning' ? 'warning' : 'danger') ?>">
+                <?= htmlspecialchars($newsFeedback['message'] ?? '', ENT_QUOTES, 'UTF-8') ?>
             </div>
         <?php endif; ?>
 
@@ -206,6 +214,84 @@ unset($_SESSION['newsletter_custom_recipients']);
                     <?php for ($i = 1; $i <= $pagesCount; $i++): ?>
                         <li class="page-item <?= $i === $current_page ? 'active' : '' ?>">
                             <a class="page-link" href="?page=edit&template=notes&p=<?= $i ?><?= $searchQueryParam ?>"><?= $i ?></a>
+                        </li>
+                    <?php endfor; ?>
+                </ul>
+            </nav>
+        <?php elseif ($showNewsTable): ?>
+            <?php
+            $newsItems = function_exists('nammu_actuality_list_news_items') ? nammu_actuality_list_news_items() : [];
+            if ($searchQuery !== '') {
+                $normalizedSearch = function_exists('mb_strtolower') ? mb_strtolower($searchQuery, 'UTF-8') : strtolower($searchQuery);
+                $newsItems = array_values(array_filter($newsItems, static function (array $item) use ($normalizedSearch): bool {
+                    $haystackParts = [
+                        (string) ($item['title'] ?? ''),
+                        (string) ($item['description'] ?? ''),
+                        (string) ($item['raw_text'] ?? ''),
+                        (string) ($item['link'] ?? ''),
+                        (string) ($item['source'] ?? ''),
+                    ];
+                    $haystack = function_exists('mb_strtolower')
+                        ? mb_strtolower(implode(' ', $haystackParts), 'UTF-8')
+                        : strtolower(implode(' ', $haystackParts));
+                    return str_contains($haystack, $normalizedSearch);
+                }));
+            }
+            $current_page = max(1, (int) ($_GET['p'] ?? 1));
+            $perPage = 16;
+            $totalNews = count($newsItems);
+            $pagesCount = max(1, (int) ceil($totalNews / $perPage));
+            $current_page = min($current_page, $pagesCount);
+            $offset = ($current_page - 1) * $perPage;
+            $pageNews = array_slice($newsItems, $offset, $perPage);
+            ?>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Título</th>
+                        <th>Texto</th>
+                        <th>Fecha</th>
+                        <th>Origen</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($pageNews)): ?>
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">No hay noticias disponibles.</td>
+                        </tr>
+                    <?php else: ?>
+                        <?php foreach ($pageNews as $news): ?>
+                            <?php
+                            $excerpt = trim((string) (($news['raw_text'] ?? '') ?: ($news['description'] ?? '')));
+                            $excerpt = preg_replace("/\s+/u", ' ', $excerpt) ?? $excerpt;
+                            $ts = (int) ($news['timestamp'] ?? 0);
+                            $formattedDate = $ts > 0 ? date('d/m/Y H:i', $ts) : '—';
+                            ?>
+                            <tr>
+                                <td><?= htmlspecialchars((string) ($news['title'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
+                                <td style="min-width: 24rem;"><?= htmlspecialchars($excerpt, ENT_QUOTES, 'UTF-8') ?></td>
+                                <td><?= htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') ?></td>
+                                <td><?= htmlspecialchars((string) ($news['source'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
+                                <td class="text-right">
+                                    <div class="d-flex flex-column align-items-end">
+                                        <a href="?page=edit-news&id=<?= urlencode((string) ($news['id'] ?? '')) ?>" class="btn btn-sm btn-primary mb-2">Editar</a>
+                                        <form method="post" onsubmit="return confirm('¿Borrar esta noticia del perfil y de las vistas públicas?');">
+                                            <input type="hidden" name="delete_news_id" value="<?= htmlspecialchars((string) ($news['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                            <button type="submit" name="delete_actuality_news" class="btn btn-sm btn-outline-danger">Borrar</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+            <nav aria-label="Page navigation">
+                <ul class="pagination pagination-break">
+                    <?php for ($i = 1; $i <= $pagesCount; $i++): ?>
+                        <li class="page-item <?= $i === $current_page ? 'active' : '' ?>">
+                            <a class="page-link" href="?page=edit&template=news&p=<?= $i ?><?= $searchQueryParam ?>"><?= $i ?></a>
                         </li>
                     <?php endfor; ?>
                 </ul>
@@ -1013,6 +1099,66 @@ unset($_SESSION['newsletter_custom_recipients']);
         <?php else: ?>
             <div class="alert alert-warning">
                 <p>No se pudo cargar la nota solicitada.</p>
+            </div>
+        <?php endif; ?>
+    </div>
+
+<?php elseif ($page === 'edit-news'): ?>
+
+    <div class="tab-pane active">
+        <?php
+        $requestedNewsId = preg_replace('/[^a-f0-9]/i', '', (string) ($_GET['id'] ?? '')) ?? '';
+        $newsData = ($requestedNewsId !== '' && function_exists('nammu_actuality_get_news_item')) ? nammu_actuality_get_news_item($requestedNewsId) : null;
+        ?>
+        <?php if ($newsFeedback !== null): ?>
+            <div class="alert alert-<?= htmlspecialchars($newsFeedback['type'] ?? 'info', ENT_QUOTES, 'UTF-8') === 'success' ? 'success' : (($newsFeedback['type'] ?? 'info') === 'warning' ? 'warning' : 'danger') ?>">
+                <?= htmlspecialchars($newsFeedback['message'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
+        <?php if ($newsData !== null): ?>
+            <?php
+            $newsTitle = trim((string) ($newsData['title'] ?? ''));
+            $newsText = trim((string) (($newsData['raw_text'] ?? '') ?: ($newsData['description'] ?? '')));
+            $newsLink = trim((string) ($newsData['link'] ?? ''));
+            $newsImages = is_array($newsData['images'] ?? null) ? $newsData['images'] : [];
+            if (empty($newsImages) && trim((string) ($newsData['image'] ?? '')) !== '') {
+                $newsImages = [trim((string) ($newsData['image'] ?? ''))];
+            }
+            $newsImagesValue = implode("\n", array_map('strval', $newsImages));
+            $newsTs = (int) ($newsData['timestamp'] ?? 0);
+            ?>
+            <h2>Editar Noticia</h2>
+            <p class="text-muted">Publicada el <?= htmlspecialchars($newsTs > 0 ? date('d/m/Y H:i', $newsTs) : '—', ENT_QUOTES, 'UTF-8') ?>.</p>
+            <form method="post">
+                <input type="hidden" name="news_id" value="<?= htmlspecialchars($requestedNewsId, ENT_QUOTES, 'UTF-8') ?>">
+                <div class="form-group">
+                    <label for="news_title">Título</label>
+                    <input type="text" name="news_title" id="news_title" class="form-control" value="<?= htmlspecialchars($newsTitle, ENT_QUOTES, 'UTF-8') ?>" required>
+                </div>
+                <div class="form-group">
+                    <label for="news_text">Texto</label>
+                    <textarea name="news_text" id="news_text" class="form-control" rows="10" required><?= htmlspecialchars($newsText, ENT_QUOTES, 'UTF-8') ?></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="news_link">Enlace</label>
+                    <input type="url" name="news_link" id="news_link" class="form-control" value="<?= htmlspecialchars($newsLink, ENT_QUOTES, 'UTF-8') ?>" required>
+                </div>
+                <div class="form-group">
+                    <label for="news_images">Imágenes</label>
+                    <div class="input-group">
+                        <textarea name="news_images" id="news_images" class="form-control" rows="4" readonly><?= htmlspecialchars($newsImagesValue, ENT_QUOTES, 'UTF-8') ?></textarea>
+                        <div class="input-group-append">
+                            <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="news_images" data-target-prefix="" data-target-multi="1" data-target-max-items="4">Añadir imagen</button>
+                        </div>
+                    </div>
+                    <small class="form-text text-muted">Puedes añadir o quitar imágenes dejando una URL por línea.</small>
+                </div>
+                <button type="submit" name="update_actuality_news" class="btn btn-primary">Actualizar</button>
+                <a href="?page=edit&template=news" class="btn btn-outline-secondary ml-2">Volver</a>
+            </form>
+        <?php else: ?>
+            <div class="alert alert-warning">
+                <p>No se pudo cargar la noticia solicitada.</p>
             </div>
         <?php endif; ?>
     </div>

@@ -715,13 +715,29 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
         }
         .footer-nammu-link {
             margin: 0.6rem 0 0.2rem;
-            text-align: center;
             font-size: 0.7rem;
             color: <?= $colorText ?>;
             opacity: 0.75;
+            max-width: min(760px, 100%);
+            margin-left: auto;
+            margin-right: auto;
+            overflow: hidden;
+            line-height: 1.55;
+            text-align: center;
         }
         .footer-nammu-link a {
             color: <?= $colorAccent ?>;
+        }
+        .footer-nammu-link__eupl {
+            width: 68px;
+            max-width: 22vw;
+            margin: 0.45rem auto 0;
+            display: block;
+        }
+        .footer-nammu-link__eupl img {
+            width: 100%;
+            height: auto;
+            display: block;
         }
         .floating-logo {
             position: fixed;
@@ -1524,7 +1540,11 @@ if (!empty($baseUrl)) {
                 <?php endif; ?>
                 <?php if ($footerNammuEnabled): ?>
                     <div class="footer-nammu-link">
-                        <?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> utiliza <a href="https://ruralnext.org/nammu" target="_blank" rel="noopener">Nammu</a>, un CMS libre desarrollado en <a href="https://ruralnext.org" target="_blank" rel="noopener">RuralNEXT</a> por <a href="https://maximalista.coop/" target="_blank" rel="noopener">Compañía Maximalista S.Coop.</a>
+                        <div><?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> utiliza <a href="https://ruralnext.org/nammu" target="_blank" rel="noopener">Nammu</a>, un CMS libre desarrollado en <a href="https://ruralnext.org" target="_blank" rel="noopener">RuralNEXT</a> por <a href="https://maximalista.coop/" target="_blank" rel="noopener">Compañía Maximalista S.Coop.</a></div>
+                        <div>Licencia Pública de la Unión Europea: <a href="https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12" target="_blank" rel="noopener">EUPL 1.2</a></div>
+                        <a class="footer-nammu-link__eupl" href="https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12" target="_blank" rel="noopener" title="Licencia Pública de la UE V1.2">
+                            <img src="<?= htmlspecialchars(rtrim((string) ($baseUrl ?? '/'), '/') . '/EUPL.png', ENT_QUOTES, 'UTF-8') ?>" alt="Licencia Pública de la UE V1.2" loading="lazy">
+                        </a>
                     </div>
                 <?php endif; ?>
             </footer>

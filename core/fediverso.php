@@ -2046,6 +2046,23 @@ function nammu_fediverse_thread_page_payload(array $item, array $config): array
     ];
 }
 
+function nammu_fediverse_thread_page_snapshot_payload(array $item, array $config): ?array
+{
+    $canonicalItem = nammu_fediverse_canonical_local_item($item, $config);
+    $itemId = trim((string) ($canonicalItem['id'] ?? ($item['id'] ?? '')));
+    if ($itemId === '') {
+        return null;
+    }
+    $snapshot = nammu_fediverse_home_snapshot_store();
+    $data = is_array($snapshot['data'] ?? null) ? $snapshot['data'] : [];
+    $threadPayloads = is_array($data['thread_payloads'] ?? null) ? $data['thread_payloads'] : [];
+    $payload = is_array($threadPayloads[$itemId] ?? null) ? $threadPayloads[$itemId] : null;
+    if (!is_array($payload)) {
+        return null;
+    }
+    return $payload;
+}
+
 function nammu_fediverse_reply_collection_url(string $objectId, array $config): string
 {
     return rtrim(nammu_fediverse_base_url($config), '/') . '/ap/replies/' . nammu_fediverse_reply_collection_hash($objectId);

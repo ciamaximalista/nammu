@@ -170,6 +170,23 @@ $renderFediversePublicText = static function (string $text, string $className = 
                 <div class="fediverse-public-status__metrics">
                     <span><?= (int) ($threadSummary['replies'] ?? 0) ?> respuesta<?= ((int) ($threadSummary['replies'] ?? 0) === 1) ? '' : 's' ?></span>
                     <div class="fediverse-public-status__metric-group">
+                        <span><?= (int) ($threadSummary['likes'] ?? 0) ?> favorito<?= ((int) ($threadSummary['likes'] ?? 0) === 1) ? '' : 's' ?></span>
+                        <?php if (!empty($threadDetails['likes'])): ?>
+                            <span class="fediverse-public-status__actor-icons">
+                                <?php foreach ($threadDetails['likes'] as $likeActor): ?>
+                                    <?php $likeActorUrl = trim((string) (($likeActor['url'] ?? '') ?: '#')); ?>
+                                    <a href="<?= htmlspecialchars($likeActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                        <?php if (!empty($likeActor['icon'])): ?>
+                                            <img src="<?= htmlspecialchars((string) $likeActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                        <?php else: ?>
+                                            <?= htmlspecialchars(mb_substr((string) (($likeActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                        <?php endif; ?>
+                                    </a>
+                                <?php endforeach; ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="fediverse-public-status__metric-group">
                         <span><?= (int) ($threadSummary['shares'] ?? 0) ?> impulso<?= ((int) ($threadSummary['shares'] ?? 0) === 1) ? '' : 's' ?></span>
                         <?php if (!empty($threadDetails['shares'])): ?>
                             <span class="fediverse-public-status__actor-icons">
@@ -186,7 +203,6 @@ $renderFediversePublicText = static function (string $text, string $className = 
                             </span>
                         <?php endif; ?>
                     </div>
-                    <span><?= (int) ($threadSummary['likes'] ?? 0) ?> favorito<?= ((int) ($threadSummary['likes'] ?? 0) === 1) ? '' : 's' ?></span>
                 </div>
             </div>
         </div>

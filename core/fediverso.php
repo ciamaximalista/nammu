@@ -1801,7 +1801,18 @@ function nammu_fediverse_rebuild_home_snapshot(array $config): array
     }
     foreach ($localItems as $localItem) {
         $localId = trim((string) ($localItem['id'] ?? ''));
-        if ($localId === '' || !isset($activeLocalIds[$localId])) {
+        if ($localId === '') {
+            continue;
+        }
+        $threadPayloads[$localId] = [
+            'item' => $localItem,
+            'thread_url' => nammu_fediverse_thread_page_url($localId, $config),
+            'original_url' => trim((string) ($localItem['url'] ?? '')),
+            'summary' => $data['local_reaction_summary'][$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0],
+            'details' => $data['local_reaction_details'][$localId] ?? ['likes' => [], 'shares' => [], 'replies' => []],
+            'replies' => [],
+        ];
+        if (!isset($activeLocalIds[$localId])) {
             continue;
         }
         $threadPayloads[$localId] = nammu_fediverse_thread_page_payload($localItem, $config);

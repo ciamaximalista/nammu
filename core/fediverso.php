@@ -1228,21 +1228,36 @@ function nammu_fediverse_timeline_entries_targeting_local_items(array $config): 
         if ($type === 'announce') {
             foreach (['object_id', 'url', 'id'] as $field) {
                 $value = trim((string) ($item[$field] ?? ''));
-                if ($value !== '' && isset($index[$value])) {
+                if ($value === '') {
+                    continue;
+                }
+                if (isset($index[$value])) {
                     $target = $value;
+                    break;
+                }
+                $matchedLocalItem = nammu_fediverse_find_local_item_for_identifier($value, $config);
+                if (is_array($matchedLocalItem)) {
+                    $target = trim((string) ($matchedLocalItem['id'] ?? $value));
                     break;
                 }
             }
         } else {
             $target = trim((string) ($item['target_url'] ?? ''));
         }
-        if ($target === '' || !isset($index[$target])) {
+        if ($target === '') {
+            continue;
+        }
+        $matchedLocalItem = $index[$target] ?? null;
+        if (!is_array($matchedLocalItem)) {
+            $matchedLocalItem = nammu_fediverse_find_local_item_for_identifier($target, $config);
+        }
+        if (!is_array($matchedLocalItem)) {
             continue;
         }
         $entries[] = [
             'target' => $target,
             'item' => $item,
-            'canonical_item' => nammu_fediverse_canonical_local_item($index[$target], $config),
+            'canonical_item' => nammu_fediverse_canonical_local_item($matchedLocalItem, $config),
         ];
     }
     return $entries;
@@ -3170,7 +3185,35 @@ function nammu_fediverse_find_local_item_for_identifier(string $identifier, arra
     }
     $index = nammu_fediverse_local_items_index($config);
     $item = $index[$identifier] ?? null;
-    return is_array($item) ? $item : null;
+    if (is_array($item)) {
+        return $item;
+    }
+    $path = (string) (@parse_url($identifier, PHP_URL_PATH) ?: '');
+    if ($path !== '' && preg_match('#/fediverso/([a-f0-9]{24})$#i', $path, $matches)) {
+        $threadItem = nammu_fediverse_find_local_item_for_thread_hash((string) ($matches[1] ?? ''), $config);
+        if (is_array($threadItem)) {
+            return $threadItem;
+        }
+    }
+    foreach (nammu_fediverse_local_content_items($config) as $candidate) {
+        foreach (nammu_fediverse_item_identifiers_with_canonical($candidate, $config) as $candidateIdentifier) {
+            if ($candidateIdentifier === $identifier) {
+                return $candidate;
+            }
+        }
+    }
+    foreach (nammu_fediverse_actions_store()['items'] as $action) {
+        $resendItem = nammu_fediverse_resend_item_from_action($action);
+        if (!is_array($resendItem)) {
+            continue;
+        }
+        foreach (nammu_fediverse_item_identifiers_with_canonical($resendItem, $config) as $candidateIdentifier) {
+            if ($candidateIdentifier === $identifier) {
+                return $resendItem;
+            }
+        }
+    }
+    return null;
 }
 
 function nammu_fediverse_local_reaction_summary(array $config): array

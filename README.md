@@ -147,12 +147,18 @@ sudo crontab -u www-data -e
 
 Si usas ese comando, las líneas van **sin** la columna `www-data`.
 
-Para que **Fediverso** cargue ágilmente en el admin sin provocar solapes ni picos de CPU, conviene ejecutar `admin.php --run-scheduled` cada `5` minutos con el usuario del servidor web, escalonando las distintas instancias y protegiendo cada una con `flock`. Ese proceso refresca actores seguidos, entrega publicaciones pendientes y prepara snapshots locales para que `Inicio`, `Mensajes` y `Notificaciones` lean datos ya construidos en vez de recomputarlos al abrir el panel.
+Para que **Fediverso** cargue ágilmente en el admin sin provocar solapes ni picos de CPU, conviene separar el cron en dos fases:
+
+- `admin.php --run-scheduled` cada `5` minutos para la parte ligera: publicación programada, cola de avisos, reconstrucción de `Actualidad`, RSS sociales, refresco de actores seguidos y entregas pendientes.
+- `admin.php --run-scheduled-heavy` cada `15` minutos para la parte pesada: precalentado de hilos y reconstrucción de snapshots del panel de Fediverso.
+
+Ambas deben ejecutarse con el usuario del servidor web, escalonando las distintas instancias y protegiendo cada una con `flock`.
 
 ### Bloque de cron recomendado
 
 ```bash
 */5 * * * * flock -n /tmp/<carpeta-publica>-run-scheduled.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
+*/15 * * * * flock -n /tmp/<carpeta-publica>-run-scheduled-heavy.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-heavy >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
 15 3 * * * flock -n /tmp/<carpeta-publica>-backup-daily.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
 30 3 * * 0 flock -n /tmp/<carpeta-publica>-backup-cleanup.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
 45 3 * * 0 flock -n /tmp/<carpeta-publica>-backup-weekly.lock php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> /var/www/html/<carpeta-publica>/backups/backup-full.log 2>&1
@@ -167,6 +173,13 @@ Si mantienes varias instalaciones Nammu en el mismo servidor, no las lances toda
 3-58/5 * * * * flock -n /tmp/terceroslugares-run-scheduled.lock php /var/www/html/blogs/terceroslugares/admin.php --run-scheduled >> /var/www/html/blogs/terceroslugares/backups/cron.log 2>&1
 4-59/5 * * * * flock -n /tmp/lacandela-run-scheduled.lock php /var/www/html/blogs/lacandela/admin.php --run-scheduled >> /var/www/html/blogs/lacandela/backups/cron.log 2>&1
 5-55/5 * * * * flock -n /tmp/communalia-run-scheduled.lock php /var/www/html/blogs/communalia/admin.php --run-scheduled >> /var/www/html/blogs/communalia/backups/cron.log 2>&1
+
+7-52/15 * * * * flock -n /tmp/memoria-run-scheduled-heavy.lock php /var/www/html/blogs/memoria/admin.php --run-scheduled-heavy >> /var/www/html/blogs/memoria/backups/cron.log 2>&1
+8-53/15 * * * * flock -n /tmp/maximalismo-run-scheduled-heavy.lock php /var/www/html/blogs/maximalismo/admin.php --run-scheduled-heavy >> /var/www/html/blogs/maximalismo/backups/cron.log 2>&1
+9-54/15 * * * * flock -n /tmp/juan-run-scheduled-heavy.lock php /var/www/html/blogs/juan/admin.php --run-scheduled-heavy >> /var/www/html/blogs/juan/backups/cron.log 2>&1
+10-55/15 * * * * flock -n /tmp/terceroslugares-run-scheduled-heavy.lock php /var/www/html/blogs/terceroslugares/admin.php --run-scheduled-heavy >> /var/www/html/blogs/terceroslugares/backups/cron.log 2>&1
+11-56/15 * * * * flock -n /tmp/lacandela-run-scheduled-heavy.lock php /var/www/html/blogs/lacandela/admin.php --run-scheduled-heavy >> /var/www/html/blogs/lacandela/backups/cron.log 2>&1
+12-57/15 * * * * flock -n /tmp/communalia-run-scheduled-heavy.lock php /var/www/html/blogs/communalia/admin.php --run-scheduled-heavy >> /var/www/html/blogs/communalia/backups/cron.log 2>&1
 ```
 
 Ese patrón evita dos problemas comunes:

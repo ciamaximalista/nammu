@@ -6195,8 +6195,65 @@ function nammu_fediverse_public_thread_url_for_named_local_item(string $slug, st
 
 function nammu_fediverse_public_thread_meta_for_named_local_item(string $slug, string $template, array $config): array
 {
-    $item = nammu_fediverse_find_named_local_item($slug, $template, $config);
-    $threadUrl = nammu_fediverse_public_thread_url_for_named_local_item($slug, $template, $config);
+    static $snapshotMaps = [];
+    $normalizedSlug = trim($slug);
+    $normalizedTemplate = nammu_fediverse_normalize_named_template($template);
+    $cacheKey = md5(nammu_fediverse_base_url($config));
+
+    if (!isset($snapshotMaps[$cacheKey])) {
+        $snapshotMaps[$cacheKey] = [];
+        $snapshot = nammu_fediverse_home_snapshot_store();
+        $data = is_array($snapshot['data'] ?? null) ? $snapshot['data'] : [];
+        $localItems = is_array($data['local_items'] ?? null) ? $data['local_items'] : [];
+        $threadPayloads = is_array($data['thread_payloads'] ?? null) ? $data['thread_payloads'] : [];
+        foreach ($localItems as $localItem) {
+            if (!is_array($localItem)) {
+                continue;
+            }
+            $itemId = trim((string) ($localItem['id'] ?? ''));
+            $itemUrl = trim((string) ($localItem['url'] ?? ''));
+            if ($itemId === '' || $itemUrl === '') {
+                continue;
+            }
+            $path = trim((string) (parse_url($itemUrl, PHP_URL_PATH) ?? ''));
+            if ($path === '') {
+                continue;
+            }
+            $path = '/' . ltrim($path, '/');
+            $key = null;
+            if (preg_match('#^/podcast/([^/]+)/?$#', $path, $matches) === 1) {
+                $key = 'podcast|' . rawurldecode((string) ($matches[1] ?? ''));
+            } elseif (preg_match('#^/itinerarios/([^/]+)/?$#', $path, $matches) === 1) {
+                $key = 'itinerary|' . rawurldecode((string) ($matches[1] ?? ''));
+            } elseif (preg_match('#^/([^/]+)$#', $path, $matches) === 1) {
+                $candidateSlug = rawurldecode((string) ($matches[1] ?? ''));
+                if ($candidateSlug !== '' && !in_array($candidateSlug, ['actualidad.php', 'podcast', 'itinerarios', 'categorias', 'buscar.php'], true) && !str_starts_with($candidateSlug, '@')) {
+                    $key = 'post|' . $candidateSlug;
+                }
+            }
+            if ($key === null) {
+                continue;
+            }
+            $payload = is_array($threadPayloads[$itemId] ?? null) ? $threadPayloads[$itemId] : null;
+            $snapshotMaps[$cacheKey][$key] = [
+                'thread_url' => nammu_fediverse_thread_page_url($itemId, $config),
+                'summary' => is_array($payload['summary'] ?? null)
+                    ? $payload['summary']
+                    : ['likes' => 0, 'shares' => 0, 'replies' => 0],
+                'details' => is_array($payload['details'] ?? null)
+                    ? $payload['details']
+                    : ['likes' => [], 'shares' => [], 'replies' => []],
+            ];
+        }
+    }
+
+    $snapshotKey = $normalizedTemplate . '|' . $normalizedSlug;
+    if ($normalizedSlug !== '' && isset($snapshotMaps[$cacheKey][$snapshotKey])) {
+        return $snapshotMaps[$cacheKey][$snapshotKey];
+    }
+
+    $item = nammu_fediverse_find_named_local_item($normalizedSlug, $normalizedTemplate, $config);
+    $threadUrl = nammu_fediverse_public_thread_url_for_named_local_item($normalizedSlug, $normalizedTemplate, $config);
     $payload = is_array($item) ? nammu_fediverse_thread_page_snapshot_payload($item, $config) : null;
 
     return [

@@ -310,9 +310,12 @@ $alphabeticalSorter = static function (Post $a, Post $b): int {
     }
     return strcmp($a->getSlug(), $b->getSlug());
 };
-$postToViewArray = static function (Post $post): array {
+$postToViewArray = static function (Post $post) use ($config): array {
     $date = $post->getDate();
     $rawDate = $post->getRawDate();
+    $fediverseMeta = function_exists('nammu_fediverse_public_thread_meta_for_named_local_item')
+        ? nammu_fediverse_public_thread_meta_for_named_local_item($post->getSlug(), 'post', $config)
+        : ['thread_url' => '', 'summary' => ['likes' => 0, 'shares' => 0, 'replies' => 0], 'details' => ['likes' => [], 'shares' => [], 'replies' => []]];
     return [
         'slug' => $post->getSlug(),
         'title' => $post->getTitle(),
@@ -320,6 +323,7 @@ $postToViewArray = static function (Post $post): array {
         'date' => nammu_format_date_spanish($date, $rawDate ?? ''),
         'category' => $post->getCategory(),
         'image' => $post->getImage(),
+        'fediverse' => $fediverseMeta,
     ];
 };
 $isLettersIndex = (bool) preg_match('#^/letras/?$#i', $routePath);
@@ -1241,8 +1245,12 @@ if (preg_match('#^/podcast/?$#i', $routePath)) {
     $episodes = [];
     foreach ($rawEpisodes as $episode) {
         $timestamp = (int) ($episode['timestamp'] ?? 0);
+        $episodeSlug = (string) ($episode['slug'] ?? '');
+        $fediverseMeta = function_exists('nammu_fediverse_public_thread_meta_for_named_local_item')
+            ? nammu_fediverse_public_thread_meta_for_named_local_item($episodeSlug, 'podcast', $config)
+            : ['thread_url' => '', 'summary' => ['likes' => 0, 'shares' => 0, 'replies' => 0], 'details' => ['likes' => [], 'shares' => [], 'replies' => []]];
         $episodes[] = [
-            'slug' => (string) ($episode['slug'] ?? ''),
+            'slug' => $episodeSlug,
             'url' => (string) ($episode['page_url'] ?? ''),
             'title' => (string) ($episode['title'] ?? ''),
             'description' => (string) ($episode['description'] ?? ''),
@@ -1251,6 +1259,7 @@ if (preg_match('#^/podcast/?$#i', $routePath)) {
             'audio' => (string) ($episode['audio'] ?? ''),
             'duration' => (string) ($episode['audio_duration'] ?? ''),
             'timestamp' => $timestamp,
+            'fediverse' => $fediverseMeta,
         ];
     }
     usort($episodes, static function (array $a, array $b): int {
@@ -2180,6 +2189,15 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
 
 if (preg_match('#^/itinerarios/?$#i', $routePath)) {
     $itineraries = $itineraryListing;
+    $itineraryFediverseMetaBySlug = [];
+    if (function_exists('nammu_fediverse_public_thread_meta_for_named_local_item')) {
+        foreach ($itineraries as $itineraryItem) {
+            if (!$itineraryItem instanceof Itinerary) {
+                continue;
+            }
+            $itineraryFediverseMetaBySlug[$itineraryItem->getSlug()] = nammu_fediverse_public_thread_meta_for_named_local_item($itineraryItem->getSlug(), 'itinerary', $config);
+        }
+    }
     $itineraryHeroImage = null;
     if (!empty($itineraries)) {
         $itineraryCandidates = $itineraries;
@@ -2209,6 +2227,7 @@ if (preg_match('#^/itinerarios/?$#i', $routePath)) {
     $content = $renderer->render('itineraries', [
         'itineraries' => $itineraries,
         'heroImage' => $itineraryHeroImage,
+        'itineraryFediverseMetaBySlug' => $itineraryFediverseMetaBySlug,
     ]);
     $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios';
     $description = 'Selección de itinerarios temáticos para seguir paso a paso.';

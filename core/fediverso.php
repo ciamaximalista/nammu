@@ -77,6 +77,11 @@ function nammu_fediverse_notifications_snapshot_file(): string
     return dirname(__DIR__) . '/config/fediverso-notifications.json';
 }
 
+function nammu_fediverse_link_cards_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-link-cards.json';
+}
+
 function nammu_fediverse_keys_file(): string
 {
     return dirname(__DIR__) . '/config/activitypub-keys.json';
@@ -98,6 +103,18 @@ function nammu_fediverse_save_json_store(string $file, array $payload): void
         nammu_ensure_directory($dir);
     }
     file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+}
+
+function nammu_fediverse_link_cards_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_link_cards_file(), ['items' => []]);
+    $store['items'] = is_array($store['items'] ?? null) ? $store['items'] : [];
+    return $store;
+}
+
+function nammu_fediverse_save_link_cards_store(array $items): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_link_cards_file(), ['items' => $items]);
 }
 
 function nammu_fediverse_fragments_cache_store(): array
@@ -1543,6 +1560,28 @@ function nammu_fediverse_remote_replies_for_item(array $item, array $config): ar
         }
         $actorId = trim((string) ($replyObject['attributedTo'] ?? ''));
         $actor = $actorId !== '' ? nammu_fediverse_resolve_actor($actorId, $config) : [];
+        $attachments = [];
+        $attachmentList = $replyObject['attachment'] ?? [];
+        if (is_array($attachmentList) && array_key_exists('type', $attachmentList)) {
+            $attachmentList = [$attachmentList];
+        }
+        foreach ((array) $attachmentList as $attachment) {
+            if (!is_array($attachment)) {
+                continue;
+            }
+            $attachmentUrl = nammu_fediverse_extract_url($attachment['url'] ?? ($attachment['href'] ?? ''));
+            if ($attachmentUrl === '') {
+                continue;
+            }
+            $attachments[] = [
+                'type' => strtolower(trim((string) ($attachment['type'] ?? ''))),
+                'url' => $attachmentUrl,
+                'name' => trim((string) ($attachment['name'] ?? '')),
+                'media_type' => trim((string) (($attachment['mediaType'] ?? '') ?: ($attachment['mimeType'] ?? ''))),
+                'image' => nammu_fediverse_extract_url($attachment['image'] ?? ''),
+                'summary' => trim((string) ($attachment['summary'] ?? '')),
+            ];
+        }
         $replies[] = [
             'id' => trim((string) (($replyObject['id'] ?? '') ?: sha1(json_encode($replyObject)))),
             'note_id' => trim((string) (($replyObject['id'] ?? '') ?: '')),
@@ -1551,7 +1590,10 @@ function nammu_fediverse_remote_replies_for_item(array $item, array $config): ar
             'reply_text' => $replyText,
             'actor_id' => $actorId,
             'actor_name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
+            'actor_username' => trim((string) ($actor['preferredUsername'] ?? '')),
             'actor_icon' => trim((string) ($actor['icon'] ?? '')),
+            'attachments' => $attachments,
+            'link_card' => nammu_fediverse_reply_link_card_from_attachments($attachments),
             'source' => 'incoming-remote',
         ];
     }
@@ -2061,6 +2103,164 @@ function nammu_fediverse_thread_page_snapshot_payload(array $item, array $config
         return null;
     }
     return $payload;
+}
+
+function nammu_fediverse_extract_first_url_from_text(string $text): string
+{
+    $text = trim($text);
+    if ($text === '') {
+        return '';
+    }
+    if (preg_match('#https?://[^\s<>"\')]+#iu', $text, $matches)) {
+        return trim((string) ($matches[0] ?? ''));
+    }
+    return '';
+}
+
+function nammu_fediverse_reply_link_card_from_attachments(array $attachments): ?array
+{
+    foreach ($attachments as $attachment) {
+        if (!is_array($attachment)) {
+            continue;
+        }
+        $type = strtolower(trim((string) ($attachment['type'] ?? '')));
+        $mediaType = strtolower(trim((string) ($attachment['media_type'] ?? '')));
+        if ($type !== 'link' && $mediaType !== 'text/html') {
+            continue;
+        }
+        $url = trim((string) ($attachment['url'] ?? ''));
+        if ($url === '') {
+            continue;
+        }
+        return [
+            'url' => $url,
+            'title' => trim((string) ($attachment['name'] ?? '')),
+            'description' => trim((string) ($attachment['summary'] ?? '')),
+            'image' => trim((string) ($attachment['image'] ?? '')),
+        ];
+    }
+    return null;
+}
+
+function nammu_fediverse_resolve_url_like_actuality(string $candidate, string $baseUrl): string
+{
+    $candidate = trim($candidate);
+    if ($candidate === '') {
+        return '';
+    }
+    if (preg_match('#^https?://#i', $candidate)) {
+        return $candidate;
+    }
+    if (function_exists('nammu_actuality_resolve_url')) {
+        return trim((string) nammu_actuality_resolve_url($candidate, $baseUrl));
+    }
+    return $candidate;
+}
+
+function nammu_fediverse_fetch_link_card(string $url, array $config, int $maxAge = 86400): ?array
+{
+    $url = trim($url);
+    if ($url === '') {
+        return null;
+    }
+    $cacheStore = nammu_fediverse_link_cards_store();
+    $cacheItems = is_array($cacheStore['items'] ?? null) ? $cacheStore['items'] : [];
+    $cacheKey = sha1($url);
+    $cached = is_array($cacheItems[$cacheKey] ?? null) ? $cacheItems[$cacheKey] : null;
+    if (is_array($cached)) {
+        $fetchedAt = (int) ($cached['fetched_at'] ?? 0);
+        $card = is_array($cached['card'] ?? null) ? $cached['card'] : [];
+        if ($fetchedAt > 0 && (time() - $fetchedAt) <= $maxAge && !empty($card)) {
+            return $card;
+        }
+    }
+
+    if (!function_exists('nammu_actuality_fetch_url') && is_file(dirname(__DIR__) . '/core/actualidad.php')) {
+        require_once dirname(__DIR__) . '/core/actualidad.php';
+    }
+
+    $response = function_exists('nammu_actuality_fetch_url')
+        ? nammu_actuality_fetch_url($url)
+        : ['body' => @file_get_contents($url) ?: '', 'headers' => []];
+    $html = trim((string) ($response['body'] ?? ''));
+    if ($html === '') {
+        return null;
+    }
+
+    libxml_use_internal_errors(true);
+    $dom = new DOMDocument();
+    if (!@$dom->loadHTML($html)) {
+        return null;
+    }
+    $xpath = new DOMXPath($dom);
+    $readMeta = static function (DOMXPath $xpath, array $queries): string {
+        foreach ($queries as $query) {
+            $nodes = $xpath->query($query);
+            if ($nodes instanceof DOMNodeList && $nodes->length > 0) {
+                $value = trim((string) $nodes->item(0)?->nodeValue);
+                if ($value !== '') {
+                    return $value;
+                }
+            }
+        }
+        return '';
+    };
+
+    $title = $readMeta($xpath, [
+        '//meta[@property="og:title"]/@content',
+        '//meta[@name="twitter:title"]/@content',
+        '//title/text()',
+    ]);
+    $description = $readMeta($xpath, [
+        '//meta[@property="og:description"]/@content',
+        '//meta[@name="description"]/@content',
+        '//meta[@name="twitter:description"]/@content',
+    ]);
+    $image = $readMeta($xpath, [
+        '//meta[@property="og:image"]/@content',
+        '//meta[@name="twitter:image"]/@content',
+        '//meta[@name="twitter:image:src"]/@content',
+    ]);
+    $image = nammu_fediverse_resolve_url_like_actuality($image, $url);
+
+    if ($title === '' && $description === '' && $image === '') {
+        return null;
+    }
+    $card = [
+        'url' => $url,
+        'title' => $title,
+        'description' => $description,
+        'image' => $image,
+    ];
+    $cacheItems[$cacheKey] = [
+        'fetched_at' => time(),
+        'card' => $card,
+    ];
+    if (count($cacheItems) > 500) {
+        uasort($cacheItems, static function (array $a, array $b): int {
+            return ((int) ($b['fetched_at'] ?? 0)) <=> ((int) ($a['fetched_at'] ?? 0));
+        });
+        $cacheItems = array_slice($cacheItems, 0, 500, true);
+    }
+    nammu_fediverse_save_link_cards_store($cacheItems);
+    return $card;
+}
+
+function nammu_fediverse_reply_link_card(array $reply, array $config): ?array
+{
+    $existing = is_array($reply['link_card'] ?? null) ? $reply['link_card'] : null;
+    if (is_array($existing) && trim((string) ($existing['url'] ?? '')) !== '') {
+        return $existing;
+    }
+    $fromAttachments = nammu_fediverse_reply_link_card_from_attachments((array) ($reply['attachments'] ?? []));
+    if ($fromAttachments !== null) {
+        return $fromAttachments;
+    }
+    $textUrl = nammu_fediverse_extract_first_url_from_text((string) ($reply['reply_text'] ?? ''));
+    if ($textUrl === '') {
+        return null;
+    }
+    return nammu_fediverse_fetch_link_card($textUrl, $config);
 }
 
 function nammu_fediverse_reply_collection_url(string $objectId, array $config): string
@@ -3235,6 +3435,28 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
         if ($contentText === '') {
             continue;
         }
+        $attachments = [];
+        $attachmentList = $object['attachment'] ?? [];
+        if (is_array($attachmentList) && array_key_exists('type', $attachmentList)) {
+            $attachmentList = [$attachmentList];
+        }
+        foreach ((array) $attachmentList as $attachment) {
+            if (!is_array($attachment)) {
+                continue;
+            }
+            $attachmentUrl = nammu_fediverse_extract_url($attachment['url'] ?? ($attachment['href'] ?? ''));
+            if ($attachmentUrl === '') {
+                continue;
+            }
+            $attachments[] = [
+                'type' => strtolower(trim((string) ($attachment['type'] ?? ''))),
+                'url' => $attachmentUrl,
+                'name' => trim((string) ($attachment['name'] ?? '')),
+                'media_type' => trim((string) (($attachment['mediaType'] ?? '') ?: ($attachment['mimeType'] ?? ''))),
+                'image' => nammu_fediverse_extract_url($attachment['image'] ?? ''),
+                'summary' => trim((string) ($attachment['summary'] ?? '')),
+            ];
+        }
         $replyId = trim((string) (($object['id'] ?? '') ?: ($payload['id'] ?? '')));
         $replyUrl = trim((string) (($object['url'] ?? '') ?: ''));
         $pendingReplies[] = [
@@ -3251,6 +3473,8 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
                 'actor_name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
                 'actor_username' => trim((string) ($actor['preferredUsername'] ?? '')),
                 'actor_icon' => trim((string) ($actor['icon'] ?? '')),
+                'attachments' => $attachments,
+                'link_card' => nammu_fediverse_reply_link_card_from_attachments($attachments),
                 'verified' => !empty($entry['verified']),
                 'source' => 'incoming',
             ],
@@ -3336,6 +3560,8 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
             'actor_name' => trim((string) (($item['actor_name'] ?? '') ?: ($item['actor_username'] ?? '') ?: ($item['actor_id'] ?? ''))),
             'actor_username' => trim((string) ($item['actor_username'] ?? '')),
             'actor_icon' => trim((string) ($item['actor_icon'] ?? '')),
+            'attachments' => is_array($item['attachments'] ?? null) ? $item['attachments'] : [],
+            'link_card' => nammu_fediverse_reply_link_card_from_attachments((array) ($item['attachments'] ?? [])),
             'verified' => true,
             'source' => 'incoming-remote',
         ];

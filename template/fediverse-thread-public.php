@@ -11,6 +11,35 @@ $threadTitle = trim((string) ($threadItem['title'] ?? ''));
 $threadContent = trim((string) ($threadItem['content'] ?? ''));
 $threadSummaryText = trim((string) ($threadItem['summary'] ?? ''));
 $threadPublished = trim((string) ($threadItem['published'] ?? ''));
+$formatFediversePublicDateTime = static function (string $value): string {
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+    try {
+        $date = new DateTimeImmutable($value);
+        $months = [
+            1 => 'enero',
+            2 => 'febrero',
+            3 => 'marzo',
+            4 => 'abril',
+            5 => 'mayo',
+            6 => 'junio',
+            7 => 'julio',
+            8 => 'agosto',
+            9 => 'septiembre',
+            10 => 'octubre',
+            11 => 'noviembre',
+            12 => 'diciembre',
+        ];
+        $monthIndex = (int) $date->format('n');
+        $monthName = $months[$monthIndex] ?? $date->format('m');
+        return $date->format('j') . ' de ' . $monthName . ' de ' . $date->format('Y') . ', ' . $date->format('H:i');
+    } catch (Throwable $exception) {
+        return $value;
+    }
+};
+$threadPublishedLabel = $formatFediversePublicDateTime($threadPublished);
 $fediverseLocalName = trim((string) ($fediverseLocalName ?? 'Blog'));
 $fediverseLocalHandle = trim((string) ($fediverseLocalHandle ?? ''));
 $fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
@@ -76,6 +105,13 @@ $renderFediversePublicText = static function (string $text, string $className = 
 .fediverse-public-status__card-description { display: block; color: rgba(0,0,0,.7); line-height: 1.5; }
 .fediverse-public-status__card-description p { margin: 0 0 .7rem; }
 .fediverse-public-status__card-description p:last-child { margin-bottom: 0; }
+.fediverse-public-reply__card { display: block; margin-top: .9rem; border-radius: 16px; overflow: hidden; background: #f7f7f7; border: 1px solid rgba(0,0,0,.08); color: inherit; text-decoration: none; }
+.fediverse-public-reply__card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+.fediverse-public-reply__card-body { padding: .9rem 1rem; }
+.fediverse-public-reply__card-title { display: block; font-weight: 700; margin-bottom: .35rem; }
+.fediverse-public-reply__card-description { display: block; color: rgba(0,0,0,.7); line-height: 1.5; }
+.fediverse-public-reply__card-description p { margin: 0 0 .6rem; }
+.fediverse-public-reply__card-description p:last-child { margin-bottom: 0; }
 .fediverse-public-status__footer { margin-top: .9rem; display: flex; flex-wrap: wrap; gap: .6rem 1rem; font-size: .95rem; }
 .fediverse-public-status__metrics { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: .65rem; }
 .fediverse-public-status__metrics span { background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 999px; padding: .38rem .7rem; font-size: .92rem; }
@@ -124,8 +160,8 @@ $renderFediversePublicText = static function (string $text, string $className = 
                     <?php if ($fediverseLocalHandle !== ''): ?>
                         <span class="fediverse-public-status__handle"><?= htmlspecialchars($fediverseLocalHandle, ENT_QUOTES, 'UTF-8') ?></span>
                     <?php endif; ?>
-                    <?php if ($threadPublished !== ''): ?>
-                        <span class="fediverse-public-status__handle"><?= htmlspecialchars($threadPublished, ENT_QUOTES, 'UTF-8') ?></span>
+                    <?php if ($threadPublishedLabel !== ''): ?>
+                        <span class="fediverse-public-status__handle"><?= htmlspecialchars($threadPublishedLabel, ENT_QUOTES, 'UTF-8') ?></span>
                     <?php endif; ?>
                 </div>
 
@@ -218,6 +254,7 @@ $renderFediversePublicText = static function (string $text, string $className = 
                     $replyName = trim((string) ($replyIsRemote ? (($reply['actor_name'] ?? '') ?: 'Actor remoto') : $fediverseLocalName));
                     $replyHandle = trim((string) ($reply['actor_handle'] ?? ($replyIsRemote ? ($reply['actor_id'] ?? '') : $fediverseLocalHandle)));
                     $replyAvatar = trim((string) ($reply['actor_icon'] ?? ''));
+                    $replyCard = is_array($reply['link_card'] ?? null) ? $reply['link_card'] : null;
                     if (!$replyIsRemote && $replyAvatar === '') {
                         $replyAvatar = $fediverseLocalAvatar;
                     }
@@ -237,11 +274,25 @@ $renderFediversePublicText = static function (string $text, string $className = 
                                     <?php if ($replyHandle !== ''): ?>
                                         <span class="fediverse-public-reply__meta"><?= htmlspecialchars($replyHandle, ENT_QUOTES, 'UTF-8') ?></span>
                                     <?php endif; ?>
-                                    <?php if (!empty($reply['published'])): ?>
-                                        <span class="fediverse-public-reply__meta"><?= htmlspecialchars((string) $reply['published'], ENT_QUOTES, 'UTF-8') ?></span>
+                                    <?php $replyPublishedLabel = $formatFediversePublicDateTime((string) ($reply['published'] ?? '')); ?>
+                                    <?php if ($replyPublishedLabel !== ''): ?>
+                                        <span class="fediverse-public-reply__meta"><?= htmlspecialchars($replyPublishedLabel, ENT_QUOTES, 'UTF-8') ?></span>
                                     <?php endif; ?>
                                 </div>
                                 <div class="fediverse-public-reply__text"><?= nl2br(htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
+                                <?php if (is_array($replyCard) && trim((string) ($replyCard['url'] ?? '')) !== ''): ?>
+                                    <a class="fediverse-public-reply__card" href="<?= htmlspecialchars((string) $replyCard['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                        <?php if (!empty($replyCard['image'])): ?>
+                                            <img src="<?= htmlspecialchars((string) $replyCard['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) (($replyCard['title'] ?? '') ?: 'Vista previa del enlace'), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                        <?php endif; ?>
+                                        <div class="fediverse-public-reply__card-body">
+                                            <span class="fediverse-public-reply__card-title"><?= htmlspecialchars((string) (($replyCard['title'] ?? '') ?: ($replyCard['url'] ?? '')), ENT_QUOTES, 'UTF-8') ?></span>
+                                            <?php if (!empty($replyCard['description'])): ?>
+                                                <div class="fediverse-public-reply__card-description"><?= $renderFediversePublicText((string) $replyCard['description']) ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </a>
+                                <?php endif; ?>
                                 <?php if (!empty($reply['image'])): ?>
                                     <div class="fediverse-public-reply__media">
                                         <img src="<?= htmlspecialchars((string) $reply['image'], ENT_QUOTES, 'UTF-8') ?>" alt="Imagen adjunta" loading="lazy">

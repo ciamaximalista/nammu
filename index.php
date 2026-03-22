@@ -815,6 +815,18 @@ if (preg_match('#^/fediverso/([a-f0-9]{24})/?$#', $routePath, $fediverseThreadMa
             'site_name' => $siteNameForMeta,
         ], $socialConfig)
         : [];
+    $threadRepliesForView = is_array($threadPayload['replies'] ?? null) ? $threadPayload['replies'] : [];
+    foreach ($threadRepliesForView as &$threadReplyForView) {
+        if (!is_array($threadReplyForView)) {
+            continue;
+        }
+        $linkCard = nammu_fediverse_reply_link_card($threadReplyForView, $configData);
+        if (is_array($linkCard) && trim((string) ($linkCard['url'] ?? '')) !== '') {
+            $threadReplyForView['link_card'] = $linkCard;
+        }
+    }
+    unset($threadReplyForView);
+    $threadPayload['replies'] = $threadRepliesForView;
     $content = $renderer->render('fediverse-thread-public', [
         'threadItem' => $threadItem,
         'threadPayload' => $threadPayload,

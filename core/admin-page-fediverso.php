@@ -163,7 +163,7 @@
             try {
                 $date = new DateTimeImmutable($value);
                 $dateLabel = nammu_format_date_spanish($date, $value);
-                return trim($dateLabel . ' · ' . $date->format('H:i'));
+                return trim($dateLabel . ', ' . $date->format('H:i'));
             } catch (Throwable $exception) {
             }
         }

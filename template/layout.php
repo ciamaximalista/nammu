@@ -192,14 +192,14 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
     <?php if ($metaRobots !== ''): ?>
         <meta name="robots" content="<?= htmlspecialchars($metaRobots, ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
-    <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($rssUrl, ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — RSS blog" href="<?= htmlspecialchars($rssUrl, ENT_QUOTES, 'UTF-8') ?>">
     <?php if (!empty($hasItineraries)): ?>
         <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Itinerarios" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/itinerarios.xml' : $searchBaseNormalized . '/itinerarios.xml', ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
     <?php if (!empty($hasPodcast)): ?>
         <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Podcast" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/podcast.xml' : $searchBaseNormalized . '/podcast.xml', ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
-    <?php if (trim((string) ((nammu_load_config()['social_rss']['feeds'] ?? ''))) !== ''): ?>
+    <?php if (function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content(nammu_load_config()) : false): ?>
         <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Noticias" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/noticias.xml' : $searchBaseNormalized . '/noticias.xml', ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
     <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Fediverso" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/fediverso.xml' : $searchBaseNormalized . '/fediverso.xml', ENT_QUOTES, 'UTF-8') ?>">

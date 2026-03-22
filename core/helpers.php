@@ -1831,7 +1831,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
     }
 
     $links[] = [
-        'label' => 'RSS',
+        'label' => 'RSS blog',
         'href' => $baseRoot . '/rss.xml',
         'svg' => $icons['rss'],
     ];
@@ -1849,7 +1849,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
             'svg' => $icons['rss'],
         ];
     }
-    if (trim((string) (($config['social_rss']['feeds'] ?? ''))) !== '') {
+    if (function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($config) : false) {
         $links[] = [
             'label' => 'RSS Noticias',
             'href' => $baseRoot . '/noticias.xml',

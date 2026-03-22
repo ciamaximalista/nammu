@@ -1479,6 +1479,9 @@ function admin_handle_social_broadcast_submission(array $settings, string $text,
         if (!function_exists('nammu_actuality_add_manual_item') && is_file(__DIR__ . '/actualidad.php')) {
             require_once __DIR__ . '/actualidad.php';
         }
+        if (!function_exists('nammu_fediverse_deliver_local_items') && is_file(__DIR__ . '/fediverso.php')) {
+            require_once __DIR__ . '/fediverso.php';
+        }
         if (function_exists('nammu_actuality_add_manual_item')) {
             $config = load_config_file();
             $siteTitle = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
@@ -1495,8 +1498,18 @@ function admin_handle_social_broadcast_submission(array $settings, string $text,
                     $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
                     nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
                 }
+                if (function_exists('nammu_fediverse_deliver_local_items')) {
+                    nammu_fediverse_deliver_local_items($config);
+                }
+                if (function_exists('nammu_fediverse_rebuild_snapshots')) {
+                    nammu_fediverse_rebuild_snapshots($config);
+                }
+                if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
+                    nammu_fediverse_save_fragments_cache_store([]);
+                }
                 $fediverseUrl = admin_social_broadcast_fediverse_url_for_actuality_item($manualItem);
                 $sent[] = 'Perfil del Fediverso';
+                $sent[] = 'Fediverso';
             } else {
                 $failed[] = 'Perfil del Fediverso: no se pudo guardar la nota.';
             }

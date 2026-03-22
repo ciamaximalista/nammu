@@ -81,6 +81,17 @@ function admin_run_scheduled_tasks(): array {
     }
     if (function_exists('admin_process_social_rss_feeds')) {
         $rssStats = admin_process_social_rss_feeds();
+        if (function_exists('nammu_actuality_rebuild_snapshot') && (int) ($rssStats['sent'] ?? 0) > 0) {
+            $config = nammu_load_config();
+            $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
+            $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
+            $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
+            $baseUrl = trim((string) ($config['site_url'] ?? ''));
+            if ($baseUrl === '') {
+                $baseUrl = nammu_base_url();
+            }
+            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
+        }
     }
     if (function_exists('admin_process_social_broadcast_queue')) {
         $socialBroadcastQueueStats = admin_process_social_broadcast_queue(1);

@@ -68,6 +68,17 @@ $renderFediversePublicText = static function (string $text, string $className = 
     }
     return $html;
 };
+$threadImageAttachments = array_values(array_filter((array) ($threadItem['attachments'] ?? []), static function ($attachment): bool {
+    if (!is_array($attachment)) {
+        return false;
+    }
+    $type = strtolower(trim((string) ($attachment['type'] ?? '')));
+    $mediaType = strtolower(trim((string) ($attachment['media_type'] ?? '')));
+    return ($type === 'image' || str_starts_with($mediaType, 'image/')) && trim((string) ($attachment['url'] ?? '')) !== '';
+}));
+if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
+    $threadImageAttachments[] = ['url' => (string) $threadItem['image']];
+}
 ?>
 <style>
 .fediverse-public-page { max-width: 860px; margin: 0 auto; }
@@ -96,6 +107,7 @@ $renderFediversePublicText = static function (string $text, string $className = 
 .fediverse-public-reply__text { font-size: 1rem; line-height: 1.6; }
 .fediverse-public-status__media,
 .fediverse-public-reply__media { margin-top: .9rem; }
+.fediverse-public-status__media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin-top: .9rem; }
 .fediverse-public-status__media img,
 .fediverse-public-reply__media img { width: 100%; max-height: 720px; object-fit: cover; display: block; border-radius: 16px; background: #fff; border: 1px solid rgba(0,0,0,.08); }
 .fediverse-public-status__card { display: block; margin-top: .9rem; border-radius: 16px; overflow: hidden; background: #fff; border: 1px solid rgba(0,0,0,.08); color: inherit; text-decoration: none; }
@@ -171,9 +183,11 @@ $renderFediversePublicText = static function (string $text, string $className = 
 
                 <?php if ($threadIsNote): ?>
                     <div class="fediverse-public-status__text"><?= nl2br(htmlspecialchars($threadContent, ENT_QUOTES, 'UTF-8')) ?></div>
-                    <?php if (!empty($threadItem['image'])): ?>
-                        <div class="fediverse-public-status__media">
-                            <img src="<?= htmlspecialchars((string) $threadItem['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($threadTitle !== '' ? $threadTitle : 'Imagen adjunta'), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                    <?php if (!empty($threadImageAttachments)): ?>
+                        <div class="<?= count($threadImageAttachments) > 1 ? 'fediverse-public-status__media-grid' : 'fediverse-public-status__media' ?>">
+                            <?php foreach ($threadImageAttachments as $imageIndex => $imageAttachment): ?>
+                                <img src="<?= htmlspecialchars((string) ($imageAttachment['url'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($threadTitle !== '' ? $threadTitle : ('Imagen adjunta ' . ($imageIndex + 1))), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                            <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
                 <?php elseif ($threadOriginalUrl !== ''): ?>

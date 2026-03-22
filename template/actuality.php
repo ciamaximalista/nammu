@@ -1,6 +1,6 @@
 <?php
 /**
- * @var array<int, array{title:string,link:string,image:string,description:string,timestamp:int,source:string,is_manual?:bool,id?:string,links?:array<int,string>,raw_text?:string}> $items
+ * @var array<int, array{title:string,link:string,image:string,images?:array<int,string>,description:string,timestamp:int,source:string,is_manual?:bool,id?:string,links?:array<int,string>,raw_text?:string}> $items
  * @var int $feedsCount
  * @var bool $hasActuality
  * @var int $currentPage
@@ -119,6 +119,28 @@ $renderLinks = static function (array $links, array $item = []) use ($fediverseI
     }
     return implode(', ', $bits);
 };
+$renderImages = static function (array $item, bool $isSiteContent = false): string {
+    $allImages = array_values(array_unique(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))));
+    $primaryImage = trim((string) ($item['image'] ?? ''));
+    if ($primaryImage !== '' && !in_array($primaryImage, $allImages, true)) {
+        array_unshift($allImages, $primaryImage);
+    }
+    if (empty($allImages)) {
+        return '';
+    }
+    $target = htmlspecialchars((string) ($item['link'] ?? '#'), ENT_QUOTES, 'UTF-8');
+    $attrs = $isSiteContent ? '' : ' target="_blank" rel="noopener"';
+    if (count($allImages) === 1) {
+        return '<a class="actuality-image-link" href="' . $target . '"' . $attrs . '><img src="' . htmlspecialchars($allImages[0], ENT_QUOTES, 'UTF-8') . '" alt="' . htmlspecialchars((string) ($item['title'] ?? 'Imagen'), ENT_QUOTES, 'UTF-8') . '" loading="lazy"></a>';
+    }
+    $html = '<div class="actuality-image-gallery">';
+    foreach ($allImages as $index => $imageUrl) {
+        $alt = $index === 0 ? (string) ($item['title'] ?? 'Imagen') : ('Imagen ' . ($index + 1));
+        $html .= '<a class="actuality-image-link actuality-image-link--gallery" href="' . $target . '"' . $attrs . '><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="' . htmlspecialchars($alt, ENT_QUOTES, 'UTF-8') . '" loading="lazy"></a>';
+    }
+    $html .= '</div>';
+    return $html;
+};
 $currentPage = max(1, (int) ($currentPage ?? 1));
 $totalPages = max(1, (int) ($totalPages ?? 1));
 $prevPageUrl = trim((string) ($prevPageUrl ?? ''));
@@ -193,10 +215,9 @@ $manualDisplayText = static function (array $item): string {
                                     <?php endif; ?>
                                 </p>
                             <?php endif; ?>
-                            <?php if ($item['image'] !== ''): ?>
-                                <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>>
-                                    <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                                </a>
+                            <?php $imagesHtml = $renderImages($item, $isSiteContent); ?>
+                            <?php if ($imagesHtml !== ''): ?>
+                                <?= $imagesHtml ?>
                             <?php endif; ?>
                             <?php if ($item['description'] !== ''): ?>
                                 <div class="actuality-description"><?= $renderActualityText((string) $item['description'], $item) ?></div>
@@ -228,10 +249,9 @@ $manualDisplayText = static function (array $item): string {
                                         <?php endif; ?>
                                     </p>
                                 <?php endif; ?>
-                                <?php if ($item['image'] !== ''): ?>
-                                    <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>>
-                                        <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                                    </a>
+                                <?php $imagesHtml = $renderImages($item, $isSiteContent); ?>
+                                <?php if ($imagesHtml !== ''): ?>
+                                    <?= $imagesHtml ?>
                                 <?php endif; ?>
                                 <?php if ((!$isManual && $item['description'] !== '') || ($isManual && $manualBody !== '')): ?>
                                     <?php $descriptionText = $isManual ? $manualBody : (string) $item['description']; ?>
@@ -265,10 +285,9 @@ $manualDisplayText = static function (array $item): string {
                                         <?php endif; ?>
                                     </p>
                                 <?php endif; ?>
-                                <?php if ($item['image'] !== ''): ?>
-                                    <a class="actuality-image-link" href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>>
-                                        <img src="<?= htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                                    </a>
+                                <?php $imagesHtml = $renderImages($item, $isSiteContent); ?>
+                                <?php if ($imagesHtml !== ''): ?>
+                                    <?= $imagesHtml ?>
                                 <?php endif; ?>
                                 <?php if ((!$isManual && $item['description'] !== '') || ($isManual && $manualBody !== '')): ?>
                                     <?php $descriptionText = $isManual ? $manualBody : (string) $item['description']; ?>
@@ -396,6 +415,15 @@ $manualDisplayText = static function (array $item): string {
         display: block;
         background: <?= $highlight ?>;
         margin-bottom: 0.95rem;
+    }
+    .actuality-image-gallery {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+        margin-bottom: 0.95rem;
+    }
+    .actuality-image-link--gallery {
+        margin-bottom: 0;
     }
     .actuality-image-link img {
         display: block;

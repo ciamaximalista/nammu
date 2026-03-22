@@ -10,6 +10,7 @@
     $fediverseProfileUrl = function_exists('nammu_fediverse_profile_page_url') ? nammu_fediverse_profile_page_url($settings) : ($baseUrl . '/actualidad.php');
     $newsFeedUrl = ($baseUrl !== '' ? $baseUrl : '') . '/noticias.xml';
     $fediverseIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';
+    $socialBroadcastMaxImages = function_exists('admin_social_broadcast_max_images') ? (int) admin_social_broadcast_max_images() : 4;
     ?>
     <div class="tab-pane active">
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
@@ -54,12 +55,12 @@
                             <div class="form-group mt-3 mb-0">
                                 <label for="social_broadcast_image">Imagen opcional</label>
                                 <div class="input-group">
-                                    <input type="text" name="social_broadcast_image" id="social_broadcast_image" class="form-control" readonly value="<?= htmlspecialchars($socialBroadcastImage ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                                    <textarea name="social_broadcast_image" id="social_broadcast_image" class="form-control" rows="4" readonly><?= htmlspecialchars($socialBroadcastImage ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
                                     <div class="input-group-append">
-                                        <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="social_broadcast_image" data-target-prefix="">Seleccionar imagen</button>
+                                        <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="social_broadcast_image" data-target-prefix="" data-target-multi="1" data-target-max-items="<?= $socialBroadcastMaxImages ?>">Añadir imagen</button>
                                     </div>
                                 </div>
-                                <small class="form-text text-muted">La imagen se enviará cuando la red lo soporte. Si marcas Instagram, Nammu la adaptará automáticamente a 1080x1080.</small>
+                                <small class="form-text text-muted">Puedes añadir hasta <?= $socialBroadcastMaxImages ?> imágenes, una por línea. X y Bluesky usarán varias; en las demás redes Nammu usará la primera cuando haga falta. Si marcas Instagram, Nammu la adaptará automáticamente a 1080x1080.</small>
                             </div>
                         </div>
                         <div class="col-lg-4">

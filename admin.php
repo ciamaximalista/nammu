@@ -14540,6 +14540,8 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             var imageTargetPrefix = '';
             var imageTargetEditor = '';
             var imageTargetAccept = '';
+            var imageTargetMulti = '';
+            var imageTargetMaxItems = 0;
             var lastImageTrigger = null;
             var imageTargetSelection = null;
             var imageTargetTextarea = null;
@@ -14834,6 +14836,8 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     imageTargetPrefix = button.data('target-prefix') || '';
                     imageTargetEditor = button.data('target-editor') || '';
                     imageTargetAccept = button.data('target-accept') || '';
+                    imageTargetMulti = button.data('target-multi') || '';
+                    imageTargetMaxItems = parseInt(button.data('target-max-items') || '0', 10) || 0;
                 }
                 if (!skipImageModalSelectionCapture) {
                     imageTargetTextarea = resolveImageTargetTextarea();
@@ -15191,7 +15195,22 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     var $input = $('#' + targetId);
                     if ($input.length) {
                         var prefix = imageTargetPrefix || '';
-                        $input.val(prefix + mediaName);
+                        var nextValue = prefix + mediaName;
+                        if (imageTargetMulti) {
+                            var currentItems = ($input.val() || '').toString().split(/\r?\n/).map(function (value) {
+                                return value.trim();
+                            }).filter(Boolean);
+                            if (currentItems.indexOf(nextValue) === -1) {
+                                if (imageTargetMaxItems > 0 && currentItems.length >= imageTargetMaxItems) {
+                                    alert('Solo puedes añadir hasta ' + imageTargetMaxItems + ' imágenes.');
+                                    return;
+                                }
+                                currentItems.push(nextValue);
+                            }
+                            $input.val(currentItems.join("\n"));
+                        } else {
+                            $input.val(nextValue);
+                        }
                         $input.trigger('change');
                     }
 

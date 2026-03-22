@@ -3034,6 +3034,7 @@ function nammu_fediverse_local_content_items(array $config): array
             'published' => gmdate(DATE_ATOM, (int) (($item['timestamp'] ?? 0) ?: time())),
             'type' => $isManual ? 'Note' : 'Article',
             'image' => trim((string) (($item['source_image'] ?? '') ?: ($item['image'] ?? ''))),
+            'images' => array_values(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))),
         ];
     }
     usort($items, static function (array $a, array $b): int {
@@ -3992,6 +3993,10 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
         $object['summary'] = htmlspecialchars($summary, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
     $image = trim((string) ($item['image'] ?? ''));
+    $images = array_values(array_unique(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))));
+    if ($image !== '' && !in_array($image, $images, true)) {
+        array_unshift($images, $image);
+    }
     if ($image !== '') {
         $object['image'] = ['type' => 'Image', 'url' => $image];
     }
@@ -4008,14 +4013,25 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
         if ($summary !== '') {
             $linkAttachment['summary'] = htmlspecialchars($summary, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         }
-        $object['attachment'] = [$linkAttachment];
-    } elseif ($image !== '') {
-        $object['attachment'] = [[
-            'type' => 'Image',
-            'mediaType' => 'image/*',
-            'url' => $image,
-            'name' => trim((string) ($item['title'] ?? '')),
-        ]];
+        $attachments = [$linkAttachment];
+        foreach ($images as $imageUrl) {
+            $attachments[] = [
+                'type' => 'Image',
+                'mediaType' => 'image/*',
+                'url' => $imageUrl,
+                'name' => trim((string) ($item['title'] ?? '')),
+            ];
+        }
+        $object['attachment'] = $attachments;
+    } elseif (!empty($images)) {
+        $object['attachment'] = array_map(static function (string $imageUrl) use ($item): array {
+            return [
+                'type' => 'Image',
+                'mediaType' => 'image/*',
+                'url' => $imageUrl,
+                'name' => trim((string) ($item['title'] ?? '')),
+            ];
+        }, $images);
     }
     if ($avatarUrl !== '') {
         $object['icon'] = ['type' => 'Image', 'url' => $avatarUrl];

@@ -168,6 +168,10 @@ function nammu_actuality_update_manual_item(string $id, string $text, string $ba
         $item['timestamp'] = $timestamp > 0 ? $timestamp : time();
         if ($image !== null) {
             $item['image'] = trim($image);
+            $item['images'] = array_values(array_unique(array_filter([
+                trim($image),
+                ...array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []),
+            ])));
         }
         $item['is_manual'] = true;
         $updated = true;
@@ -516,6 +520,19 @@ function nammu_actuality_manual_image_url(string $image, string $baseUrl): strin
     return $base . '/' . $normalized;
 }
 
+function nammu_actuality_manual_images($images, string $baseUrl): array
+{
+    $rawItems = is_array($images) ? $images : preg_split('/[\n,]+/', (string) $images);
+    $normalized = [];
+    foreach ((array) $rawItems as $image) {
+        $url = nammu_actuality_manual_image_url((string) $image, $baseUrl);
+        if ($url !== '') {
+            $normalized[] = $url;
+        }
+    }
+    return array_values(array_unique($normalized));
+}
+
 function nammu_actuality_prune_manual_items(array $items): array
 {
     $cutoff = time() - (60 * 86400);
@@ -535,6 +552,13 @@ function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $
     $items = is_array($store['items'] ?? null) ? $store['items'] : [];
     $id = substr(sha1($parts['title'] . '|' . $text . '|' . microtime(true) . '|' . random_int(0, PHP_INT_MAX)), 0, 16);
     $timestamp = time();
+    $metaImages = nammu_actuality_manual_images((array) ($meta['images'] ?? []), $baseUrl);
+    $primaryImage = nammu_actuality_manual_image_url($image, $baseUrl);
+    $images = $metaImages;
+    if ($primaryImage !== '') {
+        array_unshift($images, $primaryImage);
+    }
+    $images = array_values(array_unique(array_filter($images)));
     $item = [
         'id' => $id,
         'title' => $parts['title'],
@@ -543,12 +567,16 @@ function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $
         'links' => $parts['links'],
         'timestamp' => $timestamp,
         'link' => nammu_actuality_manual_anchor_url($baseUrl, $id),
-        'image' => trim($image),
+        'image' => $images[0] ?? $primaryImage,
+        'images' => $images,
         'source' => $siteTitle !== '' ? $siteTitle : 'Actualidad',
         'is_manual' => true,
     ];
     foreach ($meta as $metaKey => $metaValue) {
-        if (is_scalar($metaValue) || $metaValue === null) {
+        if ($metaKey === 'images') {
+            continue;
+        }
+        if (is_scalar($metaValue) || $metaValue === null || is_array($metaValue)) {
             $item[(string) $metaKey] = $metaValue;
         }
     }
@@ -1015,6 +1043,7 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
             'title' => trim((string) ($item['title'] ?? '')),
             'link' => trim((string) ($item['link'] ?? nammu_actuality_manual_anchor_url($publicBaseUrl, $manualId))),
             'image' => nammu_actuality_manual_image_url((string) ($item['image'] ?? ''), $publicBaseUrl),
+            'images' => nammu_actuality_manual_images((array) ($item['images'] ?? []), $publicBaseUrl),
             'description' => nammu_actuality_manual_plain_text((string) ($item['description'] ?? '')),
             'raw_text' => nammu_actuality_manual_plain_text((string) ($item['raw_text'] ?? '')),
             'links' => array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : []))),

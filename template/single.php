@@ -566,7 +566,7 @@ if ($isPageTemplate && $formattedDate !== '') {
     .fediverse-inline-metrics {
         display: flex;
         flex-wrap: wrap;
-        justify-content: center;
+        justify-content: flex-start;
         gap: .65rem;
     }
     .fediverse-inline-metric-group {

@@ -150,8 +150,16 @@ $serverDayExpires = date(DATE_RFC2822, strtotime('today 23:59:59'));
 $serverConsentDate = date('Y-m-d');
 $serverConsentExpires = gmdate('D, d M Y H:i:s T', time() + 31536000);
 $serverYearExpires = gmdate('D, d M Y H:i:s T', time() + 31536000);
+$allowContentWithoutStatsConsent = false;
+if (
+    preg_match('#^/fediverso/[a-f0-9]{24}/?$#i', $requestPath) === 1
+    || preg_match('#^/@[^/]+@[^/]+/?$#', $requestPath) === 1
+    || $requestPath === '/actualidad.php'
+) {
+    $allowContentWithoutStatsConsent = true;
+}
 $contentOutput = $content;
-if (!$statsConsentGiven && !$isCrawler) {
+if (!$statsConsentGiven && !$isCrawler && !$allowContentWithoutStatsConsent) {
     $contentOutput = '<section class="consent-required-notice"><p>Debes aceptar las cookies de estadisticas para poder leer el contenido.</p></section>';
 }
 if ($isCrawler) {

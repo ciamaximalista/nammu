@@ -175,8 +175,22 @@ function nammu_actuality_list_news_items(): array
         if (!is_array($item)) {
             continue;
         }
-        if (trim((string) ($item['source_kind'] ?? '')) !== 'news') {
+        $isNews = trim((string) ($item['source_kind'] ?? '')) === 'news';
+        if (!$isNews) {
+            $isManual = !empty($item['is_manual']);
+            $isSiteContent = !empty($item['is_site_content']);
+            $siteContentType = trim((string) ($item['site_content_type'] ?? ''));
+            $hasFeedShape = trim((string) ($item['link'] ?? '')) !== '' && trim((string) ($item['title'] ?? '')) !== '';
+            $isNews = !$isManual && !$isSiteContent && $siteContentType === '' && $hasFeedShape;
+        }
+        if (!$isNews) {
             continue;
+        }
+        if (trim((string) ($item['id'] ?? '')) === '') {
+            $item['id'] = nammu_actuality_news_item_id($item);
+        }
+        if (trim((string) ($item['source_kind'] ?? '')) === '') {
+            $item['source_kind'] = 'news';
         }
         $items[] = $item;
     }
@@ -202,16 +216,7 @@ function nammu_actuality_get_news_item(string $id): ?array
 
 function nammu_actuality_has_persisted_news_items(): bool
 {
-    $snapshot = nammu_actuality_load_items_snapshot();
-    foreach ((array) ($snapshot['items'] ?? []) as $item) {
-        if (!is_array($item)) {
-            continue;
-        }
-        if (trim((string) ($item['source_kind'] ?? '')) === 'news') {
-            return true;
-        }
-    }
-    return false;
+    return !empty(nammu_actuality_list_news_items());
 }
 
 function nammu_actuality_update_news_item(string $id, string $title, string $description, string $link, string $baseUrl, ?string $image = null, ?array $images = null): bool

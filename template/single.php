@@ -412,7 +412,7 @@ if ($isPageTemplate && $formattedDate !== '') {
                 </div>
                 <div class="fediverse-inline-metrics">
                     <div class="fediverse-inline-metric-group">
-                        <span><?= (int) ($fediverseThreadSummary['replies'] ?? 0) ?> respuesta<?= ((int) ($fediverseThreadSummary['replies'] ?? 0) === 1) ? '' : 's' ?></span>
+                        <a class="fediverse-inline-metric-label" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>"><?= (int) ($fediverseThreadSummary['replies'] ?? 0) ?> respuesta<?= ((int) ($fediverseThreadSummary['replies'] ?? 0) === 1) ? '' : 's' ?></a>
                         <?php if (!empty($fediverseThreadDetails['replies'])): ?>
                             <span class="fediverse-inline-actor-icons">
                                 <?php foreach ((array) $fediverseThreadDetails['replies'] as $replyActor): ?>
@@ -429,7 +429,7 @@ if ($isPageTemplate && $formattedDate !== '') {
                         <?php endif; ?>
                     </div>
                     <div class="fediverse-inline-metric-group">
-                        <span><?= (int) ($fediverseThreadSummary['likes'] ?? 0) ?> favorito<?= ((int) ($fediverseThreadSummary['likes'] ?? 0) === 1) ? '' : 's' ?></span>
+                        <a class="fediverse-inline-metric-label" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>"><?= (int) ($fediverseThreadSummary['likes'] ?? 0) ?> favorito<?= ((int) ($fediverseThreadSummary['likes'] ?? 0) === 1) ? '' : 's' ?></a>
                         <?php if (!empty($fediverseThreadDetails['likes'])): ?>
                             <span class="fediverse-inline-actor-icons">
                                 <?php foreach ((array) $fediverseThreadDetails['likes'] as $likeActor): ?>
@@ -446,7 +446,7 @@ if ($isPageTemplate && $formattedDate !== '') {
                         <?php endif; ?>
                     </div>
                     <div class="fediverse-inline-metric-group">
-                        <span><?= (int) ($fediverseThreadSummary['shares'] ?? 0) ?> impulso<?= ((int) ($fediverseThreadSummary['shares'] ?? 0) === 1) ? '' : 's' ?></span>
+                        <a class="fediverse-inline-metric-label" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>"><?= (int) ($fediverseThreadSummary['shares'] ?? 0) ?> impulso<?= ((int) ($fediverseThreadSummary['shares'] ?? 0) === 1) ? '' : 's' ?></a>
                         <?php if (!empty($fediverseThreadDetails['shares'])): ?>
                             <span class="fediverse-inline-actor-icons">
                                 <?php foreach ((array) $fediverseThreadDetails['shares'] as $shareActor): ?>
@@ -549,18 +549,19 @@ if ($isPageTemplate && $formattedDate !== '') {
         color: <?= $fediverseButtonTextColor ?>;
     }
     .fediverse-object-heading {
-        text-align: center;
+        text-align: left;
         margin-bottom: .85rem;
     }
     .fediverse-object-heading-link {
         display: inline-flex;
         align-items: center;
         gap: .6rem;
-        color: inherit;
+        color: <?= $headingSecondaryColor ?>;
         text-decoration: none;
     }
     .fediverse-object-heading-link:hover {
-        text-decoration: none;
+        color: <?= $accentColor ?>;
+        text-decoration: underline;
     }
     .fediverse-inline-metrics {
         display: flex;
@@ -578,6 +579,14 @@ if ($isPageTemplate && $formattedDate !== '') {
         padding: .35rem .45rem .35rem .8rem;
         font-size: .95rem;
         line-height: 1.2;
+    }
+    .fediverse-inline-metric-label {
+        color: inherit;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .fediverse-inline-metric-label:hover {
+        text-decoration: underline;
     }
     .fediverse-inline-actor-icons {
         display: inline-flex;

@@ -42,14 +42,27 @@ if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons'
     $headerButtonsHtml = nammu_render_standard_header_buttons(get_defined_vars());
 }
 $fediverseIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';
-$actualityFediverseLink = static function (array $item): string {
-    if (!function_exists('nammu_fediverse_public_thread_url_for_actuality_item')) {
-        return '';
+$fediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
+$fediverseConfig = is_array($fediverseConfig) ? $fediverseConfig : [];
+$actualityFediverseMeta = static function (array $item) use ($fediverseConfig): array {
+    if (!function_exists('nammu_fediverse_public_thread_meta_for_actuality_item')) {
+        return [
+            'thread_url' => '',
+            'summary' => ['likes' => 0, 'shares' => 0, 'replies' => 0],
+            'details' => ['likes' => [], 'shares' => [], 'replies' => []],
+        ];
     }
-    $fediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
-    return trim((string) nammu_fediverse_public_thread_url_for_actuality_item($item, is_array($fediverseConfig) ? $fediverseConfig : []));
+    return nammu_fediverse_public_thread_meta_for_actuality_item($item, $fediverseConfig);
 };
-$renderActualityText = static function (string $text, array $item) use ($fediverseIcon, $actualityFediverseLink): string {
+$actualityMetricIcon = static function (string $type): string {
+    return match ($type) {
+        'reply' => '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M20 4H4a2 2 0 0 0-2 2v14l4-4h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Z"/></svg>',
+        'like' => '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="m12 21-1.45-1.32C5.4 15.02 2 11.93 2 8.14 2 5.05 4.42 3 7.2 3c1.57 0 3.08.74 4.05 1.91A5.26 5.26 0 0 1 15.3 3C18.08 3 20.5 5.05 20.5 8.14c0 3.79-3.4 6.88-8.55 11.54Z"/></svg>',
+        'share' => '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17 8V5l5 5-5 5v-3h-4a7 7 0 0 0-7 7v1H4v-1a9 9 0 0 1 9-9h4Z"/><path fill="currentColor" d="M7 4h6v2H7a3 3 0 0 0-3 3v4H2V9a5 5 0 0 1 5-5Z"/></svg>',
+        default => '',
+    };
+};
+$renderActualityText = static function (string $text, array $item) use ($fediverseIcon, $actualityFediverseMeta, $actualityMetricIcon): string {
     $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
     $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
     $boostLinks = array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : [])));
@@ -59,9 +72,24 @@ $renderActualityText = static function (string $text, array $item) use ($fediver
             $html .= ' <a class="actuality-fediverse-inline" href="' . htmlspecialchars($originalUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" title="Publicación original en el Fediverso" aria-label="Publicación original en el Fediverso">' . $fediverseIcon . '</a>';
         }
     }
-    $fediverseUrl = $actualityFediverseLink($item);
+    $fediverseMeta = $actualityFediverseMeta($item);
+    $fediverseUrl = trim((string) ($fediverseMeta['thread_url'] ?? ''));
     if ($fediverseUrl !== '' && $fediverseIcon !== '') {
-        $html .= ' <a class="actuality-fediverse-inline" href="' . htmlspecialchars($fediverseUrl, ENT_QUOTES, 'UTF-8') . '" title="En el Fediverso" aria-label="En el Fediverso">' . $fediverseIcon . '</a>';
+        $summary = is_array($fediverseMeta['summary'] ?? null) ? $fediverseMeta['summary'] : [];
+        $replyCount = max(0, (int) ($summary['replies'] ?? 0));
+        $likeCount = max(0, (int) ($summary['likes'] ?? 0));
+        $shareCount = max(0, (int) ($summary['shares'] ?? 0));
+        $metricsHtml = '';
+        if ($replyCount > 0) {
+            $metricsHtml .= '<span class="actuality-fediverse-inline-count">' . $replyCount . '</span><span class="actuality-fediverse-inline-icon actuality-fediverse-inline-icon--metric">' . $actualityMetricIcon('reply') . '</span>';
+        }
+        if ($likeCount > 0) {
+            $metricsHtml .= '<span class="actuality-fediverse-inline-count">' . $likeCount . '</span><span class="actuality-fediverse-inline-icon actuality-fediverse-inline-icon--metric">' . $actualityMetricIcon('like') . '</span>';
+        }
+        if ($shareCount > 0) {
+            $metricsHtml .= '<span class="actuality-fediverse-inline-count">' . $shareCount . '</span><span class="actuality-fediverse-inline-icon actuality-fediverse-inline-icon--metric">' . $actualityMetricIcon('share') . '</span>';
+        }
+        $html .= ' <a class="actuality-fediverse-inline" href="' . htmlspecialchars($fediverseUrl, ENT_QUOTES, 'UTF-8') . '" title="En el Fediverso" aria-label="En el Fediverso"><span class="actuality-fediverse-inline-icon">' . $fediverseIcon . '</span>' . $metricsHtml . '</a>';
     }
     return $html;
 };
@@ -468,15 +496,30 @@ $manualDisplayText = static function (array $item): string {
     }
     .actuality-fediverse-inline {
         display: inline-flex;
-        width: 0.95rem;
-        height: 0.95rem;
+        align-items: center;
+        gap: .22rem;
         vertical-align: text-bottom;
         color: <?= $accentColor ?>;
+        text-decoration: none;
+    }
+    .actuality-fediverse-inline-icon {
+        display: inline-flex;
+        width: 0.95rem;
+        height: 0.95rem;
+    }
+    .actuality-fediverse-inline-icon--metric {
+        width: 0.9rem;
+        height: 0.9rem;
     }
     .actuality-fediverse-inline svg {
         width: 100%;
         height: 100%;
         display: block;
+    }
+    .actuality-fediverse-inline-count {
+        font-size: .92rem;
+        line-height: 1;
+        color: <?= $accentColor ?>;
     }
     .actuality-manual-links {
         margin: 1rem 0 0 0;

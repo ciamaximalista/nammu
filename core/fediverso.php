@@ -6147,6 +6147,23 @@ function nammu_fediverse_public_thread_url_for_named_local_item(string $slug, st
     return nammu_fediverse_thread_page_url($itemId, $config);
 }
 
+function nammu_fediverse_public_thread_meta_for_named_local_item(string $slug, string $template, array $config): array
+{
+    $item = nammu_fediverse_find_named_local_item($slug, $template, $config);
+    $threadUrl = nammu_fediverse_public_thread_url_for_named_local_item($slug, $template, $config);
+    $payload = is_array($item) ? nammu_fediverse_thread_page_snapshot_payload($item, $config) : null;
+
+    return [
+        'thread_url' => $threadUrl,
+        'summary' => is_array($payload['summary'] ?? null)
+            ? $payload['summary']
+            : ['likes' => 0, 'shares' => 0, 'replies' => 0],
+        'details' => is_array($payload['details'] ?? null)
+            ? $payload['details']
+            : ['likes' => [], 'shares' => [], 'replies' => []],
+    ];
+}
+
 function nammu_fediverse_public_thread_url_for_actuality_item(array $actualityItem, array $config): string
 {
     $candidateIdentifiers = [];
@@ -6170,6 +6187,44 @@ function nammu_fediverse_public_thread_url_for_actuality_item(array $actualityIt
         return nammu_fediverse_thread_page_url($itemId, $config);
     }
     return '';
+}
+
+function nammu_fediverse_public_thread_meta_for_actuality_item(array $actualityItem, array $config): array
+{
+    $candidateIdentifiers = [];
+    $manualId = trim((string) ($actualityItem['id'] ?? ''));
+    if ($manualId !== '') {
+        $candidateIdentifiers[] = nammu_fediverse_base_url($config) . '/ap/objects/actualidad-' . rawurlencode($manualId);
+    }
+    $link = trim((string) ($actualityItem['link'] ?? ''));
+    if ($link !== '') {
+        $candidateIdentifiers[] = $link;
+    }
+    foreach (array_unique(array_filter($candidateIdentifiers)) as $identifier) {
+        $item = nammu_fediverse_find_local_item_for_identifier($identifier, $config);
+        if (!is_array($item)) {
+            continue;
+        }
+        $itemId = trim((string) ($item['id'] ?? ''));
+        if ($itemId === '' || in_array($itemId, nammu_fediverse_deleted_store()['ids'], true)) {
+            continue;
+        }
+        $payload = nammu_fediverse_thread_page_snapshot_payload($item, $config);
+        return [
+            'thread_url' => nammu_fediverse_thread_page_url($itemId, $config),
+            'summary' => is_array($payload['summary'] ?? null)
+                ? $payload['summary']
+                : ['likes' => 0, 'shares' => 0, 'replies' => 0],
+            'details' => is_array($payload['details'] ?? null)
+                ? $payload['details']
+                : ['likes' => [], 'shares' => [], 'replies' => []],
+        ];
+    }
+    return [
+        'thread_url' => '',
+        'summary' => ['likes' => 0, 'shares' => 0, 'replies' => 0],
+        'details' => ['likes' => [], 'shares' => [], 'replies' => []],
+    ];
 }
 
 function nammu_fediverse_delete_local_item(string $itemId, array $config): array

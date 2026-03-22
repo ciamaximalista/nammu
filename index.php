@@ -1204,6 +1204,9 @@ if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
     ], $socialConfig);
 
     $episodeFilePath = __DIR__ . '/content/' . $episode->getSlug() . '.md';
+    $podcastFediverseThreadMeta = function_exists('nammu_fediverse_public_thread_meta_for_named_local_item')
+        ? nammu_fediverse_public_thread_meta_for_named_local_item($episode->getSlug(), 'podcast', $config)
+        : ['thread_url' => '', 'summary' => ['likes' => 0, 'shares' => 0, 'replies' => 0], 'details' => ['likes' => [], 'shares' => [], 'replies' => []]];
     $content = $renderer->render('single', [
         'pageTitle' => $episodeTitle,
         'post' => $episode,
@@ -1213,7 +1216,8 @@ if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
         'hidePostIntro' => true,
         'relatedPosts' => $relatedPosts,
         'podcastEpisodesIndexUrl' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/podcast',
-        'fediverseThreadUrl' => nammu_fediverse_public_thread_url_for_named_local_item($episode->getSlug(), 'podcast', $config),
+        'fediverseThreadUrl' => (string) ($podcastFediverseThreadMeta['thread_url'] ?? ''),
+        'fediverseThreadMeta' => $podcastFediverseThreadMeta,
         'customMetaBand' => $episodeDateDisplay !== '' ? 'Emitido el ' . $episodeDateDisplay : '',
         'editButtonHref' => $isAdminLogged
             ? (($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/admin.php?page=edit-post&file=' . rawurlencode($episode->getSlug() . '.md'))
@@ -1796,6 +1800,9 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
             $autoTocHtml = $generatedToc;
         }
     }
+    $itineraryFediverseThreadMeta = function_exists('nammu_fediverse_public_thread_meta_for_named_local_item')
+        ? nammu_fediverse_public_thread_meta_for_named_local_item($itinerary->getSlug(), 'itinerary', $config)
+        : ['thread_url' => '', 'summary' => ['likes' => 0, 'shares' => 0, 'replies' => 0], 'details' => ['likes' => [], 'shares' => [], 'replies' => []]];
     $itineraryBody = $renderer->render('single', [
         'pageTitle' => $itinerary->getTitle(),
         'post' => $virtualItineraryPost,
@@ -1808,6 +1815,8 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
         'suppressSingleSearchBottom' => true,
         'suppressSingleSubscriptionTop' => true,
         'suppressSingleSubscriptionBottom' => true,
+        'fediverseThreadUrl' => (string) ($itineraryFediverseThreadMeta['thread_url'] ?? ''),
+        'fediverseThreadMeta' => $itineraryFediverseThreadMeta,
     ]);
     $itineraryBody = preg_replace(
         '#<(?:div|section)\s+class="site-search-block placement-bottom"[^>]*>.*?</(?:div|section)>#si',
@@ -1950,13 +1959,67 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
                     >Comenzar itinerario</a>
                 </div>
             <?php endif; ?>
-            <?php $itineraryFediverseThreadUrl = nammu_fediverse_public_thread_url_for_named_local_item($itinerary->getSlug(), 'itinerary', $config); ?>
-            <?php if ($itineraryFediverseThreadUrl !== ''): ?>
+            <?php if (!empty($itineraryFediverseThreadMeta['thread_url'])): ?>
                 <div class="itinerary-topics__cta">
-                    <a class="button button-secondary" href="<?= htmlspecialchars($itineraryFediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="Comentarios y reacciones a este itinerario en el Fediverso" aria-label="Comentarios y reacciones a este itinerario en el Fediverso" style="display:inline-flex;align-items:center;gap:0.7rem;">
-                        <span>Comentarios y reacciones a este itinerario en el Fediverso</span>
-                        <span aria-hidden="true" style="display:inline-flex;width:1.2rem;height:1.2rem;"><?= nammu_footer_icon_svgs()['fediverse'] ?? '' ?></span>
-                    </a>
+                    <div class="post-related-heading">
+                        <a href="<?= htmlspecialchars((string) $itineraryFediverseThreadMeta['thread_url'], ENT_QUOTES, 'UTF-8') ?>" title="Comentarios y reacciones a este itinerario en el Fediverso" aria-label="Comentarios y reacciones a este itinerario en el Fediverso" style="display:inline-flex;align-items:center;gap:0.55rem;text-decoration:none;color:inherit;">
+                            <span>Comentarios y reacciones a este itinerario en el Fediverso</span>
+                            <span aria-hidden="true" style="display:inline-flex;width:1.1rem;height:1.1rem;"><?= nammu_footer_icon_svgs()['fediverse'] ?? '' ?></span>
+                        </a>
+                    </div>
+                    <div class="fediverse-inline-metrics">
+                        <div class="fediverse-inline-metric-group">
+                            <span><?= (int) (($itineraryFediverseThreadMeta['summary']['replies'] ?? 0)) ?> respuesta<?= ((int) (($itineraryFediverseThreadMeta['summary']['replies'] ?? 0)) === 1) ? '' : 's' ?></span>
+                            <?php if (!empty($itineraryFediverseThreadMeta['details']['replies'])): ?>
+                                <span class="fediverse-inline-actor-icons">
+                                    <?php foreach ((array) $itineraryFediverseThreadMeta['details']['replies'] as $replyActor): ?>
+                                        <?php $replyActorUrl = trim((string) (($replyActor['url'] ?? '') ?: ((string) $itineraryFediverseThreadMeta['thread_url']))); ?>
+                                        <a href="<?= htmlspecialchars($replyActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                            <?php if (!empty($replyActor['icon'])): ?>
+                                                <img src="<?= htmlspecialchars((string) $replyActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                            <?php else: ?>
+                                                <?= htmlspecialchars(mb_substr((string) (($replyActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                            <?php endif; ?>
+                                        </a>
+                                    <?php endforeach; ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="fediverse-inline-metric-group">
+                            <span><?= (int) (($itineraryFediverseThreadMeta['summary']['likes'] ?? 0)) ?> favorito<?= ((int) (($itineraryFediverseThreadMeta['summary']['likes'] ?? 0)) === 1) ? '' : 's' ?></span>
+                            <?php if (!empty($itineraryFediverseThreadMeta['details']['likes'])): ?>
+                                <span class="fediverse-inline-actor-icons">
+                                    <?php foreach ((array) $itineraryFediverseThreadMeta['details']['likes'] as $likeActor): ?>
+                                        <?php $likeActorUrl = trim((string) (($likeActor['url'] ?? '') ?: ((string) $itineraryFediverseThreadMeta['thread_url']))); ?>
+                                        <a href="<?= htmlspecialchars($likeActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                            <?php if (!empty($likeActor['icon'])): ?>
+                                                <img src="<?= htmlspecialchars((string) $likeActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                            <?php else: ?>
+                                                <?= htmlspecialchars(mb_substr((string) (($likeActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                            <?php endif; ?>
+                                        </a>
+                                    <?php endforeach; ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="fediverse-inline-metric-group">
+                            <span><?= (int) (($itineraryFediverseThreadMeta['summary']['shares'] ?? 0)) ?> impulso<?= ((int) (($itineraryFediverseThreadMeta['summary']['shares'] ?? 0)) === 1) ? '' : 's' ?></span>
+                            <?php if (!empty($itineraryFediverseThreadMeta['details']['shares'])): ?>
+                                <span class="fediverse-inline-actor-icons">
+                                    <?php foreach ((array) $itineraryFediverseThreadMeta['details']['shares'] as $shareActor): ?>
+                                        <?php $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: ((string) $itineraryFediverseThreadMeta['thread_url']))); ?>
+                                        <a href="<?= htmlspecialchars($shareActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                            <?php if (!empty($shareActor['icon'])): ?>
+                                                <img src="<?= htmlspecialchars((string) $shareActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                            <?php else: ?>
+                                                <?= htmlspecialchars(mb_substr((string) (($shareActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                            <?php endif; ?>
+                                        </a>
+                                    <?php endforeach; ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                 </div>
             <?php endif; ?>
             <?php if ($usageNotice !== ''): ?>
@@ -2628,6 +2691,9 @@ if ($slug !== null && $slug !== '') {
         }
     }
     $postFilePath = __DIR__ . '/content/' . $post->getSlug() . '.md';
+    $postFediverseThreadMeta = function_exists('nammu_fediverse_public_thread_meta_for_named_local_item')
+        ? nammu_fediverse_public_thread_meta_for_named_local_item($post->getSlug(), 'post', $config)
+        : ['thread_url' => '', 'summary' => ['likes' => 0, 'shares' => 0, 'replies' => 0], 'details' => ['likes' => [], 'shares' => [], 'replies' => []]];
     $content = $renderer->render('single', [
         'pageTitle' => $post->getTitle(),
         'post' => $post,
@@ -2635,7 +2701,8 @@ if ($slug !== null && $slug !== '') {
         'postFilePath' => $postFilePath,
         'autoTocHtml' => $autoTocHtml,
         'relatedPosts' => $relatedPosts,
-        'fediverseThreadUrl' => nammu_fediverse_public_thread_url_for_named_local_item($post->getSlug(), 'post', $config),
+        'fediverseThreadUrl' => (string) ($postFediverseThreadMeta['thread_url'] ?? ''),
+        'fediverseThreadMeta' => $postFediverseThreadMeta,
         'editButtonHref' => $isAdminLogged
             ? (($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/admin.php?page=edit-post&file=' . rawurlencode($post->getSlug() . '.md'))
             : '',

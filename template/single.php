@@ -27,6 +27,9 @@ $fonts = $theme['fonts'] ?? [];
 $codeFont = htmlspecialchars($fonts['code'] ?? 'VT323', ENT_QUOTES, 'UTF-8');
 $quoteFont = htmlspecialchars($fonts['quote'] ?? 'Castoro', ENT_QUOTES, 'UTF-8');
 $fediverseThreadUrl = trim((string) ($fediverseThreadUrl ?? ''));
+$fediverseThreadMeta = is_array($fediverseThreadMeta ?? null) ? $fediverseThreadMeta : [];
+$fediverseThreadSummary = is_array($fediverseThreadMeta['summary'] ?? null) ? $fediverseThreadMeta['summary'] : ['likes' => 0, 'shares' => 0, 'replies' => 0];
+$fediverseThreadDetails = is_array($fediverseThreadMeta['details'] ?? null) ? $fediverseThreadMeta['details'] : ['likes' => [], 'shares' => [], 'replies' => []];
 $fediverseIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';
 $searchSettings = $theme['search'] ?? [];
 $searchMode = in_array($searchSettings['mode'] ?? 'none', ['none', 'home', 'single', 'both'], true) ? $searchSettings['mode'] : 'none';
@@ -391,20 +394,75 @@ if ($isPageTemplate && $formattedDate !== '') {
             </div>
         <?php endif; ?>
         <?php if ($fediverseThreadUrl !== ''): ?>
-            <div class="fediverse-object-cta">
+            <div class="fediverse-object-cta" aria-label="Resumen en el Fediverso">
                 <?php
                 $fediverseButtonLabel = $isItineraryTemplate
-                    ? 'Comentarios y reacciones en el Fediverso'
+                    ? 'Comentarios y reacciones a este itinerario en el Fediverso'
                     : ($isPodcastTemplate
                         ? 'Comentarios y reacciones a este episodio en el Fediverso'
                         : 'Comentarios y reacciones a esta entrada en el Fediverso');
                 ?>
-                <a class="fediverse-object-cta-btn" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($fediverseButtonLabel, ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($fediverseButtonLabel, ENT_QUOTES, 'UTF-8') ?>">
-                    <span class="fediverse-object-cta-label"><?= htmlspecialchars($fediverseButtonLabel, ENT_QUOTES, 'UTF-8') ?></span>
-                    <?php if ($fediverseIcon !== ''): ?>
-                        <span class="fediverse-object-cta-icon" aria-hidden="true"><?= $fediverseIcon ?></span>
-                    <?php endif; ?>
-                </a>
+                <div class="post-related-heading fediverse-object-heading">
+                    <a class="fediverse-object-heading-link" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($fediverseButtonLabel, ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($fediverseButtonLabel, ENT_QUOTES, 'UTF-8') ?>">
+                        <span class="fediverse-object-cta-label"><?= htmlspecialchars($fediverseButtonLabel, ENT_QUOTES, 'UTF-8') ?></span>
+                        <?php if ($fediverseIcon !== ''): ?>
+                            <span class="fediverse-object-cta-icon" aria-hidden="true"><?= $fediverseIcon ?></span>
+                        <?php endif; ?>
+                    </a>
+                </div>
+                <div class="fediverse-inline-metrics">
+                    <div class="fediverse-inline-metric-group">
+                        <span><?= (int) ($fediverseThreadSummary['replies'] ?? 0) ?> respuesta<?= ((int) ($fediverseThreadSummary['replies'] ?? 0) === 1) ? '' : 's' ?></span>
+                        <?php if (!empty($fediverseThreadDetails['replies'])): ?>
+                            <span class="fediverse-inline-actor-icons">
+                                <?php foreach ((array) $fediverseThreadDetails['replies'] as $replyActor): ?>
+                                    <?php $replyActorUrl = trim((string) (($replyActor['url'] ?? '') ?: $fediverseThreadUrl)); ?>
+                                    <a href="<?= htmlspecialchars($replyActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                        <?php if (!empty($replyActor['icon'])): ?>
+                                            <img src="<?= htmlspecialchars((string) $replyActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                        <?php else: ?>
+                                            <?= htmlspecialchars(mb_substr((string) (($replyActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                        <?php endif; ?>
+                                    </a>
+                                <?php endforeach; ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="fediverse-inline-metric-group">
+                        <span><?= (int) ($fediverseThreadSummary['likes'] ?? 0) ?> favorito<?= ((int) ($fediverseThreadSummary['likes'] ?? 0) === 1) ? '' : 's' ?></span>
+                        <?php if (!empty($fediverseThreadDetails['likes'])): ?>
+                            <span class="fediverse-inline-actor-icons">
+                                <?php foreach ((array) $fediverseThreadDetails['likes'] as $likeActor): ?>
+                                    <?php $likeActorUrl = trim((string) (($likeActor['url'] ?? '') ?: $fediverseThreadUrl)); ?>
+                                    <a href="<?= htmlspecialchars($likeActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                        <?php if (!empty($likeActor['icon'])): ?>
+                                            <img src="<?= htmlspecialchars((string) $likeActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                        <?php else: ?>
+                                            <?= htmlspecialchars(mb_substr((string) (($likeActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                        <?php endif; ?>
+                                    </a>
+                                <?php endforeach; ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="fediverse-inline-metric-group">
+                        <span><?= (int) ($fediverseThreadSummary['shares'] ?? 0) ?> impulso<?= ((int) ($fediverseThreadSummary['shares'] ?? 0) === 1) ? '' : 's' ?></span>
+                        <?php if (!empty($fediverseThreadDetails['shares'])): ?>
+                            <span class="fediverse-inline-actor-icons">
+                                <?php foreach ((array) $fediverseThreadDetails['shares'] as $shareActor): ?>
+                                    <?php $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: $fediverseThreadUrl)); ?>
+                                    <a href="<?= htmlspecialchars($shareActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                        <?php if (!empty($shareActor['icon'])): ?>
+                                            <img src="<?= htmlspecialchars((string) $shareActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                        <?php else: ?>
+                                            <?= htmlspecialchars(mb_substr((string) (($shareActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                        <?php endif; ?>
+                                    </a>
+                                <?php endforeach; ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
         <?php endif; ?>
         <?php if (!empty($relatedPosts)): ?>
@@ -474,26 +532,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         margin: 0.35rem auto 1rem;
     }
     .fediverse-object-cta {
-        display: flex;
-        justify-content: center;
         margin: 1.5rem auto 0;
-    }
-    .fediverse-object-cta-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.7rem;
-        padding: 0.8rem 1.1rem;
-        border-radius: 999px;
-        border: 1px solid rgba(0,0,0,0.12);
-        background: rgba(255,255,255,0.88);
-        color: inherit;
-        text-decoration: none;
-        font-weight: 700;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-    }
-    .fediverse-object-cta-btn:hover {
-        text-decoration: none;
-        transform: translateY(-1px);
     }
     .fediverse-object-cta-icon {
         display: inline-flex;
@@ -508,6 +547,62 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .fediverse-object-cta-label {
         color: <?= $fediverseButtonTextColor ?>;
+    }
+    .fediverse-object-heading {
+        text-align: center;
+        margin-bottom: .85rem;
+    }
+    .fediverse-object-heading-link {
+        display: inline-flex;
+        align-items: center;
+        gap: .6rem;
+        color: inherit;
+        text-decoration: none;
+    }
+    .fediverse-object-heading-link:hover {
+        text-decoration: none;
+    }
+    .fediverse-inline-metrics {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: .65rem;
+    }
+    .fediverse-inline-metric-group {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        background: rgba(255,255,255,0.88);
+        border: 1px solid rgba(0,0,0,.08);
+        border-radius: 999px;
+        padding: .35rem .45rem .35rem .8rem;
+        font-size: .95rem;
+        line-height: 1.2;
+    }
+    .fediverse-inline-actor-icons {
+        display: inline-flex;
+        align-items: center;
+        gap: .25rem;
+    }
+    .fediverse-inline-actor-icons a {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        overflow: hidden;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #dfe7ef;
+        text-decoration: none;
+        color: inherit;
+        border: 1px solid rgba(0,0,0,.08);
+        font-weight: 700;
+    }
+    .fediverse-inline-actor-icons img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
     }
     .post-body .podcast-video-single {
         width: min(960px, 100%);

@@ -3179,6 +3179,7 @@ function nammu_fediverse_local_reaction_summary(array $config): array
     $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
     $hiddenLookup = nammu_fediverse_hidden_reply_lookup();
     $summary = [];
+    $seenActors = [];
     foreach ($activities as $entry) {
         $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
         $type = strtolower(trim((string) ($payload['type'] ?? '')));
@@ -3221,10 +3222,19 @@ function nammu_fediverse_local_reaction_summary(array $config): array
                 'replies' => 0,
             ];
         }
+        $actorId = trim((string) ($payload['actor'] ?? ''));
         if ($type === 'like') {
-            $summary[$localId]['likes']++;
+            $key = 'likes|' . ($actorId !== '' ? $actorId : sha1(json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: ''));
+            if (!isset($seenActors[$localId][$key])) {
+                $seenActors[$localId][$key] = true;
+                $summary[$localId]['likes']++;
+            }
         } elseif ($type === 'announce') {
-            $summary[$localId]['shares']++;
+            $key = 'shares|' . ($actorId !== '' ? $actorId : sha1(json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: ''));
+            if (!isset($seenActors[$localId][$key])) {
+                $seenActors[$localId][$key] = true;
+                $summary[$localId]['shares']++;
+            }
         } elseif ($type === 'create') {
             $summary[$localId]['replies']++;
         }
@@ -3246,7 +3256,12 @@ function nammu_fediverse_local_reaction_summary(array $config): array
         }
         $type = strtolower(trim((string) ($item['type'] ?? '')));
         if ($type === 'announce') {
-            $summary[$localId]['shares']++;
+            $actorId = trim((string) ($item['actor_id'] ?? ''));
+            $key = 'shares|' . ($actorId !== '' ? $actorId : sha1(json_encode($item, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: ''));
+            if (!isset($seenActors[$localId][$key])) {
+                $seenActors[$localId][$key] = true;
+                $summary[$localId]['shares']++;
+            }
             continue;
         }
         $replyEntry = [
@@ -3260,6 +3275,46 @@ function nammu_fediverse_local_reaction_summary(array $config): array
             continue;
         }
         $summary[$localId]['replies']++;
+    }
+    $localActorId = nammu_fediverse_actor_url($config);
+    foreach (nammu_fediverse_actions_store()['items'] as $action) {
+        $type = strtolower(trim((string) ($action['type'] ?? '')));
+        if (!in_array($type, ['like', 'share', 'boost'], true)) {
+            continue;
+        }
+        $target = trim((string) ($action['object_url'] ?? ''));
+        if ($target === '') {
+            continue;
+        }
+        if (!isset($index[$target])) {
+            $canonicalTarget = nammu_fediverse_canonical_local_id_for_identifier($target, $config);
+            if ($canonicalTarget !== '' && isset($index[$canonicalTarget])) {
+                $target = $canonicalTarget;
+            }
+        }
+        if (!isset($index[$target])) {
+            continue;
+        }
+        $localItem = nammu_fediverse_canonical_local_item($index[$target], $config);
+        $localId = trim((string) ($localItem['id'] ?? ''));
+        if ($localId === '') {
+            continue;
+        }
+        if (!isset($summary[$localId])) {
+            $summary[$localId] = [
+                'item' => $localItem,
+                'likes' => 0,
+                'shares' => 0,
+                'replies' => 0,
+            ];
+        }
+        $bucket = $type === 'like' ? 'likes' : 'shares';
+        $key = $bucket . '|' . $localActorId;
+        if (isset($seenActors[$localId][$key])) {
+            continue;
+        }
+        $seenActors[$localId][$key] = true;
+        $summary[$localId][$bucket]++;
     }
     return $summary;
 }

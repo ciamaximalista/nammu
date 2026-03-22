@@ -232,10 +232,51 @@ function nammu_actuality_fetch_url(string $url, string $accept = 'text/html,appl
 
 function nammu_actuality_rss_settings(array $config): array
 {
-    $socialRss = is_array($config['social_rss'] ?? null) ? $config['social_rss'] : [];
     return [
-        'feeds' => trim((string) ($socialRss['feeds'] ?? '')),
+        'feeds' => implode("\n", nammu_actuality_feed_urls($config)),
     ];
+}
+
+function nammu_actuality_feed_urls(array $config): array
+{
+    $feeds = [];
+
+    $nisaba = is_array($config['nisaba'] ?? null) ? $config['nisaba'] : [];
+    $nisabaUrls = is_array($nisaba['urls'] ?? null) ? $nisaba['urls'] : [];
+    $legacyNisabaUrl = trim((string) ($nisaba['url'] ?? ''));
+    if ($legacyNisabaUrl !== '') {
+        array_unshift($nisabaUrls, $legacyNisabaUrl);
+    }
+    foreach ($nisabaUrls as $nisabaUrl) {
+        $candidate = trim((string) $nisabaUrl);
+        if ($candidate === '') {
+            continue;
+        }
+        if (function_exists('admin_nisaba_feed_url')) {
+            $feeds[] = trim((string) admin_nisaba_feed_url($candidate));
+        } else {
+            $feeds[] = $candidate;
+        }
+    }
+
+    $telex = is_array($config['telex'] ?? null) ? $config['telex'] : [];
+    $telexUrls = is_array($telex['urls'] ?? null) ? $telex['urls'] : [];
+    foreach ($telexUrls as $url) {
+        $candidate = trim((string) $url);
+        if ($candidate === '') {
+            continue;
+        }
+        if (function_exists('admin_telex_normalize_feed_url')) {
+            $candidate = trim((string) admin_telex_normalize_feed_url($candidate));
+        }
+        if ($candidate !== '' && preg_match('#^https?://#i', $candidate)) {
+            $feeds[] = $candidate;
+        }
+    }
+
+    return array_values(array_unique(array_filter($feeds, static function (string $url): bool {
+        return $url !== '' && preg_match('#^https?://#i', $url);
+    })));
 }
 
 function nammu_actuality_rss_feed_list(string $feedsRaw): array
@@ -928,8 +969,7 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
 
 function nammu_actuality_has_feeds(array $config): bool
 {
-    $socialRssConfig = is_array($config['social_rss'] ?? null) ? $config['social_rss'] : [];
-    return trim((string) ($socialRssConfig['feeds'] ?? '')) !== '';
+    return !empty(nammu_actuality_feed_urls($config));
 }
 
 function nammu_actuality_has_manual_items(): bool
@@ -1114,8 +1154,7 @@ function nammu_actuality_page_items(array $config, string $contentDir, string $i
 
 function nammu_actuality_collect_items(array $config, string $publicBaseUrl): array
 {
-    $rssSettings = nammu_actuality_rss_settings(['social_rss' => $config['social_rss'] ?? []]);
-    $feeds = nammu_actuality_rss_feed_list($rssSettings['feeds']);
+    $feeds = nammu_actuality_feed_urls($config);
     $items = [];
     $seen = [];
     foreach ($feeds as $feedUrl) {

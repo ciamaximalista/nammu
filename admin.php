@@ -60,6 +60,7 @@ function admin_run_scheduled_tasks(): array {
     $published = 0;
     $queueStats = ['processed' => 0, 'remaining' => 0];
     $rssStats = ['sent' => 0, 'checked' => 0];
+    $socialBroadcastQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $fediverseStats = ['checked' => 0, 'new' => 0, 'followers' => 0, 'delivered' => 0];
     if (function_exists('nammu_publish_scheduled_posts')) {
         $published = (int) nammu_publish_scheduled_posts(CONTENT_DIR);
@@ -81,6 +82,9 @@ function admin_run_scheduled_tasks(): array {
     if (function_exists('admin_process_social_rss_feeds')) {
         $rssStats = admin_process_social_rss_feeds();
     }
+    if (function_exists('admin_process_social_broadcast_queue')) {
+        $socialBroadcastQueueStats = admin_process_social_broadcast_queue(1);
+    }
     if (function_exists('nammu_fediverse_refresh_following')) {
         $fediverseStats = nammu_fediverse_refresh_following();
         if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
@@ -101,6 +105,10 @@ function admin_run_scheduled_tasks(): array {
         'notifications_remaining' => (int) ($queueStats['remaining'] ?? 0),
         'social_rss_sent' => (int) ($rssStats['sent'] ?? 0),
         'social_rss_checked' => (int) ($rssStats['checked'] ?? 0),
+        'social_broadcast_queue_processed' => (int) ($socialBroadcastQueueStats['processed'] ?? 0),
+        'social_broadcast_queue_sent' => (int) ($socialBroadcastQueueStats['sent'] ?? 0),
+        'social_broadcast_queue_failed' => (int) ($socialBroadcastQueueStats['failed'] ?? 0),
+        'social_broadcast_queue_remaining' => (int) ($socialBroadcastQueueStats['remaining'] ?? 0),
         'fediverse_checked' => (int) ($fediverseStats['checked'] ?? 0),
         'fediverse_new' => (int) ($fediverseStats['new'] ?? 0),
         'fediverse_followers' => (int) ($fediverseStats['followers'] ?? 0),
@@ -9115,12 +9123,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: admin.php?page=configuracion');
         exit;
     } elseif (isset($_POST['save_nisaba'])) {
-        $nisaba_url = trim($_POST['nisaba_url'] ?? '');
+        $nisaba_raw = trim((string) ($_POST['nisaba_urls'] ?? ''));
+        $nisaba_urls = array_values(array_filter(array_map('trim', preg_split('/\\r?\\n/', $nisaba_raw))));
+        $nisaba_urls = array_values(array_filter($nisaba_urls, static function (string $url): bool {
+            return $url !== '' && preg_match('#^https?://#i', $url);
+        }));
         try {
             $config = load_config_file();
-            if ($nisaba_url !== '') {
+            if (!empty($nisaba_urls)) {
                 $config['nisaba'] = [
-                    'url' => $nisaba_url,
+                    'urls' => $nisaba_urls,
                 ];
                 $_SESSION['nisaba_feedback'] = [
                     'type' => 'success',
@@ -10263,10 +10275,6 @@ if ($isLoggedIn && $page === 'redes') {
     $socialBroadcastImage = (string) ($socialBroadcastState['image'] ?? '');
     $socialBroadcastActuality = !empty($socialBroadcastState['actuality']);
     $socialBroadcastNetworks = is_array($socialBroadcastState['networks'] ?? null) ? $socialBroadcastState['networks'] : [];
-    $socialRssState = admin_handle_social_rss_settings_request(get_settings());
-    $socialRssFeedback = $socialRssState['feedback'] ?? null;
-    $socialRssFeedsRaw = (string) ($socialRssState['feeds_raw'] ?? '');
-    $socialRssNetworks = is_array($socialRssState['networks'] ?? null) ? $socialRssState['networks'] : [];
 }
 if ($isLoggedIn && $page === 'fediverso') {
     require_once __DIR__ . '/core/fediverso.php';
@@ -10933,12 +10941,18 @@ $socialTwitter = $socialSettings['twitter'] ?? '';
 $socialLinkedin = $socialSettings['linkedin'] ?? '';
 $socialFacebookAppId = $socialSettings['facebook_app_id'] ?? '';
 $nisabaConfig = $settings['nisaba'] ?? [];
-$nisabaUrl = $nisabaConfig['url'] ?? '';
-$nisabaEnabled = $nisabaUrl !== '' && function_exists('admin_nisaba_fetch_notes');
-$nisabaFeedUrl = $nisabaEnabled ? admin_nisaba_feed_url($nisabaUrl) : '';
+$nisabaUrls = is_array($nisabaConfig['urls'] ?? null) ? $nisabaConfig['urls'] : [];
+$nisabaUrl = trim((string) ($nisabaConfig['url'] ?? ''));
+if ($nisabaUrl !== '' && !in_array($nisabaUrl, $nisabaUrls, true)) {
+    array_unshift($nisabaUrls, $nisabaUrl);
+}
+$nisabaUrlsValue = implode("\n", array_values(array_filter(array_map('strval', $nisabaUrls))));
+$nisabaPrimaryUrl = $nisabaUrls[0] ?? '';
+$nisabaEnabled = $nisabaPrimaryUrl !== '' && function_exists('admin_nisaba_fetch_notes');
+$nisabaFeedUrl = $nisabaEnabled ? admin_nisaba_feed_url($nisabaPrimaryUrl) : '';
 $nisabaPages = ['publish', 'edit', 'edit-post', 'itinerario', 'itinerario-tema'];
 $nisabaModalEnabled = $nisabaEnabled && in_array($page, $nisabaPages, true);
-$nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaUrl, 14) : [];
+$nisabaNotes = $nisabaModalEnabled ? admin_nisaba_fetch_notes($nisabaPrimaryUrl, 14) : [];
 $telexConfig = $settings['telex'] ?? [];
 $telexUrls = is_array($telexConfig['urls'] ?? null) ? $telexConfig['urls'] : [];
 $telexEnabled = !empty($telexUrls) && function_exists('admin_telex_fetch_notes');

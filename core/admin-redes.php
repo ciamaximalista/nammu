@@ -46,15 +46,61 @@ function admin_social_rss_state_file(): string
     return __DIR__ . '/../config/social-rss-state.json';
 }
 
+function admin_social_broadcast_queue_file(): string
+{
+    return __DIR__ . '/../config/social-broadcast-queue.json';
+}
+
 function admin_social_rss_settings(array $settings): array
 {
-    $rss = is_array($settings['social_rss'] ?? null) ? $settings['social_rss'] : [];
-    $feedsRaw = trim((string) ($rss['feeds'] ?? ''));
-    $networks = array_values(array_unique(array_filter(array_map('strval', $rss['networks'] ?? []))));
+    $feeds = admin_social_rss_feed_urls_from_settings($settings);
+    $availableNetworks = admin_social_broadcast_available_networks($settings);
     return [
-        'feeds' => $feedsRaw,
-        'networks' => $networks,
+        'feeds' => implode("\n", $feeds),
+        'networks' => array_keys($availableNetworks),
     ];
+}
+
+function admin_social_rss_feed_urls_from_settings(array $settings): array
+{
+    $feeds = [];
+
+    $nisaba = is_array($settings['nisaba'] ?? null) ? $settings['nisaba'] : [];
+    $nisabaUrls = is_array($nisaba['urls'] ?? null) ? $nisaba['urls'] : [];
+    $legacyNisabaUrl = trim((string) ($nisaba['url'] ?? ''));
+    if ($legacyNisabaUrl !== '') {
+        array_unshift($nisabaUrls, $legacyNisabaUrl);
+    }
+    foreach ($nisabaUrls as $nisabaUrl) {
+        $candidate = trim((string) $nisabaUrl);
+        if ($candidate === '') {
+            continue;
+        }
+        if (function_exists('admin_nisaba_feed_url')) {
+            $feeds[] = trim((string) admin_nisaba_feed_url($candidate));
+        } else {
+            $feeds[] = $candidate;
+        }
+    }
+
+    $telex = is_array($settings['telex'] ?? null) ? $settings['telex'] : [];
+    $telexUrls = is_array($telex['urls'] ?? null) ? $telex['urls'] : [];
+    foreach ($telexUrls as $url) {
+        $candidate = trim((string) $url);
+        if ($candidate === '') {
+            continue;
+        }
+        if (function_exists('admin_telex_normalize_feed_url')) {
+            $candidate = trim((string) admin_telex_normalize_feed_url($candidate));
+        }
+        if ($candidate !== '' && preg_match('#^https?://#i', $candidate)) {
+            $feeds[] = $candidate;
+        }
+    }
+
+    return array_values(array_unique(array_filter($feeds, static function (string $url): bool {
+        return $url !== '' && preg_match('#^https?://#i', $url);
+    })));
 }
 
 function admin_social_rss_feed_list(string $feedsRaw): array
@@ -94,6 +140,60 @@ function admin_save_social_rss_state(array $state): void
     }
     @file_put_contents($file, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     @chmod($file, 0664);
+}
+
+function admin_load_social_broadcast_queue(): array
+{
+    $file = admin_social_broadcast_queue_file();
+    if (!is_file($file)) {
+        return ['items' => []];
+    }
+    $raw = @file_get_contents($file);
+    if (!is_string($raw) || $raw === '') {
+        return ['items' => []];
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return ['items' => []];
+    }
+    $decoded['items'] = is_array($decoded['items'] ?? null) ? $decoded['items'] : [];
+    return $decoded;
+}
+
+function admin_save_social_broadcast_queue(array $queue): void
+{
+    $file = admin_social_broadcast_queue_file();
+    $dir = dirname($file);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    @file_put_contents($file, json_encode($queue, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
+    @chmod($file, 0664);
+}
+
+function admin_enqueue_social_broadcast(string $text, $images, array $networks, string $fediverseUrl = ''): array
+{
+    $text = trim($text);
+    $imageItems = admin_social_broadcast_parse_images($images);
+    $networks = array_values(array_unique(array_filter(array_map('strval', $networks))));
+    if ($text === '' || empty($networks)) {
+        return ['ok' => false, 'message' => 'No hay envío a redes que encolar.'];
+    }
+    $queue = admin_load_social_broadcast_queue();
+    $items = is_array($queue['items'] ?? null) ? $queue['items'] : [];
+    $job = [
+        'id' => substr(sha1($text . '|' . json_encode($imageItems, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '|' . microtime(true)), 0, 24),
+        'text' => $text,
+        'images' => $imageItems,
+        'networks' => $networks,
+        'fediverse_url' => trim($fediverseUrl),
+        'created_at' => gmdate(DATE_ATOM),
+        'attempts' => 0,
+    ];
+    $items[] = $job;
+    $queue['items'] = $items;
+    admin_save_social_broadcast_queue($queue);
+    return ['ok' => true, 'id' => $job['id'], 'queued' => count($items)];
 }
 
 function admin_fetch_social_rss_items(string $url): array
@@ -376,16 +476,11 @@ function admin_handle_social_rss_settings_request(array $settings): array
 function admin_process_social_rss_feeds(): array
 {
     $settings = get_settings();
-    $rssSettings = admin_social_rss_settings($settings);
-    $feeds = admin_social_rss_feed_list($rssSettings['feeds']);
-    $networks = $rssSettings['networks'];
+    $feeds = admin_social_rss_feed_urls_from_settings($settings);
+    $availableNetworks = admin_social_broadcast_available_networks($settings);
+    $networks = array_keys($availableNetworks);
     if (empty($feeds) || empty($networks)) {
         return ['sent' => 0, 'checked' => 0];
-    }
-    $availableNetworks = admin_social_broadcast_available_networks($settings);
-    $networks = array_values(array_filter($networks, static fn(string $network): bool => isset($availableNetworks[$network])));
-    if (empty($networks)) {
-        return ['sent' => 0, 'checked' => count($feeds)];
     }
     $state = admin_load_social_rss_state();
     $state['feeds'] = is_array($state['feeds'] ?? null) ? $state['feeds'] : [];
@@ -537,6 +632,69 @@ function admin_send_social_broadcast_to_configured_networks(string $text, $image
     return [
         'sent' => $sent,
         'failed' => $failed,
+    ];
+}
+
+function admin_process_social_broadcast_queue(int $maxJobs = 1): array
+{
+    $queue = admin_load_social_broadcast_queue();
+    $items = is_array($queue['items'] ?? null) ? array_values($queue['items']) : [];
+    if (empty($items) || $maxJobs < 1) {
+        return ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => count($items)];
+    }
+
+    $processed = 0;
+    $sent = 0;
+    $failed = 0;
+    $remaining = [];
+    $settings = get_settings();
+
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        if ($processed >= $maxJobs) {
+            $remaining[] = $item;
+            continue;
+        }
+        $processed++;
+        $networks = array_values(array_unique(array_filter(array_map('strval', $item['networks'] ?? []))));
+        if (empty($networks)) {
+            continue;
+        }
+        $selectedSettings = [];
+        $available = admin_social_broadcast_available_networks($settings);
+        foreach ($networks as $network) {
+            if (isset($available[$network])) {
+                $selectedSettings[$network] = $settings[$network] ?? [];
+            }
+        }
+        if (empty($selectedSettings)) {
+            $failed++;
+            continue;
+        }
+        $result = admin_send_social_broadcast_to_configured_networks(
+            (string) ($item['text'] ?? ''),
+            (array) ($item['images'] ?? []),
+            $selectedSettings,
+            (string) ($item['fediverse_url'] ?? '')
+        );
+        if (!empty($result['sent'])) {
+            $sent++;
+        }
+        if (empty($result['sent']) || !empty($result['failed'])) {
+            $failed++;
+        }
+    }
+
+    $queue['items'] = $remaining;
+    admin_save_social_broadcast_queue($queue);
+
+    return [
+        'processed' => $processed,
+        'sent' => $sent,
+        'failed' => $failed,
+        'remaining' => count($remaining),
     ];
 }
 
@@ -1292,12 +1450,11 @@ function admin_handle_social_broadcast_request(array $settings): array
     $imageItems = admin_social_broadcast_parse_images($image);
     $primaryImage = $imageItems[0] ?? '';
     $sendToActuality = true;
-    $selected = array_values(array_unique(array_filter(array_map('strval', $_POST['social_networks'] ?? []))));
+    $available = admin_social_broadcast_available_networks($settings);
     $result['message_text'] = $text;
     $result['image'] = $image;
     $result['actuality'] = $sendToActuality;
-    $result['networks'] = $selected;
-    $available = admin_social_broadcast_available_networks($settings);
+    $result['networks'] = array_keys($available);
 
     if ($text === '') {
         $result['feedback'] = ['type' => 'danger', 'message' => 'Escribe un mensaje antes de enviarlo.'];
@@ -1336,24 +1493,20 @@ function admin_handle_social_broadcast_request(array $settings): array
             $failed[] = 'Perfil del Fediverso: no está disponible.';
         }
     }
-    if (!empty($selected)) {
-        $selectedSettings = [];
-        foreach ($selected as $network) {
-            if (!isset($available[$network])) {
-                $failed[] = ($labels[$network] ?? $network) . ': no está configurada.';
-                continue;
-            }
-            $selectedSettings[$network] = $settings[$network] ?? [];
+    $allConfiguredNetworks = array_keys($available);
+    if (!empty($allConfiguredNetworks)) {
+        $queueResult = admin_enqueue_social_broadcast($text, $image, $allConfiguredNetworks, $fediverseUrl);
+        if (!empty($queueResult['ok'])) {
+            $sent[] = 'Cola de redes';
+        } else {
+            $failed[] = 'Cola de redes: ' . (string) ($queueResult['message'] ?? 'no se pudo encolar.');
         }
-        $networkResult = admin_send_social_broadcast_to_configured_networks($text, $image, $selectedSettings, $fediverseUrl);
-        $sent = array_merge($sent, $networkResult['sent']);
-        $failed = array_merge($failed, $networkResult['failed']);
     }
 
     if (!empty($sent) && empty($failed)) {
         $result['feedback'] = [
             'type' => 'success',
-            'message' => 'Mensaje enviado a: ' . implode(', ', $sent) . '.',
+            'message' => 'Mensaje guardado/encolado en: ' . implode(', ', $sent) . '.',
         ];
         $result['message_text'] = '';
         $result['image'] = '';

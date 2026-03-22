@@ -292,11 +292,11 @@
 
         <form method="post" class="mt-4">
             <h4 class="mt-2">Integración con Nisaba</h4>
-            <p class="text-muted mb-3">Conecta tu instalación de Nisaba para insertar notas recientes desde notas.xml.</p>
+            <p class="text-muted mb-3">Conecta tu instalación de Nisaba para insertar las noticias curadas en tu perfil del Fediverso.</p>
             <div class="form-group">
-                <label for="nisaba_url">URI de Nisaba</label>
-                <input type="url" name="nisaba_url" id="nisaba_url" class="form-control" value="<?= htmlspecialchars($nisabaUrl, ENT_QUOTES, 'UTF-8') ?>" placeholder="https://tunisaba.example">
-                <small class="form-text text-muted">Introduce la URL base de Nisaba. Se usará automáticamente <code>notas.xml</code>.</small>
+                <label for="nisaba_urls">URIs de Nisaba</label>
+                <textarea name="nisaba_urls" id="nisaba_urls" class="form-control" rows="4" placeholder="https://tunisaba.example"><?= htmlspecialchars($nisabaUrlsValue, ENT_QUOTES, 'UTF-8') ?></textarea>
+                <small class="form-text text-muted">Introduce una URL base por línea. Nammu usará automáticamente <code>notas.xml</code> en cada una.</small>
             </div>
             <div class="text-right mb-4">
                 <button type="submit" name="save_nisaba" class="btn btn-outline-primary">Guardar Nisaba</button>
@@ -304,7 +304,7 @@
         </form>
         <form method="post" class="mt-4">
             <h4 class="mt-2">Integración con Telex</h4>
-            <p class="text-muted mb-3">Añade una o varias feeds de Telex para insertar notas recientes desde sus XML.</p>
+            <p class="text-muted mb-3">Conecta tu instalación de Telex para insertar las noticias curadas en tu perfil del Fediverso.</p>
             <div class="form-group">
                 <label for="telex_urls">URIs de la feed de Telex</label>
                 <textarea name="telex_urls" id="telex_urls" class="form-control" rows="4" placeholder="https://tu-telex.example/feed.xml"><?= htmlspecialchars($telexUrlsValue, ENT_QUOTES, 'UTF-8') ?></textarea>

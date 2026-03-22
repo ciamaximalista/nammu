@@ -126,8 +126,7 @@ $renderer->setGlobal('itinerariesIndexUrl', $publicBaseUrl !== '' ? rtrim($publi
 $renderer->setGlobal('socialConfig', $socialConfig);
 $renderer->setGlobal('baseUrl', $publicBaseUrl !== '' ? $publicBaseUrl : '/');
 
-$rssSettings = admin_social_rss_settings(['social_rss' => $configData['social_rss'] ?? []]);
-$feeds = admin_social_rss_feed_list($rssSettings['feeds']);
+$feeds = function_exists('nammu_actuality_feed_urls') ? nammu_actuality_feed_urls($configData) : [];
 $items = function_exists('nammu_actuality_page_items')
     ? nammu_actuality_page_items($configData, $contentDir, $itinerariesDir, $publicBaseUrl, $siteTitle, $siteDescription, $siteLang)
     : [];

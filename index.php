@@ -183,12 +183,11 @@ $newsletterItems = function_exists('nammu_newsletter_collect_items')
     ? nammu_newsletter_collect_items(__DIR__ . '/content', $publicBaseUrl)
     : [];
 $hasNewsletters = !empty($newsletterItems);
-$socialRssConfig = is_array($configData['social_rss'] ?? null) ? $configData['social_rss'] : [];
-$hasActuality = trim((string) ($socialRssConfig['feeds'] ?? '')) !== '';
+$hasActuality = function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($configData) : false;
 $newslettersIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/newsletters';
 $renderer->setGlobal('hasNewsletters', $hasNewsletters);
 $renderer->setGlobal('newslettersIndexUrl', $newslettersIndexUrl);
-$renderer->setGlobal('hasActuality', function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($configData) : $hasActuality);
+$renderer->setGlobal('hasActuality', $hasActuality);
 $GLOBALS['hasNewsletters'] = $hasNewsletters;
 $GLOBALS['newslettersIndexUrl'] = $newslettersIndexUrl;
 $GLOBALS['hasActuality'] = $hasActuality;
@@ -343,8 +342,7 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
         $entries[] = $entry;
     };
     $config = nammu_load_config();
-    $socialRssConfig = is_array($config['social_rss'] ?? null) ? $config['social_rss'] : [];
-    $hasActuality = function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($config) : (trim((string) ($socialRssConfig['feeds'] ?? '')) !== '');
+    $hasActuality = function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($config) : false;
     $timestampFromPost = static function (Post $post): ?int {
         $date = $post->getDate();
         if ($date) {

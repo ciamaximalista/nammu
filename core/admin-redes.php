@@ -20,8 +20,8 @@ function admin_social_broadcast_max_images(): int
 function admin_social_broadcast_network_image_limits(): array
 {
     return [
-        'telegram' => 1,
-        'facebook' => 1,
+        'telegram' => 4,
+        'facebook' => 4,
         'twitter' => 4,
         'bluesky' => 4,
         'linkedin' => 0,

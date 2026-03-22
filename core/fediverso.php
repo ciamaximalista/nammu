@@ -3333,6 +3333,59 @@ function nammu_fediverse_local_reaction_details(array $config): array
             $details[$localId][$bucket][] = $actorEntry;
         }
     }
+    $localActorId = nammu_fediverse_actor_url($config);
+    $localActorEntry = [
+        'id' => $localActorId,
+        'name' => trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog')),
+        'icon' => trim((string) nammu_fediverse_avatar_url($config)),
+        'url' => trim((string) nammu_fediverse_profile_page_url($config)),
+        'published' => '',
+    ];
+    foreach (nammu_fediverse_actions_store()['items'] as $action) {
+        $type = strtolower(trim((string) ($action['type'] ?? '')));
+        if (!in_array($type, ['like', 'share', 'boost'], true)) {
+            continue;
+        }
+        $target = trim((string) ($action['object_url'] ?? ''));
+        if ($target === '') {
+            continue;
+        }
+        if (!isset($index[$target])) {
+            $canonicalTarget = nammu_fediverse_canonical_local_id_for_identifier($target, $config);
+            if ($canonicalTarget !== '' && isset($index[$canonicalTarget])) {
+                $target = $canonicalTarget;
+            }
+        }
+        if (!isset($index[$target])) {
+            continue;
+        }
+        $canonicalItem = nammu_fediverse_canonical_local_item($index[$target], $config);
+        $localId = trim((string) ($canonicalItem['id'] ?? ''));
+        if ($localId === '') {
+            continue;
+        }
+        if (!isset($details[$localId])) {
+            $details[$localId] = [
+                'likes' => [],
+                'shares' => [],
+                'replies' => [],
+            ];
+        }
+        $bucket = $type === 'like' ? 'likes' : 'shares';
+        $alreadyPresent = false;
+        foreach ($details[$localId][$bucket] as $existingActor) {
+            if (trim((string) ($existingActor['id'] ?? '')) === $localActorId) {
+                $alreadyPresent = true;
+                break;
+            }
+        }
+        if ($alreadyPresent) {
+            continue;
+        }
+        $entry = $localActorEntry;
+        $entry['published'] = trim((string) ($action['published'] ?? ''));
+        $details[$localId][$bucket][] = $entry;
+    }
     foreach (nammu_fediverse_timeline_entries_targeting_local_items($config) as $timelineEntry) {
         $item = is_array($timelineEntry['item'] ?? null) ? $timelineEntry['item'] : [];
         $canonicalItem = is_array($timelineEntry['canonical_item'] ?? null) ? $timelineEntry['canonical_item'] : [];

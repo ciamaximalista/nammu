@@ -277,6 +277,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var messageImagesGroup = document.querySelector('.message-images-group');
     var slugGroup = document.querySelector('.slug-group');
     var markdownToolbar = document.querySelector('.markdown-toolbar[data-markdown-toolbar]');
+    var insertResourceButton = document.querySelector('[data-target-editor="#content_publish"]');
+    var insertResourceHelp = insertResourceButton ? insertResourceButton.nextElementSibling : null;
     var titleLabel = document.querySelector('label[for="title"]');
     var descriptionLabel = document.querySelector('label[for="description"]');
     var descriptionGroup = document.querySelector('.description-group');
@@ -405,6 +407,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (markdownToolbar) {
             markdownToolbar.classList.toggle('d-none', isMessage);
+        }
+        if (insertResourceButton) {
+            insertResourceButton.classList.toggle('d-none', isMessage);
+        }
+        if (insertResourceHelp && insertResourceHelp.classList.contains('form-text')) {
+            insertResourceHelp.classList.toggle('d-none', isMessage);
         }
         if (titleLabel && titleLabel.dataset.podcastLabel && titleLabel.dataset.postLabel) {
             titleLabel.textContent = isPodcast ? titleLabel.dataset.podcastLabel : titleLabel.dataset.postLabel;

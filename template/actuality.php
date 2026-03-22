@@ -171,10 +171,8 @@ $manualDisplayText = static function (array $item): string {
     <div class="actuality-hero-inner">
         <h1>Fediverso</h1>
         <p>
-            <?php if ($feedsCount > 0): ?>
+            <?php if ($hasActuality || !empty($items)): ?>
                 Página de perfil de @<?= htmlspecialchars($fediverseUsername, ENT_QUOTES, 'UTF-8') ?>@<?= htmlspecialchars((string) preg_replace('#^https?://#i', '', rtrim((string) ($baseUrl ?? ''), '/')), ENT_QUOTES, 'UTF-8') ?>
-            <?php elseif ($hasActuality): ?>
-                Notas y fuentes compartidas
             <?php else: ?>
                 No hay feeds automáticas configuradas todavía.
             <?php endif; ?>

@@ -1179,6 +1179,32 @@ function nammu_actuality_has_content(array $config): bool
     return nammu_actuality_has_feeds($config) || nammu_actuality_has_manual_items();
 }
 
+function nammu_actuality_has_published_site_items(string $contentDir, string $itinerariesDir): bool
+{
+    if (is_dir($contentDir)) {
+        $repository = new \Nammu\Core\ContentRepository($contentDir);
+        foreach ($repository->all() as $post) {
+            if ($post instanceof \Nammu\Core\Post && !$post->isDraft()) {
+                return true;
+            }
+        }
+        foreach (nammu_collect_podcast_items($contentDir, '') as $episode) {
+            if (is_array($episode) && trim((string) ($episode['slug'] ?? '')) !== '') {
+                return true;
+            }
+        }
+    }
+    if (is_dir($itinerariesDir) && class_exists(\Nammu\Core\ItineraryRepository::class)) {
+        $itineraryRepository = new \Nammu\Core\ItineraryRepository($itinerariesDir);
+        foreach ($itineraryRepository->all() as $itinerary) {
+            if ($itinerary instanceof \Nammu\Core\Itinerary && $itinerary->isPublished()) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 function nammu_actuality_collect_published_site_items(string $contentDir, string $itinerariesDir, string $publicBaseUrl, string $siteTitle): array
 {
     $items = [];
@@ -1456,7 +1482,7 @@ function nammu_generate_actuality_feed(string $baseUrl, array $config, string $s
 {
     $baseUrl = rtrim($baseUrl, '/');
     $feedUrl = ($baseUrl !== '' ? $baseUrl : '') . '/noticias.xml';
-    $pageUrl = ($baseUrl !== '' ? $baseUrl : '') . '/actualidad.php';
+    $pageUrl = ($baseUrl !== '' ? $baseUrl : '') . (function_exists('nammu_fediverse_profile_alias_path') ? nammu_fediverse_profile_alias_path($config, $baseUrl) : '/actualidad.php');
     $items = nammu_actuality_collect_items($config, $baseUrl);
     $lastBuild = gmdate(DATE_RSS, !empty($items) ? (int) ($items[0]['timestamp'] ?: time()) : time());
     $titleEsc = htmlspecialchars('Actualidad — ' . ($siteTitle !== '' ? $siteTitle : 'Nammu Blog'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -1604,7 +1630,9 @@ function nammu_actuality_clear_snapshot(): void
 
 function nammu_actuality_rebuild_snapshot(string $baseUrl, array $config, string $siteTitle, string $siteDescription, string $siteLang = 'es'): array
 {
-    if (!nammu_actuality_has_content($config)) {
+    $contentDir = dirname(__DIR__) . '/content';
+    $itinerariesDir = dirname(__DIR__) . '/itinerarios';
+    if (!nammu_actuality_has_content($config) && !nammu_actuality_has_published_site_items($contentDir, $itinerariesDir)) {
         nammu_actuality_clear_snapshot();
         return ['updated_at' => 0, 'items' => []];
     }

@@ -60,6 +60,7 @@ function admin_run_scheduled_tasks(): array {
     $published = 0;
     $queueStats = ['processed' => 0, 'remaining' => 0];
     $rssStats = ['sent' => 0, 'checked' => 0];
+    $rssPublished = false;
     $socialBroadcastQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $fediverseStats = ['checked' => 0, 'new' => 0, 'followers' => 0, 'delivered' => 0];
     if (function_exists('nammu_publish_scheduled_posts')) {
@@ -81,6 +82,7 @@ function admin_run_scheduled_tasks(): array {
     }
     if (function_exists('admin_process_social_rss_feeds')) {
         $rssStats = admin_process_social_rss_feeds();
+        $rssPublished = (int) ($rssStats['sent'] ?? 0) > 0;
         if (function_exists('nammu_actuality_rebuild_snapshot') && (int) ($rssStats['sent'] ?? 0) > 0) {
             $config = nammu_load_config();
             $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
@@ -108,6 +110,12 @@ function admin_run_scheduled_tasks(): array {
             $deliveryStats = nammu_fediverse_deliver_local_items($config);
             $fediverseStats['followers'] = (int) ($deliveryStats['followers'] ?? 0);
             $fediverseStats['delivered'] = (int) ($deliveryStats['delivered'] ?? 0);
+        }
+        if ($rssPublished && function_exists('nammu_fediverse_rebuild_snapshots')) {
+            nammu_fediverse_rebuild_snapshots($config);
+        }
+        if ($rssPublished && function_exists('nammu_fediverse_save_fragments_cache_store')) {
+            nammu_fediverse_save_fragments_cache_store([]);
         }
     }
     return [

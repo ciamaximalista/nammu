@@ -10837,6 +10837,23 @@ if ($isLoggedIn && $page === 'fediverso') {
                         if (function_exists('nammu_fediverse_public_thread_url_for_actuality_item')) {
                             $fediverseUrl = trim((string) nammu_fediverse_public_thread_url_for_actuality_item($manualItem, $config));
                         }
+                        if ($fediverseUrl === '') {
+                            $manualItemId = trim((string) ($manualItem['id'] ?? ''));
+                            if (
+                                $manualItemId !== ''
+                                && function_exists('nammu_fediverse_find_local_item_for_identifier')
+                                && function_exists('nammu_fediverse_thread_page_url')
+                            ) {
+                                $manualObjectId = rtrim($baseUrl, '/') . '/ap/objects/actualidad-' . rawurlencode($manualItemId);
+                                $manualLocalItem = nammu_fediverse_find_local_item_for_identifier($manualObjectId, $config);
+                                if (is_array($manualLocalItem)) {
+                                    $manualLocalItemId = trim((string) ($manualLocalItem['id'] ?? ''));
+                                    if ($manualLocalItemId !== '') {
+                                        $fediverseUrl = trim((string) nammu_fediverse_thread_page_url($manualLocalItemId, $config));
+                                    }
+                                }
+                            }
+                        }
                     }
                     $allConfiguredNetworks = function_exists('admin_social_broadcast_available_networks')
                         ? array_keys(admin_social_broadcast_available_networks(get_settings()))

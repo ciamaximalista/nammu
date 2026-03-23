@@ -1,8 +1,9 @@
 <?php
 $__nammuCliArgs = (PHP_SAPI === 'cli' && isset($argv) && is_array($argv)) ? $argv : [];
 $__nammuRunScheduledOnly = PHP_SAPI === 'cli' && in_array('--run-scheduled', $__nammuCliArgs, true);
+$__nammuRunScheduledMaintenanceOnly = PHP_SAPI === 'cli' && in_array('--run-scheduled-maintenance', $__nammuCliArgs, true);
 $__nammuRunScheduledHeavyOnly = PHP_SAPI === 'cli' && in_array('--run-scheduled-heavy', $__nammuCliArgs, true);
-if (!$__nammuRunScheduledOnly && !$__nammuRunScheduledHeavyOnly) {
+if (!$__nammuRunScheduledOnly && !$__nammuRunScheduledMaintenanceOnly && !$__nammuRunScheduledHeavyOnly) {
     session_start();
 }
 
@@ -37,6 +38,7 @@ define('MAILING_SUBSCRIBERS_FILE', __DIR__ . '/config/mailing-subscribers.json')
 define('MAILING_SECRET_FILE', __DIR__ . '/config/mailing-secret.key');
 nammu_ensure_directory(ITINERARIES_DIR);
 $runScheduledOnly = $__nammuRunScheduledOnly;
+$runScheduledMaintenanceOnly = $__nammuRunScheduledMaintenanceOnly;
 $runScheduledHeavyOnly = $__nammuRunScheduledHeavyOnly;
 
 // --- Helper Functions ---
@@ -48,31 +50,72 @@ $runScheduledHeavyOnly = $__nammuRunScheduledHeavyOnly;
  */
 function admin_run_scheduled_tasks(): array {
     $config = nammu_load_config();
+    if (!function_exists('nammu_fediverse_refresh_following') && is_file(__DIR__ . '/core/fediverso.php')) {
+        require_once __DIR__ . '/core/fediverso.php';
+    }
+    $fediverseStats = ['checked' => 0, 'new' => 0, 'followers_checked' => 0, 'followers_removed' => 0];
+    $fediverseRecentThreadsWarmed = 0;
+    if (function_exists('nammu_fediverse_refresh_following')) {
+        $fediverseStats = nammu_fediverse_refresh_following();
+        if (function_exists('nammu_fediverse_warm_recent_threads_cache')) {
+            $fediverseRecentThreadsWarmed = (int) nammu_fediverse_warm_recent_threads_cache($config, 8);
+        }
+        if (function_exists('nammu_fediverse_rebuild_light_snapshots')) {
+            nammu_fediverse_rebuild_light_snapshots($config);
+        }
+        if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
+            nammu_fediverse_save_fragments_cache_store([]);
+        }
+    }
+    return [
+        'published' => 0,
+        'notifications_processed' => 0,
+        'notifications_remaining' => 0,
+        'social_rss_sent' => 0,
+        'social_rss_checked' => 0,
+        'social_broadcast_queue_processed' => 0,
+        'social_broadcast_queue_sent' => 0,
+        'social_broadcast_queue_failed' => 0,
+        'social_broadcast_queue_remaining' => 0,
+        'fediverse_checked' => (int) ($fediverseStats['checked'] ?? 0),
+        'fediverse_new' => (int) ($fediverseStats['new'] ?? 0),
+        'fediverse_followers' => 0,
+        'fediverse_followers_checked' => (int) ($fediverseStats['followers_checked'] ?? 0),
+        'fediverse_followers_removed' => (int) ($fediverseStats['followers_removed'] ?? 0),
+        'fediverse_delivered' => 0,
+        'fediverse_recent_threads_warmed' => $fediverseRecentThreadsWarmed,
+        'fediverse_follow_accepts_checked' => 0,
+        'fediverse_follow_accepts_sent' => 0,
+        'fediverse_follow_accepts_failed' => 0,
+        'fediverse_delete_queue_processed' => 0,
+        'fediverse_delete_queue_sent' => 0,
+        'fediverse_delete_queue_failed' => 0,
+        'fediverse_delete_queue_remaining' => 0,
+    ];
+}
+
+function admin_run_scheduled_maintenance_tasks(): array {
+    $config = nammu_load_config();
     if (!function_exists('admin_process_social_rss_feeds') && is_file(__DIR__ . '/core/admin-redes.php')) {
         require_once __DIR__ . '/core/admin-redes.php';
     }
     if (!function_exists('nammu_actuality_rebuild_snapshot') && is_file(__DIR__ . '/core/actualidad.php')) {
         require_once __DIR__ . '/core/actualidad.php';
     }
-    if (!function_exists('nammu_fediverse_refresh_following') && is_file(__DIR__ . '/core/fediverso.php')) {
+    if (!function_exists('nammu_fediverse_rebuild_light_snapshots') && is_file(__DIR__ . '/core/fediverso.php')) {
         require_once __DIR__ . '/core/fediverso.php';
     }
-    $published = 0;
-    $queueStats = ['processed' => 0, 'remaining' => 0];
+    $published = function_exists('nammu_publish_scheduled_posts') ? (int) nammu_publish_scheduled_posts(CONTENT_DIR) : 0;
+    $queueStats = function_exists('nammu_process_scheduled_notifications_queue')
+        ? nammu_process_scheduled_notifications_queue()
+        : ['processed' => 0, 'remaining' => 0];
     $rssStats = ['sent' => 0, 'checked' => 0];
-    $rssPublished = false;
     $socialBroadcastQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $fediverseDeleteQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
-    $fediverseStats = ['checked' => 0, 'new' => 0, 'followers' => 0, 'delivered' => 0];
-    $fediverseRecentThreadsWarmed = 0;
-    if (function_exists('nammu_publish_scheduled_posts')) {
-        $published = (int) nammu_publish_scheduled_posts(CONTENT_DIR);
-    }
-    if (function_exists('nammu_process_scheduled_notifications_queue')) {
-        $queueStats = nammu_process_scheduled_notifications_queue();
-    }
+    $deliveryStats = ['followers' => 0, 'delivered' => 0];
+    $acceptStats = ['checked' => 0, 'accepted' => 0, 'failed' => 0];
+
     if (function_exists('nammu_actuality_rebuild_snapshot')) {
-        $config = nammu_load_config();
         $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
         $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
         $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
@@ -84,9 +127,7 @@ function admin_run_scheduled_tasks(): array {
     }
     if (function_exists('admin_process_social_rss_feeds')) {
         $rssStats = admin_process_social_rss_feeds();
-        $rssPublished = (int) ($rssStats['sent'] ?? 0) > 0;
-        if (function_exists('nammu_actuality_rebuild_snapshot') && (int) ($rssStats['sent'] ?? 0) > 0) {
-            $config = nammu_load_config();
+        if ((int) ($rssStats['sent'] ?? 0) > 0 && function_exists('nammu_actuality_rebuild_snapshot')) {
             $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
             $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
             $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
@@ -100,48 +141,28 @@ function admin_run_scheduled_tasks(): array {
     if (function_exists('admin_process_social_broadcast_queue')) {
         $socialBroadcastQueueStats = admin_process_social_broadcast_queue(1);
     }
-    if (function_exists('nammu_fediverse_refresh_following')) {
-        $fediverseStats = nammu_fediverse_refresh_following();
-        if (function_exists('nammu_fediverse_process_delete_queue')) {
-            $fediverseDeleteQueueStats = nammu_fediverse_process_delete_queue($config, 2);
-        }
-        if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
-            $acceptStats = nammu_fediverse_retry_pending_follower_accepts($config);
-            $fediverseStats['follow_accepts_checked'] = (int) ($acceptStats['checked'] ?? 0);
-            $fediverseStats['follow_accepts_sent'] = (int) ($acceptStats['accepted'] ?? 0);
-            $fediverseStats['follow_accepts_failed'] = (int) ($acceptStats['failed'] ?? 0);
-        }
-        if (function_exists('nammu_fediverse_deliver_local_items')) {
-            $deliveryStats = nammu_fediverse_deliver_local_items($config);
-            $fediverseStats['followers'] = (int) ($deliveryStats['followers'] ?? 0);
-            $fediverseStats['delivered'] = (int) ($deliveryStats['delivered'] ?? 0);
-        }
-        if (function_exists('nammu_fediverse_warm_recent_threads_cache')) {
-            $fediverseRecentThreadsWarmed = (int) nammu_fediverse_warm_recent_threads_cache($config, 8);
-        }
-        if (
-            (
-                $rssPublished
-                || (int) ($fediverseStats['new'] ?? 0) > 0
-                || (int) ($fediverseStats['delivered'] ?? 0) > 0
-                || $fediverseRecentThreadsWarmed > 0
-            )
-            && function_exists('nammu_fediverse_rebuild_light_snapshots')
-        ) {
+    if (function_exists('nammu_fediverse_process_delete_queue')) {
+        $fediverseDeleteQueueStats = nammu_fediverse_process_delete_queue($config, 2);
+    }
+    if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
+        $acceptStats = nammu_fediverse_retry_pending_follower_accepts($config);
+    }
+    if (function_exists('nammu_fediverse_deliver_local_items')) {
+        $deliveryStats = nammu_fediverse_deliver_local_items($config);
+    }
+    if (
+        $published > 0
+        || (int) ($rssStats['sent'] ?? 0) > 0
+        || (int) ($deliveryStats['delivered'] ?? 0) > 0
+    ) {
+        if (function_exists('nammu_fediverse_rebuild_light_snapshots')) {
             nammu_fediverse_rebuild_light_snapshots($config);
         }
-        if (
-            (
-                $rssPublished
-                || (int) ($fediverseStats['new'] ?? 0) > 0
-                || (int) ($fediverseStats['delivered'] ?? 0) > 0
-                || $fediverseRecentThreadsWarmed > 0
-            )
-            && function_exists('nammu_fediverse_save_fragments_cache_store')
-        ) {
+        if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
             nammu_fediverse_save_fragments_cache_store([]);
         }
     }
+
     return [
         'published' => $published,
         'notifications_processed' => (int) ($queueStats['processed'] ?? 0),
@@ -152,16 +173,16 @@ function admin_run_scheduled_tasks(): array {
         'social_broadcast_queue_sent' => (int) ($socialBroadcastQueueStats['sent'] ?? 0),
         'social_broadcast_queue_failed' => (int) ($socialBroadcastQueueStats['failed'] ?? 0),
         'social_broadcast_queue_remaining' => (int) ($socialBroadcastQueueStats['remaining'] ?? 0),
-        'fediverse_checked' => (int) ($fediverseStats['checked'] ?? 0),
-        'fediverse_new' => (int) ($fediverseStats['new'] ?? 0),
-        'fediverse_followers' => (int) ($fediverseStats['followers'] ?? 0),
-        'fediverse_followers_checked' => (int) ($fediverseStats['followers_checked'] ?? 0),
-        'fediverse_followers_removed' => (int) ($fediverseStats['followers_removed'] ?? 0),
-        'fediverse_delivered' => (int) ($fediverseStats['delivered'] ?? 0),
-        'fediverse_recent_threads_warmed' => $fediverseRecentThreadsWarmed,
-        'fediverse_follow_accepts_checked' => (int) ($fediverseStats['follow_accepts_checked'] ?? 0),
-        'fediverse_follow_accepts_sent' => (int) ($fediverseStats['follow_accepts_sent'] ?? 0),
-        'fediverse_follow_accepts_failed' => (int) ($fediverseStats['follow_accepts_failed'] ?? 0),
+        'fediverse_checked' => 0,
+        'fediverse_new' => 0,
+        'fediverse_followers' => (int) ($deliveryStats['followers'] ?? 0),
+        'fediverse_followers_checked' => 0,
+        'fediverse_followers_removed' => 0,
+        'fediverse_delivered' => (int) ($deliveryStats['delivered'] ?? 0),
+        'fediverse_recent_threads_warmed' => 0,
+        'fediverse_follow_accepts_checked' => (int) ($acceptStats['checked'] ?? 0),
+        'fediverse_follow_accepts_sent' => (int) ($acceptStats['accepted'] ?? 0),
+        'fediverse_follow_accepts_failed' => (int) ($acceptStats['failed'] ?? 0),
         'fediverse_delete_queue_processed' => (int) ($fediverseDeleteQueueStats['processed'] ?? 0),
         'fediverse_delete_queue_sent' => (int) ($fediverseDeleteQueueStats['sent'] ?? 0),
         'fediverse_delete_queue_failed' => (int) ($fediverseDeleteQueueStats['failed'] ?? 0),
@@ -205,6 +226,35 @@ function admin_run_scheduled_heavy_tasks(): array {
         'fediverse_threads_warmed' => $threadsWarmed,
         'fediverse_snapshots_rebuilt' => 1,
     ];
+}
+
+function admin_scheduled_lock_file(): string
+{
+    return __DIR__ . '/config/.scheduled-run.lock';
+}
+
+function admin_run_with_scheduled_lock(callable $callback): array
+{
+    $lockFile = admin_scheduled_lock_file();
+    $handle = @fopen($lockFile, 'c+');
+    if (!is_resource($handle)) {
+        return ['ok' => false, 'skipped' => 1, 'reason' => 'lock_unavailable'];
+    }
+    if (!@flock($handle, LOCK_EX | LOCK_NB)) {
+        fclose($handle);
+        return ['ok' => true, 'skipped' => 1, 'reason' => 'already_running'];
+    }
+    try {
+        $result = $callback();
+        if (!is_array($result)) {
+            $result = ['ok' => true];
+        }
+        $result['skipped'] = (int) ($result['skipped'] ?? 0);
+        return $result;
+    } finally {
+        @flock($handle, LOCK_UN);
+        fclose($handle);
+    }
 }
 
 function get_all_posts_metadata() {
@@ -6565,13 +6615,22 @@ if (!is_array($itineraryFeedback) || !isset($itineraryFeedback['message'], $itin
 }
 
 if ($runScheduledOnly) {
-    $result = admin_run_scheduled_tasks();
+    $result = admin_run_with_scheduled_lock('admin_run_scheduled_tasks');
+    $result['mode'] = 'light';
+    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+    exit(0);
+}
+
+if ($runScheduledMaintenanceOnly) {
+    $result = admin_run_with_scheduled_lock('admin_run_scheduled_maintenance_tasks');
+    $result['mode'] = 'maintenance';
     fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
     exit(0);
 }
 
 if ($runScheduledHeavyOnly) {
-    $result = admin_run_scheduled_heavy_tasks();
+    $result = admin_run_with_scheduled_lock('admin_run_scheduled_heavy_tasks');
+    $result['mode'] = 'heavy';
     fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
     exit(0);
 }

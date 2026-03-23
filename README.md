@@ -159,17 +159,19 @@ sudo crontab -u www-data -e
 
 Si usas ese comando, las líneas van **sin** la columna `www-data`.
 
-Para que **Fediverso** cargue ágilmente en el admin sin provocar solapes ni picos de CPU, conviene separar el cron en dos fases:
+Para que **Fediverso** cargue ágilmente en el admin sin provocar solapes ni picos de CPU, conviene separar el cron en tres fases:
 
-- `admin.php --run-scheduled` cada `5` minutos para la parte ligera: publicación programada, cola de avisos, reconstrucción de `Actualidad`, RSS sociales, refresco de actores seguidos y entregas pendientes.
-- `admin.php --run-scheduled-heavy` una vez por hora para la parte pesada: precalentado de hilos y reconstrucción de snapshots del panel de Fediverso.
+- `admin.php --run-scheduled` cada `5` minutos para la parte ligera de Fediverso: novedades de actores seguidos, respuestas y reacciones recibidas, precalentado de unos pocos hilos recientes y reconstrucción ligera de `Inicio` y `Notificaciones`.
+- `admin.php --run-scheduled-maintenance` cada `15` minutos para mantenimiento no crítico: publicación programada, cola de avisos, reconstrucción de `Actualidad`, RSS sociales, cola social, entregas federadas pendientes y cola de borrados/accepts.
+- `admin.php --run-scheduled-heavy` una vez por hora para la parte pesada: precalentado amplio de hilos y reconstrucción completa de snapshots del panel de Fediverso.
 
-Ambas deben ejecutarse con el usuario del servidor web, escalonando las distintas instancias y protegiendo cada una con `flock`.
+Las tres deben ejecutarse con el usuario del servidor web, escalonando las distintas instancias y protegiendo cada una con `flock`. Además, Nammu usa un lock interno común para evitar que `light`, `maintenance` y `heavy` se solapen entre sí aunque el cron las dispare demasiado cerca.
 
 ### Bloque de cron recomendado
 
 ```bash
 */5 * * * * flock -n /tmp/<carpeta-publica>-run-scheduled.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
+11,26,41,56 * * * * flock -n /tmp/<carpeta-publica>-run-scheduled-maintenance.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-maintenance >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
 7 * * * * flock -n /tmp/<carpeta-publica>-run-scheduled-heavy.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-heavy >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
 15 3 * * * flock -n /tmp/<carpeta-publica>-backup-daily.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
 30 3 * * 0 flock -n /tmp/<carpeta-publica>-backup-cleanup.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
@@ -186,6 +188,13 @@ Si mantienes varias instalaciones Nammu en el mismo servidor, no las lances toda
 4-59/5 * * * * flock -n /tmp/lacandela-run-scheduled.lock php /var/www/html/blogs/lacandela/admin.php --run-scheduled >> /var/www/html/blogs/lacandela/backups/cron.log 2>&1
 5-55/5 * * * * flock -n /tmp/communalia-run-scheduled.lock php /var/www/html/blogs/communalia/admin.php --run-scheduled >> /var/www/html/blogs/communalia/backups/cron.log 2>&1
 
+11,26,41,56 * * * * flock -n /tmp/memoria-run-scheduled-maintenance.lock php /var/www/html/blogs/memoria/admin.php --run-scheduled-maintenance >> /var/www/html/blogs/memoria/backups/cron.log 2>&1
+12,27,42,57 * * * * flock -n /tmp/maximalismo-run-scheduled-maintenance.lock php /var/www/html/blogs/maximalismo/admin.php --run-scheduled-maintenance >> /var/www/html/blogs/maximalismo/backups/cron.log 2>&1
+13,28,43,58 * * * * flock -n /tmp/juan-run-scheduled-maintenance.lock php /var/www/html/blogs/juan/admin.php --run-scheduled-maintenance >> /var/www/html/blogs/juan/backups/cron.log 2>&1
+14,29,44,59 * * * * flock -n /tmp/terceroslugares-run-scheduled-maintenance.lock php /var/www/html/blogs/terceroslugares/admin.php --run-scheduled-maintenance >> /var/www/html/blogs/terceroslugares/backups/cron.log 2>&1
+15,30,45,0 * * * * flock -n /tmp/lacandela-run-scheduled-maintenance.lock php /var/www/html/blogs/lacandela/admin.php --run-scheduled-maintenance >> /var/www/html/blogs/lacandela/backups/cron.log 2>&1
+16,31,46,1 * * * * flock -n /tmp/communalia-run-scheduled-maintenance.lock php /var/www/html/blogs/communalia/admin.php --run-scheduled-maintenance >> /var/www/html/blogs/communalia/backups/cron.log 2>&1
+
 7 * * * * flock -n /tmp/memoria-run-scheduled-heavy.lock php /var/www/html/blogs/memoria/admin.php --run-scheduled-heavy >> /var/www/html/blogs/memoria/backups/cron.log 2>&1
 17 * * * * flock -n /tmp/maximalismo-run-scheduled-heavy.lock php /var/www/html/blogs/maximalismo/admin.php --run-scheduled-heavy >> /var/www/html/blogs/maximalismo/backups/cron.log 2>&1
 27 * * * * flock -n /tmp/juan-run-scheduled-heavy.lock php /var/www/html/blogs/juan/admin.php --run-scheduled-heavy >> /var/www/html/blogs/juan/backups/cron.log 2>&1
@@ -197,7 +206,7 @@ Si mantienes varias instalaciones Nammu en el mismo servidor, no las lances toda
 Ese patrón evita dos problemas comunes:
 
 - que varias instancias recomputen `Fediverso` a la vez,
-- y que una misma instancia se pise a sí misma si `--run-scheduled` tarda más de lo previsto.
+- y que una misma instancia se pise a sí misma o solape la fase ligera con la pesada.
 
 Si en vez de eso editas `/etc/crontab` o usas `sudo crontab -e`, entonces sí debes añadir `www-data` delante del comando.
 

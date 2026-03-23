@@ -3,7 +3,8 @@ $__nammuCliArgs = (PHP_SAPI === 'cli' && isset($argv) && is_array($argv)) ? $arg
 $__nammuRunScheduledOnly = PHP_SAPI === 'cli' && in_array('--run-scheduled', $__nammuCliArgs, true);
 $__nammuRunScheduledMaintenanceOnly = PHP_SAPI === 'cli' && in_array('--run-scheduled-maintenance', $__nammuCliArgs, true);
 $__nammuRunScheduledHeavyOnly = PHP_SAPI === 'cli' && in_array('--run-scheduled-heavy', $__nammuCliArgs, true);
-if (!$__nammuRunScheduledOnly && !$__nammuRunScheduledMaintenanceOnly && !$__nammuRunScheduledHeavyOnly) {
+$__nammuReplayFediverseDeletesOnly = PHP_SAPI === 'cli' && in_array('--replay-fediverse-deletes', $__nammuCliArgs, true);
+if (!$__nammuRunScheduledOnly && !$__nammuRunScheduledMaintenanceOnly && !$__nammuRunScheduledHeavyOnly && !$__nammuReplayFediverseDeletesOnly) {
     session_start();
 }
 
@@ -40,6 +41,7 @@ nammu_ensure_directory(ITINERARIES_DIR);
 $runScheduledOnly = $__nammuRunScheduledOnly;
 $runScheduledMaintenanceOnly = $__nammuRunScheduledMaintenanceOnly;
 $runScheduledHeavyOnly = $__nammuRunScheduledHeavyOnly;
+$runReplayFediverseDeletesOnly = $__nammuReplayFediverseDeletesOnly;
 
 // --- Helper Functions ---
 
@@ -6636,6 +6638,21 @@ if ($runScheduledMaintenanceOnly) {
 if ($runScheduledHeavyOnly) {
     $result = admin_run_with_scheduled_lock('admin_run_scheduled_heavy_tasks');
     $result['mode'] = 'heavy';
+    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+    exit(0);
+}
+
+if ($runReplayFediverseDeletesOnly) {
+    $result = admin_run_with_scheduled_lock(static function (): array {
+        $config = nammu_load_config();
+        if (!function_exists('nammu_fediverse_replay_all_deletes') && is_file(__DIR__ . '/core/fediverso.php')) {
+            require_once __DIR__ . '/core/fediverso.php';
+        }
+        return function_exists('nammu_fediverse_replay_all_deletes')
+            ? nammu_fediverse_replay_all_deletes($config)
+            : ['ok' => false, 'message' => 'No se pudo cargar el replay de deletes del Fediverso.'];
+    });
+    $result['mode'] = 'delete_replay';
     fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
     exit(0);
 }

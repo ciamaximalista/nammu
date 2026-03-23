@@ -7339,3 +7339,49 @@ function nammu_fediverse_process_delete_queue(array $config, int $maxJobs = 3): 
         'remaining' => count($remaining),
     ];
 }
+
+function nammu_fediverse_replay_all_deletes(array $config): array
+{
+    $deletedItems = array_values(array_filter((array) (nammu_fediverse_deleted_store()['items'] ?? []), static function ($item): bool {
+        return is_array($item) && trim((string) ($item['id'] ?? '')) !== '';
+    }));
+    if (empty($deletedItems)) {
+        return [
+            'requeued' => 0,
+            'processed' => 0,
+            'sent' => 0,
+            'failed' => 0,
+            'remaining' => 0,
+        ];
+    }
+    $queue = nammu_fediverse_delete_queue_store();
+    $queuedById = [];
+    foreach ((array) ($queue['items'] ?? []) as $queued) {
+        if (!is_array($queued)) {
+            continue;
+        }
+        $queuedId = trim((string) ($queued['item_id'] ?? ''));
+        if ($queuedId !== '') {
+            $queuedById[$queuedId] = $queued;
+        }
+    }
+    $requeued = 0;
+    foreach ($deletedItems as $deletedItem) {
+        $itemId = trim((string) ($deletedItem['id'] ?? ''));
+        if ($itemId === '') {
+            continue;
+        }
+        if (!isset($queuedById[$itemId])) {
+            $queuedById[$itemId] = [
+                'item_id' => $itemId,
+                'created_at' => trim((string) ($deletedItem['deleted_at'] ?? '')) ?: gmdate(DATE_ATOM),
+                'attempts' => 0,
+            ];
+            $requeued++;
+        }
+    }
+    nammu_fediverse_save_delete_queue_store(array_values($queuedById));
+    $processed = nammu_fediverse_process_delete_queue($config, max(1, count($deletedItems)));
+    $processed['requeued'] = $requeued;
+    return $processed;
+}

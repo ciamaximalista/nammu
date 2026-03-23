@@ -8456,6 +8456,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!function_exists('nammu_actuality_delete_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
             require_once __DIR__ . '/core/actualidad.php';
         }
+        if (!function_exists('nammu_fediverse_enqueue_delete_local_item') && is_file(__DIR__ . '/core/fediverso.php')) {
+            require_once __DIR__ . '/core/fediverso.php';
+        }
         $noteId = preg_replace('/[^a-f0-9]/i', '', (string) ($_POST['delete_note_id'] ?? '')) ?? '';
         if ($noteId === '') {
             $_SESSION['notes_feedback'] = ['type' => 'danger', 'message' => 'No se pudo identificar la nota para borrarla.'];
@@ -8463,22 +8466,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         $config = load_config_file();
-        $siteTitle = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
-        $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
-        $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
         $baseUrl = trim((string) ($config['site_url'] ?? ''));
         if ($baseUrl === '') {
             $baseUrl = nammu_base_url();
+        }
+        $deleteMessages = [];
+        if (function_exists('nammu_fediverse_enqueue_delete_local_item')) {
+            $fediverseItemId = rtrim($baseUrl, '/') . '/ap/objects/actualidad-' . rawurlencode($noteId);
+            $fediverseDelete = nammu_fediverse_enqueue_delete_local_item($fediverseItemId, $config);
+            if (!empty($fediverseDelete['message'])) {
+                $deleteMessages[] = trim((string) $fediverseDelete['message']);
+            }
         }
         if (!function_exists('nammu_actuality_delete_manual_item') || !nammu_actuality_delete_manual_item($noteId)) {
             $_SESSION['notes_feedback'] = ['type' => 'warning', 'message' => 'La nota ya no existe o no se pudo borrar.'];
             header('Location: admin.php?page=edit&template=notes');
             exit;
         }
-        if (function_exists('nammu_actuality_rebuild_snapshot')) {
-            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        if (function_exists('nammu_actuality_remove_manual_item_from_snapshots')) {
+            nammu_actuality_remove_manual_item_from_snapshots($noteId);
         }
-        $_SESSION['notes_feedback'] = ['type' => 'success', 'message' => 'Nota borrada.'];
+        if (function_exists('nammu_fediverse_remove_local_item_from_home_snapshot')) {
+            $fediverseItemId = rtrim($baseUrl, '/') . '/ap/objects/actualidad-' . rawurlencode($noteId);
+            nammu_fediverse_remove_local_item_from_home_snapshot($fediverseItemId);
+        }
+        if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
+            nammu_fediverse_save_fragments_cache_store([]);
+        }
+        $_SESSION['notes_feedback'] = ['type' => 'success', 'message' => trim('Nota borrada. ' . implode(' ', array_filter($deleteMessages)))];
         header('Location: admin.php?page=edit&template=notes');
         exit;
     } elseif (isset($_POST['delete_actuality_news'])) {

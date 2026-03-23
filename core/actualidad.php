@@ -517,6 +517,21 @@ function nammu_actuality_delete_manual_item(string $id): bool
     return true;
 }
 
+function nammu_actuality_remove_manual_item_from_snapshots(string $id): void
+{
+    $normalizedId = preg_replace('/[^a-f0-9]/i', '', trim($id)) ?? '';
+    if ($normalizedId === '') {
+        return;
+    }
+
+    $snapshot = nammu_actuality_load_items_snapshot();
+    $items = is_array($snapshot['items'] ?? null) ? $snapshot['items'] : [];
+    $items = array_values(array_filter($items, static function ($item) use ($normalizedId): bool {
+        return !is_array($item) || (string) ($item['id'] ?? '') !== $normalizedId;
+    }));
+    nammu_actuality_save_items_snapshot($items);
+}
+
 function nammu_actuality_fetch_url(string $url, string $accept = 'text/html,application/xhtml+xml', int $timeout = 8): array
 {
     $headers = [];

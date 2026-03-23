@@ -47,6 +47,11 @@ function nammu_fediverse_deleted_file(): string
     return dirname(__DIR__) . '/config/fediverso-deleted.json';
 }
 
+function nammu_fediverse_legacy_actuality_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-legacy-actualidad.json';
+}
+
 function nammu_fediverse_delete_queue_file(): string
 {
     return dirname(__DIR__) . '/config/fediverso-delete-queue.json';
@@ -847,6 +852,28 @@ function nammu_fediverse_deleted_store(): array
     return ['ids' => $ids];
 }
 
+function nammu_fediverse_legacy_actuality_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_legacy_actuality_file(), ['items' => []]);
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    $normalized = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $itemId = trim((string) ($item['id'] ?? ''));
+        if ($itemId === '') {
+            continue;
+        }
+        $normalized[] = [
+            'id' => $itemId,
+            'published' => trim((string) ($item['published'] ?? '')),
+            'source' => trim((string) ($item['source'] ?? '')),
+        ];
+    }
+    return ['items' => $normalized];
+}
+
 function nammu_fediverse_delete_queue_store(): array
 {
     $store = nammu_fediverse_load_json_store(nammu_fediverse_delete_queue_file(), ['items' => []]);
@@ -907,6 +934,11 @@ function nammu_fediverse_save_deleted_store(array $ids): void
         return trim($value) !== '';
     })));
     nammu_fediverse_save_json_store(nammu_fediverse_deleted_file(), ['ids' => $normalized]);
+}
+
+function nammu_fediverse_save_legacy_actuality_store(array $items): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_legacy_actuality_file(), ['items' => array_values($items)]);
 }
 
 function nammu_fediverse_save_delete_queue_store(array $items): void
@@ -2031,6 +2063,91 @@ function nammu_fediverse_thread_page_url(string $objectId, array $config): strin
     return rtrim(nammu_fediverse_base_url($config), '/') . '/fediverso/' . nammu_fediverse_thread_page_hash($objectId);
 }
 
+function nammu_fediverse_extract_legacy_actuality_ids_from_payload(array $payload, array $config): array
+{
+    $baseUrl = rtrim(nammu_fediverse_base_url($config), '/');
+    if ($baseUrl === '') {
+        return [];
+    }
+    $prefix = $baseUrl . '/ap/objects/actualidad-';
+    $candidates = [];
+    $object = $payload['object'] ?? null;
+
+    if (is_string($payload['object'] ?? null) || is_numeric($payload['object'] ?? null)) {
+        $candidates[] = trim((string) $payload['object']);
+    }
+    if (is_array($object)) {
+        $candidates[] = trim((string) ($object['id'] ?? ''));
+        if (is_string($object['url'] ?? null) || is_numeric($object['url'] ?? null)) {
+            $candidates[] = trim((string) $object['url']);
+        }
+        $candidates[] = trim((string) ($object['atomUri'] ?? ''));
+        $candidates[] = trim((string) ($object['inReplyTo'] ?? ''));
+    }
+
+    $ids = [];
+    foreach ($candidates as $candidate) {
+        if ($candidate === '' || !str_starts_with($candidate, $prefix)) {
+            continue;
+        }
+        $ids[] = $candidate;
+    }
+    return array_values(array_unique(array_filter($ids)));
+}
+
+function nammu_fediverse_record_legacy_actuality_payload(array $payload, array $config): void
+{
+    $ids = nammu_fediverse_extract_legacy_actuality_ids_from_payload($payload, $config);
+    if (empty($ids)) {
+        return;
+    }
+    $store = nammu_fediverse_legacy_actuality_store();
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    $byId = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $itemId = trim((string) ($item['id'] ?? ''));
+        if ($itemId === '') {
+            continue;
+        }
+        $byId[$itemId] = $item;
+    }
+    $published = trim((string) ($payload['published'] ?? ''));
+    $source = trim((string) ($payload['id'] ?? ''));
+    foreach ($ids as $id) {
+        if (!isset($byId[$id])) {
+            $byId[$id] = [
+                'id' => $id,
+                'published' => $published,
+                'source' => $source,
+            ];
+            continue;
+        }
+        if ($published !== '' && trim((string) ($byId[$id]['published'] ?? '')) === '') {
+            $byId[$id]['published'] = $published;
+        }
+        if ($source !== '' && trim((string) ($byId[$id]['source'] ?? '')) === '') {
+            $byId[$id]['source'] = $source;
+        }
+    }
+    nammu_fediverse_save_legacy_actuality_store(array_values($byId));
+}
+
+function nammu_fediverse_sync_legacy_actuality_from_inbox(array $config): void
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
+    $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
+    foreach ($activities as $entry) {
+        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        if (empty($payload)) {
+            continue;
+        }
+        nammu_fediverse_record_legacy_actuality_payload($payload, $config);
+    }
+}
+
 function nammu_fediverse_local_item_alias_identifiers(array $item, array $config): array
 {
     $aliases = [];
@@ -3027,6 +3144,11 @@ function nammu_fediverse_local_content_items(array $config): array
 {
     $baseUrl = nammu_fediverse_base_url($config);
     $deletedIds = array_fill_keys(nammu_fediverse_deleted_store()['ids'], true);
+    $legacyStore = nammu_fediverse_legacy_actuality_store();
+    if (empty((array) ($legacyStore['items'] ?? []))) {
+        nammu_fediverse_sync_legacy_actuality_from_inbox($config);
+        $legacyStore = nammu_fediverse_legacy_actuality_store();
+    }
     $items = [];
     foreach (glob(dirname(__DIR__) . '/content/*.md') ?: [] as $file) {
         if (!is_readable($file)) {
@@ -3138,6 +3260,30 @@ function nammu_fediverse_local_content_items(array $config): array
             'type' => $isManual ? 'Note' : 'Article',
             'image' => trim((string) (($item['source_image'] ?? '') ?: ($item['image'] ?? ''))),
             'images' => array_values(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))),
+        ];
+    }
+    $knownIds = array_fill_keys(array_map(static function (array $item): string {
+        return trim((string) ($item['id'] ?? ''));
+    }, $items), true);
+    foreach ((array) ($legacyStore['items'] ?? []) as $legacyItem) {
+        if (!is_array($legacyItem)) {
+            continue;
+        }
+        $itemId = trim((string) ($legacyItem['id'] ?? ''));
+        if ($itemId === '' || isset($knownIds[$itemId]) || isset($deletedIds[$itemId])) {
+            continue;
+        }
+        $knownIds[$itemId] = true;
+        $items[] = [
+            'id' => $itemId,
+            'url' => nammu_fediverse_thread_page_url($itemId, $config),
+            'title' => 'Noticia',
+            'content' => '',
+            'summary' => '',
+            'published' => trim((string) ($legacyItem['published'] ?? '')) ?: gmdate(DATE_ATOM),
+            'type' => 'Article',
+            'image' => '',
+            'images' => [],
         ];
     }
     usort($items, static function (array $a, array $b): int {
@@ -4677,7 +4823,7 @@ function nammu_fediverse_inspect_object(string $objectUrl, array $config): array
     ];
 }
 
-function nammu_fediverse_store_inbox_activity(array $payload, array $meta = []): void
+function nammu_fediverse_store_inbox_activity(array $payload, array $meta = [], ?array $config = null): void
 {
     $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
     $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
@@ -4691,6 +4837,9 @@ function nammu_fediverse_store_inbox_activity(array $payload, array $meta = []):
     ];
     $store['activities'] = array_slice($activities, -1000);
     nammu_fediverse_save_json_store(nammu_fediverse_inbox_file(), $store);
+    if (is_array($config)) {
+        nammu_fediverse_record_legacy_actuality_payload($payload, $config);
+    }
 }
 
 function nammu_fediverse_remove_timeline_items(array $identifiers): int
@@ -5954,7 +6103,7 @@ function nammu_fediverse_handle_inbox_payload(array $payload, array $config, arr
         'verification_error' => (string) ($verification['error'] ?? ''),
         'signature_key_id' => (string) ($verification['key_id'] ?? ''),
         'signed_headers' => (string) ($verification['signed_headers'] ?? ''),
-    ]);
+    ], $config);
     if (empty($verification['verified'])) {
         return ['accepted' => false, 'type' => 'unauthorized', 'verified' => false, 'error' => (string) ($verification['error'] ?? '')];
     }

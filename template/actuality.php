@@ -460,14 +460,7 @@ $manualDisplayText = static function (array $item): string {
         color: #7a5300;
     }
     .actuality-card--manual::before {
-        content: "";
-        display: block;
-        width: 64px;
-        height: 22px;
-        margin: 0.7rem auto -0.25rem;
-        border-radius: 4px;
-        background: rgba(255,255,255,0.42);
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.38);
+        display: none;
     }
     .actuality-card--boost::before {
         display: none;

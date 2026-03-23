@@ -852,9 +852,37 @@ function nammu_fediverse_actions_store(): array
 
 function nammu_fediverse_deleted_store(): array
 {
-    $store = nammu_fediverse_load_json_store(nammu_fediverse_deleted_file(), ['ids' => []]);
-    $ids = is_array($store['ids'] ?? null) ? array_values(array_unique(array_map('strval', $store['ids']))) : [];
-    return ['ids' => $ids];
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_deleted_file(), ['ids' => [], 'items' => []]);
+    $normalized = [];
+    foreach ((array) ($store['items'] ?? []) as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $id = trim((string) ($item['id'] ?? ''));
+        if ($id === '') {
+            continue;
+        }
+        $normalized[$id] = [
+            'id' => $id,
+            'deleted_at' => trim((string) ($item['deleted_at'] ?? '')),
+        ];
+    }
+    foreach ((array) ($store['ids'] ?? []) as $id) {
+        $id = trim((string) $id);
+        if ($id === '') {
+            continue;
+        }
+        if (!isset($normalized[$id])) {
+            $normalized[$id] = [
+                'id' => $id,
+                'deleted_at' => '',
+            ];
+        }
+    }
+    return [
+        'ids' => array_keys($normalized),
+        'items' => array_values($normalized),
+    ];
 }
 
 function nammu_fediverse_legacy_actuality_store(): array
@@ -935,10 +963,51 @@ function nammu_fediverse_save_hidden_replies_store(array $items): void
 
 function nammu_fediverse_save_deleted_store(array $ids): void
 {
-    $normalized = array_values(array_unique(array_filter(array_map('strval', $ids), static function (string $value): bool {
-        return trim($value) !== '';
-    })));
-    nammu_fediverse_save_json_store(nammu_fediverse_deleted_file(), ['ids' => $normalized]);
+    $normalized = [];
+    foreach ($ids as $entry) {
+        if (is_array($entry)) {
+            $id = trim((string) ($entry['id'] ?? ''));
+            if ($id === '') {
+                continue;
+            }
+            $normalized[$id] = [
+                'id' => $id,
+                'deleted_at' => trim((string) ($entry['deleted_at'] ?? '')),
+            ];
+            continue;
+        }
+        $id = trim((string) $entry);
+        if ($id === '') {
+            continue;
+        }
+        if (!isset($normalized[$id])) {
+            $normalized[$id] = [
+                'id' => $id,
+                'deleted_at' => '',
+            ];
+        }
+    }
+    nammu_fediverse_save_json_store(nammu_fediverse_deleted_file(), [
+        'ids' => array_keys($normalized),
+        'items' => array_values($normalized),
+    ]);
+}
+
+function nammu_fediverse_deleted_entry(string $itemId): ?array
+{
+    $itemId = trim($itemId);
+    if ($itemId === '') {
+        return null;
+    }
+    foreach ((array) (nammu_fediverse_deleted_store()['items'] ?? []) as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        if (trim((string) ($entry['id'] ?? '')) === $itemId) {
+            return $entry;
+        }
+    }
+    return null;
 }
 
 function nammu_fediverse_save_legacy_actuality_store(array $items): void
@@ -4875,6 +4944,20 @@ function nammu_fediverse_outbox_document(array $config): array
         return nammu_fediverse_activity_for_local_item($item, $config);
     }, nammu_fediverse_local_content_items($config));
     $activities = array_merge($activities, nammu_fediverse_public_action_activities($config));
+    foreach ((array) (nammu_fediverse_deleted_store()['items'] ?? []) as $deletedItem) {
+        if (!is_array($deletedItem)) {
+            continue;
+        }
+        $deletedId = trim((string) ($deletedItem['id'] ?? ''));
+        if ($deletedId === '') {
+            continue;
+        }
+        $activities[] = nammu_fediverse_build_delete_activity(
+            $deletedId,
+            $config,
+            trim((string) ($deletedItem['deleted_at'] ?? ''))
+        );
+    }
     usort($activities, static function (array $a, array $b): int {
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });
@@ -4894,6 +4977,17 @@ function nammu_fediverse_object_document(string $routePath, array $config): ?arr
         return null;
     }
     $baseUrl = rtrim(nammu_fediverse_base_url($config), '/');
+    $deletedItemId = $baseUrl . $routePath;
+    $deletedEntry = nammu_fediverse_deleted_entry($deletedItemId);
+    if (is_array($deletedEntry)) {
+        return [
+            '@context' => 'https://www.w3.org/ns/activitystreams',
+            'id' => $deletedItemId,
+            'type' => 'Tombstone',
+            'formerType' => 'Article',
+            'deleted' => trim((string) ($deletedEntry['deleted_at'] ?? '')) ?: gmdate(DATE_ATOM),
+        ];
+    }
     foreach (nammu_fediverse_local_content_items($config) as $item) {
         $itemId = trim((string) ($item['id'] ?? ''));
         if ($itemId === '') {
@@ -7131,23 +7225,31 @@ function nammu_fediverse_mark_local_item_deleted(string $itemId, array $config):
     }
     $deletedIds = nammu_fediverse_deleted_store()['ids'];
     if (!in_array($itemId, $deletedIds, true)) {
-        $deletedIds[] = $itemId;
-        nammu_fediverse_save_deleted_store($deletedIds);
+        $deletedEntries = (array) (nammu_fediverse_deleted_store()['items'] ?? []);
+        $deletedEntries[] = [
+            'id' => $itemId,
+            'deleted_at' => gmdate(DATE_ATOM),
+        ];
+        nammu_fediverse_save_deleted_store($deletedEntries);
     }
     return ['ok' => true, 'message' => 'Publicación marcada para borrado en el Fediverso.'];
 }
 
-function nammu_fediverse_build_delete_activity(string $itemId, array $config): array
+function nammu_fediverse_build_delete_activity(string $itemId, array $config, string $published = ''): array
 {
     $actorUrl = nammu_fediverse_actor_url($config);
+    $published = trim($published);
+    if ($published === '') {
+        $published = gmdate(DATE_ATOM);
+    }
     return [
         '@context' => 'https://www.w3.org/ns/activitystreams',
-        'id' => $actorUrl . '/delete/' . substr(sha1($itemId . '|' . microtime(true)), 0, 24),
+        'id' => $actorUrl . '/delete/' . substr(sha1($itemId . '|' . $published), 0, 24),
         'type' => 'Delete',
         'actor' => $actorUrl,
         'to' => ['https://www.w3.org/ns/activitystreams#Public'],
         'object' => $itemId,
-        'published' => gmdate(DATE_ATOM),
+        'published' => $published,
     ];
 }
 

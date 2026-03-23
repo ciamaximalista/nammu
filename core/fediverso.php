@@ -3194,6 +3194,8 @@ function nammu_fediverse_refresh_following(array $options = []): array
     });
     $actorLimit = max(1, (int) ($options['actor_limit'] ?? count($actors)));
     $outboxLimit = max(1, (int) ($options['outbox_limit'] ?? 8));
+    $refreshFollowers = !array_key_exists('refresh_followers', $options) || !empty($options['refresh_followers']);
+    $resolveActorTtl = max(0, (int) ($options['resolve_actor_ttl'] ?? 3600));
     $checked = 0;
     $newItems = 0;
     foreach ($actors as $actorIndex => &$actor) {
@@ -3202,12 +3204,20 @@ function nammu_fediverse_refresh_following(array $options = []): array
         }
         $checked++;
         $actor['last_checked_at'] = gmdate(DATE_ATOM);
-        $actorDoc = nammu_fediverse_resolve_actor((string) ($actor['id'] ?? ''), $config);
+        $actorDoc = [];
+        $lastResolvedAt = strtotime((string) ($actor['resolved_at'] ?? '')) ?: 0;
+        $storedOutbox = trim((string) ($actor['outbox'] ?? ''));
+        if ($storedOutbox !== '' && $resolveActorTtl > 0 && $lastResolvedAt > 0 && (time() - $lastResolvedAt) < $resolveActorTtl) {
+            $actorDoc = $actor;
+        } else {
+            $actorDoc = nammu_fediverse_resolve_actor((string) ($actor['id'] ?? ''), $config);
+        }
         if (!is_array($actorDoc) || trim((string) ($actorDoc['outbox'] ?? '')) === '') {
             $actor['last_error'] = 'No se pudo refrescar el actor remoto.';
             continue;
         }
         $actor = array_merge($actor, $actorDoc);
+        $actor['resolved_at'] = gmdate(DATE_ATOM);
         $outbox = nammu_fediverse_signed_fetch_json((string) $actor['outbox'], $config);
         if (!is_array($outbox)) {
             $actor['last_error'] = 'No se pudo leer su outbox.';
@@ -3225,7 +3235,7 @@ function nammu_fediverse_refresh_following(array $options = []): array
     unset($actor);
     nammu_fediverse_save_following_store($actors);
     nammu_fediverse_save_timeline_store(array_values($timelineById));
-    $followerStats = nammu_fediverse_refresh_followers($config);
+    $followerStats = $refreshFollowers ? nammu_fediverse_refresh_followers($config) : ['checked' => 0, 'removed' => 0];
     return [
         'checked' => $checked,
         'new' => $newItems,
@@ -6894,7 +6904,7 @@ function nammu_fediverse_public_thread_meta_for_named_local_item(string $slug, s
                 continue;
             }
             $payload = is_array($threadPayloads[$itemId] ?? null) ? $threadPayloads[$itemId] : null;
-            $snapshotMaps[$cacheKey][$key] = [
+            $candidate = [
                 'thread_url' => nammu_fediverse_thread_page_url($itemId, $config),
                 'summary' => is_array($payload['summary'] ?? null)
                     ? $payload['summary']
@@ -6903,6 +6913,16 @@ function nammu_fediverse_public_thread_meta_for_named_local_item(string $slug, s
                     ? $payload['details']
                     : ['likes' => [], 'shares' => [], 'replies' => []],
             ];
+            $candidateScore = (int) ($candidate['summary']['likes'] ?? 0)
+                + (int) ($candidate['summary']['shares'] ?? 0)
+                + (int) ($candidate['summary']['replies'] ?? 0);
+            $existing = is_array($snapshotMaps[$cacheKey][$key] ?? null) ? $snapshotMaps[$cacheKey][$key] : null;
+            $existingScore = is_array($existing)
+                ? ((int) ($existing['summary']['likes'] ?? 0) + (int) ($existing['summary']['shares'] ?? 0) + (int) ($existing['summary']['replies'] ?? 0))
+                : -1;
+            if (!is_array($existing) || $candidateScore >= $existingScore) {
+                $snapshotMaps[$cacheKey][$key] = $candidate;
+            }
         }
     }
 

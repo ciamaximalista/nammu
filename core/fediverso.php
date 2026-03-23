@@ -3638,15 +3638,8 @@ function nammu_fediverse_local_content_items(array $config): array
 
 function nammu_fediverse_local_items_index(array $config): array
 {
-    $items = nammu_fediverse_local_content_items($config);
-    foreach (nammu_fediverse_actions_store()['items'] as $action) {
-        $resendItem = nammu_fediverse_resend_item_from_action($action);
-        if (is_array($resendItem)) {
-            $items[] = $resendItem;
-        }
-    }
     $byIdentifier = [];
-    foreach ($items as $item) {
+    $registerItem = static function (array $item, bool $overwrite = false) use (&$byIdentifier, $config): void {
         $identifiers = [];
         foreach (['id', 'url'] as $field) {
             $value = trim((string) ($item[$field] ?? ''));
@@ -3658,7 +3651,19 @@ function nammu_fediverse_local_items_index(array $config): array
             $identifiers[] = $aliasIdentifier;
         }
         foreach (array_unique($identifiers) as $identifier) {
+            if (!$overwrite && isset($byIdentifier[$identifier])) {
+                continue;
+            }
             $byIdentifier[$identifier] = $item;
+        }
+    };
+    foreach (nammu_fediverse_local_content_items($config) as $item) {
+        $registerItem($item, true);
+    }
+    foreach (nammu_fediverse_actions_store()['items'] as $action) {
+        $resendItem = nammu_fediverse_resend_item_from_action($action);
+        if (is_array($resendItem)) {
+            $registerItem($resendItem, false);
         }
     }
     return $byIdentifier;
@@ -6762,27 +6767,6 @@ function nammu_fediverse_public_thread_url_for_named_local_item(string $slug, st
         default => $baseUrl . '/ap/objects/post-' . rawurlencode(trim($slug)),
     };
     $itemId = is_array($item) ? trim((string) ($item['id'] ?? '')) : $fallbackObjectId;
-    $itemUrl = is_array($item) ? trim((string) ($item['url'] ?? '')) : $fallbackUrl;
-    $latestResend = null;
-    if ($itemUrl !== '') {
-        foreach (nammu_fediverse_actions_store()['items'] as $action) {
-            if (strtolower(trim((string) ($action['type'] ?? ''))) !== 'resend') {
-                continue;
-            }
-            if (trim((string) ($action['object_url'] ?? '')) !== $itemUrl) {
-                continue;
-            }
-            if (!is_array($latestResend) || strcmp((string) ($action['published'] ?? ''), (string) ($latestResend['published'] ?? '')) > 0) {
-                $latestResend = $action;
-            }
-        }
-    }
-    if (is_array($latestResend)) {
-        $resendObjectId = trim((string) ($latestResend['resend_object_id'] ?? ''));
-        if ($resendObjectId !== '') {
-            return nammu_fediverse_thread_page_url($resendObjectId, $config);
-        }
-    }
     if ($itemId === '' || in_array($itemId, nammu_fediverse_deleted_store()['ids'], true)) {
         return '';
     }

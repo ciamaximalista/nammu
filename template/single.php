@@ -345,6 +345,9 @@ if ($isPageTemplate && $formattedDate !== '') {
                 </div>
             <?php endif; ?>
         </div>
+<?php if ($showHeaderButtonsSingle && $isPageTemplate): ?>
+    <?= $headerButtonsHtml ?>
+<?php endif; ?>
         <h1><?= htmlspecialchars($post->getTitle(), ENT_QUOTES, 'UTF-8') ?></h1>
 <?php if (!$isPageTemplate && $topMetaText !== '' && empty($hideCategory)): ?>
     <div class="post-meta-band"><?= $topMetaText ?></div>

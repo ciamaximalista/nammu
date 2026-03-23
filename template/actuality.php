@@ -255,7 +255,7 @@ $manualDisplayText = static function (array $item): string {
 ?>
 <section class="actuality-hero">
     <div class="actuality-hero-inner">
-        <h1>Fediverso</h1>
+        <h1><?= htmlspecialchars((string) ($siteTitle ?? 'Fediverso'), ENT_QUOTES, 'UTF-8') ?></h1>
         <p>
             <?php if ($hasActuality || !empty($items)): ?>
                 Página de perfil de @<?= htmlspecialchars($fediverseUsername, ENT_QUOTES, 'UTF-8') ?>@<?= htmlspecialchars((string) preg_replace('#^https?://#i', '', rtrim((string) ($baseUrl ?? ''), '/')), ENT_QUOTES, 'UTF-8') ?>

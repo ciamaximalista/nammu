@@ -932,6 +932,10 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item): array
     if ($primaryImage !== '' && !in_array($primaryImage, $images, true)) {
         array_unshift($images, $primaryImage);
     }
+    $boostOriginalUrl = trim((string) ($item['boost_original_url'] ?? ''));
+    $boostActorName = trim((string) ($item['boost_actor_name'] ?? ''));
+    $boostActorIcon = trim((string) ($item['boost_actor_icon'] ?? ''));
+    $boostActorUrl = trim((string) ($item['boost_actor_url'] ?? ''));
 
     $manualId = trim((string) ($item['id'] ?? ''));
     $candidateIdentifiers = array_values(array_filter(array_map('strval', array_merge(
@@ -956,6 +960,18 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item): array
             || ($actionObjectUrl !== '' && in_array($actionObjectUrl, $candidateIdentifiers, true))
             || ($actionPublicUrl !== '' && in_array($actionPublicUrl, $candidateIdentifiers, true))
         ) {
+            if ($boostOriginalUrl === '' && $actionPublicUrl !== '') {
+                $boostOriginalUrl = $actionPublicUrl;
+            }
+            if ($boostActorName === '') {
+                $boostActorName = trim((string) ($action['boost_actor_name'] ?? ''));
+            }
+            if ($boostActorIcon === '') {
+                $boostActorIcon = trim((string) ($action['boost_actor_icon'] ?? ''));
+            }
+            if ($boostActorUrl === '') {
+                $boostActorUrl = trim((string) ($action['boost_actor_url'] ?? ''));
+            }
             foreach (array_filter([
                 trim((string) ($action['image'] ?? '')),
                 ...array_map('strval', is_array($action['images'] ?? null) ? $action['images'] : []),
@@ -987,6 +1003,21 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item): array
         if (!$matchesCandidate) {
             continue;
         }
+        if ($boostOriginalUrl === '') {
+            $timelineUrl = trim((string) (($timelineItem['url'] ?? '') ?: ($timelineItem['object_id'] ?? '') ?: ($timelineItem['id'] ?? '')));
+            if ($timelineUrl !== '') {
+                $boostOriginalUrl = $timelineUrl;
+            }
+        }
+        if ($boostActorName === '') {
+            $boostActorName = trim((string) ($timelineItem['actor_name'] ?? ''));
+        }
+        if ($boostActorIcon === '') {
+            $boostActorIcon = trim((string) ($timelineItem['actor_icon'] ?? ''));
+        }
+        if ($boostActorUrl === '') {
+            $boostActorUrl = trim((string) (($timelineItem['actor_url'] ?? '') ?: ($timelineItem['actor_id'] ?? '')));
+        }
         foreach (nammu_actuality_images_from_fediverse_attachments((array) ($timelineItem['attachments'] ?? [])) as $imageUrl) {
             if (!in_array($imageUrl, $images, true)) {
                 $images[] = $imageUrl;
@@ -1001,6 +1032,24 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item): array
     if (!empty($images)) {
         $item['images'] = array_values($images);
         $item['image'] = (string) ($images[0] ?? '');
+    }
+    if ($boostOriginalUrl === '') {
+        $boostLinks = array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : [])));
+        if (!empty($boostLinks)) {
+            $boostOriginalUrl = trim((string) end($boostLinks));
+        }
+    }
+    if ($boostOriginalUrl !== '') {
+        $item['boost_original_url'] = $boostOriginalUrl;
+    }
+    if ($boostActorName !== '') {
+        $item['boost_actor_name'] = $boostActorName;
+    }
+    if ($boostActorIcon !== '') {
+        $item['boost_actor_icon'] = $boostActorIcon;
+    }
+    if ($boostActorUrl !== '') {
+        $item['boost_actor_url'] = $boostActorUrl;
     }
     return $item;
 }
@@ -1647,6 +1696,10 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
             'timestamp' => (int) ($item['timestamp'] ?? 0),
             'source' => trim((string) ($item['source'] ?? '')),
             'via' => trim((string) ($item['via'] ?? '')),
+            'boost_original_url' => trim((string) ($item['boost_original_url'] ?? '')),
+            'boost_actor_name' => trim((string) ($item['boost_actor_name'] ?? '')),
+            'boost_actor_icon' => trim((string) ($item['boost_actor_icon'] ?? '')),
+            'boost_actor_url' => trim((string) ($item['boost_actor_url'] ?? '')),
             'is_manual' => true,
         ];
     }

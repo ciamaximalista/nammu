@@ -10727,6 +10727,9 @@ if ($isLoggedIn && $page === 'fediverso') {
         $objectTitle = trim((string) ($_POST['fediverse_object_title'] ?? ''));
         $objectContent = trim((string) ($_POST['fediverse_object_content'] ?? ''));
         $objectImage = trim((string) ($_POST['fediverse_object_image'] ?? ''));
+        $objectActorName = trim((string) ($_POST['fediverse_actor_name'] ?? ''));
+        $objectActorIcon = trim((string) ($_POST['fediverse_actor_icon'] ?? ''));
+        $objectActorUrl = trim((string) ($_POST['fediverse_actor_url'] ?? ''));
         $objectImages = json_decode((string) ($_POST['fediverse_object_images'] ?? '[]'), true);
         $objectImages = array_values(array_unique(array_filter(array_map('strval', is_array($objectImages) ? $objectImages : []))));
         if ($objectImage !== '' && !in_array($objectImage, $objectImages, true)) {
@@ -10761,6 +10764,10 @@ if ($isLoggedIn && $page === 'fediverso') {
                 $manualItem = nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle, $objectImage, [
                     'via' => 'boost',
                     'images' => $objectImages,
+                    'boost_original_url' => $displayUrl,
+                    'boost_actor_name' => $objectActorName,
+                    'boost_actor_icon' => $objectActorIcon,
+                    'boost_actor_url' => $objectActorUrl,
                 ]);
                 if (function_exists('nammu_actuality_rebuild_snapshot')) {
                     nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
@@ -10773,6 +10780,9 @@ if ($isLoggedIn && $page === 'fediverso') {
                     'images' => $objectImages,
                     'manual_item_id' => (string) ($manualItem['id'] ?? ''),
                     'public_url' => $displayUrl,
+                    'boost_actor_name' => $objectActorName,
+                    'boost_actor_icon' => $objectActorIcon,
+                    'boost_actor_url' => $objectActorUrl,
                 ]);
                 $result['message'] = rtrim((string) ($result['message'] ?? '')) . ' También publicada como nota.';
                 if (function_exists('admin_enqueue_social_broadcast')) {

@@ -64,14 +64,6 @@ $actualityMetricIcon = static function (string $type): string {
 };
 $renderActualityText = static function (string $text, array $item) use ($fediverseIcon, $actualityFediverseMeta, $actualityMetricIcon): string {
     $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
-    $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
-    $boostLinks = array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : [])));
-    if ($isBoost && !empty($boostLinks) && $fediverseIcon !== '') {
-        $originalUrl = trim((string) end($boostLinks));
-        if ($originalUrl !== '') {
-            $html .= ' <a class="actuality-fediverse-inline" href="' . htmlspecialchars($originalUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" title="Publicación original en el Fediverso" aria-label="Publicación original en el Fediverso">' . $fediverseIcon . '</a>';
-        }
-    }
     $fediverseMeta = $actualityFediverseMeta($item);
     $fediverseUrl = trim((string) ($fediverseMeta['thread_url'] ?? ''));
     if ($fediverseUrl !== '' && $fediverseIcon !== '') {
@@ -92,6 +84,28 @@ $renderActualityText = static function (string $text, array $item) use ($fediver
         $html .= ' <a class="actuality-fediverse-inline" href="' . htmlspecialchars($fediverseUrl, ENT_QUOTES, 'UTF-8') . '" title="En el Fediverso" aria-label="En el Fediverso"><span class="actuality-fediverse-inline-icon">' . $fediverseIcon . '</span>' . $metricsHtml . '</a>';
     }
     return $html;
+};
+$renderBoostHeader = static function (array $item): string {
+    if (strtolower(trim((string) ($item['via'] ?? ''))) !== 'boost') {
+        return '';
+    }
+    $originalUrl = trim((string) ($item['boost_original_url'] ?? ''));
+    if ($originalUrl === '') {
+        $boostLinks = array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : [])));
+        if (!empty($boostLinks)) {
+            $originalUrl = trim((string) end($boostLinks));
+        }
+    }
+    if ($originalUrl === '') {
+        return '';
+    }
+    $actorName = trim((string) ($item['boost_actor_name'] ?? ''));
+    $actorIcon = trim((string) ($item['boost_actor_icon'] ?? ''));
+    $fallback = mb_substr($actorName !== '' ? $actorName : 'F', 0, 1, 'UTF-8');
+    $avatarHtml = $actorIcon !== ''
+        ? '<img class="actuality-boost-origin__avatar" src="' . htmlspecialchars($actorIcon, ENT_QUOTES, 'UTF-8') . '" alt="' . htmlspecialchars($actorName !== '' ? $actorName : 'Autor original', ENT_QUOTES, 'UTF-8') . '" loading="lazy">'
+        : '<span class="actuality-boost-origin__avatar actuality-boost-origin__avatar--fallback">' . htmlspecialchars($fallback, ENT_QUOTES, 'UTF-8') . '</span>';
+    return '<div class="actuality-boost-origin"><a class="actuality-boost-origin__link" href="' . htmlspecialchars($originalUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" title="' . htmlspecialchars($actorName !== '' ? $actorName : 'Publicación original', ENT_QUOTES, 'UTF-8') . '" aria-label="' . htmlspecialchars($actorName !== '' ? ('Publicación original de ' . $actorName) : 'Publicación original', ENT_QUOTES, 'UTF-8') . '">' . $avatarHtml . '</a></div>';
 };
 $formatDate = static function (int $timestamp): string {
     if ($timestamp <= 0) {
@@ -226,7 +240,13 @@ $manualDisplayText = static function (array $item): string {
                     <?php $isManual = !empty($item['is_manual']); ?>
                     <?php $isSiteContent = !empty($item['is_site_content']); ?>
                     <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
-                    <article class="actuality-card actuality-card--full<?= $isManual ? ' actuality-card--manual' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                    <article class="actuality-card actuality-card--full<?= $isManual ? ' actuality-card--manual' : '' ?><?= strtolower(trim((string) ($item['via'] ?? ''))) === 'boost' ? ' actuality-card--boost' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                        <?php if ($isManual): ?>
+                            <?php $boostHeaderHtml = $renderBoostHeader($item); ?>
+                            <?php if ($boostHeaderHtml !== ''): ?>
+                                <?= $boostHeaderHtml ?>
+                            <?php endif; ?>
+                        <?php endif; ?>
                         <div class="actuality-card-body">
                             <?php if (!$isManual): ?>
                                 <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
@@ -260,7 +280,13 @@ $manualDisplayText = static function (array $item): string {
                         <?php $isSiteContent = !empty($item['is_site_content']); ?>
                         <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
                         <?php $manualBody = $isManual ? $manualDisplayText($item) : ''; ?>
-                        <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                        <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?><?= strtolower(trim((string) ($item['via'] ?? ''))) === 'boost' ? ' actuality-card--boost' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                            <?php if ($isManual): ?>
+                                <?php $boostHeaderHtml = $renderBoostHeader($item); ?>
+                                <?php if ($boostHeaderHtml !== ''): ?>
+                                    <?= $boostHeaderHtml ?>
+                                <?php endif; ?>
+                            <?php endif; ?>
                             <div class="actuality-card-body">
                                 <?php if (!$isManual): ?>
                                     <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
@@ -296,7 +322,13 @@ $manualDisplayText = static function (array $item): string {
                         <?php $isSiteContent = !empty($item['is_site_content']); ?>
                         <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
                         <?php $manualBody = $isManual ? $manualDisplayText($item) : ''; ?>
-                        <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                        <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?><?= strtolower(trim((string) ($item['via'] ?? ''))) === 'boost' ? ' actuality-card--boost' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                            <?php if ($isManual): ?>
+                                <?php $boostHeaderHtml = $renderBoostHeader($item); ?>
+                                <?php if ($boostHeaderHtml !== ''): ?>
+                                    <?= $boostHeaderHtml ?>
+                                <?php endif; ?>
+                            <?php endif; ?>
                             <div class="actuality-card-body">
                                 <?php if (!$isManual): ?>
                                     <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
@@ -436,6 +468,40 @@ $manualDisplayText = static function (array $item): string {
         border-radius: 4px;
         background: rgba(255,255,255,0.42);
         box-shadow: inset 0 0 0 1px rgba(255,255,255,0.38);
+    }
+    .actuality-card--boost::before {
+        display: none;
+    }
+    .actuality-boost-origin {
+        display: flex;
+        justify-content: center;
+        padding-top: 0.7rem;
+        margin-bottom: -0.25rem;
+    }
+    .actuality-boost-origin__link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+    }
+    .actuality-boost-origin__avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 999px;
+        object-fit: cover;
+        display: block;
+        border: 2px solid rgba(255,255,255,0.82);
+        box-shadow: 0 8px 18px rgba(91, 74, 12, 0.18);
+        background: rgba(255,255,255,0.72);
+    }
+    .actuality-boost-origin__avatar--fallback {
+        align-items: center;
+        background: rgba(255,255,255,0.72);
+        color: #7a5300;
+        display: inline-flex;
+        font-size: 1.15rem;
+        font-weight: 700;
+        justify-content: center;
     }
     .actuality-image-link {
         display: block;

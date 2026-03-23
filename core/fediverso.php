@@ -2028,12 +2028,32 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
         );
         $summary = $reactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0];
         $summary['replies'] = count($mergedReplies);
+        $details = $reactionDetails[$localId] ?? ['likes' => [], 'shares' => [], 'replies' => []];
+        $replyActors = [];
+        foreach ($mergedReplies as $reply) {
+            if (!is_array($reply)) {
+                continue;
+            }
+            $actorId = trim((string) ($reply['actor_id'] ?? ''));
+            $actorKey = $actorId !== '' ? $actorId : sha1(json_encode($reply, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            if (isset($replyActors[$actorKey])) {
+                continue;
+            }
+            $replyActors[$actorKey] = [
+                'id' => $actorId,
+                'name' => trim((string) (($reply['actor_name'] ?? '') ?: ($reply['actor_username'] ?? '') ?: $actorId)),
+                'icon' => trim((string) ($reply['actor_icon'] ?? '')),
+                'url' => trim((string) (($reply['url'] ?? '') ?: $actorId)),
+                'published' => trim((string) ($reply['published'] ?? '')),
+            ];
+        }
+        $details['replies'] = array_values($replyActors);
         $threadPayloads[$localId] = [
             'item' => $canonicalItem,
             'thread_url' => nammu_fediverse_thread_page_url($localId, $config),
             'original_url' => trim((string) ($canonicalItem['url'] ?? ($localItem['url'] ?? ''))),
             'summary' => $summary,
-            'details' => $reactionDetails[$localId] ?? ['likes' => [], 'shares' => [], 'replies' => []],
+            'details' => $details,
             'replies' => $mergedReplies,
         ];
     }
@@ -2601,12 +2621,32 @@ function nammu_fediverse_thread_page_payload(array $item, array $config): array
     });
     $summary = $reactionSummary[$itemId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0];
     $summary['replies'] = count($mergedReplies);
+    $details = $reactionDetails[$itemId] ?? ['likes' => [], 'shares' => [], 'replies' => []];
+    $replyActors = [];
+    foreach ($mergedReplies as $reply) {
+        if (!is_array($reply)) {
+            continue;
+        }
+        $actorId = trim((string) ($reply['actor_id'] ?? ''));
+        $actorKey = $actorId !== '' ? $actorId : sha1(json_encode($reply, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        if (isset($replyActors[$actorKey])) {
+            continue;
+        }
+        $replyActors[$actorKey] = [
+            'id' => $actorId,
+            'name' => trim((string) (($reply['actor_name'] ?? '') ?: ($reply['actor_username'] ?? '') ?: $actorId)),
+            'icon' => trim((string) ($reply['actor_icon'] ?? '')),
+            'url' => trim((string) (($reply['url'] ?? '') ?: $actorId)),
+            'published' => trim((string) ($reply['published'] ?? '')),
+        ];
+    }
+    $details['replies'] = array_values($replyActors);
     return [
         'item' => $canonicalItem,
         'thread_url' => nammu_fediverse_thread_page_url($itemId, $config),
         'original_url' => trim((string) ($canonicalItem['url'] ?? ($item['url'] ?? ''))),
         'summary' => $summary,
-        'details' => $reactionDetails[$itemId] ?? ['likes' => [], 'shares' => [], 'replies' => []],
+        'details' => $details,
         'replies' => $mergedReplies,
     ];
 }

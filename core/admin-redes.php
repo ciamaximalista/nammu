@@ -405,6 +405,9 @@ function admin_build_social_rss_message(string $network, string $title, string $
 
 function admin_social_broadcast_fediverse_url_for_actuality_item(array $item): string
 {
+    if (!function_exists('nammu_actuality_news_item_id') && is_file(__DIR__ . '/actualidad.php')) {
+        require_once __DIR__ . '/actualidad.php';
+    }
     if (!function_exists('nammu_fediverse_public_thread_url_for_actuality_item') && is_file(__DIR__ . '/fediverso.php')) {
         require_once __DIR__ . '/fediverso.php';
     }
@@ -412,6 +415,14 @@ function admin_social_broadcast_fediverse_url_for_actuality_item(array $item): s
         return '';
     }
     $config = load_config_file();
+    $shortId = trim((string) ($item['id'] ?? ''));
+    if ($shortId === '' && function_exists('nammu_actuality_news_item_id')) {
+        $shortId = trim((string) nammu_actuality_news_item_id($item));
+    }
+    if ($shortId !== '' && function_exists('nammu_fediverse_thread_page_url') && function_exists('nammu_fediverse_base_url')) {
+        $itemId = rtrim((string) nammu_fediverse_base_url($config), '/') . '/ap/objects/actualidad-' . rawurlencode($shortId);
+        return trim((string) nammu_fediverse_thread_page_url($itemId, $config));
+    }
     return trim((string) nammu_fediverse_public_thread_url_for_actuality_item($item, $config));
 }
 

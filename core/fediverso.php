@@ -2589,6 +2589,58 @@ function nammu_fediverse_find_local_item_for_thread_hash(string $hash, array $co
     if ($hash === '' || !preg_match('/^[a-f0-9]{24}$/', $hash)) {
         return null;
     }
+    $baseUrl = rtrim(nammu_fediverse_base_url($config), '/');
+    $deletedIds = array_fill_keys(nammu_fediverse_deleted_store()['ids'], true);
+    $legacyAliases = is_array((nammu_fediverse_legacy_actuality_aliases_store()['map'] ?? null)) ? nammu_fediverse_legacy_actuality_aliases_store()['map'] : [];
+    $actualityStore = nammu_fediverse_load_json_store(dirname(__DIR__) . '/config/actualidad-items.json', ['items' => []]);
+    foreach ((array) ($actualityStore['items'] ?? []) as $actualityItem) {
+        if (!is_array($actualityItem)) {
+            continue;
+        }
+        if (!empty($actualityItem['is_manual']) && strtolower(trim((string) ($actualityItem['via'] ?? ''))) === 'boost') {
+            continue;
+        }
+        $shortId = trim((string) ($actualityItem['id'] ?? ''));
+        if ($shortId === '' && function_exists('nammu_actuality_news_item_id')) {
+            $shortId = trim((string) nammu_actuality_news_item_id($actualityItem));
+        }
+        if ($shortId === '') {
+            continue;
+        }
+        $itemId = $baseUrl . '/ap/objects/actualidad-' . rawurlencode($shortId);
+        if (isset($deletedIds[$itemId])) {
+            continue;
+        }
+        $aliasIds = nammu_fediverse_legacy_actuality_alias_ids($actualityItem, $baseUrl);
+        foreach ($legacyAliases as $legacyId => $currentId) {
+            if (trim((string) $currentId) === $itemId) {
+                $aliasIds[] = trim((string) $legacyId);
+            }
+        }
+        $localItem = [
+            'id' => $itemId,
+            'url' => trim((string) (($actualityItem['link'] ?? '') ?: ($baseUrl . '/actualidad.php'))),
+            'title' => trim((string) ($actualityItem['title'] ?? '')),
+            'content' => trim((string) (($actualityItem['raw_text'] ?? '') ?: ($actualityItem['description'] ?? ''))),
+            'summary' => trim((string) ($actualityItem['description'] ?? '')),
+            'published' => gmdate(DATE_ATOM, (int) (($actualityItem['timestamp'] ?? 0) ?: time())),
+            'type' => !empty($actualityItem['is_manual']) ? 'Note' : 'Article',
+            'image' => trim((string) (($actualityItem['source_image'] ?? '') ?: ($actualityItem['image'] ?? ''))),
+            'images' => array_values(array_filter(array_map('strval', is_array($actualityItem['images'] ?? null) ? $actualityItem['images'] : []))),
+            'alias_ids' => array_values(array_unique(array_filter(array_map('trim', $aliasIds)))),
+        ];
+        $candidateHashes = [nammu_fediverse_thread_page_hash($itemId)];
+        foreach (nammu_fediverse_local_item_alias_identifiers($localItem, $config) as $aliasUrl) {
+            $candidateHashes[] = nammu_fediverse_thread_page_hash($aliasUrl);
+            $aliasPath = trim((string) (parse_url($aliasUrl, PHP_URL_PATH) ?? ''));
+            if (preg_match('#/fediverso/([a-f0-9]{24})/?$#', $aliasPath, $matches) === 1) {
+                $candidateHashes[] = strtolower((string) ($matches[1] ?? ''));
+            }
+        }
+        if (in_array($hash, array_values(array_unique(array_filter($candidateHashes))), true)) {
+            return $localItem;
+        }
+    }
     foreach (nammu_fediverse_local_content_items($config) as $item) {
         $itemId = trim((string) ($item['id'] ?? ''));
         if ($itemId === '') {
@@ -7133,13 +7185,19 @@ function nammu_fediverse_public_thread_meta_for_named_local_item(string $slug, s
 
 function nammu_fediverse_public_thread_url_for_actuality_item(array $actualityItem, array $config): string
 {
-    $candidateIdentifiers = [];
     $manualId = trim((string) ($actualityItem['id'] ?? ''));
-    if ($manualId !== '') {
-        $candidateIdentifiers[] = nammu_fediverse_base_url($config) . '/ap/objects/actualidad-' . rawurlencode($manualId);
+    if ($manualId === '' && function_exists('nammu_actuality_news_item_id')) {
+        $manualId = trim((string) nammu_actuality_news_item_id($actualityItem));
     }
+    if ($manualId !== '') {
+        $itemId = nammu_fediverse_base_url($config) . '/ap/objects/actualidad-' . rawurlencode($manualId);
+        if (!in_array($itemId, nammu_fediverse_deleted_store()['ids'], true)) {
+            return nammu_fediverse_thread_page_url($itemId, $config);
+        }
+    }
+    $candidateIdentifiers = [];
     $link = trim((string) ($actualityItem['link'] ?? ''));
-    if ($manualId === '' && $link !== '') {
+    if ($link !== '') {
         $candidateIdentifiers[] = $link;
     }
     foreach (array_unique(array_filter($candidateIdentifiers)) as $identifier) {
@@ -7158,13 +7216,16 @@ function nammu_fediverse_public_thread_url_for_actuality_item(array $actualityIt
 
 function nammu_fediverse_public_thread_meta_for_actuality_item(array $actualityItem, array $config): array
 {
-    $candidateIdentifiers = [];
     $manualId = trim((string) ($actualityItem['id'] ?? ''));
+    if ($manualId === '' && function_exists('nammu_actuality_news_item_id')) {
+        $manualId = trim((string) nammu_actuality_news_item_id($actualityItem));
+    }
+    $candidateIdentifiers = [];
     if ($manualId !== '') {
         $candidateIdentifiers[] = nammu_fediverse_base_url($config) . '/ap/objects/actualidad-' . rawurlencode($manualId);
     }
     $link = trim((string) ($actualityItem['link'] ?? ''));
-    if ($manualId === '' && $link !== '') {
+    if ($link !== '') {
         $candidateIdentifiers[] = $link;
     }
     $snapshotMeta = nammu_fediverse_home_snapshot_meta_for_local_identifiers($candidateIdentifiers, $config);

@@ -6789,6 +6789,45 @@ function nammu_fediverse_public_thread_url_for_named_local_item(string $slug, st
     return nammu_fediverse_thread_page_url($itemId, $config);
 }
 
+function nammu_fediverse_thread_meta_score(array $meta): int
+{
+    $summary = is_array($meta['summary'] ?? null) ? $meta['summary'] : [];
+    return max(0, (int) ($summary['likes'] ?? 0))
+        + max(0, (int) ($summary['shares'] ?? 0))
+        + max(0, (int) ($summary['replies'] ?? 0));
+}
+
+function nammu_fediverse_best_snapshot_meta_for_items(array $items, array $config): ?array
+{
+    $bestMeta = null;
+    $bestScore = -1;
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $itemId = trim((string) ($item['id'] ?? ''));
+        if ($itemId === '' || in_array($itemId, nammu_fediverse_deleted_store()['ids'], true)) {
+            continue;
+        }
+        $payload = nammu_fediverse_thread_page_snapshot_payload($item, $config);
+        $meta = [
+            'thread_url' => nammu_fediverse_thread_page_url($itemId, $config),
+            'summary' => is_array($payload['summary'] ?? null)
+                ? $payload['summary']
+                : ['likes' => 0, 'shares' => 0, 'replies' => 0],
+            'details' => is_array($payload['details'] ?? null)
+                ? $payload['details']
+                : ['likes' => [], 'shares' => [], 'replies' => []],
+        ];
+        $score = nammu_fediverse_thread_meta_score($meta);
+        if ($bestMeta === null || $score >= $bestScore) {
+            $bestMeta = $meta;
+            $bestScore = $score;
+        }
+    }
+    return $bestMeta;
+}
+
 function nammu_fediverse_home_snapshot_meta_for_local_identifiers(array $candidateIdentifiers, array $config): ?array
 {
     $candidateIdentifiers = array_values(array_unique(array_filter(array_map(static function ($value): string {
@@ -6948,6 +6987,13 @@ function nammu_fediverse_public_thread_meta_for_named_local_item(string $slug, s
     }
 
     $item = nammu_fediverse_find_named_local_item($normalizedSlug, $normalizedTemplate, $config);
+    if (is_array($item)) {
+        $equivalentItems = nammu_fediverse_equivalent_local_items_by_url((string) ($item['url'] ?? ''), $config);
+        $bestMeta = nammu_fediverse_best_snapshot_meta_for_items($equivalentItems, $config);
+        if (is_array($bestMeta)) {
+            return $bestMeta;
+        }
+    }
     $threadUrl = nammu_fediverse_public_thread_url_for_named_local_item($normalizedSlug, $normalizedTemplate, $config);
     $payload = is_array($item) ? nammu_fediverse_thread_page_snapshot_payload($item, $config) : null;
 

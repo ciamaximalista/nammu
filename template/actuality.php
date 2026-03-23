@@ -113,6 +113,50 @@ $formatDate = static function (int $timestamp): string {
     }
     return nammu_format_date_spanish((new DateTimeImmutable())->setTimestamp($timestamp), date('Y-m-d', $timestamp));
 };
+$actualitySourceLabel = static function (array $item): string {
+    $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
+    if ($isBoost) {
+        $actorUrl = trim((string) ($item['boost_actor_url'] ?? ''));
+        $actorName = trim((string) ($item['boost_actor_name'] ?? ''));
+        $candidates = [];
+        if ($actorUrl !== '') {
+            $path = trim((string) (parse_url($actorUrl, PHP_URL_PATH) ?? ''));
+            if ($path !== '') {
+                if (preg_match('#/@([^/@]+)(?:@[^/]+)?/?$#', $path, $matches) === 1) {
+                    $candidates[] = (string) ($matches[1] ?? '');
+                }
+                if (preg_match('#/(?:users|accounts)/([^/]+)/?$#', $path, $matches) === 1) {
+                    $candidates[] = (string) ($matches[1] ?? '');
+                }
+                if (preg_match('#/ap/actor/?$#', $path) !== 1) {
+                    $basename = basename($path);
+                    if ($basename !== '' && $basename !== 'actor') {
+                        $candidates[] = $basename;
+                    }
+                }
+            }
+        }
+        if ($actorName !== '') {
+            if (preg_match('/@([A-Za-z0-9._-]+)/u', $actorName, $matches) === 1) {
+                $candidates[] = (string) ($matches[1] ?? '');
+            } elseif (!preg_match('/\s/u', $actorName)) {
+                $candidates[] = $actorName;
+            }
+        }
+        foreach ($candidates as $candidate) {
+            $candidate = trim((string) $candidate);
+            $candidate = ltrim($candidate, '@');
+            if ($candidate === '') {
+                continue;
+            }
+            $candidate = preg_replace('/@.+$/u', '', $candidate) ?? $candidate;
+            if ($candidate !== '') {
+                return '@' . $candidate;
+            }
+        }
+    }
+    return trim((string) preg_replace('/^www\./i', '', (string) ($item['source'] ?? '')));
+};
 $groupedItems = [];
 foreach ($items as $item) {
     $timestamp = (int) ($item['timestamp'] ?? 0);
@@ -256,8 +300,9 @@ $manualDisplayText = static function (array $item): string {
                                     <?php if ($item['timestamp'] > 0): ?>
                                         <span><?= htmlspecialchars($formatDate($item['timestamp']), ENT_QUOTES, 'UTF-8') ?></span>
                                     <?php endif; ?>
-                                    <?php if ($item['source'] !== ''): ?>
-                                        <span><?= htmlspecialchars(preg_replace('/^www\./i', '', $item['source']), ENT_QUOTES, 'UTF-8') ?></span>
+                                    <?php $sourceLabel = $actualitySourceLabel($item); ?>
+                                    <?php if ($sourceLabel !== ''): ?>
+                                        <span><?= htmlspecialchars($sourceLabel, ENT_QUOTES, 'UTF-8') ?></span>
                                     <?php endif; ?>
                                 </p>
                             <?php endif; ?>
@@ -296,8 +341,9 @@ $manualDisplayText = static function (array $item): string {
                                         <?php if ($item['timestamp'] > 0): ?>
                                             <span><?= htmlspecialchars($formatDate($item['timestamp']), ENT_QUOTES, 'UTF-8') ?></span>
                                         <?php endif; ?>
-                                        <?php if ($item['source'] !== ''): ?>
-                                            <span><?= htmlspecialchars(preg_replace('/^www\./i', '', $item['source']), ENT_QUOTES, 'UTF-8') ?></span>
+                                        <?php $sourceLabel = $actualitySourceLabel($item); ?>
+                                        <?php if ($sourceLabel !== ''): ?>
+                                            <span><?= htmlspecialchars($sourceLabel, ENT_QUOTES, 'UTF-8') ?></span>
                                         <?php endif; ?>
                                     </p>
                                 <?php endif; ?>
@@ -338,8 +384,9 @@ $manualDisplayText = static function (array $item): string {
                                         <?php if ($item['timestamp'] > 0): ?>
                                             <span><?= htmlspecialchars($formatDate($item['timestamp']), ENT_QUOTES, 'UTF-8') ?></span>
                                         <?php endif; ?>
-                                        <?php if ($item['source'] !== ''): ?>
-                                            <span><?= htmlspecialchars(preg_replace('/^www\./i', '', $item['source']), ENT_QUOTES, 'UTF-8') ?></span>
+                                        <?php $sourceLabel = $actualitySourceLabel($item); ?>
+                                        <?php if ($sourceLabel !== ''): ?>
+                                            <span><?= htmlspecialchars($sourceLabel, ENT_QUOTES, 'UTF-8') ?></span>
                                         <?php endif; ?>
                                     </p>
                                 <?php endif; ?>

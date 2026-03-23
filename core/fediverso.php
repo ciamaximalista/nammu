@@ -52,6 +52,11 @@ function nammu_fediverse_legacy_actuality_file(): string
     return dirname(__DIR__) . '/config/fediverso-legacy-actualidad.json';
 }
 
+function nammu_fediverse_legacy_actuality_aliases_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-legacy-actualidad-aliases.json';
+}
+
 function nammu_fediverse_delete_queue_file(): string
 {
     return dirname(__DIR__) . '/config/fediverso-delete-queue.json';
@@ -939,6 +944,136 @@ function nammu_fediverse_save_deleted_store(array $ids): void
 function nammu_fediverse_save_legacy_actuality_store(array $items): void
 {
     nammu_fediverse_save_json_store(nammu_fediverse_legacy_actuality_file(), ['items' => array_values($items)]);
+}
+
+function nammu_fediverse_legacy_actuality_aliases_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_legacy_actuality_aliases_file(), ['map' => []]);
+    $store['map'] = is_array($store['map'] ?? null) ? $store['map'] : [];
+    return $store;
+}
+
+function nammu_fediverse_save_legacy_actuality_aliases_store(array $map): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_legacy_actuality_aliases_file(), ['updated_at' => time(), 'map' => $map]);
+}
+
+function nammu_fediverse_alias_score_tokens(string $text): array
+{
+    $text = trim(mb_strtolower(html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8'), 'UTF-8'));
+    if ($text === '') {
+        return [];
+    }
+    $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
+    if (is_string($ascii) && $ascii !== '') {
+        $text = $ascii;
+    }
+    $text = preg_replace('/[^a-z0-9]+/i', ' ', $text) ?? '';
+    $parts = preg_split('/\s+/', trim($text)) ?: [];
+    $stop = [
+        'para' => true, 'como' => true, 'pero' => true, 'esta' => true, 'este' => true, 'estos' => true,
+        'estas' => true, 'desde' => true, 'sobre' => true, 'hasta' => true, 'donde' => true, 'porque' => true,
+        'entre' => true, 'cuando' => true, 'puede' => true, 'pueden' => true, 'mucho' => true, 'muchos' => true,
+        'muchas' => true, 'parte' => true, 'tiene' => true, 'tienen' => true, 'haber' => true, 'hacia' => true,
+        'ellos' => true, 'ellas' => true, 'nuestro' => true, 'nuestra' => true, 'maximalismo' => true,
+        'maximalistas' => true, 'estudio' => true,
+    ];
+    $tokens = [];
+    foreach ($parts as $part) {
+        $part = trim($part);
+        if ($part === '' || strlen($part) < 5 || isset($stop[$part])) {
+            continue;
+        }
+        $tokens[$part] = true;
+    }
+    return array_keys($tokens);
+}
+
+function nammu_fediverse_refresh_legacy_actuality_aliases(array $config): array
+{
+    $baseUrl = rtrim(nammu_fediverse_base_url($config), '/');
+    if ($baseUrl === '') {
+        return [];
+    }
+
+    $actualityStore = nammu_fediverse_load_json_store(dirname(__DIR__) . '/config/actualidad-items.json', ['items' => []]);
+    $currentNews = [];
+    foreach ((array) ($actualityStore['items'] ?? []) as $item) {
+        if (!is_array($item) || trim((string) ($item['source_kind'] ?? '')) !== 'news') {
+            continue;
+        }
+        $shortId = trim((string) ($item['id'] ?? ''));
+        if ($shortId === '') {
+            continue;
+        }
+        $objectId = $baseUrl . '/ap/objects/actualidad-' . $shortId;
+        $currentNews[$objectId] = [
+            'object_id' => $objectId,
+            'published_day' => gmdate('Y-m-d', (int) ($item['timestamp'] ?? time())),
+            'tokens' => nammu_fediverse_alias_score_tokens(trim((string) ($item['title'] ?? '')) . "\n" . trim((string) (($item['raw_text'] ?? '') ?: ($item['description'] ?? '')))),
+        ];
+    }
+
+    $timeline = nammu_fediverse_timeline_store();
+    $legacyTexts = [];
+    foreach ((array) ($timeline['items'] ?? []) as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        $targetUrl = trim((string) ($entry['target_url'] ?? ''));
+        if (!str_starts_with($targetUrl, $baseUrl . '/ap/objects/actualidad-')) {
+            continue;
+        }
+        $content = trim((string) (($entry['content'] ?? '') ?: ($entry['content_html'] ?? '')));
+        if ($content === '') {
+            continue;
+        }
+        $legacyTexts[$targetUrl][] = $content;
+    }
+
+    $legacyStore = nammu_fediverse_legacy_actuality_store();
+    $map = [];
+    foreach ((array) ($legacyStore['items'] ?? []) as $legacyItem) {
+        if (!is_array($legacyItem)) {
+            continue;
+        }
+        $legacyId = trim((string) ($legacyItem['id'] ?? ''));
+        if ($legacyId === '' || isset($currentNews[$legacyId])) {
+            continue;
+        }
+        $texts = $legacyTexts[$legacyId] ?? [];
+        if ($texts === []) {
+            continue;
+        }
+        $legacyTokens = nammu_fediverse_alias_score_tokens(implode("\n", $texts));
+        if ($legacyTokens === []) {
+            continue;
+        }
+        $legacyDay = substr(trim((string) ($legacyItem['published'] ?? '')), 0, 10);
+        $bestId = '';
+        $bestScore = 0;
+        $secondScore = 0;
+        foreach ($currentNews as $currentId => $candidate) {
+            $candidateDay = trim((string) ($candidate['published_day'] ?? ''));
+            if ($legacyDay !== '' && $candidateDay !== '' && $legacyDay !== $candidateDay) {
+                continue;
+            }
+            $score = count(array_intersect($legacyTokens, (array) ($candidate['tokens'] ?? [])));
+            if ($score > $bestScore) {
+                $secondScore = $bestScore;
+                $bestScore = $score;
+                $bestId = $currentId;
+            } elseif ($score > $secondScore) {
+                $secondScore = $score;
+            }
+        }
+        if ($bestId !== '' && $bestScore >= 2 && $bestScore > $secondScore) {
+            $map[$legacyId] = $bestId;
+        }
+    }
+
+    nammu_fediverse_save_legacy_actuality_aliases_store($map);
+    return $map;
 }
 
 function nammu_fediverse_save_delete_queue_store(array $items): void
@@ -1980,6 +2115,7 @@ function nammu_fediverse_rebuild_notifications_snapshot(array $config): array
 
 function nammu_fediverse_rebuild_snapshots(array $config): array
 {
+    nammu_fediverse_refresh_legacy_actuality_aliases($config);
     $home = nammu_fediverse_rebuild_home_snapshot($config);
     $messages = nammu_fediverse_rebuild_messages_snapshot($config);
     $notifications = nammu_fediverse_rebuild_notifications_snapshot($config);
@@ -2154,6 +2290,7 @@ function nammu_fediverse_local_item_alias_identifiers(array $item, array $config
     $baseUrl = rtrim(nammu_fediverse_base_url($config), '/');
     $itemId = trim((string) ($item['id'] ?? ''));
     $itemUrl = trim((string) ($item['url'] ?? ''));
+    $aliasIds = array_values(array_filter(array_map('strval', is_array($item['alias_ids'] ?? null) ? $item['alias_ids'] : [])));
 
     if ($itemId !== '') {
         $aliases[] = nammu_fediverse_thread_page_url($itemId, $config);
@@ -2162,8 +2299,45 @@ function nammu_fediverse_local_item_alias_identifiers(array $item, array $config
     if ($itemUrl !== '') {
         $aliases[] = $baseUrl . '/fediverso/' . nammu_fediverse_thread_page_hash($itemUrl);
     }
+    foreach ($aliasIds as $aliasId) {
+        $aliasId = trim($aliasId);
+        if ($aliasId === '') {
+            continue;
+        }
+        $aliases[] = $aliasId;
+        $aliases[] = nammu_fediverse_thread_page_url($aliasId, $config);
+        $aliases[] = $baseUrl . '/fediverso/' . nammu_fediverse_thread_page_hash($aliasId . '/activity');
+    }
 
     return array_values(array_unique(array_filter(array_map('trim', $aliases))));
+}
+
+function nammu_fediverse_legacy_actuality_alias_ids(array $item, string $baseUrl): array
+{
+    $isNews = trim((string) ($item['source_kind'] ?? '')) === 'news';
+    if (!$isNews) {
+        return [];
+    }
+
+    $legacyPayload = [
+        'title' => trim((string) ($item['title'] ?? '')),
+        'link' => trim((string) ($item['link'] ?? '')),
+        'image' => trim((string) ($item['image'] ?? '')),
+        'description' => (string) ($item['description'] ?? ''),
+        'timestamp' => (int) ($item['timestamp'] ?? 0),
+        'source' => (string) (parse_url((string) ($item['link'] ?? ''), PHP_URL_HOST) ?: trim((string) ($item['source'] ?? ''))),
+    ];
+
+    if ($legacyPayload['title'] === '' && $legacyPayload['link'] === '') {
+        return [];
+    }
+
+    $legacyId = sha1(json_encode($legacyPayload));
+    if ($legacyId === '') {
+        return [];
+    }
+
+    return [rtrim($baseUrl, '/') . '/ap/objects/actualidad-' . $legacyId];
 }
 
 function nammu_fediverse_remote_thread_page_url(string $objectId): string
@@ -3149,6 +3323,7 @@ function nammu_fediverse_local_content_items(array $config): array
         nammu_fediverse_sync_legacy_actuality_from_inbox($config);
         $legacyStore = nammu_fediverse_legacy_actuality_store();
     }
+    $legacyAliases = is_array((nammu_fediverse_legacy_actuality_aliases_store()['map'] ?? null)) ? nammu_fediverse_legacy_actuality_aliases_store()['map'] : [];
     $items = [];
     foreach (glob(dirname(__DIR__) . '/content/*.md') ?: [] as $file) {
         if (!is_readable($file)) {
@@ -3250,6 +3425,12 @@ function nammu_fediverse_local_content_items(array $config): array
         }
         $title = trim((string) ($item['title'] ?? ''));
         $content = trim((string) (($item['raw_text'] ?? '') ?: ($item['description'] ?? '')));
+        $aliasIds = nammu_fediverse_legacy_actuality_alias_ids($item, $baseUrl);
+        foreach ($legacyAliases as $legacyId => $currentId) {
+            if (trim((string) $currentId) === $itemId) {
+                $aliasIds[] = trim((string) $legacyId);
+            }
+        }
         $items[] = [
             'id' => $itemId,
             'url' => trim((string) (($item['link'] ?? '') ?: ($baseUrl . '/actualidad.php'))),
@@ -3260,17 +3441,28 @@ function nammu_fediverse_local_content_items(array $config): array
             'type' => $isManual ? 'Note' : 'Article',
             'image' => trim((string) (($item['source_image'] ?? '') ?: ($item['image'] ?? ''))),
             'images' => array_values(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))),
+            'alias_ids' => $aliasIds,
         ];
     }
-    $knownIds = array_fill_keys(array_map(static function (array $item): string {
-        return trim((string) ($item['id'] ?? ''));
-    }, $items), true);
+    $knownIds = [];
+    foreach ($items as $item) {
+        $itemId = trim((string) ($item['id'] ?? ''));
+        if ($itemId !== '') {
+            $knownIds[$itemId] = true;
+        }
+        foreach (array_values(array_filter(array_map('strval', is_array($item['alias_ids'] ?? null) ? $item['alias_ids'] : []))) as $aliasId) {
+            $aliasId = trim($aliasId);
+            if ($aliasId !== '') {
+                $knownIds[$aliasId] = true;
+            }
+        }
+    }
     foreach ((array) ($legacyStore['items'] ?? []) as $legacyItem) {
         if (!is_array($legacyItem)) {
             continue;
         }
         $itemId = trim((string) ($legacyItem['id'] ?? ''));
-        if ($itemId === '' || isset($knownIds[$itemId]) || isset($deletedIds[$itemId])) {
+        if ($itemId === '' || isset($legacyAliases[$itemId]) || isset($knownIds[$itemId]) || isset($deletedIds[$itemId])) {
             continue;
         }
         $knownIds[$itemId] = true;

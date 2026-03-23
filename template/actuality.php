@@ -64,6 +64,9 @@ $actualityMetricIcon = static function (string $type): string {
 };
 $renderActualityText = static function (string $text, array $item) use ($fediverseIcon, $actualityFediverseMeta, $actualityMetricIcon): string {
     $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
+    if (strtolower(trim((string) ($item['via'] ?? ''))) === 'boost') {
+        return $html;
+    }
     $fediverseMeta = $actualityFediverseMeta($item);
     $fediverseUrl = trim((string) ($fediverseMeta['thread_url'] ?? ''));
     if ($fediverseUrl !== '' && $fediverseIcon !== '') {

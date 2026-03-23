@@ -2022,16 +2022,19 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
         if ($localId === '') {
             continue;
         }
+        $mergedReplies = nammu_fediverse_merge_thread_replies(
+            $localRepliesByObject[$localId] ?? [],
+            (array) ($incomingReplies[$localId] ?? [])
+        );
+        $summary = $reactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0];
+        $summary['replies'] = count($mergedReplies);
         $threadPayloads[$localId] = [
             'item' => $canonicalItem,
             'thread_url' => nammu_fediverse_thread_page_url($localId, $config),
             'original_url' => trim((string) ($canonicalItem['url'] ?? ($localItem['url'] ?? ''))),
-            'summary' => $reactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0],
+            'summary' => $summary,
             'details' => $reactionDetails[$localId] ?? ['likes' => [], 'shares' => [], 'replies' => []],
-            'replies' => nammu_fediverse_merge_thread_replies(
-                $localRepliesByObject[$localId] ?? [],
-                (array) ($incomingReplies[$localId] ?? [])
-            ),
+            'replies' => $mergedReplies,
         ];
     }
     return $threadPayloads;
@@ -2596,11 +2599,13 @@ function nammu_fediverse_thread_page_payload(array $item, array $config): array
     usort($mergedReplies, static function (array $a, array $b): int {
         return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
     });
+    $summary = $reactionSummary[$itemId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0];
+    $summary['replies'] = count($mergedReplies);
     return [
         'item' => $canonicalItem,
         'thread_url' => nammu_fediverse_thread_page_url($itemId, $config),
         'original_url' => trim((string) ($canonicalItem['url'] ?? ($item['url'] ?? ''))),
-        'summary' => $reactionSummary[$itemId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0],
+        'summary' => $summary,
         'details' => $reactionDetails[$itemId] ?? ['likes' => [], 'shares' => [], 'replies' => []],
         'replies' => $mergedReplies,
     ];

@@ -2031,6 +2031,24 @@ function nammu_fediverse_thread_page_url(string $objectId, array $config): strin
     return rtrim(nammu_fediverse_base_url($config), '/') . '/fediverso/' . nammu_fediverse_thread_page_hash($objectId);
 }
 
+function nammu_fediverse_local_item_alias_identifiers(array $item, array $config): array
+{
+    $aliases = [];
+    $baseUrl = rtrim(nammu_fediverse_base_url($config), '/');
+    $itemId = trim((string) ($item['id'] ?? ''));
+    $itemUrl = trim((string) ($item['url'] ?? ''));
+
+    if ($itemId !== '') {
+        $aliases[] = nammu_fediverse_thread_page_url($itemId, $config);
+        $aliases[] = $baseUrl . '/fediverso/' . nammu_fediverse_thread_page_hash($itemId . '/activity');
+    }
+    if ($itemUrl !== '') {
+        $aliases[] = $baseUrl . '/fediverso/' . nammu_fediverse_thread_page_hash($itemUrl);
+    }
+
+    return array_values(array_unique(array_filter(array_map('trim', $aliases))));
+}
+
 function nammu_fediverse_remote_thread_page_url(string $objectId): string
 {
     $objectId = trim($objectId);
@@ -2069,7 +2087,15 @@ function nammu_fediverse_find_local_item_for_thread_hash(string $hash, array $co
         if ($itemId === '') {
             continue;
         }
-        if (nammu_fediverse_thread_page_hash($itemId) === $hash) {
+        $candidateHashes = [nammu_fediverse_thread_page_hash($itemId)];
+        foreach (nammu_fediverse_local_item_alias_identifiers($item, $config) as $aliasUrl) {
+            $candidateHashes[] = nammu_fediverse_thread_page_hash($aliasUrl);
+            $aliasPath = trim((string) (parse_url($aliasUrl, PHP_URL_PATH) ?? ''));
+            if (preg_match('#/fediverso/([a-f0-9]{24})/?$#', $aliasPath, $matches) === 1) {
+                $candidateHashes[] = strtolower((string) ($matches[1] ?? ''));
+            }
+        }
+        if (in_array($hash, array_values(array_unique(array_filter($candidateHashes))), true)) {
             return $item;
         }
     }
@@ -2082,7 +2108,15 @@ function nammu_fediverse_find_local_item_for_thread_hash(string $hash, array $co
         if ($itemId === '') {
             continue;
         }
-        if (nammu_fediverse_thread_page_hash($itemId) === $hash) {
+        $candidateHashes = [nammu_fediverse_thread_page_hash($itemId)];
+        foreach (nammu_fediverse_local_item_alias_identifiers($resendItem, $config) as $aliasUrl) {
+            $candidateHashes[] = nammu_fediverse_thread_page_hash($aliasUrl);
+            $aliasPath = trim((string) (parse_url($aliasUrl, PHP_URL_PATH) ?? ''));
+            if (preg_match('#/fediverso/([a-f0-9]{24})/?$#', $aliasPath, $matches) === 1) {
+                $candidateHashes[] = strtolower((string) ($matches[1] ?? ''));
+            }
+        }
+        if (in_array($hash, array_values(array_unique(array_filter($candidateHashes))), true)) {
             return $resendItem;
         }
     }
@@ -3129,6 +3163,9 @@ function nammu_fediverse_local_items_index(array $config): array
             if ($value !== '') {
                 $identifiers[] = $value;
             }
+        }
+        foreach (nammu_fediverse_local_item_alias_identifiers($item, $config) as $aliasIdentifier) {
+            $identifiers[] = $aliasIdentifier;
         }
         foreach (array_unique($identifiers) as $identifier) {
             $byIdentifier[$identifier] = $item;

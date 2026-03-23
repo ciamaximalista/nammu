@@ -56,7 +56,10 @@ function admin_run_scheduled_tasks(): array {
     $fediverseStats = ['checked' => 0, 'new' => 0, 'followers_checked' => 0, 'followers_removed' => 0];
     $fediverseRecentThreadsWarmed = 0;
     if (function_exists('nammu_fediverse_refresh_following')) {
-        $fediverseStats = nammu_fediverse_refresh_following();
+        $fediverseStats = nammu_fediverse_refresh_following([
+            'actor_limit' => 3,
+            'outbox_limit' => 6,
+        ]);
         if (function_exists('nammu_fediverse_warm_recent_threads_cache')) {
             $fediverseRecentThreadsWarmed = (int) nammu_fediverse_warm_recent_threads_cache($config, 8);
         }
@@ -10557,7 +10560,10 @@ if ($isLoggedIn && $page === 'fediverso') {
         if (function_exists('nammu_actuality_rebuild_snapshot')) {
             nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
         }
-        $stats = nammu_fediverse_refresh_following();
+        $stats = nammu_fediverse_refresh_following([
+            'actor_limit' => 3,
+            'outbox_limit' => 6,
+        ]);
         if (function_exists('nammu_fediverse_warm_recent_threads_cache')) {
             $stats['recent_threads_warmed'] = (int) nammu_fediverse_warm_recent_threads_cache($config, 8);
         }

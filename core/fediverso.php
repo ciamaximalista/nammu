@@ -3132,7 +3132,7 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
     ];
 }
 
-function nammu_fediverse_extract_outbox_items(array $outbox, array $actor, array $config): array
+function nammu_fediverse_extract_outbox_items(array $outbox, array $actor, array $config, int $limit = 8, array $knownTimelineIds = []): array
 {
     $payload = $outbox;
     if (!empty($outbox['first']) && is_string($outbox['first'])) {
@@ -3148,7 +3148,11 @@ function nammu_fediverse_extract_outbox_items(array $outbox, array $actor, array
         $rawItems = $payload['items'];
     }
     $items = [];
+    $knownTimelineIds = array_fill_keys(array_values(array_filter(array_map('strval', $knownTimelineIds))), true);
     foreach ($rawItems as $rawItem) {
+        if (count($items) >= max(1, $limit)) {
+            break;
+        }
         if (is_string($rawItem) && preg_match('#^https?://#i', $rawItem)) {
             $rawItemPayload = nammu_fediverse_signed_fetch_json($rawItem, $config);
             if (!is_array($rawItemPayload)) {
@@ -3163,13 +3167,17 @@ function nammu_fediverse_extract_outbox_items(array $outbox, array $actor, array
         }
         $normalized = nammu_fediverse_normalize_remote_item($rawItem, $actor, $config);
         if ($normalized !== null) {
+            $normalizedId = trim((string) ($normalized['id'] ?? ''));
+            if ($normalizedId !== '' && isset($knownTimelineIds[$normalizedId])) {
+                break;
+            }
             $items[] = $normalized;
         }
     }
     return $items;
 }
 
-function nammu_fediverse_refresh_following(): array
+function nammu_fediverse_refresh_following(array $options = []): array
 {
     $config = function_exists('nammu_load_config') ? nammu_load_config() : [];
     $store = nammu_fediverse_following_store();
@@ -3179,9 +3187,19 @@ function nammu_fediverse_refresh_following(): array
     foreach ($timeline as $item) {
         $timelineById[(string) ($item['id'] ?? '')] = $item;
     }
+    usort($actors, static function (array $a, array $b): int {
+        $checkedA = trim((string) ($a['last_checked_at'] ?? ''));
+        $checkedB = trim((string) ($b['last_checked_at'] ?? ''));
+        return strcmp($checkedA, $checkedB);
+    });
+    $actorLimit = max(1, (int) ($options['actor_limit'] ?? count($actors)));
+    $outboxLimit = max(1, (int) ($options['outbox_limit'] ?? 8));
     $checked = 0;
     $newItems = 0;
-    foreach ($actors as &$actor) {
+    foreach ($actors as $actorIndex => &$actor) {
+        if ($checked >= $actorLimit) {
+            break;
+        }
         $checked++;
         $actor['last_checked_at'] = gmdate(DATE_ATOM);
         $actorDoc = nammu_fediverse_resolve_actor((string) ($actor['id'] ?? ''), $config);
@@ -3196,7 +3214,7 @@ function nammu_fediverse_refresh_following(): array
             continue;
         }
         $actor['last_error'] = '';
-        foreach (nammu_fediverse_extract_outbox_items($outbox, $actor, $config) as $item) {
+        foreach (nammu_fediverse_extract_outbox_items($outbox, $actor, $config, $outboxLimit, array_keys($timelineById)) as $item) {
             if (isset($timelineById[$item['id']])) {
                 continue;
             }
@@ -6761,6 +6779,79 @@ function nammu_fediverse_public_thread_url_for_named_local_item(string $slug, st
     return nammu_fediverse_thread_page_url($itemId, $config);
 }
 
+function nammu_fediverse_home_snapshot_meta_for_local_identifiers(array $candidateIdentifiers, array $config): ?array
+{
+    $candidateIdentifiers = array_values(array_unique(array_filter(array_map(static function ($value): string {
+        return trim((string) $value);
+    }, $candidateIdentifiers))));
+    if (empty($candidateIdentifiers)) {
+        return null;
+    }
+
+    $candidatePaths = [];
+    foreach ($candidateIdentifiers as $identifier) {
+        $path = trim((string) (parse_url($identifier, PHP_URL_PATH) ?? ''));
+        if ($path !== '') {
+            $candidatePaths[rtrim('/' . ltrim($path, '/'), '/')] = true;
+        }
+    }
+
+    $snapshot = nammu_fediverse_home_snapshot_store();
+    $data = is_array($snapshot['data'] ?? null) ? $snapshot['data'] : [];
+    $localItems = is_array($data['local_items'] ?? null) ? $data['local_items'] : [];
+    $threadPayloads = is_array($data['thread_payloads'] ?? null) ? $data['thread_payloads'] : [];
+    $summaryMap = is_array($data['local_reaction_summary'] ?? null) ? $data['local_reaction_summary'] : [];
+    $detailsMap = is_array($data['local_reaction_details'] ?? null) ? $data['local_reaction_details'] : [];
+
+    foreach ($localItems as $localItem) {
+        if (!is_array($localItem)) {
+            continue;
+        }
+        $itemId = trim((string) ($localItem['id'] ?? ''));
+        $itemUrl = trim((string) ($localItem['url'] ?? ''));
+        if ($itemId === '') {
+            continue;
+        }
+        $itemIdentifiers = [$itemId];
+        if ($itemUrl !== '') {
+            $itemIdentifiers[] = $itemUrl;
+        }
+        foreach (nammu_fediverse_local_item_alias_identifiers($localItem, $config) as $aliasIdentifier) {
+            $itemIdentifiers[] = $aliasIdentifier;
+        }
+        $itemIdentifiers = array_values(array_unique(array_filter(array_map('trim', $itemIdentifiers))));
+
+        $matched = false;
+        foreach ($itemIdentifiers as $itemIdentifier) {
+            if (in_array($itemIdentifier, $candidateIdentifiers, true)) {
+                $matched = true;
+                break;
+            }
+            $itemPath = trim((string) (parse_url($itemIdentifier, PHP_URL_PATH) ?? ''));
+            if ($itemPath !== '' && isset($candidatePaths[rtrim('/' . ltrim($itemPath, '/'), '/')])) {
+                $matched = true;
+                break;
+            }
+        }
+        if (!$matched) {
+            continue;
+        }
+
+        $payload = is_array($threadPayloads[$itemId] ?? null) ? $threadPayloads[$itemId] : null;
+        return [
+            'thread_url' => nammu_fediverse_thread_page_url($itemId, $config),
+            'summary' => is_array($payload['summary'] ?? null)
+                ? $payload['summary']
+                : (is_array($summaryMap[$itemId] ?? null) ? $summaryMap[$itemId] : ['likes' => 0, 'shares' => 0, 'replies' => 0]),
+            'details' => is_array($payload['details'] ?? null)
+                ? $payload['details']
+                : (is_array($detailsMap[$itemId] ?? null) ? $detailsMap[$itemId] : ['likes' => [], 'shares' => [], 'replies' => []]),
+        ];
+    }
+
+    return null;
+}
+
 function nammu_fediverse_public_thread_meta_for_named_local_item(string $slug, string $template, array $config): array
 {
     static $snapshotMaps = [];
@@ -6820,6 +6911,22 @@ function nammu_fediverse_public_thread_meta_for_named_local_item(string $slug, s
         return $snapshotMaps[$cacheKey][$snapshotKey];
     }
 
+    $baseUrl = nammu_fediverse_base_url($config);
+    $candidateUrl = match ($normalizedTemplate) {
+        'podcast' => $baseUrl . '/podcast/' . rawurlencode($normalizedSlug),
+        'itinerary' => $baseUrl . '/itinerarios/' . rawurlencode($normalizedSlug),
+        default => $baseUrl . '/' . rawurlencode($normalizedSlug),
+    };
+    $candidateId = match ($normalizedTemplate) {
+        'podcast' => $baseUrl . '/ap/objects/podcast-' . rawurlencode($normalizedSlug),
+        'itinerary' => $baseUrl . '/ap/objects/itinerary-' . rawurlencode($normalizedSlug),
+        default => $baseUrl . '/ap/objects/post-' . rawurlencode($normalizedSlug),
+    };
+    $snapshotMeta = nammu_fediverse_home_snapshot_meta_for_local_identifiers([$candidateId, $candidateUrl], $config);
+    if (is_array($snapshotMeta)) {
+        return $snapshotMeta;
+    }
+
     $item = nammu_fediverse_find_named_local_item($normalizedSlug, $normalizedTemplate, $config);
     $threadUrl = nammu_fediverse_public_thread_url_for_named_local_item($normalizedSlug, $normalizedTemplate, $config);
     $payload = is_array($item) ? nammu_fediverse_thread_page_snapshot_payload($item, $config) : null;
@@ -6870,6 +6977,10 @@ function nammu_fediverse_public_thread_meta_for_actuality_item(array $actualityI
     $link = trim((string) ($actualityItem['link'] ?? ''));
     if ($link !== '') {
         $candidateIdentifiers[] = $link;
+    }
+    $snapshotMeta = nammu_fediverse_home_snapshot_meta_for_local_identifiers($candidateIdentifiers, $config);
+    if (is_array($snapshotMeta)) {
+        return $snapshotMeta;
     }
     foreach (array_unique(array_filter($candidateIdentifiers)) as $identifier) {
         $item = nammu_fediverse_find_local_item_for_identifier($identifier, $config);

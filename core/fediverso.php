@@ -7139,7 +7139,7 @@ function nammu_fediverse_public_thread_url_for_actuality_item(array $actualityIt
         $candidateIdentifiers[] = nammu_fediverse_base_url($config) . '/ap/objects/actualidad-' . rawurlencode($manualId);
     }
     $link = trim((string) ($actualityItem['link'] ?? ''));
-    if ($link !== '') {
+    if ($manualId === '' && $link !== '') {
         $candidateIdentifiers[] = $link;
     }
     foreach (array_unique(array_filter($candidateIdentifiers)) as $identifier) {
@@ -7164,7 +7164,7 @@ function nammu_fediverse_public_thread_meta_for_actuality_item(array $actualityI
         $candidateIdentifiers[] = nammu_fediverse_base_url($config) . '/ap/objects/actualidad-' . rawurlencode($manualId);
     }
     $link = trim((string) ($actualityItem['link'] ?? ''));
-    if ($link !== '') {
+    if ($manualId === '' && $link !== '') {
         $candidateIdentifiers[] = $link;
     }
     $snapshotMeta = nammu_fediverse_home_snapshot_meta_for_local_identifiers($candidateIdentifiers, $config);

@@ -9152,6 +9152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $site_name = trim($_POST['site_name'] ?? '');
         $site_url = trim($_POST['site_url'] ?? '');
         $site_lang = trim($_POST['site_lang'] ?? 'es');
+        $eupl_notice = isset($_POST['eupl_notice']) ? 'on' : 'off';
         $social_default_description = trim($_POST['social_default_description'] ?? '');
         $contact_telegram = trim($_POST['contact_telegram'] ?? '');
         $contact_email = trim($_POST['contact_email'] ?? '');
@@ -9191,6 +9192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 unset($config['site_lang']);
             }
+            $config['eupl_notice'] = $eupl_notice;
 
             $social = $config['social'] ?? [];
             if ($social_default_description !== '') {

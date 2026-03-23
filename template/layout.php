@@ -27,6 +27,8 @@ $colorCodeBackground = htmlspecialchars($themeColors['code_background'] ?? '#000
 $colorCodeText = htmlspecialchars($themeColors['code_text'] ?? '#90ee90', ENT_QUOTES, 'UTF-8');
 $footerHtml = $theme['footer_html'] ?? '';
 $footerNammuEnabled = ($theme['footer_nammu'] ?? 'on') === 'on';
+$layoutConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
+$footerEuplEnabled = (($layoutConfig['eupl_notice'] ?? 'on') === 'on');
 $footerLogoPosition = $theme['footer_logo'] ?? 'none';
 if (!in_array($footerLogoPosition, ['none', 'top', 'bottom'], true)) {
     $footerLogoPosition = 'none';
@@ -1540,11 +1542,18 @@ if (!empty($baseUrl)) {
                 <?php endif; ?>
                 <?php if ($footerNammuEnabled): ?>
                     <div class="footer-nammu-link">
-                        <div><?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> utiliza <a href="https://ruralnext.org/nammu" target="_blank" rel="noopener">Nammu</a>, un CMS libre desarrollado en <a href="https://ruralnext.org" target="_blank" rel="noopener">RuralNEXT</a> por <a href="https://maximalista.coop/" target="_blank" rel="noopener">Compañía Maximalista S.Coop.</a></div>
-                        <div>Licencia Pública de la Unión Europea: <a href="https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12" target="_blank" rel="noopener">EUPL 1.2</a></div>
-                        <a class="footer-nammu-link__eupl" href="https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12" target="_blank" rel="noopener" title="Licencia Pública de la UE V1.2">
-                            <img src="<?= htmlspecialchars(rtrim((string) ($baseUrl ?? '/'), '/') . '/EUPL.png', ENT_QUOTES, 'UTF-8') ?>" alt="Licencia Pública de la UE V1.2" loading="lazy">
-                        </a>
+                        <div>
+                            <?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> utiliza <a href="https://ruralnext.org/nammu" target="_blank" rel="noopener">Nammu</a>, un CMS libre desarrollado en <a href="https://ruralnext.org" target="_blank" rel="noopener">RuralNEXT</a> por <a href="https://maximalista.coop/" target="_blank" rel="noopener">Compañía Maximalista S.Coop.</a>
+                            <?php if ($footerEuplEnabled): ?>
+                                <br>
+                                Licencia Pública de la Unión Europea: <a href="https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12" target="_blank" rel="noopener">EUPL 1.2</a>
+                            <?php endif; ?>
+                        </div>
+                        <?php if ($footerEuplEnabled): ?>
+                            <a class="footer-nammu-link__eupl" href="https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12" target="_blank" rel="noopener" title="Licencia Pública de la Unión Europea: EUPL 1.2">
+                                <img src="<?= htmlspecialchars(rtrim((string) ($baseUrl ?? '/'), '/') . '/EUPL.png', ENT_QUOTES, 'UTF-8') ?>" alt="Licencia Pública de la Unión Europea: EUPL 1.2" loading="lazy">
+                            </a>
+                        <?php endif; ?>
                     </div>
                 <?php endif; ?>
             </footer>

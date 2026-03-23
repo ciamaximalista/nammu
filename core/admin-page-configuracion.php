@@ -81,6 +81,7 @@
         $contactFooter = ($contactSettings['footer'] ?? 'off') === 'on';
         $contactSignature = ($contactSettings['signature'] ?? 'off') === 'on';
         $contactSignatureFields = is_array($contactSettings['signature_fields'] ?? null) ? $contactSettings['signature_fields'] : [];
+        $euplNoticeEnabled = ($settings['eupl_notice'] ?? 'on') === 'on';
         $statsBackups = function_exists('admin_list_stats_backups') ? admin_list_stats_backups(7) : [];
         $fullBackups = function_exists('admin_list_full_backups') ? admin_list_full_backups(8) : [];
         $languageOptions = [
@@ -159,6 +160,13 @@
                     <?php endforeach; ?>
                 </select>
                 <small class="form-text text-muted">Se usa como idioma por defecto en la portada y nuevas entradas.</small>
+            </div>
+
+            <div class="form-group">
+                <div class="custom-control custom-checkbox">
+                    <input type="checkbox" class="custom-control-input" id="eupl_notice" name="eupl_notice" <?= $euplNoticeEnabled ? 'checked' : '' ?>>
+                    <label class="custom-control-label" for="eupl_notice">Mostrar la referencia a la licencia EUPL en el bloque de Nammu del pie</label>
+                </div>
             </div>
 
             <div class="text-right mb-4">

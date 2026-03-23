@@ -181,12 +181,33 @@ function admin_enqueue_social_broadcast(string $text, $images, array $networks, 
     }
     $queue = admin_load_social_broadcast_queue();
     $items = is_array($queue['items'] ?? null) ? $queue['items'] : [];
+    $signature = sha1(json_encode([
+        'text' => $text,
+        'images' => $imageItems,
+        'networks' => $networks,
+        'fediverse_url' => trim($fediverseUrl),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    foreach ($items as $queuedItem) {
+        if (!is_array($queuedItem)) {
+            continue;
+        }
+        $queuedSignature = trim((string) ($queuedItem['signature'] ?? ''));
+        if ($queuedSignature !== '' && hash_equals($queuedSignature, $signature)) {
+            return [
+                'ok' => true,
+                'id' => (string) ($queuedItem['id'] ?? ''),
+                'queued' => count($items),
+                'duplicate' => true,
+            ];
+        }
+    }
     $job = [
         'id' => substr(sha1($text . '|' . json_encode($imageItems, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '|' . microtime(true)), 0, 24),
         'text' => $text,
         'images' => $imageItems,
         'networks' => $networks,
         'fediverse_url' => trim($fediverseUrl),
+        'signature' => $signature,
         'created_at' => gmdate(DATE_ATOM),
         'attempts' => 0,
     ];

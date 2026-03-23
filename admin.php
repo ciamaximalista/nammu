@@ -64,6 +64,7 @@ function admin_run_scheduled_tasks(): array {
     $socialBroadcastQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $fediverseDeleteQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $fediverseStats = ['checked' => 0, 'new' => 0, 'followers' => 0, 'delivered' => 0];
+    $fediverseRecentThreadsWarmed = 0;
     if (function_exists('nammu_publish_scheduled_posts')) {
         $published = (int) nammu_publish_scheduled_posts(CONTENT_DIR);
     }
@@ -115,24 +116,26 @@ function admin_run_scheduled_tasks(): array {
             $fediverseStats['followers'] = (int) ($deliveryStats['followers'] ?? 0);
             $fediverseStats['delivered'] = (int) ($deliveryStats['delivered'] ?? 0);
         }
+        if (function_exists('nammu_fediverse_warm_recent_threads_cache')) {
+            $fediverseRecentThreadsWarmed = (int) nammu_fediverse_warm_recent_threads_cache($config, 8);
+        }
         if (
             (
                 $rssPublished
                 || (int) ($fediverseStats['new'] ?? 0) > 0
                 || (int) ($fediverseStats['delivered'] ?? 0) > 0
+                || $fediverseRecentThreadsWarmed > 0
             )
-            && function_exists('nammu_fediverse_rebuild_home_snapshot')
+            && function_exists('nammu_fediverse_rebuild_light_snapshots')
         ) {
-            nammu_fediverse_rebuild_home_snapshot($config);
-        }
-        if ($rssPublished && function_exists('nammu_fediverse_rebuild_snapshots')) {
-            nammu_fediverse_rebuild_snapshots($config);
+            nammu_fediverse_rebuild_light_snapshots($config);
         }
         if (
             (
                 $rssPublished
                 || (int) ($fediverseStats['new'] ?? 0) > 0
                 || (int) ($fediverseStats['delivered'] ?? 0) > 0
+                || $fediverseRecentThreadsWarmed > 0
             )
             && function_exists('nammu_fediverse_save_fragments_cache_store')
         ) {
@@ -155,6 +158,7 @@ function admin_run_scheduled_tasks(): array {
         'fediverse_followers_checked' => (int) ($fediverseStats['followers_checked'] ?? 0),
         'fediverse_followers_removed' => (int) ($fediverseStats['followers_removed'] ?? 0),
         'fediverse_delivered' => (int) ($fediverseStats['delivered'] ?? 0),
+        'fediverse_recent_threads_warmed' => $fediverseRecentThreadsWarmed,
         'fediverse_follow_accepts_checked' => (int) ($fediverseStats['follow_accepts_checked'] ?? 0),
         'fediverse_follow_accepts_sent' => (int) ($fediverseStats['follow_accepts_sent'] ?? 0),
         'fediverse_follow_accepts_failed' => (int) ($fediverseStats['follow_accepts_failed'] ?? 0),
@@ -10495,8 +10499,11 @@ if ($isLoggedIn && $page === 'fediverso') {
             nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
         }
         $stats = nammu_fediverse_refresh_following();
-        if (function_exists('nammu_fediverse_rebuild_home_snapshot')) {
-            nammu_fediverse_rebuild_home_snapshot($config);
+        if (function_exists('nammu_fediverse_warm_recent_threads_cache')) {
+            $stats['recent_threads_warmed'] = (int) nammu_fediverse_warm_recent_threads_cache($config, 8);
+        }
+        if (function_exists('nammu_fediverse_rebuild_light_snapshots')) {
+            nammu_fediverse_rebuild_light_snapshots($config);
         }
         if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
             $acceptStats = nammu_fediverse_retry_pending_follower_accepts($config);
@@ -10508,7 +10515,7 @@ if ($isLoggedIn && $page === 'fediverso') {
         }
         $fediverseFeedback = [
             'type' => 'info',
-            'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '. Seguidores revisados: ' . (int) ($stats['followers_checked'] ?? 0) . '. Seguidores eliminados: ' . (int) ($stats['followers_removed'] ?? 0) . '. Accept enviados: ' . (int) ($stats['follow_accepts_sent'] ?? 0) . '.',
+            'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '. Hilos recientes actualizados: ' . (int) ($stats['recent_threads_warmed'] ?? 0) . '. Seguidores revisados: ' . (int) ($stats['followers_checked'] ?? 0) . '. Seguidores eliminados: ' . (int) ($stats['followers_removed'] ?? 0) . '. Accept enviados: ' . (int) ($stats['follow_accepts_sent'] ?? 0) . '.',
         ];
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refresh_fediverse_threads'])) {

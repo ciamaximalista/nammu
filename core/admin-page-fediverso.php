@@ -681,6 +681,10 @@
                                 $localIsNote = strcasecmp((string) ($localItem['type'] ?? ''), 'Note') === 0;
                                 $localCardDescription = trim((string) (($localItem['summary'] ?? '') ?: ($localItem['content'] ?? '')));
                                 $localCardDescription = preg_replace('/\s+/', ' ', strip_tags($localCardDescription)) ?? '';
+                                $localImages = array_values(array_filter(array_map('strval', is_array($localItem['images'] ?? null) ? $localItem['images'] : [])));
+                                if (empty($localImages) && !empty($localItem['image'])) {
+                                    $localImages[] = (string) $localItem['image'];
+                                }
                                 ?>
                                 <article class="fediverse-status fediverse-status--local" id="<?= htmlspecialchars($localAnchor, ENT_QUOTES, 'UTF-8') ?>">
                                     <div class="fediverse-status__avatar">
@@ -718,11 +722,13 @@
                                                     <?php endif; ?>
                                                 </a>
                                             </div>
-                                        <?php elseif (!empty($localItem['image'])): ?>
+                                        <?php elseif (!empty($localImages)): ?>
                                             <div class="fediverse-status__attachments">
-                                                <a class="fediverse-status__media" href="<?= htmlspecialchars((string) $localItem['image'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                                    <img src="<?= htmlspecialchars((string) $localItem['image'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
-                                                </a>
+                                                <?php foreach ($localImages as $localImage): ?>
+                                                    <a class="fediverse-status__media" href="<?= htmlspecialchars($localImage, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                        <img src="<?= htmlspecialchars($localImage, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                                    </a>
+                                                <?php endforeach; ?>
                                             </div>
                                         <?php endif; ?>
                                         <div class="fediverse-status__footer">

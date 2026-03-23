@@ -179,6 +179,29 @@ function nammu_fediverse_save_notifications_snapshot_store(array $data): void
     ]);
 }
 
+function nammu_fediverse_remove_local_item_from_home_snapshot(string $itemId): void
+{
+    $itemId = trim($itemId);
+    if ($itemId === '') {
+        return;
+    }
+    $store = nammu_fediverse_home_snapshot_store();
+    $data = is_array($store['data'] ?? null) ? $store['data'] : [];
+
+    $localItems = is_array($data['local_items'] ?? null) ? $data['local_items'] : [];
+    $data['local_items'] = array_values(array_filter($localItems, static function ($item) use ($itemId): bool {
+        return !is_array($item) || trim((string) ($item['id'] ?? '')) !== $itemId;
+    }));
+
+    foreach (['local_reaction_summary', 'local_reaction_details', 'incoming_replies', 'thread_payloads'] as $key) {
+        if (isset($data[$key][$itemId])) {
+            unset($data[$key][$itemId]);
+        }
+    }
+
+    nammu_fediverse_save_home_snapshot_store($data);
+}
+
 function nammu_fediverse_base_url(array $config): string
 {
     $base = trim((string) ($config['site_url'] ?? ''));

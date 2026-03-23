@@ -8447,11 +8447,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: admin.php?page=edit&template=news');
             exit;
         }
-        if (function_exists('nammu_actuality_rebuild_snapshot')) {
-            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        if (function_exists('nammu_actuality_remove_news_item_from_snapshots')) {
+            nammu_actuality_remove_news_item_from_snapshots($newsId);
         }
-        if (function_exists('nammu_fediverse_rebuild_snapshots')) {
-            nammu_fediverse_rebuild_snapshots($config);
+        if (function_exists('nammu_fediverse_remove_local_item_from_home_snapshot')) {
+            $fediverseItemId = rtrim($baseUrl, '/') . '/ap/objects/actualidad-' . rawurlencode($newsId);
+            nammu_fediverse_remove_local_item_from_home_snapshot($fediverseItemId);
         }
         if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
             nammu_fediverse_save_fragments_cache_store([]);

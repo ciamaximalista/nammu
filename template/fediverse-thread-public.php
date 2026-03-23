@@ -277,12 +277,35 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
             <div class="fediverse-public-thread">
                 <?php foreach ($threadReplies as $reply): ?>
                     <?php
-                    $replyIsRemote = ($reply['source'] ?? '') === 'incoming-remote';
-                    $replyName = trim((string) ($replyIsRemote ? (($reply['actor_name'] ?? '') ?: 'Actor remoto') : $fediverseLocalName));
-                    $replyHandle = trim((string) ($reply['actor_handle'] ?? ($replyIsRemote ? ($reply['actor_id'] ?? '') : $fediverseLocalHandle)));
+                    $replyActorId = trim((string) ($reply['actor_id'] ?? ''));
+                    $replyActorUsername = trim((string) ($reply['actor_username'] ?? ''));
+                    $replyName = trim((string) ($reply['actor_name'] ?? ''));
+                    if ($replyName === '') {
+                        if ($replyActorUsername !== '') {
+                            $replyName = $replyActorUsername;
+                        } elseif ($replyActorId !== '') {
+                            $replyName = $replyActorId;
+                        } else {
+                            $replyName = $fediverseLocalName;
+                        }
+                    }
+                    $replyHandle = trim((string) ($reply['actor_handle'] ?? ''));
+                    if ($replyHandle === '') {
+                        if ($replyActorUsername !== '') {
+                            $actorHost = trim((string) (parse_url($replyActorId, PHP_URL_HOST) ?? ''));
+                            $replyHandle = '@' . ltrim($replyActorUsername, '@');
+                            if ($actorHost !== '') {
+                                $replyHandle .= '@' . $actorHost;
+                            }
+                        } elseif ($replyActorId !== '') {
+                            $replyHandle = $replyActorId;
+                        } else {
+                            $replyHandle = $fediverseLocalHandle;
+                        }
+                    }
                     $replyAvatar = trim((string) ($reply['actor_icon'] ?? ''));
                     $replyCard = is_array($reply['link_card'] ?? null) ? $reply['link_card'] : null;
-                    if (!$replyIsRemote && $replyAvatar === '') {
+                    if ($replyActorId === '' && $replyAvatar === '') {
                         $replyAvatar = $fediverseLocalAvatar;
                     }
                     ?>

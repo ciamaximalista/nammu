@@ -117,20 +117,34 @@ Si luego activas Push en **Difusión**, Nammu generará las claves VAPID.
 
 ### Qué tareas automáticas necesita Nammu
 
-La tarea principal es:
+Nammu separa la automatización en tres fases:
 
 ```bash
 php /var/www/html/<carpeta-publica>/admin.php --run-scheduled
 ```
 
-Esa tarea se encarga de:
+La fase ligera se encarga solo de:
+
+- refrescar actores seguidos en **Fediverso**,
+- recoger respuestas y reacciones nuevas,
+- precalentar unos pocos hilos recientes,
+- y regenerar los snapshots ligeros de `Inicio` y `Notificaciones`.
+
+La fase de mantenimiento va aparte:
+
+```bash
+php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-maintenance
+```
+
+Esa segunda tarea se encarga de:
 
 - publicar contenidos programados,
-- procesar colas pendientes,
-- revisar RSS externas configuradas en **Configuración**,
-- refrescar actores seguidos en **Fediverso**,
+- procesar avisos y colas pendientes,
+- reconstruir `Actualidad`,
+- revisar Nisaba, Telex y otras RSS configuradas,
+- enviar a redes sociales lo encolado,
 - repartir publicaciones federadas pendientes,
-- y mantener al día `Actualidad`, `noticias.xml` y las colas ligeras.
+- y procesar borrados/accepts pendientes.
 
 La fase pesada va aparte:
 
@@ -138,7 +152,7 @@ La fase pesada va aparte:
 php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-heavy
 ```
 
-Esa segunda tarea se encarga de:
+Esa tercera tarea se encarga de:
 
 - precalentar cachés y hilos de **Fediverso**,
 - regenerar snapshots del panel de Fediverso,
@@ -171,42 +185,33 @@ Las tres deben ejecutarse con el usuario del servidor web, escalonando las disti
 
 ```bash
 */5 * * * * flock -n /tmp/<carpeta-publica>-run-scheduled.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
-11,26,41,56 * * * * flock -n /tmp/<carpeta-publica>-run-scheduled-maintenance.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-maintenance >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
+12,27,42,57 * * * * flock -n /tmp/<carpeta-publica>-run-scheduled-maintenance.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-maintenance >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
 7 * * * * flock -n /tmp/<carpeta-publica>-run-scheduled-heavy.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-heavy >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
 15 3 * * * flock -n /tmp/<carpeta-publica>-backup-daily.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
 30 3 * * 0 flock -n /tmp/<carpeta-publica>-backup-cleanup.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
 45 3 * * 0 flock -n /tmp/<carpeta-publica>-backup-weekly.lock php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> /var/www/html/<carpeta-publica>/backups/backup-full.log 2>&1
 ```
 
-Si mantienes varias instalaciones Nammu en el mismo servidor, no las lances todas en el mismo minuto. Lo recomendable es escalonarlas:
+Si mantienes varias instalaciones Nammu en el mismo servidor, no las lances todas en el mismo minuto. Lo recomendable es escalonarlas con ejemplos genéricos como estos:
 
 ```bash
-*/5 * * * * flock -n /tmp/memoria-run-scheduled.lock php /var/www/html/blogs/memoria/admin.php --run-scheduled >> /var/www/html/blogs/memoria/backups/cron.log 2>&1
-1-56/5 * * * * flock -n /tmp/maximalismo-run-scheduled.lock php /var/www/html/blogs/maximalismo/admin.php --run-scheduled >> /var/www/html/blogs/maximalismo/backups/cron.log 2>&1
-2-57/5 * * * * flock -n /tmp/juan-run-scheduled.lock php /var/www/html/blogs/juan/admin.php --run-scheduled >> /var/www/html/blogs/juan/backups/cron.log 2>&1
-3-58/5 * * * * flock -n /tmp/terceroslugares-run-scheduled.lock php /var/www/html/blogs/terceroslugares/admin.php --run-scheduled >> /var/www/html/blogs/terceroslugares/backups/cron.log 2>&1
-4-59/5 * * * * flock -n /tmp/lacandela-run-scheduled.lock php /var/www/html/blogs/lacandela/admin.php --run-scheduled >> /var/www/html/blogs/lacandela/backups/cron.log 2>&1
-5-55/5 * * * * flock -n /tmp/communalia-run-scheduled.lock php /var/www/html/blogs/communalia/admin.php --run-scheduled >> /var/www/html/blogs/communalia/backups/cron.log 2>&1
+*/5 * * * * flock -n /tmp/sitio-a-run-scheduled.lock php /var/www/html/sitio-a/admin.php --run-scheduled >> /var/www/html/sitio-a/backups/cron.log 2>&1
+1-56/5 * * * * flock -n /tmp/sitio-b-run-scheduled.lock php /var/www/html/sitio-b/admin.php --run-scheduled >> /var/www/html/sitio-b/backups/cron.log 2>&1
+2-57/5 * * * * flock -n /tmp/sitio-c-run-scheduled.lock php /var/www/html/sitio-c/admin.php --run-scheduled >> /var/www/html/sitio-c/backups/cron.log 2>&1
 
-11,26,41,56 * * * * flock -n /tmp/memoria-run-scheduled-maintenance.lock php /var/www/html/blogs/memoria/admin.php --run-scheduled-maintenance >> /var/www/html/blogs/memoria/backups/cron.log 2>&1
-12,27,42,57 * * * * flock -n /tmp/maximalismo-run-scheduled-maintenance.lock php /var/www/html/blogs/maximalismo/admin.php --run-scheduled-maintenance >> /var/www/html/blogs/maximalismo/backups/cron.log 2>&1
-13,28,43,58 * * * * flock -n /tmp/juan-run-scheduled-maintenance.lock php /var/www/html/blogs/juan/admin.php --run-scheduled-maintenance >> /var/www/html/blogs/juan/backups/cron.log 2>&1
-14,29,44,59 * * * * flock -n /tmp/terceroslugares-run-scheduled-maintenance.lock php /var/www/html/blogs/terceroslugares/admin.php --run-scheduled-maintenance >> /var/www/html/blogs/terceroslugares/backups/cron.log 2>&1
-15,30,45,0 * * * * flock -n /tmp/lacandela-run-scheduled-maintenance.lock php /var/www/html/blogs/lacandela/admin.php --run-scheduled-maintenance >> /var/www/html/blogs/lacandela/backups/cron.log 2>&1
-16,31,46,1 * * * * flock -n /tmp/communalia-run-scheduled-maintenance.lock php /var/www/html/blogs/communalia/admin.php --run-scheduled-maintenance >> /var/www/html/blogs/communalia/backups/cron.log 2>&1
+12,27,42,57 * * * * flock -n /tmp/sitio-a-run-scheduled-maintenance.lock php /var/www/html/sitio-a/admin.php --run-scheduled-maintenance >> /var/www/html/sitio-a/backups/cron.log 2>&1
+13,28,43,58 * * * * flock -n /tmp/sitio-b-run-scheduled-maintenance.lock php /var/www/html/sitio-b/admin.php --run-scheduled-maintenance >> /var/www/html/sitio-b/backups/cron.log 2>&1
+14,29,44,59 * * * * flock -n /tmp/sitio-c-run-scheduled-maintenance.lock php /var/www/html/sitio-c/admin.php --run-scheduled-maintenance >> /var/www/html/sitio-c/backups/cron.log 2>&1
 
-7 * * * * flock -n /tmp/memoria-run-scheduled-heavy.lock php /var/www/html/blogs/memoria/admin.php --run-scheduled-heavy >> /var/www/html/blogs/memoria/backups/cron.log 2>&1
-17 * * * * flock -n /tmp/maximalismo-run-scheduled-heavy.lock php /var/www/html/blogs/maximalismo/admin.php --run-scheduled-heavy >> /var/www/html/blogs/maximalismo/backups/cron.log 2>&1
-27 * * * * flock -n /tmp/juan-run-scheduled-heavy.lock php /var/www/html/blogs/juan/admin.php --run-scheduled-heavy >> /var/www/html/blogs/juan/backups/cron.log 2>&1
-37 * * * * flock -n /tmp/terceroslugares-run-scheduled-heavy.lock php /var/www/html/blogs/terceroslugares/admin.php --run-scheduled-heavy >> /var/www/html/blogs/terceroslugares/backups/cron.log 2>&1
-47 * * * * flock -n /tmp/lacandela-run-scheduled-heavy.lock php /var/www/html/blogs/lacandela/admin.php --run-scheduled-heavy >> /var/www/html/blogs/lacandela/backups/cron.log 2>&1
-57 * * * * flock -n /tmp/communalia-run-scheduled-heavy.lock php /var/www/html/blogs/communalia/admin.php --run-scheduled-heavy >> /var/www/html/blogs/communalia/backups/cron.log 2>&1
+7 * * * * flock -n /tmp/sitio-a-run-scheduled-heavy.lock php /var/www/html/sitio-a/admin.php --run-scheduled-heavy >> /var/www/html/sitio-a/backups/cron.log 2>&1
+17 * * * * flock -n /tmp/sitio-b-run-scheduled-heavy.lock php /var/www/html/sitio-b/admin.php --run-scheduled-heavy >> /var/www/html/sitio-b/backups/cron.log 2>&1
+27 * * * * flock -n /tmp/sitio-c-run-scheduled-heavy.lock php /var/www/html/sitio-c/admin.php --run-scheduled-heavy >> /var/www/html/sitio-c/backups/cron.log 2>&1
 ```
 
 Ese patrón evita dos problemas comunes:
 
 - que varias instancias recomputen `Fediverso` a la vez,
-- y que una misma instancia se pise a sí misma o solape la fase ligera con la pesada.
+- y que una misma instancia se pise a sí misma o solape `light`, `maintenance` y `heavy`.
 
 Si en vez de eso editas `/etc/crontab` o usas `sudo crontab -e`, entonces sí debes añadir `www-data` delante del comando.
 

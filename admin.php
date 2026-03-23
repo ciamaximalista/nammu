@@ -10774,9 +10774,8 @@ if ($isLoggedIn && $page === 'fediverso') {
                     'manual_item_id' => (string) ($manualItem['id'] ?? ''),
                     'public_url' => $displayUrl,
                 ]);
-                $deliveryStats = nammu_fediverse_deliver_local_items($config);
-                $result['message'] = rtrim((string) ($result['message'] ?? '')) . ' También publicada como nota. Entregas federadas: ' . (int) ($deliveryStats['delivered'] ?? 0) . '.';
-                if (function_exists('admin_send_social_broadcast_to_configured_networks')) {
+                $result['message'] = rtrim((string) ($result['message'] ?? '')) . ' También publicada como nota.';
+                if (function_exists('admin_enqueue_social_broadcast')) {
                     $socialTextParts = [];
                     if ($objectTitle !== '') {
                         $socialTextParts[] = '**' . $objectTitle . '**';
@@ -10797,14 +10796,12 @@ if ($isLoggedIn && $page === 'fediverso') {
                             $fediverseUrl = trim((string) nammu_fediverse_public_thread_url_for_actuality_item($manualItem, $config));
                         }
                     }
-                    $socialResult = admin_send_social_broadcast_to_configured_networks($socialText !== '' ? $socialText : $noteText, $objectImage, get_settings(), $fediverseUrl);
-                    $sentNetworks = is_array($socialResult['sent'] ?? null) ? $socialResult['sent'] : [];
-                    $failedNetworks = is_array($socialResult['failed'] ?? null) ? $socialResult['failed'] : [];
-                    if (!empty($sentNetworks)) {
-                        $result['message'] .= ' Redes: ' . implode(', ', $sentNetworks) . '.';
-                    }
-                    if (!empty($failedNetworks)) {
-                        $result['message'] .= ' Errores en redes: ' . implode(' | ', $failedNetworks);
+                    $allConfiguredNetworks = function_exists('admin_social_broadcast_available_networks')
+                        ? array_keys(admin_social_broadcast_available_networks(get_settings()))
+                        : [];
+                    $queueResult = admin_enqueue_social_broadcast($socialText !== '' ? $socialText : $noteText, $objectImages, $allConfiguredNetworks, $fediverseUrl);
+                    if (!empty($queueResult['ok'])) {
+                        $result['message'] .= ' Encolada para redes.';
                     }
                 }
             }

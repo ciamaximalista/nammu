@@ -249,6 +249,18 @@ function nammu_actuality_news_item_id(array $item): string
 function nammu_actuality_list_news_items(): array
 {
     $newsStore = nammu_actuality_load_news_store();
+    $newsOverridesStore = nammu_actuality_load_news_overrides();
+    $newsOverrides = [];
+    foreach ((array) ($newsOverridesStore['items'] ?? []) as $override) {
+        if (!is_array($override)) {
+            continue;
+        }
+        $overrideId = preg_replace('/[^a-f0-9]/i', '', (string) ($override['id'] ?? '')) ?? '';
+        if ($overrideId === '') {
+            continue;
+        }
+        $newsOverrides[$overrideId] = $override;
+    }
     $items = [];
     foreach ((array) ($newsStore['items'] ?? []) as $item) {
         if (!is_array($item)) {
@@ -267,6 +279,13 @@ function nammu_actuality_list_news_items(): array
         }
         if (trim((string) ($item['id'] ?? '')) === '') {
             $item['id'] = nammu_actuality_news_item_id($item);
+        }
+        $itemId = trim((string) ($item['id'] ?? ''));
+        if ($itemId !== '' && isset($newsOverrides[$itemId])) {
+            $override = $newsOverrides[$itemId];
+            if (!empty($override['deleted'])) {
+                continue;
+            }
         }
         if (trim((string) ($item['source_kind'] ?? '')) === '') {
             $item['source_kind'] = 'news';
@@ -790,6 +809,11 @@ function nammu_actuality_html_to_text_preserving_breaks(string $html): string
     $html = trim($html);
     if ($html === '') {
         return '';
+    }
+
+    $decodedHtml = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if (preg_match('/<\s*(p|div|section|article|li|blockquote|br|h[1-6])\b/i', $decodedHtml) === 1) {
+        $html = $decodedHtml;
     }
 
     $normalized = preg_replace('/<\s*br\s*\/?>/iu', "\n", $html) ?? $html;

@@ -52,6 +52,24 @@ $actualityFediverseMeta = static function (array $item) use ($fediverseConfig): 
             'details' => ['likes' => [], 'shares' => [], 'replies' => []],
         ];
     }
+    if (!empty($item['is_site_content']) && function_exists('nammu_fediverse_public_thread_meta_for_named_local_item')) {
+        $type = trim((string) ($item['site_content_type'] ?? 'post'));
+        $path = trim((string) (parse_url((string) ($item['link'] ?? ''), PHP_URL_PATH) ?? ''));
+        $slug = '';
+        if ($path !== '') {
+            $path = '/' . ltrim($path, '/');
+            if ($type === 'podcast' && preg_match('#^/podcast/([^/]+)/?$#', $path, $matches) === 1) {
+                $slug = rawurldecode((string) ($matches[1] ?? ''));
+            } elseif ($type === 'itinerary' && preg_match('#^/itinerarios/([^/]+)/?$#', $path, $matches) === 1) {
+                $slug = rawurldecode((string) ($matches[1] ?? ''));
+            } elseif ($type === 'post' && preg_match('#^/([^/]+)$#', $path, $matches) === 1) {
+                $slug = rawurldecode((string) ($matches[1] ?? ''));
+            }
+        }
+        if ($slug !== '') {
+            return nammu_fediverse_public_thread_meta_for_named_local_item($slug, $type, $fediverseConfig);
+        }
+    }
     return nammu_fediverse_public_thread_meta_for_actuality_item($item, $fediverseConfig);
 };
 $actualityMetricIcon = static function (string $type): string {

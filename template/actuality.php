@@ -512,6 +512,14 @@ $manualDisplayText = static function (array $item): string {
     .actuality-card--manual::before {
         display: none;
     }
+    .actuality-card--manual.actuality-card--boost {
+        background: #dff4c2;
+        border: 1px solid rgba(76, 122, 34, 0.24);
+        box-shadow: 0 20px 30px rgba(62, 105, 28, 0.16);
+    }
+    .actuality-card--manual.actuality-card--boost .actuality-meta {
+        color: #3f6f1f;
+    }
     .actuality-card--boost::before {
         display: none;
     }

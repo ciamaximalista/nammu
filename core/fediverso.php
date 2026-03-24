@@ -2468,12 +2468,50 @@ function nammu_fediverse_record_legacy_actuality_payload(array $payload, array $
     }
     $published = trim((string) ($payload['published'] ?? ''));
     $source = trim((string) ($payload['id'] ?? ''));
+    $object = is_array($payload['object'] ?? null) ? $payload['object'] : [];
+    $legacyTitle = trim((string) ($object['name'] ?? $object['title'] ?? ''));
+    $legacyContent = trim((string) strip_tags((string) ($object['content'] ?? $object['summary'] ?? '')));
+    $legacyUrl = '';
+    if (is_string($object['url'] ?? null) || is_numeric($object['url'] ?? null)) {
+        $legacyUrl = trim((string) $object['url']);
+    } elseif (is_array($object['url'] ?? null)) {
+        foreach ((array) $object['url'] as $candidateUrl) {
+            if (is_string($candidateUrl) || is_numeric($candidateUrl)) {
+                $legacyUrl = trim((string) $candidateUrl);
+                if ($legacyUrl !== '') {
+                    break;
+                }
+            } elseif (is_array($candidateUrl)) {
+                $legacyUrl = trim((string) (($candidateUrl['href'] ?? '') ?: ($candidateUrl['url'] ?? '')));
+                if ($legacyUrl !== '') {
+                    break;
+                }
+            }
+        }
+    }
+    $legacyImage = '';
+    foreach ((array) ($object['attachment'] ?? []) as $attachment) {
+        if (!is_array($attachment)) {
+            continue;
+        }
+        $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
+        $attachmentMediaType = strtolower(trim((string) ($attachment['mediaType'] ?? $attachment['media_type'] ?? '')));
+        $attachmentUrl = trim((string) ($attachment['url'] ?? ''));
+        if ($attachmentUrl !== '' && ($attachmentType === 'image' || str_starts_with($attachmentMediaType, 'image/'))) {
+            $legacyImage = $attachmentUrl;
+            break;
+        }
+    }
     foreach ($ids as $id) {
         if (!isset($byId[$id])) {
             $byId[$id] = [
                 'id' => $id,
                 'published' => $published,
                 'source' => $source,
+                'title' => $legacyTitle,
+                'content' => $legacyContent,
+                'url' => $legacyUrl,
+                'image' => $legacyImage,
             ];
             continue;
         }
@@ -2482,6 +2520,18 @@ function nammu_fediverse_record_legacy_actuality_payload(array $payload, array $
         }
         if ($source !== '' && trim((string) ($byId[$id]['source'] ?? '')) === '') {
             $byId[$id]['source'] = $source;
+        }
+        if ($legacyTitle !== '' && trim((string) ($byId[$id]['title'] ?? '')) === '') {
+            $byId[$id]['title'] = $legacyTitle;
+        }
+        if ($legacyContent !== '' && trim((string) ($byId[$id]['content'] ?? '')) === '') {
+            $byId[$id]['content'] = $legacyContent;
+        }
+        if ($legacyUrl !== '' && trim((string) ($byId[$id]['url'] ?? '')) === '') {
+            $byId[$id]['url'] = $legacyUrl;
+        }
+        if ($legacyImage !== '' && trim((string) ($byId[$id]['image'] ?? '')) === '') {
+            $byId[$id]['image'] = $legacyImage;
         }
     }
     nammu_fediverse_save_legacy_actuality_store(array_values($byId));
@@ -3783,16 +3833,23 @@ function nammu_fediverse_local_content_items(array $config): array
         if ($itemId === '' || isset($legacyAliases[$itemId]) || isset($knownIds[$itemId]) || isset($deletedIds[$itemId])) {
             continue;
         }
+        $legacyTitle = trim((string) ($legacyItem['title'] ?? ''));
+        $legacyContent = trim((string) ($legacyItem['content'] ?? ''));
+        $legacyUrl = trim((string) ($legacyItem['url'] ?? ''));
+        $legacyImage = trim((string) ($legacyItem['image'] ?? ''));
+        if ($legacyTitle === '' && $legacyContent === '' && $legacyUrl === '' && $legacyImage === '') {
+            continue;
+        }
         $knownIds[$itemId] = true;
         $items[] = [
             'id' => $itemId,
-            'url' => nammu_fediverse_thread_page_url($itemId, $config),
-            'title' => 'Noticia',
-            'content' => '',
-            'summary' => '',
+            'url' => $legacyUrl !== '' ? $legacyUrl : nammu_fediverse_thread_page_url($itemId, $config),
+            'title' => $legacyTitle !== '' ? $legacyTitle : 'Noticia',
+            'content' => $legacyContent,
+            'summary' => $legacyContent,
             'published' => trim((string) ($legacyItem['published'] ?? '')) ?: gmdate(DATE_ATOM),
             'type' => 'Article',
-            'image' => '',
+            'image' => $legacyImage,
             'images' => [],
         ];
     }

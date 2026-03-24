@@ -1215,22 +1215,34 @@
                                                     array_unshift($boostImageUrls, $boostImageUrl);
                                                 }
                                                 if ($boostImageUrl === '') {
+                                                    $boostImageUrl = trim((string) ($item['image'] ?? ''));
+                                                }
+                                                if ($boostImageUrl === '') {
                                                     foreach ($attachments as $attachment) {
                                                         $attachmentUrl = trim((string) ($attachment['url'] ?? ''));
+                                                        $attachmentImage = trim((string) ($attachment['image'] ?? ''));
                                                         $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
                                                         $attachmentMediaType = strtolower(trim((string) ($attachment['media_type'] ?? '')));
                                                         if ($attachmentUrl !== '' && ($attachmentType === 'image' || str_starts_with($attachmentMediaType, 'image/'))) {
                                                             $boostImageUrl = $attachmentUrl;
                                                             break;
                                                         }
+                                                        if ($attachmentImage !== '' && ($attachmentType === 'link' || $attachmentMediaType === 'text/html' || str_starts_with($attachmentMediaType, 'text/html'))) {
+                                                            $boostImageUrl = $attachmentImage;
+                                                            break;
+                                                        }
                                                     }
                                                 }
                                                 foreach ($attachments as $attachment) {
                                                     $attachmentUrl = trim((string) ($attachment['url'] ?? ''));
+                                                    $attachmentImage = trim((string) ($attachment['image'] ?? ''));
                                                     $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
                                                     $attachmentMediaType = strtolower(trim((string) ($attachment['media_type'] ?? '')));
                                                     if ($attachmentUrl !== '' && ($attachmentType === 'image' || str_starts_with($attachmentMediaType, 'image/')) && !in_array($attachmentUrl, $boostImageUrls, true)) {
                                                         $boostImageUrls[] = $attachmentUrl;
+                                                    }
+                                                    if ($attachmentImage !== '' && ($attachmentType === 'link' || $attachmentMediaType === 'text/html' || str_starts_with($attachmentMediaType, 'text/html')) && !in_array($attachmentImage, $boostImageUrls, true)) {
+                                                        $boostImageUrls[] = $attachmentImage;
                                                     }
                                                 }
                                                 ?>

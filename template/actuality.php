@@ -211,6 +211,9 @@ $renderLinks = static function (array $links, array $item = []) use ($fediverseI
 $renderImages = static function (array $item, bool $isSiteContent = false): string {
     $allImages = array_values(array_unique(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))));
     $primaryImage = trim((string) ($item['image'] ?? ''));
+    if ($primaryImage === '') {
+        $primaryImage = trim((string) ($item['source_image'] ?? ''));
+    }
     if ($primaryImage !== '' && !in_array($primaryImage, $allImages, true)) {
         array_unshift($allImages, $primaryImage);
     }

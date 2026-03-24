@@ -977,22 +977,38 @@
                                     }
                                     $remoteReplyMeta['count'] = max((int) ($remoteReplyMeta['count'] ?? 0), count($remoteReplyActors) ?: count($remoteItemReplies));
                                 }
+                                $isRemoteAnnounce = strcasecmp((string) ($item['type'] ?? ''), 'announce') === 0;
+                                $displayActorName = trim((string) ($item['actor_name'] ?? ''));
+                                $displayActorIcon = trim((string) ($item['actor_icon'] ?? ''));
+                                $displayActorId = trim((string) ($item['actor_id'] ?? ''));
+                                $displayActorUsername = trim((string) ($item['actor_username'] ?? ''));
+                                if ($isRemoteAnnounce && trim((string) ($item['target_actor_name'] ?? '')) !== '') {
+                                    $displayActorName = trim((string) $item['target_actor_name']);
+                                    $displayActorIcon = trim((string) (($item['target_actor_icon'] ?? '') ?: $displayActorIcon));
+                                    $displayActorId = trim((string) (($item['object_actor_id'] ?? '') ?: ($item['target_actor_id'] ?? '') ?: $displayActorId));
+                                    $displayActorUsername = trim((string) (($item['target_actor_username'] ?? '') ?: $displayActorUsername));
+                                }
+                                $displayActorHandle = $fediverseHandle([
+                                    'actor_id' => $displayActorId,
+                                    'actor_username' => $displayActorUsername,
+                                ]);
+                                $boostedByHandle = $fediverseHandle($item);
                                 ?>
                                 <article class="fediverse-status">
                                     <div class="fediverse-status__avatar">
-                                        <?php if (!empty($item['actor_icon'])): ?>
-                                            <img src="<?= htmlspecialchars((string) $item['actor_icon'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                        <?php if ($displayActorIcon !== ''): ?>
+                                            <img src="<?= htmlspecialchars($displayActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
                                         <?php else: ?>
-                                            <div class="fediverse-status__avatar-fallback"><?= htmlspecialchars(mb_substr((string) (($item['actor_name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
+                                            <div class="fediverse-status__avatar-fallback"><?= htmlspecialchars(mb_substr($displayActorName !== '' ? $displayActorName : 'A', 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
                                         <?php endif; ?>
                                     </div>
                                     <div class="fediverse-status__body">
                                         <div class="fediverse-status__header">
                                             <div class="fediverse-status__identity">
-                                                <strong><?= htmlspecialchars((string) (($item['actor_name'] ?? '') ?: 'Actor remoto'), ENT_QUOTES, 'UTF-8') ?></strong>
-                                                <span class="fediverse-status__handle"><?= htmlspecialchars($fediverseHandle($item), ENT_QUOTES, 'UTF-8') ?></span>
-                                                <?php if (strcasecmp((string) ($item['type'] ?? ''), 'announce') === 0): ?>
-                                                    <span class="fediverse-status__handle">impulsó</span>
+                                                <strong><?= htmlspecialchars($displayActorName !== '' ? $displayActorName : 'Actor remoto', ENT_QUOTES, 'UTF-8') ?></strong>
+                                                <span class="fediverse-status__handle"><?= htmlspecialchars($displayActorHandle, ENT_QUOTES, 'UTF-8') ?></span>
+                                                <?php if ($isRemoteAnnounce): ?>
+                                                    <span class="fediverse-status__handle">impulsado por <?= htmlspecialchars($boostedByHandle, ENT_QUOTES, 'UTF-8') ?></span>
                                                 <?php endif; ?>
                                             </div>
                                             <div class="fediverse-status__meta">

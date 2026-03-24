@@ -7614,22 +7614,6 @@ function nammu_fediverse_public_thread_url_for_actuality_item(array $actualityIt
             return nammu_fediverse_thread_page_url($itemId, $config);
         }
     }
-    $candidateIdentifiers = [];
-    $link = trim((string) ($actualityItem['link'] ?? ''));
-    if ($link !== '') {
-        $candidateIdentifiers[] = $link;
-    }
-    foreach (array_unique(array_filter($candidateIdentifiers)) as $identifier) {
-        $item = nammu_fediverse_find_local_item_for_identifier($identifier, $config);
-        if (!is_array($item)) {
-            continue;
-        }
-        $itemId = trim((string) ($item['id'] ?? ''));
-        if ($itemId === '' || in_array($itemId, nammu_fediverse_deleted_store()['ids'], true)) {
-            continue;
-        }
-        return nammu_fediverse_thread_page_url($itemId, $config);
-    }
     return '';
 }
 
@@ -7658,35 +7642,6 @@ function nammu_fediverse_public_thread_meta_for_actuality_item(array $actualityI
                     : ['likes' => [], 'shares' => [], 'replies' => []],
             ];
         }
-    }
-    $candidateIdentifiers = [];
-    $link = trim((string) ($actualityItem['link'] ?? ''));
-    if ($link !== '') {
-        $candidateIdentifiers[] = $link;
-    }
-    $snapshotMeta = nammu_fediverse_home_snapshot_meta_for_local_identifiers($candidateIdentifiers, $config);
-    if (is_array($snapshotMeta)) {
-        return $snapshotMeta;
-    }
-    foreach (array_unique(array_filter($candidateIdentifiers)) as $identifier) {
-        $item = nammu_fediverse_find_local_item_for_identifier($identifier, $config);
-        if (!is_array($item)) {
-            continue;
-        }
-        $itemId = trim((string) ($item['id'] ?? ''));
-        if ($itemId === '' || in_array($itemId, nammu_fediverse_deleted_store()['ids'], true)) {
-            continue;
-        }
-        $payload = nammu_fediverse_thread_page_snapshot_payload($item, $config);
-        return [
-            'thread_url' => nammu_fediverse_thread_page_url($itemId, $config),
-            'summary' => is_array($payload['summary'] ?? null)
-                ? $payload['summary']
-                : ['likes' => 0, 'shares' => 0, 'replies' => 0],
-            'details' => is_array($payload['details'] ?? null)
-                ? $payload['details']
-                : ['likes' => [], 'shares' => [], 'replies' => []],
-        ];
     }
     return [
         'thread_url' => '',

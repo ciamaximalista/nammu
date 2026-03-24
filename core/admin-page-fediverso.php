@@ -736,7 +736,7 @@
                                                     <?php endif; ?>
                                                     <span class="fediverse-status__file-name"><?= htmlspecialchars((string) (($localItem['title'] ?? '') ?: ($localItem['url'] ?? '')), ENT_QUOTES, 'UTF-8') ?></span>
                                                     <?php if ($localCardDescription !== ''): ?>
-                                                        <span class="fediverse-status__file-meta fediverse-status__file-meta--description"><?= $fediverseRenderCardDescription($localCardDescription) ?></span>
+                                                        <div class="fediverse-status__file-meta fediverse-status__file-meta--description"><?= $fediverseRenderCardDescription($localCardDescription) ?></div>
                                                     <?php endif; ?>
                                                 </a>
                                             </div>
@@ -1057,7 +1057,7 @@
                                                             <?php endif; ?>
                                                             <span class="fediverse-status__file-name"><?= htmlspecialchars($linkCardTitle, ENT_QUOTES, 'UTF-8') ?></span>
                                                             <?php if ($linkCardDescription !== ''): ?>
-                                                                <span class="fediverse-status__file-meta fediverse-status__file-meta--description"><?= $fediverseRenderCardDescription($linkCardDescription) ?></span>
+                                                                <div class="fediverse-status__file-meta fediverse-status__file-meta--description"><?= $fediverseRenderCardDescription($linkCardDescription) ?></div>
                                                             <?php endif; ?>
                                                         </a>
                                                     <?php else: ?>

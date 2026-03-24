@@ -1189,9 +1189,9 @@
                                                 <input type="hidden" name="fediverse_item_id" value="<?= htmlspecialchars((string) ($item['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_title" value="<?= htmlspecialchars((string) ($item['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_content" value="<?= htmlspecialchars((string) ($item['content'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                <input type="hidden" name="fediverse_actor_name" value="<?= htmlspecialchars((string) ($item['actor_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                <input type="hidden" name="fediverse_actor_icon" value="<?= htmlspecialchars((string) ($item['actor_icon'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                <input type="hidden" name="fediverse_actor_url" value="<?= htmlspecialchars((string) ($item['actor_url'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_actor_name" value="<?= htmlspecialchars((string) (($item['target_actor_name'] ?? '') ?: ($item['actor_name'] ?? '')), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_actor_icon" value="<?= htmlspecialchars((string) (($item['target_actor_icon'] ?? '') ?: ($item['actor_icon'] ?? '')), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_actor_url" value="<?= htmlspecialchars((string) (($item['object_id'] ?? '') ?: ($item['target_actor_id'] ?? '') ?: ($item['actor_url'] ?? '')), ENT_QUOTES, 'UTF-8') ?>">
                                                 <?php
                                                 $boostImageUrl = trim((string) ($item['image'] ?? ''));
                                                 $boostImageUrls = array_values(array_unique(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))));

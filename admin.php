@@ -10774,6 +10774,35 @@ if ($isLoggedIn && $page === 'fediverso') {
             array_unshift($objectImages, $objectImage);
         }
         $config = load_config_file();
+        if (!function_exists('nammu_fediverse_signed_fetch_json') && is_file(__DIR__ . '/core/fediverso.php')) {
+            require_once __DIR__ . '/core/fediverso.php';
+        }
+        if (function_exists('nammu_fediverse_signed_fetch_json') && function_exists('nammu_fediverse_resolve_actor')) {
+            $resolvedObject = nammu_fediverse_signed_fetch_json($objectUrl, $config);
+            if (!is_array($resolvedObject)) {
+                $resolvedObject = nammu_fediverse_fetch_json($objectUrl);
+            }
+            if (is_array($resolvedObject)) {
+                $resolvedActorId = trim((string) (($resolvedObject['attributedTo'] ?? '') ?: ($resolvedObject['actor'] ?? '')));
+                if ($resolvedActorId !== '') {
+                    $resolvedActor = nammu_fediverse_resolve_actor($resolvedActorId, $config);
+                    if (is_array($resolvedActor)) {
+                        $resolvedActorName = trim((string) (($resolvedActor['name'] ?? '') ?: ($resolvedActor['preferredUsername'] ?? '') ?: ''));
+                        $resolvedActorIcon = trim((string) ($resolvedActor['icon'] ?? ''));
+                        $resolvedActorUrl = trim((string) (($resolvedActor['url'] ?? '') ?: ($resolvedActor['id'] ?? '')));
+                        if ($resolvedActorName !== '') {
+                            $objectActorName = $resolvedActorName;
+                        }
+                        if ($resolvedActorIcon !== '') {
+                            $objectActorIcon = $resolvedActorIcon;
+                        }
+                        if ($resolvedActorUrl !== '') {
+                            $objectActorUrl = $resolvedActorUrl;
+                        }
+                    }
+                }
+            }
+        }
         $result = nammu_fediverse_send_announce($recipientId, $objectUrl, $config);
         if (!empty($result['ok'])) {
             if (!function_exists('admin_send_social_broadcast_to_configured_networks') && is_file(__DIR__ . '/core/admin-redes.php')) {

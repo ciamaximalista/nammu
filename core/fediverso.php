@@ -3348,7 +3348,14 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
     ];
 }
 
-function nammu_fediverse_extract_outbox_items(array $outbox, array $actor, array $config, int $limit = 8, array $knownTimelineIds = []): array
+function nammu_fediverse_extract_outbox_items(
+    array $outbox,
+    array $actor,
+    array $config,
+    int $limit = 8,
+    array $knownTimelineIds = [],
+    ?int $inspectLimit = null
+): array
 {
     $payload = $outbox;
     if (!empty($outbox['first']) && is_string($outbox['first'])) {
@@ -3365,7 +3372,13 @@ function nammu_fediverse_extract_outbox_items(array $outbox, array $actor, array
     }
     $items = [];
     $knownTimelineIds = array_fill_keys(array_values(array_filter(array_map('strval', $knownTimelineIds))), true);
+    $inspectLimit = $inspectLimit !== null ? max(1, $inspectLimit) : max($limit * 6, 24);
+    $inspected = 0;
     foreach ($rawItems as $rawItem) {
+        if ($inspected >= $inspectLimit) {
+            break;
+        }
+        $inspected++;
         if (count($items) >= max(1, $limit)) {
             break;
         }
@@ -3385,7 +3398,7 @@ function nammu_fediverse_extract_outbox_items(array $outbox, array $actor, array
         if ($normalized !== null) {
             $normalizedId = trim((string) ($normalized['id'] ?? ''));
             if ($normalizedId !== '' && isset($knownTimelineIds[$normalizedId])) {
-                break;
+                continue;
             }
             $items[] = $normalized;
         }
@@ -3410,6 +3423,7 @@ function nammu_fediverse_refresh_following(array $options = []): array
     });
     $actorLimit = max(1, (int) ($options['actor_limit'] ?? count($actors)));
     $outboxLimit = max(1, (int) ($options['outbox_limit'] ?? 8));
+    $outboxInspectLimit = max($outboxLimit, (int) ($options['outbox_inspect_limit'] ?? max($outboxLimit * 6, 24)));
     $refreshFollowers = !array_key_exists('refresh_followers', $options) || !empty($options['refresh_followers']);
     $resolveActorTtl = max(0, (int) ($options['resolve_actor_ttl'] ?? 3600));
     $checked = 0;
@@ -3440,7 +3454,7 @@ function nammu_fediverse_refresh_following(array $options = []): array
             continue;
         }
         $actor['last_error'] = '';
-        foreach (nammu_fediverse_extract_outbox_items($outbox, $actor, $config, $outboxLimit, array_keys($timelineById)) as $item) {
+        foreach (nammu_fediverse_extract_outbox_items($outbox, $actor, $config, $outboxLimit, array_keys($timelineById), $outboxInspectLimit) as $item) {
             if (isset($timelineById[$item['id']])) {
                 continue;
             }

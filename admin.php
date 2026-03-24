@@ -61,6 +61,7 @@ function admin_run_scheduled_tasks(): array {
         $fediverseStats = nammu_fediverse_refresh_following([
             'actor_limit' => 1,
             'outbox_limit' => 3,
+            'outbox_inspect_limit' => 18,
             'refresh_followers' => false,
             'resolve_actor_ttl' => 21600,
         ]);
@@ -10597,6 +10598,7 @@ if ($isLoggedIn && $page === 'fediverso') {
         $stats = nammu_fediverse_refresh_following([
             'actor_limit' => 1,
             'outbox_limit' => 3,
+            'outbox_inspect_limit' => 18,
             'refresh_followers' => false,
             'resolve_actor_ttl' => 21600,
         ]);

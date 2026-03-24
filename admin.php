@@ -10871,6 +10871,9 @@ if ($isLoggedIn && $page === 'fediverso') {
                     if ($displayUrl !== '' && !in_array($displayUrl, $socialTextParts, true)) {
                         $socialTextParts[] = $displayUrl;
                     }
+                    if ($displayUrl !== '') {
+                        $socialTextParts[] = 'Via: ' . $displayUrl;
+                    }
                     $socialText = trim(implode("\n\n", array_filter($socialTextParts, static fn(string $part): bool => trim($part) !== '')));
                     $fediverseUrl = '';
                     if (is_array($manualItem ?? null) && !empty($manualItem)) {

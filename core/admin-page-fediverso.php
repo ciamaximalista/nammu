@@ -697,6 +697,7 @@
                                 $shareModalId = 'fediverse-share-modal-' . preg_replace('/[^a-z0-9_-]+/i', '-', $localAnchor);
                                 $localIsNote = strcasecmp((string) ($localItem['type'] ?? ''), 'Note') === 0;
                                 $localCardDescription = trim((string) (($localItem['summary'] ?? '') ?: ($localItem['content'] ?? '')));
+                                $localCardDescription = str_replace(["\r\n", "\r"], "\n", strip_tags($localCardDescription));
                                 $localCardDescription = preg_replace('/\s+/', ' ', strip_tags($localCardDescription)) ?? '';
                                 $localImages = array_values(array_filter(array_map('strval', is_array($localItem['images'] ?? null) ? $localItem['images'] : [])));
                                 if (empty($localImages) && !empty($localItem['image'])) {
@@ -1030,7 +1031,7 @@
                                                     $linkCardImage = trim((string) (($attachment['image'] ?? '') ?: ($item['image'] ?? '')));
                                                     $linkCardDescription = trim((string) (($attachment['summary'] ?? '') ?: ($item['summary'] ?? '') ?: ($item['content'] ?? '')));
                                                     $linkCardDescription = preg_replace('#^\s*https?://\S+\s*#iu', '', $linkCardDescription) ?? $linkCardDescription;
-                                                    $linkCardDescription = preg_replace('/\s+/', ' ', strip_tags($linkCardDescription)) ?? '';
+                                                    $linkCardDescription = str_replace(["\r\n", "\r"], "\n", strip_tags($linkCardDescription));
                                                     ?>
                                                     <?php if ($isImage): ?>
                                                         <a class="fediverse-status__media" href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">

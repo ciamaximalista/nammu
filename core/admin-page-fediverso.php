@@ -169,6 +169,23 @@
         }
         return $value;
     };
+    $fediverseRenderCardDescription = static function (?string $value): string {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return '';
+        }
+        $value = str_replace(["\r\n", "\r"], "\n", strip_tags($value));
+        $paragraphs = preg_split("/\n{2,}/", $value) ?: [];
+        $html = [];
+        foreach ($paragraphs as $paragraph) {
+            $paragraph = trim((string) $paragraph);
+            if ($paragraph === '') {
+                continue;
+            }
+            $html[] = '<p>' . nl2br(htmlspecialchars($paragraph, ENT_QUOTES, 'UTF-8')) . '</p>';
+        }
+        return implode('', $html);
+    };
     $fediverseKnownActors = [];
     if (($isFediverseHomeTab || $isFediverseNotificationsTab || $isFediverseMessagesTab) && $fediverseNeedsLivePanel) {
         if ($isFediverseHomeTab && is_array($fediverseHomeSnapshot['actors_by_id'] ?? null)) {
@@ -718,7 +735,7 @@
                                                     <?php endif; ?>
                                                     <span class="fediverse-status__file-name"><?= htmlspecialchars((string) (($localItem['title'] ?? '') ?: ($localItem['url'] ?? '')), ENT_QUOTES, 'UTF-8') ?></span>
                                                     <?php if ($localCardDescription !== ''): ?>
-                                                        <span class="fediverse-status__file-meta fediverse-status__file-meta--description"><?= htmlspecialchars($localCardDescription, ENT_QUOTES, 'UTF-8') ?></span>
+                                                        <span class="fediverse-status__file-meta fediverse-status__file-meta--description"><?= $fediverseRenderCardDescription($localCardDescription) ?></span>
                                                     <?php endif; ?>
                                                 </a>
                                             </div>
@@ -1039,7 +1056,7 @@
                                                             <?php endif; ?>
                                                             <span class="fediverse-status__file-name"><?= htmlspecialchars($linkCardTitle, ENT_QUOTES, 'UTF-8') ?></span>
                                                             <?php if ($linkCardDescription !== ''): ?>
-                                                                <span class="fediverse-status__file-meta fediverse-status__file-meta--description"><?= htmlspecialchars($linkCardDescription, ENT_QUOTES, 'UTF-8') ?></span>
+                                                                <span class="fediverse-status__file-meta fediverse-status__file-meta--description"><?= $fediverseRenderCardDescription($linkCardDescription) ?></span>
                                                             <?php endif; ?>
                                                         </a>
                                                     <?php else: ?>
@@ -1902,6 +1919,12 @@
         }
         .fediverse-status__file-meta--description {
             line-height: 1.45;
+        }
+        .fediverse-status__file-meta--description p {
+            margin: 0 0 0.55rem;
+        }
+        .fediverse-status__file-meta--description p:last-child {
+            margin-bottom: 0;
         }
         .fediverse-status__footer {
             margin-top: 0.85rem;

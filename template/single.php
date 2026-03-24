@@ -487,6 +487,9 @@ if ($isPageTemplate && $formattedDate !== '') {
                                 <?php endif; ?>
                             </div>
                         <?php endif; ?>
+                        <div class="fediverse-inline-metric-group">
+                            <a class="fediverse-inline-metric-label" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>">Ver</a>
+                        </div>
                     </div>
                 <?php else: ?>
                     <a class="fediverse-object-empty-btn" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($fediverseEmptyLabel, ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($fediverseEmptyLabel, ENT_QUOTES, 'UTF-8') ?>">

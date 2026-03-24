@@ -67,6 +67,11 @@ function nammu_fediverse_undo_announce_queue_file(): string
     return dirname(__DIR__) . '/config/fediverso-undo-announce-queue.json';
 }
 
+function nammu_fediverse_announce_queue_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-announce-queue.json';
+}
+
 function nammu_fediverse_threads_cache_file(): string
 {
     return dirname(__DIR__) . '/config/fediverso-threads-cache.json';
@@ -960,6 +965,33 @@ function nammu_fediverse_undo_announce_queue_store(): array
     return ['items' => $normalized];
 }
 
+function nammu_fediverse_announce_queue_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_announce_queue_file(), ['items' => []]);
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    $normalized = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $activityId = trim((string) ($item['activity_id'] ?? ''));
+        $recipientId = trim((string) ($item['recipient_id'] ?? ''));
+        $objectUrl = trim((string) ($item['object_url'] ?? ''));
+        if ($activityId === '' || $recipientId === '' || $objectUrl === '') {
+            continue;
+        }
+        $normalized[] = [
+            'activity_id' => $activityId,
+            'recipient_id' => $recipientId,
+            'object_url' => $objectUrl,
+            'published' => trim((string) ($item['published'] ?? '')) ?: gmdate(DATE_ATOM),
+            'created_at' => trim((string) ($item['created_at'] ?? '')) ?: gmdate(DATE_ATOM),
+            'attempts' => (int) ($item['attempts'] ?? 0),
+        ];
+    }
+    return ['items' => $normalized];
+}
+
 function nammu_fediverse_threads_cache_store(): array
 {
     $store = nammu_fediverse_load_json_store(nammu_fediverse_threads_cache_file(), ['items' => []]);
@@ -1184,6 +1216,11 @@ function nammu_fediverse_save_delete_queue_store(array $items): void
 function nammu_fediverse_save_undo_announce_queue_store(array $items): void
 {
     nammu_fediverse_save_json_store(nammu_fediverse_undo_announce_queue_file(), ['items' => array_values($items)]);
+}
+
+function nammu_fediverse_save_announce_queue_store(array $items): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_announce_queue_file(), ['items' => array_values($items)]);
 }
 
 function nammu_fediverse_save_actions_store(array $items): void
@@ -6402,52 +6439,126 @@ function nammu_fediverse_send_announce(string $recipientId, string $objectUrl, a
     if ($recipientId === '' || $objectUrl === '') {
         return ['ok' => false, 'message' => 'Falta el destinatario o la publicación a impulsar.'];
     }
-    $recipient = nammu_fediverse_resolve_actor($recipientId, $config);
-    if (!is_array($recipient)) {
-        return ['ok' => false, 'message' => 'No se pudo resolver el actor remoto.'];
-    }
-    $inboxUrl = nammu_fediverse_remote_inbox_for_actor($recipient);
-    if ($inboxUrl === '') {
-        return ['ok' => false, 'message' => 'Ese actor no expone un inbox usable.'];
-    }
     $actorUrl = nammu_fediverse_actor_url($config);
     $activityId = $actorUrl . '/announces/' . substr(sha1($recipientId . '|' . $objectUrl . '|' . microtime(true)), 0, 24);
-    $activity = [
-        '@context' => 'https://www.w3.org/ns/activitystreams',
-        'id' => $activityId,
-        'type' => 'Announce',
-        'actor' => $actorUrl,
-        'object' => $objectUrl,
-        'to' => ['https://www.w3.org/ns/activitystreams#Public'],
-        'cc' => [$recipientId],
-        'published' => gmdate(DATE_ATOM),
+    $published = gmdate(DATE_ATOM);
+    $queue = nammu_fediverse_announce_queue_store();
+    $items = is_array($queue['items'] ?? null) ? $queue['items'] : [];
+    foreach ($items as $queued) {
+        if (
+            trim((string) ($queued['recipient_id'] ?? '')) === $recipientId
+            && trim((string) ($queued['object_url'] ?? '')) === $objectUrl
+        ) {
+            nammu_fediverse_record_action('boost', $recipientId, $objectUrl, [
+                'activity_id' => trim((string) ($queued['activity_id'] ?? '')),
+                'published' => trim((string) ($queued['published'] ?? $published)),
+            ]);
+            return ['ok' => true, 'message' => 'Impulso encolado.'];
+        }
+    }
+    $items[] = [
+        'activity_id' => $activityId,
+        'recipient_id' => $recipientId,
+        'object_url' => $objectUrl,
+        'published' => $published,
+        'created_at' => $published,
+        'attempts' => 0,
     ];
-    $deliveries = [];
-    $deliveries[$inboxUrl] = nammu_fediverse_post_activity_response($inboxUrl, $activity, $config);
-    foreach (nammu_fediverse_followers_store()['followers'] as $follower) {
-        $followerInbox = nammu_fediverse_remote_inbox_for_actor($follower);
-        if ($followerInbox === '' || isset($deliveries[$followerInbox])) {
-            continue;
-        }
-        $deliveries[$followerInbox] = nammu_fediverse_post_activity_response($followerInbox, $activity, $config);
-    }
-    $successfulDeliveries = 0;
-    $lastError = '';
-    foreach ($deliveries as $deliveryResult) {
-        if (!empty($deliveryResult['ok'])) {
-            $successfulDeliveries++;
-            continue;
-        }
-        $lastError = trim((string) ($deliveryResult['message'] ?? ''));
-    }
-    if ($successfulDeliveries === 0) {
-        return ['ok' => false, 'message' => 'No se pudo enviar el impulso. ' . $lastError];
-    }
+    nammu_fediverse_save_announce_queue_store($items);
     nammu_fediverse_record_action('boost', $recipientId, $objectUrl, [
         'activity_id' => $activityId,
-        'published' => (string) ($activity['published'] ?? gmdate(DATE_ATOM)),
+        'published' => $published,
     ]);
-    return ['ok' => true, 'message' => 'Impulso enviado. Entregas: ' . $successfulDeliveries . '.'];
+    return ['ok' => true, 'message' => 'Impulso encolado.'];
+}
+
+function nammu_fediverse_process_announce_queue(array $config, int $maxJobs = 2): array
+{
+    $queue = nammu_fediverse_announce_queue_store();
+    $items = is_array($queue['items'] ?? null) ? array_values($queue['items']) : [];
+    $processed = 0;
+    $sent = 0;
+    $failed = 0;
+    $remaining = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        if ($processed >= max(1, $maxJobs)) {
+            $remaining[] = $item;
+            continue;
+        }
+        $recipientId = trim((string) ($item['recipient_id'] ?? ''));
+        $objectUrl = trim((string) ($item['object_url'] ?? ''));
+        $activityId = trim((string) ($item['activity_id'] ?? ''));
+        $published = trim((string) ($item['published'] ?? '')) ?: gmdate(DATE_ATOM);
+        if ($recipientId === '' || $objectUrl === '' || $activityId === '') {
+            continue;
+        }
+        $processed++;
+        $recipient = nammu_fediverse_resolve_actor($recipientId, $config);
+        if (!is_array($recipient)) {
+            $item['attempts'] = (int) ($item['attempts'] ?? 0) + 1;
+            $failed++;
+            if ((int) $item['attempts'] < 5) {
+                $remaining[] = $item;
+            }
+            continue;
+        }
+        $inboxTargets = [];
+        $inboxUrl = nammu_fediverse_remote_inbox_for_actor($recipient);
+        if ($inboxUrl !== '') {
+            $inboxTargets[$inboxUrl] = true;
+        }
+        foreach (nammu_fediverse_followers_store()['followers'] as $follower) {
+            $followerInbox = nammu_fediverse_remote_inbox_for_actor($follower);
+            if ($followerInbox !== '') {
+                $inboxTargets[$followerInbox] = true;
+            }
+        }
+        if (empty($inboxTargets)) {
+            $item['attempts'] = (int) ($item['attempts'] ?? 0) + 1;
+            $failed++;
+            if ((int) $item['attempts'] < 5) {
+                $remaining[] = $item;
+            }
+            continue;
+        }
+        $actorUrl = nammu_fediverse_actor_url($config);
+        $activity = [
+            '@context' => 'https://www.w3.org/ns/activitystreams',
+            'id' => $activityId,
+            'type' => 'Announce',
+            'actor' => $actorUrl,
+            'object' => $objectUrl,
+            'to' => ['https://www.w3.org/ns/activitystreams#Public'],
+            'cc' => [$recipientId],
+            'published' => $published,
+        ];
+        $successfulDeliveries = 0;
+        foreach (array_keys($inboxTargets) as $targetInbox) {
+            $delivery = nammu_fediverse_post_activity_response($targetInbox, $activity, $config);
+            if (!empty($delivery['ok'])) {
+                $successfulDeliveries++;
+            }
+        }
+        if ($successfulDeliveries > 0) {
+            $sent++;
+            continue;
+        }
+        $item['attempts'] = (int) ($item['attempts'] ?? 0) + 1;
+        $failed++;
+        if ((int) $item['attempts'] < 5) {
+            $remaining[] = $item;
+        }
+    }
+    nammu_fediverse_save_announce_queue_store($remaining);
+    return [
+        'processed' => $processed,
+        'sent' => $sent,
+        'failed' => $failed,
+        'remaining' => count($remaining),
+    ];
 }
 
 function nammu_fediverse_send_undo_like_for_item(array $item, array $config): array

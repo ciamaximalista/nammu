@@ -124,6 +124,8 @@ function admin_run_scheduled_maintenance_tasks(): array {
     $rssStats = ['sent' => 0, 'checked' => 0];
     $socialBroadcastQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $fediverseDeleteQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
+    $fediverseUndoAnnounceQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
+    $fediverseAnnounceQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $deliveryStats = ['followers' => 0, 'delivered' => 0];
     $acceptStats = ['checked' => 0, 'accepted' => 0, 'failed' => 0];
 
@@ -155,6 +157,12 @@ function admin_run_scheduled_maintenance_tasks(): array {
     }
     if (function_exists('nammu_fediverse_process_delete_queue')) {
         $fediverseDeleteQueueStats = nammu_fediverse_process_delete_queue($config, 2);
+    }
+    if (function_exists('nammu_fediverse_process_announce_queue')) {
+        $fediverseAnnounceQueueStats = nammu_fediverse_process_announce_queue($config, 2);
+    }
+    if (function_exists('nammu_fediverse_process_undo_announce_queue')) {
+        $fediverseUndoAnnounceQueueStats = nammu_fediverse_process_undo_announce_queue($config, 2);
     }
     if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
         $acceptStats = nammu_fediverse_retry_pending_follower_accepts($config);
@@ -195,10 +203,10 @@ function admin_run_scheduled_maintenance_tasks(): array {
         'fediverse_follow_accepts_checked' => (int) ($acceptStats['checked'] ?? 0),
         'fediverse_follow_accepts_sent' => (int) ($acceptStats['accepted'] ?? 0),
         'fediverse_follow_accepts_failed' => (int) ($acceptStats['failed'] ?? 0),
-        'fediverse_delete_queue_processed' => (int) ($fediverseDeleteQueueStats['processed'] ?? 0),
-        'fediverse_delete_queue_sent' => (int) ($fediverseDeleteQueueStats['sent'] ?? 0),
-        'fediverse_delete_queue_failed' => (int) ($fediverseDeleteQueueStats['failed'] ?? 0),
-        'fediverse_delete_queue_remaining' => (int) ($fediverseDeleteQueueStats['remaining'] ?? 0),
+        'fediverse_delete_queue_processed' => (int) ($fediverseDeleteQueueStats['processed'] ?? 0) + (int) ($fediverseUndoAnnounceQueueStats['processed'] ?? 0) + (int) ($fediverseAnnounceQueueStats['processed'] ?? 0),
+        'fediverse_delete_queue_sent' => (int) ($fediverseDeleteQueueStats['sent'] ?? 0) + (int) ($fediverseUndoAnnounceQueueStats['sent'] ?? 0) + (int) ($fediverseAnnounceQueueStats['sent'] ?? 0),
+        'fediverse_delete_queue_failed' => (int) ($fediverseDeleteQueueStats['failed'] ?? 0) + (int) ($fediverseUndoAnnounceQueueStats['failed'] ?? 0) + (int) ($fediverseAnnounceQueueStats['failed'] ?? 0),
+        'fediverse_delete_queue_remaining' => (int) ($fediverseDeleteQueueStats['remaining'] ?? 0) + (int) ($fediverseUndoAnnounceQueueStats['remaining'] ?? 0) + (int) ($fediverseAnnounceQueueStats['remaining'] ?? 0),
     ];
 }
 
@@ -10913,19 +10921,6 @@ if ($isLoggedIn && $page === 'fediverso') {
         ];
         $config = load_config_file();
         $result = nammu_fediverse_send_undo_announce_for_item($item, $config);
-        if (!function_exists('nammu_actuality_rebuild_snapshot') && is_file(__DIR__ . '/core/actualidad.php')) {
-            require_once __DIR__ . '/core/actualidad.php';
-        }
-        if (!empty($result['ok']) && function_exists('nammu_actuality_rebuild_snapshot')) {
-            $baseUrl = rtrim((string) (($config['site_url'] ?? '') ?: nammu_base_url()), '/');
-            $siteTitle = trim((string) (($config['site_name'] ?? '') ?: ''));
-            $siteDescription = trim((string) ($config['site_description'] ?? ''));
-            $siteLang = trim((string) ($config['site_lang'] ?? 'es'));
-            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
-        }
-        if (!empty($result['ok']) && function_exists('nammu_fediverse_rebuild_snapshots')) {
-            nammu_fediverse_rebuild_snapshots($config);
-        }
         if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
             nammu_fediverse_save_fragments_cache_store([]);
         }

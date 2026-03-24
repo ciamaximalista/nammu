@@ -698,7 +698,6 @@
                                 $localIsNote = strcasecmp((string) ($localItem['type'] ?? ''), 'Note') === 0;
                                 $localCardDescription = trim((string) (($localItem['summary'] ?? '') ?: ($localItem['content'] ?? '')));
                                 $localCardDescription = str_replace(["\r\n", "\r"], "\n", strip_tags($localCardDescription));
-                                $localCardDescription = preg_replace('/\s+/', ' ', strip_tags($localCardDescription)) ?? '';
                                 $localImages = array_values(array_filter(array_map('strval', is_array($localItem['images'] ?? null) ? $localItem['images'] : [])));
                                 if (empty($localImages) && !empty($localItem['image'])) {
                                     $localImages[] = (string) $localItem['image'];

@@ -532,6 +532,28 @@ function nammu_actuality_remove_manual_item_from_snapshots(string $id): void
     nammu_actuality_save_items_snapshot($items);
 }
 
+function nammu_actuality_add_item_to_snapshots(array $item): void
+{
+    if (!is_array($item)) {
+        return;
+    }
+    $itemId = trim((string) ($item['id'] ?? ''));
+    if ($itemId === '') {
+        return;
+    }
+
+    $snapshot = nammu_actuality_load_items_snapshot();
+    $items = is_array($snapshot['items'] ?? null) ? $snapshot['items'] : [];
+    $items = array_values(array_filter($items, static function ($existing) use ($itemId): bool {
+        return !is_array($existing) || trim((string) ($existing['id'] ?? '')) !== $itemId;
+    }));
+    array_unshift($items, $item);
+    usort($items, static function (array $a, array $b): int {
+        return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
+    });
+    nammu_actuality_save_items_snapshot($items);
+}
+
 function nammu_actuality_fetch_url(string $url, string $accept = 'text/html,application/xhtml+xml', int $timeout = 8): array
 {
     $headers = [];

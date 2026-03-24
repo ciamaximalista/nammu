@@ -10807,8 +10807,8 @@ if ($isLoggedIn && $page === 'fediverso') {
                     'boost_actor_icon' => $objectActorIcon,
                     'boost_actor_url' => $objectActorUrl,
                 ]);
-                if (function_exists('nammu_actuality_rebuild_snapshot')) {
-                    nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+                if (function_exists('nammu_actuality_add_item_to_snapshots')) {
+                    nammu_actuality_add_item_to_snapshots($manualItem);
                 }
                 nammu_fediverse_record_action('share', '', $objectUrl, [
                     'share_text' => $objectContent,

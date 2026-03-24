@@ -2349,24 +2349,6 @@ function nammu_fediverse_rebuild_messages_snapshot(array $config): array
             $flatMessages[] = $messageItem;
         }
     }
-    foreach (array_merge(
-        nammu_fediverse_public_reply_message_entries($config),
-        nammu_fediverse_outgoing_public_reply_message_entries($config),
-        nammu_fediverse_remote_public_reply_message_entries($config),
-        nammu_fediverse_public_thread_root_message_entries($config),
-        nammu_fediverse_remote_thread_root_message_entries($config)
-    ) as $messageItem) {
-        if (!is_array($messageItem)) {
-            continue;
-        }
-        $messageId = trim((string) ($messageItem['id'] ?? ''));
-        $messageKey = $messageId !== '' ? 'id:' . $messageId : 'hash:' . sha1(json_encode($messageItem, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-        if (isset($flatMessageKeys[$messageKey])) {
-            continue;
-        }
-        $flatMessageKeys[$messageKey] = true;
-        $flatMessages[] = $messageItem;
-    }
     $data = [
         'actors_by_id' => $actorsById,
         'recipients' => nammu_fediverse_message_recipients(),
@@ -6145,9 +6127,153 @@ function nammu_fediverse_notification_entries(array $config): array
         if ($type === 'delete') {
             return false;
         }
-        return !nammu_fediverse_is_direct_message_activity($payload, $config);
+        if (nammu_fediverse_is_direct_message_activity($payload, $config)) {
+            return false;
+        }
+        return nammu_fediverse_notification_is_relevant($payload, $config);
     }));
     return array_values(array_reverse($filtered));
+}
+
+function nammu_fediverse_notification_is_relevant(array $payload, array $config): bool
+{
+    $type = strtolower(trim((string) ($payload['type'] ?? '')));
+    if (in_array($type, ['follow', 'undo', 'accept'], true)) {
+        return true;
+    }
+    if (nammu_fediverse_notification_mentions_local_actor($payload, $config)) {
+        return true;
+    }
+    $targets = nammu_fediverse_notification_target_identifiers($payload);
+    if (empty($targets)) {
+        return false;
+    }
+    $watched = nammu_fediverse_notification_watched_identifiers($config);
+    foreach ($targets as $target) {
+        if ($target !== '' && isset($watched[$target])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function nammu_fediverse_notification_mentions_local_actor(array $payload, array $config): bool
+{
+    $actorUrl = trim((string) nammu_fediverse_actor_url($config));
+    $actorAcct = trim((string) nammu_fediverse_acct_uri($config));
+    $preferredUsername = trim((string) nammu_fediverse_preferred_username($config));
+    $profileAliasPath = function_exists('nammu_fediverse_profile_alias_path')
+        ? trim((string) nammu_fediverse_profile_alias_path($config, nammu_fediverse_base_url($config)))
+        : '';
+    $profileAliasUrl = $profileAliasPath !== '' ? rtrim(nammu_fediverse_base_url($config), '/') . $profileAliasPath : '';
+    $needles = array_values(array_filter([
+        $actorUrl,
+        $actorAcct,
+        $profileAliasUrl,
+        $preferredUsername !== '' ? '@' . $preferredUsername : '',
+    ]));
+
+    $haystacks = [];
+    foreach (['to', 'cc'] as $field) {
+        $values = $payload[$field] ?? [];
+        if (is_string($values)) {
+            $haystacks[] = trim($values);
+        } elseif (is_array($values)) {
+            foreach ($values as $value) {
+                $haystacks[] = trim((string) $value);
+            }
+        }
+    }
+    $object = is_array($payload['object'] ?? null) ? $payload['object'] : [];
+    foreach (['to', 'cc', 'attributedTo'] as $field) {
+        $values = $object[$field] ?? [];
+        if (is_string($values)) {
+            $haystacks[] = trim($values);
+        } elseif (is_array($values)) {
+            foreach ($values as $value) {
+                $haystacks[] = trim((string) $value);
+            }
+        }
+    }
+    foreach ((array) ($object['tag'] ?? []) as $tag) {
+        if (!is_array($tag)) {
+            continue;
+        }
+        $haystacks[] = trim((string) ($tag['href'] ?? ''));
+        $haystacks[] = trim((string) ($tag['name'] ?? ''));
+    }
+    $content = trim((string) (($object['content'] ?? '') ?: ''));
+    if ($content !== '') {
+        $haystacks[] = html_entity_decode(strip_tags($content), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+    foreach ($haystacks as $haystack) {
+        if ($haystack === '') {
+            continue;
+        }
+        foreach ($needles as $needle) {
+            if ($needle === '') {
+                continue;
+            }
+            if ($haystack === $needle || str_contains($haystack, $needle)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+function nammu_fediverse_notification_target_identifiers(array $payload): array
+{
+    $targets = [];
+    $type = strtolower(trim((string) ($payload['type'] ?? '')));
+    $object = $payload['object'] ?? null;
+
+    if (in_array($type, ['like', 'announce'], true) && is_string($object)) {
+        $targets[] = trim($object);
+    } elseif ($type === 'create' && is_array($object)) {
+        foreach (['inReplyTo', 'context', 'conversation', 'id', 'url'] as $field) {
+            $targets[] = trim((string) ($object[$field] ?? ''));
+        }
+    } elseif (is_string($object)) {
+        $targets[] = trim($object);
+    } elseif (is_array($object)) {
+        foreach (['id', 'url', 'inReplyTo', 'context', 'conversation'] as $field) {
+            $targets[] = trim((string) ($object[$field] ?? ''));
+        }
+    }
+
+    return array_values(array_unique(array_filter($targets, static fn(string $value): bool => $value !== '')));
+}
+
+function nammu_fediverse_notification_watched_identifiers(array $config): array
+{
+    $watched = [];
+    foreach (nammu_fediverse_local_content_items($config) as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        foreach (['id', 'url'] as $field) {
+            $value = trim((string) ($item[$field] ?? ''));
+            if ($value !== '') {
+                $watched[$value] = true;
+            }
+        }
+    }
+    foreach (nammu_fediverse_actions_store()['items'] as $action) {
+        if (!is_array($action)) {
+            continue;
+        }
+        if (strtolower(trim((string) ($action['type'] ?? ''))) !== 'reply') {
+            continue;
+        }
+        foreach (['object_url', 'note_id', 'activity_id'] as $field) {
+            $value = trim((string) ($action[$field] ?? ''));
+            if ($value !== '') {
+                $watched[$value] = true;
+            }
+        }
+    }
+    return $watched;
 }
 
 function nammu_fediverse_post_activity(string $inboxUrl, array $activity, array $config): bool

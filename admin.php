@@ -10868,43 +10868,14 @@ if ($isLoggedIn && $page === 'fediverso') {
                     if ($objectContent !== '' && $objectContent !== $objectTitle) {
                         $socialTextParts[] = $objectContent;
                     }
-                    if ($displayUrl !== '' && !in_array($displayUrl, $socialTextParts, true)) {
-                        $socialTextParts[] = $displayUrl;
-                    }
                     if ($displayUrl !== '') {
                         $socialTextParts[] = 'Via: ' . $displayUrl;
                     }
                     $socialText = trim(implode("\n\n", array_filter($socialTextParts, static fn(string $part): bool => trim($part) !== '')));
-                    $fediverseUrl = '';
-                    if (is_array($manualItem ?? null) && !empty($manualItem)) {
-                        if (!function_exists('nammu_fediverse_public_thread_url_for_actuality_item') && is_file(__DIR__ . '/core/fediverso.php')) {
-                            require_once __DIR__ . '/core/fediverso.php';
-                        }
-                        if (function_exists('nammu_fediverse_public_thread_url_for_actuality_item')) {
-                            $fediverseUrl = trim((string) nammu_fediverse_public_thread_url_for_actuality_item($manualItem, $config));
-                        }
-                        if ($fediverseUrl === '') {
-                            $manualItemId = trim((string) ($manualItem['id'] ?? ''));
-                            if (
-                                $manualItemId !== ''
-                                && function_exists('nammu_fediverse_find_local_item_for_identifier')
-                                && function_exists('nammu_fediverse_thread_page_url')
-                            ) {
-                                $manualObjectId = rtrim($baseUrl, '/') . '/ap/objects/actualidad-' . rawurlencode($manualItemId);
-                                $manualLocalItem = nammu_fediverse_find_local_item_for_identifier($manualObjectId, $config);
-                                if (is_array($manualLocalItem)) {
-                                    $manualLocalItemId = trim((string) ($manualLocalItem['id'] ?? ''));
-                                    if ($manualLocalItemId !== '') {
-                                        $fediverseUrl = trim((string) nammu_fediverse_thread_page_url($manualLocalItemId, $config));
-                                    }
-                                }
-                            }
-                        }
-                    }
                     $allConfiguredNetworks = function_exists('admin_social_broadcast_available_networks')
                         ? array_keys(admin_social_broadcast_available_networks(get_settings()))
                         : [];
-                    $queueResult = admin_enqueue_social_broadcast($socialText !== '' ? $socialText : $noteText, $objectImages, $allConfiguredNetworks, $fediverseUrl);
+                    $queueResult = admin_enqueue_social_broadcast($socialText !== '' ? $socialText : $noteText, $objectImages, $allConfiguredNetworks, '');
                     if (!empty($queueResult['ok'])) {
                         $result['message'] .= ' Encolada para redes.';
                     }

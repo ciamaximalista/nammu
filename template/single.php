@@ -488,7 +488,7 @@ if ($isPageTemplate && $formattedDate !== '') {
                             </div>
                         <?php endif; ?>
                         <div class="fediverse-inline-metric-group">
-                            <a class="fediverse-inline-metric-label" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>">Ver</a>
+                            <a class="fediverse-inline-metric-label fediverse-inline-metric-label--cta" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>">Ver</a>
                         </div>
                     </div>
                 <?php else: ?>
@@ -623,6 +623,22 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .fediverse-inline-metric-label:hover {
         text-decoration: underline;
+    }
+    .fediverse-inline-metric-label--cta {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: .28rem .78rem;
+        border-radius: 999px;
+        background: <?= $fediverseButtonTextColor ?>;
+        color: #fff;
+        text-decoration: none;
+        box-shadow: 0 8px 18px rgba(0,0,0,.12);
+    }
+    .fediverse-inline-metric-label--cta:hover {
+        color: #fff;
+        text-decoration: none;
+        filter: brightness(.96);
     }
     .fediverse-object-empty-btn {
         display: inline-flex;

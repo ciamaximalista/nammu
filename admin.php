@@ -67,7 +67,7 @@ function admin_run_scheduled_tasks(): array {
             'resolve_actor_ttl' => 21600,
         ]);
         if (function_exists('nammu_fediverse_sync_recent_followed_inbox_items')) {
-            $fediverseInboxSyncStats = nammu_fediverse_sync_recent_followed_inbox_items($config, 4, 40);
+            $fediverseInboxSyncStats = nammu_fediverse_sync_recent_followed_inbox_items($config, 8, 400);
         }
         if (function_exists('nammu_fediverse_warm_recent_threads_cache')) {
             $fediverseRecentThreadsWarmed = (int) nammu_fediverse_warm_recent_threads_cache($config, 8);

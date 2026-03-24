@@ -3474,6 +3474,73 @@ function nammu_fediverse_refresh_following(array $options = []): array
     ];
 }
 
+function nammu_fediverse_sync_recent_followed_inbox_items(array $config, int $limit = 6, int $scanLimit = 60): array
+{
+    $limit = max(1, $limit);
+    $scanLimit = max($limit, $scanLimit);
+    $followingActors = nammu_fediverse_following_store()['actors'];
+    $followingIds = [];
+    foreach ($followingActors as $actor) {
+        $actorId = trim((string) ($actor['id'] ?? ''));
+        if ($actorId !== '') {
+            $followingIds[$actorId] = $actor;
+        }
+    }
+    if (empty($followingIds)) {
+        return ['scanned' => 0, 'new' => 0];
+    }
+
+    $timelineStore = nammu_fediverse_timeline_store();
+    $timelineItems = is_array($timelineStore['items'] ?? null) ? $timelineStore['items'] : [];
+    $timelineById = [];
+    foreach ($timelineItems as $item) {
+        $itemId = trim((string) ($item['id'] ?? ''));
+        if ($itemId !== '') {
+            $timelineById[$itemId] = $item;
+        }
+    }
+
+    $inboxStore = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
+    $activities = is_array($inboxStore['activities'] ?? null) ? $inboxStore['activities'] : [];
+    $activities = array_reverse($activities);
+    $scanned = 0;
+    $newItems = 0;
+
+    foreach ($activities as $entry) {
+        if ($scanned >= $scanLimit || $newItems >= $limit) {
+            break;
+        }
+        $scanned++;
+        if (empty($entry['verified'])) {
+            continue;
+        }
+        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        $actorId = trim((string) ($payload['actor'] ?? ''));
+        if ($actorId === '' || !isset($followingIds[$actorId])) {
+            continue;
+        }
+        if (nammu_fediverse_is_direct_message_activity($payload, $config)) {
+            continue;
+        }
+        $normalized = nammu_fediverse_normalize_remote_item($payload, $followingIds[$actorId], $config);
+        if ($normalized === null) {
+            continue;
+        }
+        $normalizedId = trim((string) ($normalized['id'] ?? ''));
+        if ($normalizedId === '' || isset($timelineById[$normalizedId])) {
+            continue;
+        }
+        $timelineById[$normalizedId] = $normalized;
+        $newItems++;
+    }
+
+    if ($newItems > 0) {
+        nammu_fediverse_save_timeline_store(array_values($timelineById));
+    }
+
+    return ['scanned' => $scanned, 'new' => $newItems];
+}
+
 function nammu_fediverse_refresh_followers(array $config): array
 {
     $followers = nammu_fediverse_followers_store()['followers'];

@@ -56,6 +56,7 @@ function admin_run_scheduled_tasks(): array {
         require_once __DIR__ . '/core/fediverso.php';
     }
     $fediverseStats = ['checked' => 0, 'new' => 0, 'followers_checked' => 0, 'followers_removed' => 0];
+    $fediverseInboxSyncStats = ['scanned' => 0, 'new' => 0];
     $fediverseRecentThreadsWarmed = 0;
     if (function_exists('nammu_fediverse_refresh_following')) {
         $fediverseStats = nammu_fediverse_refresh_following([
@@ -65,6 +66,9 @@ function admin_run_scheduled_tasks(): array {
             'refresh_followers' => false,
             'resolve_actor_ttl' => 21600,
         ]);
+        if (function_exists('nammu_fediverse_sync_recent_followed_inbox_items')) {
+            $fediverseInboxSyncStats = nammu_fediverse_sync_recent_followed_inbox_items($config, 4, 40);
+        }
         if (function_exists('nammu_fediverse_warm_recent_threads_cache')) {
             $fediverseRecentThreadsWarmed = (int) nammu_fediverse_warm_recent_threads_cache($config, 8);
         }
@@ -86,7 +90,7 @@ function admin_run_scheduled_tasks(): array {
         'social_broadcast_queue_failed' => 0,
         'social_broadcast_queue_remaining' => 0,
         'fediverse_checked' => (int) ($fediverseStats['checked'] ?? 0),
-        'fediverse_new' => (int) ($fediverseStats['new'] ?? 0),
+        'fediverse_new' => (int) ($fediverseStats['new'] ?? 0) + (int) ($fediverseInboxSyncStats['new'] ?? 0),
         'fediverse_followers' => 0,
         'fediverse_followers_checked' => (int) ($fediverseStats['followers_checked'] ?? 0),
         'fediverse_followers_removed' => (int) ($fediverseStats['followers_removed'] ?? 0),

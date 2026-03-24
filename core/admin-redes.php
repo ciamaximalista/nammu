@@ -1,5 +1,60 @@
 <?php
 
+function admin_social_broadcast_runtime_settings(): array
+{
+    if (function_exists('get_settings')) {
+        return get_settings();
+    }
+
+    $config = function_exists('nammu_load_config') ? nammu_load_config() : [];
+    $telegram = is_array($config['telegram'] ?? null) ? $config['telegram'] : [];
+    $channel = trim((string) ($telegram['channel'] ?? ''));
+    if ($channel !== '' && $channel[0] !== '@' && !preg_match('/^-?\d+$/', $channel)) {
+        $channel = '@' . ltrim($channel, '@');
+    }
+
+    return [
+        'telegram' => [
+            'token' => trim((string) ($telegram['token'] ?? '')),
+            'channel' => $channel,
+            'recipient' => trim((string) ($telegram['recipient'] ?? '')),
+            'auto_post' => trim((string) ($telegram['auto_post'] ?? 'off')),
+        ],
+        'facebook' => is_array($config['facebook'] ?? null) ? $config['facebook'] : [],
+        'twitter' => is_array($config['twitter'] ?? null) ? $config['twitter'] : [],
+        'bluesky' => is_array($config['bluesky'] ?? null) ? $config['bluesky'] : [],
+        'instagram' => is_array($config['instagram'] ?? null) ? $config['instagram'] : [],
+        'linkedin' => is_array($config['linkedin'] ?? null) ? $config['linkedin'] : [],
+    ];
+}
+
+function admin_social_broadcast_network_is_configured(string $network, array $settings): bool
+{
+    if (function_exists('admin_is_social_network_configured')) {
+        return admin_is_social_network_configured($network, $settings);
+    }
+
+    switch ($network) {
+        case 'telegram':
+            return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
+        case 'facebook':
+            return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
+        case 'twitter':
+            return ($settings['api_key'] ?? '') !== ''
+                && ($settings['api_secret'] ?? '') !== ''
+                && ($settings['access_token'] ?? '') !== ''
+                && ($settings['access_secret'] ?? '') !== '';
+        case 'bluesky':
+            return ($settings['identifier'] ?? '') !== '' && ($settings['app_password'] ?? '') !== '';
+        case 'instagram':
+            return ($settings['token'] ?? '') !== '' && ($settings['channel'] ?? '') !== '';
+        case 'linkedin':
+            return ($settings['token'] ?? '') !== '' && ($settings['author'] ?? '') !== '';
+        default:
+            return false;
+    }
+}
+
 function admin_social_broadcast_limits(): array
 {
     return [
@@ -596,7 +651,7 @@ function admin_social_broadcast_available_networks(array $settings): array
     $available = [];
     foreach ($labels as $network => $label) {
         $networkSettings = is_array($settings[$network] ?? null) ? $settings[$network] : [];
-        if (!admin_is_social_network_configured($network, $networkSettings)) {
+        if (!admin_social_broadcast_network_is_configured($network, $networkSettings)) {
             continue;
         }
         $available[$network] = [
@@ -614,7 +669,7 @@ function admin_send_social_broadcast_to_configured_networks(string $text, $image
     $text = trim($text);
     $imageItems = admin_social_broadcast_parse_images($images);
     $text = admin_social_broadcast_append_fediverse_link($text, $fediverseUrl);
-    $settings = is_array($settings) ? $settings : get_settings();
+    $settings = is_array($settings) ? $settings : admin_social_broadcast_runtime_settings();
     $available = admin_social_broadcast_available_networks($settings);
     $limits = admin_social_broadcast_limits();
     $imageLimits = admin_social_broadcast_network_image_limits();
@@ -679,7 +734,7 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
     $sent = 0;
     $failed = 0;
     $remaining = [];
-    $settings = get_settings();
+    $settings = admin_social_broadcast_runtime_settings();
 
     foreach ($items as $item) {
         if (!is_array($item)) {

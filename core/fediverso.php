@@ -3210,6 +3210,7 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
     $objectActorId = '';
     $objectActorName = '';
     $objectActorIcon = '';
+    $canDeriveThreadUrl = true;
     if ($type === 'announce') {
         $announcedObject = $activity['object'] ?? null;
         $objectId = '';
@@ -3229,8 +3230,24 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
         if ($objectId !== '' && trim((string) ($object['id'] ?? '')) === '') {
             $object['id'] = $objectId;
         }
+        if ($objectId !== '') {
+            $objectHost = parse_url($objectId, PHP_URL_HOST);
+            $localHost = parse_url(nammu_fediverse_base_url($config), PHP_URL_HOST);
+            $objectPath = trim((string) (parse_url($objectId, PHP_URL_PATH) ?? ''));
+            if (
+                is_string($objectHost)
+                && is_string($localHost)
+                && $objectHost !== ''
+                && $localHost !== ''
+                && strcasecmp($objectHost, $localHost) === 0
+                && preg_match('#^/ap/objects/#', $objectPath)
+                && !is_array(nammu_fediverse_find_local_item_for_identifier($objectId, $config))
+            ) {
+                $canDeriveThreadUrl = false;
+            }
+        }
         if (trim((string) ($object['url'] ?? '')) === '' && $objectId !== '') {
-            $object['url'] = nammu_fediverse_remote_thread_page_url($objectId);
+            $object['url'] = $canDeriveThreadUrl ? nammu_fediverse_remote_thread_page_url($objectId) : '';
             if (trim((string) ($object['url'] ?? '')) === '') {
                 $object['url'] = $objectId;
             }
@@ -3258,7 +3275,7 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
     }
     $url = nammu_fediverse_extract_url($object['url'] ?? '');
     if (($url === '' || $url === $objectId) && $objectId !== '') {
-        $threadUrl = nammu_fediverse_remote_thread_page_url($objectId);
+        $threadUrl = $canDeriveThreadUrl ? nammu_fediverse_remote_thread_page_url($objectId) : '';
         if ($threadUrl !== '') {
             $url = $threadUrl;
         }

@@ -5991,6 +5991,9 @@ function nammu_fediverse_store_message(array $message): void
     if ($id === '') {
         return;
     }
+    if (!array_key_exists('visibility', $message) || trim((string) ($message['visibility'] ?? '')) === '') {
+        $message['visibility'] = 'private';
+    }
     foreach ($items as $index => $existing) {
         if ((string) ($existing['id'] ?? '') === $id) {
             $items[$index] = array_merge($existing, $message);
@@ -6007,6 +6010,10 @@ function nammu_fediverse_grouped_messages(): array
     $items = nammu_fediverse_messages_store()['items'];
     $groups = [];
     foreach ($items as $item) {
+        $visibility = strtolower(trim((string) ($item['visibility'] ?? 'private')));
+        if ($visibility === 'public') {
+            continue;
+        }
         $actorId = trim((string) ($item['actor_id'] ?? ''));
         if ($actorId === '') {
             continue;

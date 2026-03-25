@@ -393,6 +393,19 @@ function nammu_detect_bot_name(string $userAgent): string
         'gtmetrix' => 'GTmetrix',
         'pingdom' => 'Pingdom',
         'uptimerobot' => 'UptimeRobot',
+        'gptbot' => 'OpenAI',
+        'chatgpt-user' => 'ChatGPT',
+        'oai-searchbot' => 'OpenAI',
+        'openai' => 'OpenAI',
+        'claudebot' => 'Claude',
+        'anthropic-ai' => 'Claude',
+        'anthropic' => 'Claude',
+        'deepseekbot' => 'DeepSeek',
+        'deepseek' => 'DeepSeek',
+        'perplexitybot' => 'Perplexity',
+        'perplexity' => 'Perplexity',
+        'xai' => 'xAI',
+        'grok' => 'Grok',
     ];
     foreach ($bots as $needle => $label) {
         if (str_contains($ua, $needle)) {

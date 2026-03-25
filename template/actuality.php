@@ -259,6 +259,82 @@ $fediverseUsername = trim((string) ($fediverseUsername ?? ''));
 if ($fediverseUsername === '') {
     $fediverseUsername = trim((string) (explode('.', strtolower((string) parse_url((string) ($baseUrl ?? ''), PHP_URL_HOST)))[0] ?? 'blog'));
 }
+$defaultDescription = '';
+if (function_exists('nammu_social_settings')) {
+    $socialSettings = nammu_social_settings();
+    $defaultDescription = trim((string) ($socialSettings['default_description'] ?? ''));
+}
+$headerConfig = is_array($homeSettings['header'] ?? null) ? $homeSettings['header'] : [];
+$headerTypes = ['none', 'graphic', 'text', 'mixed'];
+$headerType = in_array($headerConfig['type'] ?? 'none', $headerTypes, true) ? $headerConfig['type'] : 'none';
+$headerMode = in_array($headerConfig['mode'] ?? 'contain', ['contain', 'cover'], true) ? $headerConfig['mode'] : 'contain';
+$textHeaderStyle = $headerConfig['text_style'] ?? 'boxed';
+if (!in_array($textHeaderStyle, ['boxed', 'plain'], true)) {
+    $textHeaderStyle = 'boxed';
+}
+$headerOrder = $headerConfig['order'] ?? 'image-text';
+if (!in_array($headerOrder, ['image-text', 'text-image'], true)) {
+    $headerOrder = 'image-text';
+}
+$headerImageUrl = null;
+$headerImage = trim((string) ($headerConfig['image'] ?? ''));
+if ($headerImage !== '' && function_exists('nammu_resolve_asset')) {
+    $resolvedImage = nammu_resolve_asset($headerImage, (string) ($baseUrl ?? '/'));
+    if (is_string($resolvedImage) && $resolvedImage !== '') {
+        $headerImageUrl = $resolvedImage;
+    }
+}
+$hasHeaderImage = $headerImageUrl !== null;
+$homeBrandTitle = trim((string) ($theme['author'] ?? ''));
+$homeHeroTitle = trim((string) ($theme['blog'] ?? ($siteTitle ?? '')));
+$homeHeroTagline = $defaultDescription !== '' ? $defaultDescription : trim((string) ($siteDescription ?? ''));
+$profileHost = trim((string) preg_replace('#^https?://#i', '', rtrim((string) ($baseUrl ?? ''), '/')));
+$profileFediverseHandle = '@' . $fediverseUsername . ($profileHost !== '' ? '@' . $profileHost : '');
+$hasTextHeaderContent = ($homeBrandTitle !== '' || $homeHeroTitle !== '' || $homeHeroTagline !== '' || $profileFediverseHandle !== '@');
+if ($headerType === 'mixed' && !$hasHeaderImage && !$hasTextHeaderContent) {
+    $headerType = 'none';
+} elseif ($headerType === 'mixed' && !$hasHeaderImage) {
+    $headerType = 'text';
+} elseif ($headerType === 'mixed' && !$hasTextHeaderContent) {
+    $headerType = 'graphic';
+}
+if ($headerType === 'graphic' && !$hasHeaderImage) {
+    $headerType = 'none';
+}
+if (($headerType === 'text' || $headerType === 'mixed') && !$hasTextHeaderContent) {
+    if ($headerType === 'mixed' && $hasHeaderImage) {
+        $headerType = 'graphic';
+    } else {
+        $headerType = 'none';
+    }
+}
+$mixedBoxedHeader = $headerType === 'mixed' && $textHeaderStyle === 'boxed';
+$mixedHasImage = $headerType === 'mixed' && $hasHeaderImage;
+$mixedBoxedFullWidth = $mixedBoxedHeader && $headerMode === 'cover';
+$renderProfileHeroText = static function () use ($homeBrandTitle, $homeHeroTitle, $homeHeroTagline, $profileFediverseHandle): void {
+    if ($homeBrandTitle !== '') {
+        ?>
+        <div class="home-brand">
+            <span class="home-brand-title"><?= htmlspecialchars($homeBrandTitle, ENT_QUOTES, 'UTF-8') ?></span>
+        </div>
+        <?php
+    }
+    if ($homeHeroTitle !== '') {
+        ?>
+        <h1><?= htmlspecialchars($homeHeroTitle, ENT_QUOTES, 'UTF-8') ?></h1>
+        <?php
+    }
+    if ($profileFediverseHandle !== '@') {
+        ?>
+        <p class="home-hero-profile-handle"><?= htmlspecialchars($profileFediverseHandle, ENT_QUOTES, 'UTF-8') ?></p>
+        <?php
+    }
+    if ($homeHeroTagline !== '') {
+        ?>
+        <p class="home-hero-tagline"><?= htmlspecialchars($homeHeroTagline, ENT_QUOTES, 'UTF-8') ?></p>
+        <?php
+    }
+};
 $manualDisplayText = static function (array $item): string {
     $rawText = trim((string) ($item['raw_text'] ?? ''));
     if ($rawText !== '') {
@@ -277,19 +353,69 @@ $manualDisplayText = static function (array $item): string {
     return trim((string) ($item['title'] ?? ''));
 };
 ?>
-<section class="actuality-hero">
-    <div class="actuality-hero-inner">
-        <h1><?= htmlspecialchars((string) ($siteTitle ?? 'Fediverso'), ENT_QUOTES, 'UTF-8') ?></h1>
-        <p>
-            <?php if ($hasActuality || !empty($items)): ?>
-                Página de perfil de @<?= htmlspecialchars($fediverseUsername, ENT_QUOTES, 'UTF-8') ?>@<?= htmlspecialchars((string) preg_replace('#^https?://#i', '', rtrim((string) ($baseUrl ?? ''), '/')), ENT_QUOTES, 'UTF-8') ?>
-            <?php else: ?>
-                No hay feeds automáticas configuradas todavía.
+<?php if ($headerType === 'graphic' && $headerImageUrl): ?>
+    <section class="home-hero home-hero-graphic mode-<?= htmlspecialchars($headerMode, ENT_QUOTES, 'UTF-8') ?>">
+        <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio" decoding="async" fetchpriority="high">
+    </section>
+<?php elseif ($headerType === 'mixed'): ?>
+    <?php
+    $mixedLayoutClass = $mixedBoxedHeader ? 'mixed-boxed' : 'mixed-split';
+    $mixedOrderClass = 'order-' . $headerOrder;
+    $mixedSectionClasses = trim($mixedLayoutClass . ' ' . $mixedOrderClass);
+    $textClassParts = [
+        'home-hero-text',
+        'variant-' . $textHeaderStyle,
+    ];
+    if ($mixedBoxedHeader && $mixedHasImage) {
+        $textClassParts[] = 'mixed-has-image';
+    }
+    if ($mixedBoxedFullWidth) {
+        $textClassParts[] = 'full-width';
+    }
+    $textClasses = implode(' ', $textClassParts);
+    ?>
+    <section class="home-hero home-hero-mixed <?= htmlspecialchars($mixedSectionClasses, ENT_QUOTES, 'UTF-8') ?>">
+        <?php if ($mixedBoxedHeader): ?>
+            <div class="<?= htmlspecialchars($textClasses, ENT_QUOTES, 'UTF-8') ?>">
+                <?php if ($headerOrder === 'image-text' && $hasHeaderImage): ?>
+                    <?php $insideGraphicClass = 'home-hero-graphic inside mode-' . $headerMode . ($mixedBoxedFullWidth ? ' full' : ''); ?>
+                    <div class="<?= htmlspecialchars($insideGraphicClass, ENT_QUOTES, 'UTF-8') ?>">
+                        <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio" decoding="async" fetchpriority="high">
+                    </div>
+                <?php endif; ?>
+                <?php $renderProfileHeroText(); ?>
+                <?php if ($headerOrder === 'text-image' && $hasHeaderImage): ?>
+                    <?php $insideGraphicClass = 'home-hero-graphic inside mode-' . $headerMode . ($mixedBoxedFullWidth ? ' full' : ''); ?>
+                    <div class="<?= htmlspecialchars($insideGraphicClass, ENT_QUOTES, 'UTF-8') ?>">
+                        <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio" decoding="async" fetchpriority="high">
+                    </div>
+                <?php endif; ?>
+            </div>
+        <?php else: ?>
+            <?php if ($headerOrder === 'image-text' && $hasHeaderImage): ?>
+                <div class="home-hero-graphic mode-<?= htmlspecialchars($headerMode, ENT_QUOTES, 'UTF-8') ?> full">
+                    <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio" decoding="async" fetchpriority="high">
+                </div>
             <?php endif; ?>
-        </p>
-        <?= $headerButtonsHtml ?>
-    </div>
-</section>
+            <div class="<?= htmlspecialchars($textClasses, ENT_QUOTES, 'UTF-8') ?>">
+                <?php $renderProfileHeroText(); ?>
+            </div>
+            <?php if ($headerOrder === 'text-image' && $hasHeaderImage): ?>
+                <div class="home-hero-graphic mode-<?= htmlspecialchars($headerMode, ENT_QUOTES, 'UTF-8') ?> full">
+                    <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio" decoding="async" fetchpriority="high">
+                </div>
+            <?php endif; ?>
+        <?php endif; ?>
+    </section>
+<?php elseif ($headerType === 'text'): ?>
+    <section class="home-hero home-hero-text variant-<?= htmlspecialchars($textHeaderStyle, ENT_QUOTES, 'UTF-8') ?>">
+        <?php $renderProfileHeroText(); ?>
+    </section>
+<?php endif; ?>
+
+<?php if ($showHeaderButtons): ?>
+    <?= $headerButtonsHtml ?>
+<?php endif; ?>
 
 <?php if (empty($items)): ?>
     <section class="actuality-empty">
@@ -301,7 +427,6 @@ $manualDisplayText = static function (array $item): string {
         <?php $singleItem = count($group['items']) === 1 ? $group['items'][0] : null; ?>
         <?php $singleItemIsManual = is_array($singleItem) && !empty($singleItem['is_manual']); ?>
         <section class="actuality-day">
-            <h2 class="actuality-day-heading"><?= htmlspecialchars((string) $group['label'], ENT_QUOTES, 'UTF-8') ?></h2>
             <div class="actuality-grid<?= (count($group['items']) === 1 && !$singleItemIsManual) ? ' is-single-item' : '' ?>">
                 <?php if (count($group['items']) === 1 && !$singleItemIsManual): ?>
                     <?php $item = $group['items'][0]; ?>
@@ -453,25 +578,127 @@ $manualDisplayText = static function (array $item): string {
 <?php endif; ?>
 
 <style>
-    .actuality-hero {
-        margin-bottom: 2rem;
+    .home-hero {
+        margin-bottom: 0;
     }
-    .actuality-hero-inner {
-        background: <?= $actualityHeroBackgroundEsc !== '' ? "linear-gradient(rgba(0,0,0,0.48), rgba(0,0,0,0.48)), url('{$actualityHeroBackgroundEsc}')" : $highlight ?>;
-        background-size: cover;
-        background-position: center;
+    .home-hero-graphic {
+        min-height: 160px;
         border-radius: var(--nammu-radius-lg);
-        padding: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    .home-hero-graphic.full {
+        width: 100%;
+    }
+    .home-hero-graphic.full img {
+        width: 100%;
+    }
+    .home-hero-graphic img {
+        display: block;
+        border-radius: inherit;
+    }
+    .home-hero-graphic.mode-contain img {
+        max-height: 160px;
+        width: auto;
+        max-width: 100%;
+    }
+    .home-hero-graphic.mode-cover img {
+        width: 100%;
+        height: 160px;
+        object-fit: cover;
+    }
+    .home-hero-mixed {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        align-items: stretch;
+        margin-bottom: 0;
+    }
+    .home-hero-mixed.mixed-split .home-hero-graphic {
+        margin: 0 auto;
+        width: 100%;
+        max-width: min(960px, 100%);
+    }
+    .home-hero-mixed .home-hero-text {
+        width: 100%;
+    }
+    .home-hero-text {
+        display: grid;
+        gap: 0.75rem;
         text-align: center;
-        border: 1px solid rgba(0,0,0,0.05);
+        border-radius: var(--nammu-radius-lg);
+        padding: 2rem clamp(1.5rem, 4vw, 3rem);
+        border: 1px solid transparent;
+        max-width: min(760px, 100%);
+        margin: 0 auto;
+        box-sizing: border-box;
     }
-    .actuality-hero-inner h1 {
-        margin: 0 0 0.5rem 0;
-        color: <?= $actualityHeroBackgroundEsc !== '' ? '#ffffff' : $h1Color ?>;
+    .home-hero-text.variant-boxed {
+        background: <?= $highlight ?>;
+        border-color: rgba(0,0,0,0.05);
+        overflow: hidden;
     }
-    .actuality-hero-inner p {
-        margin: 0 0 1.25rem 0;
-        color: <?= $actualityHeroBackgroundEsc !== '' ? 'rgba(255,255,255,0.92)' : $textColor ?>;
+    .home-hero-text.variant-plain {
+        background: transparent;
+        border: none;
+        padding: 0 clamp(1.5rem, 4vw, 3rem) 0.25rem;
+    }
+    .home-hero-text.variant-boxed .home-hero-graphic {
+        border-radius: 0;
+    }
+    .home-hero-text.mixed-has-image {
+        gap: 1.25rem;
+    }
+    .home-hero-text.mixed-has-image .home-hero-graphic {
+        margin: 0;
+        width: 100%;
+    }
+    .home-hero-text.mixed-has-image .home-hero-graphic img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+    }
+    .home-hero-text.full-width {
+        max-width: none;
+        width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .home-brand {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        justify-content: center;
+        align-items: center;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 0.85rem;
+        color: <?= $brandColor ?>;
+    }
+    .home-brand-title {
+        font-weight: 700;
+    }
+    .home-hero-text h1 {
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 3rem);
+        line-height: 1.1;
+        color: <?= $h1Color ?>;
+    }
+    .home-hero-tagline {
+        margin: 0;
+        font-size: 1.05rem;
+        color: <?= $brandColor ?>;
+        max-width: 720px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .home-hero-profile-handle {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 700;
+        color: <?= $accentColor ?>;
     }
     .actuality-grid {
         display: grid;
@@ -492,12 +719,6 @@ $manualDisplayText = static function (array $item): string {
     }
     .actuality-card--full {
         width: 100%;
-    }
-    .actuality-day-heading {
-        margin: 0 0 1.1rem 0;
-        text-align: center;
-        color: <?= $brandColor ?>;
-        font-size: clamp(1.2rem, 2.5vw, 1.5rem);
     }
     .actuality-card {
         background: #fff;

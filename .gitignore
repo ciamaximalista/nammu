@@ -33,6 +33,10 @@ config/fediverso-*.json
 config/fediverso-hidden-replies.json
 config/fediverso-blocked.json
 config/activitypub-keys.json
+# Artefactos generados de Webmention
+config/webmentions.json
+config/webmention-queue.json
+config/webmention-state.json
 # Locks y estados de runtime
 config/*.lock
 indexnow-*.txt

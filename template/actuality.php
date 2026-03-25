@@ -286,12 +286,12 @@ if ($headerImage !== '' && function_exists('nammu_resolve_asset')) {
     }
 }
 $hasHeaderImage = $headerImageUrl !== null;
-$homeBrandTitle = trim((string) ($theme['author'] ?? ''));
-$homeHeroTitle = trim((string) ($theme['blog'] ?? ($siteTitle ?? '')));
-$homeHeroTagline = $defaultDescription !== '' ? $defaultDescription : trim((string) ($siteDescription ?? ''));
 $profileHost = trim((string) preg_replace('#^https?://#i', '', rtrim((string) ($baseUrl ?? ''), '/')));
 $profileFediverseHandle = '@' . $fediverseUsername . ($profileHost !== '' ? '@' . $profileHost : '');
-$hasTextHeaderContent = ($homeBrandTitle !== '' || $homeHeroTitle !== '' || $homeHeroTagline !== '' || $profileFediverseHandle !== '@');
+$homeBrandTitle = $profileFediverseHandle;
+$homeHeroTitle = trim((string) ($theme['blog'] ?? ($siteTitle ?? '')));
+$homeHeroTagline = $defaultDescription !== '' ? $defaultDescription : trim((string) ($siteDescription ?? ''));
+$hasTextHeaderContent = ($homeBrandTitle !== '' || $homeHeroTitle !== '' || $homeHeroTagline !== '');
 if ($headerType === 'mixed' && !$hasHeaderImage && !$hasTextHeaderContent) {
     $headerType = 'none';
 } elseif ($headerType === 'mixed' && !$hasHeaderImage) {
@@ -312,7 +312,7 @@ if (($headerType === 'text' || $headerType === 'mixed') && !$hasTextHeaderConten
 $mixedBoxedHeader = $headerType === 'mixed' && $textHeaderStyle === 'boxed';
 $mixedHasImage = $headerType === 'mixed' && $hasHeaderImage;
 $mixedBoxedFullWidth = $mixedBoxedHeader && $headerMode === 'cover';
-$renderProfileHeroText = static function () use ($homeBrandTitle, $homeHeroTitle, $homeHeroTagline, $profileFediverseHandle): void {
+$renderProfileHeroText = static function () use ($homeBrandTitle, $homeHeroTitle, $homeHeroTagline): void {
     if ($homeBrandTitle !== '') {
         ?>
         <div class="home-brand">
@@ -323,11 +323,6 @@ $renderProfileHeroText = static function () use ($homeBrandTitle, $homeHeroTitle
     if ($homeHeroTitle !== '') {
         ?>
         <h1><?= htmlspecialchars($homeHeroTitle, ENT_QUOTES, 'UTF-8') ?></h1>
-        <?php
-    }
-    if ($profileFediverseHandle !== '@') {
-        ?>
-        <p class="home-hero-profile-handle"><?= htmlspecialchars($profileFediverseHandle, ENT_QUOTES, 'UTF-8') ?></p>
         <?php
     }
     if ($homeHeroTagline !== '') {

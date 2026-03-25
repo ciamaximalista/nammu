@@ -432,8 +432,9 @@ $manualDisplayText = static function (array $item): string {
                     <?php $item = $group['items'][0]; ?>
                     <?php $isManual = !empty($item['is_manual']); ?>
                     <?php $isSiteContent = !empty($item['is_site_content']); ?>
+                    <?php $siteContentTypeClass = $isSiteContent ? ' actuality-card--type-' . preg_replace('/[^a-z0-9_-]/i', '', strtolower((string) ($item['site_content_type'] ?? 'post'))) : ''; ?>
                     <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
-                    <article class="actuality-card actuality-card--full<?= $isManual ? ' actuality-card--manual' : '' ?><?= strtolower(trim((string) ($item['via'] ?? ''))) === 'boost' ? ' actuality-card--boost' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                    <article class="actuality-card actuality-card--full<?= $isManual ? ' actuality-card--manual' : '' ?><?= strtolower(trim((string) ($item['via'] ?? ''))) === 'boost' ? ' actuality-card--boost' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?><?= $siteContentTypeClass ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                         <?php if ($isManual): ?>
                             <?php $boostHeaderHtml = $renderBoostHeader($item); ?>
                             <?php if ($boostHeaderHtml !== ''): ?>
@@ -472,9 +473,10 @@ $manualDisplayText = static function (array $item): string {
                     <?php foreach ($leftColumnItems as $item): ?>
                         <?php $isManual = !empty($item['is_manual']); ?>
                         <?php $isSiteContent = !empty($item['is_site_content']); ?>
+                        <?php $siteContentTypeClass = $isSiteContent ? ' actuality-card--type-' . preg_replace('/[^a-z0-9_-]/i', '', strtolower((string) ($item['site_content_type'] ?? 'post'))) : ''; ?>
                         <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
                         <?php $manualBody = $isManual ? $manualDisplayText($item) : ''; ?>
-                        <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?><?= strtolower(trim((string) ($item['via'] ?? ''))) === 'boost' ? ' actuality-card--boost' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                        <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?><?= strtolower(trim((string) ($item['via'] ?? ''))) === 'boost' ? ' actuality-card--boost' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?><?= $siteContentTypeClass ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                             <?php if ($isManual): ?>
                                 <?php $boostHeaderHtml = $renderBoostHeader($item); ?>
                                 <?php if ($boostHeaderHtml !== ''): ?>
@@ -515,9 +517,10 @@ $manualDisplayText = static function (array $item): string {
                     <?php foreach ($rightColumnItems as $item): ?>
                         <?php $isManual = !empty($item['is_manual']); ?>
                         <?php $isSiteContent = !empty($item['is_site_content']); ?>
+                        <?php $siteContentTypeClass = $isSiteContent ? ' actuality-card--type-' . preg_replace('/[^a-z0-9_-]/i', '', strtolower((string) ($item['site_content_type'] ?? 'post'))) : ''; ?>
                         <?php $articleId = $isManual && !empty($item['id']) ? 'manual-' . preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $item['id']) : ''; ?>
                         <?php $manualBody = $isManual ? $manualDisplayText($item) : ''; ?>
-                        <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?><?= strtolower(trim((string) ($item['via'] ?? ''))) === 'boost' ? ' actuality-card--boost' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                        <article class="actuality-card<?= $isManual ? ' actuality-card--manual' : '' ?><?= strtolower(trim((string) ($item['via'] ?? ''))) === 'boost' ? ' actuality-card--boost' : '' ?><?= $isSiteContent ? ' actuality-card--site' : '' ?><?= $siteContentTypeClass ?>"<?= $articleId !== '' ? ' id="' . htmlspecialchars($articleId, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                             <?php if ($isManual): ?>
                                 <?php $boostHeaderHtml = $renderBoostHeader($item); ?>
                                 <?php if ($boostHeaderHtml !== ''): ?>
@@ -708,6 +711,10 @@ $manualDisplayText = static function (array $item): string {
     .actuality-day {
         margin-bottom: 2rem;
     }
+    .actuality-day + .actuality-day {
+        border-top: 2px dashed rgba(0, 0, 0, 0.14);
+        padding-top: 2rem;
+    }
     .actuality-column {
         display: flex;
         flex-direction: column;
@@ -830,6 +837,10 @@ $manualDisplayText = static function (array $item): string {
         color: <?= $headingSecondaryColor ?>;
         text-decoration: none;
         transition: color 0.2s ease;
+    }
+    .actuality-grid.is-single-item .actuality-card--site.actuality-card--type-post h3 {
+        font-size: clamp(2rem, 5vw, 3rem);
+        line-height: 1.1;
     }
     .actuality-card--site .actuality-image-link {
         background: transparent;

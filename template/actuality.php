@@ -185,6 +185,7 @@ foreach ($items as $item) {
     if (!isset($groupedItems[$groupKey])) {
         $groupedItems[$groupKey] = [
             'label' => $timestamp > 0 ? $formatDate($timestamp) : 'Sin fecha',
+            'short_label' => $timestamp > 0 ? date('d/m/Y', $timestamp) : '',
             'items' => [],
         ];
     }
@@ -427,6 +428,11 @@ $manualDisplayText = static function (array $item): string {
         <?php $singleItem = count($group['items']) === 1 ? $group['items'][0] : null; ?>
         <?php $singleItemIsManual = is_array($singleItem) && !empty($singleItem['is_manual']); ?>
         <section class="actuality-day">
+            <?php if (!empty($group['short_label'])): ?>
+                <div class="actuality-day-divider" aria-hidden="true">
+                    <span><?= htmlspecialchars((string) $group['short_label'], ENT_QUOTES, 'UTF-8') ?></span>
+                </div>
+            <?php endif; ?>
             <div class="actuality-grid<?= (count($group['items']) === 1 && !$singleItemIsManual) ? ' is-single-item' : '' ?>">
                 <?php if (count($group['items']) === 1 && !$singleItemIsManual): ?>
                     <?php $item = $group['items'][0]; ?>
@@ -712,8 +718,29 @@ $manualDisplayText = static function (array $item): string {
         margin-bottom: 2rem;
     }
     .actuality-day + .actuality-day {
-        border-top: 2px dashed rgba(0, 0, 0, 0.14);
         padding-top: 2rem;
+    }
+    .actuality-day-divider {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        margin: 0 0 1.2rem 0;
+        color: rgba(0, 0, 0, 0.14);
+    }
+    .actuality-day-divider::before {
+        content: "";
+        flex: 1;
+        border-top: 2px dashed currentColor;
+    }
+    .actuality-day-divider span {
+        flex: 0 0 auto;
+        font-size: 0.78rem;
+        line-height: 1;
+        letter-spacing: 0.04em;
+        color: currentColor;
+    }
+    .actuality-day:first-of-type .actuality-day-divider {
+        display: none;
     }
     .actuality-column {
         display: flex;
@@ -839,8 +866,8 @@ $manualDisplayText = static function (array $item): string {
         transition: color 0.2s ease;
     }
     .actuality-grid.is-single-item .actuality-card--site.actuality-card--type-post h3 {
-        font-size: clamp(2rem, 5vw, 3rem);
-        line-height: 1.1;
+        font-size: clamp(1.8rem, 3.6vw, 2.4rem);
+        line-height: 1.15;
     }
     .actuality-card--site .actuality-image-link {
         background: transparent;

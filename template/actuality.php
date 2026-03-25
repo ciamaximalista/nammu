@@ -423,12 +423,12 @@ $manualDisplayText = static function (array $item): string {
         <p>Cuando configures feeds RSS automáticas o añadas notas manuales desde Redes, aquí aparecerán sus novedades agregadas.</p>
     </section>
 <?php else: ?>
-    <?php foreach ($groupedItems as $group): ?>
+    <?php foreach (array_values($groupedItems) as $groupIndex => $group): ?>
         <?php [$leftColumnItems, $rightColumnItems] = $splitColumns($group['items']); ?>
         <?php $singleItem = count($group['items']) === 1 ? $group['items'][0] : null; ?>
         <?php $singleItemIsManual = is_array($singleItem) && !empty($singleItem['is_manual']); ?>
         <section class="actuality-day">
-            <?php if (!empty($group['short_label'])): ?>
+            <?php if ($groupIndex > 0 && !empty($group['short_label'])): ?>
                 <div class="actuality-day-divider" aria-hidden="true">
                     <span><?= htmlspecialchars((string) $group['short_label'], ENT_QUOTES, 'UTF-8') ?></span>
                 </div>
@@ -738,9 +738,6 @@ $manualDisplayText = static function (array $item): string {
         line-height: 1;
         letter-spacing: 0.04em;
         color: currentColor;
-    }
-    .actuality-day:first-of-type .actuality-day-divider {
-        display: none;
     }
     .actuality-column {
         display: flex;

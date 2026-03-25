@@ -3267,6 +3267,7 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
     }
     $objectActorId = '';
     $objectActorName = '';
+    $objectActorUsername = '';
     $objectActorIcon = '';
     $canDeriveThreadUrl = true;
     if ($type === 'announce') {
@@ -3322,6 +3323,7 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
             $objectActor = nammu_fediverse_resolve_actor($objectActorId, $config);
             if (is_array($objectActor)) {
                 $objectActorName = trim((string) (($objectActor['name'] ?? '') ?: ($objectActor['preferredUsername'] ?? '') ?: $objectActorId));
+                $objectActorUsername = trim((string) ($objectActor['preferredUsername'] ?? ''));
                 $objectActorIcon = trim((string) ($objectActor['icon'] ?? ''));
             }
         }
@@ -3419,6 +3421,7 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
         'actor_icon' => trim((string) ($actor['icon'] ?? '')),
         'target_actor_id' => $objectActorId !== '' ? $objectActorId : (string) ($actor['id'] ?? ''),
         'target_actor_name' => $objectActorName !== '' ? $objectActorName : trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? ''))),
+        'target_actor_username' => $objectActorUsername !== '' ? $objectActorUsername : trim((string) ($actor['preferredUsername'] ?? '')),
         'target_actor_icon' => $objectActorIcon !== '' ? $objectActorIcon : trim((string) ($actor['icon'] ?? '')),
     ];
 }

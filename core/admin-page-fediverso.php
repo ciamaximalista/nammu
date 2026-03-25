@@ -992,6 +992,21 @@
                                     $displayActorIcon = trim((string) (($item['target_actor_icon'] ?? '') ?: $displayActorIcon));
                                     $displayActorId = trim((string) (($item['object_actor_id'] ?? '') ?: ($item['target_actor_id'] ?? '') ?: $displayActorId));
                                     $displayActorUsername = trim((string) (($item['target_actor_username'] ?? '') ?: $displayActorUsername));
+                                    if ($displayActorUsername === '' && $displayActorId !== '') {
+                                        $displayActorPath = trim((string) (parse_url($displayActorId, PHP_URL_PATH) ?? ''));
+                                        if ($displayActorPath !== '') {
+                                            if (preg_match('#/@([^/@]+)(?:@[^/]+)?/?$#', $displayActorPath, $matches) === 1) {
+                                                $displayActorUsername = trim((string) ($matches[1] ?? ''));
+                                            } elseif (preg_match('#/(?:users|accounts)/([^/]+)/?$#', $displayActorPath, $matches) === 1) {
+                                                $displayActorUsername = trim((string) ($matches[1] ?? ''));
+                                            } else {
+                                                $displayActorBasename = basename($displayActorPath);
+                                                if ($displayActorBasename !== '' && $displayActorBasename !== 'actor') {
+                                                    $displayActorUsername = trim((string) $displayActorBasename);
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 $displayActorHandle = $fediverseHandle([
                                     'actor_id' => $displayActorId,

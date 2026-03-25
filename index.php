@@ -10,6 +10,7 @@ require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
 require_once __DIR__ . '/core/actualidad.php';
 require_once __DIR__ . '/core/fediverso.php';
+require_once __DIR__ . '/core/webmention.php';
 
 use Nammu\Core\ContentRepository;
 use Nammu\Core\Itinerary;
@@ -41,6 +42,24 @@ if (preg_match('/^\/indexnow-([a-f0-9]+)\.txt$/i', $requestPath, $match)) {
         echo $key;
         exit;
     }
+}
+
+if ($requestPath === '/webmention') {
+    $config = nammu_load_config();
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+        $result = nammu_webmention_receive((string) ($_POST['source'] ?? ''), (string) ($_POST['target'] ?? ''), $config);
+        http_response_code((int) ($result['status'] ?? 202));
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode([
+            'ok' => (bool) ($result['ok'] ?? false),
+            'message' => (string) ($result['message'] ?? ''),
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    header('Content-Type: text/plain; charset=UTF-8');
+    echo "Endpoint Webmention de Nammu\n";
+    echo 'POST source=...&target=...' . "\n";
+    exit;
 }
 
 if (session_status() !== PHP_SESSION_ACTIVE) {

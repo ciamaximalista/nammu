@@ -2231,6 +2231,9 @@ function nammu_fediverse_store_files_for_tab(string $tab): array
             nammu_fediverse_followers_file(),
             nammu_fediverse_hidden_replies_file(),
         ],
+        'mentions' => [
+            dirname(__DIR__) . '/config/webmentions.json',
+        ],
         'network' => [
             nammu_fediverse_following_file(),
             nammu_fediverse_followers_file(),

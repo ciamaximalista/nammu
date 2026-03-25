@@ -85,6 +85,10 @@ $hasActuality = function_exists('nammu_actuality_has_content') ? nammu_actuality
 $actualityUrl = rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/actualidad.php';
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
 $currentUrl = ($baseUrl ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
+$webmentionTargetUrl = strtok((string) $currentUrl, '?') ?: (string) $currentUrl;
+$webmentionMentions = function_exists('nammu_webmention_mentions_for_target')
+    ? nammu_webmention_mentions_for_target($webmentionTargetUrl)
+    : [];
 $subscriptionSuccess = isset($_GET['subscribed']) && $_GET['subscribed'] === '1';
 $subscriptionSent = isset($_GET['sub_sent']) && $_GET['sub_sent'] === '1';
 $subscriptionError = isset($_GET['sub_error']) && $_GET['sub_error'] === '1';
@@ -501,6 +505,35 @@ if ($isPageTemplate && $formattedDate !== '') {
                 <?php endif; ?>
             </div>
         <?php endif; ?>
+        <?php if (!empty($webmentionMentions)): ?>
+            <div class="fediverse-object-cta" aria-label="Menciones en otros blogs">
+                <div class="post-related-heading fediverse-object-heading">
+                    <span class="fediverse-object-cta-label">Menciones en otros blogs</span>
+                </div>
+                <div class="fediverse-inline-metrics">
+                    <?php foreach ($webmentionMentions as $mention): ?>
+                        <?php
+                        $mentionBlogName = trim((string) (($mention['blog_name'] ?? '') ?: ((string) (parse_url((string) ($mention['source'] ?? ''), PHP_URL_HOST) ?? ''))));
+                        $mentionBlogIcon = trim((string) ($mention['blog_icon'] ?? ''));
+                        $mentionSourceUrl = trim((string) ($mention['source'] ?? ''));
+                        if ($mentionSourceUrl === '') {
+                            continue;
+                        }
+                        ?>
+                        <div class="fediverse-inline-metric-group fediverse-inline-metric-group--mention">
+                            <a class="fediverse-inline-metric-label fediverse-inline-metric-label--mention" href="<?= htmlspecialchars($mentionSourceUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                <?php if ($mentionBlogIcon !== ''): ?>
+                                    <span class="fediverse-inline-mention-icon"><img src="<?= htmlspecialchars($mentionBlogIcon, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($mentionBlogName, ENT_QUOTES, 'UTF-8') ?>" loading="lazy"></span>
+                                <?php else: ?>
+                                    <span class="fediverse-inline-mention-fallback"><?= htmlspecialchars(mb_substr($mentionBlogName !== '' ? $mentionBlogName : 'B', 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></span>
+                                <?php endif; ?>
+                                <span><?= htmlspecialchars($mentionBlogName !== '' ? $mentionBlogName : 'Blog externo', ENT_QUOTES, 'UTF-8') ?></span>
+                            </a>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
         <?php if (!empty($relatedPosts)): ?>
             <section class="post-related" aria-label="Entradas o itinerarios relacionados">
                 <div class="post-related-heading">Descubre ahora</div>
@@ -624,6 +657,15 @@ if ($isPageTemplate && $formattedDate !== '') {
     .fediverse-inline-metric-label:hover {
         text-decoration: underline;
     }
+    .fediverse-inline-metric-group--mention {
+        padding-left: .45rem;
+        padding-right: .8rem;
+    }
+    .fediverse-inline-metric-label--mention {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+    }
     .fediverse-inline-metric-label--cta {
         display: inline-flex;
         align-items: center;
@@ -682,6 +724,27 @@ if ($isPageTemplate && $formattedDate !== '') {
         object-fit: cover;
         display: block;
         filter: grayscale(1) brightness(1.18);
+    }
+    .fediverse-inline-mention-icon,
+    .fediverse-inline-mention-fallback {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        overflow: hidden;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #dfe7ef;
+        color: inherit;
+        border: 1px solid rgba(0,0,0,.08);
+        font-weight: 700;
+        flex: 0 0 28px;
+    }
+    .fediverse-inline-mention-icon img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
     }
     .post-body .podcast-video-single {
         width: min(960px, 100%);

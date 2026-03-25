@@ -16,6 +16,7 @@ Nammu combina en una sola instalación:
 - Itinerarios, cursos y colecciones de temas.
 - Perfil del fediverso con notas manuales y agregación de RSS externas.
 - Nodo propio en el Fediverso mediante ActivityPub.
+- Emisión y recepción de Webmention para citas entre blogs.
 - Biblioteca multimedia, buscador, SEO técnico, estadísticas propias y automatización social.
 
 ## Requisitos mínimos
@@ -142,6 +143,7 @@ Esa segunda tarea se encarga de:
 - procesar avisos y colas pendientes,
 - reconstruir `Actualidad`,
 - revisar Nisaba, Telex y otras RSS configuradas,
+- descubrir y enviar Webmentions pendientes,
 - enviar a redes sociales lo encolado,
 - repartir publicaciones federadas pendientes,
 - y procesar borrados/accepts pendientes.
@@ -327,14 +329,16 @@ Nammu no se limita a generar RSS: también convierte cada blog en una cuenta pro
 - Borrar publicaciones locales federadas.
 - Borrar respuestas propias.
 - Ocultar localmente respuestas de terceros en publicaciones propias para que no aparezcan en el blog ni en las páginas públicas del hilo.
+- Enviar y recibir Webmentions cuando un contenido del blog cita o es citado por otros blogs compatibles.
 
 #### Qué ves en el admin
 
-- Módulo **Fediverso** con pestañas de `Inicio`, `Notificaciones`, `Mensajes`, `Red` y `Configuración`.
+- Módulo **Fediverso** con pestañas de `Inicio`, `Notificaciones`, `Mensajes`, `Menciones`, `Red` y `Configuración`.
 - Timeline remoto con publicaciones locales y remotas.
 - Hilos públicos bajo cada publicación cuando hay respuestas.
 - Notificaciones de favoritos, impulsos, follows y otras actividades remotas.
 - Conversaciones públicas y privadas agrupadas por hilo.
+- Listado de Webmentions verificadas recibidas, con opción de borrarlas desde el admin.
 - Gestión de actores seguidos, seguidores y bloqueados.
 - Historial local de favoritos, respuestas, impulsos, reenvíos y borrados hechos desde Nammu.
 
@@ -344,6 +348,7 @@ Nammu no se limita a generar RSS: también convierte cada blog en una cuenta pro
 - Las notas y noticias de `Actualidad` pueden entrar en la salida ActivityPub del sitio como contenido federable.
 - Los contenidos federados visibles en esa página pueden enlazar a su página pública de hilo correspondiente.
 - El perfil público puede funcionar como página de presentación del blog dentro del fediverso, no solo como agregador de noticias.
+- Las Webmentions salientes usan como `source` la URL propia de la pieza en entradas, podcast e itinerarios, y la página pública del objeto Fediverso en noticias y notas de `Actualidad`.
 
 #### Feeds asociados al Fediverso
 
@@ -355,9 +360,18 @@ Nammu no se limita a generar RSS: también convierte cada blog en una cuenta pro
 
 - El cron integrado refresca periódicamente actores seguidos y actividades remotas.
 - Ese mismo cron reparte a seguidores federados las nuevas publicaciones locales que aún no se hayan entregado.
+- La fase `maintenance` descubre enlaces salientes en contenidos publicados, encola Webmentions y procesa su envío sin bloquear la petición web.
 - El admin puede separar refrescos ligeros y recalculado de hilos para evitar operaciones pesadas en una sola petición.
 - Parte del estado del Fediverso se guarda en stores locales para acelerar timeline, mensajes y notificaciones.
 - `llms.txt` sigue disponible como archivo adicional para consumo por modelos de lenguaje.
+
+#### Webmention
+
+- Nammu expone un endpoint estándar `POST /webmention`.
+- Publicita ese endpoint en el `<head>` y por cabecera HTTP `Link` para facilitar discovery automático.
+- Verifica menciones entrantes comprobando que la `source` enlaza realmente a una URL local.
+- Guarda las menciones verificadas en `config/webmentions.json`.
+- Puede mostrar esas menciones bajo las entradas del blog como bloque `Menciones en otros blogs`.
 
 ### 7. Itinerarios y formación
 

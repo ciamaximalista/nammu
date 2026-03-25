@@ -14,6 +14,7 @@ require_once __DIR__ . '/core/postal.php';
 require_once __DIR__ . '/core/admin-nisaba.php';
 require_once __DIR__ . '/core/admin-telex.php';
 require_once __DIR__ . '/core/admin-ideas.php';
+require_once __DIR__ . '/core/webmention.php';
 
 // Load dependencies (optional)
 $autoload = __DIR__ . '/vendor/autoload.php';
@@ -123,6 +124,8 @@ function admin_run_scheduled_maintenance_tasks(): array {
         : ['processed' => 0, 'remaining' => 0];
     $rssStats = ['sent' => 0, 'checked' => 0];
     $socialBroadcastQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
+    $webmentionSyncStats = ['scanned' => 0, 'enqueued' => 0, 'remaining' => 0];
+    $webmentionQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $fediverseDeleteQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $fediverseUndoAnnounceQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $fediverseAnnounceQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
@@ -154,6 +157,12 @@ function admin_run_scheduled_maintenance_tasks(): array {
     }
     if (function_exists('admin_process_social_broadcast_queue')) {
         $socialBroadcastQueueStats = admin_process_social_broadcast_queue(1);
+    }
+    if (function_exists('nammu_webmention_sync_sources')) {
+        $webmentionSyncStats = nammu_webmention_sync_sources($config, 4);
+    }
+    if (function_exists('nammu_webmention_process_queue')) {
+        $webmentionQueueStats = nammu_webmention_process_queue($config, 4);
     }
     if (function_exists('nammu_fediverse_process_delete_queue')) {
         $fediverseDeleteQueueStats = nammu_fediverse_process_delete_queue($config, 2);
@@ -193,6 +202,12 @@ function admin_run_scheduled_maintenance_tasks(): array {
         'social_broadcast_queue_sent' => (int) ($socialBroadcastQueueStats['sent'] ?? 0),
         'social_broadcast_queue_failed' => (int) ($socialBroadcastQueueStats['failed'] ?? 0),
         'social_broadcast_queue_remaining' => (int) ($socialBroadcastQueueStats['remaining'] ?? 0),
+        'webmention_scanned' => (int) ($webmentionSyncStats['scanned'] ?? 0),
+        'webmention_enqueued' => (int) ($webmentionSyncStats['enqueued'] ?? 0),
+        'webmention_queue_processed' => (int) ($webmentionQueueStats['processed'] ?? 0),
+        'webmention_queue_sent' => (int) ($webmentionQueueStats['sent'] ?? 0),
+        'webmention_queue_failed' => (int) ($webmentionQueueStats['failed'] ?? 0),
+        'webmention_queue_remaining' => (int) (($webmentionQueueStats['remaining'] ?? 0) ?: ($webmentionSyncStats['remaining'] ?? 0)),
         'fediverse_checked' => 0,
         'fediverse_new' => 0,
         'fediverse_followers' => (int) ($deliveryStats['followers'] ?? 0),
@@ -10975,6 +10990,17 @@ if ($isLoggedIn && $page === 'fediverso') {
             'message' => (string) ($result['message'] ?? ''),
         ];
         $fediverseRedirect = true;
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_webmention'])) {
+        $signature = trim((string) ($_POST['webmention_signature'] ?? ''));
+        $deleted = function_exists('nammu_webmention_delete') ? nammu_webmention_delete($signature) : false;
+        if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
+            nammu_fediverse_save_fragments_cache_store([]);
+        }
+        $fediverseFeedback = [
+            'type' => $deleted ? 'success' : 'danger',
+            'message' => $deleted ? 'Mención eliminada.' : 'No se pudo eliminar la mención.',
+        ];
+        $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_share_note'])) {
         if (!function_exists('nammu_actuality_add_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
             require_once __DIR__ . '/core/actualidad.php';
@@ -11017,7 +11043,7 @@ if ($isLoggedIn && $page === 'fediverso') {
         $_SESSION['fediverse_feedback'] = $fediverseFeedback;
         $_SESSION['fediverse_state'] = $fediverseRedirectState;
         $redirectTab = strtolower(trim((string) ($_POST['fediverse_tab'] ?? ($_GET['tab'] ?? 'home'))));
-        if (!in_array($redirectTab, ['home', 'notifications', 'messages', 'network', 'settings'], true)) {
+        if (!in_array($redirectTab, ['home', 'notifications', 'messages', 'mentions', 'network', 'settings'], true)) {
             $redirectTab = 'home';
         }
         $redirectUrl = 'admin.php?page=fediverso&tab=' . rawurlencode($redirectTab);
@@ -11044,7 +11070,7 @@ if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET'
         return trim($html);
     };
     $fediverseFragmentTab = strtolower(trim((string) ($_GET['tab'] ?? 'home')));
-    if (!in_array($fediverseFragmentTab, ['home', 'notifications', 'messages', 'network', 'settings'], true)) {
+    if (!in_array($fediverseFragmentTab, ['home', 'notifications', 'messages', 'mentions', 'network', 'settings'], true)) {
         $fediverseFragmentTab = 'home';
     }
     $fediverseFragmentContext = [];
@@ -11080,7 +11106,7 @@ if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET'
     header('Content-Type: application/json; charset=UTF-8');
     header('Cache-Control: no-store, no-cache, must-revalidate');
     header('Pragma: no-cache');
-    $tabs = ['home', 'notifications', 'messages', 'network', 'settings'];
+    $tabs = ['home', 'notifications', 'messages', 'mentions', 'network', 'settings'];
     echo json_encode(['versions' => nammu_fediverse_stream_state($tabs)], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;
 }

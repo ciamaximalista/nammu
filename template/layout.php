@@ -28,6 +28,9 @@ $colorCodeText = htmlspecialchars($themeColors['code_text'] ?? '#90ee90', ENT_QU
 $footerHtml = $theme['footer_html'] ?? '';
 $footerNammuEnabled = ($theme['footer_nammu'] ?? 'on') === 'on';
 $layoutConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
+if (!function_exists('nammu_webmention_endpoint_url') && is_file(dirname(__DIR__) . '/core/webmention.php')) {
+    require_once dirname(__DIR__) . '/core/webmention.php';
+}
 $footerEuplEnabled = (($layoutConfig['eupl_notice'] ?? 'on') === 'on');
 $footerLogoPosition = $theme['footer_logo'] ?? 'none';
 if (!in_array($footerLogoPosition, ['none', 'top', 'bottom'], true)) {
@@ -39,6 +42,10 @@ $faviconUrl = $theme['favicon_url'] ?? null;
 $showLogo = $showLogo ?? false;
 $socialMeta = $socialMeta ?? [];
 $jsonLd = $jsonLd ?? [];
+$webmentionEndpoint = function_exists('nammu_webmention_endpoint_url') ? nammu_webmention_endpoint_url($layoutConfig) : '';
+if ($webmentionEndpoint !== '' && !headers_sent()) {
+    header('Link: <' . $webmentionEndpoint . '>; rel="webmention"', false);
+}
 $metaRobots = $metaRobots ?? '';
 $themeGlobal = $theme['global'] ?? [];
 $cornerStyle = $theme['corners'] ?? ($themeGlobal['corners'] ?? 'rounded');
@@ -205,6 +212,9 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
         <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Noticias" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/noticias.xml' : $searchBaseNormalized . '/noticias.xml', ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
     <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Fediverso" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/fediverso.xml' : $searchBaseNormalized . '/fediverso.xml', ENT_QUOTES, 'UTF-8') ?>">
+    <?php if ($webmentionEndpoint !== ''): ?>
+        <link rel="webmention" href="<?= htmlspecialchars($webmentionEndpoint, ENT_QUOTES, 'UTF-8') ?>">
+    <?php endif; ?>
     <?php if (function_exists('nammu_fediverse_actor_url') && function_exists('nammu_fediverse_acct_uri') && function_exists('nammu_fediverse_base_url')): ?>
         <?php $fediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : []; ?>
         <link rel="alternate" type="application/activity+json" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — ActivityPub" href="<?= htmlspecialchars(nammu_fediverse_actor_url($fediverseConfig), ENT_QUOTES, 'UTF-8') ?>">

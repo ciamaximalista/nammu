@@ -10,6 +10,7 @@ $threadOriginalUrl = trim((string) ($threadPayload['original_url'] ?? ''));
 $threadUrl = trim((string) ($threadPayload['thread_url'] ?? ''));
 $threadIsNote = strcasecmp((string) ($threadItem['type'] ?? ''), 'Note') === 0;
 $threadIsBoostNote = $threadIsNote && $threadOriginalUrl !== '';
+$threadIsOwnNote = $threadIsNote && !$threadIsBoostNote;
 $threadTitle = trim((string) ($threadItem['title'] ?? ''));
 $threadContent = trim((string) ($threadItem['content'] ?? ''));
 $threadSummaryText = trim((string) ($threadItem['summary'] ?? ''));
@@ -120,7 +121,14 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
 .fediverse-public-status__title { font-size: 1.35rem; font-weight: 700; margin: 0 0 .85rem; line-height: 1.15; }
 .fediverse-public-status__text,
 .fediverse-public-reply__text { font-size: 1rem; line-height: 1.6; }
-.fediverse-public-status__text--note { font-family: "<?= $noteFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 1.16rem; line-height: 1.78; }
+.fediverse-public-status--note-own,
+.fediverse-public-status--note-own .fediverse-public-status__text,
+.fediverse-public-status--note-own .fediverse-public-status__header,
+.fediverse-public-status--note-own .fediverse-public-status__footer,
+.fediverse-public-status--note-own .fediverse-public-status__metrics {
+    font-family: "<?= $noteFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.fediverse-public-status__text--note { font-size: 1.16rem; line-height: 1.78; }
 .fediverse-public-status__media,
 .fediverse-public-reply__media { margin-top: .9rem; }
 .fediverse-public-status__media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin-top: .9rem; }
@@ -174,7 +182,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
         <?php endif; ?>
     </p>
 
-    <article class="fediverse-public-status">
+    <article class="fediverse-public-status<?= $threadIsOwnNote ? ' fediverse-public-status--note-own' : '' ?>">
         <div class="fediverse-public-status__top">
             <div class="fediverse-public-status__avatar">
                 <?php if ($fediverseLocalAvatar !== ''): ?>

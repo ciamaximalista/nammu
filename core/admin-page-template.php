@@ -173,16 +173,6 @@
                                             <small class="form-text text-muted">Se aplicará a las notas en la página de perfil.</small>
                                         </div>
                                         <div class="form-group col-md-6">
-                                            <label for="code_font">Fuente para código</label>
-                                            <select name="code_font" id="code_font" class="form-control" data-current-font="<?= htmlspecialchars($fontCode) ?>">
-                                                <option value="">Selecciona una fuente</option>
-                                                <?php if ($fontCode): ?>
-                                                    <option value="<?= htmlspecialchars($fontCode) ?>" selected><?= htmlspecialchars($fontCode) ?> (actual)</option>
-                                                <?php endif; ?>
-                                            </select>
-                                            <small class="form-text text-muted">Se aplicará a bloques `code` y `pre`.</small>
-                                        </div>
-                                        <div class="form-group col-md-6">
                                             <label for="quote_font">Fuente para citas</label>
                                             <select name="quote_font" id="quote_font" class="form-control" data-current-font="<?= htmlspecialchars($fontQuote) ?>">
                                                 <option value="">Selecciona una fuente</option>
@@ -191,6 +181,18 @@
                                                 <?php endif; ?>
                                             </select>
                                             <small class="form-text text-muted">Se utilizará en los bloques de cita (&gt;).</small>
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group col-md-6">
+                                            <label for="code_font">Fuente para código</label>
+                                            <select name="code_font" id="code_font" class="form-control" data-current-font="<?= htmlspecialchars($fontCode) ?>">
+                                                <option value="">Selecciona una fuente</option>
+                                                <?php if ($fontCode): ?>
+                                                    <option value="<?= htmlspecialchars($fontCode) ?>" selected><?= htmlspecialchars($fontCode) ?> (actual)</option>
+                                                <?php endif; ?>
+                                            </select>
+                                            <small class="form-text text-muted">Se aplicará a bloques `code` y `pre`.</small>
                                         </div>
                                     </div>
                                     <div id="fonts-alert"></div>

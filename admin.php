@@ -7147,9 +7147,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if (!empty($subscribers)) {
                                 $payload = admin_prepare_mailing_payload('single', $settings, $title, $description, $link, $image);
                                 try {
-                                    admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                                    $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                                    if ((int) ($sendResult['failed'] ?? 0) > 0 && function_exists('nammu_enqueue_scheduled_notification')) {
+                                        nammu_enqueue_scheduled_notification([
+                                            'filename' => $targetFilename,
+                                            'slug' => $slug,
+                                            'title' => $title,
+                                            'description' => $description,
+                                            'image' => $image,
+                                            'template' => 'post',
+                                            'published_at' => date('Y-m-d H:i'),
+                                            'mailing_only' => true,
+                                        ]);
+                                    }
                                 } catch (Throwable $e) {
-                                    // ignore mailing errors on publish
+                                    if (function_exists('nammu_enqueue_scheduled_notification')) {
+                                        nammu_enqueue_scheduled_notification([
+                                            'filename' => $targetFilename,
+                                            'slug' => $slug,
+                                            'title' => $title,
+                                            'description' => $description,
+                                            'image' => $image,
+                                            'template' => 'post',
+                                            'published_at' => date('Y-m-d H:i'),
+                                            'mailing_only' => true,
+                                        ]);
+                                    }
                                 }
                             }
                         }
@@ -7170,9 +7193,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if (!empty($subscribers)) {
                                 $payload = admin_prepare_mailing_payload('podcast', $settings, $title, $description, $audioUrl, $image);
                                 try {
-                                    admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                                    $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                                    if ((int) ($sendResult['failed'] ?? 0) > 0 && function_exists('nammu_enqueue_scheduled_notification')) {
+                                        nammu_enqueue_scheduled_notification([
+                                            'filename' => $targetFilename,
+                                            'slug' => $slug,
+                                            'title' => $title,
+                                            'description' => $description,
+                                            'image' => $image,
+                                            'audio' => $audio,
+                                            'template' => 'podcast',
+                                            'published_at' => date('Y-m-d H:i'),
+                                            'mailing_only' => true,
+                                        ]);
+                                    }
                                 } catch (Throwable $e) {
-                                    // ignore mailing errors on publish
+                                    if (function_exists('nammu_enqueue_scheduled_notification')) {
+                                        nammu_enqueue_scheduled_notification([
+                                            'filename' => $targetFilename,
+                                            'slug' => $slug,
+                                            'title' => $title,
+                                            'description' => $description,
+                                            'image' => $image,
+                                            'audio' => $audio,
+                                            'template' => 'podcast',
+                                            'published_at' => date('Y-m-d H:i'),
+                                            'mailing_only' => true,
+                                        ]);
+                                    }
                                 }
                             }
                         }
@@ -7772,9 +7820,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if (!empty($subscribers)) {
                                 $payload = admin_prepare_mailing_payload('podcast', $settings, $title, $description, $audioUrl, $image);
                                 try {
-                                    admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                                    $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                                    if ((int) ($sendResult['failed'] ?? 0) > 0 && function_exists('nammu_enqueue_scheduled_notification')) {
+                                        nammu_enqueue_scheduled_notification([
+                                            'filename' => $targetFilename,
+                                            'slug' => $slug,
+                                            'title' => $title,
+                                            'description' => $description,
+                                            'image' => $image,
+                                            'audio' => $audio,
+                                            'template' => 'podcast',
+                                            'published_at' => date('Y-m-d H:i'),
+                                            'mailing_only' => true,
+                                        ]);
+                                    }
                                 } catch (Throwable $e) {
-                                    // ignore mailing errors on publish
+                                    if (function_exists('nammu_enqueue_scheduled_notification')) {
+                                        nammu_enqueue_scheduled_notification([
+                                            'filename' => $targetFilename,
+                                            'slug' => $slug,
+                                            'title' => $title,
+                                            'description' => $description,
+                                            'image' => $image,
+                                            'audio' => $audio,
+                                            'template' => 'podcast',
+                                            'published_at' => date('Y-m-d H:i'),
+                                            'mailing_only' => true,
+                                        ]);
+                                    }
                                 }
                             }
                         }
@@ -7789,9 +7862,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if (!empty($subscribers)) {
                                 $payload = admin_prepare_mailing_payload('single', $settings, $title, $description, $link, $image);
                                 try {
-                                    admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                                    $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
+                                    if ((int) ($sendResult['failed'] ?? 0) > 0 && function_exists('nammu_enqueue_scheduled_notification')) {
+                                        nammu_enqueue_scheduled_notification([
+                                            'filename' => $targetFilename,
+                                            'slug' => $slug,
+                                            'title' => $title,
+                                            'description' => $description,
+                                            'image' => $image,
+                                            'template' => 'post',
+                                            'published_at' => date('Y-m-d H:i'),
+                                            'mailing_only' => true,
+                                        ]);
+                                    }
                                 } catch (Throwable $e) {
-                                    // ignore mailing errors on publish
+                                    if (function_exists('nammu_enqueue_scheduled_notification')) {
+                                        nammu_enqueue_scheduled_notification([
+                                            'filename' => $targetFilename,
+                                            'slug' => $slug,
+                                            'title' => $title,
+                                            'description' => $description,
+                                            'image' => $image,
+                                            'template' => 'post',
+                                            'published_at' => date('Y-m-d H:i'),
+                                            'mailing_only' => true,
+                                        ]);
+                                    }
                                 }
                             }
                         }

@@ -297,6 +297,46 @@ function nammu_detect_referrer_source(string $referer, string $host): array
             return ['bucket' => 'social', 'detail' => $label];
         }
     }
+    $refPath = trim((string) (parse_url($referer, PHP_URL_PATH) ?? ''));
+    $fediverseHosts = [
+        'maximalismo.red',
+        'mastodon.',
+        'mstdn.',
+        'pleroma.',
+        'akkoma.',
+        'misskey.',
+        'calckey.',
+        'firefish.',
+        'friendica.',
+        'hubzilla.',
+        'pixelfed.',
+        'peertube.',
+        'bookwyrm.',
+        'lemmy.',
+        'kbin.',
+    ];
+    foreach ($fediverseHosts as $needle) {
+        if (str_contains($refHost, $needle)) {
+            return ['bucket' => 'social', 'detail' => 'Fediverso'];
+        }
+    }
+    $fediverseLikeTlds = ['.social', '.masto.host', '.fedihost.io', '.activitypub-troll.cf'];
+    foreach ($fediverseLikeTlds as $suffix) {
+        if (str_ends_with($refHost, $suffix)) {
+            return ['bucket' => 'social', 'detail' => 'Fediverso'];
+        }
+    }
+    if (
+        $refPath !== ''
+        && (
+            preg_match('#^/@[^/]+(?:@[^/]+)?(?:/[^/]+)?$#', $refPath) === 1
+            || preg_match('#^/(?:users|@)/[^/]+/statuses/\d+#', $refPath) === 1
+            || preg_match('#^/notes/[A-Za-z0-9]+$#', $refPath) === 1
+            || preg_match('#^/objects/[A-Za-z0-9._:-]+$#', $refPath) === 1
+        )
+    ) {
+        return ['bucket' => 'social', 'detail' => 'Fediverso'];
+    }
     $mailDomains = [
         'mail.google.com',
         'gmail.com',
@@ -2690,6 +2730,7 @@ function nammu_handle_scheduled_post_notifications(array $payload): void
 function nammu_try_send_scheduled_post_notifications(array $payload): bool
 {
     $template = strtolower((string) ($payload['template'] ?? 'post'));
+    $mailingOnly = !empty($payload['mailing_only']);
     $requiredAdmin = function_exists('admin_maybe_auto_post_to_social_networks')
         && function_exists('admin_maybe_enqueue_push_notification')
         && function_exists('get_settings')
@@ -2710,27 +2751,27 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
     $image = (string) ($payload['image'] ?? '');
     $audio = (string) ($payload['audio'] ?? '');
     $indexnowUrls = [];
-    if ($template === 'podcast') {
+    if (!$mailingOnly && $template === 'podcast') {
         if ($slug !== '' && function_exists('admin_public_podcast_url')) {
             $podcastUrl = admin_public_podcast_url($slug);
             if ($podcastUrl !== '') {
                 $indexnowUrls[] = $podcastUrl;
             }
         }
-    } else {
+    } elseif (!$mailingOnly) {
         $link = $slug !== '' ? admin_public_post_url($slug) : '';
         if ($link !== '') {
             $indexnowUrls[] = $link;
         }
     }
-    if (!empty($indexnowUrls) && function_exists('admin_maybe_send_indexnow')) {
+    if (!$mailingOnly && !empty($indexnowUrls) && function_exists('admin_maybe_send_indexnow')) {
         admin_maybe_send_indexnow($indexnowUrls);
     }
-    if ($template === 'page') {
+    if (!$mailingOnly && $template === 'page') {
         return true;
     }
 
-    if ($filename !== '') {
+    if (!$mailingOnly && $filename !== '') {
         if ($template === 'podcast') {
             $podcastUrl = ($slug !== '' && function_exists('admin_public_podcast_url')) ? admin_public_podcast_url($slug) : '';
             $imageUrl = admin_public_asset_url($image);
@@ -2771,7 +2812,7 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
                 }
             }
         }
-        if ($link !== '') {
+        if (!$mailingOnly && $link !== '') {
             admin_maybe_enqueue_push_notification('post', $title, $description, $link, $image);
         }
     }

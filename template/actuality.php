@@ -12,6 +12,26 @@ $colors = $theme['colors'] ?? [];
 $highlight = htmlspecialchars($colors['highlight'] ?? '#f3f6f9', ENT_QUOTES, 'UTF-8');
 $textColor = htmlspecialchars($colors['text'] ?? '#222222', ENT_QUOTES, 'UTF-8');
 $accentColor = htmlspecialchars($colors['accent'] ?? '#0a4c8a', ENT_QUOTES, 'UTF-8');
+$accentRaw = $colors['accent'] ?? '#0a4c8a';
+$accentBackground = 'rgba(0, 0, 0, 0.08)';
+$accentBorder = 'rgba(0, 0, 0, 0.18)';
+if (is_string($accentRaw)) {
+    if (preg_match('/^#([0-9a-f]{6})$/i', $accentRaw, $matches)) {
+        $hex = $matches[1];
+        $r = hexdec(substr($hex, 0, 2));
+        $g = hexdec(substr($hex, 2, 2));
+        $b = hexdec(substr($hex, 4, 2));
+        $accentBackground = sprintf('rgba(%d, %d, %d, 0.12)', $r, $g, $b);
+        $accentBorder = sprintf('rgba(%d, %d, %d, 0.28)', $r, $g, $b);
+    } elseif (preg_match('/^#([0-9a-f]{3})$/i', $accentRaw, $matches)) {
+        $hex = $matches[1];
+        $r = hexdec(str_repeat(substr($hex, 0, 1), 2));
+        $g = hexdec(str_repeat(substr($hex, 1, 1), 2));
+        $b = hexdec(str_repeat(substr($hex, 2, 1), 2));
+        $accentBackground = sprintf('rgba(%d, %d, %d, 0.12)', $r, $g, $b);
+        $accentBorder = sprintf('rgba(%d, %d, %d, 0.28)', $r, $g, $b);
+    }
+}
 $brandColor = htmlspecialchars($colors['brand'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8');
 $h1Color = htmlspecialchars($colors['h1'] ?? '#1b8eed', ENT_QUOTES, 'UTF-8');
 $headingSecondaryColor = htmlspecialchars($colors['h2'] ?? '#ea2f28', ENT_QUOTES, 'UTF-8');
@@ -443,11 +463,15 @@ $manualDisplayText = static function (array $item): string {
                             <?php endif; ?>
                         <?php endif; ?>
                         <div class="actuality-card-body">
+                            <?php $imagesHtml = $renderImages($item, $isSiteContent); ?>
+                            <?php if ($isSiteContent && $imagesHtml !== ''): ?>
+                                <?= $imagesHtml ?>
+                            <?php endif; ?>
                             <?php if (!$isManual): ?>
                                 <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
                             <?php endif; ?>
                             <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
-                                <p class="actuality-meta">
+                                <p class="actuality-meta<?= $isSiteContent ? ' actuality-meta--site' : '' ?>">
                                     <?php if ($item['timestamp'] > 0): ?>
                                         <span><?= htmlspecialchars($formatDate($item['timestamp']), ENT_QUOTES, 'UTF-8') ?></span>
                                     <?php endif; ?>
@@ -457,8 +481,7 @@ $manualDisplayText = static function (array $item): string {
                                     <?php endif; ?>
                                 </p>
                             <?php endif; ?>
-                            <?php $imagesHtml = $renderImages($item, $isSiteContent); ?>
-                            <?php if ($imagesHtml !== ''): ?>
+                            <?php if (!$isSiteContent && $imagesHtml !== ''): ?>
                                 <?= $imagesHtml ?>
                             <?php endif; ?>
                             <?php if ($item['description'] !== ''): ?>
@@ -485,11 +508,15 @@ $manualDisplayText = static function (array $item): string {
                                 <?php endif; ?>
                             <?php endif; ?>
                             <div class="actuality-card-body">
+                                <?php $imagesHtml = $renderImages($item, $isSiteContent); ?>
+                                <?php if ($isSiteContent && $imagesHtml !== ''): ?>
+                                    <?= $imagesHtml ?>
+                                <?php endif; ?>
                                 <?php if (!$isManual): ?>
                                     <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
                                 <?php endif; ?>
                                 <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
-                                    <p class="actuality-meta">
+                                    <p class="actuality-meta<?= $isSiteContent ? ' actuality-meta--site' : '' ?>">
                                         <?php if ($item['timestamp'] > 0): ?>
                                             <span><?= htmlspecialchars($formatDate($item['timestamp']), ENT_QUOTES, 'UTF-8') ?></span>
                                         <?php endif; ?>
@@ -499,8 +526,7 @@ $manualDisplayText = static function (array $item): string {
                                         <?php endif; ?>
                                     </p>
                                 <?php endif; ?>
-                                <?php $imagesHtml = $renderImages($item, $isSiteContent); ?>
-                                <?php if ($imagesHtml !== ''): ?>
+                                <?php if (!$isSiteContent && $imagesHtml !== ''): ?>
                                     <?= $imagesHtml ?>
                                 <?php endif; ?>
                                 <?php if ((!$isManual && $item['description'] !== '') || ($isManual && $manualBody !== '')): ?>
@@ -529,11 +555,15 @@ $manualDisplayText = static function (array $item): string {
                                 <?php endif; ?>
                             <?php endif; ?>
                             <div class="actuality-card-body">
+                                <?php $imagesHtml = $renderImages($item, $isSiteContent); ?>
+                                <?php if ($isSiteContent && $imagesHtml !== ''): ?>
+                                    <?= $imagesHtml ?>
+                                <?php endif; ?>
                                 <?php if (!$isManual): ?>
                                     <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
                                 <?php endif; ?>
                                 <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
-                                    <p class="actuality-meta">
+                                    <p class="actuality-meta<?= $isSiteContent ? ' actuality-meta--site' : '' ?>">
                                         <?php if ($item['timestamp'] > 0): ?>
                                             <span><?= htmlspecialchars($formatDate($item['timestamp']), ENT_QUOTES, 'UTF-8') ?></span>
                                         <?php endif; ?>
@@ -543,8 +573,7 @@ $manualDisplayText = static function (array $item): string {
                                         <?php endif; ?>
                                     </p>
                                 <?php endif; ?>
-                                <?php $imagesHtml = $renderImages($item, $isSiteContent); ?>
-                                <?php if ($imagesHtml !== ''): ?>
+                                <?php if (!$isSiteContent && $imagesHtml !== ''): ?>
                                     <?= $imagesHtml ?>
                                 <?php endif; ?>
                                 <?php if ((!$isManual && $item['description'] !== '') || ($isManual && $manualBody !== '')): ?>
@@ -762,6 +791,9 @@ $manualDisplayText = static function (array $item): string {
         overflow: hidden;
         box-sizing: border-box;
     }
+    .actuality-card--site .actuality-card-body {
+        padding: 1.15rem;
+    }
     .actuality-card--manual {
         background: #fff6a8;
         border: 1px solid rgba(124, 92, 5, 0.24);
@@ -863,6 +895,15 @@ $manualDisplayText = static function (array $item): string {
     }
     .actuality-card--site .actuality-image-link {
         background: transparent;
+        display: block;
+        margin-bottom: 0.9rem;
+    }
+    .actuality-card--site .actuality-image-link img,
+    .actuality-card--site .actuality-image-gallery img {
+        border-radius: var(--nammu-radius-md);
+    }
+    .actuality-card--site .actuality-image-gallery {
+        margin-bottom: 0.9rem;
     }
     .actuality-card h3 a:hover {
         color: <?= $accentColor ?>;
@@ -877,6 +918,20 @@ $manualDisplayText = static function (array $item): string {
         color: <?= $accentColor ?>;
         text-transform: uppercase;
         letter-spacing: 0.04em;
+    }
+    .actuality-meta--site {
+        display: inline-flex;
+        width: fit-content;
+        max-width: 100%;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+        letter-spacing: 0.012em;
+        background: <?= $accentBackground ?>;
+        border: 1px solid <?= $accentBorder ?>;
+        color: <?= $accentColor ?>;
+        border-radius: var(--nammu-radius-sm);
+        text-transform: none;
+        margin: 0 0 0.8rem 0;
     }
     .actuality-description {
         margin: 0;

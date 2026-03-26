@@ -317,6 +317,40 @@ function nammu_actuality_has_persisted_news_items(): bool
     return !empty(nammu_actuality_list_news_items());
 }
 
+function nammu_actuality_profile_day_sort_key(array $item): string
+{
+    $timestamp = (int) ($item['timestamp'] ?? 0);
+    return $timestamp > 0 ? gmdate('Y-m-d', $timestamp) : '';
+}
+
+function nammu_actuality_profile_type_priority(array $item): int
+{
+    if (!empty($item['is_site_content'])) {
+        $type = trim((string) ($item['site_content_type'] ?? ''));
+        if (in_array($type, ['post', 'podcast', 'itinerary'], true)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+function nammu_actuality_profile_compare(array $a, array $b): int
+{
+    $dayA = nammu_actuality_profile_day_sort_key($a);
+    $dayB = nammu_actuality_profile_day_sort_key($b);
+    if ($dayA !== $dayB) {
+        return strcmp($dayB, $dayA);
+    }
+
+    $priorityA = nammu_actuality_profile_type_priority($a);
+    $priorityB = nammu_actuality_profile_type_priority($b);
+    if ($priorityA !== $priorityB) {
+        return $priorityA <=> $priorityB;
+    }
+
+    return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
+}
+
 function nammu_actuality_update_news_item(string $id, string $title, string $description, string $link, string $baseUrl, ?string $image = null, ?array $images = null): bool
 {
     $normalizedId = preg_replace('/[^a-f0-9]/i', '', trim($id)) ?? '';
@@ -1594,9 +1628,7 @@ function nammu_actuality_page_items(array $config, string $contentDir, string $i
         }
         $merged[] = $item;
     }
-    usort($merged, static function (array $a, array $b): int {
-        return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
-    });
+    usort($merged, 'nammu_actuality_profile_compare');
     return $merged;
 }
 

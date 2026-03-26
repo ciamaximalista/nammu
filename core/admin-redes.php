@@ -1580,16 +1580,8 @@ function admin_handle_social_broadcast_submission(array $settings, string $text,
                 'images' => $imageItems,
             ]);
             if (!empty($manualItem)) {
-                if (function_exists('nammu_actuality_rebuild_snapshot')) {
-                    $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
-                    $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
-                    nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
-                }
-                if (function_exists('nammu_fediverse_deliver_local_items')) {
-                    nammu_fediverse_deliver_local_items($config);
-                }
-                if (function_exists('nammu_fediverse_rebuild_snapshots')) {
-                    nammu_fediverse_rebuild_snapshots($config);
+                if (function_exists('nammu_actuality_add_item_to_snapshots')) {
+                    nammu_actuality_add_item_to_snapshots($manualItem);
                 }
                 if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
                     nammu_fediverse_save_fragments_cache_store([]);

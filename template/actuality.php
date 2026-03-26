@@ -808,21 +808,21 @@ $manualDisplayText = static function (array $item): string {
     .actuality-card--manual .actuality-card-body {
         padding-top: 1.35rem;
     }
-    .actuality-card--manual,
-    .actuality-card--manual .actuality-card-body,
-    .actuality-card--manual .actuality-description,
-    .actuality-card--manual .actuality-manual-links,
-    .actuality-card--manual .actuality-meta,
-    .actuality-card--manual h3,
-    .actuality-card--manual p,
-    .actuality-card--manual a,
-    .actuality-card--manual span {
+    .actuality-card--manual:not(.actuality-card--boost),
+    .actuality-card--manual:not(.actuality-card--boost) .actuality-card-body,
+    .actuality-card--manual:not(.actuality-card--boost) .actuality-description,
+    .actuality-card--manual:not(.actuality-card--boost) .actuality-manual-links,
+    .actuality-card--manual:not(.actuality-card--boost) .actuality-meta,
+    .actuality-card--manual:not(.actuality-card--boost) h3,
+    .actuality-card--manual:not(.actuality-card--boost) p,
+    .actuality-card--manual:not(.actuality-card--boost) a,
+    .actuality-card--manual:not(.actuality-card--boost) span {
         font-family: "<?= $noteFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    .actuality-card--manual .actuality-description,
-    .actuality-card--manual .actuality-manual-links {
-        font-size: 1.08rem;
-        line-height: 1.72;
+    .actuality-card--manual:not(.actuality-card--boost) .actuality-description,
+    .actuality-card--manual:not(.actuality-card--boost) .actuality-manual-links {
+        font-size: 1.16rem;
+        line-height: 1.78;
     }
     .actuality-card--manual .actuality-meta {
         color: #7a5300;

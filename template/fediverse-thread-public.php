@@ -9,6 +9,7 @@ $threadReplies = is_array($threadPayload['replies'] ?? null) ? $threadPayload['r
 $threadOriginalUrl = trim((string) ($threadPayload['original_url'] ?? ''));
 $threadUrl = trim((string) ($threadPayload['thread_url'] ?? ''));
 $threadIsNote = strcasecmp((string) ($threadItem['type'] ?? ''), 'Note') === 0;
+$threadIsBoostNote = $threadIsNote && $threadOriginalUrl !== '';
 $threadTitle = trim((string) ($threadItem['title'] ?? ''));
 $threadContent = trim((string) ($threadItem['content'] ?? ''));
 $threadSummaryText = trim((string) ($threadItem['summary'] ?? ''));
@@ -119,7 +120,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
 .fediverse-public-status__title { font-size: 1.35rem; font-weight: 700; margin: 0 0 .85rem; line-height: 1.15; }
 .fediverse-public-status__text,
 .fediverse-public-reply__text { font-size: 1rem; line-height: 1.6; }
-.fediverse-public-status__text { font-family: "<?= $noteFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 1.08rem; line-height: 1.72; }
+.fediverse-public-status__text--note { font-family: "<?= $noteFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 1.16rem; line-height: 1.78; }
 .fediverse-public-status__media,
 .fediverse-public-reply__media { margin-top: .9rem; }
 .fediverse-public-status__media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin-top: .9rem; }
@@ -198,7 +199,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
                 <?php endif; ?>
 
                 <?php if ($threadIsNote): ?>
-                    <div class="fediverse-public-status__text"><?= nl2br(htmlspecialchars($threadContent, ENT_QUOTES, 'UTF-8')) ?></div>
+                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"><?= nl2br(htmlspecialchars($threadContent, ENT_QUOTES, 'UTF-8')) ?></div>
                     <?php if (!empty($threadImageAttachments)): ?>
                         <div class="<?= count($threadImageAttachments) > 1 ? 'fediverse-public-status__media-grid' : 'fediverse-public-status__media' ?>">
                             <?php foreach ($threadImageAttachments as $imageIndex => $imageAttachment): ?>
@@ -221,7 +222,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
                         </div>
                     </a>
                 <?php else: ?>
-                    <div class="fediverse-public-status__text"><?= nl2br(htmlspecialchars($threadContent, ENT_QUOTES, 'UTF-8')) ?></div>
+                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"><?= nl2br(htmlspecialchars($threadContent, ENT_QUOTES, 'UTF-8')) ?></div>
                 <?php endif; ?>
 
                 <div class="fediverse-public-status__footer">

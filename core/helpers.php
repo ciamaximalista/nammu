@@ -1009,6 +1009,7 @@ function nammu_template_settings(): array
     $fontRequests = [];
     $titleFont = $fonts['title'] ?? '';
     $bodyFont = $fonts['body'] ?? '';
+    $noteFont = $fonts['note'] ?? '';
     $codeFont = $fonts['code'] ?? '';
     $quoteFont = $fonts['quote'] ?? '';
 
@@ -1017,6 +1018,11 @@ function nammu_template_settings(): array
     }
     if ($bodyFont !== '') {
         $fontRequests[$bodyFont] = 'wght@400;700';
+    }
+    if ($noteFont !== '') {
+        if (!isset($fontRequests[$noteFont])) {
+            $fontRequests[$noteFont] = 'wght@400;700';
+        }
     }
     if ($quoteFont !== '') {
         if (!isset($fontRequests[$quoteFont])) {
@@ -1119,6 +1125,7 @@ function nammu_default_template_settings(): array
         'fonts' => [
             'title' => 'Gabarito',
             'body' => 'Roboto',
+            'note' => 'Roboto',
             'code' => 'VT323',
             'quote' => 'Castoro',
         ],

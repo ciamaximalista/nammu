@@ -5093,6 +5093,7 @@ function get_default_template_settings(): array {
         'fonts' => [
             'title' => 'Gabarito',
             'body' => 'Roboto',
+            'note' => 'Roboto',
             'code' => 'VT323',
             'quote' => 'Castoro',
         ],
@@ -10188,6 +10189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fonts = [
             'title' => trim($_POST['title_font'] ?? ''),
             'body' => trim($_POST['body_font'] ?? ''),
+            'note' => trim($_POST['note_font'] ?? ''),
             'code' => trim($_POST['code_font'] ?? ''),
             'quote' => trim($_POST['quote_font'] ?? ''),
         ];
@@ -13598,12 +13600,14 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             const apiKey = form.dataset.googleFontsKey || '';
             const titleSelect = document.getElementById('title_font');
             const bodySelect = document.getElementById('body_font');
+            const noteSelect = document.getElementById('note_font');
             const codeSelect = document.getElementById('code_font');
             const quoteSelect = document.getElementById('quote_font');
             const fontsAlert = document.getElementById('fonts-alert');
 
             const currentTitleFont = titleSelect ? titleSelect.dataset.currentFont || '' : '';
             const currentBodyFont = bodySelect ? bodySelect.dataset.currentFont || '' : '';
+            const currentNoteFont = noteSelect ? noteSelect.dataset.currentFont || '' : '';
             const currentCodeFont = codeSelect ? codeSelect.dataset.currentFont || '' : '';
             const currentQuoteFont = quoteSelect ? quoteSelect.dataset.currentFont || '' : '';
 
@@ -13643,7 +13647,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                 }
             }
 
-            if (apiKey && (titleSelect || bodySelect || codeSelect || quoteSelect)) {
+            if (apiKey && (titleSelect || bodySelect || noteSelect || codeSelect || quoteSelect)) {
                 fetch('https://www.googleapis.com/webfonts/v1/webfonts?key=' + encodeURIComponent(apiKey) + '&sort=popularity')
                     .then(function(response) {
                         if (!response.ok) {
@@ -13655,6 +13659,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                         const fonts = data && Array.isArray(data.items) ? data.items : [];
                         fillSelect(titleSelect, fonts, currentTitleFont);
                         fillSelect(bodySelect, fonts, currentBodyFont);
+                        fillSelect(noteSelect, fonts, currentNoteFont);
                         fillSelect(codeSelect, fonts, currentCodeFont);
                         fillSelect(quoteSelect, fonts, currentQuoteFont);
                     })

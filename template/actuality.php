@@ -35,6 +35,8 @@ if (is_string($accentRaw)) {
 $brandColor = htmlspecialchars($colors['brand'] ?? '#1b1b1b', ENT_QUOTES, 'UTF-8');
 $h1Color = htmlspecialchars($colors['h1'] ?? '#1b8eed', ENT_QUOTES, 'UTF-8');
 $headingSecondaryColor = htmlspecialchars($colors['h2'] ?? '#ea2f28', ENT_QUOTES, 'UTF-8');
+$themeFonts = $theme['fonts'] ?? [];
+$noteFont = htmlspecialchars($themeFonts['note'] ?? ($themeFonts['body'] ?? 'Roboto'), ENT_QUOTES, 'UTF-8');
 $actualityHeroBackground = trim((string) ($actualityHeroBackground ?? ''));
 $actualityHeroBackgroundEsc = htmlspecialchars($actualityHeroBackground, ENT_QUOTES, 'UTF-8');
 $searchActionBase = $baseUrl ?? '/';
@@ -805,6 +807,7 @@ $manualDisplayText = static function (array $item): string {
     }
     .actuality-card--manual .actuality-card-body {
         padding-top: 1.35rem;
+        font-family: "<?= $noteFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     .actuality-card--manual .actuality-meta {
         color: #7a5300;

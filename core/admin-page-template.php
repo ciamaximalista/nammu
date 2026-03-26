@@ -5,6 +5,7 @@
                             $templateSettings = $settings['template'] ?? $defaults;
                             $fontTitle = $templateSettings['fonts']['title'] ?? '';
                             $fontBody = $templateSettings['fonts']['body'] ?? '';
+                            $fontNote = $templateSettings['fonts']['note'] ?? '';
                             $fontCode = $templateSettings['fonts']['code'] ?? '';
                             $fontQuote = $templateSettings['fonts']['quote'] ?? '';
                             $entryTemplateToc = $templateSettings['entry']['toc'] ?? ($defaults['entry']['toc'] ?? ['auto' => 'off', 'min_headings' => 3]);
@@ -161,6 +162,16 @@
                                         </div>
                                     </div>
                                     <div class="form-row">
+                                        <div class="form-group col-md-6">
+                                            <label for="note_font">Fuente para notas</label>
+                                            <select name="note_font" id="note_font" class="form-control" data-current-font="<?= htmlspecialchars($fontNote) ?>">
+                                                <option value="">Selecciona una fuente</option>
+                                                <?php if ($fontNote): ?>
+                                                    <option value="<?= htmlspecialchars($fontNote) ?>" selected><?= htmlspecialchars($fontNote) ?> (actual)</option>
+                                                <?php endif; ?>
+                                            </select>
+                                            <small class="form-text text-muted">Se aplicará a las notas en la página de perfil.</small>
+                                        </div>
                                         <div class="form-group col-md-6">
                                             <label for="code_font">Fuente para código</label>
                                             <select name="code_font" id="code_font" class="form-control" data-current-font="<?= htmlspecialchars($fontCode) ?>">

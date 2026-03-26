@@ -123,12 +123,17 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
 .fediverse-public-reply__text { font-size: 1rem; line-height: 1.6; }
 .fediverse-public-status--note-own,
 .fediverse-public-status--note-own .fediverse-public-status__text,
+.fediverse-public-status--note-own .fediverse-public-status__text p,
 .fediverse-public-status--note-own .fediverse-public-status__header,
 .fediverse-public-status--note-own .fediverse-public-status__footer,
-.fediverse-public-status--note-own .fediverse-public-status__metrics {
-    font-family: "<?= $noteFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+.fediverse-public-status--note-own .fediverse-public-status__metrics,
+.fediverse-public-status--note-own a,
+.fediverse-public-status--note-own span,
+.fediverse-public-status--note-own strong,
+.fediverse-public-status--note-own div {
+    font-family: "<?= $noteFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
 }
-.fediverse-public-status__text--note { font-size: 1.16rem; line-height: 1.78; }
+.fediverse-public-status__text--note { font-size: 1.22rem; line-height: 1.82; }
 .fediverse-public-status__media,
 .fediverse-public-reply__media { margin-top: .9rem; }
 .fediverse-public-status__media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin-top: .9rem; }

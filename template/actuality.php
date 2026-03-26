@@ -980,8 +980,7 @@ $manualDisplayText = static function (array $item): string {
         color: <?= $textColor ?>;
         line-height: 1.6;
     }
-    .actuality-card--boost .actuality-description,
-    .actuality-card:not(.actuality-card--manual):not(.actuality-card--site) .actuality-description {
+    .actuality-card:not(.actuality-card--manual) .actuality-description {
         text-align: justify;
     }
     .actuality-fediverse-inline {

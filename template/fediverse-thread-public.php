@@ -137,6 +137,12 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
     font-family: "<?= $noteFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
 }
 .fediverse-public-status__text--note { font-size: 1.22rem; line-height: 1.82; }
+.fediverse-public-status--note-own .fediverse-public-status__header strong { font-size: 1.08rem; }
+.fediverse-public-status--note-own .fediverse-public-status__handle { font-size: 1rem; }
+.fediverse-public-status--note-own .fediverse-public-status__metrics span,
+.fediverse-public-status--note-own .fediverse-public-status__metric-group {
+    font-size: 1rem;
+}
 .fediverse-public-status__media,
 .fediverse-public-reply__media { margin-top: .9rem; }
 .fediverse-public-status__media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin-top: .9rem; }

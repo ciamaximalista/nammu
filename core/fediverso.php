@@ -114,11 +114,21 @@ function nammu_fediverse_keys_file(): string
 
 function nammu_fediverse_load_json_store(string $file, array $default = []): array
 {
+    if (!isset($GLOBALS['nammu_fediverse_json_store_cache']) || !is_array($GLOBALS['nammu_fediverse_json_store_cache'])) {
+        $GLOBALS['nammu_fediverse_json_store_cache'] = [];
+    }
+    $cache = &$GLOBALS['nammu_fediverse_json_store_cache'];
+    if (array_key_exists($file, $cache)) {
+        $cached = $cache[$file];
+        return is_array($cached) ? $cached : $default;
+    }
     if (!is_file($file)) {
+        $cache[$file] = null;
         return $default;
     }
     $decoded = json_decode((string) file_get_contents($file), true);
-    return is_array($decoded) ? $decoded : $default;
+    $cache[$file] = is_array($decoded) ? $decoded : null;
+    return is_array($cache[$file]) ? $cache[$file] : $default;
 }
 
 function nammu_fediverse_save_json_store(string $file, array $payload): void
@@ -128,6 +138,10 @@ function nammu_fediverse_save_json_store(string $file, array $payload): void
         nammu_ensure_directory($dir);
     }
     file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    if (!isset($GLOBALS['nammu_fediverse_json_store_cache']) || !is_array($GLOBALS['nammu_fediverse_json_store_cache'])) {
+        $GLOBALS['nammu_fediverse_json_store_cache'] = [];
+    }
+    $GLOBALS['nammu_fediverse_json_store_cache'][$file] = $payload;
 }
 
 function nammu_fediverse_link_cards_store(): array

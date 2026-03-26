@@ -8,8 +8,10 @@ $threadDetails = is_array($threadPayload['details'] ?? null) ? $threadPayload['d
 $threadReplies = is_array($threadPayload['replies'] ?? null) ? $threadPayload['replies'] : [];
 $threadOriginalUrl = trim((string) ($threadPayload['original_url'] ?? ''));
 $threadUrl = trim((string) ($threadPayload['thread_url'] ?? ''));
+$threadItemUrl = trim((string) ($threadItem['url'] ?? ''));
 $threadIsNote = strcasecmp((string) ($threadItem['type'] ?? ''), 'Note') === 0;
-$threadIsBoostNote = $threadIsNote && $threadOriginalUrl !== '';
+$threadOriginalUrlIsOwnItem = $threadOriginalUrl !== '' && $threadItemUrl !== '' && rtrim($threadOriginalUrl, '/') === rtrim($threadItemUrl, '/');
+$threadIsBoostNote = $threadIsNote && $threadOriginalUrl !== '' && !$threadOriginalUrlIsOwnItem;
 $threadIsOwnNote = $threadIsNote && !$threadIsBoostNote;
 $threadTitle = trim((string) ($threadItem['title'] ?? ''));
 $threadContent = trim((string) ($threadItem['content'] ?? ''));

@@ -838,6 +838,8 @@ $manualDisplayText = static function (array $item): string {
     }
     .actuality-card--manual .actuality-meta {
         color: #7a5300;
+        font-size: 1.08rem;
+        line-height: 1.6;
     }
     .actuality-card--manual::before {
         display: none;

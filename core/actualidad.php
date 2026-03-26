@@ -320,7 +320,7 @@ function nammu_actuality_has_persisted_news_items(): bool
 function nammu_actuality_profile_day_sort_key(array $item): string
 {
     $timestamp = (int) ($item['timestamp'] ?? 0);
-    return $timestamp > 0 ? gmdate('Y-m-d', $timestamp) : '';
+    return $timestamp > 0 ? date('Y-m-d', $timestamp) : '';
 }
 
 function nammu_actuality_profile_type_priority(array $item): int

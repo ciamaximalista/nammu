@@ -912,17 +912,24 @@ $manualDisplayText = static function (array $item): string {
     .actuality-meta {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.65rem;
+        gap: 0;
         margin: 0 0 0.8rem 0;
+        width: 100%;
         font-size: 0.82rem;
         color: <?= $accentColor ?>;
         text-transform: uppercase;
         letter-spacing: 0.04em;
+        box-sizing: border-box;
+    }
+    .actuality-meta > span + span::before {
+        content: "·";
+        display: inline-block;
+        margin: 0 0.45rem;
     }
     .actuality-meta--site {
         display: inline-flex;
-        width: fit-content;
-        max-width: 100%;
+        width: 100%;
+        max-width: none;
         padding: 0.5rem 0.75rem;
         font-size: 0.9rem;
         letter-spacing: 0.012em;

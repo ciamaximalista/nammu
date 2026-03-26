@@ -309,19 +309,18 @@ $renderPostCards = static function (array $subset, bool $hideMeta = false) use (
         }
         $thumbClass = implode(' ', $thumbClassParts);
         $category = $post['category'] ?? '';
-        $metaText = '';
+        $metaParts = [];
         if (($post['date'] ?? '') !== '') {
-            $metaText = 'Publicado el ' . $post['date'];
+            $metaParts[] = '<span>Publicado el ' . htmlspecialchars((string) $post['date'], ENT_QUOTES, 'UTF-8') . '</span>';
         }
-        $categoryLinkHtml = '';
         if ($category !== '') {
             $categorySlug = nammu_slugify_label($category);
             if ($categorySlug !== '' && $categorySlug !== 'sin-categoria') {
                 $categoryUrl = ($baseHref ?? '/') !== '' ? rtrim($baseHref, '/') . '/categoria/' . rawurlencode($categorySlug) : '/categoria/' . rawurlencode($categorySlug);
-                $categoryLinkHtml = '<a class="category-tag-link" href="' . htmlspecialchars($categoryUrl, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($category, ENT_QUOTES, 'UTF-8') . '</a>';
-                $metaText .= $metaText !== '' ? ' · ' . $categoryLinkHtml : $categoryLinkHtml;
+                $metaParts[] = '<span><a class="category-tag-link" href="' . htmlspecialchars($categoryUrl, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($category, ENT_QUOTES, 'UTF-8') . '</a></span>';
             }
         }
+        $metaHtml = implode('', $metaParts);
         ?>
         <article class="<?= htmlspecialchars($cardClass, ENT_QUOTES, 'UTF-8') ?>">
             <?php if ($imageUrl): ?>
@@ -333,8 +332,8 @@ $renderPostCards = static function (array $subset, bool $hideMeta = false) use (
             <?php endif; ?>
             <div class="post-body">
                 <h2><a href="<?= htmlspecialchars($link, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8') ?></a></h2>
-                <?php if (!$hideMeta && $metaText !== ''): ?>
-                    <p class="post-meta"><?= $metaText ?></p>
+                <?php if (!$hideMeta && $metaHtml !== ''): ?>
+                    <p class="post-meta"><?= $metaHtml ?></p>
                 <?php endif; ?>
                 <?php if (($post['description'] ?? '') !== ''): ?>
                     <p class="post-description"><?= htmlspecialchars($post['description'], ENT_QUOTES, 'UTF-8') ?><?= $renderFediverseInlineMeta(is_array($post['fediverse'] ?? null) ? $post['fediverse'] : []) ?></p>
@@ -1192,7 +1191,10 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     }
     .post-meta {
         margin: 0;
-        display: block;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0;
+        width: 100%;
         padding: 0.5rem 0.75rem;
         font-size: 0.9rem;
         letter-spacing: 0.012em;
@@ -1200,6 +1202,12 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
         border: 1px solid <?= $accentBorder ?>;
         color: <?= $accentColor ?>;
         border-radius: var(--nammu-radius-sm);
+        box-sizing: border-box;
+    }
+    .post-meta > span + span::before {
+        content: "·";
+        display: inline-block;
+        margin: 0 0.45rem;
     }
     .category-tag-link {
         color: <?= $accentColor ?>;

@@ -889,9 +889,12 @@ $manualDisplayText = static function (array $item): string {
         text-decoration: none;
         transition: color 0.2s ease;
     }
-    .actuality-grid.is-single-item .actuality-card--site.actuality-card--type-post h3 {
+    .actuality-grid.is-single-item .actuality-card--site.actuality-card--type-post h3,
+    .actuality-grid.is-single-item .actuality-card--site.actuality-card--type-podcast h3,
+    .actuality-grid.is-single-item .actuality-card--site.actuality-card--type-itinerary h3 {
         font-size: clamp(1.8rem, 3.6vw, 2.4rem);
         line-height: 1.15;
+        text-align: center;
     }
     .actuality-card--site .actuality-image-link {
         background: transparent;
@@ -944,6 +947,10 @@ $manualDisplayText = static function (array $item): string {
         margin: 0;
         color: <?= $textColor ?>;
         line-height: 1.6;
+    }
+    .actuality-card--boost .actuality-description,
+    .actuality-card:not(.actuality-card--manual):not(.actuality-card--site) .actuality-description {
+        text-align: justify;
     }
     .actuality-fediverse-inline {
         display: inline-flex;

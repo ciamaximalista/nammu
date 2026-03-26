@@ -827,6 +827,11 @@ $manualDisplayText = static function (array $item): string {
         font-size: 1.22rem;
         line-height: 1.82;
     }
+    .actuality-card--boost .actuality-meta,
+    .actuality-card--boost .actuality-meta span,
+    .actuality-card--boost .actuality-meta a {
+        font-family: "<?= $noteFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    }
     .actuality-card--manual .actuality-meta {
         color: #7a5300;
     }

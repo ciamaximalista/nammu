@@ -47,6 +47,9 @@ $threadPublishedLabel = $formatFediversePublicDateTime($threadPublished);
 $fediverseLocalName = trim((string) ($fediverseLocalName ?? 'Blog'));
 $fediverseLocalHandle = trim((string) ($fediverseLocalHandle ?? ''));
 $fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
+$threadOwnNoteFontStyle = $threadIsOwnNote
+    ? ' style="font-family:&quot;' . $noteFont . '&quot;, system-ui, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif !important;"'
+    : '';
 $baseUrlValue = trim((string) ($baseUrl ?? ''));
 $fediverseProfileUrl = '';
 if ($fediverseLocalHandle !== '') {
@@ -187,7 +190,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
         <?php endif; ?>
     </p>
 
-    <article class="fediverse-public-status<?= $threadIsOwnNote ? ' fediverse-public-status--note-own' : '' ?>">
+    <article class="fediverse-public-status<?= $threadIsOwnNote ? ' fediverse-public-status--note-own' : '' ?>"<?= $threadOwnNoteFontStyle ?>>
         <div class="fediverse-public-status__top">
             <div class="fediverse-public-status__avatar">
                 <?php if ($fediverseLocalAvatar !== ''): ?>
@@ -197,7 +200,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
                 <?php endif; ?>
             </div>
             <div class="fediverse-public-status__main">
-                <div class="fediverse-public-status__header">
+                <div class="fediverse-public-status__header"<?= $threadOwnNoteFontStyle ?>>
                     <strong><?= htmlspecialchars($fediverseLocalName, ENT_QUOTES, 'UTF-8') ?></strong>
                     <?php if ($fediverseLocalHandle !== ''): ?>
                         <span class="fediverse-public-status__handle"><?= htmlspecialchars($fediverseLocalHandle, ENT_QUOTES, 'UTF-8') ?></span>
@@ -212,7 +215,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
                 <?php endif; ?>
 
                 <?php if ($threadIsNote): ?>
-                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"><?= nl2br(htmlspecialchars($threadContent, ENT_QUOTES, 'UTF-8')) ?></div>
+                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= nl2br(htmlspecialchars($threadContent, ENT_QUOTES, 'UTF-8')) ?></div>
                     <?php if (!empty($threadImageAttachments)): ?>
                         <div class="<?= count($threadImageAttachments) > 1 ? 'fediverse-public-status__media-grid' : 'fediverse-public-status__media' ?>">
                             <?php foreach ($threadImageAttachments as $imageIndex => $imageAttachment): ?>
@@ -235,10 +238,10 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
                         </div>
                     </a>
                 <?php else: ?>
-                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"><?= nl2br(htmlspecialchars($threadContent, ENT_QUOTES, 'UTF-8')) ?></div>
+                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= nl2br(htmlspecialchars($threadContent, ENT_QUOTES, 'UTF-8')) ?></div>
                 <?php endif; ?>
 
-                <div class="fediverse-public-status__footer">
+                <div class="fediverse-public-status__footer"<?= $threadOwnNoteFontStyle ?>>
                     <?php if ($threadOriginalUrl !== ''): ?>
                         <a href="<?= htmlspecialchars($threadOriginalUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Abrir contenido original</a>
                     <?php endif; ?>
@@ -247,7 +250,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
                     <?php endif; ?>
                 </div>
 
-                <div class="fediverse-public-status__metrics">
+                <div class="fediverse-public-status__metrics"<?= $threadOwnNoteFontStyle ?>>
                     <span><?= (int) ($threadSummary['replies'] ?? 0) ?> respuesta<?= ((int) ($threadSummary['replies'] ?? 0) === 1) ? '' : 's' ?></span>
                     <div class="fediverse-public-status__metric-group">
                         <span><?= (int) ($threadSummary['likes'] ?? 0) ?> favorito<?= ((int) ($threadSummary['likes'] ?? 0) === 1) ? '' : 's' ?></span>

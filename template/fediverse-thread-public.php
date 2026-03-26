@@ -1,5 +1,7 @@
 <?php
 $threadItem = is_array($threadItem ?? null) ? $threadItem : [];
+$themeFonts = is_array($theme['fonts'] ?? null) ? $theme['fonts'] : [];
+$noteFont = htmlspecialchars((string) ($themeFonts['note'] ?? ($themeFonts['body'] ?? 'Roboto')), ENT_QUOTES, 'UTF-8');
 $threadPayload = is_array($threadPayload ?? null) ? $threadPayload : [];
 $threadSummary = is_array($threadPayload['summary'] ?? null) ? $threadPayload['summary'] : ['likes' => 0, 'shares' => 0, 'replies' => 0];
 $threadDetails = is_array($threadPayload['details'] ?? null) ? $threadPayload['details'] : ['likes' => [], 'shares' => [], 'replies' => []];
@@ -117,6 +119,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
 .fediverse-public-status__title { font-size: 1.35rem; font-weight: 700; margin: 0 0 .85rem; line-height: 1.15; }
 .fediverse-public-status__text,
 .fediverse-public-reply__text { font-size: 1rem; line-height: 1.6; }
+.fediverse-public-status__text { font-family: "<?= $noteFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .fediverse-public-status__media,
 .fediverse-public-reply__media { margin-top: .9rem; }
 .fediverse-public-status__media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin-top: .9rem; }

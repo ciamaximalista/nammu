@@ -807,6 +807,16 @@ $manualDisplayText = static function (array $item): string {
     }
     .actuality-card--manual .actuality-card-body {
         padding-top: 1.35rem;
+    }
+    .actuality-card--manual,
+    .actuality-card--manual .actuality-card-body,
+    .actuality-card--manual .actuality-description,
+    .actuality-card--manual .actuality-manual-links,
+    .actuality-card--manual .actuality-meta,
+    .actuality-card--manual h3,
+    .actuality-card--manual p,
+    .actuality-card--manual a,
+    .actuality-card--manual span {
         font-family: "<?= $noteFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     .actuality-card--manual .actuality-meta {

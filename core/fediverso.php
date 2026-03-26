@@ -3857,6 +3857,11 @@ function nammu_fediverse_meta_date(array $meta, ?string $filePath = null): strin
 
 function nammu_fediverse_local_content_items(array $config): array
 {
+    static $cache = [];
+    $cacheKey = md5(nammu_fediverse_base_url($config));
+    if (isset($cache[$cacheKey]) && is_array($cache[$cacheKey])) {
+        return $cache[$cacheKey];
+    }
     $baseUrl = nammu_fediverse_base_url($config);
     $deletedIds = array_fill_keys(nammu_fediverse_deleted_store()['ids'], true);
     $legacyStore = nammu_fediverse_legacy_actuality_store();
@@ -4029,6 +4034,7 @@ function nammu_fediverse_local_content_items(array $config): array
     usort($items, static function (array $a, array $b): int {
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });
+    $cache[$cacheKey] = $items;
     return $items;
 }
 

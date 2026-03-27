@@ -127,6 +127,80 @@
     if ($bingDebug) {
         $GLOBALS['bing_debug_log'] = [];
     }
+    $multiInstanceDashboard = [
+        'enabled' => false,
+        'cluster' => '',
+        'sites' => 0,
+        'shared_cache_dir' => '',
+        'shared_queue_dir' => '',
+        'scheduler_mode' => 'standalone',
+        'tracked_hosts' => 0,
+        'hosts_in_backoff' => 0,
+        'recent_light_runs' => 0,
+        'recent_maintenance_runs' => 0,
+        'recent_heavy_runs' => 0,
+        'runner_label' => '',
+        'runner_url' => '',
+        'runner_at_label' => '',
+    ];
+    if (function_exists('admin_multi_instance_settings')) {
+        $multiSettings = admin_multi_instance_settings($settings);
+        if (($multiSettings['enabled'] ?? 'off') === 'on' && ($multiSettings['scheduler_mode'] ?? 'standalone') === 'central') {
+            $multiInstanceDashboard['enabled'] = true;
+            $multiInstanceDashboard['cluster'] = trim((string) ($multiSettings['cluster'] ?? ''));
+            $multiInstanceDashboard['shared_cache_dir'] = trim((string) ($multiSettings['shared_cache_dir'] ?? ''));
+            $multiInstanceDashboard['shared_queue_dir'] = trim((string) ($multiSettings['shared_queue_dir'] ?? ''));
+            $multiInstanceDashboard['scheduler_mode'] = 'central';
+            if (function_exists('admin_multi_instance_discover_cluster_sites')) {
+                $clusterSites = admin_multi_instance_discover_cluster_sites($settings);
+                $multiInstanceDashboard['sites'] = count($clusterSites);
+            }
+            if (function_exists('admin_multi_instance_scheduler_state_load')) {
+                $clusterState = admin_multi_instance_scheduler_state_load($settings);
+                $runs = is_array($clusterState['runs'] ?? null) ? $clusterState['runs'] : [];
+                $currentHour = date('Y-m-d-H');
+                $currentSlotPrefix = date('Y-m-d-H:');
+                $runner = is_array($clusterState['last_runner'] ?? null) ? $clusterState['last_runner'] : [];
+                $multiInstanceDashboard['runner_label'] = trim((string) ($runner['site_name'] ?? '')) ?: trim((string) ($runner['slug'] ?? ''));
+                $multiInstanceDashboard['runner_url'] = trim((string) ($runner['site_url'] ?? ''));
+                $runnerTimestamp = (int) ($runner['timestamp'] ?? 0);
+                if ($runnerTimestamp > 0) {
+                    $multiInstanceDashboard['runner_at_label'] = date('d/m/Y H:i', $runnerTimestamp);
+                }
+                foreach ($runs as $run) {
+                    if (!is_array($run)) {
+                        continue;
+                    }
+                    if (str_starts_with((string) ($run['light_slot'] ?? ''), $currentSlotPrefix)) {
+                        $multiInstanceDashboard['recent_light_runs']++;
+                    }
+                    if (str_starts_with((string) ($run['maintenance_slot'] ?? ''), $currentSlotPrefix)) {
+                        $multiInstanceDashboard['recent_maintenance_runs']++;
+                    }
+                    if ((string) ($run['heavy_hour'] ?? '') === $currentHour) {
+                        $multiInstanceDashboard['recent_heavy_runs']++;
+                    }
+                }
+            }
+            if (function_exists('nammu_multi_instance_remote_host_state_file')) {
+                $hostStateFile = nammu_multi_instance_remote_host_state_file($settings);
+                if ($hostStateFile !== '' && is_file($hostStateFile)) {
+                    $hostState = json_decode((string) @file_get_contents($hostStateFile), true);
+                    $hosts = is_array($hostState['hosts'] ?? null) ? $hostState['hosts'] : [];
+                    $multiInstanceDashboard['tracked_hosts'] = count($hosts);
+                    $nowMicro = microtime(true);
+                    foreach ($hosts as $hostPayload) {
+                        if (!is_array($hostPayload)) {
+                            continue;
+                        }
+                        if ((float) ($hostPayload['backoff_until'] ?? 0) > $nowMicro) {
+                            $multiInstanceDashboard['hosts_in_backoff']++;
+                        }
+                    }
+                }
+            }
+        }
+    }
     $gscCountryNames = [
         'AD' => 'Andorra',
         'AE' => 'Emiratos Árabes Unidos',
@@ -1283,6 +1357,31 @@
         'push' => 'Notificaciones push',
         'other' => 'Sitios web',
     ];
+    $isFediverseSourceLabel = static function (string $label, string $url = ''): bool {
+        $label = strtolower(trim($label));
+        $url = strtolower(trim($url));
+        if ($label === 'fediverso' || $label === 'mastodon') {
+            return true;
+        }
+        $haystack = $label . ' ' . $url;
+        foreach ([
+            'maximalismo.red',
+            'mastodon.social',
+            'mastodon.',
+            'mstdn.',
+            '.social',
+            '.masto.host',
+            '/@',
+            '/users/',
+            '/statuses/',
+            '/notes/',
+        ] as $needle) {
+            if ($needle !== '' && str_contains($haystack, strtolower($needle))) {
+                return true;
+            }
+        }
+        return false;
+    };
     $collectEmailDetails = static function (string $fromKey, ?string $toKey = null) use ($sourcesDaily, $emailBreakdownLabels): array {
         $details = [];
         $mailNeedles = [
@@ -1399,12 +1498,16 @@
         $sourceMainLabels,
         $buildPercentTable,
         $collectEmailDetails,
-        $collectOtherDetails
+        $collectOtherDetails,
+        $isFediverseSourceLabel
     ): array {
         $sourceMain = [];
         foreach (['direct', 'search', 'social', 'email', 'push', 'other'] as $bucket) {
             $sourceMain[$bucket] = [];
         }
+        $socialDetailUids = [];
+        $otherDetailUids = [];
+        $otherUrls = [];
         foreach ($sourcesDaily as $day => $payload) {
             if (!is_string($day) || $day < $fromKey || ($toKey !== null && $day > $toKey)) {
                 continue;
@@ -1420,6 +1523,24 @@
                     if (is_array($details)) {
                         foreach ($details as $label => $detailPayload) {
                             if (!in_array((string) $label, $emailDetailLabels, true)) {
+                                $detailUids = is_array($detailPayload) ? ($detailPayload['uids'] ?? []) : [];
+                                $detailUrl = is_array($detailPayload) ? (string) ($detailPayload['url'] ?? '') : '';
+                                if ($isFediverseSourceLabel((string) $label, $detailUrl)) {
+                                    foreach ($detailUids as $uid => $flag) {
+                                        $sourceMain['social'][$uid] = true;
+                                        $socialDetailUids['Fediverso'][$uid] = true;
+                                    }
+                                    foreach ($detailUids as $uid => $flag) {
+                                        unset($sourceMain['other'][$uid]);
+                                    }
+                                    continue;
+                                }
+                                foreach ($detailUids as $uid => $flag) {
+                                    $otherDetailUids[$label][$uid] = true;
+                                }
+                                if ($detailUrl !== '') {
+                                    $otherUrls[$label] = $detailUrl;
+                                }
                                 continue;
                             }
                             $detailUids = is_array($detailPayload) ? ($detailPayload['uids'] ?? []) : [];
@@ -1432,7 +1553,7 @@
             }
         }
 
-        $collectSourceUidsRange = static function (string $category) use ($sourcesDaily, $fromKey, $toKey, $emailDetailLabels): array {
+        $collectSourceUidsRange = static function (string $category) use ($sourcesDaily, $fromKey, $toKey, $emailDetailLabels, $isFediverseSourceLabel): array {
             $result = [];
             foreach ($sourcesDaily as $day => $payload) {
                 if (!is_string($day) || $day < $fromKey || ($toKey !== null && $day > $toKey)) {
@@ -1450,6 +1571,9 @@
                     if ($category === 'other' && in_array((string) $label, $emailDetailLabels, true)) {
                         continue;
                     }
+                    if ($category === 'social' && $isFediverseSourceLabel((string) $label)) {
+                        $label = 'Fediverso';
+                    }
                     $detailUids = is_array($detailPayload) ? ($detailPayload['uids'] ?? []) : [];
                     foreach ($detailUids as $uid => $flag) {
                         $result[$label][$uid] = true;
@@ -1461,7 +1585,13 @@
 
         $sourceMainRowsLocal = $buildPercentTable($sourceMain, $sourceMainLabels);
         $searchDetailRowsLocal = $buildPercentTable($collectSourceUidsRange('search'), []);
-        $socialDetailRowsLocal = $buildPercentTable($collectSourceUidsRange('social'), []);
+        $socialDetailsMerged = $collectSourceUidsRange('social');
+        foreach ($socialDetailUids as $label => $uids) {
+            foreach ($uids as $uid => $flag) {
+                $socialDetailsMerged[$label][$uid] = true;
+            }
+        }
+        $socialDetailRowsLocal = $buildPercentTable($socialDetailsMerged, []);
         $pushDetailRowsLocal = $buildPercentTable($collectSourceUidsRange('push'), []);
 
         $emailDetails = $collectEmailDetails($fromKey, $toKey);
@@ -1486,11 +1616,15 @@
 
         $otherDetails = $collectOtherDetails($fromKey, $toKey);
         $otherUids = [];
-        $otherUrls = [];
         foreach ($otherDetails as $label => $detailPayload) {
             $otherUids[$label] = $detailPayload['uids'] ?? [];
             if (!empty($detailPayload['url'])) {
                 $otherUrls[$label] = $detailPayload['url'];
+            }
+        }
+        foreach ($otherDetailUids as $label => $uids) {
+            foreach ($uids as $uid => $flag) {
+                $otherUids[$label][$uid] = true;
             }
         }
         $otherDetailRowsLocal = $buildPercentTable($otherUids, []);
@@ -2536,6 +2670,31 @@
 
         <div class="row">
             <div class="col-lg-4 order-lg-2">
+                <?php if (!empty($multiInstanceDashboard['enabled'])): ?>
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Clúster central</h4>
+                            <p class="mb-2"><strong>Clúster:</strong> <?= htmlspecialchars((string) ($multiInstanceDashboard['cluster'] ?: 'sin nombre'), ENT_QUOTES, 'UTF-8') ?></p>
+                            <p class="mb-2"><strong>Sitios detectados:</strong> <?= (int) $multiInstanceDashboard['sites'] ?></p>
+                            <?php if ($multiInstanceDashboard['runner_label'] !== ''): ?>
+                                <p class="mb-2"><strong>Runner activo:</strong>
+                                    <?php if ($multiInstanceDashboard['runner_url'] !== ''): ?>
+                                        <a href="<?= htmlspecialchars((string) $multiInstanceDashboard['runner_url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer"><?= htmlspecialchars((string) $multiInstanceDashboard['runner_label'], ENT_QUOTES, 'UTF-8') ?></a>
+                                    <?php else: ?>
+                                        <?= htmlspecialchars((string) $multiInstanceDashboard['runner_label'], ENT_QUOTES, 'UTF-8') ?>
+                                    <?php endif; ?>
+                                    <?php if ($multiInstanceDashboard['runner_at_label'] !== ''): ?>
+                                        · <?= htmlspecialchars((string) $multiInstanceDashboard['runner_at_label'], ENT_QUOTES, 'UTF-8') ?>
+                                    <?php endif; ?>
+                                </p>
+                            <?php endif; ?>
+                            <p class="mb-2"><strong>Slots esta hora:</strong> light <?= (int) $multiInstanceDashboard['recent_light_runs'] ?> · maintenance <?= (int) $multiInstanceDashboard['recent_maintenance_runs'] ?> · heavy <?= (int) $multiInstanceDashboard['recent_heavy_runs'] ?></p>
+                            <p class="mb-2"><strong>Hosts remotos seguidos:</strong> <?= (int) $multiInstanceDashboard['tracked_hosts'] ?></p>
+                            <p class="mb-2"><strong>Hosts en backoff:</strong> <?= (int) $multiInstanceDashboard['hosts_in_backoff'] ?></p>
+                            <p class="mb-0"><strong>Caché compartida:</strong> <?= $multiInstanceDashboard['shared_cache_dir'] !== '' ? 'activa' : 'no configurada' ?> · <strong>Cola compartida:</strong> <?= $multiInstanceDashboard['shared_queue_dir'] !== '' ? 'activa' : 'no configurada' ?></p>
+                        </div>
+                    </div>
+                <?php endif; ?>
                 <div class="card mb-4">
                     <div class="card-body">
                         <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Imagen 30 días</h4>

@@ -538,6 +538,14 @@ function admin_run_cluster_scheduled_tasks(): array
         }
         $state = admin_multi_instance_scheduler_state_load($config);
         $now = time();
+        $state['last_runner'] = [
+            'site_dir' => __DIR__,
+            'slug' => basename(__DIR__),
+            'site_name' => trim((string) ($config['site_name'] ?? basename(__DIR__))),
+            'site_url' => trim((string) ($config['site_url'] ?? '')),
+            'ran_at' => gmdate(DATE_ATOM, $now),
+            'timestamp' => $now,
+        ];
         $runs = [];
         foreach ($sites as $index => $site) {
             $siteKey = (string) ($site['site_dir'] ?? ('site-' . $index));

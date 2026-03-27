@@ -304,6 +304,19 @@ Ese estado no bloquea de forma dura las peticiones. Lo que hace es:
 
 Si multiinstancia está apagado, este control no se usa y cada instalación sigue funcionando como hasta ahora.
 
+### Dashboard en modo central
+
+Cuando un sitio está en `scheduler_mode = central`, el dashboard muestra además un bloque `Clúster central` sobre `Imagen 30 días` con métricas básicas del grupo:
+
+- sitios detectados en el clúster,
+- la instancia que actuó por última vez como runner central,
+- slots recientes ejecutados,
+- hosts remotos seguidos,
+- hosts actualmente en backoff,
+- y estado de caché/cola compartidas.
+
+En el bloque `Origen de los usuarios únicos`, las referencias federadas se muestran como `Fediverso`. Eso incluye dominios como `mastodon.social` o `maximalismo.red`, que no deben computar en `Sitios web` sino en `Redes sociales`.
+
 Si en vez de eso editas `/etc/crontab` o usas `sudo crontab -e`, entonces sí debes añadir `www-data` delante del comando.
 
 ### Qué guarda cada backup

@@ -99,6 +99,7 @@ En el primer acceso Nammu crea el usuario inicial y guarda la configuración bá
 Nada más entrar, revisa estas pantallas:
 
 1. **Configuración**: nombre del sitio, autor, idioma, modo blog/diccionario, URL del sitio y, si hace falta, declaraciones opcionales de multiinstancia para servidores con varias instalaciones.
+   El bloque `Formas de contacto para los lectores` se guarda por separado dentro de esa misma pantalla para no interferir con la configuración general del sitio.
 2. **Plantilla**: tipografías, colores, portada, footer y botones de cabecera.
 3. **Difusión**: redes sociales, push, podcast y metadatos sociales.
 4. **Lista**: correo saliente y suscripciones si vas a usar avisos o newsletters.
@@ -225,9 +226,50 @@ Campos disponibles:
 - `cluster`: nombre lógico del grupo de sitios.
 - `shared_cache_dir`: ruta de caché remota compartida.
 - `shared_queue_dir`: ruta de colas compartidas.
+- `instances_root_dir`: directorio donde viven las distintas instalaciones del clúster.
 - `scheduler_mode`: `standalone` o `central`.
 
+En la fase 1, si `enabled = on` y `shared_cache_dir` apunta a un directorio escribible, Nammu puede reutilizar entre instancias:
+
+- documentos `WebFinger`,
+- documentos ActivityPub remotos obtenidos por `GET`,
+- estado/documento de actores remotos,
+- y metadatos de social cards o link cards.
+
+Si el directorio no existe, no es escribible o dejas esta configuración vacía, Nammu sigue funcionando con sus cachés locales habituales y no cambia nada en una instalación única.
+
 Si dejas ese bloque vacío o apagado, Nammu se comporta como instalación única, sin cambios de compatibilidad ni de flujo.
+
+### Fase 2: planificador central opcional
+
+Si varias instalaciones del mismo servidor usan:
+
+- el mismo `cluster`,
+- el mismo `shared_queue_dir`,
+- y `scheduler_mode = central`,
+
+puedes lanzar un único runner central:
+
+```bash
+php /var/www/html/<carpeta-publica>/admin.php --run-cluster-scheduled
+```
+
+Ese runner:
+
+- descubre las instalaciones hermanas del mismo clúster,
+- reparte sus fases `light`, `maintenance` y `heavy` por slots,
+- ejecuta internamente los comandos normales de cada sitio,
+- y evita duplicaciones con dos barreras:
+  - un lock compartido por clúster,
+  - y un estado compartido de slots ya ejecutados.
+
+Para mayor seguridad, el runner central solo incorpora sitios que coincidan exactamente en:
+
+- `cluster`
+- `shared_queue_dir`
+- `scheduler_mode = central`
+
+Si un sitio sigue en `standalone`, conserva su cron propio y queda fuera del planificador central.
 
 Si en vez de eso editas `/etc/crontab` o usas `sudo crontab -e`, entonces sí debes añadir `www-data` delante del comando.
 

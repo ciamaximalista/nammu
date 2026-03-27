@@ -112,6 +112,107 @@ function nammu_fediverse_keys_file(): string
     return dirname(__DIR__) . '/config/activitypub-keys.json';
 }
 
+function nammu_fediverse_multi_instance_config(array $config): array
+{
+    $settings = is_array($config['multi_instance'] ?? null) ? $config['multi_instance'] : [];
+    $normalized = [
+        'enabled' => (($settings['enabled'] ?? 'off') === 'on') ? 'on' : 'off',
+        'cluster' => trim((string) ($settings['cluster'] ?? '')),
+        'shared_cache_dir' => trim((string) ($settings['shared_cache_dir'] ?? '')),
+        'shared_queue_dir' => trim((string) ($settings['shared_queue_dir'] ?? '')),
+        'scheduler_mode' => trim((string) ($settings['scheduler_mode'] ?? 'standalone')),
+    ];
+    if (!in_array($normalized['scheduler_mode'], ['standalone', 'central'], true)) {
+        $normalized['scheduler_mode'] = 'standalone';
+    }
+    return $normalized;
+}
+
+function nammu_fediverse_shared_cache_dir(array $config): string
+{
+    $multi = nammu_fediverse_multi_instance_config($config);
+    if (($multi['enabled'] ?? 'off') !== 'on') {
+        return '';
+    }
+    $path = trim((string) ($multi['shared_cache_dir'] ?? ''));
+    if ($path === '') {
+        return '';
+    }
+    return rtrim($path, '/');
+}
+
+function nammu_fediverse_shared_cache_file(array $config, string $bucket, string $key): string
+{
+    $base = nammu_fediverse_shared_cache_dir($config);
+    if ($base === '') {
+        return '';
+    }
+    $bucket = preg_replace('/[^a-z0-9._-]+/i', '-', strtolower(trim($bucket))) ?? '';
+    if ($bucket === '') {
+        $bucket = 'misc';
+    }
+    $hash = sha1($key);
+    return $base . '/fediverse/' . $bucket . '/' . $hash . '.json';
+}
+
+function nammu_fediverse_shared_cache_read(array $config, string $bucket, string $key, int $ttl): ?array
+{
+    $file = nammu_fediverse_shared_cache_file($config, $bucket, $key);
+    if ($file === '' || !is_file($file)) {
+        return null;
+    }
+    try {
+        $payload = nammu_fediverse_load_json_store($file, []);
+    } catch (Throwable $e) {
+        return null;
+    }
+    if (!is_array($payload) || empty($payload)) {
+        return null;
+    }
+    $fetchedAt = (int) ($payload['fetched_at'] ?? 0);
+    if ($fetchedAt <= 0 || (time() - $fetchedAt) > max(1, $ttl)) {
+        return null;
+    }
+    return $payload;
+}
+
+function nammu_fediverse_shared_cache_write(array $config, string $bucket, string $key, array $payload): void
+{
+    $file = nammu_fediverse_shared_cache_file($config, $bucket, $key);
+    if ($file === '') {
+        return;
+    }
+    try {
+        $dir = dirname($file);
+        if (!is_dir($dir)) {
+            nammu_ensure_directory($dir);
+        }
+        nammu_fediverse_save_json_store($file, $payload);
+    } catch (Throwable $e) {
+        return;
+    }
+}
+
+function nammu_fediverse_should_shared_cache_remote_url(string $url, ?array $config = null): bool
+{
+    $url = trim($url);
+    if ($url === '' || !preg_match('#^https?://#i', $url)) {
+        return false;
+    }
+    $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+    if ($host === '') {
+        return false;
+    }
+    if (is_array($config)) {
+        $localHost = nammu_fediverse_site_host($config);
+        if ($localHost !== '' && $host === $localHost) {
+            return false;
+        }
+        return nammu_fediverse_shared_cache_dir($config) !== '';
+    }
+    return true;
+}
+
 function nammu_fediverse_load_json_store(string $file, array $default = []): array
 {
     if (!isset($GLOBALS['nammu_fediverse_json_store_cache']) || !is_array($GLOBALS['nammu_fediverse_json_store_cache'])) {
@@ -497,6 +598,18 @@ function nammu_fediverse_signed_fetch(string $url, array $config, string $method
 
 function nammu_fediverse_signed_fetch_json(string $url, array $config, string $method = 'GET', string $body = ''): ?array
 {
+    $url = trim($url);
+    if (
+        strtoupper($method) === 'GET'
+        && $body === ''
+        && nammu_fediverse_should_shared_cache_remote_url($url, $config)
+    ) {
+        $cached = nammu_fediverse_shared_cache_read($config, 'activitypub-json', $url, 300);
+        $payload = is_array($cached['payload'] ?? null) ? $cached['payload'] : null;
+        if (is_array($payload)) {
+            return $payload;
+        }
+    }
     $response = nammu_fediverse_signed_fetch($url, $config, $method, $body);
     if (($response['status'] ?? 0) < 200 || ($response['status'] ?? 0) >= 400) {
         if (strtoupper($method) === 'GET' && $body === '') {
@@ -505,6 +618,17 @@ function nammu_fediverse_signed_fetch_json(string $url, array $config, string $m
         return null;
     }
     $decoded = json_decode((string) ($response['body'] ?? ''), true);
+    if (
+        is_array($decoded)
+        && strtoupper($method) === 'GET'
+        && $body === ''
+        && nammu_fediverse_should_shared_cache_remote_url($url, $config)
+    ) {
+        nammu_fediverse_shared_cache_write($config, 'activitypub-json', $url, [
+            'fetched_at' => time(),
+            'payload' => $decoded,
+        ]);
+    }
     return is_array($decoded) ? $decoded : null;
 }
 
@@ -541,6 +665,7 @@ function nammu_fediverse_fetch(string $url, string $accept = 'application/activi
 
 function nammu_fediverse_fetch_json(string $url, string $accept = 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9'): ?array
 {
+    $url = trim($url);
     $response = nammu_fediverse_fetch($url, $accept);
     if (($response['status'] ?? 0) < 200 || ($response['status'] ?? 0) >= 400) {
         return null;
@@ -555,19 +680,47 @@ function nammu_fediverse_fetch_actor_document_status(string $url, array $config)
     if ($url === '') {
         return ['status' => 0, 'body' => null];
     }
+    if (nammu_fediverse_should_shared_cache_remote_url($url, $config)) {
+        $cached = nammu_fediverse_shared_cache_read($config, 'actor-status', $url, 300);
+        $cachedStatus = (int) ($cached['status'] ?? 0);
+        $cachedBody = is_array($cached['body'] ?? null) ? $cached['body'] : null;
+        if ($cachedStatus > 0 && is_array($cachedBody)) {
+            return ['status' => $cachedStatus, 'body' => $cachedBody];
+        }
+    }
     $response = nammu_fediverse_signed_fetch($url, $config);
     $status = (int) ($response['status'] ?? 0);
     $body = json_decode((string) ($response['body'] ?? ''), true);
     if ($status >= 200 && $status < 400 && is_array($body)) {
+        if (nammu_fediverse_should_shared_cache_remote_url($url, $config)) {
+            nammu_fediverse_shared_cache_write($config, 'actor-status', $url, [
+                'fetched_at' => time(),
+                'status' => $status,
+                'body' => $body,
+            ]);
+        }
         return ['status' => $status, 'body' => $body];
     }
     $fallback = nammu_fediverse_fetch($url);
     $fallbackStatus = (int) ($fallback['status'] ?? 0);
     $fallbackBody = json_decode((string) ($fallback['body'] ?? ''), true);
-    return [
+    $result = [
         'status' => $fallbackStatus > 0 ? $fallbackStatus : $status,
         'body' => is_array($fallbackBody) ? $fallbackBody : (is_array($body) ? $body : null),
     ];
+    if (
+        nammu_fediverse_should_shared_cache_remote_url($url, $config)
+        && (int) ($result['status'] ?? 0) >= 200
+        && (int) ($result['status'] ?? 0) < 400
+        && is_array($result['body'] ?? null)
+    ) {
+        nammu_fediverse_shared_cache_write($config, 'actor-status', $url, [
+            'fetched_at' => time(),
+            'status' => (int) $result['status'],
+            'body' => $result['body'],
+        ]);
+    }
+    return $result;
 }
 
 function nammu_fediverse_extract_url($value): string
@@ -764,10 +917,24 @@ function nammu_fediverse_resolve_actor(string $input, ?array $config = null): ?a
     if ($domain === '') {
         return null;
     }
-    $webfinger = nammu_fediverse_fetch_json(
-        'https://' . $domain . '/.well-known/webfinger?resource=' . $resource,
-        'application/jrd+json, application/json;q=0.9'
-    );
+    $webfingerUrl = 'https://' . $domain . '/.well-known/webfinger?resource=' . $resource;
+    $webfinger = null;
+    if (is_array($config) && nammu_fediverse_should_shared_cache_remote_url($webfingerUrl, $config)) {
+        $cached = nammu_fediverse_shared_cache_read($config, 'webfinger', $webfingerUrl, 21600);
+        $webfinger = is_array($cached['payload'] ?? null) ? $cached['payload'] : null;
+    }
+    if (!is_array($webfinger)) {
+        $webfinger = nammu_fediverse_fetch_json(
+            $webfingerUrl,
+            'application/jrd+json, application/json;q=0.9'
+        );
+        if (is_array($config) && is_array($webfinger) && nammu_fediverse_should_shared_cache_remote_url($webfingerUrl, $config)) {
+            nammu_fediverse_shared_cache_write($config, 'webfinger', $webfingerUrl, [
+                'fetched_at' => time(),
+                'payload' => $webfinger,
+            ]);
+        }
+    }
     if (!is_array($webfinger)) {
         return null;
     }
@@ -2980,6 +3147,18 @@ function nammu_fediverse_fetch_link_card(string $url, array $config, int $maxAge
             return $card;
         }
     }
+    if (nammu_fediverse_should_shared_cache_remote_url($url, $config)) {
+        $shared = nammu_fediverse_shared_cache_read($config, 'link-card', $url, $maxAge);
+        $sharedCard = is_array($shared['card'] ?? null) ? $shared['card'] : [];
+        if (!empty($sharedCard)) {
+            $cacheItems[$cacheKey] = [
+                'fetched_at' => (int) ($shared['fetched_at'] ?? time()),
+                'card' => $sharedCard,
+            ];
+            nammu_fediverse_save_link_cards_store($cacheItems);
+            return $sharedCard;
+        }
+    }
 
     if (!function_exists('nammu_actuality_fetch_url') && is_file(dirname(__DIR__) . '/core/actualidad.php')) {
         require_once dirname(__DIR__) . '/core/actualidad.php';
@@ -3049,6 +3228,12 @@ function nammu_fediverse_fetch_link_card(string $url, array $config, int $maxAge
         $cacheItems = array_slice($cacheItems, 0, 500, true);
     }
     nammu_fediverse_save_link_cards_store($cacheItems);
+    if (nammu_fediverse_should_shared_cache_remote_url($url, $config)) {
+        nammu_fediverse_shared_cache_write($config, 'link-card', $url, [
+            'fetched_at' => time(),
+            'card' => $card,
+        ]);
+    }
     return $card;
 }
 

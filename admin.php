@@ -3,8 +3,9 @@ $__nammuCliArgs = (PHP_SAPI === 'cli' && isset($argv) && is_array($argv)) ? $arg
 $__nammuRunScheduledOnly = PHP_SAPI === 'cli' && in_array('--run-scheduled', $__nammuCliArgs, true);
 $__nammuRunScheduledMaintenanceOnly = PHP_SAPI === 'cli' && in_array('--run-scheduled-maintenance', $__nammuCliArgs, true);
 $__nammuRunScheduledHeavyOnly = PHP_SAPI === 'cli' && in_array('--run-scheduled-heavy', $__nammuCliArgs, true);
+$__nammuRunClusterScheduledOnly = PHP_SAPI === 'cli' && in_array('--run-cluster-scheduled', $__nammuCliArgs, true);
 $__nammuReplayFediverseDeletesOnly = PHP_SAPI === 'cli' && in_array('--replay-fediverse-deletes', $__nammuCliArgs, true);
-if (!$__nammuRunScheduledOnly && !$__nammuRunScheduledMaintenanceOnly && !$__nammuRunScheduledHeavyOnly && !$__nammuReplayFediverseDeletesOnly) {
+if (!$__nammuRunScheduledOnly && !$__nammuRunScheduledMaintenanceOnly && !$__nammuRunScheduledHeavyOnly && !$__nammuRunClusterScheduledOnly && !$__nammuReplayFediverseDeletesOnly) {
     session_start();
 }
 
@@ -42,6 +43,7 @@ nammu_ensure_directory(ITINERARIES_DIR);
 $runScheduledOnly = $__nammuRunScheduledOnly;
 $runScheduledMaintenanceOnly = $__nammuRunScheduledMaintenanceOnly;
 $runScheduledHeavyOnly = $__nammuRunScheduledHeavyOnly;
+$runClusterScheduledOnly = $__nammuRunClusterScheduledOnly;
 $runReplayFediverseDeletesOnly = $__nammuReplayFediverseDeletesOnly;
 
 // --- Helper Functions ---
@@ -261,6 +263,311 @@ function admin_run_scheduled_heavy_tasks(): array {
         'fediverse_threads_warmed' => $threadsWarmed,
         'fediverse_snapshots_rebuilt' => 1,
     ];
+}
+
+function admin_multi_instance_settings(array $config): array
+{
+    $settings = is_array($config['multi_instance'] ?? null) ? $config['multi_instance'] : [];
+    $normalized = [
+        'enabled' => (($settings['enabled'] ?? 'off') === 'on') ? 'on' : 'off',
+        'cluster' => trim((string) ($settings['cluster'] ?? '')),
+        'shared_cache_dir' => trim((string) ($settings['shared_cache_dir'] ?? '')),
+        'shared_queue_dir' => trim((string) ($settings['shared_queue_dir'] ?? '')),
+        'instances_root_dir' => trim((string) ($settings['instances_root_dir'] ?? '')),
+        'scheduler_mode' => trim((string) ($settings['scheduler_mode'] ?? 'standalone')),
+    ];
+    if (!in_array($normalized['scheduler_mode'], ['standalone', 'central'], true)) {
+        $normalized['scheduler_mode'] = 'standalone';
+    }
+    return $normalized;
+}
+
+function admin_multi_instance_instances_root_dir(array $config): string
+{
+    $settings = admin_multi_instance_settings($config);
+    $configured = trim((string) ($settings['instances_root_dir'] ?? ''));
+    if ($configured !== '') {
+        return rtrim($configured, '/');
+    }
+    return rtrim(dirname(__DIR__), '/');
+}
+
+function admin_multi_instance_shared_queue_dir(array $config): string
+{
+    $settings = admin_multi_instance_settings($config);
+    if (($settings['enabled'] ?? 'off') !== 'on') {
+        return '';
+    }
+    $configured = trim((string) ($settings['shared_queue_dir'] ?? ''));
+    if ($configured === '') {
+        return '';
+    }
+    return rtrim($configured, '/');
+}
+
+function admin_multi_instance_cluster_name(array $config): string
+{
+    $settings = admin_multi_instance_settings($config);
+    return trim((string) ($settings['cluster'] ?? ''));
+}
+
+function admin_multi_instance_load_config_at(string $siteDir): array
+{
+    $configFile = rtrim($siteDir, '/') . '/config/config.yml';
+    if (!is_file($configFile)) {
+        return [];
+    }
+    $raw = @file_get_contents($configFile);
+    if (!is_string($raw) || $raw === '') {
+        return [];
+    }
+    if (class_exists(Yaml::class)) {
+        try {
+            $parsed = Yaml::parse($raw);
+            return is_array($parsed) ? $parsed : [];
+        } catch (Throwable $e) {
+        }
+    }
+    $parsed = simple_yaml_parse($raw);
+    return is_array($parsed) ? $parsed : [];
+}
+
+function admin_multi_instance_discover_cluster_sites(array $config): array
+{
+    $settings = admin_multi_instance_settings($config);
+    $cluster = trim((string) ($settings['cluster'] ?? ''));
+    $rootDir = admin_multi_instance_instances_root_dir($config);
+    $sharedQueueDir = admin_multi_instance_shared_queue_dir($config);
+    if (($settings['enabled'] ?? 'off') !== 'on' || ($settings['scheduler_mode'] ?? 'standalone') !== 'central' || $cluster === '' || $sharedQueueDir === '' || !is_dir($rootDir)) {
+        return [];
+    }
+    $items = [];
+    foreach (glob($rootDir . '/*', GLOB_ONLYDIR) ?: [] as $siteDir) {
+        $siteDir = rtrim((string) $siteDir, '/');
+        $siteConfig = admin_multi_instance_load_config_at($siteDir);
+        if (empty($siteConfig)) {
+            continue;
+        }
+        $siteMulti = admin_multi_instance_settings($siteConfig);
+        if (($siteMulti['enabled'] ?? 'off') !== 'on' || ($siteMulti['scheduler_mode'] ?? 'standalone') !== 'central') {
+            continue;
+        }
+        if (trim((string) ($siteMulti['cluster'] ?? '')) !== $cluster) {
+            continue;
+        }
+        $siteSharedQueueDir = admin_multi_instance_shared_queue_dir($siteConfig);
+        if ($siteSharedQueueDir === '' || rtrim($siteSharedQueueDir, '/') !== rtrim($sharedQueueDir, '/')) {
+            continue;
+        }
+        $adminFile = $siteDir . '/admin.php';
+        if (!is_file($adminFile)) {
+            continue;
+        }
+        $items[] = [
+            'site_dir' => $siteDir,
+            'admin_file' => $adminFile,
+            'site_name' => trim((string) ($siteConfig['site_name'] ?? basename($siteDir))),
+            'site_url' => trim((string) ($siteConfig['site_url'] ?? '')),
+            'slug' => basename($siteDir),
+        ];
+    }
+    usort($items, static function (array $a, array $b): int {
+        return strcmp((string) ($a['site_dir'] ?? ''), (string) ($b['site_dir'] ?? ''));
+    });
+    return $items;
+}
+
+function admin_multi_instance_scheduler_state_file(array $config): string
+{
+    $queueDir = admin_multi_instance_shared_queue_dir($config);
+    $cluster = preg_replace('/[^a-z0-9._-]+/i', '-', admin_multi_instance_cluster_name($config)) ?? '';
+    if ($queueDir === '' || $cluster === '') {
+        return '';
+    }
+    return $queueDir . '/scheduler-' . strtolower($cluster) . '.json';
+}
+
+function admin_multi_instance_scheduler_lock_file(array $config): string
+{
+    $queueDir = admin_multi_instance_shared_queue_dir($config);
+    $cluster = preg_replace('/[^a-z0-9._-]+/i', '-', admin_multi_instance_cluster_name($config)) ?? '';
+    if ($queueDir === '' || $cluster === '') {
+        return '';
+    }
+    return $queueDir . '/scheduler-' . strtolower($cluster) . '.lock';
+}
+
+function admin_multi_instance_scheduler_state_load(array $config): array
+{
+    $file = admin_multi_instance_scheduler_state_file($config);
+    if ($file === '' || !is_file($file)) {
+        return ['runs' => []];
+    }
+    $raw = @file_get_contents($file);
+    $decoded = json_decode((string) $raw, true);
+    if (!is_array($decoded)) {
+        return ['runs' => []];
+    }
+    $decoded['runs'] = is_array($decoded['runs'] ?? null) ? $decoded['runs'] : [];
+    return $decoded;
+}
+
+function admin_multi_instance_scheduler_state_save(array $config, array $state): void
+{
+    $file = admin_multi_instance_scheduler_state_file($config);
+    if ($file === '') {
+        return;
+    }
+    $dir = dirname($file);
+    if (!is_dir($dir)) {
+        nammu_ensure_directory($dir);
+    }
+    @file_put_contents($file, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+}
+
+function admin_multi_instance_due_slots(int $index): array
+{
+    return [
+        'light' => $index % 10,
+        'maintenance' => (12 + ($index * 2)) % 30,
+        'heavy' => (13 + ($index * 10)) % 60,
+    ];
+}
+
+function admin_multi_instance_phase_due(string $phase, int $index, array $state, string $siteKey, int $now): bool
+{
+    $minute = (int) date('i', $now);
+    $hourKey = date('Y-m-d-H', $now);
+    $slotKey = date('Y-m-d-H:i', $now);
+    $slots = admin_multi_instance_due_slots($index);
+    $siteState = is_array($state['runs'][$siteKey] ?? null) ? $state['runs'][$siteKey] : [];
+    if ($phase === 'light') {
+        if (($minute % 10) !== (int) $slots['light']) {
+            return false;
+        }
+        return trim((string) ($siteState['light_slot'] ?? '')) !== $slotKey;
+    }
+    if ($phase === 'maintenance') {
+        if (($minute % 30) !== (int) $slots['maintenance']) {
+            return false;
+        }
+        return trim((string) ($siteState['maintenance_slot'] ?? '')) !== $slotKey;
+    }
+    if ($phase === 'heavy') {
+        if ($minute !== (int) $slots['heavy']) {
+            return false;
+        }
+        return trim((string) ($siteState['heavy_hour'] ?? '')) !== $hourKey;
+    }
+    return false;
+}
+
+function admin_multi_instance_mark_phase_run(array &$state, string $siteKey, string $phase, int $now): void
+{
+    if (!isset($state['runs']) || !is_array($state['runs'])) {
+        $state['runs'] = [];
+    }
+    if (!isset($state['runs'][$siteKey]) || !is_array($state['runs'][$siteKey])) {
+        $state['runs'][$siteKey] = [];
+    }
+    if ($phase === 'heavy') {
+        $state['runs'][$siteKey]['heavy_hour'] = date('Y-m-d-H', $now);
+        return;
+    }
+    $state['runs'][$siteKey][$phase . '_slot'] = date('Y-m-d-H:i', $now);
+}
+
+function admin_multi_instance_run_site_phase(string $adminFile, string $phase): array
+{
+    $map = [
+        'light' => '--run-scheduled',
+        'maintenance' => '--run-scheduled-maintenance',
+        'heavy' => '--run-scheduled-heavy',
+    ];
+    $flag = $map[$phase] ?? '';
+    if ($flag === '') {
+        return ['ok' => false, 'phase' => $phase, 'reason' => 'invalid_phase'];
+    }
+    $php = defined('PHP_BINARY') && PHP_BINARY !== '' ? PHP_BINARY : 'php';
+    $cmd = escapeshellarg($php) . ' ' . escapeshellarg($adminFile) . ' ' . $flag . ' 2>&1';
+    exec($cmd, $output, $code);
+    $raw = trim(implode("\n", $output));
+    $decoded = json_decode($raw, true);
+    return [
+        'ok' => $code === 0,
+        'phase' => $phase,
+        'exit_code' => $code,
+        'result' => is_array($decoded) ? $decoded : null,
+        'raw' => $raw,
+    ];
+}
+
+function admin_run_cluster_scheduled_tasks(): array
+{
+    $config = nammu_load_config();
+    $settings = admin_multi_instance_settings($config);
+    if (($settings['enabled'] ?? 'off') !== 'on') {
+        return ['ok' => true, 'skipped' => 1, 'reason' => 'multi_instance_disabled'];
+    }
+    if (($settings['scheduler_mode'] ?? 'standalone') !== 'central') {
+        return ['ok' => true, 'skipped' => 1, 'reason' => 'scheduler_mode_not_central'];
+    }
+    $queueDir = admin_multi_instance_shared_queue_dir($config);
+    if ($queueDir === '') {
+        return ['ok' => true, 'skipped' => 1, 'reason' => 'shared_queue_dir_missing'];
+    }
+    if (!is_dir($queueDir)) {
+        nammu_ensure_directory($queueDir);
+    }
+    $lockFile = admin_multi_instance_scheduler_lock_file($config);
+    if ($lockFile === '') {
+        return ['ok' => true, 'skipped' => 1, 'reason' => 'cluster_lock_unavailable'];
+    }
+    $lockHandle = @fopen($lockFile, 'c+');
+    if (!is_resource($lockHandle)) {
+        return ['ok' => true, 'skipped' => 1, 'reason' => 'cluster_lock_unavailable'];
+    }
+    if (!@flock($lockHandle, LOCK_EX | LOCK_NB)) {
+        fclose($lockHandle);
+        return ['ok' => true, 'skipped' => 1, 'reason' => 'cluster_already_running'];
+    }
+    try {
+        $sites = admin_multi_instance_discover_cluster_sites($config);
+        if (empty($sites)) {
+            return ['ok' => true, 'skipped' => 1, 'reason' => 'no_cluster_sites'];
+        }
+        $state = admin_multi_instance_scheduler_state_load($config);
+        $now = time();
+        $runs = [];
+        foreach ($sites as $index => $site) {
+            $siteKey = (string) ($site['site_dir'] ?? ('site-' . $index));
+            foreach (['light', 'maintenance', 'heavy'] as $phase) {
+                if (!admin_multi_instance_phase_due($phase, $index, $state, $siteKey, $now)) {
+                    continue;
+                }
+                $run = admin_multi_instance_run_site_phase((string) $site['admin_file'], $phase);
+                $runs[] = [
+                    'site' => $site['slug'] ?? basename((string) $site['site_dir']),
+                    'phase' => $phase,
+                    'exit_code' => (int) ($run['exit_code'] ?? 1),
+                    'result' => $run['result'] ?? null,
+                ];
+                admin_multi_instance_mark_phase_run($state, $siteKey, $phase, $now);
+            }
+        }
+        admin_multi_instance_scheduler_state_save($config, $state);
+        return [
+            'ok' => true,
+            'skipped' => 0,
+            'cluster' => admin_multi_instance_cluster_name($config),
+            'sites' => count($sites),
+            'executed' => count($runs),
+            'runs' => $runs,
+        ];
+    } finally {
+        @flock($lockHandle, LOCK_UN);
+        fclose($lockHandle);
+    }
 }
 
 function admin_scheduled_lock_file(): string
@@ -1904,6 +2211,7 @@ function get_settings() {
         'cluster' => '',
         'shared_cache_dir' => '',
         'shared_queue_dir' => '',
+        'instances_root_dir' => '',
         'scheduler_mode' => 'standalone',
     ];
     $multiInstance = array_merge($multiInstanceDefaults, $config['multi_instance'] ?? []);
@@ -6637,6 +6945,12 @@ if (!is_array($fullBackupFeedback) || !isset($fullBackupFeedback['message'], $fu
 } else {
     unset($_SESSION['full_backup_feedback']);
 }
+$contactFeedback = $_SESSION['contact_feedback'] ?? null;
+if (!is_array($contactFeedback) || !isset($contactFeedback['message'], $contactFeedback['type'])) {
+    $contactFeedback = null;
+} else {
+    unset($_SESSION['contact_feedback']);
+}
 $postalFeedback = $_SESSION['postal_feedback'] ?? null;
 if (!is_array($postalFeedback) || !isset($postalFeedback['message'], $postalFeedback['type'])) {
     $postalFeedback = null;
@@ -6679,6 +6993,13 @@ if ($runScheduledMaintenanceOnly) {
 if ($runScheduledHeavyOnly) {
     $result = admin_run_with_scheduled_lock('admin_run_scheduled_heavy_tasks');
     $result['mode'] = 'heavy';
+    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+    exit(0);
+}
+
+if ($runClusterScheduledOnly) {
+    $result = admin_run_cluster_scheduled_tasks();
+    $result['mode'] = 'cluster';
     fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
     exit(0);
 }
@@ -9394,21 +9715,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $multi_instance_cluster = trim((string) ($_POST['multi_instance_cluster'] ?? ''));
         $multi_instance_shared_cache_dir = trim((string) ($_POST['multi_instance_shared_cache_dir'] ?? ''));
         $multi_instance_shared_queue_dir = trim((string) ($_POST['multi_instance_shared_queue_dir'] ?? ''));
+        $multi_instance_instances_root_dir = trim((string) ($_POST['multi_instance_instances_root_dir'] ?? ''));
         $multi_instance_scheduler_mode = trim((string) ($_POST['multi_instance_scheduler_mode'] ?? 'standalone'));
         if (!in_array($multi_instance_scheduler_mode, ['standalone', 'central'], true)) {
             $multi_instance_scheduler_mode = 'standalone';
         }
         $social_default_description = trim($_POST['social_default_description'] ?? '');
-        $contact_telegram = trim($_POST['contact_telegram'] ?? '');
-        $contact_email = trim($_POST['contact_email'] ?? '');
-        $contact_phone = trim($_POST['contact_phone'] ?? '');
-        $contact_footer = isset($_POST['contact_footer']) ? 'on' : 'off';
-        $contact_signature = isset($_POST['contact_signature']) ? 'on' : 'off';
-        $contact_signature_fields = $_POST['contact_signature_fields'] ?? [];
-        if (!is_array($contact_signature_fields)) {
-            $contact_signature_fields = [];
-        }
-        $contact_signature_fields = array_values(array_intersect(['telegram', 'email', 'phone'], $contact_signature_fields));
 
         try {
             $config = load_config_file();
@@ -9443,6 +9755,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 || $multi_instance_cluster !== ''
                 || $multi_instance_shared_cache_dir !== ''
                 || $multi_instance_shared_queue_dir !== ''
+                || $multi_instance_instances_root_dir !== ''
                 || $multi_instance_scheduler_mode !== 'standalone'
             ) {
                 $config['multi_instance'] = [
@@ -9450,6 +9763,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'cluster' => $multi_instance_cluster,
                     'shared_cache_dir' => $multi_instance_shared_cache_dir,
                     'shared_queue_dir' => $multi_instance_shared_queue_dir,
+                    'instances_root_dir' => $multi_instance_instances_root_dir,
                     'scheduler_mode' => $multi_instance_scheduler_mode,
                 ];
             } else {
@@ -9466,19 +9780,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $config['social'] = $social;
             } else {
                 unset($config['social']);
-            }
-
-            if ($contact_telegram !== '' || $contact_email !== '' || $contact_phone !== '' || $contact_footer === 'on' || $contact_signature === 'on') {
-                $config['contact'] = [
-                    'telegram' => $contact_telegram,
-                    'email' => $contact_email,
-                    'phone' => $contact_phone,
-                    'footer' => $contact_footer,
-                    'signature' => $contact_signature,
-                    'signature_fields' => $contact_signature_fields,
-                ];
-            } else {
-                unset($config['contact']);
             }
 
             save_config_file($config);
@@ -9515,8 +9816,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 unset($config['contact']);
             }
             save_config_file($config);
+            $_SESSION['contact_feedback'] = [
+                'type' => 'success',
+                'message' => 'Formas de contacto guardadas correctamente.',
+            ];
         } catch (Throwable $e) {
-            $error = "Error guardando la configuración: " . $e->getMessage();
+            $_SESSION['contact_feedback'] = [
+                'type' => 'danger',
+                'message' => "Error guardando las formas de contacto: " . $e->getMessage(),
+            ];
         }
         header('Location: admin.php?page=configuracion');
         exit;

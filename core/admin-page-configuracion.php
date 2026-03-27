@@ -39,6 +39,11 @@
                 <?= htmlspecialchars($fullBackupFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
             </div>
         <?php endif; ?>
+        <?php if (isset($contactFeedback) && $contactFeedback !== null): ?>
+            <div class="alert alert-<?= $contactFeedback['type'] === 'success' ? 'success' : 'danger' ?>">
+                <?= htmlspecialchars($contactFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
         <?php
         $telegramSettings = $settings['telegram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
         $telegramAutoEnabled = ($telegramSettings['auto_post'] ?? 'off') === 'on';
@@ -87,6 +92,7 @@
         $multiInstanceCluster = trim((string) ($multiInstanceSettings['cluster'] ?? ''));
         $multiInstanceSharedCacheDir = trim((string) ($multiInstanceSettings['shared_cache_dir'] ?? ''));
         $multiInstanceSharedQueueDir = trim((string) ($multiInstanceSettings['shared_queue_dir'] ?? ''));
+        $multiInstanceInstancesRootDir = trim((string) ($multiInstanceSettings['instances_root_dir'] ?? ''));
         $multiInstanceSchedulerMode = trim((string) ($multiInstanceSettings['scheduler_mode'] ?? 'standalone'));
         if (!in_array($multiInstanceSchedulerMode, ['standalone', 'central'], true)) {
             $multiInstanceSchedulerMode = 'standalone';
@@ -199,6 +205,11 @@
                     <div class="form-group">
                         <label for="multi_instance_shared_queue_dir">Directorio compartido de colas</label>
                         <input type="text" name="multi_instance_shared_queue_dir" id="multi_instance_shared_queue_dir" class="form-control" value="<?= htmlspecialchars($multiInstanceSharedQueueDir, ENT_QUOTES, 'UTF-8') ?>" placeholder="/var/www/html/blogs/_shared-queue">
+                    </div>
+                    <div class="form-group">
+                        <label for="multi_instance_instances_root_dir">Directorio raíz de instancias</label>
+                        <input type="text" name="multi_instance_instances_root_dir" id="multi_instance_instances_root_dir" class="form-control" value="<?= htmlspecialchars($multiInstanceInstancesRootDir, ENT_QUOTES, 'UTF-8') ?>" placeholder="/var/www/html/blogs">
+                        <small class="form-text text-muted">Se usa solo en modo central para descubrir otras instalaciones del mismo clúster.</small>
                     </div>
                     <div class="form-group mb-0">
                         <label for="multi_instance_scheduler_mode">Modo de planificación</label>

@@ -3566,9 +3566,10 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
                 $canDeriveThreadUrl = false;
             }
         }
-        if (trim((string) ($object['url'] ?? '')) === '' && $objectId !== '') {
+        $objectUrl = nammu_fediverse_extract_url($object['url'] ?? '');
+        if ($objectUrl === '' && $objectId !== '') {
             $object['url'] = $canDeriveThreadUrl ? nammu_fediverse_remote_thread_page_url($objectId) : '';
-            if (trim((string) ($object['url'] ?? '')) === '') {
+            if (nammu_fediverse_extract_url($object['url'] ?? '') === '') {
                 $object['url'] = $objectId;
             }
         }

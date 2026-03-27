@@ -37,6 +37,12 @@ config/activitypub-keys.json
 config/webmentions.json
 config/webmention-queue.json
 config/webmention-state.json
+# Artefactos opcionales de multiinstancia / caché compartida
+shared-cache/
+shared-queue/
+_shared-cache/
+_shared-queue/
+config/multi-instance-*.json
 # Locks y estados de runtime
 config/*.lock
 indexnow-*.txt

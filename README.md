@@ -98,7 +98,7 @@ En el primer acceso Nammu crea el usuario inicial y guarda la configuración bá
 
 Nada más entrar, revisa estas pantallas:
 
-1. **Configuración**: nombre del sitio, autor, idioma, modo blog/diccionario, URL del sitio.
+1. **Configuración**: nombre del sitio, autor, idioma, modo blog/diccionario, URL del sitio y, si hace falta, declaraciones opcionales de multiinstancia para servidores con varias instalaciones.
 2. **Plantilla**: tipografías, colores, portada, footer y botones de cabecera.
 3. **Difusión**: redes sociales, push, podcast y metadatos sociales.
 4. **Lista**: correo saliente y suscripciones si vas a usar avisos o newsletters.
@@ -214,6 +214,20 @@ Ese patrón evita dos problemas comunes:
 
 - que varias instancias recomputen `Fediverso` a la vez,
 - y que una misma instancia se pise a sí misma o solape `light`, `maintenance` y `heavy`.
+
+### Declaraciones opcionales de multiinstancia
+
+Desde **Configuración** puedes guardar una sección opcional de multiinstancia pensada para servidores donde conviven varias instalaciones Nammu. Esta sección no cambia por sí sola el comportamiento del blog: mientras no actives fases específicas de multiinstancia en código o cron, una instalación individual seguirá funcionando exactamente como siempre.
+
+Campos disponibles:
+
+- `enabled`: activa la declaración multiinstancia para ese sitio.
+- `cluster`: nombre lógico del grupo de sitios.
+- `shared_cache_dir`: ruta de caché remota compartida.
+- `shared_queue_dir`: ruta de colas compartidas.
+- `scheduler_mode`: `standalone` o `central`.
+
+Si dejas ese bloque vacío o apagado, Nammu se comporta como instalación única, sin cambios de compatibilidad ni de flujo.
 
 Si en vez de eso editas `/etc/crontab` o usas `sudo crontab -e`, entonces sí debes añadir `www-data` delante del comando.
 

@@ -82,6 +82,15 @@
         $contactSignature = ($contactSettings['signature'] ?? 'off') === 'on';
         $contactSignatureFields = is_array($contactSettings['signature_fields'] ?? null) ? $contactSettings['signature_fields'] : [];
         $euplNoticeEnabled = ($settings['eupl_notice'] ?? 'on') === 'on';
+        $multiInstanceSettings = is_array($settings['multi_instance'] ?? null) ? $settings['multi_instance'] : [];
+        $multiInstanceEnabled = ($multiInstanceSettings['enabled'] ?? 'off') === 'on';
+        $multiInstanceCluster = trim((string) ($multiInstanceSettings['cluster'] ?? ''));
+        $multiInstanceSharedCacheDir = trim((string) ($multiInstanceSettings['shared_cache_dir'] ?? ''));
+        $multiInstanceSharedQueueDir = trim((string) ($multiInstanceSettings['shared_queue_dir'] ?? ''));
+        $multiInstanceSchedulerMode = trim((string) ($multiInstanceSettings['scheduler_mode'] ?? 'standalone'));
+        if (!in_array($multiInstanceSchedulerMode, ['standalone', 'central'], true)) {
+            $multiInstanceSchedulerMode = 'standalone';
+        }
         $statsBackups = function_exists('admin_list_stats_backups') ? admin_list_stats_backups(7) : [];
         $fullBackups = function_exists('admin_list_full_backups') ? admin_list_full_backups(8) : [];
         $languageOptions = [
@@ -166,6 +175,39 @@
                 <div class="custom-control custom-checkbox">
                     <input type="checkbox" class="custom-control-input" id="eupl_notice" name="eupl_notice" <?= $euplNoticeEnabled ? 'checked' : '' ?>>
                     <label class="custom-control-label" for="eupl_notice">Mostrar la referencia a la licencia EUPL en el bloque de Nammu del pie</label>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h4 class="mt-0">Multiinstancia opcional</h4>
+                    <p class="text-muted mb-3">Úsalo solo si varias instalaciones Nammu comparten servidor y quieres declarar recursos comunes. Si lo dejas apagado, esta instalación seguirá funcionando exactamente igual que una instalación única.</p>
+                    <div class="form-group">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input" id="multi_instance_enabled" name="multi_instance_enabled" <?= $multiInstanceEnabled ? 'checked' : '' ?>>
+                            <label class="custom-control-label" for="multi_instance_enabled">Activar configuración multiinstancia para este blog</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="multi_instance_cluster">Nombre del grupo o clúster</label>
+                        <input type="text" name="multi_instance_cluster" id="multi_instance_cluster" class="form-control" value="<?= htmlspecialchars($multiInstanceCluster, ENT_QUOTES, 'UTF-8') ?>" placeholder="repoblacion">
+                    </div>
+                    <div class="form-group">
+                        <label for="multi_instance_shared_cache_dir">Directorio compartido de caché remota</label>
+                        <input type="text" name="multi_instance_shared_cache_dir" id="multi_instance_shared_cache_dir" class="form-control" value="<?= htmlspecialchars($multiInstanceSharedCacheDir, ENT_QUOTES, 'UTF-8') ?>" placeholder="/var/www/html/blogs/_shared-cache">
+                    </div>
+                    <div class="form-group">
+                        <label for="multi_instance_shared_queue_dir">Directorio compartido de colas</label>
+                        <input type="text" name="multi_instance_shared_queue_dir" id="multi_instance_shared_queue_dir" class="form-control" value="<?= htmlspecialchars($multiInstanceSharedQueueDir, ENT_QUOTES, 'UTF-8') ?>" placeholder="/var/www/html/blogs/_shared-queue">
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="multi_instance_scheduler_mode">Modo de planificación</label>
+                        <select name="multi_instance_scheduler_mode" id="multi_instance_scheduler_mode" class="form-control">
+                            <option value="standalone" <?= $multiInstanceSchedulerMode === 'standalone' ? 'selected' : '' ?>>Standalone</option>
+                            <option value="central" <?= $multiInstanceSchedulerMode === 'central' ? 'selected' : '' ?>>Central</option>
+                        </select>
+                        <small class="form-text text-muted">Por ahora esta sección es declarativa: no cambia el cron ni el comportamiento del sitio si no activas explícitamente fases multiinstancia en una siguiente iteración.</small>
+                    </div>
                 </div>
             </div>
 

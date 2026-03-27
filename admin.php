@@ -1899,6 +1899,17 @@ function get_settings() {
     if (!is_array($socialRss['networks'] ?? null)) {
         $socialRss['networks'] = [];
     }
+    $multiInstanceDefaults = [
+        'enabled' => 'off',
+        'cluster' => '',
+        'shared_cache_dir' => '',
+        'shared_queue_dir' => '',
+        'scheduler_mode' => 'standalone',
+    ];
+    $multiInstance = array_merge($multiInstanceDefaults, $config['multi_instance'] ?? []);
+    if (!in_array($multiInstance['scheduler_mode'], ['standalone', 'central'], true)) {
+        $multiInstance['scheduler_mode'] = 'standalone';
+    }
 
     return [
         'sort_order' => $sort_order,
@@ -1938,6 +1949,7 @@ function get_settings() {
         'telex' => $telex,
         'contact' => $contact,
         'social_rss' => $socialRss,
+        'multi_instance' => $multiInstance,
         'entry' => $entry,
     ];
 }
@@ -9378,6 +9390,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $site_url = trim($_POST['site_url'] ?? '');
         $site_lang = trim($_POST['site_lang'] ?? 'es');
         $eupl_notice = isset($_POST['eupl_notice']) ? 'on' : 'off';
+        $multi_instance_enabled = isset($_POST['multi_instance_enabled']) ? 'on' : 'off';
+        $multi_instance_cluster = trim((string) ($_POST['multi_instance_cluster'] ?? ''));
+        $multi_instance_shared_cache_dir = trim((string) ($_POST['multi_instance_shared_cache_dir'] ?? ''));
+        $multi_instance_shared_queue_dir = trim((string) ($_POST['multi_instance_shared_queue_dir'] ?? ''));
+        $multi_instance_scheduler_mode = trim((string) ($_POST['multi_instance_scheduler_mode'] ?? 'standalone'));
+        if (!in_array($multi_instance_scheduler_mode, ['standalone', 'central'], true)) {
+            $multi_instance_scheduler_mode = 'standalone';
+        }
         $social_default_description = trim($_POST['social_default_description'] ?? '');
         $contact_telegram = trim($_POST['contact_telegram'] ?? '');
         $contact_email = trim($_POST['contact_email'] ?? '');
@@ -9418,6 +9438,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 unset($config['site_lang']);
             }
             $config['eupl_notice'] = $eupl_notice;
+            if (
+                $multi_instance_enabled === 'on'
+                || $multi_instance_cluster !== ''
+                || $multi_instance_shared_cache_dir !== ''
+                || $multi_instance_shared_queue_dir !== ''
+                || $multi_instance_scheduler_mode !== 'standalone'
+            ) {
+                $config['multi_instance'] = [
+                    'enabled' => $multi_instance_enabled,
+                    'cluster' => $multi_instance_cluster,
+                    'shared_cache_dir' => $multi_instance_shared_cache_dir,
+                    'shared_queue_dir' => $multi_instance_shared_queue_dir,
+                    'scheduler_mode' => $multi_instance_scheduler_mode,
+                ];
+            } else {
+                unset($config['multi_instance']);
+            }
 
             $social = $config['social'] ?? [];
             if ($social_default_description !== '') {

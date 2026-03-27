@@ -133,6 +133,15 @@ function admin_run_scheduled_maintenance_tasks(): array {
     $fediverseAnnounceQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $deliveryStats = ['followers' => 0, 'delivered' => 0];
     $acceptStats = ['checked' => 0, 'accepted' => 0, 'failed' => 0];
+    $actualityChanged = false;
+    $snapshotSignature = static function (array $snapshot): string {
+        $items = is_array($snapshot['items'] ?? null) ? $snapshot['items'] : [];
+        return sha1(json_encode($items, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '[]');
+    };
+    $actualityBefore = function_exists('nammu_actuality_load_items_snapshot')
+        ? nammu_actuality_load_items_snapshot()
+        : ['items' => []];
+    $actualityBeforeSignature = $snapshotSignature($actualityBefore);
 
     if (function_exists('nammu_actuality_rebuild_snapshot')) {
         $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
@@ -142,7 +151,8 @@ function admin_run_scheduled_maintenance_tasks(): array {
         if ($baseUrl === '') {
             $baseUrl = nammu_base_url();
         }
-        nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
+        $rebuiltActuality = nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
+        $actualityChanged = $snapshotSignature(is_array($rebuiltActuality) ? $rebuiltActuality : ['items' => []]) !== $actualityBeforeSignature;
     }
     if (function_exists('admin_process_social_rss_feeds')) {
         $rssStats = admin_process_social_rss_feeds();
@@ -154,7 +164,8 @@ function admin_run_scheduled_maintenance_tasks(): array {
             if ($baseUrl === '') {
                 $baseUrl = nammu_base_url();
             }
-            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
+            $rebuiltActuality = nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
+            $actualityChanged = $actualityChanged || ($snapshotSignature(is_array($rebuiltActuality) ? $rebuiltActuality : ['items' => []]) !== $actualityBeforeSignature);
         }
     }
     if (function_exists('admin_process_social_broadcast_queue')) {
@@ -183,6 +194,7 @@ function admin_run_scheduled_maintenance_tasks(): array {
     }
     if (
         $published > 0
+        || $actualityChanged
         || (int) ($rssStats['sent'] ?? 0) > 0
         || (int) ($deliveryStats['delivered'] ?? 0) > 0
     ) {
@@ -198,6 +210,7 @@ function admin_run_scheduled_maintenance_tasks(): array {
         'published' => $published,
         'notifications_processed' => (int) ($queueStats['processed'] ?? 0),
         'notifications_remaining' => (int) ($queueStats['remaining'] ?? 0),
+        'actuality_changed' => $actualityChanged ? 1 : 0,
         'social_rss_sent' => (int) ($rssStats['sent'] ?? 0),
         'social_rss_checked' => (int) ($rssStats['checked'] ?? 0),
         'social_broadcast_queue_processed' => (int) ($socialBroadcastQueueStats['processed'] ?? 0),

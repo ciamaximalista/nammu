@@ -1050,6 +1050,26 @@
                                             <div class="fediverse-status__content"><?= nl2br(htmlspecialchars(strip_tags($statusText), ENT_QUOTES, 'UTF-8')) ?></div>
                                         <?php endif; ?>
                                         <?php $attachments = is_array($item['attachments'] ?? null) ? $item['attachments'] : []; ?>
+                                        <?php
+                                        $primaryLinkCardImageUrl = '';
+                                        foreach ($attachments as $attachmentProbe) {
+                                            if (!is_array($attachmentProbe)) {
+                                                continue;
+                                            }
+                                            $attachmentProbeType = strtolower(trim((string) ($attachmentProbe['type'] ?? '')));
+                                            $attachmentProbeMediaType = strtolower(trim((string) ($attachmentProbe['media_type'] ?? '')));
+                                            $isProbeLinkCard = $attachmentProbeType === 'link'
+                                                || $attachmentProbeMediaType === 'text/html'
+                                                || str_starts_with($attachmentProbeMediaType, 'text/html');
+                                            if (!$isProbeLinkCard) {
+                                                continue;
+                                            }
+                                            $primaryLinkCardImageUrl = trim((string) (($attachmentProbe['image'] ?? '') ?: ($item['image'] ?? '')));
+                                            if ($primaryLinkCardImageUrl !== '') {
+                                                break;
+                                            }
+                                        }
+                                        ?>
                                         <?php if (!empty($attachments)): ?>
                                             <div class="fediverse-status__attachments">
                                                 <?php foreach ($attachments as $attachment): ?>
@@ -1069,6 +1089,9 @@
                                                     $linkCardDescription = str_replace(["\r\n", "\r"], "\n", strip_tags($linkCardDescription));
                                                     ?>
                                                     <?php if ($isImage): ?>
+                                                        <?php if ($primaryLinkCardImageUrl !== '' && trim($attachmentUrl) === $primaryLinkCardImageUrl): ?>
+                                                            <?php continue; ?>
+                                                        <?php endif; ?>
                                                         <a class="fediverse-status__media" href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
                                                             <img src="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($attachment['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                                                         </a>

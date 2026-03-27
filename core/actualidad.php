@@ -607,8 +607,11 @@ function nammu_actuality_add_item_to_snapshots(array $item): void
     nammu_actuality_save_items_snapshot($items);
 }
 
-function nammu_actuality_fetch_url(string $url, string $accept = 'text/html,application/xhtml+xml', int $timeout = 8): array
+function nammu_actuality_fetch_url(string $url, string $accept = 'text/html,application/xhtml+xml', int $timeout = 8, ?array $config = null): array
 {
+    if (is_array($config) && function_exists('nammu_multi_instance_remote_host_before_request')) {
+        nammu_multi_instance_remote_host_before_request($url, $config);
+    }
     $headers = [];
     $context = stream_context_create([
         'http' => [
@@ -626,10 +629,21 @@ function nammu_actuality_fetch_url(string $url, string $accept = 'text/html,appl
         [$name, $value] = explode(':', $headerLine, 2);
         $headers[strtolower(trim($name))] = trim($value);
     }
-    return [
+    $result = [
         'body' => is_string($body) ? $body : '',
         'headers' => $headers,
     ];
+    if (is_array($config) && function_exists('nammu_multi_instance_remote_host_after_request')) {
+        $status = 0;
+        foreach (($http_response_header ?? []) as $headerLine) {
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#', (string) $headerLine, $matches) === 1) {
+                $status = (int) ($matches[1] ?? 0);
+                break;
+            }
+        }
+        nammu_multi_instance_remote_host_after_request($url, $config, $status);
+    }
+    return $result;
 }
 
 function nammu_actuality_rss_settings(array $config): array

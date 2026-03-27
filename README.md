@@ -271,6 +271,39 @@ Para mayor seguridad, el runner central solo incorpora sitios que coincidan exac
 
 Si un sitio sigue en `standalone`, conserva su cron propio y queda fuera del planificador central.
 
+### Fase 3: colas compartidas opcionales
+
+Si `shared_queue_dir` está activo, Nammu puede mover a ese directorio algunas colas salientes manteniéndolas separadas por sitio. En esta fase se comparten, por instancia:
+
+- `fediverso-announce-queue`
+- `fediverso-undo-announce-queue`
+- `fediverso-delete-queue`
+- `webmention-queue`
+- `webmention-state`
+
+Cada fichero compartido lleva un sufijo derivado de la URL base del sitio, así que varias instalaciones pueden usar el mismo `shared_queue_dir` sin mezclar sus trabajos.
+
+Si `shared_queue_dir` está vacío o desactivado:
+
+- esas colas siguen viviendo en `config/`
+- y una instalación única no nota ningún cambio
+
+### Fase 4: pacing y backoff compartidos por host remoto
+
+Con `shared_queue_dir` activo, Nammu mantiene también un estado compartido por host remoto para:
+
+- fetches ActivityPub,
+- entregas ActivityPub,
+- Webmentions,
+- y fetches remotos usados por social cards.
+
+Ese estado no bloquea de forma dura las peticiones. Lo que hace es:
+
+- espaciar suavemente peticiones concurrentes entre instancias al mismo host,
+- y propagar un backoff común cuando un servidor remoto devuelve `429`, `503`, `504`, `5xx` o falla sin respuesta.
+
+Si multiinstancia está apagado, este control no se usa y cada instalación sigue funcionando como hasta ahora.
+
 Si en vez de eso editas `/etc/crontab` o usas `sudo crontab -e`, entonces sí debes añadir `www-data` delante del comando.
 
 ### Qué guarda cada backup

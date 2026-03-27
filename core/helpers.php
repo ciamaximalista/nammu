@@ -73,6 +73,174 @@ function nammu_base_url(): string
     return rtrim($scheme . '://' . $host . $portSuffix . $dir, '/');
 }
 
+function nammu_multi_instance_settings(array $config): array
+{
+    $settings = is_array($config['multi_instance'] ?? null) ? $config['multi_instance'] : [];
+    $normalized = [
+        'enabled' => (($settings['enabled'] ?? 'off') === 'on') ? 'on' : 'off',
+        'cluster' => trim((string) ($settings['cluster'] ?? '')),
+        'shared_cache_dir' => trim((string) ($settings['shared_cache_dir'] ?? '')),
+        'shared_queue_dir' => trim((string) ($settings['shared_queue_dir'] ?? '')),
+        'instances_root_dir' => trim((string) ($settings['instances_root_dir'] ?? '')),
+        'scheduler_mode' => trim((string) ($settings['scheduler_mode'] ?? 'standalone')),
+    ];
+    if (!in_array($normalized['scheduler_mode'], ['standalone', 'central'], true)) {
+        $normalized['scheduler_mode'] = 'standalone';
+    }
+    return $normalized;
+}
+
+function nammu_multi_instance_shared_queue_dir(array $config): string
+{
+    $settings = nammu_multi_instance_settings($config);
+    if (($settings['enabled'] ?? 'off') !== 'on') {
+        return '';
+    }
+    $path = trim((string) ($settings['shared_queue_dir'] ?? ''));
+    if ($path === '') {
+        return '';
+    }
+    return rtrim($path, '/');
+}
+
+function nammu_multi_instance_local_host(array $config): string
+{
+    $baseUrl = trim((string) ($config['site_url'] ?? ''));
+    if ($baseUrl === '') {
+        $baseUrl = nammu_base_url();
+    }
+    $host = parse_url($baseUrl, PHP_URL_HOST);
+    return is_string($host) ? strtolower(trim($host)) : '';
+}
+
+function nammu_multi_instance_remote_host_state_file(array $config): string
+{
+    $queueDir = nammu_multi_instance_shared_queue_dir($config);
+    if ($queueDir === '') {
+        return '';
+    }
+    return $queueDir . '/remote-host-state.json';
+}
+
+function nammu_multi_instance_remote_host_lock_file(array $config): string
+{
+    $queueDir = nammu_multi_instance_shared_queue_dir($config);
+    if ($queueDir === '') {
+        return '';
+    }
+    return $queueDir . '/remote-host-state.lock';
+}
+
+function nammu_multi_instance_remote_host_for_url(string $url, array $config): string
+{
+    $url = trim($url);
+    if ($url === '' || !preg_match('#^https?://#i', $url)) {
+        return '';
+    }
+    $host = parse_url($url, PHP_URL_HOST);
+    $host = is_string($host) ? strtolower(trim($host)) : '';
+    if ($host === '') {
+        return '';
+    }
+    $localHost = nammu_multi_instance_local_host($config);
+    if ($localHost !== '' && $host === $localHost) {
+        return '';
+    }
+    if (nammu_multi_instance_shared_queue_dir($config) === '') {
+        return '';
+    }
+    return $host;
+}
+
+function nammu_multi_instance_remote_host_with_lock(array $config, callable $callback)
+{
+    $lockFile = nammu_multi_instance_remote_host_lock_file($config);
+    $stateFile = nammu_multi_instance_remote_host_state_file($config);
+    if ($lockFile === '' || $stateFile === '') {
+        return null;
+    }
+    $dir = dirname($stateFile);
+    if (!is_dir($dir)) {
+        nammu_ensure_directory($dir);
+    }
+    $handle = @fopen($lockFile, 'c+');
+    if (!is_resource($handle)) {
+        return null;
+    }
+    try {
+        if (!@flock($handle, LOCK_EX)) {
+            return null;
+        }
+        $raw = @file_get_contents($stateFile);
+        $state = json_decode((string) $raw, true);
+        if (!is_array($state)) {
+            $state = ['hosts' => []];
+        }
+        $state['hosts'] = is_array($state['hosts'] ?? null) ? $state['hosts'] : [];
+        $result = $callback($state);
+        @file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        return $result;
+    } finally {
+        @flock($handle, LOCK_UN);
+        fclose($handle);
+    }
+}
+
+function nammu_multi_instance_remote_host_before_request(string $url, array $config, int $maxWaitMs = 1200): void
+{
+    $host = nammu_multi_instance_remote_host_for_url($url, $config);
+    if ($host === '') {
+        return;
+    }
+    $sleepMicros = 0;
+    nammu_multi_instance_remote_host_with_lock($config, static function (array &$state) use ($host, $maxWaitMs, &$sleepMicros): void {
+        $now = microtime(true);
+        $hostState = is_array($state['hosts'][$host] ?? null) ? $state['hosts'][$host] : [];
+        $nextAllowed = max(
+            (float) ($hostState['next_allowed_at'] ?? 0),
+            (float) ($hostState['backoff_until'] ?? 0)
+        );
+        $waitSeconds = max(0.0, $nextAllowed - $now);
+        if ($waitSeconds > 0) {
+            $sleepMicros = (int) min((float) $maxWaitMs * 1000.0, $waitSeconds * 1000000.0);
+            $now += ($sleepMicros / 1000000.0);
+        }
+        $hostState['next_allowed_at'] = $now + 0.35;
+        $hostState['updated_at'] = gmdate(DATE_ATOM);
+        $state['hosts'][$host] = $hostState;
+    });
+    if ($sleepMicros > 0) {
+        usleep($sleepMicros);
+    }
+}
+
+function nammu_multi_instance_remote_host_after_request(string $url, array $config, int $status): void
+{
+    $host = nammu_multi_instance_remote_host_for_url($url, $config);
+    if ($host === '') {
+        return;
+    }
+    nammu_multi_instance_remote_host_with_lock($config, static function (array &$state) use ($host, $status): void {
+        $now = microtime(true);
+        $hostState = is_array($state['hosts'][$host] ?? null) ? $state['hosts'][$host] : [];
+        $failures = (int) ($hostState['failures'] ?? 0);
+        $isSuccess = $status >= 200 && $status < 400;
+        $isBackoffStatus = ($status === 0 || $status === 429 || $status === 503 || $status === 504 || ($status >= 500 && $status <= 599));
+        if ($isSuccess) {
+            $hostState['failures'] = 0;
+            $hostState['backoff_until'] = 0;
+        } elseif ($isBackoffStatus) {
+            $failures++;
+            $hostState['failures'] = $failures;
+            $delay = min(300, (int) pow(2, min($failures, 8)));
+            $hostState['backoff_until'] = $now + $delay;
+        }
+        $hostState['last_status'] = $status;
+        $hostState['updated_at'] = gmdate(DATE_ATOM);
+        $state['hosts'][$host] = $hostState;
+    });
+}
+
 function nammu_route_path(): string
 {
     $requestUri = $_SERVER['REQUEST_URI'] ?? '/';

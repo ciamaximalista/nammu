@@ -17,6 +17,49 @@ function nammu_webmention_state_file(): string
     return dirname(__DIR__) . '/config/webmention-state.json';
 }
 
+function nammu_webmention_effective_config(?array $config = null): array
+{
+    if (is_array($config)) {
+        return $config;
+    }
+    if (function_exists('nammu_load_config')) {
+        $loaded = nammu_load_config();
+        return is_array($loaded) ? $loaded : [];
+    }
+    return [];
+}
+
+function nammu_webmention_shared_queue_dir(array $config): string
+{
+    $settings = is_array($config['multi_instance'] ?? null) ? $config['multi_instance'] : [];
+    if (($settings['enabled'] ?? 'off') !== 'on') {
+        return '';
+    }
+    $path = trim((string) ($settings['shared_queue_dir'] ?? ''));
+    if ($path === '') {
+        return '';
+    }
+    return rtrim($path, '/');
+}
+
+function nammu_webmention_instance_queue_suffix(array $config): string
+{
+    $base = trim((string) (($config['site_url'] ?? '') ?: (function_exists('nammu_base_url') ? nammu_base_url() : '')));
+    if ($base === '') {
+        $base = trim((string) ($config['site_name'] ?? 'nammu'));
+    }
+    return sha1($base);
+}
+
+function nammu_webmention_queue_path_for(array $config, string $basename, string $fallback): string
+{
+    $sharedDir = nammu_webmention_shared_queue_dir($config);
+    if ($sharedDir === '') {
+        return $fallback;
+    }
+    return $sharedDir . '/' . $basename . '-' . nammu_webmention_instance_queue_suffix($config) . '.json';
+}
+
 function nammu_webmention_load_store(string $file, array $default): array
 {
     if (!is_file($file)) {
@@ -42,28 +85,36 @@ function nammu_webmention_store(): array
     return $store;
 }
 
-function nammu_webmention_queue_store(): array
+function nammu_webmention_queue_store(?array $config = null): array
 {
-    $store = nammu_webmention_load_store(nammu_webmention_queue_file(), ['items' => []]);
+    $resolvedConfig = nammu_webmention_effective_config($config);
+    $file = nammu_webmention_queue_path_for($resolvedConfig, 'webmention-queue', nammu_webmention_queue_file());
+    $store = nammu_webmention_load_store($file, ['items' => []]);
     $store['items'] = is_array($store['items'] ?? null) ? $store['items'] : [];
     return $store;
 }
 
-function nammu_webmention_state_store(): array
+function nammu_webmention_state_store(?array $config = null): array
 {
-    $store = nammu_webmention_load_store(nammu_webmention_state_file(), ['sources' => []]);
+    $resolvedConfig = nammu_webmention_effective_config($config);
+    $file = nammu_webmention_queue_path_for($resolvedConfig, 'webmention-state', nammu_webmention_state_file());
+    $store = nammu_webmention_load_store($file, ['sources' => []]);
     $store['sources'] = is_array($store['sources'] ?? null) ? $store['sources'] : [];
     return $store;
 }
 
-function nammu_webmention_save_queue_store(array $items): void
+function nammu_webmention_save_queue_store(array $items, ?array $config = null): void
 {
-    nammu_webmention_save_store(nammu_webmention_queue_file(), ['items' => array_values($items)]);
+    $resolvedConfig = nammu_webmention_effective_config($config);
+    $file = nammu_webmention_queue_path_for($resolvedConfig, 'webmention-queue', nammu_webmention_queue_file());
+    nammu_webmention_save_store($file, ['items' => array_values($items)]);
 }
 
-function nammu_webmention_save_state_store(array $sources): void
+function nammu_webmention_save_state_store(array $sources, ?array $config = null): void
 {
-    nammu_webmention_save_store(nammu_webmention_state_file(), ['sources' => $sources]);
+    $resolvedConfig = nammu_webmention_effective_config($config);
+    $file = nammu_webmention_queue_path_for($resolvedConfig, 'webmention-state', nammu_webmention_state_file());
+    nammu_webmention_save_store($file, ['sources' => $sources]);
 }
 
 function nammu_webmention_endpoint_url(array $config): string
@@ -148,6 +199,10 @@ function nammu_webmention_http_request(string $url, string $method = 'GET', arra
     $responseHeaders = [];
     $status = 0;
     $responseBody = '';
+    $config = nammu_webmention_effective_config();
+    if (function_exists('nammu_multi_instance_remote_host_before_request')) {
+        nammu_multi_instance_remote_host_before_request($url, $config);
+    }
 
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
@@ -175,7 +230,11 @@ function nammu_webmention_http_request(string $url, string $method = 'GET', arra
         $responseBody = (string) curl_exec($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         curl_close($ch);
-        return ['status' => $status, 'headers' => $responseHeaders, 'body' => $responseBody];
+        $result = ['status' => $status, 'headers' => $responseHeaders, 'body' => $responseBody];
+        if (function_exists('nammu_multi_instance_remote_host_after_request')) {
+            nammu_multi_instance_remote_host_after_request($url, $config, (int) ($result['status'] ?? 0));
+        }
+        return $result;
     }
 
     $context = stream_context_create([
@@ -197,7 +256,11 @@ function nammu_webmention_http_request(string $url, string $method = 'GET', arra
             $status = (int) ($matches[1] ?? 0);
         }
     }
-    return ['status' => $status, 'headers' => $responseHeaders, 'body' => is_string($responseBody) ? $responseBody : ''];
+    $result = ['status' => $status, 'headers' => $responseHeaders, 'body' => is_string($responseBody) ? $responseBody : ''];
+    if (function_exists('nammu_multi_instance_remote_host_after_request')) {
+        nammu_multi_instance_remote_host_after_request($url, $config, (int) ($result['status'] ?? 0));
+    }
+    return $result;
 }
 
 function nammu_webmention_discover_endpoint_from_headers(array $headers): string
@@ -413,7 +476,7 @@ function nammu_webmention_content_sources(array $config): array
     return $sources;
 }
 
-function nammu_webmention_enqueue_item(string $sourceUrl, string $targetUrl, string $endpointUrl): bool
+function nammu_webmention_enqueue_item(string $sourceUrl, string $targetUrl, string $endpointUrl, ?array $config = null): bool
 {
     $sourceUrl = nammu_webmention_normalize_url($sourceUrl);
     $targetUrl = nammu_webmention_normalize_url($targetUrl);
@@ -421,7 +484,7 @@ function nammu_webmention_enqueue_item(string $sourceUrl, string $targetUrl, str
     if ($sourceUrl === '' || $targetUrl === '' || $endpointUrl === '') {
         return false;
     }
-    $store = nammu_webmention_queue_store();
+    $store = nammu_webmention_queue_store($config);
     $items = is_array($store['items'] ?? null) ? $store['items'] : [];
     $signature = sha1($sourceUrl . '|' . $targetUrl . '|' . $endpointUrl);
     foreach ($items as $item) {
@@ -437,14 +500,14 @@ function nammu_webmention_enqueue_item(string $sourceUrl, string $targetUrl, str
         'created_at' => gmdate(DATE_ATOM),
         'attempts' => 0,
     ];
-    nammu_webmention_save_queue_store($items);
+    nammu_webmention_save_queue_store($items, $config);
     return true;
 }
 
 function nammu_webmention_sync_sources(array $config, int $limit = 4): array
 {
     $sources = nammu_webmention_content_sources($config);
-    $stateStore = nammu_webmention_state_store();
+    $stateStore = nammu_webmention_state_store($config);
     $state = is_array($stateStore['sources'] ?? null) ? $stateStore['sources'] : [];
     usort($sources, static function (array $a, array $b) use ($state): int {
         $checkedA = trim((string) (($state[$a['url']]['checked_at'] ?? '')));
@@ -490,13 +553,13 @@ function nammu_webmention_sync_sources(array $config, int $limit = 4): array
             if ($endpoint === '') {
                 continue;
             }
-            if (nammu_webmention_enqueue_item($sourceUrl, $targetUrl, $endpoint)) {
+            if (nammu_webmention_enqueue_item($sourceUrl, $targetUrl, $endpoint, $config)) {
                 $enqueued++;
             }
         }
     }
-    nammu_webmention_save_state_store($state);
-    $queueStore = nammu_webmention_queue_store();
+    nammu_webmention_save_state_store($state, $config);
+    $queueStore = nammu_webmention_queue_store($config);
     return [
         'scanned' => $scanned,
         'enqueued' => $enqueued,
@@ -506,7 +569,7 @@ function nammu_webmention_sync_sources(array $config, int $limit = 4): array
 
 function nammu_webmention_process_queue(array $config, int $limit = 4): array
 {
-    $store = nammu_webmention_queue_store();
+    $store = nammu_webmention_queue_store($config);
     $items = is_array($store['items'] ?? null) ? $store['items'] : [];
     $processed = 0;
     $sent = 0;
@@ -543,7 +606,7 @@ function nammu_webmention_process_queue(array $config, int $limit = 4): array
         }
         $failed++;
     }
-    nammu_webmention_save_queue_store(array_values($items));
+    nammu_webmention_save_queue_store(array_values($items), $config);
     return [
         'processed' => $processed,
         'sent' => $sent,

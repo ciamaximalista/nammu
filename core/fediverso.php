@@ -72,6 +72,49 @@ function nammu_fediverse_announce_queue_file(): string
     return dirname(__DIR__) . '/config/fediverso-announce-queue.json';
 }
 
+function nammu_fediverse_shared_queue_dir(array $config): string
+{
+    $multi = nammu_fediverse_multi_instance_config($config);
+    if (($multi['enabled'] ?? 'off') !== 'on') {
+        return '';
+    }
+    $path = trim((string) ($multi['shared_queue_dir'] ?? ''));
+    if ($path === '') {
+        return '';
+    }
+    return rtrim($path, '/');
+}
+
+function nammu_fediverse_effective_config(?array $config = null): array
+{
+    if (is_array($config)) {
+        return $config;
+    }
+    if (function_exists('nammu_load_config')) {
+        $loaded = nammu_load_config();
+        return is_array($loaded) ? $loaded : [];
+    }
+    return [];
+}
+
+function nammu_fediverse_instance_queue_suffix(array $config): string
+{
+    $base = nammu_fediverse_base_url($config);
+    if ($base === '') {
+        $base = trim((string) ($config['site_name'] ?? 'nammu'));
+    }
+    return sha1($base);
+}
+
+function nammu_fediverse_queue_file_for(array $config, string $basename, string $fallback): string
+{
+    $sharedDir = nammu_fediverse_shared_queue_dir($config);
+    if ($sharedDir === '') {
+        return $fallback;
+    }
+    return $sharedDir . '/' . $basename . '-' . nammu_fediverse_instance_queue_suffix($config) . '.json';
+}
+
 function nammu_fediverse_threads_cache_file(): string
 {
     return dirname(__DIR__) . '/config/fediverso-threads-cache.json';
@@ -561,6 +604,9 @@ function nammu_fediverse_signature_header(string $method, string $url, array $co
 function nammu_fediverse_signed_fetch(string $url, array $config, string $method = 'GET', string $body = '', ?int $timeoutOverride = null): array
 {
     $method = strtoupper($method);
+    if (function_exists('nammu_multi_instance_remote_host_before_request')) {
+        nammu_multi_instance_remote_host_before_request($url, $config);
+    }
     $headers = nammu_fediverse_signature_header($method, $url, $config, $body) ?? [
         'User-Agent: Nammu Fediverso',
         'Accept: application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9',
@@ -589,11 +635,15 @@ function nammu_fediverse_signed_fetch(string $url, array $config, string $method
         [$name, $value] = explode(':', $line, 2);
         $rawHeaders[strtolower(trim($name))] = trim($value);
     }
-    return [
+    $result = [
         'status' => $status,
         'headers' => $rawHeaders,
         'body' => is_string($responseBody) ? $responseBody : '',
     ];
+    if (function_exists('nammu_multi_instance_remote_host_after_request')) {
+        nammu_multi_instance_remote_host_after_request($url, $config, (int) ($result['status'] ?? 0));
+    }
+    return $result;
 }
 
 function nammu_fediverse_signed_fetch_json(string $url, array $config, string $method = 'GET', string $body = ''): ?array
@@ -1098,9 +1148,11 @@ function nammu_fediverse_legacy_actuality_store(): array
     return ['items' => $normalized];
 }
 
-function nammu_fediverse_delete_queue_store(): array
+function nammu_fediverse_delete_queue_store(?array $config = null): array
 {
-    $store = nammu_fediverse_load_json_store(nammu_fediverse_delete_queue_file(), ['items' => []]);
+    $resolvedConfig = nammu_fediverse_effective_config($config);
+    $file = nammu_fediverse_queue_file_for($resolvedConfig, 'fediverso-delete-queue', nammu_fediverse_delete_queue_file());
+    $store = nammu_fediverse_load_json_store($file, ['items' => []]);
     $items = is_array($store['items'] ?? null) ? $store['items'] : [];
     $normalized = [];
     foreach ($items as $item) {
@@ -1120,9 +1172,11 @@ function nammu_fediverse_delete_queue_store(): array
     return ['items' => $normalized];
 }
 
-function nammu_fediverse_undo_announce_queue_store(): array
+function nammu_fediverse_undo_announce_queue_store(?array $config = null): array
 {
-    $store = nammu_fediverse_load_json_store(nammu_fediverse_undo_announce_queue_file(), ['items' => []]);
+    $resolvedConfig = nammu_fediverse_effective_config($config);
+    $file = nammu_fediverse_queue_file_for($resolvedConfig, 'fediverso-undo-announce-queue', nammu_fediverse_undo_announce_queue_file());
+    $store = nammu_fediverse_load_json_store($file, ['items' => []]);
     $items = is_array($store['items'] ?? null) ? $store['items'] : [];
     $normalized = [];
     foreach ($items as $item) {
@@ -1146,9 +1200,11 @@ function nammu_fediverse_undo_announce_queue_store(): array
     return ['items' => $normalized];
 }
 
-function nammu_fediverse_announce_queue_store(): array
+function nammu_fediverse_announce_queue_store(?array $config = null): array
 {
-    $store = nammu_fediverse_load_json_store(nammu_fediverse_announce_queue_file(), ['items' => []]);
+    $resolvedConfig = nammu_fediverse_effective_config($config);
+    $file = nammu_fediverse_queue_file_for($resolvedConfig, 'fediverso-announce-queue', nammu_fediverse_announce_queue_file());
+    $store = nammu_fediverse_load_json_store($file, ['items' => []]);
     $items = is_array($store['items'] ?? null) ? $store['items'] : [];
     $normalized = [];
     foreach ($items as $item) {
@@ -1389,19 +1445,25 @@ function nammu_fediverse_refresh_legacy_actuality_aliases(array $config): array
     return $map;
 }
 
-function nammu_fediverse_save_delete_queue_store(array $items): void
+function nammu_fediverse_save_delete_queue_store(array $items, ?array $config = null): void
 {
-    nammu_fediverse_save_json_store(nammu_fediverse_delete_queue_file(), ['items' => array_values($items)]);
+    $resolvedConfig = nammu_fediverse_effective_config($config);
+    $file = nammu_fediverse_queue_file_for($resolvedConfig, 'fediverso-delete-queue', nammu_fediverse_delete_queue_file());
+    nammu_fediverse_save_json_store($file, ['items' => array_values($items)]);
 }
 
-function nammu_fediverse_save_undo_announce_queue_store(array $items): void
+function nammu_fediverse_save_undo_announce_queue_store(array $items, ?array $config = null): void
 {
-    nammu_fediverse_save_json_store(nammu_fediverse_undo_announce_queue_file(), ['items' => array_values($items)]);
+    $resolvedConfig = nammu_fediverse_effective_config($config);
+    $file = nammu_fediverse_queue_file_for($resolvedConfig, 'fediverso-undo-announce-queue', nammu_fediverse_undo_announce_queue_file());
+    nammu_fediverse_save_json_store($file, ['items' => array_values($items)]);
 }
 
-function nammu_fediverse_save_announce_queue_store(array $items): void
+function nammu_fediverse_save_announce_queue_store(array $items, ?array $config = null): void
 {
-    nammu_fediverse_save_json_store(nammu_fediverse_announce_queue_file(), ['items' => array_values($items)]);
+    $resolvedConfig = nammu_fediverse_effective_config($config);
+    $file = nammu_fediverse_queue_file_for($resolvedConfig, 'fediverso-announce-queue', nammu_fediverse_announce_queue_file());
+    nammu_fediverse_save_json_store($file, ['items' => array_values($items)]);
 }
 
 function nammu_fediverse_save_actions_store(array $items): void
@@ -3165,7 +3227,7 @@ function nammu_fediverse_fetch_link_card(string $url, array $config, int $maxAge
     }
 
     $response = function_exists('nammu_actuality_fetch_url')
-        ? nammu_actuality_fetch_url($url)
+        ? nammu_actuality_fetch_url($url, 'text/html,application/xhtml+xml', 8, $config)
         : ['body' => @file_get_contents($url) ?: '', 'headers' => []];
     $html = trim((string) ($response['body'] ?? ''));
     if ($html === '') {
@@ -6808,7 +6870,7 @@ function nammu_fediverse_send_announce(string $recipientId, string $objectUrl, a
         'created_at' => $published,
         'attempts' => 0,
     ];
-    nammu_fediverse_save_announce_queue_store($items);
+    nammu_fediverse_save_announce_queue_store($items, $config);
     nammu_fediverse_record_action('boost', $recipientId, $objectUrl, [
         'activity_id' => $activityId,
         'published' => $published,
@@ -6818,7 +6880,7 @@ function nammu_fediverse_send_announce(string $recipientId, string $objectUrl, a
 
 function nammu_fediverse_process_announce_queue(array $config, int $maxJobs = 2): array
 {
-    $queue = nammu_fediverse_announce_queue_store();
+    $queue = nammu_fediverse_announce_queue_store($config);
     $items = is_array($queue['items'] ?? null) ? array_values($queue['items']) : [];
     $processed = 0;
     $sent = 0;
@@ -6896,7 +6958,7 @@ function nammu_fediverse_process_announce_queue(array $config, int $maxJobs = 2)
             $remaining[] = $item;
         }
     }
-    nammu_fediverse_save_announce_queue_store($remaining);
+    nammu_fediverse_save_announce_queue_store($remaining, $config);
     return [
         'processed' => $processed,
         'sent' => $sent,
@@ -6978,7 +7040,7 @@ function nammu_fediverse_enqueue_undo_announce_for_item(array $item, array $conf
     if ($recipientId === '' || $objectUrl === '') {
         return ['ok' => false, 'message' => 'Faltan datos para retirar ese impulso.'];
     }
-    $queue = nammu_fediverse_undo_announce_queue_store();
+    $queue = nammu_fediverse_undo_announce_queue_store($config);
     $queuedItems = is_array($queue['items'] ?? null) ? $queue['items'] : [];
     $activityId = trim((string) ($boostAction['activity_id'] ?? ''));
     $alreadyQueued = false;
@@ -7002,7 +7064,7 @@ function nammu_fediverse_enqueue_undo_announce_for_item(array $item, array $conf
             'created_at' => gmdate(DATE_ATOM),
             'attempts' => 0,
         ];
-        nammu_fediverse_save_undo_announce_queue_store($queuedItems);
+        nammu_fediverse_save_undo_announce_queue_store($queuedItems, $config);
     }
 
     $messageParts = ['Impulso retirado localmente y encolado para deshacerlo en el Fediverso.'];
@@ -7044,7 +7106,7 @@ function nammu_fediverse_enqueue_undo_announce_for_item(array $item, array $conf
 
 function nammu_fediverse_process_undo_announce_queue(array $config, int $maxJobs = 2): array
 {
-    $queue = nammu_fediverse_undo_announce_queue_store();
+    $queue = nammu_fediverse_undo_announce_queue_store($config);
     $items = is_array($queue['items'] ?? null) ? array_values($queue['items']) : [];
     $processed = 0;
     $sent = 0;
@@ -7131,7 +7193,7 @@ function nammu_fediverse_process_undo_announce_queue(array $config, int $maxJobs
             $remaining[] = $item;
         }
     }
-    nammu_fediverse_save_undo_announce_queue_store($remaining);
+    nammu_fediverse_save_undo_announce_queue_store($remaining, $config);
     return [
         'processed' => $processed,
         'sent' => $sent,
@@ -8076,7 +8138,7 @@ function nammu_fediverse_enqueue_delete_local_item(string $itemId, array $config
     if (empty($mark['ok'])) {
         return $mark;
     }
-    $queue = nammu_fediverse_delete_queue_store();
+    $queue = nammu_fediverse_delete_queue_store($config);
     $items = is_array($queue['items'] ?? null) ? $queue['items'] : [];
     foreach ($items as $queued) {
         if (trim((string) ($queued['item_id'] ?? '')) === $itemId) {
@@ -8088,13 +8150,13 @@ function nammu_fediverse_enqueue_delete_local_item(string $itemId, array $config
         'created_at' => gmdate(DATE_ATOM),
         'attempts' => 0,
     ];
-    nammu_fediverse_save_delete_queue_store($items);
+    nammu_fediverse_save_delete_queue_store($items, $config);
     return ['ok' => true, 'queued' => count($items), 'message' => 'Publicación borrada localmente y encolada para borrado federado.'];
 }
 
 function nammu_fediverse_process_delete_queue(array $config, int $maxJobs = 3): array
 {
-    $queue = nammu_fediverse_delete_queue_store();
+    $queue = nammu_fediverse_delete_queue_store($config);
     $items = is_array($queue['items'] ?? null) ? array_values($queue['items']) : [];
     if ($maxJobs < 1) {
         $maxJobs = 1;
@@ -8127,7 +8189,7 @@ function nammu_fediverse_process_delete_queue(array $config, int $maxJobs = 3): 
             $remaining[] = $item;
         }
     }
-    nammu_fediverse_save_delete_queue_store($remaining);
+    nammu_fediverse_save_delete_queue_store($remaining, $config);
     return [
         'processed' => $processed,
         'sent' => $sent,
@@ -8150,7 +8212,7 @@ function nammu_fediverse_replay_all_deletes(array $config): array
             'remaining' => 0,
         ];
     }
-    $queue = nammu_fediverse_delete_queue_store();
+    $queue = nammu_fediverse_delete_queue_store($config);
     $queuedById = [];
     foreach ((array) ($queue['items'] ?? []) as $queued) {
         if (!is_array($queued)) {
@@ -8176,7 +8238,7 @@ function nammu_fediverse_replay_all_deletes(array $config): array
             $requeued++;
         }
     }
-    nammu_fediverse_save_delete_queue_store(array_values($queuedById));
+    nammu_fediverse_save_delete_queue_store(array_values($queuedById), $config);
     $processed = nammu_fediverse_process_delete_queue($config, max(1, count($deletedItems)));
     $processed['requeued'] = $requeued;
     return $processed;

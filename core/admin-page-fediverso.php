@@ -558,8 +558,15 @@
         } elseif (is_array($object)) {
             $targetUrl = trim((string) (($object['url'] ?? '') ?: ($object['id'] ?? '')));
         }
-        if ($targetUrl !== '' && isset($fediverseLocalLinks[$targetUrl])) {
-            $targetUrl = $fediverseLocalLinks[$targetUrl];
+        if ($targetUrl !== '') {
+            $targetPublicUrl = function_exists('nammu_fediverse_public_url_for_local_identifier')
+                ? trim((string) nammu_fediverse_public_url_for_local_identifier($targetUrl, $fediverseConfig))
+                : '';
+            if ($targetPublicUrl !== '') {
+                $targetUrl = $targetPublicUrl;
+            } elseif (isset($fediverseLocalLinks[$targetUrl])) {
+                $targetUrl = $fediverseLocalLinks[$targetUrl];
+            }
         }
         $actorUsername = trim((string) (($actor['preferredUsername'] ?? '') ?: ''));
         $actorHandle = $actorId;

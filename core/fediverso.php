@@ -4424,6 +4424,32 @@ function nammu_fediverse_find_local_item_for_identifier(string $identifier, arra
     return is_array($item) ? $item : null;
 }
 
+function nammu_fediverse_public_url_for_local_identifier(string $identifier, array $config): string
+{
+    $identifier = trim($identifier);
+    if ($identifier === '') {
+        return '';
+    }
+    $canonicalId = nammu_fediverse_canonical_local_id_for_identifier($identifier, $config);
+    if ($canonicalId === '') {
+        $canonicalId = $identifier;
+    }
+    $item = nammu_fediverse_find_local_item_for_identifier($canonicalId, $config);
+    if (!is_array($item)) {
+        $item = nammu_fediverse_find_local_item_for_identifier($identifier, $config);
+    }
+    if (preg_match('#/ap/objects/(post|podcast|itinerary)-#', $canonicalId) === 1) {
+        $itemUrl = trim((string) ($item['url'] ?? ''));
+        if ($itemUrl !== '') {
+            return $itemUrl;
+        }
+    }
+    if (str_contains($canonicalId, '/ap/objects/')) {
+        return nammu_fediverse_thread_page_url($canonicalId, $config);
+    }
+    return trim((string) ($item['url'] ?? ''));
+}
+
 function nammu_fediverse_local_reaction_summary(array $config): array
 {
     $index = nammu_fediverse_local_items_index($config);

@@ -94,8 +94,12 @@
         $multiInstanceSharedQueueDir = trim((string) ($multiInstanceSettings['shared_queue_dir'] ?? ''));
         $multiInstanceInstancesRootDir = trim((string) ($multiInstanceSettings['instances_root_dir'] ?? ''));
         $multiInstanceSchedulerMode = trim((string) ($multiInstanceSettings['scheduler_mode'] ?? 'standalone'));
+        $multiInstanceSchedulerStrategy = trim((string) ($multiInstanceSettings['scheduler_strategy'] ?? 'fixed'));
         if (!in_array($multiInstanceSchedulerMode, ['standalone', 'central'], true)) {
             $multiInstanceSchedulerMode = 'standalone';
+        }
+        if (!in_array($multiInstanceSchedulerStrategy, ['fixed', 'activity'], true)) {
+            $multiInstanceSchedulerStrategy = 'fixed';
         }
         $statsBackups = function_exists('admin_list_stats_backups') ? admin_list_stats_backups(7) : [];
         $fullBackups = function_exists('admin_list_full_backups') ? admin_list_full_backups(8) : [];
@@ -211,13 +215,21 @@
                         <input type="text" name="multi_instance_instances_root_dir" id="multi_instance_instances_root_dir" class="form-control" value="<?= htmlspecialchars($multiInstanceInstancesRootDir, ENT_QUOTES, 'UTF-8') ?>" placeholder="/var/www/html/blogs">
                         <small class="form-text text-muted">Se usa solo en modo central para descubrir otras instalaciones del mismo clúster.</small>
                     </div>
-                    <div class="form-group mb-0">
+                    <div class="form-group">
                         <label for="multi_instance_scheduler_mode">Modo de planificación</label>
                         <select name="multi_instance_scheduler_mode" id="multi_instance_scheduler_mode" class="form-control">
                             <option value="standalone" <?= $multiInstanceSchedulerMode === 'standalone' ? 'selected' : '' ?>>Standalone</option>
                             <option value="central" <?= $multiInstanceSchedulerMode === 'central' ? 'selected' : '' ?>>Central</option>
                         </select>
-                        <small class="form-text text-muted">Por ahora esta sección es declarativa: no cambia el cron ni el comportamiento del sitio si no activas explícitamente fases multiinstancia en una siguiente iteración.</small>
+                        <small class="form-text text-muted">`central` permite que un runner compartido reparta las fases del clúster. `standalone` deja este blog fuera del planificador central.</small>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="multi_instance_scheduler_strategy">Estrategia del planificador central</label>
+                        <select name="multi_instance_scheduler_strategy" id="multi_instance_scheduler_strategy" class="form-control">
+                            <option value="fixed" <?= $multiInstanceSchedulerStrategy === 'fixed' ? 'selected' : '' ?>>Fixed</option>
+                            <option value="activity" <?= $multiInstanceSchedulerStrategy === 'activity' ? 'selected' : '' ?>>Activity</option>
+                        </select>
+                        <small class="form-text text-muted">`fixed` mantiene los slots por índice. `activity` da prioridad a los blogs con contenido local reciente y deja a los inactivos en una cadencia más lenta.</small>
                     </div>
                 </div>
             </div>

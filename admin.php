@@ -288,9 +288,13 @@ function admin_multi_instance_settings(array $config): array
         'shared_queue_dir' => trim((string) ($settings['shared_queue_dir'] ?? '')),
         'instances_root_dir' => trim((string) ($settings['instances_root_dir'] ?? '')),
         'scheduler_mode' => trim((string) ($settings['scheduler_mode'] ?? 'standalone')),
+        'scheduler_strategy' => trim((string) ($settings['scheduler_strategy'] ?? 'fixed')),
     ];
     if (!in_array($normalized['scheduler_mode'], ['standalone', 'central'], true)) {
         $normalized['scheduler_mode'] = 'standalone';
+    }
+    if (!in_array($normalized['scheduler_strategy'], ['fixed', 'activity'], true)) {
+        $normalized['scheduler_strategy'] = 'fixed';
     }
     return $normalized;
 }
@@ -382,6 +386,7 @@ function admin_multi_instance_discover_cluster_sites(array $config): array
             'site_name' => trim((string) ($siteConfig['site_name'] ?? basename($siteDir))),
             'site_url' => trim((string) ($siteConfig['site_url'] ?? '')),
             'slug' => basename($siteDir),
+            'last_local_activity_at' => admin_multi_instance_site_last_local_activity_at($siteDir),
         ];
     }
     usort($items, static function (array $a, array $b): int {
@@ -438,6 +443,130 @@ function admin_multi_instance_scheduler_state_save(array $config, array $state):
     @file_put_contents($file, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 }
 
+function admin_multi_instance_site_last_local_activity_at(string $siteDir): int
+{
+    $timestamps = [];
+    foreach ([
+        rtrim($siteDir, '/') . '/content',
+        rtrim($siteDir, '/') . '/config/actualidad-manual.json',
+    ] as $path) {
+        if (($time = @filemtime($path)) !== false) {
+            $timestamps[] = (int) $time;
+        }
+    }
+    return empty($timestamps) ? 0 : max($timestamps);
+}
+
+function admin_multi_instance_site_activity_profile(array $site, int $now): array
+{
+    $lastActivityAt = (int) ($site['last_local_activity_at'] ?? 0);
+    if ($lastActivityAt <= 0) {
+        return [
+            'name' => 'idle',
+            'priority' => 100,
+            'light_interval' => 3600,
+            'maintenance_interval' => 10800,
+            'heavy_interval' => 43200,
+        ];
+    }
+    $age = max(0, $now - $lastActivityAt);
+    if ($age <= 129600) {
+        return [
+            'name' => 'fresh',
+            'priority' => 300,
+            'light_interval' => 600,
+            'maintenance_interval' => 1800,
+            'heavy_interval' => 3600,
+        ];
+    }
+    if ($age <= 604800) {
+        return [
+            'name' => 'warm',
+            'priority' => 200,
+            'light_interval' => 1200,
+            'maintenance_interval' => 3600,
+            'heavy_interval' => 10800,
+        ];
+    }
+    return [
+        'name' => 'idle',
+        'priority' => 100,
+        'light_interval' => 3600,
+        'maintenance_interval' => 10800,
+        'heavy_interval' => 43200,
+    ];
+}
+
+function admin_multi_instance_phase_last_run_timestamp(array $state, string $siteKey, string $phase): int
+{
+    $siteState = is_array($state['runs'][$siteKey] ?? null) ? $state['runs'][$siteKey] : [];
+    return (int) ($siteState[$phase . '_last_at'] ?? 0);
+}
+
+function admin_multi_instance_phase_interval_activity(string $phase, array $site, int $now): int
+{
+    $profile = admin_multi_instance_site_activity_profile($site, $now);
+    if ($phase === 'light') {
+        return (int) ($profile['light_interval'] ?? 3600);
+    }
+    if ($phase === 'maintenance') {
+        return (int) ($profile['maintenance_interval'] ?? 10800);
+    }
+    if ($phase === 'heavy') {
+        return (int) ($profile['heavy_interval'] ?? 43200);
+    }
+    return 3600;
+}
+
+function admin_multi_instance_phase_due_activity(string $phase, array $site, array $state, string $siteKey, int $now): bool
+{
+    $interval = admin_multi_instance_phase_interval_activity($phase, $site, $now);
+    $lastRunAt = admin_multi_instance_phase_last_run_timestamp($state, $siteKey, $phase);
+    if ($lastRunAt <= 0) {
+        return true;
+    }
+    return ($now - $lastRunAt) >= $interval;
+}
+
+function admin_multi_instance_pick_due_site_activity(string $phase, array $sites, array $state, int $now): ?array
+{
+    $eligible = [];
+    foreach ($sites as $site) {
+        $siteKey = (string) ($site['site_dir'] ?? '');
+        if ($siteKey === '' || !admin_multi_instance_phase_due_activity($phase, $site, $state, $siteKey, $now)) {
+            continue;
+        }
+        $profile = admin_multi_instance_site_activity_profile($site, $now);
+        $lastRunAt = admin_multi_instance_phase_last_run_timestamp($state, $siteKey, $phase);
+        $eligible[] = [
+            'site' => $site,
+            'site_key' => $siteKey,
+            'profile' => $profile,
+            'last_run_at' => $lastRunAt,
+            'last_local_activity_at' => (int) ($site['last_local_activity_at'] ?? 0),
+        ];
+    }
+    if (empty($eligible)) {
+        return null;
+    }
+    usort($eligible, static function (array $a, array $b): int {
+        $priorityCompare = ((int) ($b['profile']['priority'] ?? 0)) <=> ((int) ($a['profile']['priority'] ?? 0));
+        if ($priorityCompare !== 0) {
+            return $priorityCompare;
+        }
+        $runCompare = ((int) ($a['last_run_at'] ?? 0)) <=> ((int) ($b['last_run_at'] ?? 0));
+        if ($runCompare !== 0) {
+            return $runCompare;
+        }
+        $activityCompare = ((int) ($b['last_local_activity_at'] ?? 0)) <=> ((int) ($a['last_local_activity_at'] ?? 0));
+        if ($activityCompare !== 0) {
+            return $activityCompare;
+        }
+        return strcmp((string) (($a['site']['site_dir'] ?? '')), (string) (($b['site']['site_dir'] ?? '')));
+    });
+    return $eligible[0];
+}
+
 function admin_multi_instance_due_slots(int $index): array
 {
     return [
@@ -485,9 +614,10 @@ function admin_multi_instance_mark_phase_run(array &$state, string $siteKey, str
     }
     if ($phase === 'heavy') {
         $state['runs'][$siteKey]['heavy_hour'] = date('Y-m-d-H', $now);
-        return;
+    } else {
+        $state['runs'][$siteKey][$phase . '_slot'] = date('Y-m-d-H:i', $now);
     }
-    $state['runs'][$siteKey][$phase . '_slot'] = date('Y-m-d-H:i', $now);
+    $state['runs'][$siteKey][$phase . '_last_at'] = $now;
 }
 
 function admin_multi_instance_run_site_phase(string $adminFile, string $phase): array
@@ -550,6 +680,7 @@ function admin_run_cluster_scheduled_tasks(): array
             return ['ok' => true, 'skipped' => 1, 'reason' => 'no_cluster_sites'];
         }
         $state = admin_multi_instance_scheduler_state_load($config);
+        $strategy = trim((string) ($settings['scheduler_strategy'] ?? 'fixed'));
         $now = time();
         $state['last_runner'] = [
             'site_dir' => __DIR__,
@@ -560,20 +691,45 @@ function admin_run_cluster_scheduled_tasks(): array
             'timestamp' => $now,
         ];
         $runs = [];
-        foreach ($sites as $index => $site) {
-            $siteKey = (string) ($site['site_dir'] ?? ('site-' . $index));
+        if ($strategy === 'activity') {
             foreach (['light', 'maintenance', 'heavy'] as $phase) {
-                if (!admin_multi_instance_phase_due($phase, $index, $state, $siteKey, $now)) {
+                $pick = admin_multi_instance_pick_due_site_activity($phase, $sites, $state, $now);
+                if (!is_array($pick)) {
+                    continue;
+                }
+                $site = is_array($pick['site'] ?? null) ? $pick['site'] : [];
+                $siteKey = (string) ($pick['site_key'] ?? ($site['site_dir'] ?? ''));
+                if ($siteKey === '' || empty($site['admin_file'])) {
                     continue;
                 }
                 $run = admin_multi_instance_run_site_phase((string) $site['admin_file'], $phase);
                 $runs[] = [
-                    'site' => $site['slug'] ?? basename((string) $site['site_dir']),
+                    'site' => $site['slug'] ?? basename((string) ($site['site_dir'] ?? '')),
                     'phase' => $phase,
+                    'strategy' => 'activity',
+                    'activity_profile' => (string) (($pick['profile']['name'] ?? 'idle')),
                     'exit_code' => (int) ($run['exit_code'] ?? 1),
                     'result' => $run['result'] ?? null,
                 ];
                 admin_multi_instance_mark_phase_run($state, $siteKey, $phase, $now);
+            }
+        } else {
+            foreach ($sites as $index => $site) {
+                $siteKey = (string) ($site['site_dir'] ?? ('site-' . $index));
+                foreach (['light', 'maintenance', 'heavy'] as $phase) {
+                    if (!admin_multi_instance_phase_due($phase, $index, $state, $siteKey, $now)) {
+                        continue;
+                    }
+                    $run = admin_multi_instance_run_site_phase((string) $site['admin_file'], $phase);
+                    $runs[] = [
+                        'site' => $site['slug'] ?? basename((string) $site['site_dir']),
+                        'phase' => $phase,
+                        'strategy' => 'fixed',
+                        'exit_code' => (int) ($run['exit_code'] ?? 1),
+                        'result' => $run['result'] ?? null,
+                    ];
+                    admin_multi_instance_mark_phase_run($state, $siteKey, $phase, $now);
+                }
             }
         }
         admin_multi_instance_scheduler_state_save($config, $state);
@@ -581,6 +737,7 @@ function admin_run_cluster_scheduled_tasks(): array
             'ok' => true,
             'skipped' => 0,
             'cluster' => admin_multi_instance_cluster_name($config),
+            'strategy' => $strategy,
             'sites' => count($sites),
             'executed' => count($runs),
             'runs' => $runs,
@@ -2234,10 +2391,14 @@ function get_settings() {
         'shared_queue_dir' => '',
         'instances_root_dir' => '',
         'scheduler_mode' => 'standalone',
+        'scheduler_strategy' => 'fixed',
     ];
     $multiInstance = array_merge($multiInstanceDefaults, $config['multi_instance'] ?? []);
     if (!in_array($multiInstance['scheduler_mode'], ['standalone', 'central'], true)) {
         $multiInstance['scheduler_mode'] = 'standalone';
+    }
+    if (!in_array($multiInstance['scheduler_strategy'], ['fixed', 'activity'], true)) {
+        $multiInstance['scheduler_strategy'] = 'fixed';
     }
 
     return [
@@ -9738,8 +9899,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $multi_instance_shared_queue_dir = trim((string) ($_POST['multi_instance_shared_queue_dir'] ?? ''));
         $multi_instance_instances_root_dir = trim((string) ($_POST['multi_instance_instances_root_dir'] ?? ''));
         $multi_instance_scheduler_mode = trim((string) ($_POST['multi_instance_scheduler_mode'] ?? 'standalone'));
+        $multi_instance_scheduler_strategy = trim((string) ($_POST['multi_instance_scheduler_strategy'] ?? 'fixed'));
         if (!in_array($multi_instance_scheduler_mode, ['standalone', 'central'], true)) {
             $multi_instance_scheduler_mode = 'standalone';
+        }
+        if (!in_array($multi_instance_scheduler_strategy, ['fixed', 'activity'], true)) {
+            $multi_instance_scheduler_strategy = 'fixed';
         }
         $social_default_description = trim($_POST['social_default_description'] ?? '');
 
@@ -9778,6 +9943,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 || $multi_instance_shared_queue_dir !== ''
                 || $multi_instance_instances_root_dir !== ''
                 || $multi_instance_scheduler_mode !== 'standalone'
+                || $multi_instance_scheduler_strategy !== 'fixed'
             ) {
                 $config['multi_instance'] = [
                     'enabled' => $multi_instance_enabled,
@@ -9786,6 +9952,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'shared_queue_dir' => $multi_instance_shared_queue_dir,
                     'instances_root_dir' => $multi_instance_instances_root_dir,
                     'scheduler_mode' => $multi_instance_scheduler_mode,
+                    'scheduler_strategy' => $multi_instance_scheduler_strategy,
                 ];
             } else {
                 unset($config['multi_instance']);

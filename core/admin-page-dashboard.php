@@ -134,11 +134,15 @@
         'shared_cache_dir' => '',
         'shared_queue_dir' => '',
         'scheduler_mode' => 'standalone',
+        'scheduler_strategy' => 'fixed',
         'tracked_hosts' => 0,
         'hosts_in_backoff' => 0,
         'recent_light_runs' => 0,
         'recent_maintenance_runs' => 0,
         'recent_heavy_runs' => 0,
+        'fresh_sites' => 0,
+        'warm_sites' => 0,
+        'idle_sites' => 0,
         'runner_label' => '',
         'runner_url' => '',
         'runner_at_label' => '',
@@ -151,9 +155,24 @@
             $multiInstanceDashboard['shared_cache_dir'] = trim((string) ($multiSettings['shared_cache_dir'] ?? ''));
             $multiInstanceDashboard['shared_queue_dir'] = trim((string) ($multiSettings['shared_queue_dir'] ?? ''));
             $multiInstanceDashboard['scheduler_mode'] = 'central';
+            $multiInstanceDashboard['scheduler_strategy'] = trim((string) ($multiSettings['scheduler_strategy'] ?? 'fixed'));
             if (function_exists('admin_multi_instance_discover_cluster_sites')) {
                 $clusterSites = admin_multi_instance_discover_cluster_sites($settings);
                 $multiInstanceDashboard['sites'] = count($clusterSites);
+                if (function_exists('admin_multi_instance_site_activity_profile')) {
+                    $clusterNow = time();
+                    foreach ($clusterSites as $clusterSite) {
+                        $profile = admin_multi_instance_site_activity_profile(is_array($clusterSite) ? $clusterSite : [], $clusterNow);
+                        $profileName = trim((string) ($profile['name'] ?? 'idle'));
+                        if ($profileName === 'fresh') {
+                            $multiInstanceDashboard['fresh_sites']++;
+                        } elseif ($profileName === 'warm') {
+                            $multiInstanceDashboard['warm_sites']++;
+                        } else {
+                            $multiInstanceDashboard['idle_sites']++;
+                        }
+                    }
+                }
             }
             if (function_exists('admin_multi_instance_scheduler_state_load')) {
                 $clusterState = admin_multi_instance_scheduler_state_load($settings);
@@ -2676,6 +2695,8 @@
                             <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Clúster central</h4>
                             <p class="mb-2"><strong>Clúster:</strong> <?= htmlspecialchars((string) ($multiInstanceDashboard['cluster'] ?: 'sin nombre'), ENT_QUOTES, 'UTF-8') ?></p>
                             <p class="mb-2"><strong>Sitios detectados:</strong> <?= (int) $multiInstanceDashboard['sites'] ?></p>
+                            <p class="mb-2"><strong>Estrategia:</strong> <?= htmlspecialchars((string) ($multiInstanceDashboard['scheduler_strategy'] === 'activity' ? 'Activity' : 'Fixed'), ENT_QUOTES, 'UTF-8') ?></p>
+                            <p class="mb-2"><strong>Perfiles:</strong> fresh <?= (int) $multiInstanceDashboard['fresh_sites'] ?> · warm <?= (int) $multiInstanceDashboard['warm_sites'] ?> · idle <?= (int) $multiInstanceDashboard['idle_sites'] ?></p>
                             <?php if ($multiInstanceDashboard['runner_label'] !== ''): ?>
                                 <p class="mb-2"><strong>Runner activo:</strong>
                                     <?php if ($multiInstanceDashboard['runner_url'] !== ''): ?>

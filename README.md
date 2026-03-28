@@ -228,6 +228,7 @@ Campos disponibles:
 - `shared_queue_dir`: ruta de colas compartidas.
 - `instances_root_dir`: directorio donde viven las distintas instalaciones del clúster.
 - `scheduler_mode`: `standalone` o `central`.
+- `scheduler_strategy`: `fixed` o `activity`.
 
 En la fase 1, si `enabled = on` y `shared_cache_dir` apunta a un directorio escribible, Nammu puede reutilizar entre instancias:
 
@@ -257,11 +258,29 @@ php /var/www/html/<carpeta-publica>/admin.php --run-cluster-scheduled
 Ese runner:
 
 - descubre las instalaciones hermanas del mismo clúster,
-- reparte sus fases `light`, `maintenance` y `heavy` por slots,
+- reparte sus fases `light`, `maintenance` y `heavy`,
 - ejecuta internamente los comandos normales de cada sitio,
 - y evita duplicaciones con dos barreras:
   - un lock compartido por clúster,
   - y un estado compartido de slots ya ejecutados.
+
+Estrategias disponibles:
+
+- `fixed`: mantiene el reparto por slots fijos según el índice de cada sitio dentro del clúster. Es el comportamiento conservador y el valor por defecto.
+- `activity`: deja de reservar slots iguales para todos. Da prioridad a los sitios con contenido local reciente y relega a los inactivos a una cadencia más lenta.
+
+En `activity`, Nammu mira actividad local reciente del sitio:
+
+- publicaciones nuevas en `content/`,
+- y notas manuales nuevas en `config/actualidad-manual.json`.
+
+Con esa señal, el runner central aplica una cadencia orientativa:
+
+- sitios frescos: `light` cada 10 minutos, `maintenance` cada 30, `heavy` cada 60
+- sitios templados: `light` cada 20 minutos, `maintenance` cada 60, `heavy` cada 180
+- sitios inactivos: `light` cada 60 minutos, `maintenance` cada 180, `heavy` cada 720
+
+Así, si varios blogs del clúster no han publicado nada recientemente, no siguen ocupando el mismo turno que otro blog que acaba de sacar una entrada, episodio, itinerario o nota.
 
 Para mayor seguridad, el runner central solo incorpora sitios que coincidan exactamente en:
 
@@ -309,6 +328,8 @@ Si multiinstancia está apagado, este control no se usa y cada instalación sigu
 Cuando un sitio está en `scheduler_mode = central`, el dashboard muestra además un bloque `Clúster central` sobre `Imagen 30 días` con métricas básicas del grupo:
 
 - sitios detectados en el clúster,
+- estrategia activa del planificador (`fixed` o `activity`),
+- reparto de sitios por perfil (`fresh`, `warm`, `idle`),
 - la instancia que actuó por última vez como runner central,
 - slots recientes ejecutados,
 - hosts remotos seguidos,

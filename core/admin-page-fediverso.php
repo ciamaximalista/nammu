@@ -816,9 +816,32 @@
                                                 </div>
                                             </div>
                                         <?php endif; ?>
+                                        <div class="fediverse-status__actions mt-3">
+                                            <details class="fediverse-inline-form">
+                                                <summary class="fediverse-inline-form__summary-button">Responder</summary>
+                                                <form method="post">
+                                                    <input type="hidden" name="fediverse_tab" value="home">
+                                                    <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars((string) $localId, ENT_QUOTES, 'UTF-8') ?>">
+                                                    <textarea name="fediverse_reply_text" class="form-control form-control-sm" rows="3" placeholder="Escribe tu respuesta"></textarea>
+                                                    <label class="fediverse-inline-check">
+                                                        <input type="checkbox" name="fediverse_reply_as_note" value="1">
+                                                        Publicar también como nota en Actualidad
+                                                    </label>
+                                                    <button type="submit" name="fediverse_reply_item" class="btn btn-primary btn-sm mt-2">Enviar respuesta</button>
+                                                </form>
+                                            </details>
+                                        </div>
                                         <?php if (!empty($threadReplies)): ?>
                                             <div class="fediverse-thread">
                                                 <?php foreach ($threadReplies as $reply): ?>
+                                                    <?php
+                                                    $replyObjectUrl = trim((string) (($reply['id'] ?? '') ?: ($reply['url'] ?? '')));
+                                                    $replyPublicUrl = trim((string) ($reply['url'] ?? ''));
+                                                    $replyActorId = trim((string) ($reply['actor_id'] ?? ''));
+                                                    $replyActorName = trim((string) ($reply['actor_name'] ?? ''));
+                                                    $replyActorIcon = trim((string) ($reply['actor_icon'] ?? ''));
+                                                    $replyBoostImages = [];
+                                                    ?>
                                                     <div class="fediverse-thread__reply">
                                                         <div class="fediverse-thread__avatar">
                                                             <?php if (!empty($reply['actor_icon'])): ?>
@@ -838,6 +861,48 @@
                                                                 <?php endif; ?>
                                                             </div>
                                                             <div class="fediverse-thread__content"><?= nl2br(htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
+                                                            <?php if ($replyObjectUrl !== ''): ?>
+                                                                <div class="fediverse-status__actions mt-2">
+                                                                    <?php if ($replyActorId !== ''): ?>
+                                                                        <form method="post" class="mb-0">
+                                                                            <input type="hidden" name="fediverse_tab" value="home">
+                                                                            <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($replyActorId, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($replyObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_public_url" value="<?= htmlspecialchars($replyPublicUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <button type="submit" name="fediverse_like_item" class="btn btn-outline-secondary btn-sm">Favorito</button>
+                                                                        </form>
+                                                                        <form method="post" class="mb-0">
+                                                                            <input type="hidden" name="fediverse_tab" value="home">
+                                                                            <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($replyActorId, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($replyObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_public_url" value="<?= htmlspecialchars($replyPublicUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_item_id" value="<?= htmlspecialchars((string) ($reply['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_object_title" value="">
+                                                                            <input type="hidden" name="fediverse_object_content" value="<?= htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_actor_name" value="<?= htmlspecialchars($replyActorName, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_actor_icon" value="<?= htmlspecialchars($replyActorIcon, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_actor_url" value="<?= htmlspecialchars($replyActorId, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_object_image" value="">
+                                                                            <input type="hidden" name="fediverse_object_images" value="<?= htmlspecialchars(json_encode($replyBoostImages, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <button type="submit" name="fediverse_boost_item" class="btn btn-outline-secondary btn-sm">Impulsar</button>
+                                                                        </form>
+                                                                    <?php endif; ?>
+                                                                    <details class="fediverse-inline-form">
+                                                                        <summary class="fediverse-inline-form__summary-button">Responder</summary>
+                                                                        <form method="post">
+                                                                            <input type="hidden" name="fediverse_tab" value="home">
+                                                                            <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($replyActorId, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($replyObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <textarea name="fediverse_reply_text" class="form-control form-control-sm" rows="3" placeholder="Escribe tu respuesta"></textarea>
+                                                                            <label class="fediverse-inline-check">
+                                                                                <input type="checkbox" name="fediverse_reply_as_note" value="1">
+                                                                                Publicar también como nota en Actualidad
+                                                                            </label>
+                                                                            <button type="submit" name="fediverse_reply_item" class="btn btn-primary btn-sm mt-2">Enviar respuesta</button>
+                                                                        </form>
+                                                                    </details>
+                                                                </div>
+                                                            <?php endif; ?>
                                                             <?php if (($reply['source'] ?? '') === 'local' && !empty($reply['id'])): ?>
                                                                 <form method="post" class="mt-2" onsubmit="return confirm('¿Borrar esta respuesta del Fediverso?');">
                                                                     <input type="hidden" name="fediverse_tab" value="home">
@@ -861,21 +926,6 @@
                                                 <?php endforeach; ?>
                                             </div>
                                         <?php endif; ?>
-                                        <div class="fediverse-status__actions mt-3">
-                                            <details class="fediverse-inline-form">
-                                                <summary class="fediverse-inline-form__summary-button">Responder</summary>
-                                                <form method="post">
-                                                    <input type="hidden" name="fediverse_tab" value="home">
-                                                    <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars((string) $localId, ENT_QUOTES, 'UTF-8') ?>">
-                                                    <textarea name="fediverse_reply_text" class="form-control form-control-sm" rows="3" placeholder="Escribe tu respuesta"></textarea>
-                                                    <label class="fediverse-inline-check">
-                                                        <input type="checkbox" name="fediverse_reply_as_note" value="1">
-                                                        Publicar también como nota en Actualidad
-                                                    </label>
-                                                    <button type="submit" name="fediverse_reply_item" class="btn btn-primary btn-sm mt-2">Enviar respuesta</button>
-                                                </form>
-                                            </details>
-                                        </div>
                                     </div>
                                 </article>
                                 <?php else: ?>
@@ -1203,41 +1253,6 @@
                                                 <?php if (!empty($itemActionState['replied'])): ?><span><?= (int) ($itemActionState['reply_count'] ?? 0) ?> respuesta<?= ((int) ($itemActionState['reply_count'] ?? 0) === 1) ? '' : 's' ?></span><?php endif; ?>
                                             </div>
                                         <?php endif; ?>
-                                        <?php if (!empty($itemReplies)): ?>
-                                            <div class="fediverse-thread">
-                                                <?php foreach ($itemReplies as $reply): ?>
-                                                    <div class="fediverse-thread__reply">
-                                                        <div class="fediverse-thread__avatar">
-                                                            <?php if (!empty($reply['actor_icon'])): ?>
-                                                                <img src="<?= htmlspecialchars((string) $reply['actor_icon'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
-                                                            <?php elseif (($reply['source'] ?? '') === 'incoming-remote'): ?>
-                                                                <div class="fediverse-thread__avatar-fallback"><?= htmlspecialchars(mb_substr((string) (($reply['actor_name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
-                                                            <?php elseif ($fediverseLocalAvatar !== ''): ?>
-                                                                <img src="<?= htmlspecialchars($fediverseLocalAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
-                                                            <?php else: ?>
-                                                                <div class="fediverse-thread__avatar-fallback"><?= htmlspecialchars(mb_substr($fediverseLocalHandle, 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
-                                                            <?php endif; ?>
-                                                        </div>
-                                                        <div class="fediverse-thread__body">
-                                                            <div class="fediverse-thread__header">
-                                                                <strong><?= htmlspecialchars((string) (($reply['source'] ?? '') === 'incoming-remote' ? (($reply['actor_name'] ?? '') ?: 'Actor remoto') : $fediverseLocalHandle), ENT_QUOTES, 'UTF-8') ?></strong>
-                                                                <?php if (!empty($reply['published'])): ?>
-                                                                    <time datetime="<?= htmlspecialchars((string) $reply['published'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($fediverseFormatDate((string) $reply['published']), ENT_QUOTES, 'UTF-8') ?></time>
-                                                                <?php endif; ?>
-                                                            </div>
-                                                            <div class="fediverse-thread__content"><?= nl2br(htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
-                                                            <?php if (($reply['source'] ?? '') !== 'incoming-remote' && !empty($reply['id'])): ?>
-                                                                <form method="post" class="mt-2" onsubmit="return confirm('¿Borrar esta respuesta del Fediverso?');">
-                                                                    <input type="hidden" name="fediverse_tab" value="home">
-                                                                    <input type="hidden" name="fediverse_reply_action_id" value="<?= htmlspecialchars((string) $reply['id'], ENT_QUOTES, 'UTF-8') ?>">
-                                                                    <button type="submit" name="fediverse_delete_reply_item" class="btn btn-outline-danger btn-sm">Borrar</button>
-                                                                </form>
-                                                            <?php endif; ?>
-                                                        </div>
-                                                    </div>
-                                                <?php endforeach; ?>
-                                            </div>
-                                        <?php endif; ?>
                                         <div class="fediverse-status__actions">
                                             <form method="post" class="mb-0">
                                                 <input type="hidden" name="fediverse_tab" value="home">
@@ -1315,6 +1330,91 @@
                                                 </form>
                                             </details>
                                         </div>
+                                        <?php if (!empty($itemReplies)): ?>
+                                            <div class="fediverse-thread">
+                                                <?php foreach ($itemReplies as $reply): ?>
+                                                    <?php
+                                                    $replyObjectUrl = trim((string) (($reply['id'] ?? '') ?: ($reply['url'] ?? '')));
+                                                    $replyPublicUrl = trim((string) ($reply['url'] ?? ''));
+                                                    $replyActorId = trim((string) ($reply['actor_id'] ?? ''));
+                                                    $replyActorName = trim((string) ($reply['actor_name'] ?? ''));
+                                                    $replyActorIcon = trim((string) ($reply['actor_icon'] ?? ''));
+                                                    $replyBoostImages = [];
+                                                    ?>
+                                                    <div class="fediverse-thread__reply">
+                                                        <div class="fediverse-thread__avatar">
+                                                            <?php if (!empty($reply['actor_icon'])): ?>
+                                                                <img src="<?= htmlspecialchars((string) $reply['actor_icon'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                                            <?php elseif (($reply['source'] ?? '') === 'incoming-remote'): ?>
+                                                                <div class="fediverse-thread__avatar-fallback"><?= htmlspecialchars(mb_substr((string) (($reply['actor_name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
+                                                            <?php elseif ($fediverseLocalAvatar !== ''): ?>
+                                                                <img src="<?= htmlspecialchars($fediverseLocalAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                                            <?php else: ?>
+                                                                <div class="fediverse-thread__avatar-fallback"><?= htmlspecialchars(mb_substr($fediverseLocalHandle, 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                        <div class="fediverse-thread__body">
+                                                            <div class="fediverse-thread__header">
+                                                                <strong><?= htmlspecialchars((string) (($reply['source'] ?? '') === 'incoming-remote' ? (($reply['actor_name'] ?? '') ?: 'Actor remoto') : $fediverseLocalHandle), ENT_QUOTES, 'UTF-8') ?></strong>
+                                                                <?php if (!empty($reply['published'])): ?>
+                                                                    <time datetime="<?= htmlspecialchars((string) $reply['published'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($fediverseFormatDate((string) $reply['published']), ENT_QUOTES, 'UTF-8') ?></time>
+                                                                <?php endif; ?>
+                                                            </div>
+                                                            <div class="fediverse-thread__content"><?= nl2br(htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
+                                                            <?php if ($replyObjectUrl !== ''): ?>
+                                                                <div class="fediverse-status__actions mt-2">
+                                                                    <?php if ($replyActorId !== ''): ?>
+                                                                        <form method="post" class="mb-0">
+                                                                            <input type="hidden" name="fediverse_tab" value="home">
+                                                                            <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($replyActorId, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($replyObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_public_url" value="<?= htmlspecialchars($replyPublicUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <button type="submit" name="fediverse_like_item" class="btn btn-outline-secondary btn-sm">Favorito</button>
+                                                                        </form>
+                                                                        <form method="post" class="mb-0">
+                                                                            <input type="hidden" name="fediverse_tab" value="home">
+                                                                            <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($replyActorId, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($replyObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_public_url" value="<?= htmlspecialchars($replyPublicUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_item_id" value="<?= htmlspecialchars((string) ($reply['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_object_title" value="">
+                                                                            <input type="hidden" name="fediverse_object_content" value="<?= htmlspecialchars((string) ($reply['reply_text'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_actor_name" value="<?= htmlspecialchars($replyActorName, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_actor_icon" value="<?= htmlspecialchars($replyActorIcon, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_actor_url" value="<?= htmlspecialchars($replyActorId, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_object_image" value="">
+                                                                            <input type="hidden" name="fediverse_object_images" value="<?= htmlspecialchars(json_encode($replyBoostImages, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <button type="submit" name="fediverse_boost_item" class="btn btn-outline-secondary btn-sm">Impulsar</button>
+                                                                        </form>
+                                                                    <?php endif; ?>
+                                                                    <details class="fediverse-inline-form">
+                                                                        <summary class="fediverse-inline-form__summary-button">Responder</summary>
+                                                                        <form method="post">
+                                                                            <input type="hidden" name="fediverse_tab" value="home">
+                                                                            <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($replyActorId, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($replyObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <textarea name="fediverse_reply_text" class="form-control form-control-sm" rows="3" placeholder="Escribe tu respuesta"></textarea>
+                                                                            <label class="fediverse-inline-check">
+                                                                                <input type="checkbox" name="fediverse_reply_as_note" value="1">
+                                                                                Publicar también como nota en Actualidad
+                                                                            </label>
+                                                                            <button type="submit" name="fediverse_reply_item" class="btn btn-primary btn-sm mt-2">Enviar respuesta</button>
+                                                                        </form>
+                                                                    </details>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                            <?php if (($reply['source'] ?? '') !== 'incoming-remote' && !empty($reply['id'])): ?>
+                                                                <form method="post" class="mt-2" onsubmit="return confirm('¿Borrar esta respuesta del Fediverso?');">
+                                                                    <input type="hidden" name="fediverse_tab" value="home">
+                                                                    <input type="hidden" name="fediverse_reply_action_id" value="<?= htmlspecialchars((string) $reply['id'], ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <button type="submit" name="fediverse_delete_reply_item" class="btn btn-outline-danger btn-sm">Borrar</button>
+                                                                </form>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
                                 </article>
                                 <?php endif; ?>
@@ -2210,6 +2310,21 @@
         .fediverse-thread__content {
             white-space: pre-wrap;
             color: #1f2d39;
+        }
+        .fediverse-thread__body > .fediverse-status__actions {
+            margin-top: 0.75rem;
+            gap: 0.55rem;
+        }
+        .fediverse-thread__body > .fediverse-status__actions .fediverse-inline-form {
+            min-width: 0;
+        }
+        .fediverse-thread__body > .fediverse-status__actions .fediverse-inline-form[open] {
+            flex-basis: 100%;
+            max-width: 100%;
+        }
+        .fediverse-thread__body > .fediverse-status__actions .btn,
+        .fediverse-thread__body > .fediverse-status__actions .fediverse-inline-form__summary-button {
+            min-height: calc(1.5em + 0.5rem + 2px);
         }
         .fediverse-debug {
             max-height: 420px;

@@ -1862,6 +1862,12 @@ function nammu_remove_push_subscription(string $endpoint): void
     }
 }
 
+function nammu_fediverse_symbol_svg(int $size = 20): string
+{
+    $size = max(12, $size);
+    return '<svg width="' . $size . '" height="' . $size . '" viewBox="0 0 25 25" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><rect width="25" height="25" x="0" y="0" rx="12.791245" ry="12.791245" fill="var(--nammu-fediverse-bg, currentColor)"/><path fill="var(--nammu-fediverse-fg, #ffffff)" fill-opacity="0.87" d="M11.92247 3.81369v.48511l.19972 3.16462-2.64135-1.75469-.42024-.24255-.57754 1.00031.42023.24255 2.84023 1.40952-2.84023 1.40994-.42023.24255.57754 1.00032.42024-.24255 2.64135-1.75511-.19972 3.16504v.48468h1.15508v-.48468l-.1993-3.16504 2.64136 1.75511.4198.24255.57755-1.00032-.42023-.24255-2.84023-1.40994 2.84023-1.40994.42023-.24213-.57755-1.00031-.4198.24255-2.64136 1.75469.1993-3.16462v-.48511zm-4.17342 7.22864v.4851l.19972 3.16505-2.64136-1.75554-.42022-.24255-.57754 1.00032.42022.24255 2.84065 1.40994-2.84065 1.40994-.42022.24255.57754.99989.42022-.24213 2.64136-1.75553-.19972 3.16504v.48511h1.15509v-.48511l-.1993-3.16462 2.64135 1.75511.4198.24213.57755-.99989-.4198-.24255-2.84066-1.40994 2.84066-1.40994.4198-.24255-.57755-1.00032-.4198.24255-2.64135 1.75511.1993-3.16462v-.4851zm8.34683 0v.4851l.19973 3.16505-2.64136-1.75554-.42022-.24255-.57755 1.00032.42023.24255 2.84023 1.40994-2.84023 1.40994-.42023.24255.57755.99989.42022-.24213 2.64136-1.75553-.19973 3.16504v.48511h1.15509v-.48511l-.1993-3.16462 2.64136 1.75511.4198.24213.57754-.99989-.42022-.24255-2.84066-1.40994 2.84066-1.40994.42022-.24255-.57754-1.00032-.4198.24255-2.64136 1.75511.1993-3.16462v-.4851z"/></svg>';
+}
+
 function nammu_footer_icon_svgs(): array
 {
     return [
@@ -1871,7 +1877,7 @@ function nammu_footer_icon_svgs(): array
         'twitter' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 4h3.7l4.3 5.2L17 4h3l-6.4 7.4L20 20h-3.7l-4.8-5.9L6.2 20H3l6.9-7.9L4 4z"/></svg>',
         'linkedin' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M6.5 9H3.5v11h3zm-1.5-6a1.75 1.75 0 1 0 0 3.5A1.75 1.75 0 0 0 5 3zm4 6h2.9v1.5h.1c.4-.8 1.5-1.7 3.2-1.7 3.4 0 4 2.2 4 5.2V20h-3v-5.1c0-1.2 0-2.8-1.7-2.8s-2 1.3-2 2.7V20h-3V9z"/></svg>',
         'bluesky' => '<svg width="20" height="20" viewBox="0 0 600 600" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="m135.72 44.03c66.496 49.921 138.02 151.14 164.28 205.46 26.262-54.316 97.782-155.54 164.28-205.46 47.98-36.021 125.72-63.892 125.72 24.795 0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.3797-3.6904-10.832-3.7077-7.8964-0.0174-2.9357-1.1937 0.51669-3.7077 7.8964-13.714 40.255-67.233 197.36-189.63 71.766-64.444-66.128-34.605-132.26 82.697-152.22-67.108 11.421-142.55-7.4491-163.25-81.433-5.9562-21.282-16.111-152.36-16.111-170.07 0-88.687 77.742-60.816 125.72-24.795z" fill="currentColor"/></svg>',
-        'fediverse' => '<svg width="20" height="20" viewBox="0 0 200 190" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><g fill="currentColor"><path d="M47.9242 72.7966a18.2278 18.2278 0 0 1-7.7959 7.7597l42.7984 42.9653 10.3182-5.2291zm56.4524 56.6704-10.3182 5.2291 21.686 21.7708a18.2278 18.2278 0 0 1 7.7975-7.7608z"/><path d="M129.6645 102.0765l1.7865 11.4272 27.4149-13.8942a18.2278 18.2278 0 0 1-4.9719-9.8124zm-14.0658 7.1282-57.2891 29.0339a18.2278 18.2278 0 0 1 4.9728 9.8133l54.1027-27.4194z"/><path d="M69.5312 91.6539l8.1618 8.1933 29.269-57.1387a18.2278 18.2278 0 0 1-9.787-5.0219zm-7.1897 14.0363-14.0022 27.3353a18.2278 18.2278 0 0 1 9.786 5.0214l12.3775-24.1639z"/><path d="M39.8906 80.6763a18.2278 18.2278 0 0 1-10.8655 1.7198l8.1762 52.2981a18.2278 18.2278 0 0 1 10.8645-1.7198z"/><path d="M63.3259 148.3109a18.2278 18.2278 0 0 1-1.7322 10.8629l52.2893 8.3907a18.2278 18.2278 0 0 1 1.7322-10.8629z"/><path d="M134.9148 146.9182a18.2278 18.2278 0 0 1 9.788 5.0224l24.1345-47.117a18.2278 18.2278 0 0 1-9.7875-5.0229z"/><path d="M126.1329 33.1603a18.2278 18.2278 0 0 1-7.7975 7.7608l37.3765 37.5207a18.2278 18.2278 0 0 1 7.7969-7.7608z"/><path d="M44.7704 51.6279a18.2278 18.2278 0 0 1 4.9723 9.8123l47.2478-23.9453a18.2278 18.2278 0 0 1-4.9718-9.8113z"/><path d="M118.2491 40.9645a18.2278 18.2278 0 0 1-10.8511 1.8123l4.1853 26.8 11.42 1.8324zm-4.2333 44.1927 9.8955 63.3631a18.2278 18.2278 0 0 1 10.88-1.6278l-9.355-59.9035z"/><path d="M49.7763 61.6412a18.2278 18.2278 0 0 1-1.694 10.8686l26.8206 4.3077 5.2715-10.2945zm45.9677 7.382-5.272 10.2955 63.3713 10.1777a18.2278 18.2278 0 0 1 1.7606-10.8593z"/><path d="M93.4385 23.8419a1 1 0 1 0 33.0924 1.8025 1 1 0 1 0-33.0924-1.8025"/><path d="M155.314 85.957a1 1 0 1 0 33.0923 1.8025 1 1 0 1 0-33.0923-1.8025"/><path d="M115.3466 163.9824a1 1 0 1 0 33.0923 1.8025 1 1 0 1 0-33.0923-1.8025"/><path d="M28.7698 150.0898a1 1 0 1 0 33.0923 1.8025 1 1 0 1 0-33.0923-1.8025"/><path d="M15.2298 63.4781a1 1 0 1 0 33.0923 1.8025 1 1 0 1 0-33.0923-1.8025"/></g></svg>',
+        'fediverse' => nammu_fediverse_symbol_svg(20),
         'email' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2v.3l8 5.2 8-5.2V8H4z"/></svg>',
         'postal' => nammu_postal_icon_svg(),
         'rss' => '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M6 18a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm-2-8v-3a11 11 0 0 1 11 11h-3a8 8 0 0 0-8-8zm0-6V1a17 17 0 0 1 17 17h-3a14 14 0 0 0-14-14z"/></svg>',
@@ -2036,6 +2042,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
                 'href' => '#fediverse-follow',
                 'svg' => $icons['fediverse'],
                 'modal' => 'fediverse-follow',
+                'class' => 'footer-social-link--fediverse',
             ];
         }
     }
@@ -3290,6 +3297,7 @@ function nammu_render_header_buttons(array $options): string
             'label' => 'Fediverso',
             'href' => $actualityUrl,
             'svg' => (string) ($footerIcons['fediverse'] ?? ''),
+            'class' => 'site-header-button-link--fediverse',
         ];
     }
     if ($hasNewsletters) {
@@ -3330,7 +3338,8 @@ function nammu_render_header_buttons(array $options): string
     ob_start(); ?>
     <div class="site-header-buttons"<?= $style ?>>
         <?php foreach ($items as $item): ?>
-            <a class="site-header-button-link" href="<?= htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>">
+            <?php $itemClass = trim((string) ($item['class'] ?? '')); ?>
+            <a class="site-header-button-link<?= $itemClass !== '' ? ' ' . htmlspecialchars($itemClass, ENT_QUOTES, 'UTF-8') : '' ?>" href="<?= htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>">
                 <?= $item['svg'] ?>
             </a>
         <?php endforeach; ?>

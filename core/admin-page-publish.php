@@ -181,6 +181,21 @@
 
             <label for="content_publish" data-message-label="Nota" data-default-label="Contenido (Markdown)">Contenido (Markdown)</label>
             <p class="text-muted small mb-3 message-help d-none">Este mensaje se enviará al <strong>Fediverso</strong> <span class="align-middle d-inline-block social-fediverse-inline-icon"><?= $fediverseIcon ?></span> y aparecerá en <a href="<?= htmlspecialchars($newsFeedUrl, ENT_QUOTES, 'UTF-8') ?>"><code>noticias.xml</code></a> y en <a href="<?= htmlspecialchars($fediverseProfileUrl, ENT_QUOTES, 'UTF-8') ?>">tu página de perfil del Fediverso</a> como una nota tipo post-it.</p>
+            <style>
+                .social-fediverse-inline-icon {
+                    width: 0.95rem;
+                    height: 0.95rem;
+                    line-height: 1;
+                    vertical-align: -0.1em;
+                    --nammu-fediverse-bg: #0d6efd;
+                    --nammu-fediverse-fg: #ffffff;
+                }
+                .social-fediverse-inline-icon svg {
+                    display: block;
+                    width: 100%;
+                    height: 100%;
+                }
+            </style>
             <div class="btn-toolbar markdown-toolbar mb-2 flex-wrap" role="toolbar" aria-label="Atajos de Markdown" data-markdown-toolbar data-target="#content_publish">
                 <div class="btn-group btn-group-sm mr-1 mb-1" role="group">
                     <button type="button" class="btn btn-outline-secondary" data-md-action="bold" title="Negrita" aria-label="Negrita"><strong>B</strong></button>

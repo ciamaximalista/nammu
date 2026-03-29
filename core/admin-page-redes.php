@@ -105,6 +105,8 @@
             height: 0.95rem;
             line-height: 1;
             vertical-align: -0.1em;
+            --nammu-fediverse-bg: #0d6efd;
+            --nammu-fediverse-fg: #ffffff;
         }
         .social-fediverse-inline-icon svg {
             display: block;

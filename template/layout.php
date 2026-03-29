@@ -149,7 +149,7 @@ $pushUnsubscribeUrl = $searchBaseNormalized === '' ? '/push-unsubscribe.php' : $
 $showPushPrompt = $pushEnabled && $pushPublicKey !== '' && !$isCrawler;
 $fediverseCtaHandle = '';
 $fediverseCtaUrl = '';
-$fediverseCtaIcon = function_exists('nammu_fediverse_symbol_svg') ? nammu_fediverse_symbol_svg(24) : '';
+$fediverseCtaIcon = function_exists('nammu_fediverse_glyph_svg') ? nammu_fediverse_glyph_svg(24) : '';
 if (function_exists('nammu_fediverse_actor_url') && function_exists('nammu_fediverse_acct_uri')) {
     $fediverseCtaUrl = nammu_fediverse_actor_url($fediverseConfig ?? (function_exists('nammu_load_config') ? nammu_load_config() : []));
     $fediverseAcctUri = nammu_fediverse_acct_uri($fediverseConfig ?? (function_exists('nammu_load_config') ? nammu_load_config() : []));
@@ -343,10 +343,9 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             height: 14px;
         }
         .site-header-button-link--fediverse svg {
-            width: 16px;
-            height: 16px;
-            --nammu-fediverse-bg: #ffffff;
-            --nammu-fediverse-fg: var(--nammu-header-button-accent);
+            width: 18px;
+            height: 18px;
+            color: #ffffff;
         }
         table {
             width: 100%;
@@ -658,8 +657,8 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             display: block;
         }
         .footer-social-link--fediverse svg {
-            --nammu-fediverse-bg: <?= $colorBrand ?>;
-            --nammu-fediverse-fg: #ffffff;
+            --nammu-fediverse-bg: #ffffff;
+            --nammu-fediverse-fg: <?= $colorAccent ?>;
             width: 20px;
             height: 20px;
         }
@@ -831,11 +830,10 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             line-height: 1.2;
         }
         .floating-fediverse__button svg {
-            width: 24px;
-            height: 24px;
-            flex: 0 0 24px;
-            --nammu-fediverse-bg: #ffffff;
-            --nammu-fediverse-fg: <?= $colorBrand ?>;
+            width: 30px;
+            height: 30px;
+            flex: 0 0 30px;
+            color: #ffffff;
         }
         .floating-fediverse__button:hover {
             color: #fff;
@@ -1603,7 +1601,7 @@ if (!empty($baseUrl)) {
                 <dialog class="fediverse-follow-dialog" data-fediverse-follow-dialog>
                     <div class="fediverse-follow-dialog__card">
                         <h2>Síguenos en el Fediverso</h2>
-                        <p>Abre tu servidor Mastodon, Akkoma o compatible, pega el siguiente nombre de cuenta en el buscador de usuarios o perfiles y síguela como a cualquier otro perfil.</p>
+                        <p>Si tienes un blog en Nammu o cuenta en un servidor Mastodon, Smac2, Akkoma o compatible con Activity Pub, pega el siguiente nombre de cuenta en el buscador de usuarios o perfiles y síguela como a cualquier otro perfil.</p>
                         <code class="fediverse-follow-dialog__handle"><?= htmlspecialchars($fediverseCtaHandle, ENT_QUOTES, 'UTF-8') ?></code>
                         <p>Si tu servidor no encuentra la cuenta enseguida, pega el identificador completo en ese mismo buscador.</p>
                         <div class="fediverse-follow-dialog__actions">

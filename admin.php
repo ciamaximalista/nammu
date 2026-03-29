@@ -9064,8 +9064,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: admin.php?page=edit-note&id=' . urlencode($noteId));
             exit;
         }
-        if (function_exists('nammu_actuality_rebuild_snapshot')) {
+        if (function_exists('nammu_actuality_replace_manual_item_in_snapshots')) {
+            nammu_actuality_replace_manual_item_in_snapshots($noteId);
+        } elseif (function_exists('nammu_actuality_rebuild_snapshot')) {
             nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        }
+        if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
+            nammu_fediverse_save_fragments_cache_store([]);
         }
         $_SESSION['notes_feedback'] = ['type' => 'success', 'message' => 'Nota actualizada.'];
         header('Location: admin.php?page=edit&template=notes');

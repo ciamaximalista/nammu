@@ -607,6 +607,34 @@ function nammu_actuality_add_item_to_snapshots(array $item): void
     nammu_actuality_save_items_snapshot($items);
 }
 
+function nammu_actuality_manual_item(string $id): ?array
+{
+    $normalizedId = preg_replace('/[^a-f0-9]/i', '', trim($id)) ?? '';
+    if ($normalizedId === '') {
+        return null;
+    }
+    $store = nammu_actuality_load_manual_items();
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        if ((string) ($item['id'] ?? '') === $normalizedId) {
+            return $item;
+        }
+    }
+    return null;
+}
+
+function nammu_actuality_replace_manual_item_in_snapshots(string $id): void
+{
+    $item = nammu_actuality_manual_item($id);
+    if (!is_array($item)) {
+        return;
+    }
+    nammu_actuality_add_item_to_snapshots($item);
+}
+
 function nammu_actuality_fetch_url(string $url, string $accept = 'text/html,application/xhtml+xml', int $timeout = 8, ?array $config = null): array
 {
     if (is_array($config) && function_exists('nammu_multi_instance_remote_host_before_request')) {

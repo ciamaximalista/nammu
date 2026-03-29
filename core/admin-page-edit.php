@@ -92,6 +92,7 @@ unset($_SESSION['newsletter_custom_recipients']);
             'instagram' => 'Instagram',
             'fediverse' => 'Fediverso',
         ];
+        $fediverseButtonIcon = function_exists('nammu_fediverse_symbol_svg') ? nammu_fediverse_symbol_svg(14) : '';
         $mailingReady = admin_is_mailing_ready($settings);
         $mailingSettings = $settings['mailing'] ?? (function_exists('get_settings') ? (get_settings()['mailing'] ?? []) : []);
         $mailingNewsletterEnabled = (($mailingSettings['auto_newsletter'] ?? (($mailingSettings['gmail_address'] ?? '') !== '' ? 'on' : 'off')) === 'on');
@@ -442,8 +443,11 @@ unset($_SESSION['newsletter_custom_recipients']);
                                         <input type="hidden" name="social_network" value="fediverse">
                                         <input type="hidden" name="social_filename" value="<?= htmlspecialchars($post['filename'], ENT_QUOTES, 'UTF-8') ?>">
                                         <input type="hidden" name="social_template" value="<?= htmlspecialchars($templateFilter, ENT_QUOTES, 'UTF-8') ?>">
-                                        <button type="submit" name="send_social_post" class="btn btn-sm btn-outline-primary">
-                                            Fediverso
+                                        <button type="submit" name="send_social_post" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center">
+                                            <?php if ($fediverseButtonIcon !== ''): ?>
+                                                <span class="admin-fediverse-button-icon mr-1"><?= $fediverseButtonIcon ?></span>
+                                            <?php endif; ?>
+                                            <span>Fediverso</span>
                                         </button>
                                     </form>
                                 <?php endif; ?>
@@ -1162,5 +1166,22 @@ unset($_SESSION['newsletter_custom_recipients']);
             </div>
         <?php endif; ?>
     </div>
+
+    <style>
+        .admin-fediverse-button-icon {
+            width: 0.9rem;
+            height: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            --nammu-fediverse-bg: #0d6efd;
+            --nammu-fediverse-fg: #ffffff;
+        }
+        .admin-fediverse-button-icon svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
 
 <?php endif; ?>

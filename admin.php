@@ -11427,6 +11427,7 @@ if ($isLoggedIn && $page === 'fediverso') {
         if ($objectImage !== '' && !in_array($objectImage, $objectImages, true)) {
             array_unshift($objectImages, $objectImage);
         }
+        $resolvedObjectType = '';
         $config = load_config_file();
         if (!function_exists('nammu_fediverse_signed_fetch_json') && is_file(__DIR__ . '/core/fediverso.php')) {
             require_once __DIR__ . '/core/fediverso.php';
@@ -11437,6 +11438,7 @@ if ($isLoggedIn && $page === 'fediverso') {
                 $resolvedObject = nammu_fediverse_fetch_json($objectUrl);
             }
             if (is_array($resolvedObject)) {
+                $resolvedObjectType = strtolower(trim((string) ($resolvedObject['type'] ?? '')));
                 $resolvedActorId = trim((string) (($resolvedObject['attributedTo'] ?? '') ?: ($resolvedObject['actor'] ?? '')));
                 if ($resolvedActorId !== '') {
                     $resolvedActor = nammu_fediverse_resolve_actor($resolvedActorId, $config);
@@ -11456,6 +11458,9 @@ if ($isLoggedIn && $page === 'fediverso') {
                     }
                 }
             }
+        }
+        if ($resolvedObjectType === 'note') {
+            $objectTitle = '';
         }
         $result = nammu_fediverse_send_announce($recipientId, $objectUrl, $config);
         if (!empty($result['ok'])) {

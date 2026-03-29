@@ -343,8 +343,8 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             height: 14px;
         }
         .site-header-button-link--fediverse svg {
-            width: 18px;
-            height: 18px;
+            width: 22px;
+            height: 22px;
             color: #ffffff;
         }
         table {
@@ -659,8 +659,8 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
         .footer-social-link--fediverse svg {
             --nammu-fediverse-bg: #ffffff;
             --nammu-fediverse-fg: <?= $colorAccent ?>;
-            width: 20px;
-            height: 20px;
+            width: 24px;
+            height: 24px;
         }
         .footer-contact-block {
             margin: 0 0 1.5rem 0;

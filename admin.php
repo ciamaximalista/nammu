@@ -13579,7 +13579,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                                 <li class="nav-item <?= $page === 'fediverso' ? 'active' : '' ?>">
                                     <a class="nav-link" href="?page=fediverso" title="Fediverso" aria-label="Fediverso">
-                                        <?= nammu_fediverse_symbol_svg(44) ?>
+                                        <?= function_exists('nammu_fediverse_glyph_svg') ? nammu_fediverse_glyph_svg(48) : nammu_fediverse_symbol_svg(44) ?>
                                     </a>
                                 </li>
 

@@ -3772,6 +3772,8 @@ function nammu_fediverse_extract_outbox_items(
         $rawItems = $payload['items'];
     }
     $items = [];
+    $topLevelItems = [];
+    $otherItems = [];
     $knownTimelineIds = array_fill_keys(array_values(array_filter(array_map('strval', $knownTimelineIds))), true);
     $inspectLimit = $inspectLimit !== null ? max(1, $inspectLimit) : max($limit * 6, 24);
     $inspected = 0;
@@ -3780,9 +3782,6 @@ function nammu_fediverse_extract_outbox_items(
             break;
         }
         $inspected++;
-        if (count($items) >= max(1, $limit)) {
-            break;
-        }
         if (is_string($rawItem) && preg_match('#^https?://#i', $rawItem)) {
             $rawItemPayload = nammu_fediverse_signed_fetch_json($rawItem, $config);
             if (!is_array($rawItemPayload)) {
@@ -3801,8 +3800,29 @@ function nammu_fediverse_extract_outbox_items(
             if ($normalizedId !== '' && isset($knownTimelineIds[$normalizedId])) {
                 continue;
             }
-            $items[] = $normalized;
+            $isTopLevelPublication = trim((string) ($normalized['target_url'] ?? '')) === ''
+                && strtolower(trim((string) ($normalized['type'] ?? ''))) !== 'announce';
+            if ($isTopLevelPublication) {
+                $topLevelItems[] = $normalized;
+            } else {
+                $otherItems[] = $normalized;
+            }
         }
+    }
+    if (!empty($topLevelItems)) {
+        $items[] = array_shift($topLevelItems);
+    }
+    foreach ($topLevelItems as $candidate) {
+        if (count($items) >= max(1, $limit)) {
+            break;
+        }
+        $items[] = $candidate;
+    }
+    foreach ($otherItems as $candidate) {
+        if (count($items) >= max(1, $limit)) {
+            break;
+        }
+        $items[] = $candidate;
     }
     return $items;
 }

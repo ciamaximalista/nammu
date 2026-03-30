@@ -3201,6 +3201,21 @@ function nammu_fediverse_thread_page_snapshot_payload(array $item, array $config
     return $payload;
 }
 
+function nammu_fediverse_best_thread_page_payload(array $item, array $config): array
+{
+    $snapshotPayload = nammu_fediverse_thread_page_snapshot_payload($item, $config);
+    $livePayload = nammu_fediverse_thread_page_payload($item, $config);
+    if (!is_array($snapshotPayload)) {
+        return $livePayload;
+    }
+    $snapshotReplies = is_array($snapshotPayload['replies'] ?? null) ? count($snapshotPayload['replies']) : 0;
+    $liveReplies = is_array($livePayload['replies'] ?? null) ? count($livePayload['replies']) : 0;
+    if ($liveReplies > $snapshotReplies) {
+        return $livePayload;
+    }
+    return $snapshotPayload;
+}
+
 function nammu_fediverse_extract_first_url_from_text(string $text): string
 {
     $text = trim($text);

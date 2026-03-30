@@ -1587,7 +1587,7 @@
             }
         }
 
-        $collectSourceUidsRange = static function (string $category) use ($sourcesDaily, $fromKey, $toKey, $emailDetailLabels, $isFediverseSourceLabel): array {
+        $collectSourceUidsRange = static function (string $category) use ($sourcesDaily, $fromKey, $toKey, $emailDetailLabels, $normalizeSocialSourceLabel): array {
             $result = [];
             foreach ($sourcesDaily as $day => $payload) {
                 if (!is_string($day) || $day < $fromKey || ($toKey !== null && $day > $toKey)) {

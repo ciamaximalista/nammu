@@ -1592,6 +1592,9 @@
                     }
                     if ($category === 'social' && $isFediverseSourceLabel((string) $label)) {
                         $label = 'Fediverso';
+                    } elseif ($category === 'social' && function_exists('nammu_normalize_stats_social_detail_label')) {
+                        $detailUrl = is_array($detailPayload) ? (string) ($detailPayload['url'] ?? '') : '';
+                        $label = nammu_normalize_stats_social_detail_label((string) $label, $detailUrl);
                     }
                     $detailUids = is_array($detailPayload) ? ($detailPayload['uids'] ?? []) : [];
                     foreach ($detailUids as $uid => $flag) {

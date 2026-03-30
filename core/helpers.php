@@ -428,6 +428,12 @@ function nammu_detect_referrer_source(string $referer, string $host): array
     if ($host !== '' && ($refHost === $host || str_ends_with($refHost, '.' . $host))) {
         return ['bucket' => 'direct', 'detail' => ''];
     }
+    if ($refHost === 'com.linkedin.android') {
+        return ['bucket' => 'social', 'detail' => 'Linkedin'];
+    }
+    if ($refHost === 'web.telegram.org') {
+        return ['bucket' => 'social', 'detail' => 'Telegram'];
+    }
     $searchEngines = [
         'google.' => 'Google Search',
         'bing.com' => 'Bing',
@@ -448,6 +454,7 @@ function nammu_detect_referrer_source(string $referer, string $host): array
     $socialDomains = [
         't.me' => 'Telegram',
         'telegram.me' => 'Telegram',
+        'telegram.org' => 'Telegram',
         'facebook.com' => 'Facebook',
         'fb.com' => 'Facebook',
         'instagram.com' => 'Instagram',
@@ -457,7 +464,7 @@ function nammu_detect_referrer_source(string $referer, string $host): array
         'bsky.app' => 'Bluesky',
         'go.bsky.app' => 'Bluesky',
         'bsky.social' => 'Bluesky',
-        'linkedin.com' => 'LinkedIn',
+        'linkedin.com' => 'Linkedin',
         'pinterest.' => 'Pinterest',
     ];
     foreach ($socialDomains as $needle => $label) {
@@ -541,6 +548,29 @@ function nammu_detect_referrer_source(string $referer, string $host): array
     ];
 }
 
+function nammu_normalize_stats_social_detail_label(string $label, string $url = ''): string
+{
+    $label = trim($label);
+    $url = trim($url);
+    $lower = strtolower($label);
+    $host = strtolower(trim((string) (parse_url($url, PHP_URL_HOST) ?? '')));
+
+    if ($lower === 'linkedin' || $host === 'com.linkedin.android' || str_contains($host, 'linkedin.com')) {
+        return 'Linkedin';
+    }
+    if (
+        $lower === 'telegram'
+        || $host === 'web.telegram.org'
+        || $host === 'telegram.me'
+        || $host === 't.me'
+        || str_contains($host, 'telegram.org')
+    ) {
+        return 'Telegram';
+    }
+
+    return $label;
+}
+
 function nammu_detect_user_agent_source(string $userAgent): array
 {
     $userAgent = strtolower(trim($userAgent));
@@ -557,6 +587,7 @@ function nammu_detect_user_agent_source(string $userAgent): array
         'x.com' => 'Twitter/X',
         'bluesky' => 'Bluesky',
         'bsky' => 'Bluesky',
+        'linkedin' => 'Linkedin',
     ];
     foreach ($uaSocial as $needle => $label) {
         if (str_contains($userAgent, $needle)) {

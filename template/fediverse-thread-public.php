@@ -6,6 +6,53 @@ $threadPayload = is_array($threadPayload ?? null) ? $threadPayload : [];
 $threadSummary = is_array($threadPayload['summary'] ?? null) ? $threadPayload['summary'] : ['likes' => 0, 'shares' => 0, 'replies' => 0];
 $threadDetails = is_array($threadPayload['details'] ?? null) ? $threadPayload['details'] : ['likes' => [], 'shares' => [], 'replies' => []];
 $threadReplies = is_array($threadPayload['replies'] ?? null) ? $threadPayload['replies'] : [];
+$threadReplyActors = [];
+foreach ($threadReplies as $threadReplyEntry) {
+    if (!is_array($threadReplyEntry)) {
+        continue;
+    }
+    $replyActorId = trim((string) ($threadReplyEntry['actor_id'] ?? ''));
+    $replyActorUsername = trim((string) ($threadReplyEntry['actor_username'] ?? ''));
+    $replyActorName = trim((string) (($threadReplyEntry['actor_name'] ?? '') ?: $replyActorUsername ?: $replyActorId));
+    $replyActorUrl = trim((string) (($threadReplyEntry['url'] ?? '') ?: $replyActorId));
+    $replyActorIcon = trim((string) ($threadReplyEntry['actor_icon'] ?? ''));
+    $replyActorKey = $replyActorId !== ''
+        ? $replyActorId
+        : strtolower($replyActorUsername . '|' . $replyActorName . '|' . $replyActorUrl);
+    if ($replyActorKey === '' || isset($threadReplyActors[$replyActorKey])) {
+        continue;
+    }
+    $threadReplyActors[$replyActorKey] = [
+        'id' => $replyActorId,
+        'name' => $replyActorName,
+        'icon' => $replyActorIcon,
+        'url' => $replyActorUrl,
+    ];
+}
+if (empty($threadReplyActors) && !empty($threadDetails['replies']) && is_array($threadDetails['replies'])) {
+    foreach ($threadDetails['replies'] as $replyActor) {
+        if (!is_array($replyActor)) {
+            continue;
+        }
+        $replyActorId = trim((string) ($replyActor['id'] ?? ''));
+        $replyActorName = trim((string) (($replyActor['name'] ?? '') ?: $replyActorId));
+        $replyActorUrl = trim((string) (($replyActor['url'] ?? '') ?: $replyActorId));
+        $replyActorIcon = trim((string) ($replyActor['icon'] ?? ''));
+        $replyActorKey = $replyActorId !== ''
+            ? $replyActorId
+            : strtolower($replyActorName . '|' . $replyActorUrl);
+        if ($replyActorKey === '' || isset($threadReplyActors[$replyActorKey])) {
+            continue;
+        }
+        $threadReplyActors[$replyActorKey] = [
+            'id' => $replyActorId,
+            'name' => $replyActorName,
+            'icon' => $replyActorIcon,
+            'url' => $replyActorUrl,
+        ];
+    }
+}
+$threadReplyActors = array_values($threadReplyActors);
 $threadOriginalUrl = trim((string) ($threadPayload['original_url'] ?? ''));
 $threadUrl = trim((string) ($threadPayload['thread_url'] ?? ''));
 $threadItemUrl = trim((string) ($threadItem['url'] ?? ''));
@@ -259,7 +306,23 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
                 </div>
 
                 <div class="fediverse-public-status__metrics"<?= $threadOwnNoteFontStyle ?>>
-                    <span><?= (int) ($threadSummary['replies'] ?? 0) ?> respuesta<?= ((int) ($threadSummary['replies'] ?? 0) === 1) ? '' : 's' ?></span>
+                    <div class="fediverse-public-status__metric-group">
+                        <span><?= (int) ($threadSummary['replies'] ?? 0) ?> respuesta<?= ((int) ($threadSummary['replies'] ?? 0) === 1) ? '' : 's' ?></span>
+                        <?php if (!empty($threadReplyActors)): ?>
+                            <span class="fediverse-public-status__actor-icons">
+                                <?php foreach ($threadReplyActors as $replyActor): ?>
+                                    <?php $replyActorUrl = trim((string) (($replyActor['url'] ?? '') ?: '#')); ?>
+                                    <a href="<?= htmlspecialchars($replyActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                        <?php if (!empty($replyActor['icon'])): ?>
+                                            <img src="<?= htmlspecialchars((string) $replyActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                        <?php else: ?>
+                                            <?= htmlspecialchars(mb_substr((string) (($replyActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                        <?php endif; ?>
+                                    </a>
+                                <?php endforeach; ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
                     <div class="fediverse-public-status__metric-group">
                         <span><?= (int) ($threadSummary['likes'] ?? 0) ?> favorito<?= ((int) ($threadSummary['likes'] ?? 0) === 1) ? '' : 's' ?></span>
                         <?php if (!empty($threadDetails['likes'])): ?>

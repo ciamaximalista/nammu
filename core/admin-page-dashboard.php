@@ -1401,6 +1401,15 @@
         }
         return false;
     };
+    $normalizeSocialSourceLabel = static function (string $label, string $url = '') use ($isFediverseSourceLabel): string {
+        if ($isFediverseSourceLabel($label, $url)) {
+            return 'Fediverso';
+        }
+        if (function_exists('nammu_normalize_stats_social_detail_label')) {
+            return nammu_normalize_stats_social_detail_label($label, $url);
+        }
+        return trim($label);
+    };
     $collectEmailDetails = static function (string $fromKey, ?string $toKey = null) use ($sourcesDaily, $emailBreakdownLabels): array {
         $details = [];
         $mailNeedles = [
@@ -1479,7 +1488,7 @@
         }
         return $details;
     };
-    $collectOtherDetails = static function (string $fromKey, ?string $toKey = null) use ($sourcesDaily, $emailDetailLabels): array {
+    $collectOtherDetails = static function (string $fromKey, ?string $toKey = null) use ($sourcesDaily, $emailDetailLabels, $normalizeSocialSourceLabel): array {
         $details = [];
         foreach ($sourcesDaily as $day => $payload) {
             if (!is_string($day) || $day < $fromKey || ($toKey !== null && $day > $toKey)) {
@@ -1494,6 +1503,11 @@
                 if (is_array($emailDetailLabels) && in_array((string) $label, $emailDetailLabels, true)) {
                     continue;
                 }
+                $detailUrl = is_array($detailPayload) ? (string) ($detailPayload['url'] ?? '') : '';
+                $normalizedSocialLabel = $normalizeSocialSourceLabel((string) $label, $detailUrl);
+                if ($normalizedSocialLabel !== trim((string) $label)) {
+                    continue;
+                }
                 if (!isset($details[$label])) {
                     $details[$label] = ['uids' => [], 'url' => ''];
                 }
@@ -1503,7 +1517,6 @@
                         $details[$label]['uids'][$uid] = true;
                     }
                 }
-                $detailUrl = is_array($detailPayload) ? (string) ($detailPayload['url'] ?? '') : '';
                 if ($detailUrl !== '') {
                     $details[$label]['url'] = $detailUrl;
                 }
@@ -1518,7 +1531,8 @@
         $buildPercentTable,
         $collectEmailDetails,
         $collectOtherDetails,
-        $isFediverseSourceLabel
+        $isFediverseSourceLabel,
+        $normalizeSocialSourceLabel
     ): array {
         $sourceMain = [];
         foreach (['direct', 'search', 'social', 'email', 'push', 'other'] as $bucket) {
@@ -1544,10 +1558,11 @@
                             if (!in_array((string) $label, $emailDetailLabels, true)) {
                                 $detailUids = is_array($detailPayload) ? ($detailPayload['uids'] ?? []) : [];
                                 $detailUrl = is_array($detailPayload) ? (string) ($detailPayload['url'] ?? '') : '';
-                                if ($isFediverseSourceLabel((string) $label, $detailUrl)) {
+                                $normalizedSocialLabel = $normalizeSocialSourceLabel((string) $label, $detailUrl);
+                                if ($normalizedSocialLabel !== trim((string) $label)) {
                                     foreach ($detailUids as $uid => $flag) {
                                         $sourceMain['social'][$uid] = true;
-                                        $socialDetailUids['Fediverso'][$uid] = true;
+                                        $socialDetailUids[$normalizedSocialLabel][$uid] = true;
                                     }
                                     foreach ($detailUids as $uid => $flag) {
                                         unset($sourceMain['other'][$uid]);
@@ -1590,11 +1605,9 @@
                     if ($category === 'other' && in_array((string) $label, $emailDetailLabels, true)) {
                         continue;
                     }
-                    if ($category === 'social' && $isFediverseSourceLabel((string) $label)) {
-                        $label = 'Fediverso';
-                    } elseif ($category === 'social' && function_exists('nammu_normalize_stats_social_detail_label')) {
+                    if ($category === 'social') {
                         $detailUrl = is_array($detailPayload) ? (string) ($detailPayload['url'] ?? '') : '';
-                        $label = nammu_normalize_stats_social_detail_label((string) $label, $detailUrl);
+                        $label = $normalizeSocialSourceLabel((string) $label, $detailUrl);
                     }
                     $detailUids = is_array($detailPayload) ? ($detailPayload['uids'] ?? []) : [];
                     foreach ($detailUids as $uid => $flag) {

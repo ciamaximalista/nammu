@@ -3375,6 +3375,27 @@ function nammu_fediverse_best_thread_page_payload(array $item, array $config): a
     if ($liveReplies > $snapshotReplies) {
         return $livePayload;
     }
+    $replyReactionScore = static function (array $payload): int {
+        $score = 0;
+        foreach ((array) ($payload['replies'] ?? []) as $reply) {
+            if (!is_array($reply)) {
+                continue;
+            }
+            $summary = is_array($reply['summary'] ?? null) ? $reply['summary'] : [];
+            $likes = max(0, (int) ($summary['likes'] ?? 0));
+            $shares = max(0, (int) ($summary['shares'] ?? 0));
+            if ($likes > 0 || $shares > 0) {
+                $score += ($likes + $shares);
+                continue;
+            }
+            $details = is_array($reply['details'] ?? null) ? $reply['details'] : [];
+            $score += count((array) ($details['likes'] ?? [])) + count((array) ($details['shares'] ?? []));
+        }
+        return $score;
+    };
+    if ($replyReactionScore($livePayload) > $replyReactionScore($snapshotPayload)) {
+        return $livePayload;
+    }
     return $snapshotPayload;
 }
 

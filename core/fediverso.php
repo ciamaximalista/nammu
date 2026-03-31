@@ -3217,7 +3217,16 @@ function nammu_fediverse_thread_page_payload(array $item, array $config): array
 
 function nammu_fediverse_reaction_snapshot_for_targets(array $targetMap, array $config): array
 {
-    $targetMap = array_filter(array_map('strval', $targetMap), static fn(string $value): bool => trim($value) !== '');
+    $normalizedTargetMap = [];
+    foreach ($targetMap as $identifier => $targetKey) {
+        $identifier = trim((string) $identifier);
+        $targetKey = trim((string) $targetKey);
+        if ($identifier === '' || $targetKey === '') {
+            continue;
+        }
+        $normalizedTargetMap[$identifier] = $targetKey;
+    }
+    $targetMap = $normalizedTargetMap;
     if ($targetMap === []) {
         return [];
     }
@@ -3251,13 +3260,24 @@ function nammu_fediverse_reaction_snapshot_for_targets(array $targetMap, array $
             continue;
         }
         $object = $payload['object'] ?? null;
-        $target = '';
+        $targetCandidates = [];
         if (is_string($object)) {
-            $target = trim($object);
+            $targetCandidates[] = trim($object);
         } elseif (is_array($object)) {
-            $target = trim((string) (($object['id'] ?? '') ?: ($object['url'] ?? '')));
+            foreach (['id', 'url'] as $field) {
+                $candidate = nammu_fediverse_extract_url($object[$field] ?? '');
+                if ($candidate !== '') {
+                    $targetCandidates[] = $candidate;
+                }
+            }
         }
-        $targetKey = $targetMap[$target] ?? '';
+        $targetKey = '';
+        foreach (array_values(array_unique(array_filter($targetCandidates))) as $targetCandidate) {
+            if (isset($targetMap[$targetCandidate])) {
+                $targetKey = $targetMap[$targetCandidate];
+                break;
+            }
+        }
         if ($targetKey === '') {
             continue;
         }
@@ -3303,15 +3323,14 @@ function nammu_fediverse_reaction_snapshot_for_targets(array $targetMap, array $
         if (!in_array($type, ['like', 'announce'], true)) {
             continue;
         }
-        $target = '';
+        $targetKey = '';
         foreach (['object_id', 'target_url'] as $field) {
             $value = trim((string) ($timelineItem[$field] ?? ''));
-            if ($value !== '') {
-                $target = $value;
+            if ($value !== '' && isset($targetMap[$value])) {
+                $targetKey = $targetMap[$value];
                 break;
             }
         }
-        $targetKey = $targetMap[$target] ?? '';
         if ($targetKey === '') {
             continue;
         }

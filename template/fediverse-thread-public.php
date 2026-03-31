@@ -129,26 +129,14 @@ $filterFediverseReplyText = static function (string $text): string {
     if ($text === '') {
         return '';
     }
-    $lines = explode("\n", $text);
-    $filtered = [];
-    foreach ($lines as $index => $line) {
-        $trimmed = trim($line);
-        if ($trimmed === '') {
-            if ($filtered !== []) {
-                $filtered[] = '';
-            }
-            continue;
-        }
-        $normalized = preg_replace('/^\s*(?:cc\s*:|cc)\s*/iu', '', $trimmed) ?? $trimmed;
-        $normalized = trim($normalized);
-        $mentionOnly = preg_replace('/(?:^|\s)@[A-Za-z0-9._-]+(?:@[A-Za-z0-9.-]+)?/u', '', $normalized) ?? $normalized;
-        $mentionOnly = trim(preg_replace('/[\s,;:]+/u', ' ', $mentionOnly) ?? $mentionOnly);
-        if ($index === 0 && $mentionOnly === '') {
-            continue;
-        }
-        $filtered[] = $line;
-    }
-    $text = trim(preg_replace("/\n{3,}/", "\n\n", implode("\n", $filtered)) ?? implode("\n", $filtered));
+    $mentionBlock = '@[A-Za-z0-9._-]+(?:@[A-Za-z0-9.-]+)?';
+    $text = preg_replace('/^\s*CC:\s*(?:' . $mentionBlock . '(?:[\s,;:]+|$))+/iu', '', $text) ?? $text;
+    $text = preg_replace('/^\s*(?:' . $mentionBlock . '(?:[\s,;:]+|$))+(?=\S)/u', '', $text) ?? $text;
+    $text = preg_replace('/(?:\n|\A)\s*CC:\s*(?:' . $mentionBlock . '(?:[\s,;:]+|$))+\s*(?=\n|\z)/iu', "\n", $text) ?? $text;
+    $text = preg_replace('/(?:\n|\A)\s*(?:' . $mentionBlock . '(?:[\s,;:]+|$))+\s*(?=\n|\z)/u', "\n", $text) ?? $text;
+    $text = preg_replace('/\s+CC:\s*(?:' . $mentionBlock . '(?:[\s,;:]+|$))+\s*$/iu', '', $text) ?? $text;
+    $text = preg_replace('/\s+(?:' . $mentionBlock . '(?:[\s,;:]+|$))+\s*$/u', '', $text) ?? $text;
+    $text = trim(preg_replace("/\n{3,}/", "\n\n", $text) ?? $text);
     return $text;
 };
 $threadImageAttachments = array_values(array_filter((array) ($threadItem['attachments'] ?? []), static function ($attachment): bool {

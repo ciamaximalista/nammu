@@ -3149,6 +3149,37 @@ function nammu_fediverse_thread_page_payload(array $item, array $config): array
         $mergedReplies[] = $incomingReply;
     }
     }
+    $replyReactionTargetMap = [];
+    $replyReactionKeyMap = [];
+    foreach ($mergedReplies as $replyIndex => $reply) {
+        if (!is_array($reply)) {
+            continue;
+        }
+        $replyIdentifiers = array_values(array_unique(array_filter([
+            trim((string) ($reply['id'] ?? '')),
+            trim((string) ($reply['url'] ?? '')),
+            trim((string) ($reply['note_id'] ?? '')),
+        ])));
+        $replyKey = 'reply:' . $replyIndex;
+        foreach ($replyIdentifiers as $replyIdentifier) {
+            $replyReactionTargetMap[$replyIdentifier] = $replyKey;
+        }
+        $replyReactionKeyMap[$replyKey] = $replyIdentifiers;
+    }
+    $replyReactionMap = nammu_fediverse_reaction_snapshot_for_targets($replyReactionTargetMap, $config);
+    foreach ($mergedReplies as $replyIndex => &$reply) {
+        if (!is_array($reply)) {
+            continue;
+        }
+        $replyKey = 'reply:' . $replyIndex;
+        $replyReaction = is_array($replyReactionMap[$replyKey] ?? null) ? $replyReactionMap[$replyKey] : [
+            'summary' => ['likes' => 0, 'shares' => 0],
+            'details' => ['likes' => [], 'shares' => []],
+        ];
+        $reply['summary'] = is_array($replyReaction['summary'] ?? null) ? $replyReaction['summary'] : ['likes' => 0, 'shares' => 0];
+        $reply['details'] = is_array($replyReaction['details'] ?? null) ? $replyReaction['details'] : ['likes' => [], 'shares' => []];
+    }
+    unset($reply);
     usort($mergedReplies, static function (array $a, array $b): int {
         return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
     });
@@ -3182,6 +3213,118 @@ function nammu_fediverse_thread_page_payload(array $item, array $config): array
         'details' => $details,
         'replies' => $mergedReplies,
     ];
+}
+
+function nammu_fediverse_reaction_snapshot_for_targets(array $targetMap, array $config): array
+{
+    $targetMap = array_filter(array_map('strval', $targetMap), static fn(string $value): bool => trim($value) !== '');
+    if ($targetMap === []) {
+        return [];
+    }
+    $result = [];
+    $seen = [];
+    $ensureTarget = static function (string $key) use (&$result): void {
+        if (!isset($result[$key])) {
+            $result[$key] = [
+                'summary' => ['likes' => 0, 'shares' => 0],
+                'details' => ['likes' => [], 'shares' => []],
+            ];
+        }
+    };
+    $addActor = static function (string $targetKey, string $bucket, array $actorEntry) use (&$result, &$seen, $ensureTarget): void {
+        $ensureTarget($targetKey);
+        $actorId = trim((string) ($actorEntry['id'] ?? ''));
+        $dedupeKey = $bucket . '|' . ($actorId !== '' ? $actorId : sha1(json_encode($actorEntry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: ''));
+        if (isset($seen[$targetKey][$dedupeKey])) {
+            return;
+        }
+        $seen[$targetKey][$dedupeKey] = true;
+        $result[$targetKey]['summary'][$bucket]++;
+        $result[$targetKey]['details'][$bucket][] = $actorEntry;
+    };
+
+    $inboxStore = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
+    foreach ((array) ($inboxStore['activities'] ?? []) as $entry) {
+        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        $type = strtolower(trim((string) ($payload['type'] ?? '')));
+        if (!in_array($type, ['like', 'announce'], true)) {
+            continue;
+        }
+        $object = $payload['object'] ?? null;
+        $target = '';
+        if (is_string($object)) {
+            $target = trim($object);
+        } elseif (is_array($object)) {
+            $target = trim((string) (($object['id'] ?? '') ?: ($object['url'] ?? '')));
+        }
+        $targetKey = $targetMap[$target] ?? '';
+        if ($targetKey === '') {
+            continue;
+        }
+        $actorId = trim((string) ($payload['actor'] ?? ''));
+        $actor = $actorId !== '' ? nammu_fediverse_resolve_actor($actorId, $config) : [];
+        $addActor($targetKey, $type === 'like' ? 'likes' : 'shares', [
+            'id' => $actorId,
+            'name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
+            'icon' => trim((string) ($actor['icon'] ?? '')),
+            'url' => trim((string) (($actor['url'] ?? '') ?: ($actor['id'] ?? '') ?: $actorId)),
+            'published' => trim((string) (($payload['published'] ?? '') ?: ($entry['received_at'] ?? ''))),
+        ]);
+    }
+
+    $localActorId = nammu_fediverse_actor_url($config);
+    $localActorEntry = [
+        'id' => $localActorId,
+        'name' => trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog')),
+        'icon' => trim((string) nammu_fediverse_avatar_url($config)),
+        'url' => trim((string) nammu_fediverse_profile_page_url($config)),
+        'published' => '',
+    ];
+    foreach (nammu_fediverse_actions_store()['items'] as $action) {
+        $type = strtolower(trim((string) ($action['type'] ?? '')));
+        if (!in_array($type, ['like', 'share', 'boost'], true)) {
+            continue;
+        }
+        $target = trim((string) ($action['object_url'] ?? ''));
+        $targetKey = $targetMap[$target] ?? '';
+        if ($targetKey === '') {
+            continue;
+        }
+        $entry = $localActorEntry;
+        $entry['published'] = trim((string) ($action['published'] ?? ''));
+        $addActor($targetKey, $type === 'like' ? 'likes' : 'shares', $entry);
+    }
+
+    foreach (nammu_fediverse_timeline_store()['items'] as $timelineItem) {
+        if (!is_array($timelineItem)) {
+            continue;
+        }
+        $type = strtolower(trim((string) ($timelineItem['type'] ?? '')));
+        if (!in_array($type, ['like', 'announce'], true)) {
+            continue;
+        }
+        $target = '';
+        foreach (['object_id', 'target_url'] as $field) {
+            $value = trim((string) ($timelineItem[$field] ?? ''));
+            if ($value !== '') {
+                $target = $value;
+                break;
+            }
+        }
+        $targetKey = $targetMap[$target] ?? '';
+        if ($targetKey === '') {
+            continue;
+        }
+        $addActor($targetKey, $type === 'like' ? 'likes' : 'shares', [
+            'id' => trim((string) ($timelineItem['actor_id'] ?? '')),
+            'name' => trim((string) (($timelineItem['actor_name'] ?? '') ?: ($timelineItem['actor_username'] ?? '') ?: ($timelineItem['actor_id'] ?? ''))),
+            'icon' => trim((string) ($timelineItem['actor_icon'] ?? '')),
+            'url' => trim((string) (($timelineItem['actor_url'] ?? '') ?: ($timelineItem['actor_id'] ?? ''))),
+            'published' => trim((string) ($timelineItem['published'] ?? '')),
+        ]);
+    }
+
+    return $result;
 }
 
 function nammu_fediverse_thread_page_snapshot_payload(array $item, array $config): ?array

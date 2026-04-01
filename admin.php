@@ -169,7 +169,7 @@ function admin_run_scheduled_maintenance_tasks(): array {
         }
     }
     if (function_exists('admin_process_social_broadcast_queue')) {
-        $socialBroadcastQueueStats = admin_process_social_broadcast_queue(1);
+        $socialBroadcastQueueStats = admin_process_social_broadcast_queue(3);
     }
     if (function_exists('nammu_webmention_sync_sources')) {
         $webmentionSyncStats = nammu_webmention_sync_sources($config, 4);

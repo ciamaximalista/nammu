@@ -63,7 +63,7 @@ function admin_run_scheduled_tasks(): array {
     $fediverseRecentThreadsWarmed = 0;
     if (function_exists('nammu_fediverse_refresh_following')) {
         $fediverseStats = nammu_fediverse_refresh_following([
-            'actor_limit' => 1,
+            'actor_limit' => 4,
             'outbox_limit' => 3,
             'outbox_inspect_limit' => 18,
             'refresh_followers' => false,
@@ -11259,7 +11259,7 @@ if ($isLoggedIn && $page === 'fediverso') {
             nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
         }
         $stats = nammu_fediverse_refresh_following([
-            'actor_limit' => 1,
+            'actor_limit' => 4,
             'outbox_limit' => 3,
             'outbox_inspect_limit' => 18,
             'refresh_followers' => false,

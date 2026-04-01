@@ -385,16 +385,6 @@
         if (in_array($fediverseTimelineType, ['like', 'delete'], true)) {
             continue;
         }
-        if ($fediverseTimelineType === 'announce') {
-            $announceHasContent = trim((string) ($fediverseTimelineItem['content'] ?? '')) !== ''
-                || trim((string) ($fediverseTimelineItem['content_html'] ?? '')) !== ''
-                || trim((string) ($fediverseTimelineItem['title'] ?? '')) !== ''
-                || trim((string) ($fediverseTimelineItem['image'] ?? '')) !== ''
-                || !empty($fediverseTimelineItem['attachments']);
-            if (!$announceHasContent) {
-                continue;
-            }
-        }
         $fediverseTimelineIdentifiers = [];
         foreach (['id', 'object_id', 'url'] as $fediverseTimelineField) {
             $fediverseTimelineFieldValue = trim((string) ($fediverseTimelineItem[$fediverseTimelineField] ?? ''));
@@ -438,7 +428,13 @@
             }
         }
         if ($fediverseTimelineTargetUrl !== '' && $fediverseTimelineType !== 'announce') {
-            continue;
+            $fediverseTimelineTargetsLocal = false;
+            if (function_exists('nammu_fediverse_canonical_local_id_for_identifier')) {
+                $fediverseTimelineTargetsLocal = trim((string) nammu_fediverse_canonical_local_id_for_identifier($fediverseTimelineTargetUrl, $fediverseConfig)) !== '';
+            }
+            if ($fediverseTimelineTargetsLocal) {
+                continue;
+            }
         }
         $fediverseSkipTimelineItem = false;
         foreach ($fediverseTimelineIdentifiers as $fediverseTimelineIdentifier) {
@@ -499,6 +495,32 @@
                 'name' => '',
                 'media_type' => 'image/*',
             ];
+        }
+        if ($fediverseTimelineType === 'announce'
+            && trim((string) ($fediverseTimelineItem['title'] ?? '')) === ''
+            && trim((string) ($fediverseTimelineItem['content'] ?? '')) === ''
+            && trim((string) ($fediverseTimelineItem['content_html'] ?? '')) === ''
+            && empty($fediverseTimelineAttachments)
+        ) {
+            $fediverseBoostTargetUrl = '';
+            foreach (['object_id', 'url', 'id'] as $fediverseBoostField) {
+                $fediverseBoostValue = trim((string) ($fediverseTimelineItem[$fediverseBoostField] ?? ''));
+                if ($fediverseBoostValue !== '') {
+                    $fediverseBoostTargetUrl = $fediverseBoostValue;
+                    break;
+                }
+            }
+            if ($fediverseBoostTargetUrl !== '') {
+                $fediverseTimelineAttachments[] = [
+                    'type' => 'link',
+                    'url' => $fediverseBoostTargetUrl,
+                    'name' => 'Publicación impulsada',
+                    'media_type' => 'text/html',
+                    'summary' => '',
+                    'image' => '',
+                ];
+                $fediverseTimelineItem['content'] = 'Ha impulsado una publicación';
+            }
         }
         if (trim((string) ($fediverseTimelineItem['content'] ?? '')) === '' && trim((string) ($fediverseTimelineItem['content_html'] ?? '')) !== '' && function_exists('nammu_fediverse_html_to_text')) {
             $fediverseTimelineItem['content'] = nammu_fediverse_html_to_text((string) $fediverseTimelineItem['content_html']);

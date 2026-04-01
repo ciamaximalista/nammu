@@ -2077,136 +2077,175 @@ function nammu_fediverse_remote_replies_for_item(array $item, array $config): ar
         return [];
     }
 
-    $repliesRef = $objectDocument['replies'] ?? null;
-    $collectionUrl = '';
-    $firstPage = null;
-    if (is_string($repliesRef)) {
-        $collectionUrl = trim($repliesRef);
-    } elseif (is_array($repliesRef)) {
-        $firstRef = $repliesRef['first'] ?? null;
-        if (is_array($firstRef)) {
-            $firstPage = $firstRef;
-            $collectionUrl = trim((string) (($repliesRef['id'] ?? '') ?: ($firstRef['partOf'] ?? '') ?: ($firstRef['id'] ?? '')));
-        } elseif (is_string($firstRef)) {
-            $collectionUrl = trim((string) (($repliesRef['id'] ?? '') ?: $firstRef));
-        } else {
-            $collectionUrl = trim((string) ($repliesRef['id'] ?? ''));
-        }
-    }
-    if ($collectionUrl === '') {
-        $cache[$objectId] = [];
-        return [];
-    }
-
-    $collection = nammu_fediverse_signed_fetch_json($collectionUrl, $config);
-    if (!is_array($collection) && is_array($firstPage)) {
-        $collection = $firstPage;
-    }
-    if (!is_array($collection)) {
-        $cache[$objectId] = [];
-        return [];
-    }
-
-    $orderedItems = $collection['orderedItems'] ?? ($collection['items'] ?? []);
-    if (empty($orderedItems) && is_array($collection['first'] ?? null)) {
-        $firstObject = $collection['first'];
-        $orderedItems = $firstObject['orderedItems'] ?? ($firstObject['items'] ?? []);
-        if (empty($orderedItems) || !empty($firstPage)) {
-            $firstId = trim((string) ($firstObject['id'] ?? ''));
-            if ($firstId !== '') {
-                $firstPageFetched = nammu_fediverse_signed_fetch_json($firstId, $config);
-                if (!is_array($firstPageFetched)) {
-                    $firstPageFetched = nammu_fediverse_fetch_json($firstId);
-                }
-                if (is_array($firstPageFetched)) {
-                    $orderedItems = $firstPageFetched['orderedItems'] ?? ($firstPageFetched['items'] ?? []);
-                }
-            }
-        }
-    } elseif (empty($orderedItems) && is_array($firstPage)) {
-        $firstId = trim((string) ($firstPage['id'] ?? ''));
-        if ($firstId !== '') {
-            $firstPageFetched = nammu_fediverse_signed_fetch_json($firstId, $config);
-            if (!is_array($firstPageFetched)) {
-                $firstPageFetched = nammu_fediverse_fetch_json($firstId);
-            }
-            if (is_array($firstPageFetched)) {
-                $orderedItems = $firstPageFetched['orderedItems'] ?? ($firstPageFetched['items'] ?? []);
-            }
-        }
-    } elseif (empty($orderedItems) && is_string($collection['first'] ?? null)) {
-        $firstId = trim((string) $collection['first']);
-        if ($firstId !== '') {
-            $firstPageFetched = nammu_fediverse_signed_fetch_json($firstId, $config);
-            if (!is_array($firstPageFetched)) {
-                $firstPageFetched = nammu_fediverse_fetch_json($firstId);
-            }
-            if (is_array($firstPageFetched)) {
-                $orderedItems = $firstPageFetched['orderedItems'] ?? ($firstPageFetched['items'] ?? []);
-            }
-        }
-    }
-    if (is_array($orderedItems) && array_key_exists('id', $orderedItems)) {
-        $orderedItems = [$orderedItems];
-    }
     $replies = [];
-    foreach ((array) $orderedItems as $rawReply) {
-        $replyObject = null;
-        if (is_string($rawReply)) {
-            $replyObject = nammu_fediverse_signed_fetch_json(trim($rawReply), $config);
-        } elseif (is_array($rawReply)) {
-            $replyObject = $rawReply;
+    $seenObjects = [];
+    $seenReplies = [];
+    $fetchObject = static function (string $url, array $config): ?array {
+        $url = trim($url);
+        if ($url === '') {
+            return null;
         }
-        if (!is_array($replyObject)) {
-            continue;
+        $fetched = nammu_fediverse_signed_fetch_json($url, $config);
+        if (!is_array($fetched)) {
+            $fetched = nammu_fediverse_fetch_json($url);
         }
-        if (strtolower(trim((string) ($replyObject['type'] ?? ''))) !== 'note') {
-            continue;
+        return is_array($fetched) ? $fetched : null;
+    };
+    $extractOrderedItems = static function (array $collection, array $config, ?array $firstPage = null) use ($fetchObject): array {
+        $orderedItems = $collection['orderedItems'] ?? ($collection['items'] ?? []);
+        if (empty($orderedItems) && is_array($collection['first'] ?? null)) {
+            $firstObject = $collection['first'];
+            $orderedItems = $firstObject['orderedItems'] ?? ($firstObject['items'] ?? []);
+            if (empty($orderedItems) || !empty($firstPage)) {
+                $firstId = trim((string) ($firstObject['id'] ?? ''));
+                if ($firstId !== '') {
+                    $firstFetched = $fetchObject($firstId, $config);
+                    if (is_array($firstFetched)) {
+                        $orderedItems = $firstFetched['orderedItems'] ?? ($firstFetched['items'] ?? []);
+                    }
+                }
+            }
+        } elseif (empty($orderedItems) && is_array($firstPage)) {
+            $firstId = trim((string) ($firstPage['id'] ?? ''));
+            if ($firstId !== '') {
+                $firstFetched = $fetchObject($firstId, $config);
+                if (is_array($firstFetched)) {
+                    $orderedItems = $firstFetched['orderedItems'] ?? ($firstFetched['items'] ?? []);
+                }
+            }
+        } elseif (empty($orderedItems) && is_string($collection['first'] ?? null)) {
+            $firstId = trim((string) $collection['first']);
+            if ($firstId !== '') {
+                $firstFetched = $fetchObject($firstId, $config);
+                if (is_array($firstFetched)) {
+                    $orderedItems = $firstFetched['orderedItems'] ?? ($firstFetched['items'] ?? []);
+                }
+            }
         }
-        $replyHtml = trim((string) ($replyObject['content'] ?? ''));
-        $replyText = trim((string) (function_exists('nammu_fediverse_html_to_text') ? nammu_fediverse_html_to_text($replyHtml) : strip_tags($replyHtml)));
-        if ($replyText === '') {
-            continue;
+        if (is_array($orderedItems) && array_key_exists('id', $orderedItems)) {
+            $orderedItems = [$orderedItems];
         }
-        $actorId = trim((string) ($replyObject['attributedTo'] ?? ''));
-        $actor = $actorId !== '' ? nammu_fediverse_resolve_actor($actorId, $config) : [];
-        $attachments = [];
-        $attachmentList = $replyObject['attachment'] ?? [];
-        if (is_array($attachmentList) && array_key_exists('type', $attachmentList)) {
-            $attachmentList = [$attachmentList];
+        return is_array($orderedItems) ? $orderedItems : [];
+    };
+    $walkReplies = function (array $sourceObject, int $depth) use (&$walkReplies, &$replies, &$seenObjects, &$seenReplies, $config, $fetchObject, $extractOrderedItems): void {
+        if ($depth > 4) {
+            return;
         }
-        foreach ((array) $attachmentList as $attachment) {
-            if (!is_array($attachment)) {
+        $repliesRef = $sourceObject['replies'] ?? null;
+        $collectionUrl = '';
+        $firstPage = null;
+        if (is_string($repliesRef)) {
+            $collectionUrl = trim($repliesRef);
+        } elseif (is_array($repliesRef)) {
+            $firstRef = $repliesRef['first'] ?? null;
+            if (is_array($firstRef)) {
+                $firstPage = $firstRef;
+                $collectionUrl = trim((string) (($repliesRef['id'] ?? '') ?: ($firstRef['partOf'] ?? '') ?: ($firstRef['id'] ?? '')));
+            } elseif (is_string($firstRef)) {
+                $collectionUrl = trim((string) (($repliesRef['id'] ?? '') ?: $firstRef));
+            } else {
+                $collectionUrl = trim((string) ($repliesRef['id'] ?? ''));
+            }
+        }
+        if ($collectionUrl === '') {
+            return;
+        }
+        if (isset($seenObjects['collection:' . $collectionUrl])) {
+            return;
+        }
+        $seenObjects['collection:' . $collectionUrl] = true;
+        $collection = $fetchObject($collectionUrl, $config);
+        if (!is_array($collection) && is_array($firstPage)) {
+            $collection = $firstPage;
+        }
+        if (!is_array($collection)) {
+            return;
+        }
+        foreach ($extractOrderedItems($collection, $config, $firstPage) as $rawReply) {
+            $replyObject = null;
+            if (is_string($rawReply)) {
+                $replyObject = $fetchObject(trim($rawReply), $config);
+            } elseif (is_array($rawReply)) {
+                $replyObject = $rawReply;
+                $replyObjectId = trim((string) ($replyObject['id'] ?? ''));
+                if ($replyObjectId !== '') {
+                    $hydrated = $fetchObject($replyObjectId, $config);
+                    if (is_array($hydrated)) {
+                        $replyObject = $hydrated;
+                    }
+                }
+            }
+            if (!is_array($replyObject)) {
                 continue;
             }
-            $attachmentUrl = nammu_fediverse_extract_url($attachment['url'] ?? ($attachment['href'] ?? ''));
-            if ($attachmentUrl === '') {
+            if (strtolower(trim((string) ($replyObject['type'] ?? ''))) !== 'note') {
                 continue;
             }
-            $attachments[] = [
-                'type' => strtolower(trim((string) ($attachment['type'] ?? ''))),
-                'url' => $attachmentUrl,
-                'name' => trim((string) ($attachment['name'] ?? '')),
-                'media_type' => trim((string) (($attachment['mediaType'] ?? '') ?: ($attachment['mimeType'] ?? ''))),
-                'image' => nammu_fediverse_extract_url($attachment['image'] ?? ''),
-                'summary' => trim((string) ($attachment['summary'] ?? '')),
-            ];
+            $replyHtml = trim((string) ($replyObject['content'] ?? ''));
+            $replyText = trim((string) (function_exists('nammu_fediverse_html_to_text') ? nammu_fediverse_html_to_text($replyHtml) : strip_tags($replyHtml)));
+            if ($replyText === '') {
+                continue;
+            }
+            $replyId = trim((string) (($replyObject['id'] ?? '') ?: sha1(json_encode($replyObject))));
+            $replyUrl = trim((string) (($replyObject['url'] ?? '') ?: ''));
+            $dedupKeys = array_filter([
+                $replyId !== '' ? 'id:' . $replyId : '',
+                $replyUrl !== '' ? 'url:' . $replyUrl : '',
+            ]);
+            $alreadySeen = false;
+            foreach ($dedupKeys as $dedupKey) {
+                if (isset($seenReplies[$dedupKey])) {
+                    $alreadySeen = true;
+                    break;
+                }
+            }
+            if (!$alreadySeen) {
+                foreach ($dedupKeys as $dedupKey) {
+                    $seenReplies[$dedupKey] = true;
+                }
+                $actorId = trim((string) ($replyObject['attributedTo'] ?? ''));
+                $actor = $actorId !== '' ? nammu_fediverse_resolve_actor($actorId, $config) : [];
+                $attachments = [];
+                $attachmentList = $replyObject['attachment'] ?? [];
+                if (is_array($attachmentList) && array_key_exists('type', $attachmentList)) {
+                    $attachmentList = [$attachmentList];
+                }
+                foreach ((array) $attachmentList as $attachment) {
+                    if (!is_array($attachment)) {
+                        continue;
+                    }
+                    $attachmentUrl = nammu_fediverse_extract_url($attachment['url'] ?? ($attachment['href'] ?? ''));
+                    if ($attachmentUrl === '') {
+                        continue;
+                    }
+                    $attachments[] = [
+                        'type' => strtolower(trim((string) ($attachment['type'] ?? ''))),
+                        'url' => $attachmentUrl,
+                        'name' => trim((string) ($attachment['name'] ?? '')),
+                        'media_type' => trim((string) (($attachment['mediaType'] ?? '') ?: ($attachment['mimeType'] ?? ''))),
+                        'image' => nammu_fediverse_extract_url($attachment['image'] ?? ''),
+                        'summary' => trim((string) ($attachment['summary'] ?? '')),
+                    ];
+                }
+                $replies[] = [
+                    'id' => $replyId,
+                    'note_id' => trim((string) (($replyObject['id'] ?? '') ?: '')),
+                    'url' => $replyUrl,
+                    'published' => trim((string) ($replyObject['published'] ?? '')),
+                    'reply_text' => $replyText,
+                    'actor_id' => $actorId,
+                    'actor_name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
+                    'actor_username' => trim((string) ($actor['preferredUsername'] ?? '')),
+                    'actor_icon' => trim((string) ($actor['icon'] ?? '')),
+                    'attachments' => $attachments,
+                    'link_card' => nammu_fediverse_reply_link_card_from_attachments($attachments),
+                    'source' => 'incoming-remote',
+                ];
+            }
+            $walkReplies($replyObject, $depth + 1);
         }
-        $replies[] = [
-            'id' => trim((string) (($replyObject['id'] ?? '') ?: sha1(json_encode($replyObject)))),
-            'note_id' => trim((string) (($replyObject['id'] ?? '') ?: '')),
-            'url' => trim((string) (($replyObject['url'] ?? '') ?: '')),
-            'published' => trim((string) ($replyObject['published'] ?? '')),
-            'reply_text' => $replyText,
-            'actor_id' => $actorId,
-            'actor_name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
-            'actor_username' => trim((string) ($actor['preferredUsername'] ?? '')),
-            'actor_icon' => trim((string) ($actor['icon'] ?? '')),
-            'attachments' => $attachments,
-            'link_card' => nammu_fediverse_reply_link_card_from_attachments($attachments),
-            'source' => 'incoming-remote',
-        ];
-    }
+    };
+    $walkReplies($objectDocument, 0);
     usort($replies, static function (array $a, array $b): int {
         return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
     });
@@ -2467,7 +2506,8 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
         $targetIdentifiers = nammu_fediverse_item_identifiers_with_canonical($canonicalItem, $config);
         $mergedReplies = nammu_fediverse_merge_thread_replies(
             nammu_fediverse_collect_recursive_replies($localRepliesByObject, $targetIdentifiers),
-            (array) ($incomingReplies[$localId] ?? [])
+            nammu_fediverse_collect_recursive_replies($incomingReplies, $targetIdentifiers),
+            nammu_fediverse_cached_remote_replies_snapshot_for_item($canonicalItem)
         );
         $summary = $reactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0];
         $summary['replies'] = count($mergedReplies);
@@ -3175,52 +3215,11 @@ function nammu_fediverse_thread_page_payload(array $item, array $config): array
     $incomingReplies = nammu_fediverse_incoming_public_replies_by_object($config);
     $reactionSummary = nammu_fediverse_local_reaction_summary($config);
     $reactionDetails = nammu_fediverse_local_reaction_details($config);
-    $replyKeys = [];
-    foreach ($localReplies as $reply) {
-        foreach (array_filter([
-            trim((string) ($reply['id'] ?? '')),
-            trim((string) ($reply['url'] ?? '')),
-            trim((string) ($reply['note_id'] ?? '')),
-        ]) as $identifier) {
-            $replyKeys['id:' . $identifier] = true;
-        }
-        $fallback = strtolower(trim((string) ($reply['actor_id'] ?? ''))) . '|' .
-            trim((string) ($reply['published'] ?? '')) . '|' .
-            trim((string) ($reply['reply_text'] ?? ''));
-        if ($fallback !== '||') {
-            $replyKeys['fallback:' . $fallback] = true;
-        }
-    }
-    $mergedReplies = $localReplies;
-    foreach ($targetIdentifiers as $targetIdentifier) {
-        foreach ((array) ($incomingReplies[$targetIdentifier] ?? []) as $incomingReply) {
-        $keys = array_filter([
-            trim((string) ($incomingReply['id'] ?? '')) !== '' ? 'id:' . trim((string) $incomingReply['id']) : '',
-            trim((string) ($incomingReply['url'] ?? '')) !== '' ? 'id:' . trim((string) $incomingReply['url']) : '',
-            trim((string) ($incomingReply['note_id'] ?? '')) !== '' ? 'id:' . trim((string) $incomingReply['note_id']) : '',
-        ]);
-        $fallback = strtolower(trim((string) ($incomingReply['actor_id'] ?? ''))) . '|' .
-            trim((string) ($incomingReply['published'] ?? '')) . '|' .
-            trim((string) ($incomingReply['reply_text'] ?? ''));
-        if ($fallback !== '||') {
-            $keys[] = 'fallback:' . $fallback;
-        }
-        $alreadySeen = false;
-        foreach ($keys as $key) {
-            if (isset($replyKeys[$key])) {
-                $alreadySeen = true;
-                break;
-            }
-        }
-        if ($alreadySeen) {
-            continue;
-        }
-        foreach ($keys as $key) {
-            $replyKeys[$key] = true;
-        }
-        $mergedReplies[] = $incomingReply;
-    }
-    }
+    $mergedReplies = nammu_fediverse_merge_thread_replies(
+        $localReplies,
+        nammu_fediverse_collect_recursive_replies($incomingReplies, $targetIdentifiers),
+        nammu_fediverse_cached_remote_replies_snapshot_for_item($canonicalItem)
+    );
     $replyReactionTargetMap = [];
     $replyReactionKeyMap = [];
     foreach ($mergedReplies as $replyIndex => $reply) {

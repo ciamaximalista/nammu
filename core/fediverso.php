@@ -135,6 +135,11 @@ function nammu_fediverse_home_snapshot_file(): string
     return dirname(__DIR__) . '/config/fediverso-home.json';
 }
 
+function nammu_fediverse_thread_state_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-thread-state.json';
+}
+
 function nammu_fediverse_messages_snapshot_file(): string
 {
     return dirname(__DIR__) . '/config/fediverso-threads.json';
@@ -333,6 +338,13 @@ function nammu_fediverse_notifications_snapshot_store(): array
     return $store;
 }
 
+function nammu_fediverse_thread_state_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_thread_state_file(), ['items' => []]);
+    $store['items'] = is_array($store['items'] ?? null) ? $store['items'] : [];
+    return $store;
+}
+
 function nammu_fediverse_save_home_snapshot_store(array $data): void
 {
     nammu_fediverse_save_json_store(nammu_fediverse_home_snapshot_file(), [
@@ -357,6 +369,14 @@ function nammu_fediverse_save_notifications_snapshot_store(array $data): void
     ]);
 }
 
+function nammu_fediverse_save_thread_state_store(array $items): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_thread_state_file(), [
+        'updated_at' => gmdate(DATE_ATOM),
+        'items' => $items,
+    ]);
+}
+
 function nammu_fediverse_remove_local_item_from_home_snapshot(string $itemId): void
 {
     $itemId = trim($itemId);
@@ -378,6 +398,13 @@ function nammu_fediverse_remove_local_item_from_home_snapshot(string $itemId): v
     }
 
     nammu_fediverse_save_home_snapshot_store($data);
+
+    $threadState = nammu_fediverse_thread_state_store();
+    $threadItems = is_array($threadState['items'] ?? null) ? $threadState['items'] : [];
+    if (isset($threadItems[$itemId])) {
+        unset($threadItems[$itemId]);
+        nammu_fediverse_save_thread_state_store($threadItems);
+    }
 }
 
 function nammu_fediverse_base_url(array $config): string
@@ -2394,8 +2421,57 @@ function nammu_fediverse_merge_thread_replies(array ...$replyGroups): array
     return $merged;
 }
 
+function nammu_fediverse_filter_visible_replies(array $replies, ?array $hiddenLookup = null): array
+{
+    $hiddenLookup = is_array($hiddenLookup) ? $hiddenLookup : nammu_fediverse_hidden_reply_lookup();
+    $visible = [];
+    foreach ($replies as $reply) {
+        if (!is_array($reply) || nammu_fediverse_is_hidden_reply($reply, $hiddenLookup)) {
+            continue;
+        }
+        $visible[] = $reply;
+    }
+    return $visible;
+}
+
+function nammu_fediverse_thread_reply_actor_details(array $replies): array
+{
+    $replyActors = [];
+    foreach ($replies as $reply) {
+        if (!is_array($reply)) {
+            continue;
+        }
+        $actorId = trim((string) ($reply['actor_id'] ?? ''));
+        $actorKey = $actorId !== '' ? $actorId : sha1(json_encode($reply, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        if (isset($replyActors[$actorKey])) {
+            continue;
+        }
+        $replyActors[$actorKey] = [
+            'id' => $actorId,
+            'name' => trim((string) (($reply['actor_name'] ?? '') ?: ($reply['actor_username'] ?? '') ?: $actorId)),
+            'icon' => trim((string) ($reply['actor_icon'] ?? '')),
+            'url' => trim((string) (($reply['url'] ?? '') ?: $actorId)),
+            'published' => trim((string) ($reply['published'] ?? '')),
+        ];
+    }
+    return array_values($replyActors);
+}
+
+function nammu_fediverse_normalize_thread_payload(array $payload): array
+{
+    $payload['replies'] = nammu_fediverse_filter_visible_replies((array) ($payload['replies'] ?? []));
+    $summary = is_array($payload['summary'] ?? null) ? $payload['summary'] : ['likes' => 0, 'shares' => 0, 'replies' => 0];
+    $details = is_array($payload['details'] ?? null) ? $payload['details'] : ['likes' => [], 'shares' => [], 'replies' => []];
+    $summary['replies'] = count((array) $payload['replies']);
+    $details['replies'] = nammu_fediverse_thread_reply_actor_details((array) $payload['replies']);
+    $payload['summary'] = $summary;
+    $payload['details'] = $details;
+    return $payload;
+}
+
 function nammu_fediverse_reply_list_score(array $replies): int
 {
+    $replies = nammu_fediverse_filter_visible_replies($replies);
     $score = 0;
     foreach ($replies as $reply) {
         if (!is_array($reply)) {
@@ -2421,6 +2497,7 @@ function nammu_fediverse_reply_list_score(array $replies): int
 
 function nammu_fediverse_stable_reply_list(array ...$replyGroups): array
 {
+    $replyGroups = array_map(static fn(array $group): array => nammu_fediverse_filter_visible_replies($group), $replyGroups);
     $merged = nammu_fediverse_merge_thread_replies(...$replyGroups);
     $bestReplies = $merged;
     $bestScore = nammu_fediverse_reply_list_score($merged);
@@ -2562,25 +2639,7 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
         $summary = $reactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0];
         $summary['replies'] = count($mergedReplies);
         $details = $reactionDetails[$localId] ?? ['likes' => [], 'shares' => [], 'replies' => []];
-        $replyActors = [];
-        foreach ($mergedReplies as $reply) {
-            if (!is_array($reply)) {
-                continue;
-            }
-            $actorId = trim((string) ($reply['actor_id'] ?? ''));
-            $actorKey = $actorId !== '' ? $actorId : sha1(json_encode($reply, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-            if (isset($replyActors[$actorKey])) {
-                continue;
-            }
-            $replyActors[$actorKey] = [
-                'id' => $actorId,
-                'name' => trim((string) (($reply['actor_name'] ?? '') ?: ($reply['actor_username'] ?? '') ?: $actorId)),
-                'icon' => trim((string) ($reply['actor_icon'] ?? '')),
-                'url' => trim((string) (($reply['url'] ?? '') ?: $actorId)),
-                'published' => trim((string) ($reply['published'] ?? '')),
-            ];
-        }
-        $details['replies'] = array_values($replyActors);
+        $details['replies'] = nammu_fediverse_thread_reply_actor_details($mergedReplies);
         $candidatePayload = [
             'item' => $canonicalItem,
             'thread_url' => nammu_fediverse_thread_page_url($localId, $config),
@@ -2593,6 +2652,7 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
             && nammu_fediverse_thread_payload_score($existingPayload) > nammu_fediverse_thread_payload_score($candidatePayload)
             ? $existingPayload
             : $candidatePayload;
+        $threadPayloads[$localId] = nammu_fediverse_normalize_thread_payload($threadPayloads[$localId]);
     }
     return $threadPayloads;
 }
@@ -2641,12 +2701,69 @@ function nammu_fediverse_promote_thread_payloads_to_threads_cache(array $threadP
     }
 }
 
+function nammu_fediverse_best_persisted_thread_payload(?array $a, ?array $b): ?array
+{
+    $a = is_array($a) ? nammu_fediverse_normalize_thread_payload($a) : null;
+    $b = is_array($b) ? nammu_fediverse_normalize_thread_payload($b) : null;
+    if (!is_array($a)) {
+        return $b;
+    }
+    if (!is_array($b)) {
+        return $a;
+    }
+    return nammu_fediverse_thread_payload_score($b) > nammu_fediverse_thread_payload_score($a) ? $b : $a;
+}
+
+function nammu_fediverse_promote_thread_payloads_to_state_store(array $threadPayloads, array $config): void
+{
+    $stateStore = nammu_fediverse_thread_state_store();
+    $stateItems = is_array($stateStore['items'] ?? null) ? $stateStore['items'] : [];
+    $now = gmdate(DATE_ATOM);
+    $changed = false;
+
+    foreach ($threadPayloads as $payload) {
+        if (!is_array($payload)) {
+            continue;
+        }
+        $item = is_array($payload['item'] ?? null) ? $payload['item'] : [];
+        $objectId = trim((string) (($item['object_id'] ?? '') ?: ($item['id'] ?? '')));
+        if ($objectId === '' || !nammu_fediverse_is_named_local_object_id($objectId, $config)) {
+            continue;
+        }
+        $candidatePayload = nammu_fediverse_normalize_thread_payload($payload);
+        if (nammu_fediverse_thread_payload_score($candidatePayload) <= 0) {
+            continue;
+        }
+        $existingEntry = is_array($stateItems[$objectId] ?? null) ? $stateItems[$objectId] : [];
+        $existingPayload = is_array($existingEntry['payload'] ?? null) ? $existingEntry['payload'] : null;
+        $bestPayload = nammu_fediverse_best_persisted_thread_payload($existingPayload, $candidatePayload);
+        if (!is_array($bestPayload)) {
+            continue;
+        }
+        $existingScore = is_array($existingPayload) ? nammu_fediverse_thread_payload_score($existingPayload) : -1;
+        $bestScore = nammu_fediverse_thread_payload_score($bestPayload);
+        if ($bestScore <= $existingScore && isset($stateItems[$objectId])) {
+            continue;
+        }
+        $stateItems[$objectId] = [
+            'updated_at' => $now,
+            'payload' => $bestPayload,
+        ];
+        $changed = true;
+    }
+
+    if ($changed) {
+        nammu_fediverse_save_thread_state_store($stateItems);
+    }
+}
+
 function nammu_fediverse_store_files_for_tab(string $tab): array
 {
     $tab = strtolower(trim($tab));
     $files = match ($tab) {
         'home' => [
             nammu_fediverse_home_snapshot_file(),
+            nammu_fediverse_thread_state_file(),
             nammu_fediverse_timeline_file(),
             nammu_fediverse_actions_file(),
             nammu_fediverse_inbox_file(),
@@ -2662,6 +2779,7 @@ function nammu_fediverse_store_files_for_tab(string $tab): array
         ],
         'messages' => [
             nammu_fediverse_messages_snapshot_file(),
+            nammu_fediverse_thread_state_file(),
             nammu_fediverse_messages_file(),
             nammu_fediverse_actions_file(),
             nammu_fediverse_inbox_file(),
@@ -2690,6 +2808,7 @@ function nammu_fediverse_store_files_for_tab(string $tab): array
             nammu_fediverse_following_file(),
             nammu_fediverse_followers_file(),
             nammu_fediverse_actions_file(),
+            nammu_fediverse_thread_state_file(),
             nammu_fediverse_threads_cache_file(),
             nammu_fediverse_hidden_replies_file(),
             nammu_fediverse_blocked_file(),
@@ -2719,6 +2838,14 @@ function nammu_fediverse_rebuild_home_snapshot(array $config): array
     $existingSnapshot = nammu_fediverse_home_snapshot_store();
     $existingData = is_array($existingSnapshot['data'] ?? null) ? $existingSnapshot['data'] : [];
     $existingThreadPayloads = is_array($existingData['thread_payloads'] ?? null) ? $existingData['thread_payloads'] : [];
+    $threadState = nammu_fediverse_thread_state_store();
+    foreach ((array) ($threadState['items'] ?? []) as $stateItemId => $stateEntry) {
+        $statePayload = is_array($stateEntry['payload'] ?? null) ? $stateEntry['payload'] : null;
+        $existingThreadPayloads[$stateItemId] = nammu_fediverse_best_persisted_thread_payload(
+            is_array($existingThreadPayloads[$stateItemId] ?? null) ? $existingThreadPayloads[$stateItemId] : null,
+            $statePayload
+        );
+    }
     $knownActors = nammu_fediverse_known_actors();
     $actorsById = [];
     foreach ($knownActors as $actor) {
@@ -2767,6 +2894,7 @@ function nammu_fediverse_rebuild_home_snapshot(array $config): array
         $incomingReplies,
         $existingThreadPayloads
     );
+    nammu_fediverse_promote_thread_payloads_to_state_store($data['thread_payloads'], $config);
     nammu_fediverse_promote_thread_payloads_to_threads_cache($data['thread_payloads'], $config);
     nammu_fediverse_save_home_snapshot_store($data);
     return $data;
@@ -3360,33 +3488,15 @@ function nammu_fediverse_thread_page_payload(array $item, array $config): array
     $summary = $reactionSummary[$itemId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0];
     $summary['replies'] = count($mergedReplies);
     $details = $reactionDetails[$itemId] ?? ['likes' => [], 'shares' => [], 'replies' => []];
-    $replyActors = [];
-    foreach ($mergedReplies as $reply) {
-        if (!is_array($reply)) {
-            continue;
-        }
-        $actorId = trim((string) ($reply['actor_id'] ?? ''));
-        $actorKey = $actorId !== '' ? $actorId : sha1(json_encode($reply, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-        if (isset($replyActors[$actorKey])) {
-            continue;
-        }
-        $replyActors[$actorKey] = [
-            'id' => $actorId,
-            'name' => trim((string) (($reply['actor_name'] ?? '') ?: ($reply['actor_username'] ?? '') ?: $actorId)),
-            'icon' => trim((string) ($reply['actor_icon'] ?? '')),
-            'url' => trim((string) (($reply['url'] ?? '') ?: $actorId)),
-            'published' => trim((string) ($reply['published'] ?? '')),
-        ];
-    }
-    $details['replies'] = array_values($replyActors);
-    return [
+    $details['replies'] = nammu_fediverse_thread_reply_actor_details($mergedReplies);
+    return nammu_fediverse_normalize_thread_payload([
         'item' => $canonicalItem,
         'thread_url' => nammu_fediverse_thread_page_url($itemId, $config),
         'original_url' => trim((string) ($canonicalItem['url'] ?? ($item['url'] ?? ''))),
         'summary' => $summary,
         'details' => $details,
         'replies' => $mergedReplies,
-    ];
+    ]);
 }
 
 function nammu_fediverse_reaction_snapshot_for_targets(array $targetMap, array $config): array
@@ -3531,10 +3641,10 @@ function nammu_fediverse_thread_page_snapshot_payload(array $item, array $config
     $data = is_array($snapshot['data'] ?? null) ? $snapshot['data'] : [];
     $threadPayloads = is_array($data['thread_payloads'] ?? null) ? $data['thread_payloads'] : [];
     $payload = is_array($threadPayloads[$itemId] ?? null) ? $threadPayloads[$itemId] : null;
-    if (!is_array($payload)) {
-        return null;
-    }
-    return $payload;
+    $threadState = nammu_fediverse_thread_state_store();
+    $stateItems = is_array($threadState['items'] ?? null) ? $threadState['items'] : [];
+    $statePayload = is_array(($stateItems[$itemId]['payload'] ?? null)) ? $stateItems[$itemId]['payload'] : null;
+    return nammu_fediverse_best_persisted_thread_payload($payload, $statePayload);
 }
 
 function nammu_fediverse_best_thread_page_payload(array $item, array $config): array

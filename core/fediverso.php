@@ -4286,9 +4286,8 @@ function nammu_fediverse_extract_outbox_items(
             if ($normalizedId !== '' && isset($knownTimelineIds[$normalizedId])) {
                 continue;
             }
-            $isTopLevelPublication = trim((string) ($normalized['target_url'] ?? '')) === ''
-                && strtolower(trim((string) ($normalized['type'] ?? ''))) !== 'announce';
-            if ($isTopLevelPublication) {
+            $isTopLevelFeedItem = trim((string) ($normalized['target_url'] ?? '')) === '';
+            if ($isTopLevelFeedItem) {
                 $topLevelItems[] = $normalized;
             } else {
                 $otherItems[] = $normalized;

@@ -820,10 +820,18 @@ if (preg_match('#^/fediverso/([a-f0-9]{24})/?$#', $routePath, $fediverseThreadMa
     if (!is_array($threadItem)) {
         $renderNotFound('Hilo federado no encontrado', 'La publicación federada solicitada no está disponible.', $routePath);
     }
-    $threadPayload = nammu_fediverse_thread_page_snapshot_payload($threadItem, $configData)
-        ?? (function_exists('nammu_fediverse_best_thread_page_payload')
+    $threadPayload = nammu_fediverse_thread_page_snapshot_payload($threadItem, $configData);
+    $threadItemId = trim((string) ($threadItem['id'] ?? ''));
+    if (function_exists('nammu_fediverse_best_thread_page_payload')
+        && function_exists('nammu_fediverse_is_named_local_object_id')
+        && nammu_fediverse_is_named_local_object_id($threadItemId, $configData)
+    ) {
+        $threadPayload = nammu_fediverse_best_thread_page_payload($threadItem, $configData);
+    } elseif (!is_array($threadPayload)) {
+        $threadPayload = function_exists('nammu_fediverse_best_thread_page_payload')
             ? nammu_fediverse_best_thread_page_payload($threadItem, $configData)
-            : nammu_fediverse_thread_page_payload($threadItem, $configData));
+            : nammu_fediverse_thread_page_payload($threadItem, $configData);
+    }
     $threadPageTitle = trim((string) (($threadItem['title'] ?? '') ?: ($siteTitle . ' — Fediverso')));
     $threadDescription = trim((string) (($threadItem['summary'] ?? '') ?: ($threadItem['content'] ?? '')));
     $threadUrl = trim((string) ($threadPayload['thread_url'] ?? ''));

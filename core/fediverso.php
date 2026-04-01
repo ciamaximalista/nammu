@@ -3442,30 +3442,7 @@ function nammu_fediverse_best_thread_page_payload(array $item, array $config): a
     if (!is_array($snapshotPayload)) {
         return $livePayload;
     }
-    $snapshotReplies = is_array($snapshotPayload['replies'] ?? null) ? count($snapshotPayload['replies']) : 0;
-    $liveReplies = is_array($livePayload['replies'] ?? null) ? count($livePayload['replies']) : 0;
-    if ($liveReplies > $snapshotReplies) {
-        return $livePayload;
-    }
-    $replyReactionScore = static function (array $payload): int {
-        $score = 0;
-        foreach ((array) ($payload['replies'] ?? []) as $reply) {
-            if (!is_array($reply)) {
-                continue;
-            }
-            $summary = is_array($reply['summary'] ?? null) ? $reply['summary'] : [];
-            $likes = max(0, (int) ($summary['likes'] ?? 0));
-            $shares = max(0, (int) ($summary['shares'] ?? 0));
-            if ($likes > 0 || $shares > 0) {
-                $score += ($likes + $shares);
-                continue;
-            }
-            $details = is_array($reply['details'] ?? null) ? $reply['details'] : [];
-            $score += count((array) ($details['likes'] ?? [])) + count((array) ($details['shares'] ?? []));
-        }
-        return $score;
-    };
-    if ($replyReactionScore($livePayload) > $replyReactionScore($snapshotPayload)) {
+    if (nammu_fediverse_thread_payload_score($livePayload) > nammu_fediverse_thread_payload_score($snapshotPayload)) {
         return $livePayload;
     }
     return $snapshotPayload;
@@ -8147,6 +8124,44 @@ function nammu_fediverse_thread_meta_score(array $meta): int
         + max(0, (int) ($summary['replies'] ?? 0));
 }
 
+function nammu_fediverse_is_named_local_object_id(string $itemId, array $config): bool
+{
+    $itemId = trim($itemId);
+    if ($itemId === '') {
+        return false;
+    }
+    $baseUrl = rtrim(nammu_fediverse_base_url($config), '/');
+    return preg_match('#^' . preg_quote($baseUrl, '#') . '/ap/objects/(post|podcast|itinerary)-#', $itemId) === 1;
+}
+
+function nammu_fediverse_thread_payload_score(array $payload): int
+{
+    $summary = is_array($payload['summary'] ?? null) ? $payload['summary'] : [];
+    $details = is_array($payload['details'] ?? null) ? $payload['details'] : [];
+    $score = max(0, (int) ($summary['likes'] ?? 0))
+        + max(0, (int) ($summary['shares'] ?? 0))
+        + max(0, (int) ($summary['replies'] ?? 0));
+    $score += count((array) ($details['likes'] ?? []))
+        + count((array) ($details['shares'] ?? []))
+        + count((array) ($details['replies'] ?? []));
+
+    foreach ((array) ($payload['replies'] ?? []) as $reply) {
+        if (!is_array($reply)) {
+            continue;
+        }
+        $replySummary = is_array($reply['summary'] ?? null) ? $reply['summary'] : [];
+        $replyDetails = is_array($reply['details'] ?? null) ? $reply['details'] : [];
+        $score += max(0, (int) ($replySummary['likes'] ?? 0))
+            + max(0, (int) ($replySummary['shares'] ?? 0))
+            + max(0, (int) ($replySummary['replies'] ?? 0));
+        $score += count((array) ($replyDetails['likes'] ?? []))
+            + count((array) ($replyDetails['shares'] ?? []))
+            + count((array) ($replyDetails['replies'] ?? []));
+    }
+
+    return $score;
+}
+
 function nammu_fediverse_best_snapshot_meta_for_items(array $items, array $config): ?array
 {
     $bestMeta = null;
@@ -8368,12 +8383,24 @@ function nammu_fediverse_public_thread_meta_for_named_local_item(string $slug, s
     if (is_array($item)) {
         $equivalentItems = nammu_fediverse_equivalent_local_items_by_url((string) ($item['url'] ?? ''), $config);
         $bestMeta = nammu_fediverse_best_snapshot_meta_for_items($equivalentItems, $config);
-        if (is_array($bestMeta)) {
+        if (is_array($bestMeta) && nammu_fediverse_thread_meta_score($bestMeta) > 0) {
             return $bestMeta;
         }
     }
     $threadUrl = nammu_fediverse_public_thread_url_for_named_local_item($normalizedSlug, $normalizedTemplate, $config);
-    $payload = is_array($item) ? nammu_fediverse_thread_page_snapshot_payload($item, $config) : null;
+    $payload = null;
+    if (is_array($item)) {
+        $payload = nammu_fediverse_thread_page_snapshot_payload($item, $config);
+        $itemId = trim((string) ($item['id'] ?? ''));
+        if (nammu_fediverse_is_named_local_object_id($itemId, $config)
+            && (!is_array($payload) || nammu_fediverse_thread_payload_score($payload) <= 0)
+        ) {
+            $bestPayload = nammu_fediverse_best_thread_page_payload($item, $config);
+            if (nammu_fediverse_thread_payload_score($bestPayload) > nammu_fediverse_thread_payload_score((array) $payload)) {
+                $payload = $bestPayload;
+            }
+        }
+    }
 
     return [
         'thread_url' => $threadUrl,

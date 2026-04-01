@@ -2263,14 +2263,17 @@ function nammu_fediverse_cached_remote_replies_for_item(array $item, array $conf
     $cacheItems = is_array($cacheStore['items'] ?? null) ? $cacheStore['items'] : [];
     $now = time();
     $cached = is_array($cacheItems[$objectId] ?? null) ? $cacheItems[$objectId] : null;
+    $cachedReplies = is_array($cached['replies'] ?? null) ? $cached['replies'] : [];
     if (is_array($cached)) {
         $fetchedAt = (int) ($cached['fetched_at'] ?? 0);
-        $replies = is_array($cached['replies'] ?? null) ? $cached['replies'] : [];
         if ($fetchedAt > 0 && ($now - $fetchedAt) <= $maxAge) {
-            return $replies;
+            return $cachedReplies;
         }
     }
-    $replies = nammu_fediverse_remote_replies_for_item($item, $config);
+    $replies = nammu_fediverse_stable_reply_list(
+        $cachedReplies,
+        nammu_fediverse_remote_replies_for_item($item, $config)
+    );
     $cacheItems[$objectId] = [
         'fetched_at' => $now,
         'replies' => $replies,
@@ -2391,6 +2394,46 @@ function nammu_fediverse_merge_thread_replies(array ...$replyGroups): array
     return $merged;
 }
 
+function nammu_fediverse_reply_list_score(array $replies): int
+{
+    $score = 0;
+    foreach ($replies as $reply) {
+        if (!is_array($reply)) {
+            continue;
+        }
+        $score += 4;
+        foreach (['id', 'url', 'note_id', 'reply_text', 'actor_id', 'published'] as $field) {
+            if (trim((string) ($reply[$field] ?? '')) !== '') {
+                $score++;
+            }
+        }
+        $summary = is_array($reply['summary'] ?? null) ? $reply['summary'] : [];
+        $details = is_array($reply['details'] ?? null) ? $reply['details'] : [];
+        $score += max(0, (int) ($summary['likes'] ?? 0))
+            + max(0, (int) ($summary['shares'] ?? 0))
+            + max(0, (int) ($summary['replies'] ?? 0));
+        $score += count((array) ($details['likes'] ?? []))
+            + count((array) ($details['shares'] ?? []))
+            + count((array) ($details['replies'] ?? []));
+    }
+    return $score;
+}
+
+function nammu_fediverse_stable_reply_list(array ...$replyGroups): array
+{
+    $merged = nammu_fediverse_merge_thread_replies(...$replyGroups);
+    $bestReplies = $merged;
+    $bestScore = nammu_fediverse_reply_list_score($merged);
+    foreach ($replyGroups as $replyGroup) {
+        $score = nammu_fediverse_reply_list_score($replyGroup);
+        if ($score > $bestScore) {
+            $bestReplies = $replyGroup;
+            $bestScore = $score;
+        }
+    }
+    return $bestReplies;
+}
+
 function nammu_fediverse_collect_recursive_replies(array $replyIndex, array $rootTargets): array
 {
     $queue = array_values(array_filter(array_map(static fn($target): string => trim((string) $target), $rootTargets)));
@@ -2490,7 +2533,7 @@ function nammu_fediverse_local_public_replies_by_object(array $config): array
     return $grouped;
 }
 
-function nammu_fediverse_build_home_thread_payloads(array $localItems, array $config, array $reactionSummary, array $reactionDetails, array $incomingReplies): array
+function nammu_fediverse_build_home_thread_payloads(array $localItems, array $config, array $reactionSummary, array $reactionDetails, array $incomingReplies, array $existingThreadPayloads = []): array
 {
     $threadPayloads = [];
     $localRepliesByObject = nammu_fediverse_local_public_replies_by_object($config);
@@ -2504,14 +2547,17 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
             continue;
         }
         $targetIdentifiers = nammu_fediverse_item_identifiers_with_canonical($canonicalItem, $config);
+        $existingPayload = is_array($existingThreadPayloads[$localId] ?? null) ? $existingThreadPayloads[$localId] : null;
+        $existingReplies = is_array($existingPayload['replies'] ?? null) ? $existingPayload['replies'] : [];
         $remoteReplies = nammu_fediverse_cached_remote_replies_snapshot_for_item($canonicalItem);
         if (empty($remoteReplies) && nammu_fediverse_is_named_local_object_id($localId, $config)) {
             $remoteReplies = nammu_fediverse_cached_remote_replies_for_item($canonicalItem, $config, 86400);
         }
-        $mergedReplies = nammu_fediverse_merge_thread_replies(
+        $mergedReplies = nammu_fediverse_stable_reply_list(
             nammu_fediverse_collect_recursive_replies($localRepliesByObject, $targetIdentifiers),
             nammu_fediverse_collect_recursive_replies($incomingReplies, $targetIdentifiers),
-            $remoteReplies
+            $remoteReplies,
+            $existingReplies
         );
         $summary = $reactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0];
         $summary['replies'] = count($mergedReplies);
@@ -2535,7 +2581,7 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
             ];
         }
         $details['replies'] = array_values($replyActors);
-        $threadPayloads[$localId] = [
+        $candidatePayload = [
             'item' => $canonicalItem,
             'thread_url' => nammu_fediverse_thread_page_url($localId, $config),
             'original_url' => trim((string) ($canonicalItem['url'] ?? ($localItem['url'] ?? ''))),
@@ -2543,8 +2589,56 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
             'details' => $details,
             'replies' => $mergedReplies,
         ];
+        $threadPayloads[$localId] = is_array($existingPayload)
+            && nammu_fediverse_thread_payload_score($existingPayload) > nammu_fediverse_thread_payload_score($candidatePayload)
+            ? $existingPayload
+            : $candidatePayload;
     }
     return $threadPayloads;
+}
+
+function nammu_fediverse_promote_thread_payloads_to_threads_cache(array $threadPayloads, array $config): void
+{
+    $cacheStore = nammu_fediverse_threads_cache_store();
+    $cacheItems = is_array($cacheStore['items'] ?? null) ? $cacheStore['items'] : [];
+    $now = time();
+    $changed = false;
+
+    foreach ($threadPayloads as $payload) {
+        if (!is_array($payload)) {
+            continue;
+        }
+        $item = is_array($payload['item'] ?? null) ? $payload['item'] : [];
+        $objectId = trim((string) (($item['object_id'] ?? '') ?: ($item['id'] ?? '')));
+        if ($objectId === '' || !nammu_fediverse_is_named_local_object_id($objectId, $config)) {
+            continue;
+        }
+        $payloadReplies = is_array($payload['replies'] ?? null) ? $payload['replies'] : [];
+        if ($payloadReplies === []) {
+            continue;
+        }
+        $existing = is_array($cacheItems[$objectId] ?? null) ? $cacheItems[$objectId] : [];
+        $existingReplies = is_array($existing['replies'] ?? null) ? $existing['replies'] : [];
+        $stableReplies = nammu_fediverse_stable_reply_list($existingReplies, $payloadReplies);
+        if (nammu_fediverse_reply_list_score($stableReplies) <= nammu_fediverse_reply_list_score($existingReplies)) {
+            continue;
+        }
+        $cacheItems[$objectId] = [
+            'fetched_at' => max($now, (int) ($existing['fetched_at'] ?? 0)),
+            'replies' => $stableReplies,
+        ];
+        $changed = true;
+    }
+
+    if ($changed) {
+        if (count($cacheItems) > 300) {
+            uasort($cacheItems, static function (array $a, array $b): int {
+                return ((int) ($b['fetched_at'] ?? 0)) <=> ((int) ($a['fetched_at'] ?? 0));
+            });
+            $cacheItems = array_slice($cacheItems, 0, 300, true);
+        }
+        nammu_fediverse_save_threads_cache_store($cacheItems);
+    }
 }
 
 function nammu_fediverse_store_files_for_tab(string $tab): array
@@ -2622,6 +2716,9 @@ function nammu_fediverse_tab_version(string $tab): string
 
 function nammu_fediverse_rebuild_home_snapshot(array $config): array
 {
+    $existingSnapshot = nammu_fediverse_home_snapshot_store();
+    $existingData = is_array($existingSnapshot['data'] ?? null) ? $existingSnapshot['data'] : [];
+    $existingThreadPayloads = is_array($existingData['thread_payloads'] ?? null) ? $existingData['thread_payloads'] : [];
     $knownActors = nammu_fediverse_known_actors();
     $actorsById = [];
     foreach ($knownActors as $actor) {
@@ -2667,8 +2764,10 @@ function nammu_fediverse_rebuild_home_snapshot(array $config): array
         $config,
         $localReactionSummary,
         $localReactionDetails,
-        $incomingReplies
+        $incomingReplies,
+        $existingThreadPayloads
     );
+    nammu_fediverse_promote_thread_payloads_to_threads_cache($data['thread_payloads'], $config);
     nammu_fediverse_save_home_snapshot_store($data);
     return $data;
 }

@@ -4217,28 +4217,55 @@ function nammu_fediverse_extract_outbox_items(
     ?int $inspectLimit = null
 ): array
 {
-    $payload = $outbox;
-    if (!empty($outbox['first']) && is_string($outbox['first'])) {
-        $first = nammu_fediverse_fetch_json($outbox['first']);
-        if (is_array($first)) {
-            $payload = $first;
-        }
-    }
     $rawItems = [];
-    if (is_array($payload['orderedItems'] ?? null)) {
-        $rawItems = $payload['orderedItems'];
-    } elseif (is_array($payload['items'] ?? null)) {
-        $rawItems = $payload['items'];
-    }
     $items = [];
     $topLevelItems = [];
     $otherItems = [];
     $knownTimelineIds = array_fill_keys(array_values(array_filter(array_map('strval', $knownTimelineIds))), true);
     $inspectLimit = $inspectLimit !== null ? max(1, $inspectLimit) : max($limit * 6, 24);
     $inspected = 0;
-    foreach ($rawItems as $rawItem) {
-        if ($inspected >= $inspectLimit) {
-            break;
+    $pageQueue = [];
+    $queuedPages = [];
+    $enqueuePage = static function (string $url) use (&$pageQueue, &$queuedPages): void {
+        $url = trim($url);
+        if ($url === '' || isset($queuedPages[$url])) {
+            return;
+        }
+        $queuedPages[$url] = true;
+        $pageQueue[] = $url;
+    };
+    if (!empty($outbox['first']) && is_string($outbox['first'])) {
+        $enqueuePage((string) $outbox['first']);
+    } else {
+        $rawItems = is_array($outbox['orderedItems'] ?? null)
+            ? $outbox['orderedItems']
+            : (is_array($outbox['items'] ?? null) ? $outbox['items'] : []);
+    }
+
+    while ($inspected < $inspectLimit && (!empty($rawItems) || !empty($pageQueue))) {
+        if (empty($rawItems) && !empty($pageQueue)) {
+            $nextPageUrl = array_shift($pageQueue);
+            $pagePayload = nammu_fediverse_signed_fetch_json($nextPageUrl, $config);
+            if (!is_array($pagePayload)) {
+                $pagePayload = nammu_fediverse_fetch_json($nextPageUrl);
+            }
+            if (!is_array($pagePayload)) {
+                continue;
+            }
+            $rawItems = is_array($pagePayload['orderedItems'] ?? null)
+                ? $pagePayload['orderedItems']
+                : (is_array($pagePayload['items'] ?? null) ? $pagePayload['items'] : []);
+            $pageNext = trim((string) ($pagePayload['next'] ?? ''));
+            if ($pageNext !== '') {
+                $enqueuePage($pageNext);
+            }
+            if (empty($rawItems)) {
+                continue;
+            }
+        }
+        $rawItem = array_shift($rawItems);
+        if ($rawItem === null) {
+            continue;
         }
         $inspected++;
         if (is_string($rawItem) && preg_match('#^https?://#i', $rawItem)) {

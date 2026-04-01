@@ -255,6 +255,23 @@ $renderImages = static function (array $item, bool $isSiteContent = false): stri
     if ($primaryImage === '') {
         $primaryImage = trim((string) ($item['source_image'] ?? ''));
     }
+    $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
+    if ($isBoost) {
+        $boostActorIcon = trim((string) ($item['boost_actor_icon'] ?? ''));
+        $sourceImage = trim((string) ($item['source_image'] ?? ''));
+        if ($boostActorIcon !== '') {
+            $normalizedBoostActorIcon = strtolower($boostActorIcon);
+            $allImages = array_values(array_filter($allImages, static function ($imageUrl) use ($normalizedBoostActorIcon): bool {
+                return strtolower(trim((string) $imageUrl)) !== $normalizedBoostActorIcon;
+            }));
+            if (strtolower($primaryImage) === $normalizedBoostActorIcon) {
+                $primaryImage = '';
+            }
+            if ($sourceImage !== '' && strtolower($sourceImage) === $normalizedBoostActorIcon && $primaryImage !== '') {
+                $primaryImage = '';
+            }
+        }
+    }
     if ($primaryImage !== '' && !in_array($primaryImage, $allImages, true)) {
         array_unshift($allImages, $primaryImage);
     }

@@ -2504,10 +2504,14 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
             continue;
         }
         $targetIdentifiers = nammu_fediverse_item_identifiers_with_canonical($canonicalItem, $config);
+        $remoteReplies = nammu_fediverse_cached_remote_replies_snapshot_for_item($canonicalItem);
+        if (empty($remoteReplies) && nammu_fediverse_is_named_local_object_id($localId, $config)) {
+            $remoteReplies = nammu_fediverse_cached_remote_replies_for_item($canonicalItem, $config, 86400);
+        }
         $mergedReplies = nammu_fediverse_merge_thread_replies(
             nammu_fediverse_collect_recursive_replies($localRepliesByObject, $targetIdentifiers),
             nammu_fediverse_collect_recursive_replies($incomingReplies, $targetIdentifiers),
-            nammu_fediverse_cached_remote_replies_snapshot_for_item($canonicalItem)
+            $remoteReplies
         );
         $summary = $reactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0];
         $summary['replies'] = count($mergedReplies);

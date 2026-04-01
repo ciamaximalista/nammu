@@ -3088,6 +3088,78 @@ function nammu_fediverse_find_local_item_for_thread_hash(string $hash, array $co
             return $resendItem;
         }
     }
+
+    $resolveSnapshotCandidate = static function (array $candidateItem) use ($config): ?array {
+        $candidateId = trim((string) ($candidateItem['id'] ?? ''));
+        if ($candidateId !== '') {
+            $resolvedItem = nammu_fediverse_find_local_item_for_identifier($candidateId, $config);
+            if (is_array($resolvedItem)) {
+                return nammu_fediverse_canonical_local_item($resolvedItem, $config);
+            }
+        }
+
+        $candidateUrl = nammu_fediverse_extract_url($candidateItem['url'] ?? '');
+        if ($candidateUrl !== '') {
+            $resolvedItem = nammu_fediverse_find_local_item_for_identifier($candidateUrl, $config);
+            if (is_array($resolvedItem)) {
+                return nammu_fediverse_canonical_local_item($resolvedItem, $config);
+            }
+        }
+
+        return !empty($candidateItem) ? $candidateItem : null;
+    };
+    $snapshot = nammu_fediverse_home_snapshot_store();
+    $data = is_array($snapshot['data'] ?? null) ? $snapshot['data'] : [];
+    foreach ((array) ($data['thread_payloads'] ?? []) as $payload) {
+        if (!is_array($payload)) {
+            continue;
+        }
+        $threadUrl = trim((string) ($payload['thread_url'] ?? ''));
+        $threadPath = trim((string) (parse_url($threadUrl, PHP_URL_PATH) ?? ''));
+        if ($threadPath === '' || preg_match('#/fediverso/([a-f0-9]{24})/?$#', $threadPath, $matches) !== 1) {
+            continue;
+        }
+        if (strtolower((string) ($matches[1] ?? '')) !== $hash) {
+            continue;
+        }
+        $candidateItems = [
+            is_array($payload['item'] ?? null) ? $payload['item'] : null,
+            is_array($payload['summary']['item'] ?? null) ? $payload['summary']['item'] : null,
+        ];
+        foreach ($candidateItems as $candidateItem) {
+            if (!is_array($candidateItem)) {
+                continue;
+            }
+            $resolvedItem = $resolveSnapshotCandidate($candidateItem);
+            if (is_array($resolvedItem)) {
+                return $resolvedItem;
+            }
+        }
+    }
+    foreach ((array) ($data['local_items'] ?? []) as $candidateItem) {
+        if (!is_array($candidateItem)) {
+            continue;
+        }
+        $candidateHashes = [];
+        foreach (array_filter([
+            trim((string) ($candidateItem['id'] ?? '')),
+            nammu_fediverse_extract_url($candidateItem['url'] ?? ''),
+            nammu_fediverse_extract_url($candidateItem['original_url'] ?? ''),
+        ]) as $identifier) {
+            $candidateHashes[] = nammu_fediverse_thread_page_hash($identifier);
+            $candidatePath = trim((string) (parse_url($identifier, PHP_URL_PATH) ?? ''));
+            if (preg_match('#/fediverso/([a-f0-9]{24})/?$#', $candidatePath, $matches) === 1) {
+                $candidateHashes[] = strtolower((string) ($matches[1] ?? ''));
+            }
+        }
+        if (!in_array($hash, array_values(array_unique(array_filter($candidateHashes))), true)) {
+            continue;
+        }
+        $resolvedItem = $resolveSnapshotCandidate($candidateItem);
+        if (is_array($resolvedItem)) {
+            return $resolvedItem;
+        }
+    }
     return null;
 }
 

@@ -633,13 +633,18 @@ function admin_multi_instance_run_site_phase(string $adminFile, string $phase): 
     }
     $php = defined('PHP_BINARY') && PHP_BINARY !== '' ? PHP_BINARY : 'php';
     $cmd = escapeshellarg($php) . ' ' . escapeshellarg($adminFile) . ' ' . $flag . ' 2>&1';
+    $startedAt = microtime(true);
     exec($cmd, $output, $code);
+    $finishedAt = microtime(true);
     $raw = trim(implode("\n", $output));
     $decoded = json_decode($raw, true);
     return [
         'ok' => $code === 0,
         'phase' => $phase,
         'exit_code' => $code,
+        'started_at' => gmdate(DATE_ATOM, (int) $startedAt),
+        'finished_at' => gmdate(DATE_ATOM, (int) $finishedAt),
+        'duration_ms' => (int) round(max(0, $finishedAt - $startedAt) * 1000),
         'result' => is_array($decoded) ? $decoded : null,
         'raw' => $raw,
     ];
@@ -647,6 +652,7 @@ function admin_multi_instance_run_site_phase(string $adminFile, string $phase): 
 
 function admin_run_cluster_scheduled_tasks(): array
 {
+    $clusterStartedAt = microtime(true);
     $config = nammu_load_config();
     $settings = admin_multi_instance_settings($config);
     if (($settings['enabled'] ?? 'off') !== 'on') {
@@ -708,6 +714,9 @@ function admin_run_cluster_scheduled_tasks(): array
                     'phase' => $phase,
                     'strategy' => 'activity',
                     'activity_profile' => (string) (($pick['profile']['name'] ?? 'idle')),
+                    'started_at' => (string) ($run['started_at'] ?? ''),
+                    'finished_at' => (string) ($run['finished_at'] ?? ''),
+                    'duration_ms' => (int) ($run['duration_ms'] ?? 0),
                     'exit_code' => (int) ($run['exit_code'] ?? 1),
                     'result' => $run['result'] ?? null,
                 ];
@@ -725,6 +734,9 @@ function admin_run_cluster_scheduled_tasks(): array
                         'site' => $site['slug'] ?? basename((string) $site['site_dir']),
                         'phase' => $phase,
                         'strategy' => 'fixed',
+                        'started_at' => (string) ($run['started_at'] ?? ''),
+                        'finished_at' => (string) ($run['finished_at'] ?? ''),
+                        'duration_ms' => (int) ($run['duration_ms'] ?? 0),
                         'exit_code' => (int) ($run['exit_code'] ?? 1),
                         'result' => $run['result'] ?? null,
                     ];
@@ -733,11 +745,15 @@ function admin_run_cluster_scheduled_tasks(): array
             }
         }
         admin_multi_instance_scheduler_state_save($config, $state);
+        $clusterFinishedAt = microtime(true);
         return [
             'ok' => true,
             'skipped' => 0,
             'cluster' => admin_multi_instance_cluster_name($config),
             'strategy' => $strategy,
+            'started_at' => gmdate(DATE_ATOM, (int) $clusterStartedAt),
+            'finished_at' => gmdate(DATE_ATOM, (int) $clusterFinishedAt),
+            'duration_ms' => (int) round(max(0, $clusterFinishedAt - $clusterStartedAt) * 1000),
             'sites' => count($sites),
             'executed' => count($runs),
             'runs' => $runs,

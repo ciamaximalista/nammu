@@ -11267,48 +11267,19 @@ if ($isLoggedIn && $page === 'fediverso') {
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refresh_fediverse_timeline'])) {
         $config = load_config_file();
-        $siteTitle = trim((string) (($config['site_name'] ?? '') ?: ''));
-        $siteDescription = trim((string) ($config['site_description'] ?? ''));
-        $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
-        $baseUrl = rtrim((string) (($config['site_url'] ?? '') ?: nammu_base_url()), '/');
-        if (function_exists('nammu_actuality_rebuild_snapshot')) {
-            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
-        }
-        $stats = nammu_fediverse_refresh_following([
-            'actor_limit' => 4,
-            'outbox_limit' => 3,
-            'outbox_inspect_limit' => 18,
-            'refresh_followers' => false,
-            'resolve_actor_ttl' => 21600,
-        ]);
-        if (function_exists('nammu_fediverse_warm_recent_threads_cache')) {
-            $stats['recent_threads_warmed'] = (int) nammu_fediverse_warm_recent_threads_cache($config, 8);
-        }
-        if (function_exists('nammu_fediverse_rebuild_light_snapshots')) {
-            nammu_fediverse_rebuild_light_snapshots($config);
-        }
+        $stats = admin_run_scheduled_tasks();
         if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
             $acceptStats = nammu_fediverse_retry_pending_follower_accepts($config);
             $stats['follow_accepts_checked'] = (int) ($acceptStats['checked'] ?? 0);
             $stats['follow_accepts_sent'] = (int) ($acceptStats['accepted'] ?? 0);
         }
-        if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
-            nammu_fediverse_save_fragments_cache_store([]);
-        }
         $fediverseFeedback = [
             'type' => 'info',
-            'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['checked'] ?? 0) . '. Actividades nuevas: ' . (int) ($stats['new'] ?? 0) . '. Hilos recientes actualizados: ' . (int) ($stats['recent_threads_warmed'] ?? 0) . '. Seguidores revisados: ' . (int) ($stats['followers_checked'] ?? 0) . '. Seguidores eliminados: ' . (int) ($stats['followers_removed'] ?? 0) . '. Accept enviados: ' . (int) ($stats['follow_accepts_sent'] ?? 0) . '.',
+            'message' => 'Fediverso refrescado. Actores revisados: ' . (int) ($stats['fediverse_checked'] ?? 0) . '. Actividades nuevas: ' . (int) (($stats['fediverse_new'] ?? 0) + ($stats['fediverse_inbox_sync_new'] ?? 0)) . '. Hilos recientes actualizados: ' . (int) ($stats['fediverse_recent_threads_warmed'] ?? 0) . '. Seguidores revisados: ' . (int) ($stats['fediverse_followers_checked'] ?? 0) . '. Seguidores eliminados: ' . (int) ($stats['fediverse_followers_removed'] ?? 0) . '. Accept enviados: ' . (int) ($stats['follow_accepts_sent'] ?? 0) . '.',
         ];
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refresh_fediverse_threads'])) {
         $config = load_config_file();
-        $siteTitle = trim((string) (($config['site_name'] ?? '') ?: ''));
-        $siteDescription = trim((string) ($config['site_description'] ?? ''));
-        $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
-        $baseUrl = rtrim((string) (($config['site_url'] ?? '') ?: nammu_base_url()), '/');
-        if (function_exists('nammu_actuality_rebuild_snapshot')) {
-            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
-        }
         $stats = ['threads_warmed' => 0];
         if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
             $acceptStats = nammu_fediverse_retry_pending_follower_accepts($config);
@@ -11334,13 +11305,6 @@ if ($isLoggedIn && $page === 'fediverso') {
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rebuild_fediverse_timeline'])) {
         $config = load_config_file();
-        $siteTitle = trim((string) (($config['site_name'] ?? '') ?: ''));
-        $siteDescription = trim((string) ($config['site_description'] ?? ''));
-        $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
-        $baseUrl = rtrim((string) (($config['site_url'] ?? '') ?: nammu_base_url()), '/');
-        if (function_exists('nammu_actuality_rebuild_snapshot')) {
-            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
-        }
         if (function_exists('nammu_fediverse_clear_threads_cache')) {
             nammu_fediverse_clear_threads_cache();
         }

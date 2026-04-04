@@ -2370,6 +2370,9 @@ function nammu_fediverse_warm_recent_threads_cache(array $config, int $limit = 8
             continue;
         }
         $seenObjects[$objectId] = true;
+        if (nammu_fediverse_is_named_local_object_id($objectId, $config)) {
+            continue;
+        }
         nammu_fediverse_cached_remote_replies_for_item($item, $config);
         $warmed++;
         if ($warmed >= max(1, $limit)) {
@@ -2627,7 +2630,7 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
         $existingPayload = is_array($existingThreadPayloads[$localId] ?? null) ? $existingThreadPayloads[$localId] : null;
         $existingReplies = is_array($existingPayload['replies'] ?? null) ? $existingPayload['replies'] : [];
         $remoteReplies = nammu_fediverse_cached_remote_replies_snapshot_for_item($canonicalItem);
-        if (empty($remoteReplies) && nammu_fediverse_is_named_local_object_id($localId, $config)) {
+        if (empty($remoteReplies) && !nammu_fediverse_is_named_local_object_id($localId, $config)) {
             $remoteReplies = nammu_fediverse_cached_remote_replies_for_item($canonicalItem, $config, 86400);
         }
         $mergedReplies = nammu_fediverse_stable_reply_list(

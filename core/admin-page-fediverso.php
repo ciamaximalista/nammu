@@ -281,6 +281,7 @@
     $fediverseIncomingReplyIds = [];
     $fediverseIncomingReplyRoots = [];
     $fediverseRemoteRepliesByTarget = [];
+    $fediverseRemoteReplyTimelineIds = [];
     foreach ($fediverseIncomingReplies as $fediverseIncomingLocalId => $fediverseIncomingReplyGroup) {
         foreach ((array) $fediverseIncomingReplyGroup as $fediverseIncomingReply) {
             foreach (['id', 'url'] as $fediverseIncomingReplyField) {
@@ -315,6 +316,12 @@
             }
             if (!isset($fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTarget])) {
                 $fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTarget] = [];
+            }
+            foreach (['id', 'object_id', 'url'] as $fediverseTimelineReplyIdField) {
+                $fediverseTimelineReplyIdValue = trim((string) ($fediverseTimelineReplyCandidate[$fediverseTimelineReplyIdField] ?? ''));
+                if ($fediverseTimelineReplyIdValue !== '') {
+                    $fediverseRemoteReplyTimelineIds[$fediverseTimelineReplyIdValue] = true;
+                }
             }
             $fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTarget][] = [
                 'id' => trim((string) ($fediverseTimelineReplyCandidate['id'] ?? '')),
@@ -363,6 +370,88 @@
             'sort_key' => $fediverseLocalSortKey,
             'item' => $fediverseLocalItem,
         ];
+    }
+    $fediverseExistingRemoteObjectIds = [];
+    foreach ($fediverseTimeline as $fediverseTimelineCandidate) {
+        if (!is_array($fediverseTimelineCandidate)) {
+            continue;
+        }
+        if (strtolower(trim((string) ($fediverseTimelineCandidate['type'] ?? ''))) === 'announce') {
+            continue;
+        }
+        $fediverseExistingRemoteObjectId = trim((string) (($fediverseTimelineCandidate['object_id'] ?? '') ?: ($fediverseTimelineCandidate['id'] ?? '')));
+        if ($fediverseExistingRemoteObjectId !== '') {
+            $fediverseExistingRemoteObjectIds[$fediverseExistingRemoteObjectId] = true;
+        }
+    }
+    $fediverseSyntheticRemoteItems = [];
+    if ($isFediverseHomeTab && function_exists('nammu_fediverse_cluster_actuality_item_for_object_id')) {
+        foreach ($fediverseTimeline as $fediverseTimelineCandidate) {
+            if (!is_array($fediverseTimelineCandidate)) {
+                continue;
+            }
+            if (strtolower(trim((string) ($fediverseTimelineCandidate['type'] ?? ''))) !== 'announce') {
+                continue;
+            }
+            $fediverseSyntheticObjectId = trim((string) ($fediverseTimelineCandidate['object_id'] ?? ''));
+            if ($fediverseSyntheticObjectId === '' || isset($fediverseExistingRemoteObjectIds[$fediverseSyntheticObjectId]) || isset($fediverseSyntheticRemoteItems[$fediverseSyntheticObjectId])) {
+                continue;
+            }
+            $fediverseClusterActualityItem = nammu_fediverse_cluster_actuality_item_for_object_id($fediverseSyntheticObjectId, $fediverseConfig);
+            if (!is_array($fediverseClusterActualityItem)) {
+                continue;
+            }
+            $fediverseSyntheticPublished = (int) (($fediverseClusterActualityItem['timestamp'] ?? 0) ?: 0);
+            $fediverseSyntheticUrl = trim((string) ($fediverseClusterActualityItem['link'] ?? ''));
+            $fediverseSyntheticTitle = trim((string) ($fediverseClusterActualityItem['title'] ?? ''));
+            $fediverseSyntheticContent = trim((string) (($fediverseClusterActualityItem['raw_text'] ?? '') ?: ($fediverseClusterActualityItem['description'] ?? '')));
+            $fediverseSyntheticSummary = trim((string) ($fediverseClusterActualityItem['description'] ?? ''));
+            $fediverseSyntheticImage = trim((string) (($fediverseClusterActualityItem['source_image'] ?? '') ?: ($fediverseClusterActualityItem['image'] ?? '')));
+            $fediverseSyntheticHost = strtolower(trim((string) parse_url($fediverseSyntheticObjectId, PHP_URL_HOST)));
+            $fediverseSyntheticActorName = $fediverseSyntheticHost !== '' ? preg_replace('/^www\./', '', $fediverseSyntheticHost) : 'Sitio remoto';
+            $fediverseSyntheticAttachments = [];
+            if ($fediverseSyntheticUrl !== '') {
+                $fediverseSyntheticAttachments[] = [
+                    'type' => 'link',
+                    'url' => $fediverseSyntheticUrl,
+                    'name' => $fediverseSyntheticTitle !== '' ? $fediverseSyntheticTitle : 'Abrir publicación',
+                    'media_type' => 'text/html',
+                    'image' => $fediverseSyntheticImage,
+                    'summary' => $fediverseSyntheticSummary !== '' ? $fediverseSyntheticSummary : $fediverseSyntheticContent,
+                ];
+            }
+            if ($fediverseSyntheticImage !== '') {
+                $fediverseSyntheticAttachments[] = [
+                    'type' => 'image',
+                    'url' => $fediverseSyntheticImage,
+                    'name' => $fediverseSyntheticTitle,
+                    'media_type' => 'image/*',
+                ];
+            }
+            $fediverseSyntheticRemoteItems[$fediverseSyntheticObjectId] = [
+                'id' => $fediverseSyntheticObjectId,
+                'activity_id' => $fediverseSyntheticObjectId,
+                'object_id' => $fediverseSyntheticObjectId,
+                'url' => $fediverseSyntheticUrl,
+                'target_url' => '',
+                'title' => $fediverseSyntheticTitle,
+                'content' => $fediverseSyntheticContent,
+                'content_html' => '',
+                'summary' => $fediverseSyntheticSummary,
+                'published' => $fediverseSyntheticPublished > 0 ? gmdate(DATE_ATOM, $fediverseSyntheticPublished) : trim((string) ($fediverseTimelineCandidate['published'] ?? '')),
+                'type' => 'article',
+                'image' => $fediverseSyntheticImage,
+                'attachments' => $fediverseSyntheticAttachments,
+                'actor_id' => $fediverseSyntheticHost !== '' ? ('https://' . $fediverseSyntheticHost) : '',
+                'actor_name' => $fediverseSyntheticActorName,
+                'actor_username' => '',
+                'actor_url' => $fediverseSyntheticUrl !== '' ? $fediverseSyntheticUrl : ($fediverseSyntheticHost !== '' ? ('https://' . $fediverseSyntheticHost) : ''),
+                'actor_icon' => '',
+            ];
+        }
+    }
+    if (!empty($fediverseSyntheticRemoteItems)) {
+        $fediverseTimeline = array_merge(array_values($fediverseSyntheticRemoteItems), $fediverseTimeline);
     }
     $fediverseTimelineDisplay = [];
     $fediverseRemoteCanonicalItems = [];
@@ -439,6 +528,10 @@
         $fediverseSkipTimelineItem = false;
         foreach ($fediverseTimelineIdentifiers as $fediverseTimelineIdentifier) {
             if (isset($fediverseIncomingReplyIds[$fediverseTimelineIdentifier])) {
+                $fediverseSkipTimelineItem = true;
+                break;
+            }
+            if (isset($fediverseRemoteReplyTimelineIds[$fediverseTimelineIdentifier])) {
                 $fediverseSkipTimelineItem = true;
                 break;
             }

@@ -342,6 +342,9 @@ function admin_run_scheduled_heavy_tasks(): array {
 
 function admin_refresh_fediverse_threads(array $config, int $limit = 20): array
 {
+    if (!function_exists('admin_process_social_broadcast_queue') && is_file(__DIR__ . '/core/admin-redes.php')) {
+        require_once __DIR__ . '/core/admin-redes.php';
+    }
     if (!function_exists('nammu_fediverse_warm_threads_cache') && is_file(__DIR__ . '/core/fediverso.php')) {
         require_once __DIR__ . '/core/fediverso.php';
     }
@@ -349,7 +352,18 @@ function admin_refresh_fediverse_threads(array $config, int $limit = 20): array
         'threads_warmed' => 0,
         'follow_accepts_checked' => 0,
         'follow_accepts_sent' => 0,
+        'social_broadcast_queue_processed' => 0,
+        'social_broadcast_queue_sent' => 0,
+        'social_broadcast_queue_failed' => 0,
+        'social_broadcast_queue_remaining' => 0,
     ];
+    if (function_exists('admin_process_social_broadcast_queue')) {
+        $queueStats = admin_process_social_broadcast_queue(3);
+        $stats['social_broadcast_queue_processed'] = (int) ($queueStats['processed'] ?? 0);
+        $stats['social_broadcast_queue_sent'] = (int) ($queueStats['sent'] ?? 0);
+        $stats['social_broadcast_queue_failed'] = (int) ($queueStats['failed'] ?? 0);
+        $stats['social_broadcast_queue_remaining'] = (int) ($queueStats['remaining'] ?? 0);
+    }
     if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
         $acceptStats = nammu_fediverse_retry_pending_follower_accepts($config);
         $stats['follow_accepts_checked'] = (int) ($acceptStats['checked'] ?? 0);

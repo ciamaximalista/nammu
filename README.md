@@ -220,13 +220,15 @@ Las tres deben ejecutarse con el usuario del servidor web, escalonando las disti
 45 3 * * 0 flock -n /tmp/<carpeta-publica>-backup-weekly.lock php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> /var/www/html/<carpeta-publica>/backups/backup-full.log 2>&1
 ```
 
-Si usas el planificador central multiinstancia, conviene endurecer su línea con `timeout` y dejar rastro cuando el lock esté ocupado:
+Si usas el planificador central multiinstancia, la forma más robusta es ejecutarlo con rutas absolutas y `timeout`:
 
 ```bash
-* * * * * /bin/bash -lc 'ts=$(date -Is); if flock -n /tmp/<cluster>-run-cluster.lock timeout -k 10s 50s php /var/www/html/<carpeta-publica>/admin.php --run-cluster-scheduled >> /var/www/html/<carpeta-publica>/backups/cluster-cron.log 2>&1; then :; else echo "{\"ts\":\"$ts\",\"skipped\":1,\"reason\":\"lock_busy_or_timeout\"}" >> /var/www/html/<carpeta-publica>/backups/cluster-cron.log; fi'
+* * * * * /usr/bin/timeout -k 10s 50s /usr/bin/flock -n /tmp/<cluster>-run-cluster.lock /usr/bin/php /var/www/html/<carpeta-publica>/admin.php --run-cluster-scheduled >> /var/www/html/<carpeta-publica>/backups/cluster-cron.log 2>&1
 ```
 
-Así evitas que un proceso colgado retenga el lock indefinidamente y, además, el log deja constancia de los intentos saltados.
+Así evitas que un proceso colgado retenga el lock indefinidamente.
+
+Si además quieres dejar constancia explícita en el log cuando el lock esté ocupado o salte el timeout, puedes envolver esa misma línea con un `bash -lc`, pero la variante simple de arriba suele ser la más fácil de guardar y mantener en `crontab`.
 
 Si mantienes varias instalaciones Nammu en el mismo servidor, no las lances todas en el mismo minuto. Lo recomendable es escalonarlas con ejemplos genéricos como estos:
 
@@ -296,22 +298,6 @@ Ese runner:
 - y evita duplicaciones con dos barreras:
   - un lock compartido por clúster,
   - y un estado compartido de slots ya ejecutados.
-
-Para que funcione bien en multiinstancia:
-
-- `config/*.json` de cada instalación deben ser escribibles por el usuario real del cron, normalmente `www-data`
-- `_shared-cache/` y `_shared-queue/` deben ser escribibles por ese mismo usuario
-- `backups/cluster-cron.log` debe ser escribible por ese usuario
-
-Una configuración típica y coherente para las rutas compartidas es:
-
-```bash
-sudo chown -R <tu-usuario>:www-data /var/www/html/blogs/_shared-cache /var/www/html/blogs/_shared-queue
-sudo find /var/www/html/blogs/_shared-cache -type d -exec chmod 2775 {} \;
-sudo find /var/www/html/blogs/_shared-cache -type f -exec chmod 664 {} \;
-sudo find /var/www/html/blogs/_shared-queue -type d -exec chmod 2775 {} \;
-sudo find /var/www/html/blogs/_shared-queue -type f -exec chmod 664 {} \;
-```
 
 Para que funcione bien en multiinstancia:
 

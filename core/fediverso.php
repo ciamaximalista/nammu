@@ -1851,6 +1851,26 @@ function nammu_fediverse_remote_reply_summary(): array
     return $summary;
 }
 
+function nammu_fediverse_timeline_item_for_identifier(string $identifier): ?array
+{
+    $identifier = trim($identifier);
+    if ($identifier === '') {
+        return null;
+    }
+    foreach (nammu_fediverse_timeline_store()['items'] as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        foreach (['id', 'object_id', 'url'] as $field) {
+            $value = trim((string) ($item[$field] ?? ''));
+            if ($value !== '' && $value === $identifier) {
+                return $item;
+            }
+        }
+    }
+    return null;
+}
+
 function nammu_fediverse_timeline_entries_targeting_local_items(array $config): array
 {
     $index = nammu_fediverse_local_items_index($config);
@@ -4245,6 +4265,41 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
                 && !is_array(nammu_fediverse_find_local_item_for_identifier($objectId, $config))
             ) {
                 $canDeriveThreadUrl = false;
+            }
+        }
+        if ($objectId !== '') {
+            $timelineItem = nammu_fediverse_timeline_item_for_identifier($objectId);
+            if (is_array($timelineItem)) {
+                if (trim((string) ($object['name'] ?? '')) === '') {
+                    $object['name'] = trim((string) ($timelineItem['title'] ?? ''));
+                }
+                if (trim((string) ($object['content'] ?? '')) === '' && trim((string) ($object['summary'] ?? '')) === '') {
+                    $timelineContentHtml = trim((string) ($timelineItem['content_html'] ?? ''));
+                    $timelineContent = trim((string) ($timelineItem['content'] ?? ''));
+                    if ($timelineContentHtml !== '') {
+                        $object['content'] = $timelineContentHtml;
+                    } elseif ($timelineContent !== '') {
+                        $object['summary'] = $timelineContent;
+                    }
+                }
+                if (nammu_fediverse_extract_url($object['url'] ?? '') === '') {
+                    $timelineUrl = trim((string) ($timelineItem['url'] ?? ''));
+                    if ($timelineUrl !== '') {
+                        $object['url'] = $timelineUrl;
+                    }
+                }
+                if (nammu_fediverse_extract_url($object['image'] ?? '') === '') {
+                    $timelineImage = trim((string) ($timelineItem['image'] ?? ''));
+                    if ($timelineImage !== '') {
+                        $object['image'] = $timelineImage;
+                    }
+                }
+                if (trim((string) (($object['attributedTo'] ?? '') ?: ($object['actor'] ?? ''))) === '') {
+                    $timelineActorId = trim((string) ($timelineItem['actor_id'] ?? ''));
+                    if ($timelineActorId !== '') {
+                        $object['attributedTo'] = $timelineActorId;
+                    }
+                }
             }
         }
         $objectUrl = nammu_fediverse_extract_url($object['url'] ?? '');

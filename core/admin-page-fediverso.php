@@ -281,7 +281,6 @@
     $fediverseIncomingReplyIds = [];
     $fediverseIncomingReplyRoots = [];
     $fediverseRemoteRepliesByTarget = [];
-    $fediverseRemoteReplyTimelineIds = [];
     foreach ($fediverseIncomingReplies as $fediverseIncomingLocalId => $fediverseIncomingReplyGroup) {
         foreach ((array) $fediverseIncomingReplyGroup as $fediverseIncomingReply) {
             foreach (['id', 'url'] as $fediverseIncomingReplyField) {
@@ -316,12 +315,6 @@
             }
             if (!isset($fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTarget])) {
                 $fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTarget] = [];
-            }
-            foreach (['id', 'object_id', 'url'] as $fediverseTimelineReplyIdField) {
-                $fediverseTimelineReplyIdValue = trim((string) ($fediverseTimelineReplyCandidate[$fediverseTimelineReplyIdField] ?? ''));
-                if ($fediverseTimelineReplyIdValue !== '') {
-                    $fediverseRemoteReplyTimelineIds[$fediverseTimelineReplyIdValue] = true;
-                }
             }
             $fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTarget][] = [
                 'id' => trim((string) ($fediverseTimelineReplyCandidate['id'] ?? '')),
@@ -531,10 +524,6 @@
                 $fediverseSkipTimelineItem = true;
                 break;
             }
-            if (isset($fediverseRemoteReplyTimelineIds[$fediverseTimelineIdentifier])) {
-                $fediverseSkipTimelineItem = true;
-                break;
-            }
         }
         if ($fediverseSkipTimelineItem) {
             continue;
@@ -644,6 +633,31 @@
     }
     $fediverseTimelineOffset = ($fediverseTimelinePage - 1) * $fediverseTimelinePerPage;
     $fediverseTimelinePageEntries = array_slice($fediverseTimelineEntries, $fediverseTimelineOffset, $fediverseTimelinePerPage);
+    $fediversePageRootIdentifiers = [];
+    foreach ($fediverseTimelinePageEntries as $fediversePageEntry) {
+        $fediversePageItem = is_array($fediversePageEntry['item'] ?? null) ? $fediversePageEntry['item'] : [];
+        if (empty($fediversePageItem)) {
+            continue;
+        }
+        $fediversePageKind = trim((string) ($fediversePageEntry['kind'] ?? ''));
+        $fediversePageType = strtolower(trim((string) ($fediversePageItem['type'] ?? '')));
+        $fediversePageTarget = trim((string) ($fediversePageItem['target_url'] ?? ''));
+        $fediversePageIsReply = $fediversePageKind === 'remote'
+            && $fediversePageType !== 'announce'
+            && $fediversePageTarget !== ''
+            && trim((string) ($fediversePageItem['content'] ?? '')) !== ''
+            && trim((string) ($fediversePageItem['object_id'] ?? '')) !== ''
+            && $fediversePageTarget !== trim((string) ($fediversePageItem['object_id'] ?? ''));
+        if ($fediversePageIsReply) {
+            continue;
+        }
+        foreach (['id', 'object_id', 'url'] as $fediversePageField) {
+            $fediversePageValue = trim((string) ($fediversePageItem[$fediversePageField] ?? ''));
+            if ($fediversePageValue !== '') {
+                $fediversePageRootIdentifiers[$fediversePageValue] = true;
+            }
+        }
+    }
     $buildTimelinePageUrl = static function (int $pageNumber): string {
         return 'admin.php?page=fediverso&tab=home&timeline_page=' . max(1, $pageNumber);
     };
@@ -1045,6 +1059,17 @@
                                 </article>
                                 <?php else: ?>
                                 <?php $item = is_array($timelineEntry['item'] ?? null) ? $timelineEntry['item'] : []; ?>
+                                <?php
+                                $itemTypeForPage = strtolower(trim((string) ($item['type'] ?? '')));
+                                $itemTargetForPage = trim((string) ($item['target_url'] ?? ''));
+                                $itemObjectIdForPage = trim((string) ($item['object_id'] ?? ''));
+                                $itemIsReplyForPage = $itemTypeForPage !== 'announce'
+                                    && $itemTargetForPage !== ''
+                                    && trim((string) ($item['content'] ?? '')) !== ''
+                                    && $itemObjectIdForPage !== ''
+                                    && $itemTargetForPage !== $itemObjectIdForPage;
+                                if ($itemIsReplyForPage && isset($fediversePageRootIdentifiers[$itemTargetForPage])) { continue; }
+                                ?>
                                 <?php $itemObjectId = (string) (($item['object_id'] ?? '') ?: (($item['url'] ?? '') ?: ($item['id'] ?? ''))); ?>
                                 <?php $itemTargetActorId = (string) (($item['target_actor_id'] ?? '') ?: ($item['actor_id'] ?? '')); ?>
                                 <?php $itemActionState = function_exists('nammu_fediverse_action_state_for_item') ? nammu_fediverse_action_state_for_item($item) : ['liked' => false, 'boosted' => false, 'replied' => false, 'shared' => false, 'boost_count' => 0, 'reply_count' => 0, 'share_count' => 0]; ?>

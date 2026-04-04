@@ -75,6 +75,22 @@ Sustituye:
 
 Si tu servidor usa otro grupo para PHP o Apache (`apache`, `nginx`, etc.), cambia `www-data` por el correspondiente.
 
+Importante:
+
+- Si el cron o PHP-FPM corren como `www-data`, `www-data` debe poder escribir de verdad los JSON de `config/`.
+- Esto afecta especialmente a stores que Nammu reescribe continuamente, como `fediverso-following.json`, `fediverso-timeline.json`, snapshots, colas sociales y otros ficheros de estado.
+- En entornos multiinstancia, `www-data` también debe poder escribir `_shared-cache/` y `_shared-queue/` si los activas.
+
+Comprobación rápida recomendada:
+
+```bash
+ls -ld /var/www/html/<carpeta-publica>/config
+ls -l /var/www/html/<carpeta-publica>/config/*.json
+id www-data
+```
+
+Si el cron va a ejecutarse con `www-data`, esos ficheros no pueden quedarse en un grupo sin permisos efectivos de escritura para ese usuario.
+
 ### 4. Configura el dominio o virtual host
 
 Tu dominio debe apuntar a la carpeta donde está Nammu y ejecutar `index.php` con PHP 8+.
@@ -176,6 +192,15 @@ sudo crontab -u www-data -e
 
 Si usas ese comando, las líneas van **sin** la columna `www-data`.
 
+Antes de dar el cron por bueno, conviene comprobar dos cosas:
+
+```bash
+sudo crontab -u www-data -l
+sudo systemctl status cron --no-pager
+```
+
+Si editas el cron de `www-data`, las tareas se ejecutarán con ese usuario. Por tanto, todos los JSON y directorios que Nammu actualiza en caliente deben ser escribibles por `www-data`.
+
 Para que **Fediverso** cargue ágilmente en el admin sin provocar solapes ni picos de CPU, conviene separar el cron en tres fases:
 
 - `admin.php --run-scheduled` cada `5` minutos para la parte ligera de Fediverso: novedades de actores seguidos, respuestas y reacciones recibidas, precalentado de unos pocos hilos recientes y reconstrucción ligera de `Inicio` y `Notificaciones`.
@@ -194,6 +219,14 @@ Las tres deben ejecutarse con el usuario del servidor web, escalonando las disti
 30 3 * * 0 flock -n /tmp/<carpeta-publica>-backup-cleanup.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
 45 3 * * 0 flock -n /tmp/<carpeta-publica>-backup-weekly.lock php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> /var/www/html/<carpeta-publica>/backups/backup-full.log 2>&1
 ```
+
+Si usas el planificador central multiinstancia, conviene endurecer su línea con `timeout` y dejar rastro cuando el lock esté ocupado:
+
+```bash
+* * * * * /bin/bash -lc 'ts=$(date -Is); if flock -n /tmp/<cluster>-run-cluster.lock timeout -k 10s 50s php /var/www/html/<carpeta-publica>/admin.php --run-cluster-scheduled >> /var/www/html/<carpeta-publica>/backups/cluster-cron.log 2>&1; then :; else echo "{\"ts\":\"$ts\",\"skipped\":1,\"reason\":\"lock_busy_or_timeout\"}" >> /var/www/html/<carpeta-publica>/backups/cluster-cron.log; fi'
+```
+
+Así evitas que un proceso colgado retenga el lock indefinidamente y, además, el log deja constancia de los intentos saltados.
 
 Si mantienes varias instalaciones Nammu en el mismo servidor, no las lances todas en el mismo minuto. Lo recomendable es escalonarlas con ejemplos genéricos como estos:
 
@@ -263,6 +296,38 @@ Ese runner:
 - y evita duplicaciones con dos barreras:
   - un lock compartido por clúster,
   - y un estado compartido de slots ya ejecutados.
+
+Para que funcione bien en multiinstancia:
+
+- `config/*.json` de cada instalación deben ser escribibles por el usuario real del cron, normalmente `www-data`
+- `_shared-cache/` y `_shared-queue/` deben ser escribibles por ese mismo usuario
+- `backups/cluster-cron.log` debe ser escribible por ese usuario
+
+Una configuración típica y coherente para las rutas compartidas es:
+
+```bash
+sudo chown -R <tu-usuario>:www-data /var/www/html/blogs/_shared-cache /var/www/html/blogs/_shared-queue
+sudo find /var/www/html/blogs/_shared-cache -type d -exec chmod 2775 {} \;
+sudo find /var/www/html/blogs/_shared-cache -type f -exec chmod 664 {} \;
+sudo find /var/www/html/blogs/_shared-queue -type d -exec chmod 2775 {} \;
+sudo find /var/www/html/blogs/_shared-queue -type f -exec chmod 664 {} \;
+```
+
+Para que funcione bien en multiinstancia:
+
+- `config/*.json` de cada instalación deben ser escribibles por el usuario real del cron, normalmente `www-data`
+- `_shared-cache/` y `_shared-queue/` deben ser escribibles por ese mismo usuario
+- `backups/cluster-cron.log` debe ser escribible por ese usuario
+
+Una configuración típica y coherente para las rutas compartidas es:
+
+```bash
+sudo chown -R <tu-usuario>:www-data /var/www/html/blogs/_shared-cache /var/www/html/blogs/_shared-queue
+sudo find /var/www/html/blogs/_shared-cache -type d -exec chmod 2775 {} \;
+sudo find /var/www/html/blogs/_shared-cache -type f -exec chmod 664 {} \;
+sudo find /var/www/html/blogs/_shared-queue -type d -exec chmod 2775 {} \;
+sudo find /var/www/html/blogs/_shared-queue -type f -exec chmod 664 {} \;
+```
 
 Estrategias disponibles:
 

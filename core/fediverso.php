@@ -6066,7 +6066,7 @@ function nammu_fediverse_following_collection(array $config): array
     ];
 }
 
-function nammu_fediverse_outbox_document(array $config): array
+function nammu_fediverse_outbox_activities(array $config): array
 {
     $activities = array_map(static function (array $item) use ($config): array {
         return nammu_fediverse_activity_for_local_item($item, $config);
@@ -6089,12 +6089,39 @@ function nammu_fediverse_outbox_document(array $config): array
     usort($activities, static function (array $a, array $b): int {
         return strcmp((string) ($b['published'] ?? ''), (string) ($a['published'] ?? ''));
     });
+    return $activities;
+}
+
+function nammu_fediverse_outbox_document(array $config): array
+{
+    $activities = nammu_fediverse_outbox_activities($config);
+    $outboxUrl = nammu_fediverse_outbox_url($config);
+    $pageUrl = $outboxUrl . '?page=true';
+    $isPage = strtolower(trim((string) ($_GET['page'] ?? ''))) === 'true';
+    $pageSize = 20;
+    if ($isPage) {
+        $offset = max(0, (int) ($_GET['offset'] ?? 0));
+        $pageItems = array_slice($activities, $offset, $pageSize);
+        $nextOffset = $offset + count($pageItems);
+        $nextUrl = $nextOffset < count($activities)
+            ? $outboxUrl . '?page=true&offset=' . $nextOffset
+            : '';
+        return [
+            '@context' => 'https://www.w3.org/ns/activitystreams',
+            'id' => $offset > 0 ? $outboxUrl . '?page=true&offset=' . $offset : $pageUrl,
+            'type' => 'OrderedCollectionPage',
+            'partOf' => $outboxUrl,
+            'totalItems' => count($activities),
+            'orderedItems' => $pageItems,
+            'next' => $nextUrl,
+        ];
+    }
     return [
         '@context' => 'https://www.w3.org/ns/activitystreams',
-        'id' => nammu_fediverse_outbox_url($config),
+        'id' => $outboxUrl,
         'type' => 'OrderedCollection',
         'totalItems' => count($activities),
-        'orderedItems' => $activities,
+        'first' => $pageUrl,
     ];
 }
 

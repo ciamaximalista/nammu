@@ -52,6 +52,7 @@ $cornerStyle = $theme['corners'] ?? ($themeGlobal['corners'] ?? 'rounded');
 $cornerClass = $cornerStyle === 'square' ? 'corners-square' : 'corners-rounded';
 $searchSettings = $theme['search'] ?? [];
 $searchFloatingEnabled = ($searchSettings['floating'] ?? 'off') === 'on';
+$fediverseFloatingCtaEnabled = ($searchSettings['fediverse_floating_cta'] ?? 'on') === 'on';
 $subscriptionSettings = $theme['subscription'] ?? [];
 $subscriptionFloatingEnabled = ($subscriptionSettings['floating'] ?? 'off') === 'on';
 $baseHref = $baseUrl ?? '/';
@@ -150,7 +151,7 @@ $showPushPrompt = $pushEnabled && $pushPublicKey !== '' && !$isCrawler;
 $fediverseCtaHandle = '';
 $fediverseCtaUrl = '';
 $fediverseCtaIcon = function_exists('nammu_fediverse_glyph_svg') ? nammu_fediverse_glyph_svg(24) : '';
-if (function_exists('nammu_fediverse_actor_url') && function_exists('nammu_fediverse_acct_uri')) {
+if ($fediverseFloatingCtaEnabled && function_exists('nammu_fediverse_actor_url') && function_exists('nammu_fediverse_acct_uri')) {
     $fediverseCtaUrl = nammu_fediverse_actor_url($fediverseConfig ?? (function_exists('nammu_load_config') ? nammu_load_config() : []));
     $fediverseAcctUri = nammu_fediverse_acct_uri($fediverseConfig ?? (function_exists('nammu_load_config') ? nammu_load_config() : []));
     $fediverseCtaHandle = str_starts_with($fediverseAcctUri, 'acct:') ? '@' . substr($fediverseAcctUri, 5) : $fediverseAcctUri;

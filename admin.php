@@ -2218,7 +2218,7 @@ function get_settings() {
         $orderStyle = $defaults['home']['header']['order'];
     }
     $home['header']['order'] = $orderStyle;
-    $searchDefaults = $defaults['search'] ?? ['mode' => 'single', 'position' => 'footer', 'floating' => 'off'];
+    $searchDefaults = $defaults['search'] ?? ['mode' => 'single', 'position' => 'footer', 'floating' => 'off', 'fediverse_floating_cta' => 'on'];
     $searchConfig = array_merge($searchDefaults, $templateConfig['search'] ?? []);
     $searchMode = $searchConfig['mode'] ?? 'none';
     if (!in_array($searchMode, ['none', 'home', 'single', 'both'], true)) {
@@ -2232,9 +2232,14 @@ function get_settings() {
     if (!in_array($searchFloating, ['off', 'on'], true)) {
         $searchFloating = $searchDefaults['floating'] ?? 'off';
     }
+    $searchFediverseFloatingCta = $searchConfig['fediverse_floating_cta'] ?? ($searchDefaults['fediverse_floating_cta'] ?? 'on');
+    if (!in_array($searchFediverseFloatingCta, ['off', 'on'], true)) {
+        $searchFediverseFloatingCta = $searchDefaults['fediverse_floating_cta'] ?? 'on';
+    }
     $searchConfig['mode'] = $searchMode;
     $searchConfig['position'] = $searchPosition;
     $searchConfig['floating'] = $searchFloating;
+    $searchConfig['fediverse_floating_cta'] = $searchFediverseFloatingCta;
     $subscriptionDefaults = $defaults['subscription'] ?? ['mode' => 'none', 'position' => 'footer', 'floating' => 'off'];
     $subscriptionConfig = array_merge($subscriptionDefaults, $templateConfig['subscription'] ?? []);
     $subscriptionMode = $subscriptionConfig['mode'] ?? 'none';
@@ -5661,6 +5666,7 @@ function get_default_template_settings(): array {
             'mode' => 'none',
             'position' => 'title',
             'floating' => 'off',
+            'fediverse_floating_cta' => 'on',
         ],
         'subscription' => [
             'mode' => 'none',
@@ -10956,7 +10962,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($cornerStylePosted, ['rounded', 'square'], true)) {
             $cornerStylePosted = $defaults['global']['corners'];
         }
-        $searchDefaults = $defaults['search'] ?? ['mode' => 'single', 'position' => 'footer', 'floating' => 'off'];
+        $searchDefaults = $defaults['search'] ?? ['mode' => 'single', 'position' => 'footer', 'floating' => 'off', 'fediverse_floating_cta' => 'on'];
         $searchModePosted = $_POST['search_mode'] ?? $searchDefaults['mode'];
         if (!in_array($searchModePosted, ['none', 'home', 'single', 'both'], true)) {
             $searchModePosted = $searchDefaults['mode'];
@@ -10971,6 +10977,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $searchFloatingPosted = $_POST['search_floating'] ?? ($searchDefaults['floating'] ?? 'off');
         if (!in_array($searchFloatingPosted, ['off', 'on'], true)) {
             $searchFloatingPosted = $searchDefaults['floating'] ?? 'off';
+        }
+        $searchFediverseFloatingCtaPosted = $_POST['search_fediverse_floating_cta'] ?? ($searchDefaults['fediverse_floating_cta'] ?? 'on');
+        if (!in_array($searchFediverseFloatingCtaPosted, ['off', 'on'], true)) {
+            $searchFediverseFloatingCtaPosted = $searchDefaults['fediverse_floating_cta'] ?? 'on';
         }
         $subscriptionDefaults = $defaults['subscription'] ?? ['mode' => 'none', 'position' => 'footer', 'floating' => 'off'];
         $subscriptionModePosted = $_POST['subscription_mode'] ?? $subscriptionDefaults['mode'];
@@ -11033,6 +11043,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'mode' => $searchModePosted,
                 'position' => $searchPositionPosted,
                 'floating' => $searchFloatingPosted,
+                'fediverse_floating_cta' => $searchFediverseFloatingCtaPosted,
             ],
             'subscription' => [
                 'mode' => $subscriptionModePosted,

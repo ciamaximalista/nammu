@@ -1295,6 +1295,7 @@ function nammu_template_settings(): array
         'mode' => 'none',
         'position' => 'title',
         'floating' => 'off',
+        'fediverse_floating_cta' => 'on',
     ];
     $searchConfig = array_merge($searchDefaults, $template['search'] ?? []);
     if (!in_array($searchConfig['mode'], ['none', 'home', 'single', 'both'], true)) {
@@ -1305,6 +1306,9 @@ function nammu_template_settings(): array
     }
     if (!in_array($searchConfig['floating'], ['off', 'on'], true)) {
         $searchConfig['floating'] = $searchDefaults['floating'];
+    }
+    if (!in_array($searchConfig['fediverse_floating_cta'], ['off', 'on'], true)) {
+        $searchConfig['fediverse_floating_cta'] = $searchDefaults['fediverse_floating_cta'];
     }
     $subscriptionDefaults = $defaults['subscription'] ?? [
         'mode' => 'none',
@@ -1410,6 +1414,7 @@ function nammu_default_template_settings(): array
             'mode' => 'single',
             'position' => 'footer',
             'floating' => 'off',
+            'fediverse_floating_cta' => 'on',
         ],
         'subscription' => [
             'mode' => 'none',

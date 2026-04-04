@@ -101,7 +101,7 @@
                             if (!in_array($globalCornerStyle, $allowedCorners, true)) {
                                 $globalCornerStyle = $defaults['global']['corners'];
                             }
-                            $searchDefaults = $defaults['search'] ?? ['mode' => 'single', 'position' => 'footer', 'floating' => 'off'];
+                            $searchDefaults = $defaults['search'] ?? ['mode' => 'single', 'position' => 'footer', 'floating' => 'off', 'fediverse_floating_cta' => 'on'];
                             $templateSearch = array_merge($searchDefaults, $templateSettings['search'] ?? []);
                             $searchModesAllowed = ['none', 'home', 'single', 'both'];
                             $searchPositionsAllowed = ['title', 'footer'];
@@ -110,6 +110,10 @@
                             $searchFloatingValue = $templateSearch['floating'] ?? $searchDefaults['floating'];
                             if (!in_array($searchFloatingValue, ['off', 'on'], true)) {
                                 $searchFloatingValue = $searchDefaults['floating'];
+                            }
+                            $searchFediverseFloatingCtaValue = $templateSearch['fediverse_floating_cta'] ?? $searchDefaults['fediverse_floating_cta'];
+                            if (!in_array($searchFediverseFloatingCtaValue, ['off', 'on'], true)) {
+                                $searchFediverseFloatingCtaValue = $searchDefaults['fediverse_floating_cta'];
                             }
                             $searchFloating = $searchFloatingValue;
                             $subscriptionDefaults = $defaults['subscription'] ?? ['mode' => 'none', 'position' => 'footer', 'floating' => 'off'];
@@ -866,6 +870,45 @@
                                             <label class="home-card-style-option <?= $floatActive ? 'active' : '' ?>" data-search-floating-option="1">
                                                 <input type="radio"
                                                     name="search_floating"
+                                                    value="<?= htmlspecialchars($floatKey, ENT_QUOTES, 'UTF-8') ?>"
+                                                    <?= $floatActive ? 'checked' : '' ?>>
+                                                <span class="search-floating-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">
+                                                    <span class="search-box">
+                                                        <span class="icon"></span>
+                                                    </span>
+                                                    <span class="search-hint"></span>
+                                                </span>
+                                                <span class="card-style-text">
+                                                    <strong><?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                                    <small><?= htmlspecialchars($info['caption'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                </span>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+
+                                    <div class="mt-3" data-search-fediverse-floating-cta>
+                                        <label>Botón flotante “Síguenos en el fediverso”</label>
+                                        <p class="text-muted mb-2">Muestra el botón flotante para seguir la cuenta del blog desde otro servidor compatible.</p>
+                                        <div class="home-card-style-options">
+                                            <?php
+                                            $searchFediverseFloatingCtaOptions = [
+                                                'off' => [
+                                                    'label' => 'Desactivado',
+                                                    'caption' => 'No se muestra el botón flotante de seguimiento',
+                                                    'figure' => 'search-float-off',
+                                                ],
+                                                'on' => [
+                                                    'label' => 'Activado',
+                                                    'caption' => 'Se muestra junto al buscador flotante y la suscripción',
+                                                    'figure' => 'search-float-on',
+                                                ],
+                                            ];
+                                            ?>
+                                        <?php foreach ($searchFediverseFloatingCtaOptions as $floatKey => $info): ?>
+                                            <?php $floatActive = ($searchFediverseFloatingCtaValue === $floatKey); ?>
+                                            <label class="home-card-style-option <?= $floatActive ? 'active' : '' ?>">
+                                                <input type="radio"
+                                                    name="search_fediverse_floating_cta"
                                                     value="<?= htmlspecialchars($floatKey, ENT_QUOTES, 'UTF-8') ?>"
                                                     <?= $floatActive ? 'checked' : '' ?>>
                                                 <span class="search-floating-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">

@@ -887,7 +887,7 @@
                                     </div>
 
                                     <div class="mt-3" data-search-fediverse-floating-cta>
-                                        <label>Botón flotante “Síguenos en el fediverso”</label>
+                                        <h4>Botón flotante “Síguenos en el fediverso”</h4>
                                         <p class="text-muted mb-2">Muestra el botón flotante para seguir la cuenta del blog desde otro servidor compatible.</p>
                                         <div class="home-card-style-options">
                                             <?php
@@ -906,7 +906,7 @@
                                             ?>
                                         <?php foreach ($searchFediverseFloatingCtaOptions as $floatKey => $info): ?>
                                             <?php $floatActive = ($searchFediverseFloatingCtaValue === $floatKey); ?>
-                                            <label class="home-card-style-option <?= $floatActive ? 'active' : '' ?>">
+                                            <label class="home-card-style-option <?= $floatActive ? 'active' : '' ?>" data-search-fediverse-floating-cta-option="1">
                                                 <input type="radio"
                                                     name="search_fediverse_floating_cta"
                                                     value="<?= htmlspecialchars($floatKey, ENT_QUOTES, 'UTF-8') ?>"

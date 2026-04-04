@@ -14353,6 +14353,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             var searchModeOptions = form.querySelectorAll('.home-card-style-option[data-search-mode-option]');
             var searchPositionOptions = form.querySelectorAll('.home-card-style-option[data-search-position-option]');
             var searchFloatingOptions = form.querySelectorAll('.home-card-style-option[data-search-floating-option]');
+            var searchFediverseFloatingCtaOptions = form.querySelectorAll('.home-card-style-option[data-search-fediverse-floating-cta-option]');
             var subscriptionModeOptions = form.querySelectorAll('.home-card-style-option[data-subscription-mode-option]');
             var subscriptionPositionOptions = form.querySelectorAll('.home-card-style-option[data-subscription-position-option]');
             var subscriptionFloatingOptions = form.querySelectorAll('.home-card-style-option[data-subscription-floating-option]');
@@ -14434,6 +14435,12 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     option.classList.toggle('active', radio && radio.checked);
                 });
             }
+            function refreshSearchFediverseFloatingCtaSelection() {
+                searchFediverseFloatingCtaOptions.forEach(function(option) {
+                    var radio = option.querySelector('input[type="radio"]');
+                    option.classList.toggle('active', radio && radio.checked);
+                });
+            }
             function refreshFooterLogoSelection() {
                 footerLogoOptions.forEach(function(option) {
                     var radio = option.querySelector('input[type="radio"]');
@@ -14464,6 +14471,13 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                 }
             });
             refreshSearchFloatingSelection();
+            searchFediverseFloatingCtaOptions.forEach(function(option) {
+                var radio = option.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.addEventListener('change', refreshSearchFediverseFloatingCtaSelection);
+                }
+            });
+            refreshSearchFediverseFloatingCtaSelection();
 
             function refreshSubscriptionModeSelection() {
                 var activeMode = 'none';

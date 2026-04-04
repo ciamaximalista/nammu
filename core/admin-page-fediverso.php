@@ -480,6 +480,7 @@
         }
         if ($fediverseTimelineType === 'announce') {
             $fediverseAnnounceTargetsLocal = false;
+            $fediverseAnnounceTargetsClusterContent = false;
             foreach ($fediverseTimelineIdentifiers as $fediverseTimelineIdentifier) {
                 if ($fediverseTimelineIdentifier !== '' && function_exists('nammu_fediverse_canonical_local_id_for_identifier')) {
                     $fediverseCanonicalLocalId = nammu_fediverse_canonical_local_id_for_identifier($fediverseTimelineIdentifier, $fediverseConfig);
@@ -488,6 +489,18 @@
                         break;
                     }
                 }
+                $fediverseTimelineIdentifierHost = strtolower(trim((string) parse_url($fediverseTimelineIdentifier, PHP_URL_HOST)));
+                $fediverseTimelineIdentifierPath = trim((string) (parse_url($fediverseTimelineIdentifier, PHP_URL_PATH) ?? ''));
+                $fediverseLocalHostForAnnounce = strtolower(trim((string) parse_url($fediverseBaseUrl, PHP_URL_HOST)));
+                if (
+                    $fediverseTimelineIdentifierHost !== ''
+                    && $fediverseTimelineIdentifierHost !== $fediverseLocalHostForAnnounce
+                    && preg_match('#^/ap/objects/(actualidad|post|podcast|itinerary)-[^/]+$#', $fediverseTimelineIdentifierPath) === 1
+                    && function_exists('nammu_fediverse_cluster_site_dir_for_host')
+                    && nammu_fediverse_cluster_site_dir_for_host($fediverseTimelineIdentifierHost, $fediverseConfig) !== ''
+                ) {
+                    $fediverseAnnounceTargetsClusterContent = true;
+                }
             }
             if (!$fediverseAnnounceTargetsLocal) {
                 $fediverseTimelineItemUrl = trim((string) ($fediverseTimelineItem['url'] ?? ''));
@@ -495,7 +508,7 @@
                     $fediverseAnnounceTargetsLocal = !empty(nammu_fediverse_equivalent_local_items_by_url($fediverseTimelineItemUrl, $fediverseConfig));
                 }
             }
-            if ($fediverseAnnounceTargetsLocal) {
+            if ($fediverseAnnounceTargetsLocal || $fediverseAnnounceTargetsClusterContent) {
                 continue;
             }
             $fediverseAnnounceDuplicatesExisting = false;

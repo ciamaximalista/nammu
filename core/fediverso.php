@@ -176,6 +176,97 @@ function nammu_fediverse_multi_instance_config(array $config): array
     return $normalized;
 }
 
+function nammu_fediverse_cluster_site_dir_for_host(string $host, array $config): string
+{
+    static $cache = [];
+    $host = strtolower(trim($host));
+    if ($host === '') {
+        return '';
+    }
+    $settings = function_exists('nammu_multi_instance_settings') ? nammu_multi_instance_settings($config) : [];
+    $rootDir = trim((string) ($settings['instances_root_dir'] ?? ''));
+    if ($rootDir === '' || !is_dir($rootDir)) {
+        return '';
+    }
+    $cluster = trim((string) ($settings['cluster'] ?? ''));
+    $sharedQueueDir = trim((string) ($settings['shared_queue_dir'] ?? ''));
+    $cacheKey = md5($rootDir . '|' . $cluster . '|' . $sharedQueueDir);
+    if (!isset($cache[$cacheKey])) {
+        $cache[$cacheKey] = [];
+        foreach (glob(rtrim($rootDir, '/') . '/*', GLOB_ONLYDIR) ?: [] as $siteDir) {
+            $configFile = rtrim((string) $siteDir, '/') . '/config/config.yml';
+            if (!is_file($configFile)) {
+                continue;
+            }
+            $raw = @file_get_contents($configFile);
+            if (!is_string($raw) || $raw === '') {
+                continue;
+            }
+            if (function_exists('yaml_parse_file')) {
+                $siteConfig = @yaml_parse_file($configFile);
+                $siteConfig = is_array($siteConfig) ? $siteConfig : [];
+            } else {
+                $siteConfig = function_exists('nammu_simple_yaml_parse') ? nammu_simple_yaml_parse($raw) : [];
+            }
+            if (!is_array($siteConfig) || empty($siteConfig)) {
+                continue;
+            }
+            $siteSettings = function_exists('nammu_multi_instance_settings') ? nammu_multi_instance_settings($siteConfig) : [];
+            if ($cluster !== '' && trim((string) ($siteSettings['cluster'] ?? '')) !== $cluster) {
+                continue;
+            }
+            if ($sharedQueueDir !== '' && trim((string) ($siteSettings['shared_queue_dir'] ?? '')) !== $sharedQueueDir) {
+                continue;
+            }
+            $siteUrl = trim((string) ($siteConfig['site_url'] ?? ''));
+            $siteHost = strtolower(trim((string) parse_url($siteUrl, PHP_URL_HOST)));
+            if ($siteHost === '') {
+                continue;
+            }
+            $cache[$cacheKey][$siteHost] = rtrim((string) $siteDir, '/');
+        }
+    }
+    return (string) ($cache[$cacheKey][$host] ?? '');
+}
+
+function nammu_fediverse_cluster_actuality_item_for_object_id(string $objectId, array $config): ?array
+{
+    $objectId = trim($objectId);
+    if ($objectId === '') {
+        return null;
+    }
+    $host = strtolower(trim((string) parse_url($objectId, PHP_URL_HOST)));
+    $path = trim((string) (parse_url($objectId, PHP_URL_PATH) ?? ''));
+    if ($host === '' || preg_match('#^/ap/objects/actualidad-([^/]+)$#', $path, $matches) !== 1) {
+        return null;
+    }
+    $localHost = strtolower(trim((string) parse_url(nammu_fediverse_base_url($config), PHP_URL_HOST)));
+    if ($localHost !== '' && $host === $localHost) {
+        return null;
+    }
+    $siteDir = nammu_fediverse_cluster_site_dir_for_host($host, $config);
+    if ($siteDir === '') {
+        return null;
+    }
+    $itemsFile = $siteDir . '/config/actualidad-items.json';
+    if (!is_file($itemsFile)) {
+        return null;
+    }
+    $store = nammu_fediverse_load_json_store($itemsFile, ['items' => []]);
+    $targetId = trim((string) ($matches[1] ?? ''));
+    foreach ((array) ($store['items'] ?? []) as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $itemId = trim((string) ($item['id'] ?? ''));
+        if ($itemId === '' || $itemId !== $targetId) {
+            continue;
+        }
+        return $item;
+    }
+    return null;
+}
+
 function nammu_fediverse_shared_cache_dir(array $config): string
 {
     $multi = nammu_fediverse_multi_instance_config($config);
@@ -4223,9 +4314,9 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
             $objectPath = trim((string) (parse_url($objectId, PHP_URL_PATH) ?? ''));
             if (preg_match('#^/ap/objects/(actualidad|post|podcast|itinerary)-[^/]+$#', $objectPath) === 1) {
                 $fallbackTitle = '';
-                if (preg_match('#^/ap/objects/(?:actualidad|post|podcast|itinerary)-([^/]+)$#', $objectPath, $matches) === 1) {
+                if (preg_match('#^/ap/objects/(?:post|podcast|itinerary)-([^/]+)$#', $objectPath, $matches) === 1) {
                     $fallbackSlug = trim((string) ($matches[1] ?? ''));
-                    if ($fallbackSlug !== '' && !str_starts_with($fallbackSlug, 'actualidad-')) {
+                    if ($fallbackSlug !== '') {
                         $fallbackTitle = ucwords(str_replace(['-', '_'], ' ', rawurldecode($fallbackSlug)));
                     }
                 }
@@ -4265,6 +4356,30 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
                 && !is_array(nammu_fediverse_find_local_item_for_identifier($objectId, $config))
             ) {
                 $canDeriveThreadUrl = false;
+            }
+        }
+        if ($objectId !== '') {
+            $clusterActualityItem = nammu_fediverse_cluster_actuality_item_for_object_id($objectId, $config);
+            if (is_array($clusterActualityItem)) {
+                $clusterTitle = trim((string) ($clusterActualityItem['title'] ?? ''));
+                $clusterContent = trim((string) (($clusterActualityItem['raw_text'] ?? '') ?: ($clusterActualityItem['description'] ?? '')));
+                $clusterSummary = trim((string) ($clusterActualityItem['description'] ?? ''));
+                $clusterUrl = trim((string) ($clusterActualityItem['link'] ?? ''));
+                $clusterImage = trim((string) (($clusterActualityItem['source_image'] ?? '') ?: ($clusterActualityItem['image'] ?? '')));
+                if ($clusterTitle !== '') {
+                    $object['name'] = $clusterTitle;
+                }
+                if ($clusterContent !== '') {
+                    $object['summary'] = $clusterContent;
+                } elseif ($clusterSummary !== '') {
+                    $object['summary'] = $clusterSummary;
+                }
+                if ($clusterUrl !== '') {
+                    $object['url'] = $clusterUrl;
+                }
+                if ($clusterImage !== '') {
+                    $object['image'] = $clusterImage;
+                }
             }
         }
         if ($objectId !== '') {

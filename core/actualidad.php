@@ -1466,9 +1466,22 @@ function nammu_actuality_prune_cache(array &$cache, array $activeKeys): void
     $cache['items'] = $items;
 }
 
+function nammu_actuality_skip_remote_image_discovery(): bool
+{
+    if (PHP_SAPI !== 'cli') {
+        return false;
+    }
+    global $__nammuRunScheduledOnly, $__nammuRunScheduledMaintenanceOnly, $__nammuRunScheduledHeavyOnly, $__nammuRunClusterScheduledOnly;
+    return !empty($__nammuRunScheduledOnly)
+        || !empty($__nammuRunScheduledMaintenanceOnly)
+        || !empty($__nammuRunScheduledHeavyOnly)
+        || !empty($__nammuRunClusterScheduledOnly);
+}
+
 function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): array
 {
     $startedAt = microtime(true);
+    $skipRemoteDiscovery = nammu_actuality_skip_remote_image_discovery();
     $cache = nammu_actuality_load_cache();
     $cache['items'] = is_array($cache['items'] ?? null) ? $cache['items'] : [];
     $activeKeys = [];
@@ -1497,13 +1510,16 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
         if ($localPath !== '' && is_file($localPath) && $cachedUrl !== '') {
             $items[$index]['image'] = $cachedUrl;
             $cache['items'][$key]['last_used'] = time();
-            if ($sourceImage === '') {
+            if (!$skipRemoteDiscovery && $sourceImage === '') {
                 $refreshedSourceImage = nammu_actuality_extract_social_image($targetLink);
                 if ($refreshedSourceImage !== '') {
                     $items[$index]['source_image'] = $refreshedSourceImage;
                     $cache['items'][$key]['source_image'] = $refreshedSourceImage;
                 }
             }
+            continue;
+        }
+        if ($skipRemoteDiscovery) {
             continue;
         }
         $socialImage = nammu_actuality_extract_social_image($targetLink);
@@ -1539,6 +1555,7 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
         'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
         'items' => count($items),
         'cache_keys' => count(array_values(array_unique($activeKeys))),
+        'skip_remote_discovery' => $skipRemoteDiscovery ? 1 : 0,
     ]);
     return $items;
 }

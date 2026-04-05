@@ -169,6 +169,22 @@ function admin_run_scheduled_maintenance_tasks(): array {
         'scope' => 'maintenance',
         'event' => 'enter',
     ]);
+    $traceStep = static function (string $step, callable $callback) {
+        $startedAt = microtime(true);
+        admin_maintenance_trace([
+            'scope' => 'maintenance',
+            'event' => 'step_start',
+            'step' => $step,
+        ]);
+        $result = $callback();
+        admin_maintenance_trace([
+            'scope' => 'maintenance',
+            'event' => 'step_finish',
+            'step' => $step,
+            'duration_ms' => (int) round(max(0, microtime(true) - $startedAt) * 1000),
+        ]);
+        return $result;
+    };
     $config = nammu_load_config();
     admin_maintenance_trace([
         'scope' => 'maintenance',
@@ -215,22 +231,6 @@ function admin_run_scheduled_maintenance_tasks(): array {
     $deliveryStats = ['followers' => 0, 'delivered' => 0];
     $acceptStats = ['checked' => 0, 'accepted' => 0, 'failed' => 0];
     $actualityChanged = false;
-    $traceStep = static function (string $step, callable $callback) {
-        $startedAt = microtime(true);
-        admin_maintenance_trace([
-            'scope' => 'maintenance',
-            'event' => 'step_start',
-            'step' => $step,
-        ]);
-        $result = $callback();
-        admin_maintenance_trace([
-            'scope' => 'maintenance',
-            'event' => 'step_finish',
-            'step' => $step,
-            'duration_ms' => (int) round(max(0, microtime(true) - $startedAt) * 1000),
-        ]);
-        return $result;
-    };
     $snapshotSignature = static function (array $snapshot): string {
         $items = is_array($snapshot['items'] ?? null) ? $snapshot['items'] : [];
         return sha1(json_encode($items, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '[]');

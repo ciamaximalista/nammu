@@ -278,6 +278,22 @@
     $fediverseIncomingReplies = $isFediverseHomeTab && $fediverseNeedsLivePanel
         ? (is_array($fediverseHomeSnapshot['incoming_replies'] ?? null) ? $fediverseHomeSnapshot['incoming_replies'] : [])
         : [];
+    $fediverseEquivalentIdentifiers = static function (string $identifier): array {
+        $identifier = trim($identifier);
+        if ($identifier === '') {
+            return [];
+        }
+        $variants = [$identifier];
+        $path = trim((string) (parse_url($identifier, PHP_URL_PATH) ?? ''));
+        if ($path !== '') {
+            if (str_ends_with($path, '/activity')) {
+                $variants[] = preg_replace('#/activity$#', '', $identifier) ?? $identifier;
+            } elseif (preg_match('#^/ap/(objects|notes|replies)/[^/]+$#', $path) === 1) {
+                $variants[] = rtrim($identifier, '/') . '/activity';
+            }
+        }
+        return array_values(array_unique(array_filter(array_map('strval', $variants))));
+    };
     $fediverseIncomingReplyIds = [];
     $fediverseIncomingReplyRoots = [];
     $fediverseRemoteRepliesByTarget = [];
@@ -313,10 +329,7 @@
             if ($fediverseTimelineReplyText === '') {
                 continue;
             }
-            if (!isset($fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTarget])) {
-                $fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTarget] = [];
-            }
-            $fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTarget][] = [
+            $fediverseRemoteReplyPayload = [
                 'id' => trim((string) ($fediverseTimelineReplyCandidate['id'] ?? '')),
                 'note_id' => trim((string) (($fediverseTimelineReplyCandidate['object_id'] ?? '') ?: ($fediverseTimelineReplyCandidate['id'] ?? ''))),
                 'url' => trim((string) ($fediverseTimelineReplyCandidate['url'] ?? '')),
@@ -327,6 +340,12 @@
                 'actor_icon' => trim((string) ($fediverseTimelineReplyCandidate['actor_icon'] ?? '')),
                 'source' => 'incoming-remote',
             ];
+            foreach ($fediverseEquivalentIdentifiers($fediverseTimelineReplyTarget) as $fediverseTimelineReplyTargetIdentifier) {
+                if (!isset($fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTargetIdentifier])) {
+                    $fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTargetIdentifier] = [];
+                }
+                $fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTargetIdentifier][] = $fediverseRemoteReplyPayload;
+            }
         }
     }
     $fediverseLocalLinks = [];
@@ -457,6 +476,9 @@
         }
         foreach (['object_id', 'url', 'id'] as $fediverseCanonicalField) {
             $fediverseCanonicalValue = trim((string) ($fediverseTimelineCandidate[$fediverseCanonicalField] ?? ''));
+            foreach ($fediverseEquivalentIdentifiers($fediverseCanonicalValue) as $fediverseCanonicalIdentifier) {
+                $fediverseRemoteCanonicalItems[$fediverseCanonicalIdentifier] = true;
+            }
             if ($fediverseCanonicalValue !== '') {
                 $fediverseRemoteCanonicalItems[$fediverseCanonicalValue] = true;
             }
@@ -666,8 +688,8 @@
         }
         foreach (['id', 'object_id', 'url'] as $fediversePageField) {
             $fediversePageValue = trim((string) ($fediversePageItem[$fediversePageField] ?? ''));
-            if ($fediversePageValue !== '') {
-                $fediversePageRootIdentifiers[$fediversePageValue] = true;
+            foreach ($fediverseEquivalentIdentifiers($fediversePageValue) as $fediversePageIdentifier) {
+                $fediversePageRootIdentifiers[$fediversePageIdentifier] = true;
             }
         }
     }
@@ -1096,6 +1118,13 @@
                                         trim((string) ($item['url'] ?? '')),
                                         trim((string) ($item['id'] ?? '')),
                                     ]));
+                                $itemTargetIdentifiersExpanded = [];
+                                foreach ($itemTargetIdentifiers as $itemTargetIdentifier) {
+                                    foreach ($fediverseEquivalentIdentifiers((string) $itemTargetIdentifier) as $itemTargetIdentifierVariant) {
+                                        $itemTargetIdentifiersExpanded[] = $itemTargetIdentifierVariant;
+                                    }
+                                }
+                                $itemTargetIdentifiers = array_values(array_unique(array_filter(array_map('strval', $itemTargetIdentifiersExpanded))));
                                 ?>
                                 <?php
                                 $replyDedupKeys = [];

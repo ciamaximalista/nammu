@@ -3312,12 +3312,18 @@ function nammu_fediverse_extract_legacy_actuality_ids_from_payload(array $payloa
         $candidates[] = trim((string) $payload['object']);
     }
     if (is_array($object)) {
-        $candidates[] = trim((string) ($object['id'] ?? ''));
+        if (is_string($object['id'] ?? null) || is_numeric($object['id'] ?? null)) {
+            $candidates[] = trim((string) $object['id']);
+        }
         if (is_string($object['url'] ?? null) || is_numeric($object['url'] ?? null)) {
             $candidates[] = trim((string) $object['url']);
         }
-        $candidates[] = trim((string) ($object['atomUri'] ?? ''));
-        $candidates[] = trim((string) ($object['inReplyTo'] ?? ''));
+        if (is_string($object['atomUri'] ?? null) || is_numeric($object['atomUri'] ?? null)) {
+            $candidates[] = trim((string) $object['atomUri']);
+        }
+        if (is_string($object['inReplyTo'] ?? null) || is_numeric($object['inReplyTo'] ?? null)) {
+            $candidates[] = trim((string) $object['inReplyTo']);
+        }
     }
 
     $ids = [];

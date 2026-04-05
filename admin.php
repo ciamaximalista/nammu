@@ -175,9 +175,15 @@ function admin_run_scheduled_maintenance_tasks(): array {
     if (!function_exists('nammu_fediverse_rebuild_light_snapshots') && is_file(__DIR__ . '/core/fediverso.php')) {
         require_once __DIR__ . '/core/fediverso.php';
     }
-    $published = function_exists('nammu_publish_scheduled_posts') ? (int) nammu_publish_scheduled_posts(CONTENT_DIR) : 0;
+    $published = function_exists('nammu_publish_scheduled_posts')
+        ? (int) $traceStep('publish_scheduled_posts', static function () {
+            return nammu_publish_scheduled_posts(CONTENT_DIR);
+        })
+        : 0;
     $queueStats = function_exists('nammu_process_scheduled_notifications_queue')
-        ? nammu_process_scheduled_notifications_queue()
+        ? $traceStep('notifications_queue', static function () {
+            return nammu_process_scheduled_notifications_queue();
+        })
         : ['processed' => 0, 'remaining' => 0];
     $rssStats = ['sent' => 0, 'checked' => 0];
     $socialBroadcastQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
@@ -189,6 +195,16 @@ function admin_run_scheduled_maintenance_tasks(): array {
     $deliveryStats = ['followers' => 0, 'delivered' => 0];
     $acceptStats = ['checked' => 0, 'accepted' => 0, 'failed' => 0];
     $actualityChanged = false;
+    $traceStep = static function (string $step, callable $callback) {
+        $startedAt = microtime(true);
+        $result = $callback();
+        admin_maintenance_trace([
+            'scope' => 'maintenance',
+            'step' => $step,
+            'duration_ms' => (int) round(max(0, microtime(true) - $startedAt) * 1000),
+        ]);
+        return $result;
+    };
     $snapshotSignature = static function (array $snapshot): string {
         $items = is_array($snapshot['items'] ?? null) ? $snapshot['items'] : [];
         return sha1(json_encode($items, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '[]');
@@ -206,11 +222,15 @@ function admin_run_scheduled_maintenance_tasks(): array {
         if ($baseUrl === '') {
             $baseUrl = nammu_base_url();
         }
-        $rebuiltActuality = nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
+        $rebuiltActuality = $traceStep('actuality_rebuild_snapshot', static function () use ($baseUrl, $config, $siteName, $siteDescription, $siteLang) {
+            return nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
+        });
         $actualityChanged = $snapshotSignature(is_array($rebuiltActuality) ? $rebuiltActuality : ['items' => []]) !== $actualityBeforeSignature;
     }
     if (function_exists('admin_process_social_rss_feeds')) {
-        $rssStats = admin_process_social_rss_feeds();
+        $rssStats = $traceStep('social_rss_feeds', static function () {
+            return admin_process_social_rss_feeds();
+        });
         if ((int) ($rssStats['sent'] ?? 0) > 0 && function_exists('nammu_actuality_rebuild_snapshot')) {
             $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
             $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
@@ -219,33 +239,51 @@ function admin_run_scheduled_maintenance_tasks(): array {
             if ($baseUrl === '') {
                 $baseUrl = nammu_base_url();
             }
-            $rebuiltActuality = nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
+            $rebuiltActuality = $traceStep('actuality_rebuild_snapshot_after_social_rss', static function () use ($baseUrl, $config, $siteName, $siteDescription, $siteLang) {
+                return nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
+            });
             $actualityChanged = $actualityChanged || ($snapshotSignature(is_array($rebuiltActuality) ? $rebuiltActuality : ['items' => []]) !== $actualityBeforeSignature);
         }
     }
     if (function_exists('admin_process_social_broadcast_queue')) {
-        $socialBroadcastQueueStats = admin_process_social_broadcast_queue(3);
+        $socialBroadcastQueueStats = $traceStep('social_broadcast_queue', static function () {
+            return admin_process_social_broadcast_queue(3);
+        });
     }
     if (function_exists('nammu_webmention_sync_sources')) {
-        $webmentionSyncStats = nammu_webmention_sync_sources($config, 4);
+        $webmentionSyncStats = $traceStep('webmention_sync_sources', static function () use ($config) {
+            return nammu_webmention_sync_sources($config, 4);
+        });
     }
     if (function_exists('nammu_webmention_process_queue')) {
-        $webmentionQueueStats = nammu_webmention_process_queue($config, 4);
+        $webmentionQueueStats = $traceStep('webmention_process_queue', static function () use ($config) {
+            return nammu_webmention_process_queue($config, 4);
+        });
     }
     if (function_exists('nammu_fediverse_process_delete_queue')) {
-        $fediverseDeleteQueueStats = nammu_fediverse_process_delete_queue($config, 2);
+        $fediverseDeleteQueueStats = $traceStep('fediverse_delete_queue', static function () use ($config) {
+            return nammu_fediverse_process_delete_queue($config, 2);
+        });
     }
     if (function_exists('nammu_fediverse_process_announce_queue')) {
-        $fediverseAnnounceQueueStats = nammu_fediverse_process_announce_queue($config, 2);
+        $fediverseAnnounceQueueStats = $traceStep('fediverse_announce_queue', static function () use ($config) {
+            return nammu_fediverse_process_announce_queue($config, 2);
+        });
     }
     if (function_exists('nammu_fediverse_process_undo_announce_queue')) {
-        $fediverseUndoAnnounceQueueStats = nammu_fediverse_process_undo_announce_queue($config, 2);
+        $fediverseUndoAnnounceQueueStats = $traceStep('fediverse_undo_announce_queue', static function () use ($config) {
+            return nammu_fediverse_process_undo_announce_queue($config, 2);
+        });
     }
     if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
-        $acceptStats = nammu_fediverse_retry_pending_follower_accepts($config);
+        $acceptStats = $traceStep('fediverse_retry_pending_follower_accepts', static function () use ($config) {
+            return nammu_fediverse_retry_pending_follower_accepts($config);
+        });
     }
     if (function_exists('nammu_fediverse_deliver_local_items')) {
-        $deliveryStats = nammu_fediverse_deliver_local_items($config);
+        $deliveryStats = $traceStep('fediverse_deliver_local_items', static function () use ($config) {
+            return nammu_fediverse_deliver_local_items($config);
+        });
     }
     if (
         $published > 0
@@ -254,10 +292,16 @@ function admin_run_scheduled_maintenance_tasks(): array {
         || (int) ($deliveryStats['delivered'] ?? 0) > 0
     ) {
         if (function_exists('nammu_fediverse_rebuild_light_snapshots')) {
-            nammu_fediverse_rebuild_light_snapshots($config);
+            $traceStep('fediverse_rebuild_light_snapshots', static function () use ($config) {
+                nammu_fediverse_rebuild_light_snapshots($config);
+                return null;
+            });
         }
         if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
-            nammu_fediverse_save_fragments_cache_store([]);
+            $traceStep('fediverse_clear_fragments_cache', static function () {
+                nammu_fediverse_save_fragments_cache_store([]);
+                return null;
+            });
         }
     }
 
@@ -538,6 +582,22 @@ function admin_multi_instance_scheduler_lock_file(array $config): string
     return $queueDir . '/scheduler-' . strtolower($cluster) . '.lock';
 }
 
+function admin_multi_instance_trace_file(array $config): string
+{
+    $backupDir = __DIR__ . '/backups';
+    if (!is_dir($backupDir)) {
+        nammu_ensure_directory($backupDir);
+    }
+    return $backupDir . '/cluster-trace.log';
+}
+
+function admin_multi_instance_trace(array $config, array $entry): void
+{
+    $file = admin_multi_instance_trace_file($config);
+    $entry['at'] = date(DATE_ATOM);
+    @file_put_contents($file, json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+}
+
 function admin_multi_instance_scheduler_state_load(array $config): array
 {
     $file = admin_multi_instance_scheduler_state_file($config);
@@ -795,6 +855,12 @@ function admin_multi_instance_run_site_phase(string $adminFile, string $phase): 
 function admin_run_cluster_scheduled_tasks(): array
 {
     $clusterStartedAt = microtime(true);
+    $clusterBudgetMs = 45000;
+    $phaseMinimumRemainingMs = [
+        'light' => 10000,
+        'maintenance' => 25000,
+        'heavy' => 30000,
+    ];
     $config = nammu_load_config();
     $settings = admin_multi_instance_settings($config);
     if (($settings['enabled'] ?? 'off') !== 'on') {
@@ -841,16 +907,78 @@ function admin_run_cluster_scheduled_tasks(): array
         $runs = [];
         if ($strategy === 'activity') {
             foreach (['light', 'maintenance', 'heavy'] as $phase) {
+                $elapsedMs = (int) round(max(0, microtime(true) - $clusterStartedAt) * 1000);
+                if ($elapsedMs >= $clusterBudgetMs) {
+                    admin_multi_instance_trace($config, [
+                        'scope' => 'cluster',
+                        'event' => 'phase_skip',
+                        'strategy' => 'activity',
+                        'phase' => $phase,
+                        'reason' => 'cluster_time_budget_exhausted',
+                        'elapsed_ms' => $elapsedMs,
+                    ]);
+                    break;
+                }
+                $remainingMs = $clusterBudgetMs - $elapsedMs;
+                $minimumRemainingMs = (int) ($phaseMinimumRemainingMs[$phase] ?? 0);
+                if ($remainingMs < $minimumRemainingMs) {
+                    admin_multi_instance_trace($config, [
+                        'scope' => 'cluster',
+                        'event' => 'phase_skip',
+                        'strategy' => 'activity',
+                        'phase' => $phase,
+                        'reason' => 'insufficient_time_remaining',
+                        'elapsed_ms' => $elapsedMs,
+                        'remaining_ms' => $remainingMs,
+                        'required_remaining_ms' => $minimumRemainingMs,
+                    ]);
+                    continue;
+                }
                 $pick = admin_multi_instance_pick_due_site_activity($phase, $sites, $state, $now);
                 if (!is_array($pick)) {
+                    admin_multi_instance_trace($config, [
+                        'scope' => 'cluster',
+                        'event' => 'phase_skip',
+                        'strategy' => 'activity',
+                        'phase' => $phase,
+                        'reason' => 'no_due_site',
+                    ]);
                     continue;
                 }
                 $site = is_array($pick['site'] ?? null) ? $pick['site'] : [];
                 $siteKey = (string) ($pick['site_key'] ?? ($site['site_dir'] ?? ''));
                 if ($siteKey === '' || empty($site['admin_file'])) {
+                    admin_multi_instance_trace($config, [
+                        'scope' => 'cluster',
+                        'event' => 'phase_skip',
+                        'strategy' => 'activity',
+                        'phase' => $phase,
+                        'reason' => 'invalid_pick',
+                        'site' => $site['slug'] ?? basename((string) ($site['site_dir'] ?? '')),
+                    ]);
                     continue;
                 }
+                admin_multi_instance_trace($config, [
+                    'scope' => 'cluster',
+                    'event' => 'phase_start',
+                    'strategy' => 'activity',
+                    'phase' => $phase,
+                    'site' => $site['slug'] ?? basename((string) ($site['site_dir'] ?? '')),
+                    'activity_profile' => (string) (($pick['profile']['name'] ?? 'idle')),
+                    'last_local_activity_at' => (int) ($site['last_local_activity_at'] ?? 0),
+                ]);
                 $run = admin_multi_instance_run_site_phase((string) $site['admin_file'], $phase);
+                admin_multi_instance_trace($config, [
+                    'scope' => 'cluster',
+                    'event' => 'phase_finish',
+                    'strategy' => 'activity',
+                    'phase' => $phase,
+                    'site' => $site['slug'] ?? basename((string) ($site['site_dir'] ?? '')),
+                    'duration_ms' => (int) ($run['duration_ms'] ?? 0),
+                    'exit_code' => (int) ($run['exit_code'] ?? 1),
+                    'result_keys' => array_values(array_keys(is_array($run['result'] ?? null) ? $run['result'] : [])),
+                    'raw_prefix' => substr((string) ($run['raw'] ?? ''), 0, 300),
+                ]);
                 $runs[] = [
                     'site' => $site['slug'] ?? basename((string) ($site['site_dir'] ?? '')),
                     'phase' => $phase,
@@ -863,15 +991,64 @@ function admin_run_cluster_scheduled_tasks(): array
                     'result' => $run['result'] ?? null,
                 ];
                 admin_multi_instance_mark_phase_run($state, $siteKey, $phase, $now);
+                admin_multi_instance_scheduler_state_save($config, $state);
             }
         } else {
             foreach ($sites as $index => $site) {
                 $siteKey = (string) ($site['site_dir'] ?? ('site-' . $index));
                 foreach (['light', 'maintenance', 'heavy'] as $phase) {
+                    $elapsedMs = (int) round(max(0, microtime(true) - $clusterStartedAt) * 1000);
+                    if ($elapsedMs >= $clusterBudgetMs) {
+                        admin_multi_instance_trace($config, [
+                            'scope' => 'cluster',
+                            'event' => 'phase_skip',
+                            'strategy' => 'fixed',
+                            'phase' => $phase,
+                            'site' => $site['slug'] ?? basename((string) ($site['site_dir'] ?? '')),
+                            'reason' => 'cluster_time_budget_exhausted',
+                            'elapsed_ms' => $elapsedMs,
+                        ]);
+                        break 2;
+                    }
+                    $remainingMs = $clusterBudgetMs - $elapsedMs;
+                    $minimumRemainingMs = (int) ($phaseMinimumRemainingMs[$phase] ?? 0);
+                    if ($remainingMs < $minimumRemainingMs) {
+                        admin_multi_instance_trace($config, [
+                            'scope' => 'cluster',
+                            'event' => 'phase_skip',
+                            'strategy' => 'fixed',
+                            'phase' => $phase,
+                            'site' => $site['slug'] ?? basename((string) ($site['site_dir'] ?? '')),
+                            'reason' => 'insufficient_time_remaining',
+                            'elapsed_ms' => $elapsedMs,
+                            'remaining_ms' => $remainingMs,
+                            'required_remaining_ms' => $minimumRemainingMs,
+                        ]);
+                        continue;
+                    }
                     if (!admin_multi_instance_phase_due($phase, $index, $state, $siteKey, $now)) {
                         continue;
                     }
+                    admin_multi_instance_trace($config, [
+                        'scope' => 'cluster',
+                        'event' => 'phase_start',
+                        'strategy' => 'fixed',
+                        'phase' => $phase,
+                        'site' => $site['slug'] ?? basename((string) ($site['site_dir'] ?? '')),
+                        'slot_index' => $index,
+                    ]);
                     $run = admin_multi_instance_run_site_phase((string) $site['admin_file'], $phase);
+                    admin_multi_instance_trace($config, [
+                        'scope' => 'cluster',
+                        'event' => 'phase_finish',
+                        'strategy' => 'fixed',
+                        'phase' => $phase,
+                        'site' => $site['slug'] ?? basename((string) ($site['site_dir'] ?? '')),
+                        'duration_ms' => (int) ($run['duration_ms'] ?? 0),
+                        'exit_code' => (int) ($run['exit_code'] ?? 1),
+                        'result_keys' => array_values(array_keys(is_array($run['result'] ?? null) ? $run['result'] : [])),
+                        'raw_prefix' => substr((string) ($run['raw'] ?? ''), 0, 300),
+                    ]);
                     $runs[] = [
                         'site' => $site['slug'] ?? basename((string) $site['site_dir']),
                         'phase' => $phase,
@@ -883,6 +1060,7 @@ function admin_run_cluster_scheduled_tasks(): array
                         'result' => $run['result'] ?? null,
                     ];
                     admin_multi_instance_mark_phase_run($state, $siteKey, $phase, $now);
+                    admin_multi_instance_scheduler_state_save($config, $state);
                 }
             }
         }
@@ -970,6 +1148,17 @@ function parse_yaml_front_matter($content) {
 
 function admin_stats_backup_dir(): string {
     return __DIR__ . '/backups';
+}
+
+function admin_maintenance_trace(array $entry): void
+{
+    $backupDir = __DIR__ . '/backups';
+    if (!is_dir($backupDir)) {
+        nammu_ensure_directory($backupDir);
+    }
+    $entry['at'] = date(DATE_ATOM);
+    $entry['site'] = basename(__DIR__);
+    @file_put_contents($backupDir . '/maintenance-trace.log', json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
 }
 
 /**

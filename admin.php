@@ -7439,6 +7439,49 @@ function admin_autosave_from_payload($jsonPayload): array {
     return $result;
 }
 
+if ($runScheduledOnly) {
+    $result = admin_run_with_scheduled_lock('admin_run_scheduled_tasks');
+    $result['mode'] = 'light';
+    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+    exit(0);
+}
+
+if ($runScheduledMaintenanceOnly) {
+    $result = admin_run_with_scheduled_lock('admin_run_scheduled_maintenance_tasks');
+    $result['mode'] = 'maintenance';
+    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+    exit(0);
+}
+
+if ($runScheduledHeavyOnly) {
+    $result = admin_run_with_scheduled_lock('admin_run_scheduled_heavy_tasks');
+    $result['mode'] = 'heavy';
+    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+    exit(0);
+}
+
+if ($runClusterScheduledOnly) {
+    $result = admin_run_cluster_scheduled_tasks();
+    $result['mode'] = 'cluster';
+    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+    exit(0);
+}
+
+if ($runReplayFediverseDeletesOnly) {
+    $result = admin_run_with_scheduled_lock(static function (): array {
+        $config = nammu_load_config();
+        if (!function_exists('nammu_fediverse_replay_all_deletes') && is_file(__DIR__ . '/core/fediverso.php')) {
+            require_once __DIR__ . '/core/fediverso.php';
+        }
+        return function_exists('nammu_fediverse_replay_all_deletes')
+            ? nammu_fediverse_replay_all_deletes($config)
+            : ['ok' => false, 'message' => 'No se pudo cargar el replay de deletes del Fediverso.'];
+    });
+    $result['mode'] = 'delete_replay';
+    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+    exit(0);
+}
+
 // --- Routing and Logic ---
 
 $page = $_GET['page'] ?? (is_logged_in() ? 'dashboard' : 'login');
@@ -7535,49 +7578,6 @@ if (!is_array($itineraryFeedback) || !isset($itineraryFeedback['message'], $itin
     $itineraryFeedback = null;
 } else {
     unset($_SESSION['itinerary_feedback']);
-}
-
-if ($runScheduledOnly) {
-    $result = admin_run_with_scheduled_lock('admin_run_scheduled_tasks');
-    $result['mode'] = 'light';
-    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
-    exit(0);
-}
-
-if ($runScheduledMaintenanceOnly) {
-    $result = admin_run_with_scheduled_lock('admin_run_scheduled_maintenance_tasks');
-    $result['mode'] = 'maintenance';
-    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
-    exit(0);
-}
-
-if ($runScheduledHeavyOnly) {
-    $result = admin_run_with_scheduled_lock('admin_run_scheduled_heavy_tasks');
-    $result['mode'] = 'heavy';
-    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
-    exit(0);
-}
-
-if ($runClusterScheduledOnly) {
-    $result = admin_run_cluster_scheduled_tasks();
-    $result['mode'] = 'cluster';
-    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
-    exit(0);
-}
-
-if ($runReplayFediverseDeletesOnly) {
-    $result = admin_run_with_scheduled_lock(static function (): array {
-        $config = nammu_load_config();
-        if (!function_exists('nammu_fediverse_replay_all_deletes') && is_file(__DIR__ . '/core/fediverso.php')) {
-            require_once __DIR__ . '/core/fediverso.php';
-        }
-        return function_exists('nammu_fediverse_replay_all_deletes')
-            ? nammu_fediverse_replay_all_deletes($config)
-            : ['ok' => false, 'message' => 'No se pudo cargar el replay de deletes del Fediverso.'];
-    });
-    $result['mode'] = 'delete_replay';
-    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
-    exit(0);
 }
 
 if (isset($_GET['bing_oauth'])) {

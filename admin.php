@@ -662,6 +662,9 @@ function admin_multi_instance_trace_file(array $config): string
 
 function admin_multi_instance_trace(array $config, array $entry): void
 {
+    if (PHP_SAPI !== 'cli' || !admin_cli_debug_enabled()) {
+        return;
+    }
     $file = admin_multi_instance_trace_file($config);
     $entry['at'] = date(DATE_ATOM);
     @file_put_contents($file, json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
@@ -1221,6 +1224,9 @@ function admin_stats_backup_dir(): string {
 
 function admin_maintenance_trace(array $entry): void
 {
+    if (PHP_SAPI !== 'cli' || !admin_cli_debug_enabled()) {
+        return;
+    }
     $backupDir = __DIR__ . '/backups';
     if (!is_dir($backupDir)) {
         nammu_ensure_directory($backupDir);
@@ -1232,6 +1238,9 @@ function admin_maintenance_trace(array $entry): void
 
 function admin_heavy_trace(array $entry): void
 {
+    if (PHP_SAPI !== 'cli' || !admin_cli_debug_enabled()) {
+        return;
+    }
     $backupDir = __DIR__ . '/backups';
     if (!is_dir($backupDir)) {
         nammu_ensure_directory($backupDir);

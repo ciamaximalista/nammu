@@ -197,9 +197,15 @@ function admin_run_scheduled_maintenance_tasks(): array {
     $actualityChanged = false;
     $traceStep = static function (string $step, callable $callback) {
         $startedAt = microtime(true);
+        admin_maintenance_trace([
+            'scope' => 'maintenance',
+            'event' => 'step_start',
+            'step' => $step,
+        ]);
         $result = $callback();
         admin_maintenance_trace([
             'scope' => 'maintenance',
+            'event' => 'step_finish',
             'step' => $step,
             'duration_ms' => (int) round(max(0, microtime(true) - $startedAt) * 1000),
         ]);

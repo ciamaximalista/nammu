@@ -32,6 +32,14 @@ function nammu_actuality_social_rss_state_file(): string
     return dirname(__DIR__) . '/config/social-rss-state.json';
 }
 
+function nammu_actuality_trace(array $entry): void
+{
+    if (function_exists('admin_maintenance_trace')) {
+        $entry['scope'] = $entry['scope'] ?? 'actualidad';
+        admin_maintenance_trace($entry);
+    }
+}
+
 function nammu_actuality_cache_dir(): string
 {
     return dirname(__DIR__) . '/assets/actualidad-cache';
@@ -739,21 +747,37 @@ function nammu_actuality_rss_feed_list(string $feedsRaw): array
 
 function nammu_actuality_fetch_rss_items(string $url): array
 {
+    $startedAt = microtime(true);
     $context = stream_context_create([
         'http' => [
             'method' => 'GET',
-            'timeout' => 15,
+            'timeout' => 6,
             'ignore_errors' => true,
             'header' => "User-Agent: Nammu RSS Fetcher\r\n",
         ],
     ]);
     $raw = @file_get_contents($url, false, $context);
     if (!is_string($raw) || trim($raw) === '') {
+        nammu_actuality_trace([
+            'event' => 'feed_fetch',
+            'url' => $url,
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            'ok' => 0,
+            'items' => 0,
+        ]);
         return [];
     }
     libxml_use_internal_errors(true);
     $xml = @simplexml_load_string($raw, 'SimpleXMLElement', LIBXML_NOCDATA);
     if (!$xml instanceof SimpleXMLElement) {
+        nammu_actuality_trace([
+            'event' => 'feed_fetch',
+            'url' => $url,
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            'ok' => 0,
+            'items' => 0,
+            'reason' => 'invalid_xml',
+        ]);
         return [];
     }
 
@@ -852,6 +876,13 @@ function nammu_actuality_fetch_rss_items(string $url): array
     usort($items, static function (array $a, array $b): int {
         return ($a['timestamp'] ?? 0) <=> ($b['timestamp'] ?? 0);
     });
+    nammu_actuality_trace([
+        'event' => 'feed_fetch',
+        'url' => $url,
+        'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        'ok' => 1,
+        'items' => count($items),
+    ]);
     return $items;
 }
 
@@ -2039,10 +2070,17 @@ function nammu_actuality_clear_snapshot(): void
 
 function nammu_actuality_rebuild_snapshot(string $baseUrl, array $config, string $siteTitle, string $siteDescription, string $siteLang = 'es'): array
 {
+    $startedAt = microtime(true);
     $contentDir = dirname(__DIR__) . '/content';
     $itinerariesDir = dirname(__DIR__) . '/itinerarios';
     if (!nammu_actuality_has_content($config) && !nammu_actuality_has_published_site_items($contentDir, $itinerariesDir)) {
         nammu_actuality_clear_snapshot();
+        nammu_actuality_trace([
+            'event' => 'rebuild_snapshot',
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            'items' => 0,
+            'cleared' => 1,
+        ]);
         return ['updated_at' => 0, 'items' => []];
     }
     $items = nammu_actuality_collect_items($config, $baseUrl);
@@ -2051,6 +2089,12 @@ function nammu_actuality_rebuild_snapshot(string $baseUrl, array $config, string
     if ($baseUrl !== '') {
         @file_put_contents(dirname(__DIR__) . '/noticias.xml', $feed);
     }
+    nammu_actuality_trace([
+        'event' => 'rebuild_snapshot',
+        'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        'items' => count($items),
+        'cleared' => 0,
+    ]);
     return [
         'updated_at' => time(),
         'items' => $items,

@@ -98,8 +98,9 @@ function nammu_webmention_state_store(?array $config = null): array
 {
     $resolvedConfig = nammu_webmention_effective_config($config);
     $file = nammu_webmention_queue_path_for($resolvedConfig, 'webmention-state', nammu_webmention_state_file());
-    $store = nammu_webmention_load_store($file, ['sources' => []]);
+    $store = nammu_webmention_load_store($file, ['sources' => [], 'targets' => []]);
     $store['sources'] = is_array($store['sources'] ?? null) ? $store['sources'] : [];
+    $store['targets'] = is_array($store['targets'] ?? null) ? $store['targets'] : [];
     return $store;
 }
 
@@ -110,11 +111,14 @@ function nammu_webmention_save_queue_store(array $items, ?array $config = null):
     nammu_webmention_save_store($file, ['items' => array_values($items)]);
 }
 
-function nammu_webmention_save_state_store(array $sources, ?array $config = null): void
+function nammu_webmention_save_state_store(array $sources, ?array $config = null, ?array $targets = null): void
 {
     $resolvedConfig = nammu_webmention_effective_config($config);
     $file = nammu_webmention_queue_path_for($resolvedConfig, 'webmention-state', nammu_webmention_state_file());
-    nammu_webmention_save_store($file, ['sources' => $sources]);
+    nammu_webmention_save_store($file, [
+        'sources' => $sources,
+        'targets' => is_array($targets) ? $targets : [],
+    ]);
 }
 
 function nammu_webmention_endpoint_url(array $config): string
@@ -124,6 +128,14 @@ function nammu_webmention_endpoint_url(array $config): string
         $baseUrl = nammu_base_url();
     }
     return rtrim($baseUrl, '/') . '/webmention';
+}
+
+function nammu_webmention_is_scheduled_cli_mode(): bool
+{
+    return !empty($GLOBALS['__nammuRunScheduledOnly'])
+        || !empty($GLOBALS['__nammuRunScheduledMaintenanceOnly'])
+        || !empty($GLOBALS['__nammuRunScheduledHeavyOnly'])
+        || !empty($GLOBALS['__nammuRunClusterScheduledOnly']);
 }
 
 function nammu_webmention_normalize_url(string $url): string
@@ -342,14 +354,14 @@ function nammu_webmention_resolve_relative_url(string $href, string $baseUrl): s
     return $root . ($directory !== '' ? $directory : '') . '/' . ltrim($href, '/');
 }
 
-function nammu_webmention_discover_endpoint(string $targetUrl): string
+function nammu_webmention_discover_endpoint(string $targetUrl, int $timeout = 10): string
 {
-    $head = nammu_webmention_http_request($targetUrl, 'HEAD', ['Accept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.8']);
+    $head = nammu_webmention_http_request($targetUrl, 'HEAD', ['Accept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.8'], '', $timeout);
     $endpoint = nammu_webmention_discover_endpoint_from_headers((array) ($head['headers'] ?? []));
     if ($endpoint !== '') {
         return $endpoint;
     }
-    $get = nammu_webmention_http_request($targetUrl, 'GET', ['Accept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.8']);
+    $get = nammu_webmention_http_request($targetUrl, 'GET', ['Accept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.8'], '', $timeout);
     $endpoint = nammu_webmention_discover_endpoint_from_headers((array) ($get['headers'] ?? []));
     if ($endpoint !== '') {
         return $endpoint;
@@ -506,9 +518,14 @@ function nammu_webmention_enqueue_item(string $sourceUrl, string $targetUrl, str
 
 function nammu_webmention_sync_sources(array $config, int $limit = 4): array
 {
+    $startedAt = microtime(true);
     $sources = nammu_webmention_content_sources($config);
     $stateStore = nammu_webmention_state_store($config);
     $state = is_array($stateStore['sources'] ?? null) ? $stateStore['sources'] : [];
+    $targetState = is_array($stateStore['targets'] ?? null) ? $stateStore['targets'] : [];
+    $scheduledCliMode = nammu_webmention_is_scheduled_cli_mode();
+    $maxTargetsPerSource = $scheduledCliMode ? 6 : 20;
+    $endpointTimeout = $scheduledCliMode ? 4 : 10;
     usort($sources, static function (array $a, array $b) use ($state): int {
         $checkedA = trim((string) (($state[$a['url']]['checked_at'] ?? '')));
         $checkedB = trim((string) (($state[$b['url']]['checked_at'] ?? '')));
@@ -548,8 +565,19 @@ function nammu_webmention_sync_sources(array $config, int $limit = 4): array
             $externalLinks[] = $targetUrl;
         }
         $externalLinks = array_values(array_unique($externalLinks));
+        if (count($externalLinks) > $maxTargetsPerSource) {
+            $externalLinks = array_slice($externalLinks, 0, $maxTargetsPerSource);
+        }
         foreach ($externalLinks as $targetUrl) {
-            $endpoint = nammu_webmention_discover_endpoint($targetUrl);
+            $cachedTarget = is_array($targetState[$targetUrl] ?? null) ? $targetState[$targetUrl] : [];
+            $endpoint = trim((string) ($cachedTarget['endpoint'] ?? ''));
+            if ($endpoint === '') {
+                $endpoint = nammu_webmention_discover_endpoint($targetUrl, $endpointTimeout);
+                $targetState[$targetUrl] = [
+                    'endpoint' => $endpoint,
+                    'checked_at' => gmdate(DATE_ATOM),
+                ];
+            }
             if ($endpoint === '') {
                 continue;
             }
@@ -558,8 +586,20 @@ function nammu_webmention_sync_sources(array $config, int $limit = 4): array
             }
         }
     }
-    nammu_webmention_save_state_store($state, $config);
+    nammu_webmention_save_state_store($state, $config, $targetState);
     $queueStore = nammu_webmention_queue_store($config);
+    if (function_exists('admin_maintenance_trace')) {
+        admin_maintenance_trace([
+            'scope' => 'webmention',
+            'event' => 'sync_sources',
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            'scanned' => $scanned,
+            'enqueued' => $enqueued,
+            'remaining' => count((array) ($queueStore['items'] ?? [])),
+            'scheduled_cli_mode' => $scheduledCliMode ? 1 : 0,
+            'max_targets_per_source' => $maxTargetsPerSource,
+        ]);
+    }
     return [
         'scanned' => $scanned,
         'enqueued' => $enqueued,

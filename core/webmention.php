@@ -525,6 +525,7 @@ function nammu_webmention_sync_sources(array $config, int $limit = 4): array
     $targetState = is_array($stateStore['targets'] ?? null) ? $stateStore['targets'] : [];
     $scheduledCliMode = nammu_webmention_is_scheduled_cli_mode();
     $maxTargetsPerSource = $scheduledCliMode ? 6 : 20;
+    $sourceTimeout = $scheduledCliMode ? 4 : 10;
     $endpointTimeout = $scheduledCliMode ? 4 : 10;
     usort($sources, static function (array $a, array $b) use ($state): int {
         $checkedA = trim((string) (($state[$a['url']]['checked_at'] ?? '')));
@@ -550,7 +551,7 @@ function nammu_webmention_sync_sources(array $config, int $limit = 4): array
         if (trim((string) ($existing['fingerprint'] ?? '')) === $fingerprint) {
             continue;
         }
-        $response = nammu_webmention_http_request($sourceUrl, 'GET', ['Accept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.8']);
+        $response = nammu_webmention_http_request($sourceUrl, 'GET', ['Accept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.8'], '', $sourceTimeout);
         $body = (string) ($response['body'] ?? '');
         $status = (int) ($response['status'] ?? 0);
         if ($status < 200 || $status >= 300 || trim($body) === '') {
@@ -598,6 +599,8 @@ function nammu_webmention_sync_sources(array $config, int $limit = 4): array
             'remaining' => count((array) ($queueStore['items'] ?? [])),
             'scheduled_cli_mode' => $scheduledCliMode ? 1 : 0,
             'max_targets_per_source' => $maxTargetsPerSource,
+            'source_timeout' => $sourceTimeout,
+            'endpoint_timeout' => $endpointTimeout,
         ]);
     }
     return [
@@ -609,6 +612,9 @@ function nammu_webmention_sync_sources(array $config, int $limit = 4): array
 
 function nammu_webmention_process_queue(array $config, int $limit = 4): array
 {
+    $startedAt = microtime(true);
+    $scheduledCliMode = nammu_webmention_is_scheduled_cli_mode();
+    $timeout = $scheduledCliMode ? 5 : 10;
     $store = nammu_webmention_queue_store($config);
     $items = is_array($store['items'] ?? null) ? $store['items'] : [];
     $processed = 0;
@@ -630,7 +636,8 @@ function nammu_webmention_process_queue(array $config, int $limit = 4): array
             $endpoint,
             'POST',
             ['Content-Type: application/x-www-form-urlencoded'],
-            http_build_query(['source' => $source, 'target' => $target], '', '&', PHP_QUERY_RFC3986)
+            http_build_query(['source' => $source, 'target' => $target], '', '&', PHP_QUERY_RFC3986),
+            $timeout
         );
         $status = (int) ($response['status'] ?? 0);
         if ($status >= 200 && $status < 300) {
@@ -647,6 +654,19 @@ function nammu_webmention_process_queue(array $config, int $limit = 4): array
         $failed++;
     }
     nammu_webmention_save_queue_store(array_values($items), $config);
+    if (function_exists('admin_maintenance_trace')) {
+        admin_maintenance_trace([
+            'scope' => 'webmention',
+            'event' => 'process_queue',
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            'processed' => $processed,
+            'sent' => $sent,
+            'failed' => $failed,
+            'remaining' => count(array_values($items)),
+            'scheduled_cli_mode' => $scheduledCliMode ? 1 : 0,
+            'timeout' => $timeout,
+        ]);
+    }
     return [
         'processed' => $processed,
         'sent' => $sent,

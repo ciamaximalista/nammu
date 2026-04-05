@@ -165,15 +165,35 @@ function admin_run_scheduled_tasks(): array {
 }
 
 function admin_run_scheduled_maintenance_tasks(): array {
+    admin_maintenance_trace([
+        'scope' => 'maintenance',
+        'event' => 'enter',
+    ]);
     $config = nammu_load_config();
+    admin_maintenance_trace([
+        'scope' => 'maintenance',
+        'event' => 'after_load_config',
+    ]);
     if (!function_exists('admin_process_social_rss_feeds') && is_file(__DIR__ . '/core/admin-redes.php')) {
         require_once __DIR__ . '/core/admin-redes.php';
+        admin_maintenance_trace([
+            'scope' => 'maintenance',
+            'event' => 'after_require_admin_redes',
+        ]);
     }
     if (!function_exists('nammu_actuality_rebuild_snapshot') && is_file(__DIR__ . '/core/actualidad.php')) {
         require_once __DIR__ . '/core/actualidad.php';
+        admin_maintenance_trace([
+            'scope' => 'maintenance',
+            'event' => 'after_require_actualidad',
+        ]);
     }
     if (!function_exists('nammu_fediverse_rebuild_light_snapshots') && is_file(__DIR__ . '/core/fediverso.php')) {
         require_once __DIR__ . '/core/fediverso.php';
+        admin_maintenance_trace([
+            'scope' => 'maintenance',
+            'event' => 'after_require_fediverso',
+        ]);
     }
     $published = function_exists('nammu_publish_scheduled_posts')
         ? (int) $traceStep('publish_scheduled_posts', static function () {

@@ -366,12 +366,44 @@ function admin_run_scheduled_maintenance_tasks(): array {
 }
 
 function admin_run_scheduled_heavy_tasks(): array {
+    admin_heavy_trace([
+        'scope' => 'heavy',
+        'event' => 'enter',
+    ]);
+    $traceStep = static function (string $step, callable $callback) {
+        $startedAt = microtime(true);
+        admin_heavy_trace([
+            'scope' => 'heavy',
+            'event' => 'step_start',
+            'step' => $step,
+        ]);
+        $result = $callback();
+        admin_heavy_trace([
+            'scope' => 'heavy',
+            'event' => 'step_finish',
+            'step' => $step,
+            'duration_ms' => (int) round(max(0, microtime(true) - $startedAt) * 1000),
+        ]);
+        return $result;
+    };
     $config = nammu_load_config();
+    admin_heavy_trace([
+        'scope' => 'heavy',
+        'event' => 'after_load_config',
+    ]);
     if (!function_exists('nammu_actuality_rebuild_snapshot') && is_file(__DIR__ . '/core/actualidad.php')) {
         require_once __DIR__ . '/core/actualidad.php';
+        admin_heavy_trace([
+            'scope' => 'heavy',
+            'event' => 'after_require_actualidad',
+        ]);
     }
     if (!function_exists('nammu_fediverse_warm_threads_cache') && is_file(__DIR__ . '/core/fediverso.php')) {
         require_once __DIR__ . '/core/fediverso.php';
+        admin_heavy_trace([
+            'scope' => 'heavy',
+            'event' => 'after_require_fediverso',
+        ]);
     }
     $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
     $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
@@ -382,25 +414,36 @@ function admin_run_scheduled_heavy_tasks(): array {
     }
     if (function_exists('nammu_actuality_rebuild_snapshot')) {
         $stepStartedAt = microtime(true);
-        nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
+        $traceStep('actuality_rebuild_snapshot', static function () use ($baseUrl, $config, $siteName, $siteDescription, $siteLang) {
+            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
+            return null;
+        });
         admin_cli_timing_log('heavy', 'actuality_rebuild_snapshot', $stepStartedAt);
     }
     $threadsWarmed = 0;
     if (function_exists('nammu_fediverse_warm_threads_cache')) {
         $stepStartedAt = microtime(true);
-        $threadsWarmed = (int) nammu_fediverse_warm_threads_cache($config, 20);
+        $threadsWarmed = (int) $traceStep('warm_threads_cache', static function () use ($config) {
+            return nammu_fediverse_warm_threads_cache($config, 20);
+        });
         admin_cli_timing_log('heavy', 'warm_threads_cache', $stepStartedAt, [
             'warmed' => $threadsWarmed,
         ]);
     }
     if (function_exists('nammu_fediverse_rebuild_snapshots')) {
         $stepStartedAt = microtime(true);
-        nammu_fediverse_rebuild_snapshots($config);
+        $traceStep('rebuild_snapshots', static function () use ($config) {
+            nammu_fediverse_rebuild_snapshots($config);
+            return null;
+        });
         admin_cli_timing_log('heavy', 'rebuild_snapshots', $stepStartedAt);
     }
     if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
         $stepStartedAt = microtime(true);
-        nammu_fediverse_save_fragments_cache_store([]);
+        $traceStep('clear_fragments_cache', static function () {
+            nammu_fediverse_save_fragments_cache_store([]);
+            return null;
+        });
         admin_cli_timing_log('heavy', 'clear_fragments_cache', $stepStartedAt);
     }
     return [
@@ -1185,6 +1228,17 @@ function admin_maintenance_trace(array $entry): void
     $entry['at'] = date(DATE_ATOM);
     $entry['site'] = basename(__DIR__);
     @file_put_contents($backupDir . '/maintenance-trace.log', json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+}
+
+function admin_heavy_trace(array $entry): void
+{
+    $backupDir = __DIR__ . '/backups';
+    if (!is_dir($backupDir)) {
+        nammu_ensure_directory($backupDir);
+    }
+    $entry['at'] = date(DATE_ATOM);
+    $entry['site'] = basename(__DIR__);
+    @file_put_contents($backupDir . '/heavy-trace.log', json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
 }
 
 /**

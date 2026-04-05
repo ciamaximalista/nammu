@@ -1468,6 +1468,7 @@ function nammu_actuality_prune_cache(array &$cache, array $activeKeys): void
 
 function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): array
 {
+    $startedAt = microtime(true);
     $cache = nammu_actuality_load_cache();
     $cache['items'] = is_array($cache['items'] ?? null) ? $cache['items'] : [];
     $activeKeys = [];
@@ -1533,6 +1534,12 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
     }
     nammu_actuality_prune_cache($cache, array_values(array_unique($activeKeys)));
     nammu_actuality_save_cache($cache);
+    nammu_actuality_trace([
+        'event' => 'enrich_items',
+        'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        'items' => count($items),
+        'cache_keys' => count(array_values(array_unique($activeKeys))),
+    ]);
     return $items;
 }
 
@@ -1918,12 +1925,12 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
     return nammu_actuality_enrich_items($items, $publicBaseUrl);
 }
 
-function nammu_generate_actuality_feed(string $baseUrl, array $config, string $siteTitle, string $siteDescription, string $siteLang = 'es'): string
+function nammu_generate_actuality_feed(string $baseUrl, array $config, string $siteTitle, string $siteDescription, string $siteLang = 'es', ?array $prefetchedItems = null): string
 {
     $baseUrl = rtrim($baseUrl, '/');
     $feedUrl = ($baseUrl !== '' ? $baseUrl : '') . '/noticias.xml';
     $pageUrl = ($baseUrl !== '' ? $baseUrl : '') . (function_exists('nammu_fediverse_profile_alias_path') ? nammu_fediverse_profile_alias_path($config, $baseUrl) : '/actualidad.php');
-    $items = nammu_actuality_collect_items($config, $baseUrl);
+    $items = is_array($prefetchedItems) ? $prefetchedItems : nammu_actuality_collect_items($config, $baseUrl);
     $lastBuild = gmdate(DATE_RSS, !empty($items) ? (int) ($items[0]['timestamp'] ?: time()) : time());
     $titleEsc = htmlspecialchars('Actualidad — ' . ($siteTitle !== '' ? $siteTitle : 'Nammu Blog'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $descEsc = htmlspecialchars($siteDescription !== '' ? $siteDescription : 'Selección de fuentes agregadas.', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -2085,7 +2092,7 @@ function nammu_actuality_rebuild_snapshot(string $baseUrl, array $config, string
     }
     $items = nammu_actuality_collect_items($config, $baseUrl);
     nammu_actuality_save_items_snapshot($items);
-    $feed = nammu_generate_actuality_feed($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+    $feed = nammu_generate_actuality_feed($baseUrl, $config, $siteTitle, $siteDescription, $siteLang, $items);
     if ($baseUrl !== '') {
         @file_put_contents(dirname(__DIR__) . '/noticias.xml', $feed);
     }

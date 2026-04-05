@@ -569,9 +569,28 @@ function admin_multi_instance_scheduler_state_save(array $config, array $state):
 function admin_multi_instance_site_last_local_activity_at(string $siteDir): int
 {
     $timestamps = [];
+    $siteDir = rtrim($siteDir, '/');
+
+    $publishedContentFiles = glob($siteDir . '/content/*.md') ?: [];
+    foreach ($publishedContentFiles as $path) {
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || $raw === '') {
+            continue;
+        }
+        $metadata = parse_yaml_front_matter($raw);
+        $status = strtolower(trim((string) ($metadata['Status'] ?? $metadata['status'] ?? 'published')));
+        if ($status === 'draft') {
+            continue;
+        }
+        if (($time = @filemtime($path)) !== false) {
+            $timestamps[] = (int) $time;
+        }
+    }
+
     foreach ([
-        rtrim($siteDir, '/') . '/content',
-        rtrim($siteDir, '/') . '/config/actualidad-manual.json',
+        $siteDir . '/config/actualidad-manual.json',
+        $siteDir . '/config/actualidad-items.json',
+        $siteDir . '/config/actualidad-news-store.json',
     ] as $path) {
         if (($time = @filemtime($path)) !== false) {
             $timestamps[] = (int) $time;

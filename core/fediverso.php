@@ -5338,7 +5338,7 @@ function nammu_fediverse_canonical_local_item(array $item, array $config): array
 function nammu_fediverse_item_identifiers(array $item): array
 {
     $identifiers = [];
-    foreach (['id', 'object_id', 'url', 'target_url'] as $field) {
+    foreach (['id', 'object_id', 'url'] as $field) {
         $value = trim((string) ($item[$field] ?? ''));
         if ($value !== '') {
             $identifiers[] = $value;

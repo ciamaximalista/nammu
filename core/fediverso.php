@@ -7337,9 +7337,66 @@ function nammu_fediverse_store_message(array $message): void
 
 function nammu_fediverse_grouped_messages(): array
 {
-    $items = nammu_fediverse_messages_store()['items'];
+    $config = nammu_fediverse_effective_config();
+    $items = [];
+    foreach (nammu_fediverse_messages_store()['items'] as $storedMessage) {
+        if (!is_array($storedMessage)) {
+            continue;
+        }
+        $visibility = strtolower(trim((string) ($storedMessage['visibility'] ?? 'private')));
+        if ($visibility !== 'private') {
+            continue;
+        }
+        if ((string) ($storedMessage['direction'] ?? '') === 'outgoing') {
+            $items[] = $storedMessage;
+        }
+    }
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
+    $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
+    foreach ($activities as $entry) {
+        if (!is_array($entry) || empty($entry['verified'])) {
+            continue;
+        }
+        $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        if (!nammu_fediverse_is_direct_message_activity($payload, $config)) {
+            continue;
+        }
+        $actorId = trim((string) ($payload['actor'] ?? ''));
+        if ($actorId === '') {
+            continue;
+        }
+        $remoteActor = nammu_fediverse_resolve_actor($actorId, $config);
+        $object = is_array($payload['object'] ?? null) ? $payload['object'] : [];
+        $items[] = [
+            'id' => trim((string) (($object['id'] ?? '') ?: ($payload['id'] ?? sha1(json_encode($payload))))),
+            'activity_id' => trim((string) ($payload['id'] ?? '')),
+            'actor_id' => $actorId,
+            'actor_name' => trim((string) (($remoteActor['name'] ?? '') ?: ($remoteActor['preferredUsername'] ?? '') ?: $actorId)),
+            'actor_username' => trim((string) ($remoteActor['preferredUsername'] ?? '')),
+            'actor_icon' => trim((string) ($remoteActor['icon'] ?? '')),
+            'direction' => 'incoming',
+            'content' => trim(strip_tags((string) ($object['content'] ?? ''))),
+            'published' => trim((string) (($object['published'] ?? '') ?: ($payload['published'] ?? '') ?: ($entry['received_at'] ?? gmdate(DATE_ATOM)))),
+            'url' => trim((string) ($object['url'] ?? '')),
+            'delivery_status' => 'received',
+            'verified' => true,
+            'visibility' => 'private',
+            'reply_to_message_id' => trim((string) (($object['inReplyTo'] ?? '') ?: ($object['context'] ?? '') ?: ($object['conversation'] ?? ''))),
+        ];
+    }
+    $dedupedItems = [];
+    $seenKeys = [];
     $groups = [];
     foreach ($items as $item) {
+        $id = trim((string) ($item['id'] ?? ''));
+        $key = $id !== '' ? 'id:' . $id : 'hash:' . sha1(json_encode($item, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        if (isset($seenKeys[$key])) {
+            continue;
+        }
+        $seenKeys[$key] = true;
+        $dedupedItems[] = $item;
+    }
+    foreach ($dedupedItems as $item) {
         $visibility = strtolower(trim((string) ($item['visibility'] ?? 'private')));
         if ($visibility === 'public') {
             continue;
@@ -7452,18 +7509,35 @@ function nammu_fediverse_is_direct_message_activity(array $payload, array $confi
         return false;
     }
     $actorUrl = nammu_fediverse_actor_url($config);
+    $followersUrl = nammu_fediverse_followers_url($config);
     $recipients = [];
-    foreach ((array) ($object['to'] ?? []) as $value) {
-        if (is_string($value)) {
-            $recipients[] = trim($value);
+    foreach (['to', 'cc'] as $field) {
+        foreach ((array) ($object[$field] ?? []) as $value) {
+            if (is_string($value)) {
+                $recipients[] = trim($value);
+            }
+        }
+        foreach ((array) ($payload[$field] ?? []) as $value) {
+            if (is_string($value)) {
+                $recipients[] = trim($value);
+            }
         }
     }
-    foreach ((array) ($payload['to'] ?? []) as $value) {
-        if (is_string($value)) {
-            $recipients[] = trim($value);
-        }
+    $recipients = array_values(array_unique(array_filter($recipients)));
+    if (!in_array($actorUrl, $recipients, true)) {
+        return false;
     }
-    return in_array($actorUrl, $recipients, true);
+    if (in_array('https://www.w3.org/ns/activitystreams#Public', $recipients, true)) {
+        return false;
+    }
+    if ($followersUrl !== '' && in_array($followersUrl, $recipients, true)) {
+        return false;
+    }
+    $replyTarget = trim((string) ($object['inReplyTo'] ?? ''));
+    if ($replyTarget !== '' && is_array(nammu_fediverse_find_local_item_for_identifier($replyTarget, $config))) {
+        return false;
+    }
+    return true;
 }
 
 function nammu_fediverse_notification_entries(array $config): array

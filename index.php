@@ -1932,18 +1932,43 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
     }
     $topicsHtml = '';
     if (!empty($topicSummaries)) {
+        $presentationQuizAvailable = trim($presentationQuizHtml) !== '';
+        $progressVisited = is_array($itineraryProgress['visited'] ?? null) ? $itineraryProgress['visited'] : [];
+        $progressPassed = is_array($itineraryProgress['passed'] ?? null) ? $itineraryProgress['passed'] : [];
+        $usesAssessment = $usageLogic === Itinerary::USAGE_LOGIC_ASSESSMENT;
+        $presentationUnlocked = $usesAssessment
+            ? ($presentationQuizAvailable ? in_array('__presentation', $progressPassed, true) : true)
+            : in_array('__presentation', $progressVisited, true);
+        $highestCompletedIndex = -1;
+        foreach ($topicSummaries as $topicIndex => $topicSummary) {
+            $topicCompleted = $usesAssessment
+                ? in_array($topicSummary['slug'], $progressPassed, true)
+                : in_array($topicSummary['slug'], $progressVisited, true);
+            if ($topicCompleted && $topicIndex > $highestCompletedIndex) {
+                $highestCompletedIndex = $topicIndex;
+            }
+        }
+        if (!$presentationUnlocked && $highestCompletedIndex >= 0) {
+            $presentationUnlocked = true;
+        }
+        $maxUnlockedIndex = $presentationUnlocked ? min(count($topicSummaries) - 1, $highestCompletedIndex + 1) : -1;
+        $firstTopicInitiallyUnlocked = $presentationUnlocked && $maxUnlockedIndex >= 0;
         ob_start(); ?>
         <section
             class="itinerary-topics"
             data-itinerary-topics
             data-itinerary-slug="<?= htmlspecialchars($itinerary->getSlug(), ENT_QUOTES, 'UTF-8') ?>"
             data-usage-logic="<?= htmlspecialchars($usageLogic, ENT_QUOTES, 'UTF-8') ?>"
-            data-presentation-quiz="<?= $itinerary->hasQuiz() ? '1' : '0' ?>"
+            data-presentation-quiz="<?= $presentationQuizAvailable ? '1' : '0' ?>"
         >
             <h2>Temas del itinerario</h2>
             <div class="itinerary-topics__list">
-                <?php foreach ($topicSummaries as $topic): ?>
+                <?php foreach ($topicSummaries as $topicIndex => $topic): ?>
                     <?php
+                        $topicCompleted = $usesAssessment
+                            ? in_array($topic['slug'], $progressPassed, true)
+                            : in_array($topic['slug'], $progressVisited, true);
+                        $topicUnlocked = $topicCompleted || ($presentationUnlocked && $topicIndex === ($highestCompletedIndex + 1) && $topicIndex <= $maxUnlockedIndex);
                         $topicImageUrl = null;
                         if (!empty($topic['image'])) {
                             $topicImageUrl = nammu_resolve_asset($topic['image'], $publicBaseUrl);
@@ -1952,14 +1977,17 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
                         }
                     ?>
                     <article
-                        class="itinerary-topic-card"
+                        class="itinerary-topic-card<?= $topicUnlocked ? '' : ' itinerary-topic-card--locked' ?>"
                         data-itinerary-topic
                         data-topic-slug="<?= htmlspecialchars($topic['slug'], ENT_QUOTES, 'UTF-8') ?>"
                         data-topic-number="<?= (int) $topic['number'] ?>"
                     >
                         <?php if ($topicImageUrl): ?>
                             <figure class="itinerary-topic-card__media">
-                                <a href="<?= htmlspecialchars($topic['url'], ENT_QUOTES, 'UTF-8') ?>" data-topic-link>
+                                <a
+                                    <?= $topicUnlocked ? 'href="' . htmlspecialchars($topic['url'], ENT_QUOTES, 'UTF-8') . '"' : 'data-original-href="' . htmlspecialchars($topic['url'], ENT_QUOTES, 'UTF-8') . '" aria-disabled="true" tabindex="-1"' ?>
+                                    data-topic-link
+                                >
                                     <img src="<?= htmlspecialchars($topicImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($topic['title'], ENT_QUOTES, 'UTF-8') ?>">
                                 </a>
                             </figure>
@@ -1969,14 +1997,17 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
                         </div>
                         <div class="itinerary-topic-card__body">
                             <h3>
-                                <a href="<?= htmlspecialchars($topic['url'], ENT_QUOTES, 'UTF-8') ?>" data-topic-link>
+                                <a
+                                    <?= $topicUnlocked ? 'href="' . htmlspecialchars($topic['url'], ENT_QUOTES, 'UTF-8') . '"' : 'data-original-href="' . htmlspecialchars($topic['url'], ENT_QUOTES, 'UTF-8') . '" aria-disabled="true" tabindex="-1"' ?>
+                                    data-topic-link
+                                >
                                     <?= htmlspecialchars($topic['title'], ENT_QUOTES, 'UTF-8') ?>
                                 </a>
                             </h3>
                             <?php if ($topic['description'] !== ''): ?>
                                 <p class="itinerary-topic-card__description"><?= htmlspecialchars($topic['description'], ENT_QUOTES, 'UTF-8') ?></p>
                             <?php endif; ?>
-                            <p class="itinerary-topic-card__lock" data-topic-lock-message style="display:none;">
+                            <p class="itinerary-topic-card__lock" data-topic-lock-message style="<?= $topicUnlocked ? 'display:none;' : '' ?>">
                                 Completa el paso anterior para desbloquear este tema.
                             </p>
                         </div>
@@ -1986,8 +2017,8 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
             <?php if ($firstTopicUrl): ?>
                 <div class="itinerary-topics__cta">
                     <a
-                        class="button button-primary"
-                        href="<?= htmlspecialchars($firstTopicUrl, ENT_QUOTES, 'UTF-8') ?>"
+                        class="button button-primary<?= $firstTopicInitiallyUnlocked ? '' : ' button-disabled' ?>"
+                        <?= $firstTopicInitiallyUnlocked ? 'href="' . htmlspecialchars($firstTopicUrl, ENT_QUOTES, 'UTF-8') . '"' : 'data-original-href="' . htmlspecialchars($firstTopicUrl, ENT_QUOTES, 'UTF-8') . '" aria-disabled="true" tabindex="-1"' ?>
                         data-first-topic-link="1"
                         data-topic-link
                         data-topic-slug="<?= htmlspecialchars($firstTopic !== null ? $firstTopic->getSlug() : '', ENT_QUOTES, 'UTF-8') ?>"

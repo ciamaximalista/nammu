@@ -9117,8 +9117,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['itinerary_feedback'] = $feedback;
         header('Location: admin.php?page=itinerarios');
         exit;
-    } elseif (isset($_POST['save_itinerary']) || isset($_POST['save_itinerary_view'])) {
+    } elseif (isset($_POST['save_itinerary']) || isset($_POST['save_itinerary_view']) || isset($_POST['publish_itinerary'])) {
         $viewItineraryAfterSave = isset($_POST['save_itinerary_view']);
+        $publishItineraryNow = isset($_POST['publish_itinerary']);
         $title = trim($_POST['itinerary_title'] ?? '');
         $description = trim($_POST['itinerary_description'] ?? '');
         $image = trim($_POST['itinerary_image'] ?? '');
@@ -9197,7 +9198,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $classLabel = admin_normalize_itinerary_class_label($classChoice, $classCustom);
             $usageLogic = admin_normalize_itinerary_usage_logic($usageLogicInput);
-            $statusValue = strtolower(trim((string) $statusInput)) === 'draft' ? 'draft' : 'published';
+            $statusValue = $publishItineraryNow
+                ? 'published'
+                : (strtolower(trim((string) $statusInput)) === 'draft' ? 'draft' : 'published');
             $saved = admin_itinerary_repository()->saveItinerary($slug, [
                 'Title' => $title,
                 'Description' => $description,
@@ -9208,14 +9211,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'Order' => $orderInput,
             ], $content, !empty($itineraryQuizResult['data']['questions']) ? $itineraryQuizResult['data'] : null);
             admin_regenerate_public_artifacts();
-            if ($statusValue === 'published' && function_exists('nammu_fediverse_deliver_local_items')) {
+            $shouldDispatchPublication = $publishItineraryNow || ($statusValue === 'published' && ($mode === 'new' || $previousStatus === 'draft'));
+            if ($statusValue === 'published' && function_exists('nammu_fediverse_deliver_local_items') && $shouldDispatchPublication) {
                 try {
                     nammu_fediverse_deliver_local_items(load_config_file());
                 } catch (Throwable $e) {
                     // ignore fediverse delivery errors on publish
                 }
             }
-            $shouldAutoMail = $statusValue === 'published' && ($mode === 'new' || $previousStatus === 'draft');
+            $shouldAutoMail = $statusValue === 'published' && $shouldDispatchPublication;
             if ($shouldAutoMail) {
                 $settings = get_settings();
                 $mailing = $settings['mailing'] ?? [];
@@ -9245,7 +9249,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: ' . $itineraryUrl);
                 exit;
             }
-            $_SESSION['itinerary_feedback'] = ['type' => 'success', 'message' => 'Itinerario guardado correctamente.'];
+            $_SESSION['itinerary_feedback'] = [
+                'type' => 'success',
+                'message' => $publishItineraryNow
+                    ? 'Itinerario publicado y enviado a los canales automáticos configurados.'
+                    : 'Itinerario guardado correctamente.',
+            ];
             header('Location: admin.php?page=itinerario&itinerary=' . urlencode($saved->getSlug()));
             exit;
         } catch (Throwable $e) {

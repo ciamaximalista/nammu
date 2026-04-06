@@ -6720,6 +6720,7 @@ function admin_send_mailing_broadcast(string $subject, string $textBody, string 
     $ok = 0;
     $fail = 0;
     $lastError = null;
+    $failedRecipients = [];
     foreach ($subscribers as $to) {
         $textToSend = $textBody;
         $htmlToSend = $htmlBody;
@@ -6731,12 +6732,156 @@ function admin_send_mailing_broadcast(string $subject, string $textBody, string 
             $ok++;
         } else {
             $fail++;
+            if (is_string($to) && trim($to) !== '') {
+                $failedRecipients[] = trim($to);
+            }
             if ($err !== null) {
                 $lastError = $err;
             }
         }
     }
-    return ['sent' => $ok, 'failed' => $fail, 'error' => $lastError];
+    return ['sent' => $ok, 'failed' => $fail, 'failed_recipients' => array_values(array_unique($failedRecipients)), 'error' => $lastError];
+}
+
+function admin_mailing_batch_size(): int
+{
+    return 40;
+}
+
+function admin_normalize_recipient_batch(array $recipients): array
+{
+    $normalized = [];
+    foreach ($recipients as $recipient) {
+        $email = admin_normalize_email((string) $recipient);
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            continue;
+        }
+        $normalized[$email] = true;
+    }
+    return array_keys($normalized);
+}
+
+function admin_enqueue_mailing_batches(string $context, array $payload, array $recipients): array
+{
+    if (!function_exists('nammu_enqueue_scheduled_notification')) {
+        return ['queued_batches' => 0, 'queued_recipients' => 0];
+    }
+    $recipients = admin_normalize_recipient_batch($recipients);
+    if (empty($recipients)) {
+        return ['queued_batches' => 0, 'queued_recipients' => 0];
+    }
+    $batchSize = admin_mailing_batch_size();
+    $chunks = array_chunk($recipients, $batchSize);
+    $jobId = substr(sha1($context . '|' . json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '|' . microtime(true)), 0, 20);
+    foreach ($chunks as $index => $chunk) {
+        nammu_enqueue_scheduled_notification([
+            'notification_kind' => 'mailing_batch',
+            'mailing_context' => $context,
+            'mailing_job_id' => $jobId,
+            'batch_index' => $index + 1,
+            'batch_total' => count($chunks),
+            'recipients' => array_values($chunk),
+            'dedupe_key' => $jobId . ':' . ($index + 1),
+        ] + $payload);
+    }
+    return ['queued_batches' => count($chunks), 'queued_recipients' => count($recipients)];
+}
+
+function admin_build_mailing_batch_delivery(string $context, array $payload): ?array
+{
+    $settings = get_settings();
+    if (!admin_is_mailing_ready($settings)) {
+        return null;
+    }
+    $recipients = admin_normalize_recipient_batch((array) ($payload['recipients'] ?? []));
+    if (empty($recipients)) {
+        return [
+            'subject' => '',
+            'mailingConfig' => $settings['mailing'] ?? [],
+            'bodyBuilder' => null,
+            'fromName' => null,
+            'recipients' => [],
+        ];
+    }
+
+    $title = trim((string) ($payload['title'] ?? ''));
+    $description = trim((string) ($payload['description'] ?? ''));
+    $image = trim((string) ($payload['image'] ?? ''));
+
+    if ($context === 'newsletter') {
+        $contentHtml = (string) ($payload['content_html'] ?? '');
+        $contentText = (string) ($payload['content_text'] ?? '');
+        $prepared = admin_prepare_newsletter_payload($settings, $title, $contentHtml, $contentText, $image);
+    } else {
+        $slug = trim((string) ($payload['slug'] ?? ''));
+        $template = trim((string) ($payload['template'] ?? 'single'));
+        if ($context === 'podcast') {
+            $audio = trim((string) ($payload['audio'] ?? ''));
+            $link = admin_public_asset_url($audio);
+            if ($link === '') {
+                return null;
+            }
+            $prepared = admin_prepare_mailing_payload('podcast', $settings, $title, $description, $link, $image);
+        } elseif ($context === 'itinerary') {
+            if ($slug === '') {
+                return null;
+            }
+            $link = admin_public_itinerary_url($slug);
+            $prepared = admin_prepare_mailing_payload('itinerario', $settings, $title, $description, $link, $image);
+        } else {
+            if ($slug === '') {
+                return null;
+            }
+            $link = admin_public_post_url($slug);
+            $prepared = admin_prepare_mailing_payload($template, $settings, $title, $description, $link, $image);
+        }
+    }
+
+    return [
+        'subject' => (string) ($prepared['subject'] ?? ''),
+        'mailingConfig' => (array) ($prepared['mailingConfig'] ?? []),
+        'bodyBuilder' => $prepared['bodyBuilder'] ?? null,
+        'fromName' => isset($prepared['fromName']) ? (string) $prepared['fromName'] : null,
+        'recipients' => $recipients,
+    ];
+}
+
+function admin_try_send_queued_mailing_batch(array $payload): array
+{
+    $context = strtolower(trim((string) ($payload['mailing_context'] ?? '')));
+    if (!in_array($context, ['post', 'podcast', 'itinerary', 'newsletter'], true)) {
+        return ['ok' => true, 'sent' => 0, 'failed' => 0, 'failed_recipients' => []];
+    }
+    $delivery = admin_build_mailing_batch_delivery($context, $payload);
+    if ($delivery === null) {
+        return ['ok' => false, 'sent' => 0, 'failed' => 0, 'failed_recipients' => admin_normalize_recipient_batch((array) ($payload['recipients'] ?? []))];
+    }
+    $recipients = (array) ($delivery['recipients'] ?? []);
+    if (empty($recipients)) {
+        return ['ok' => true, 'sent' => 0, 'failed' => 0, 'failed_recipients' => []];
+    }
+    $result = admin_send_mailing_broadcast(
+        (string) ($delivery['subject'] ?? ''),
+        '',
+        '',
+        $recipients,
+        (array) ($delivery['mailingConfig'] ?? []),
+        is_callable($delivery['bodyBuilder'] ?? null) ? $delivery['bodyBuilder'] : null,
+        isset($delivery['fromName']) ? (string) $delivery['fromName'] : null
+    );
+    $failedRecipients = admin_normalize_recipient_batch((array) ($result['failed_recipients'] ?? []));
+    return [
+        'ok' => empty($failedRecipients),
+        'sent' => (int) ($result['sent'] ?? 0),
+        'failed' => (int) ($result['failed'] ?? 0),
+        'failed_recipients' => $failedRecipients,
+        'error' => $result['error'] ?? null,
+    ];
+}
+
+function admin_schedule_mailing_broadcast(string $context, array $recipients, array $payload): array
+{
+    return admin_enqueue_mailing_batches($context, $payload, $recipients);
 }
 function admin_google_exchange_code(string $code, string $clientId, string $clientSecret, string $redirectUri): array {
     $postData = http_build_query([
@@ -7813,15 +7958,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $markdown = new MarkdownConverter();
             $contentHtml = $markdown->toHtml($content);
             $contentText = trim(strip_tags($contentHtml));
-            $payload = admin_prepare_newsletter_payload($settings, $title, $contentHtml, $contentText, $image);
-            try {
-                $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
-                $newsletterSendResult = $sendResult;
-                if (($sendResult['sent'] ?? 0) === 0) {
-                    $error = 'No se pudo enviar la newsletter. Revisa la configuración de correo.' . (!empty($sendResult['error']) ? ' Detalle: ' . $sendResult['error'] : '');
-                }
-            } catch (Throwable $e) {
-                $error = 'No se pudo enviar la newsletter. Revisa la configuración de correo.';
+            $newsletterSendResult = admin_schedule_mailing_broadcast('newsletter', $subscribers, [
+                'filename' => $filename . '.md',
+                'title' => $title,
+                'image' => $image,
+                'content_html' => $contentHtml,
+                'content_text' => $contentText,
+            ]);
+            if (($newsletterSendResult['queued_recipients'] ?? 0) === 0) {
+                $error = 'No se pudo encolar la newsletter. Revisa la configuración de correo.';
             }
         }
         if ($error === null && $filename !== '') {
@@ -7868,16 +8013,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = 'No se pudo guardar la newsletter. Revisa los permisos de la carpeta content/.';
                 } else {
                     if (is_array($newsletterSendResult)) {
-                        $sentCount = (int) ($newsletterSendResult['sent'] ?? 0);
-                        $failedCount = (int) ($newsletterSendResult['failed'] ?? 0);
+                        $queuedCount = (int) ($newsletterSendResult['queued_recipients'] ?? 0);
+                        $batchCount = (int) ($newsletterSendResult['queued_batches'] ?? 0);
                         $_SESSION['mailing_feedback'] = [
                             'type' => 'success',
-                            'message' => 'Newsletter enviada: ' . $sentCount . ' correos enviados' . ($failedCount > 0 ? ' y ' . $failedCount . ' fallidos' : '') . '.',
+                            'message' => 'Newsletter encolada en ' . $batchCount . ' tanda' . ($batchCount === 1 ? '' : 's') . ' para ' . $queuedCount . ' destinatario' . ($queuedCount === 1 ? '' : 's') . '.',
                         ];
                     } else {
                         $_SESSION['mailing_feedback'] = [
                             'type' => 'success',
-                            'message' => 'Newsletter enviada correctamente.',
+                            'message' => 'Newsletter encolada correctamente.',
                         ];
                     }
                     header('Location: admin.php?page=edit&template=newsletter&created=' . urlencode($targetFilename));
@@ -8103,34 +8248,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $subscribers = admin_mailing_recipients_for_type('posts', $settings);
                             if (!empty($subscribers)) {
                                 $payload = admin_prepare_mailing_payload('single', $settings, $title, $description, $link, $image);
-                                try {
-                                    $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
-                                    if ((int) ($sendResult['failed'] ?? 0) > 0 && function_exists('nammu_enqueue_scheduled_notification')) {
-                                        nammu_enqueue_scheduled_notification([
-                                            'filename' => $targetFilename,
-                                            'slug' => $slug,
-                                            'title' => $title,
-                                            'description' => $description,
-                                            'image' => $image,
-                                            'template' => 'post',
-                                            'published_at' => date('Y-m-d H:i'),
-                                            'mailing_only' => true,
-                                        ]);
-                                    }
-                                } catch (Throwable $e) {
-                                    if (function_exists('nammu_enqueue_scheduled_notification')) {
-                                        nammu_enqueue_scheduled_notification([
-                                            'filename' => $targetFilename,
-                                            'slug' => $slug,
-                                            'title' => $title,
-                                            'description' => $description,
-                                            'image' => $image,
-                                            'template' => 'post',
-                                            'published_at' => date('Y-m-d H:i'),
-                                            'mailing_only' => true,
-                                        ]);
-                                    }
-                                }
+                                admin_schedule_mailing_broadcast('post', $subscribers, [
+                                    'filename' => $targetFilename,
+                                    'slug' => $slug,
+                                    'title' => $title,
+                                    'description' => $description,
+                                    'image' => $image,
+                                    'template' => 'single',
+                                ]);
                             }
                         }
                         admin_maybe_enqueue_push_notification('post', $title, $description, $link, $image);
@@ -8149,36 +8274,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $subscribers = admin_mailing_recipients_for_type('podcast', $settings);
                             if (!empty($subscribers)) {
                                 $payload = admin_prepare_mailing_payload('podcast', $settings, $title, $description, $audioUrl, $image);
-                                try {
-                                    $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
-                                    if ((int) ($sendResult['failed'] ?? 0) > 0 && function_exists('nammu_enqueue_scheduled_notification')) {
-                                        nammu_enqueue_scheduled_notification([
-                                            'filename' => $targetFilename,
-                                            'slug' => $slug,
-                                            'title' => $title,
-                                            'description' => $description,
-                                            'image' => $image,
-                                            'audio' => $audio,
-                                            'template' => 'podcast',
-                                            'published_at' => date('Y-m-d H:i'),
-                                            'mailing_only' => true,
-                                        ]);
-                                    }
-                                } catch (Throwable $e) {
-                                    if (function_exists('nammu_enqueue_scheduled_notification')) {
-                                        nammu_enqueue_scheduled_notification([
-                                            'filename' => $targetFilename,
-                                            'slug' => $slug,
-                                            'title' => $title,
-                                            'description' => $description,
-                                            'image' => $image,
-                                            'audio' => $audio,
-                                            'template' => 'podcast',
-                                            'published_at' => date('Y-m-d H:i'),
-                                            'mailing_only' => true,
-                                        ]);
-                                    }
-                                }
+                                admin_schedule_mailing_broadcast('podcast', $subscribers, [
+                                    'filename' => $targetFilename,
+                                    'slug' => $slug,
+                                    'title' => $title,
+                                    'description' => $description,
+                                    'image' => $image,
+                                    'audio' => $audio,
+                                    'template' => 'podcast',
+                                ]);
                             }
                         }
                     }
@@ -8258,30 +8362,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $markdown = new MarkdownConverter();
         $contentHtml = $markdown->toHtml($content);
         $contentText = trim(strip_tags($contentHtml));
-        $payload = admin_prepare_newsletter_payload($settings, $title, $contentHtml, $contentText, $image);
-        try {
-            $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
-            if (($sendResult['sent'] ?? 0) === 0) {
-                $_SESSION['mailing_feedback'] = [
-                    'type' => 'danger',
-                    'message' => 'No se pudo enviar la newsletter. Revisa la configuración de correo.' . (!empty($sendResult['error']) ? ' Detalle: ' . $sendResult['error'] : ''),
-                ];
-                header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
-                exit;
-            }
-        } catch (Throwable $e) {
+        $queueResult = admin_schedule_mailing_broadcast('newsletter', $subscribers, [
+            'filename' => $editFilename,
+            'title' => $title,
+            'image' => $image,
+            'content_html' => $contentHtml,
+            'content_text' => $contentText,
+        ]);
+        if (($queueResult['queued_recipients'] ?? 0) === 0) {
             $_SESSION['mailing_feedback'] = [
                 'type' => 'danger',
-                'message' => 'No se pudo enviar la newsletter. Revisa la configuración de correo.',
+                'message' => 'No se pudo encolar la newsletter. Revisa la configuración de correo.',
             ];
             header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
             exit;
         }
-        $sentCount = (int) ($sendResult['sent'] ?? 0);
-        $failedCount = (int) ($sendResult['failed'] ?? 0);
         $_SESSION['mailing_feedback'] = [
             'type' => 'success',
-            'message' => 'Newsletter reenviada: ' . $sentCount . ' correos enviados' . ($failedCount > 0 ? ' y ' . $failedCount . ' fallidos' : '') . '.',
+            'message' => 'Newsletter reencolada en ' . ((int) ($queueResult['queued_batches'] ?? 0)) . ' tanda' . (((int) ($queueResult['queued_batches'] ?? 0)) === 1 ? '' : 's') . ' para ' . ((int) ($queueResult['queued_recipients'] ?? 0)) . ' destinatario' . (((int) ($queueResult['queued_recipients'] ?? 0)) === 1 ? '' : 's') . '.',
         ];
         header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
         exit;
@@ -8336,31 +8434,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $markdown = new MarkdownConverter();
         $contentHtml = $markdown->toHtml($content);
         $contentText = trim(strip_tags($contentHtml));
-        $payload = admin_prepare_newsletter_payload($settings, $title, $contentHtml, $contentText, $image);
-        try {
-            $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $recipients, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
-            if (($sendResult['sent'] ?? 0) === 0) {
-                $_SESSION['mailing_feedback'] = [
-                    'type' => 'danger',
-                    'message' => 'No se pudo enviar la newsletter a los destinatarios indicados.' . (!empty($sendResult['error']) ? ' Detalle: ' . $sendResult['error'] : ''),
-                ];
-                header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
-                exit;
-            }
-        } catch (Throwable $e) {
+        $queueResult = admin_schedule_mailing_broadcast('newsletter', $recipients, [
+            'filename' => $editFilename,
+            'title' => $title,
+            'image' => $image,
+            'content_html' => $contentHtml,
+            'content_text' => $contentText,
+        ]);
+        if (($queueResult['queued_recipients'] ?? 0) === 0) {
             $_SESSION['mailing_feedback'] = [
                 'type' => 'danger',
-                'message' => 'No se pudo enviar la newsletter a los destinatarios indicados.',
+                'message' => 'No se pudo encolar la newsletter para los destinatarios indicados.',
             ];
             header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
             exit;
         }
-        $sentCount = (int) ($sendResult['sent'] ?? 0);
-        $failedCount = (int) ($sendResult['failed'] ?? 0);
-        $message = 'Newsletter enviada a ' . $sentCount . ' destinatario' . ($sentCount === 1 ? '' : 's');
-        if ($failedCount > 0) {
-            $message .= ' y ' . $failedCount . ' fallido' . ($failedCount === 1 ? '' : 's');
-        }
+        $queuedCount = (int) ($queueResult['queued_recipients'] ?? 0);
+        $batchCount = (int) ($queueResult['queued_batches'] ?? 0);
+        $message = 'Newsletter encolada en ' . $batchCount . ' tanda' . ($batchCount === 1 ? '' : 's') . ' para ' . $queuedCount . ' destinatario' . ($queuedCount === 1 ? '' : 's');
         if ($invalidCount > 0) {
             $message .= '. ' . $invalidCount . ' dirección' . ($invalidCount === 1 ? '' : 'es') . ' inválida' . ($invalidCount === 1 ? '' : 's') . ' ignorada' . ($invalidCount === 1 ? '' : 's') . '.';
         } else {
@@ -8417,21 +8508,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $markdown = new MarkdownConverter();
         $contentHtml = $markdown->toHtml($content);
         $contentText = trim(strip_tags($contentHtml));
-        $payload = admin_prepare_newsletter_payload($settings, $title, $contentHtml, $contentText, $image);
-        try {
-            $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
-            if (($sendResult['sent'] ?? 0) === 0) {
-                $_SESSION['mailing_feedback'] = [
-                    'type' => 'danger',
-                    'message' => 'No se pudo enviar la newsletter. Revisa la configuración de correo.' . (!empty($sendResult['error']) ? ' Detalle: ' . $sendResult['error'] : ''),
-                ];
-                header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
-                exit;
-            }
-        } catch (Throwable $e) {
+        $queueResult = admin_schedule_mailing_broadcast('newsletter', $subscribers, [
+            'filename' => $editFilename,
+            'title' => $title,
+            'image' => $image,
+            'content_html' => $contentHtml,
+            'content_text' => $contentText,
+        ]);
+        if (($queueResult['queued_recipients'] ?? 0) === 0) {
             $_SESSION['mailing_feedback'] = [
                 'type' => 'danger',
-                'message' => 'No se pudo enviar la newsletter. Revisa la configuración de correo.',
+                'message' => 'No se pudo encolar la newsletter. Revisa la configuración de correo.',
             ];
             header('Location: admin.php?page=edit-post&file=' . urlencode($editFilename));
             exit;
@@ -8482,11 +8569,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $fileContent .= $content;
             @file_put_contents($filepath, $fileContent);
         }
-        $sentCount = (int) ($sendResult['sent'] ?? 0);
-        $failedCount = (int) ($sendResult['failed'] ?? 0);
         $_SESSION['mailing_feedback'] = [
             'type' => 'success',
-            'message' => 'Newsletter enviada: ' . $sentCount . ' correos enviados' . ($failedCount > 0 ? ' y ' . $failedCount . ' fallidos' : '') . '.',
+            'message' => 'Newsletter encolada en ' . ((int) ($queueResult['queued_batches'] ?? 0)) . ' tanda' . (((int) ($queueResult['queued_batches'] ?? 0)) === 1 ? '' : 's') . ' para ' . ((int) ($queueResult['queued_recipients'] ?? 0)) . ' destinatario' . (((int) ($queueResult['queued_recipients'] ?? 0)) === 1 ? '' : 's') . '.',
         ];
         header('Location: admin.php?page=edit-post&file=' . urlencode($targetFilename !== '' ? $targetFilename : $editFilename));
         exit;
@@ -8776,36 +8861,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $subscribers = admin_mailing_recipients_for_type('podcast', $settings);
                             if (!empty($subscribers)) {
                                 $payload = admin_prepare_mailing_payload('podcast', $settings, $title, $description, $audioUrl, $image);
-                                try {
-                                    $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
-                                    if ((int) ($sendResult['failed'] ?? 0) > 0 && function_exists('nammu_enqueue_scheduled_notification')) {
-                                        nammu_enqueue_scheduled_notification([
-                                            'filename' => $targetFilename,
-                                            'slug' => $slug,
-                                            'title' => $title,
-                                            'description' => $description,
-                                            'image' => $image,
-                                            'audio' => $audio,
-                                            'template' => 'podcast',
-                                            'published_at' => date('Y-m-d H:i'),
-                                            'mailing_only' => true,
-                                        ]);
-                                    }
-                                } catch (Throwable $e) {
-                                    if (function_exists('nammu_enqueue_scheduled_notification')) {
-                                        nammu_enqueue_scheduled_notification([
-                                            'filename' => $targetFilename,
-                                            'slug' => $slug,
-                                            'title' => $title,
-                                            'description' => $description,
-                                            'image' => $image,
-                                            'audio' => $audio,
-                                            'template' => 'podcast',
-                                            'published_at' => date('Y-m-d H:i'),
-                                            'mailing_only' => true,
-                                        ]);
-                                    }
-                                }
+                                admin_schedule_mailing_broadcast('podcast', $subscribers, [
+                                    'filename' => $targetFilename,
+                                    'slug' => $slug,
+                                    'title' => $title,
+                                    'description' => $description,
+                                    'image' => $image,
+                                    'audio' => $audio,
+                                    'template' => 'podcast',
+                                ]);
                             }
                         }
                     }
@@ -8818,34 +8882,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $subscribers = admin_mailing_recipients_for_type('posts', $settings);
                             if (!empty($subscribers)) {
                                 $payload = admin_prepare_mailing_payload('single', $settings, $title, $description, $link, $image);
-                                try {
-                                    $sendResult = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
-                                    if ((int) ($sendResult['failed'] ?? 0) > 0 && function_exists('nammu_enqueue_scheduled_notification')) {
-                                        nammu_enqueue_scheduled_notification([
-                                            'filename' => $targetFilename,
-                                            'slug' => $slug,
-                                            'title' => $title,
-                                            'description' => $description,
-                                            'image' => $image,
-                                            'template' => 'post',
-                                            'published_at' => date('Y-m-d H:i'),
-                                            'mailing_only' => true,
-                                        ]);
-                                    }
-                                } catch (Throwable $e) {
-                                    if (function_exists('nammu_enqueue_scheduled_notification')) {
-                                        nammu_enqueue_scheduled_notification([
-                                            'filename' => $targetFilename,
-                                            'slug' => $slug,
-                                            'title' => $title,
-                                            'description' => $description,
-                                            'image' => $image,
-                                            'template' => 'post',
-                                            'published_at' => date('Y-m-d H:i'),
-                                            'mailing_only' => true,
-                                        ]);
-                                    }
-                                }
+                                admin_schedule_mailing_broadcast('post', $subscribers, [
+                                    'filename' => $targetFilename,
+                                    'slug' => $slug,
+                                    'title' => $title,
+                                    'description' => $description,
+                                    'image' => $image,
+                                    'template' => 'single',
+                                ]);
                             }
                         }
                         admin_maybe_enqueue_push_notification('post', $title, $description, $link, $image);
@@ -9228,11 +9272,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!empty($subscribers)) {
                         $link = admin_public_itinerary_url($saved->getSlug());
                         $payload = admin_prepare_mailing_payload('itinerario', $settings, $title, $description, $link, $image);
-                        try {
-                            admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
-                        } catch (Throwable $e) {
-                            // ignore mailing errors on publish
-                        }
+                        admin_schedule_mailing_broadcast('itinerary', $subscribers, [
+                            'slug' => $saved->getSlug(),
+                            'title' => $title,
+                            'description' => $description,
+                            'image' => $image,
+                            'template' => 'itinerario',
+                        ]);
                     }
                 }
                 $link = admin_public_itinerary_url($saved->getSlug());
@@ -11215,22 +11261,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $link = admin_public_post_url($slug);
         }
-        $payload = admin_prepare_mailing_payload($template, $settings, $title, $description, $link, $imagePath);
-        try {
-            $result = admin_send_mailing_broadcast($payload['subject'], '', '', $subscribers, $payload['mailingConfig'], $payload['bodyBuilder'], $payload['fromName']);
-            $message = 'Aviso enviado. OK: ' . $result['sent'] . ' / Fallos: ' . $result['failed'];
-            if (!empty($result['error'])) {
-                $message .= ' (' . $result['error'] . ')';
-            }
-            $type = $result['failed'] > 0 ? 'warning' : 'success';
-            $_SESSION['mailing_feedback'] = [
-                'type' => $type,
-                'message' => $message,
-            ];
-        } catch (Throwable $e) {
+        $context = $template === 'podcast' ? 'podcast' : 'post';
+        $queueResult = admin_schedule_mailing_broadcast($context, $subscribers, [
+            'filename' => $filename,
+            'slug' => $slug,
+            'title' => $title,
+            'description' => $description,
+            'image' => $imagePath,
+            'audio' => $template === 'podcast' ? $audioPath : '',
+            'template' => $template,
+        ]);
+        if (($queueResult['queued_recipients'] ?? 0) === 0) {
             $_SESSION['mailing_feedback'] = [
                 'type' => 'danger',
-                'message' => 'Error enviando a la lista: ' . $e->getMessage(),
+                'message' => 'No se pudo encolar el aviso para la lista.',
+            ];
+        } else {
+            $_SESSION['mailing_feedback'] = [
+                'type' => 'success',
+                'message' => 'Aviso encolado en ' . ((int) ($queueResult['queued_batches'] ?? 0)) . ' tanda' . (((int) ($queueResult['queued_batches'] ?? 0)) === 1 ? '' : 's') . ' para ' . ((int) ($queueResult['queued_recipients'] ?? 0)) . ' destinatario' . (((int) ($queueResult['queued_recipients'] ?? 0)) === 1 ? '' : 's') . '.',
             ];
         }
         header('Location: ' . $redirect);

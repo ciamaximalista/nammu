@@ -2925,11 +2925,20 @@ function nammu_save_scheduled_notifications(array $queue): void
 function nammu_enqueue_scheduled_notification(array $payload): void
 {
     $queue = nammu_load_scheduled_notifications();
-    $filename = $payload['filename'] ?? '';
-    if ($filename !== '') {
+    $dedupeKey = trim((string) ($payload['dedupe_key'] ?? ''));
+    if ($dedupeKey !== '') {
         foreach ($queue as $existing) {
-            if (($existing['filename'] ?? '') === $filename) {
+            if (trim((string) ($existing['dedupe_key'] ?? '')) === $dedupeKey) {
                 return;
+            }
+        }
+    } else {
+        $filename = $payload['filename'] ?? '';
+        if ($filename !== '') {
+            foreach ($queue as $existing) {
+                if (($existing['filename'] ?? '') === $filename) {
+                    return;
+                }
             }
         }
     }
@@ -2946,6 +2955,16 @@ function nammu_handle_scheduled_post_notifications(array $payload): void
 
 function nammu_try_send_scheduled_post_notifications(array $payload): bool
 {
+    if (strtolower(trim((string) ($payload['notification_kind'] ?? ''))) === 'mailing_batch') {
+        if (!function_exists('admin_try_send_queued_mailing_batch')) {
+            return false;
+        }
+        $result = admin_try_send_queued_mailing_batch($payload);
+        if (!empty($result['ok'])) {
+            return true;
+        }
+        return false;
+    }
     $template = strtolower((string) ($payload['template'] ?? 'post'));
     $mailingOnly = !empty($payload['mailing_only']);
     $requiredAdmin = function_exists('admin_maybe_auto_post_to_social_networks')
@@ -3045,8 +3064,29 @@ function nammu_process_scheduled_notifications_queue(): array
     }
     $remaining = [];
     $processed = 0;
+    $mailingBatchProcessed = 0;
     foreach ($queue as $payload) {
-        if (nammu_try_send_scheduled_post_notifications(is_array($payload) ? $payload : [])) {
+        $payload = is_array($payload) ? $payload : [];
+        $isMailingBatch = strtolower(trim((string) ($payload['notification_kind'] ?? ''))) === 'mailing_batch';
+        if ($isMailingBatch && $mailingBatchProcessed >= 1) {
+            $remaining[] = $payload;
+            continue;
+        }
+        if ($isMailingBatch && function_exists('admin_try_send_queued_mailing_batch')) {
+            $result = admin_try_send_queued_mailing_batch($payload);
+            $processed++;
+            $mailingBatchProcessed++;
+            $failedRecipients = is_array($result['failed_recipients'] ?? null) ? array_values($result['failed_recipients']) : [];
+            if (!empty($failedRecipients)) {
+                $payload['recipients'] = $failedRecipients;
+                $payload['attempts'] = (int) (($payload['attempts'] ?? 0)) + 1;
+                $payload['last_error'] = (string) ($result['error'] ?? ('Mailing batch retry #' . $payload['attempts']));
+                $payload['last_attempt_at'] = gmdate(DATE_ATOM);
+                $remaining[] = $payload;
+            }
+            continue;
+        }
+        if (nammu_try_send_scheduled_post_notifications($payload)) {
             $processed++;
             continue;
         }

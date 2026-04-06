@@ -39,6 +39,8 @@ define('ASSETS_DIR', __DIR__ . '/assets');
 define('ITINERARIES_DIR', __DIR__ . '/itinerarios');
 define('MEDIA_TAGS_FILE', __DIR__ . '/config/media-tags.json');
 define('MAILING_SUBSCRIBERS_FILE', __DIR__ . '/config/mailing-subscribers.json');
+define('MAILING_SUPPRESSED_FILE', __DIR__ . '/config/mailing-suppressed.json');
+define('MAILING_BOUNCES_STATE_FILE', __DIR__ . '/config/mailing-bounces-state.json');
 define('MAILING_SECRET_FILE', __DIR__ . '/config/mailing-secret.key');
 nammu_ensure_directory(ITINERARIES_DIR);
 $runScheduledOnly = $__nammuRunScheduledOnly;
@@ -221,6 +223,11 @@ function admin_run_scheduled_maintenance_tasks(): array {
             return nammu_process_scheduled_notifications_queue();
         })
         : ['processed' => 0, 'remaining' => 0];
+    $mailingBounceStats = function_exists('admin_process_mailing_bounces')
+        ? $traceStep('mailing_bounces', static function () {
+            return admin_process_mailing_bounces(12);
+        })
+        : ['scanned' => 0, 'suppressed' => 0];
     $rssStats = ['sent' => 0, 'checked' => 0];
     $socialBroadcastQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $webmentionSyncStats = ['scanned' => 0, 'enqueued' => 0, 'remaining' => 0];
@@ -335,6 +342,8 @@ function admin_run_scheduled_maintenance_tasks(): array {
         'published' => $published,
         'notifications_processed' => (int) ($queueStats['processed'] ?? 0),
         'notifications_remaining' => (int) ($queueStats['remaining'] ?? 0),
+        'mailing_bounces_scanned' => (int) ($mailingBounceStats['scanned'] ?? 0),
+        'mailing_bounces_suppressed' => (int) ($mailingBounceStats['suppressed'] ?? 0),
         'actuality_changed' => $actualityChanged ? 1 : 0,
         'social_rss_sent' => (int) ($rssStats['sent'] ?? 0),
         'social_rss_checked' => (int) ($rssStats['checked'] ?? 0),
@@ -6295,6 +6304,10 @@ function admin_maybe_add_to_mailing_list(string $email): void {
     if ($normalized === '') {
         return;
     }
+    $suppressed = admin_mailing_suppressed_map();
+    if (isset($suppressed[$normalized])) {
+        return;
+    }
     try {
         $subscribers = admin_load_mailing_subscriber_entries();
     } catch (Throwable $e) {
@@ -6393,6 +6406,375 @@ function admin_mailing_normalize_entry($entry): ?array {
     ];
 }
 
+function admin_load_mailing_suppressed_entries(): array {
+    $file = MAILING_SUPPRESSED_FILE;
+    if (!is_file($file)) {
+        return [];
+    }
+    $raw = file_get_contents($file);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return [];
+    }
+    $unique = [];
+    foreach ($decoded as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        $email = admin_normalize_email((string) ($entry['email'] ?? ''));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            continue;
+        }
+        $unique[$email] = [
+            'email' => $email,
+            'reason' => trim((string) ($entry['reason'] ?? '')),
+            'source' => trim((string) ($entry['source'] ?? '')),
+            'created_at' => trim((string) ($entry['created_at'] ?? '')),
+            'last_error' => trim((string) ($entry['last_error'] ?? '')),
+        ];
+    }
+    return array_values($unique);
+}
+
+function admin_save_mailing_suppressed_entries(array $entries): void {
+    $file = MAILING_SUPPRESSED_FILE;
+    $dir = dirname($file);
+    if (!nammu_ensure_directory($dir)) {
+        throw new RuntimeException('No se pudo crear el directorio de configuración para la lista de supresión');
+    }
+    $unique = [];
+    foreach ($entries as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        $email = admin_normalize_email((string) ($entry['email'] ?? ''));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            continue;
+        }
+        $unique[$email] = [
+            'email' => $email,
+            'reason' => trim((string) ($entry['reason'] ?? '')),
+            'source' => trim((string) ($entry['source'] ?? '')),
+            'created_at' => trim((string) ($entry['created_at'] ?? '')),
+            'last_error' => trim((string) ($entry['last_error'] ?? '')),
+        ];
+    }
+    $payload = json_encode(array_values($unique), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($payload === false) {
+        throw new RuntimeException('No se pudo serializar la lista de supresión');
+    }
+    if (file_put_contents($file, $payload, LOCK_EX) === false) {
+        throw new RuntimeException('No se pudo escribir el archivo de supresión');
+    }
+    @chmod($file, 0664);
+}
+
+function admin_load_mailing_bounces_state(): array {
+    $file = MAILING_BOUNCES_STATE_FILE;
+    if (!is_file($file)) {
+        return ['processed_ids' => [], 'last_checked_at' => ''];
+    }
+    $raw = file_get_contents($file);
+    if ($raw === false || $raw === '') {
+        return ['processed_ids' => [], 'last_checked_at' => ''];
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return ['processed_ids' => [], 'last_checked_at' => ''];
+    }
+    $ids = is_array($decoded['processed_ids'] ?? null) ? $decoded['processed_ids'] : [];
+    $ids = array_values(array_filter(array_map(static function ($value): string {
+        return trim((string) $value);
+    }, $ids), static function (string $value): bool {
+        return $value !== '';
+    }));
+    return [
+        'processed_ids' => $ids,
+        'last_checked_at' => trim((string) ($decoded['last_checked_at'] ?? '')),
+    ];
+}
+
+function admin_save_mailing_bounces_state(array $state): void {
+    $file = MAILING_BOUNCES_STATE_FILE;
+    $dir = dirname($file);
+    if (!nammu_ensure_directory($dir)) {
+        throw new RuntimeException('No se pudo crear el directorio de estado de rebotes');
+    }
+    $payload = [
+        'processed_ids' => array_slice(array_values(array_filter(array_map(static function ($value): string {
+            return trim((string) $value);
+        }, (array) ($state['processed_ids'] ?? [])), static function (string $value): bool {
+            return $value !== '';
+        })), -500),
+        'last_checked_at' => trim((string) ($state['last_checked_at'] ?? '')),
+    ];
+    $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+        throw new RuntimeException('No se pudo serializar el estado de rebotes');
+    }
+    if (file_put_contents($file, $json, LOCK_EX) === false) {
+        throw new RuntimeException('No se pudo guardar el estado de rebotes');
+    }
+    @chmod($file, 0664);
+}
+
+function admin_mailing_suppressed_map(): array {
+    $map = [];
+    foreach (admin_load_mailing_suppressed_entries() as $entry) {
+        $email = admin_normalize_email((string) ($entry['email'] ?? ''));
+        if ($email !== '') {
+            $map[$email] = $entry;
+        }
+    }
+    return $map;
+}
+
+function admin_remove_mailing_subscriber(string $email): void {
+    $normalized = admin_normalize_email($email);
+    if ($normalized === '') {
+        return;
+    }
+    $entries = admin_load_mailing_subscriber_entries();
+    $filtered = array_values(array_filter($entries, static function ($entry) use ($normalized): bool {
+        return admin_normalize_email((string) ($entry['email'] ?? '')) !== $normalized;
+    }));
+    admin_save_mailing_subscriber_entries($filtered);
+}
+
+function admin_suppress_mailing_recipient(string $email, string $reason = 'hard_bounce', string $source = 'gmail', string $lastError = ''): void {
+    $normalized = admin_normalize_email($email);
+    if ($normalized === '' || !filter_var($normalized, FILTER_VALIDATE_EMAIL)) {
+        return;
+    }
+    $entries = admin_load_mailing_suppressed_entries();
+    $updated = false;
+    foreach ($entries as &$entry) {
+        $entryEmail = admin_normalize_email((string) ($entry['email'] ?? ''));
+        if ($entryEmail !== $normalized) {
+            continue;
+        }
+        $entry['reason'] = $reason;
+        $entry['source'] = $source;
+        $entry['created_at'] = trim((string) ($entry['created_at'] ?? '')) !== '' ? (string) $entry['created_at'] : gmdate(DATE_ATOM);
+        $entry['last_error'] = $lastError;
+        $updated = true;
+        break;
+    }
+    unset($entry);
+    if (!$updated) {
+        $entries[] = [
+            'email' => $normalized,
+            'reason' => $reason,
+            'source' => $source,
+            'created_at' => gmdate(DATE_ATOM),
+            'last_error' => $lastError,
+        ];
+    }
+    admin_save_mailing_suppressed_entries($entries);
+    admin_remove_mailing_subscriber($normalized);
+}
+
+function admin_is_mailing_hard_bounce_error(?string $error): bool {
+    $error = strtolower(trim((string) $error));
+    if ($error === '') {
+        return false;
+    }
+    $markers = [
+        'invalid to header',
+        'recipient address rejected',
+        'user unknown',
+        'unknown user',
+        'no such user',
+        'mailbox unavailable',
+        'address not found',
+        'recipient not found',
+        '550 5.1.1',
+        '550 5.1.0',
+        '551 5.1.1',
+        '553 5.1.3',
+        'invalid recipient',
+        'bad recipient address syntax',
+    ];
+    foreach ($markers as $marker) {
+        if (str_contains($error, $marker)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function admin_gmail_api_request_json(string $url, string $accessToken): ?array {
+    $opts = [
+        'http' => [
+            'method' => 'GET',
+            'header' => "Authorization: Bearer {$accessToken}\r\nAccept: application/json\r\n",
+            'timeout' => 10,
+            'ignore_errors' => true,
+        ],
+    ];
+    $context = stream_context_create($opts);
+    $raw = @file_get_contents($url, false, $context);
+    if (!is_string($raw) || $raw === '') {
+        return null;
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : null;
+}
+
+function admin_gmail_message_header_value(array $payload, string $name): string {
+    $headers = is_array($payload['headers'] ?? null) ? $payload['headers'] : [];
+    foreach ($headers as $header) {
+        if (!is_array($header)) {
+            continue;
+        }
+        if (strcasecmp((string) ($header['name'] ?? ''), $name) !== 0) {
+            continue;
+        }
+        return trim((string) ($header['value'] ?? ''));
+    }
+    return '';
+}
+
+function admin_gmail_decode_body_data(string $data): string {
+    $data = trim($data);
+    if ($data === '') {
+        return '';
+    }
+    $decoded = base64_decode(strtr($data, '-_', '+/'), true);
+    return is_string($decoded) ? $decoded : '';
+}
+
+function admin_gmail_message_text_parts(array $payload): array {
+    $texts = [];
+    $mimeType = strtolower(trim((string) ($payload['mimeType'] ?? '')));
+    $bodyData = trim((string) (($payload['body']['data'] ?? '') ?: ''));
+    if (($mimeType === 'text/plain' || $mimeType === 'message/delivery-status' || $mimeType === 'message/rfc822') && $bodyData !== '') {
+        $decoded = admin_gmail_decode_body_data($bodyData);
+        if ($decoded !== '') {
+            $texts[] = $decoded;
+        }
+    }
+    $parts = is_array($payload['parts'] ?? null) ? $payload['parts'] : [];
+    foreach ($parts as $part) {
+        if (is_array($part)) {
+            $texts = array_merge($texts, admin_gmail_message_text_parts($part));
+        }
+    }
+    return $texts;
+}
+
+function admin_extract_bounced_emails_from_text(string $text, string $senderEmail = ''): array {
+    $text = trim($text);
+    if ($text === '') {
+        return [];
+    }
+    $candidates = [];
+    $patterns = [
+        '/Final-Recipient:\s*rfc822;\s*([^\s<>]+)/i',
+        '/Original-Recipient:\s*rfc822;\s*([^\s<>]+)/i',
+        '/X-Failed-Recipients:\s*([^\r\n]+)/i',
+        '/Diagnostic-Code:.*?<([^>\s]+@[^>\s]+)>/i',
+        '/\b([A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,})\b/i',
+    ];
+    foreach ($patterns as $pattern) {
+        if (preg_match_all($pattern, $text, $matches)) {
+            foreach ((array) ($matches[1] ?? []) as $match) {
+                $email = admin_normalize_email((string) $match);
+                if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    continue;
+                }
+                $candidates[$email] = true;
+            }
+        }
+    }
+    $senderEmail = admin_normalize_email($senderEmail);
+    if ($senderEmail !== '' && isset($candidates[$senderEmail])) {
+        unset($candidates[$senderEmail]);
+    }
+    $filtered = [];
+    foreach (array_keys($candidates) as $email) {
+        if (str_contains($email, 'mailer-daemon') || str_contains($email, 'postmaster')) {
+            continue;
+        }
+        $filtered[$email] = true;
+    }
+    return array_keys($filtered);
+}
+
+function admin_process_mailing_bounces(int $maxMessages = 12): array {
+    $settings = get_settings();
+    if (!admin_is_mailing_ready($settings)) {
+        return ['scanned' => 0, 'suppressed' => 0];
+    }
+    $mailing = $settings['mailing'] ?? [];
+    $gmail = trim((string) ($mailing['gmail_address'] ?? ''));
+    $clientId = trim((string) ($mailing['client_id'] ?? ''));
+    $clientSecret = trim((string) ($mailing['client_secret'] ?? ''));
+    $tokens = admin_load_mailing_tokens();
+    $refresh = trim((string) ($tokens['refresh_token'] ?? ''));
+    if ($gmail === '' || $clientId === '' || $clientSecret === '' || $refresh === '') {
+        return ['scanned' => 0, 'suppressed' => 0];
+    }
+    $refreshed = admin_google_refresh_access_token($clientId, $clientSecret, $refresh);
+    $accessToken = trim((string) ($refreshed['access_token'] ?? ''));
+    if ($accessToken === '') {
+        return ['scanned' => 0, 'suppressed' => 0];
+    }
+    $state = admin_load_mailing_bounces_state();
+    $processedMap = [];
+    foreach ((array) ($state['processed_ids'] ?? []) as $id) {
+        $id = trim((string) $id);
+        if ($id !== '') {
+            $processedMap[$id] = true;
+        }
+    }
+    $query = rawurlencode('from:(mailer-daemon OR postmaster) newer_than:30d');
+    $url = 'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=' . $query . '&maxResults=' . max(1, $maxMessages);
+    $list = admin_gmail_api_request_json($url, $accessToken);
+    $messages = is_array($list['messages'] ?? null) ? $list['messages'] : [];
+    $scanned = 0;
+    $suppressed = 0;
+    foreach ($messages as $message) {
+        $messageId = trim((string) ($message['id'] ?? ''));
+        if ($messageId === '' || isset($processedMap[$messageId])) {
+            continue;
+        }
+        $detail = admin_gmail_api_request_json('https://gmail.googleapis.com/gmail/v1/users/me/messages/' . rawurlencode($messageId) . '?format=full', $accessToken);
+        $payload = is_array($detail['payload'] ?? null) ? $detail['payload'] : [];
+        $from = admin_gmail_message_header_value($payload, 'From');
+        $fromEmail = '';
+        if (preg_match('/<([^>]+)>/', $from, $match) === 1) {
+            $fromEmail = admin_normalize_email((string) ($match[1] ?? ''));
+        }
+        if ($fromEmail === '') {
+            $fromEmail = admin_normalize_email($from);
+        }
+        $text = implode("\n", admin_gmail_message_text_parts($payload));
+        if ($text === '') {
+            $text = (string) ($detail['snippet'] ?? '');
+        }
+        $emails = admin_extract_bounced_emails_from_text($text, $gmail);
+        foreach ($emails as $email) {
+            try {
+                admin_suppress_mailing_recipient($email, 'hard_bounce_async', 'gmail_bounce', 'DSN');
+                $suppressed++;
+            } catch (Throwable $e) {
+                // Ignore individual suppression failures.
+            }
+        }
+        $processedMap[$messageId] = true;
+        $scanned++;
+    }
+    admin_save_mailing_bounces_state([
+        'processed_ids' => array_keys($processedMap),
+        'last_checked_at' => gmdate(DATE_ATOM),
+    ]);
+    return ['scanned' => $scanned, 'suppressed' => $suppressed];
+}
+
 function admin_load_mailing_subscriber_entries(): array {
     $file = MAILING_SUBSCRIBERS_FILE;
     if (!is_file($file)) {
@@ -6437,6 +6819,7 @@ function admin_save_mailing_subscriber_entries(array $entries): void {
     if (!nammu_ensure_directory($dir)) {
         throw new RuntimeException('No se pudo crear el directorio de configuración para la lista de correo');
     }
+    $suppressed = admin_mailing_suppressed_map();
     $unique = [];
     foreach ($entries as $entry) {
         $normalized = admin_mailing_normalize_entry($entry);
@@ -6444,6 +6827,9 @@ function admin_save_mailing_subscriber_entries(array $entries): void {
             continue;
         }
         $email = $normalized['email'];
+        if (isset($suppressed[$email])) {
+            continue;
+        }
         $unique[$email] = $normalized;
     }
     $payload = json_encode(array_values($unique), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
@@ -6487,11 +6873,16 @@ function admin_mailing_recipients_for_type(string $type, array $settings): array
         return [];
     }
     $entries = admin_load_mailing_subscriber_entries();
+    $suppressed = admin_mailing_suppressed_map();
     $recipients = [];
     foreach ($entries as $entry) {
+        $email = admin_normalize_email((string) ($entry['email'] ?? ''));
+        if ($email === '' || isset($suppressed[$email])) {
+            continue;
+        }
         $prefs = $entry['prefs'] ?? admin_mailing_default_prefs();
         if (!empty($prefs[$type])) {
-            $recipients[] = $entry['email'];
+            $recipients[] = $email;
         }
     }
     return $recipients;
@@ -6732,8 +7123,18 @@ function admin_send_mailing_broadcast(string $subject, string $textBody, string 
             $ok++;
         } else {
             $fail++;
-            if (is_string($to) && trim($to) !== '') {
-                $failedRecipients[] = trim($to);
+            $normalizedRecipient = is_string($to) ? admin_normalize_email($to) : '';
+            $isHardBounce = admin_is_mailing_hard_bounce_error($err);
+            if ($normalizedRecipient !== '') {
+                if ($isHardBounce) {
+                    try {
+                        admin_suppress_mailing_recipient($normalizedRecipient, 'hard_bounce', 'gmail', (string) $err);
+                    } catch (Throwable $e) {
+                        // Ignore suppression persistence errors and continue classifying the send failure.
+                    }
+                } else {
+                    $failedRecipients[] = $normalizedRecipient;
+                }
             }
             if ($err !== null) {
                 $lastError = $err;
@@ -6750,10 +7151,14 @@ function admin_mailing_batch_size(): int
 
 function admin_normalize_recipient_batch(array $recipients): array
 {
+    $suppressed = function_exists('admin_mailing_suppressed_map') ? admin_mailing_suppressed_map() : [];
     $normalized = [];
     foreach ($recipients as $recipient) {
         $email = admin_normalize_email((string) $recipient);
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            continue;
+        }
+        if (isset($suppressed[$email])) {
             continue;
         }
         $normalized[$email] = true;
@@ -10812,6 +11217,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         try {
             $subscribers = admin_load_mailing_subscriber_entries();
+            $suppressed = admin_mailing_suppressed_map();
             $existing = [];
             foreach ($subscribers as $subscriber) {
                 $existingEmail = admin_normalize_email((string) ($subscriber['email'] ?? ''));
@@ -10821,7 +11227,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $addedCount = 0;
             $existsCount = 0;
+            $suppressedCount = 0;
             foreach (array_keys($emails) as $email) {
+                if (isset($suppressed[$email])) {
+                    $suppressedCount++;
+                    continue;
+                }
                 if (isset($existing[$email])) {
                     $existsCount++;
                     continue;
@@ -10842,6 +11253,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($existsCount > 0) {
                     $parts[] = $existsCount === 1 ? '1 ya existía.' : $existsCount . ' ya existían.';
                 }
+                if ($suppressedCount > 0) {
+                    $parts[] = $suppressedCount === 1 ? '1 dirección estaba suprimida por rebote duro y no se añadió.' : $suppressedCount . ' direcciones estaban suprimidas por rebote duro y no se añadieron.';
+                }
                 if ($invalidCount > 0) {
                     $parts[] = $invalidCount === 1 ? '1 correo inválido ignorado.' : $invalidCount . ' correos inválidos ignorados.';
                 }
@@ -10851,6 +11265,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ];
             } else {
                 $parts = ['Todas las direcciones ya estaban en la lista.'];
+                if ($suppressedCount > 0) {
+                    $parts[] = $suppressedCount === 1 ? '1 dirección estaba suprimida por rebote duro.' : $suppressedCount . ' direcciones estaban suprimidas por rebote duro.';
+                }
                 if ($invalidCount > 0) {
                     $parts[] = $invalidCount === 1 ? '1 correo inválido ignorado.' : $invalidCount . ' correos inválidos ignorados.';
                 }

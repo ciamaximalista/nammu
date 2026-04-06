@@ -19,8 +19,12 @@ if (function_exists('nammu_process_scheduled_notifications_queue')) {
 
 define('MAILING_SUBSCRIBERS_FILE', __DIR__ . '/config/mailing-subscribers.json');
 define('MAILING_PENDING_FILE', __DIR__ . '/config/mailing-pending.json');
+define('MAILING_SUPPRESSED_FILE', __DIR__ . '/config/mailing-suppressed.json');
 define('MAILING_TOKENS_FILE', __DIR__ . '/config/mailing-tokens.json');
 define('MAILING_SECRET_FILE', __DIR__ . '/config/mailing-secret.key');
+define('MAILING_RATE_LIMIT_FILE', __DIR__ . '/config/mailing-rate-limit.json');
+define('MAILING_RATE_LIMIT_WINDOW', 900);
+define('MAILING_RATE_LIMIT_MAX_ATTEMPTS', 5);
 
 function mailing_normalize_email(string $email): string
 {
@@ -118,6 +122,114 @@ function mailing_load_pending(): array
     }
     $decoded = json_decode($raw, true);
     return is_array($decoded) ? $decoded : [];
+}
+
+function mailing_load_suppressed_map(): array
+{
+    if (!is_file(MAILING_SUPPRESSED_FILE)) {
+        return [];
+    }
+    $raw = file_get_contents(MAILING_SUPPRESSED_FILE);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return [];
+    }
+    $map = [];
+    foreach ($decoded as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        $email = mailing_normalize_email((string) ($entry['email'] ?? ''));
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $map[$email] = true;
+        }
+    }
+    return $map;
+}
+
+function mailing_email_domain_looks_deliverable(string $email): bool
+{
+    $email = mailing_normalize_email($email);
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return false;
+    }
+    $domain = strtolower(trim((string) substr(strrchr($email, '@') ?: '', 1)));
+    if ($domain === '') {
+        return false;
+    }
+    if (!function_exists('checkdnsrr')) {
+        return true;
+    }
+    return checkdnsrr($domain, 'MX') || checkdnsrr($domain, 'A') || checkdnsrr($domain, 'AAAA');
+}
+
+function mailing_client_ip(): string
+{
+    $forwarded = trim((string) ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? ''));
+    if ($forwarded !== '') {
+        foreach (array_map('trim', explode(',', $forwarded)) as $part) {
+            if ($part !== '') {
+                return substr($part, 0, 64);
+            }
+        }
+    }
+    $remote = trim((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+    return $remote !== '' ? substr($remote, 0, 64) : 'unknown';
+}
+
+function mailing_load_rate_limit_state(): array
+{
+    if (!is_file(MAILING_RATE_LIMIT_FILE)) {
+        return [];
+    }
+    $raw = file_get_contents(MAILING_RATE_LIMIT_FILE);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function mailing_save_rate_limit_state(array $state): void
+{
+    $dir = dirname(MAILING_RATE_LIMIT_FILE);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+    $payload = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($payload === false) {
+        return;
+    }
+    file_put_contents(MAILING_RATE_LIMIT_FILE, $payload, LOCK_EX);
+    @chmod(MAILING_RATE_LIMIT_FILE, 0664);
+}
+
+function mailing_rate_limited(): bool
+{
+    $ip = mailing_client_ip();
+    $now = time();
+    $windowStart = $now - MAILING_RATE_LIMIT_WINDOW;
+    $state = mailing_load_rate_limit_state();
+    $cleaned = [];
+    foreach ($state as $key => $timestamps) {
+        if (!is_array($timestamps)) {
+            continue;
+        }
+        $filtered = array_values(array_filter($timestamps, static function ($timestamp) use ($windowStart) {
+            return is_int($timestamp) && $timestamp >= $windowStart;
+        }));
+        if (!empty($filtered)) {
+            $cleaned[(string) $key] = $filtered;
+        }
+    }
+    $attempts = $cleaned[$ip] ?? [];
+    $attempts[] = $now;
+    $cleaned[$ip] = $attempts;
+    mailing_save_rate_limit_state($cleaned);
+    return count($attempts) > MAILING_RATE_LIMIT_MAX_ATTEMPTS;
 }
 
 function mailing_save_pending(array $pending): void
@@ -497,17 +609,38 @@ if ($message === '' && isset($_GET['sub_sent']) && $_GET['sub_sent'] === '1') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = mailing_normalize_email($_POST['subscriber_email'] ?? '');
     $action = $_POST['subscription_action'] ?? '';
+    $honeypot = trim((string) ($_POST['website'] ?? ''));
     $prefsSelected = $_POST['subscription_prefs'] ?? [];
     $prefsSelected = is_array($prefsSelected) ? $prefsSelected : [];
     $prefsSelected = array_values(array_intersect($prefsSelected, $prefsAvailableKeys));
     $prefs = mailing_prefs_from_selection($prefsSelected, $availablePrefs);
+    $suppressed = mailing_load_suppressed_map();
+    $shouldSkipConfirmation = $email !== '' && (isset($suppressed[$email]) || !mailing_email_domain_looks_deliverable($email));
+    $successMessage = $action === 'unsubscribe'
+        ? 'Te hemos enviado un email para confirmar la baja.'
+        : ($action === 'update'
+            ? 'Hemos enviado un email para confirmar tus cambios.'
+            : 'Hemos enviado un email de confirmacion. Revisa tu correo.');
+    if ($honeypot !== '') {
+        $message = $successMessage;
+        $messageType = 'success';
+        goto subscription_action_done;
+    }
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $message = 'Introduce un email valido.';
         $messageType = 'danger';
+    } elseif (mailing_rate_limited()) {
+        $message = $successMessage;
+        $messageType = 'success';
     } elseif (!empty($prefsAvailableKeys) && empty($prefsSelected) && in_array($action, ['subscribe', 'update'], true)) {
         $message = 'Selecciona al menos una opcion de envio.';
         $messageType = 'danger';
     } elseif ($action === 'subscribe') {
+        if ($shouldSkipConfirmation) {
+            $message = 'Hemos enviado un email de confirmacion. Revisa tu correo.';
+            $messageType = 'success';
+            goto subscription_action_done;
+        }
         $pending = mailing_load_pending();
         $token = bin2hex(random_bytes(16));
         $pending = array_values(array_filter($pending, static function ($item) use ($email) {
@@ -529,6 +662,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'danger';
         }
     } elseif ($action === 'update') {
+        if ($shouldSkipConfirmation) {
+            $message = 'Hemos enviado un email para confirmar tus cambios.';
+            $messageType = 'success';
+            goto subscription_action_done;
+        }
         $pending = mailing_load_pending();
         $token = bin2hex(random_bytes(16));
         $pending = array_values(array_filter($pending, static function ($item) use ($email) {
@@ -559,6 +697,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'danger';
         }
     }
+    subscription_action_done:
 }
 
 $renderer = new TemplateRenderer(__DIR__ . '/template', [
@@ -634,6 +773,7 @@ ob_start();
                 <p><?= htmlspecialchars($subscribeCopy, ENT_QUOTES, 'UTF-8') ?></p>
                 <form method="post" class="postal-form">
                     <input type="hidden" name="subscription_action" value="subscribe">
+                    <input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;">
                     <label>
                         <span>Email</span>
                         <input type="email" name="subscriber_email" required>
@@ -663,6 +803,7 @@ ob_start();
                 <p><?= htmlspecialchars($updateCopy, ENT_QUOTES, 'UTF-8') ?></p>
                 <form method="post" class="postal-form">
                     <input type="hidden" name="subscription_action" value="update">
+                    <input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;">
                     <label>
                         <span>Email</span>
                         <input type="email" name="subscriber_email" required>
@@ -692,6 +833,7 @@ ob_start();
                 <p><?= htmlspecialchars($unsubscribeCopy, ENT_QUOTES, 'UTF-8') ?></p>
                 <form method="post" class="postal-form">
                     <input type="hidden" name="subscription_action" value="unsubscribe">
+                    <input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;">
                     <label>
                         <span>Email</span>
                         <input type="email" name="subscriber_email" required>

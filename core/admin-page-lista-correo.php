@@ -17,6 +17,8 @@
         $mailingFormat = $mailingSettings['format'] ?? 'html';
         $mailingEntries = admin_load_mailing_subscriber_entries();
         $mailingCount = count($mailingEntries);
+        $mailingSuppressedEntries = function_exists('admin_load_mailing_suppressed_entries') ? admin_load_mailing_suppressed_entries() : [];
+        $mailingSuppressedCount = count($mailingSuppressedEntries);
         $mailingTokens = admin_load_mailing_tokens();
         $isConnected = !empty($mailingTokens['refresh_token']);
         $canConnect = $mailingGmail !== '' && $mailingClientId !== '' && $mailingClientSecret !== '';
@@ -144,7 +146,7 @@
                     <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
                         <div>
                             <h5 class="mb-1">Suscriptores</h5>
-                            <small class="text-muted">Total: <?= (int) $mailingCount ?></small>
+                            <small class="text-muted">Total: <?= (int) $mailingCount ?><?php if ($mailingSuppressedCount > 0): ?> · Suprimidos por rebote duro: <?= (int) $mailingSuppressedCount ?><?php endif; ?></small>
                         </div>
                         <form method="post" class="form-inline">
                             <input type="hidden" name="add_subscriber" value="1">

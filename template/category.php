@@ -180,6 +180,7 @@ $renderSubscriptionBox = static function (string $variant) use ($subscriptionAct
             </span>
             <input type="hidden" name="back" value="<?= htmlspecialchars($currentUrl, ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" name="force_all" value="1">
+            <input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;">
             <input type="email" name="subscriber_email" placeholder="Suscríbete" required>
             <button type="submit" aria-label="Enviar">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= htmlspecialchars($accentColor, ENT_QUOTES, 'UTF-8') ?>" xmlns="http://www.w3.org/2000/svg">

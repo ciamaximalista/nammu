@@ -5,7 +5,11 @@ require_once __DIR__ . '/core/helpers.php';
 
 define('MAILING_SUBSCRIBERS_FILE', __DIR__ . '/config/mailing-subscribers.json');
 define('MAILING_PENDING_FILE', __DIR__ . '/config/mailing-pending.json');
+define('MAILING_SUPPRESSED_FILE', __DIR__ . '/config/mailing-suppressed.json');
 define('MAILING_TOKENS_FILE', __DIR__ . '/config/mailing-tokens.json');
+define('MAILING_RATE_LIMIT_FILE', __DIR__ . '/config/mailing-rate-limit.json');
+define('MAILING_RATE_LIMIT_WINDOW', 900);
+define('MAILING_RATE_LIMIT_MAX_ATTEMPTS', 5);
 
 function subscription_normalize_email(string $email): string {
     return strtolower(trim($email));
@@ -108,6 +112,108 @@ function subscription_load_pending(): array {
     }
     $decoded = json_decode($raw, true);
     return is_array($decoded) ? $decoded : [];
+}
+
+function subscription_load_suppressed_map(): array {
+    if (!is_file(MAILING_SUPPRESSED_FILE)) {
+        return [];
+    }
+    $raw = file_get_contents(MAILING_SUPPRESSED_FILE);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return [];
+    }
+    $map = [];
+    foreach ($decoded as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        $email = subscription_normalize_email((string) ($entry['email'] ?? ''));
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $map[$email] = true;
+        }
+    }
+    return $map;
+}
+
+function subscription_email_domain_looks_deliverable(string $email): bool {
+    $email = subscription_normalize_email($email);
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return false;
+    }
+    $domain = strtolower(trim((string) substr(strrchr($email, '@') ?: '', 1)));
+    if ($domain === '') {
+        return false;
+    }
+    if (!function_exists('checkdnsrr')) {
+        return true;
+    }
+    return checkdnsrr($domain, 'MX') || checkdnsrr($domain, 'A') || checkdnsrr($domain, 'AAAA');
+}
+
+function subscription_client_ip(): string {
+    $forwarded = trim((string) ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? ''));
+    if ($forwarded !== '') {
+        foreach (array_map('trim', explode(',', $forwarded)) as $part) {
+            if ($part !== '') {
+                return substr($part, 0, 64);
+            }
+        }
+    }
+    $remote = trim((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+    return $remote !== '' ? substr($remote, 0, 64) : 'unknown';
+}
+
+function subscription_load_rate_limit_state(): array {
+    if (!is_file(MAILING_RATE_LIMIT_FILE)) {
+        return [];
+    }
+    $raw = file_get_contents(MAILING_RATE_LIMIT_FILE);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function subscription_save_rate_limit_state(array $state): void {
+    $dir = dirname(MAILING_RATE_LIMIT_FILE);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+    $payload = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($payload === false) {
+        return;
+    }
+    file_put_contents(MAILING_RATE_LIMIT_FILE, $payload, LOCK_EX);
+    @chmod(MAILING_RATE_LIMIT_FILE, 0664);
+}
+
+function subscription_rate_limited(): bool {
+    $ip = subscription_client_ip();
+    $now = time();
+    $windowStart = $now - MAILING_RATE_LIMIT_WINDOW;
+    $state = subscription_load_rate_limit_state();
+    $cleaned = [];
+    foreach ($state as $key => $timestamps) {
+        if (!is_array($timestamps)) {
+            continue;
+        }
+        $filtered = array_values(array_filter($timestamps, static function ($timestamp) use ($windowStart) {
+            return is_int($timestamp) && $timestamp >= $windowStart;
+        }));
+        if (!empty($filtered)) {
+            $cleaned[(string) $key] = $filtered;
+        }
+    }
+    $attempts = $cleaned[$ip] ?? [];
+    $attempts[] = $now;
+    $cleaned[$ip] = $attempts;
+    subscription_save_rate_limit_state($cleaned);
+    return count($attempts) > MAILING_RATE_LIMIT_MAX_ATTEMPTS;
 }
 
 function subscription_save_pending(array $pending): void {
@@ -283,9 +389,41 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     subscription_redirect($back, ['sub_error' => 1]);
 }
 
+$honeypot = trim((string) ($_POST['website'] ?? ''));
+if ($honeypot !== '') {
+    $successBase = subscription_base_url();
+    $successPath = rtrim((string) parse_url($successBase, PHP_URL_PATH), '/');
+    if ($successPath === '') {
+        $successPath = '';
+    }
+    $successUrl = $successPath . '/avisos.php';
+    subscription_redirect($successUrl, ['sub_sent' => 1]);
+}
+
 $email = subscription_normalize_email($_POST['subscriber_email'] ?? '');
 if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     subscription_redirect($back, ['sub_error' => 1]);
+}
+
+if (subscription_rate_limited()) {
+    $successBase = subscription_base_url();
+    $successPath = rtrim((string) parse_url($successBase, PHP_URL_PATH), '/');
+    if ($successPath === '') {
+        $successPath = '';
+    }
+    $successUrl = $successPath . '/avisos.php';
+    subscription_redirect($successUrl, ['sub_sent' => 1]);
+}
+
+$suppressed = subscription_load_suppressed_map();
+if (isset($suppressed[$email]) || !subscription_email_domain_looks_deliverable($email)) {
+    $successBase = subscription_base_url();
+    $successPath = rtrim((string) parse_url($successBase, PHP_URL_PATH), '/');
+    if ($successPath === '') {
+        $successPath = '';
+    }
+    $successUrl = $successPath . '/avisos.php';
+    subscription_redirect($successUrl, ['sub_sent' => 1]);
 }
 
 $pending = subscription_load_pending();

@@ -131,9 +131,9 @@ $removed = false;
 $error = null;
 $blogName = mailing_site_name();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unsubscribe_confirm'])) {
-    $emailPost = mailing_normalize_email($_POST['email'] ?? '');
-    $tokenPost = $_POST['token'] ?? '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $emailPost = mailing_normalize_email($_POST['email'] ?? $email);
+    $tokenPost = (string) ($_POST['token'] ?? $token);
     if ($emailPost === '' || $tokenPost === '' || !hash_equals(mailing_unsubscribe_token($emailPost), $tokenPost)) {
         $valid = false;
         $error = 'El enlace de baja no es válido o ha caducado.';
@@ -146,6 +146,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unsubscribe_confirm']
             mailing_save_entries($filtered);
             $removed = true;
             $valid = true;
+            $email = $emailPost;
+            if (!headers_sent()) {
+                header('List-Unsubscribe-Post: List-Unsubscribe=One-Click');
+            }
         } catch (Throwable $e) {
             $error = 'No se pudo procesar la baja. Inténtalo de nuevo.';
         }

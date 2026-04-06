@@ -3226,9 +3226,12 @@ function nammu_fediverse_rebuild_light_snapshots(array $config): array
     $home = nammu_fediverse_rebuild_home_snapshot($config);
     nammu_fediverse_cli_timing_log($scope, 'rebuild_home_snapshot', $stepStartedAt);
     $stepStartedAt = microtime(true);
+    $messages = nammu_fediverse_rebuild_messages_snapshot($config);
+    nammu_fediverse_cli_timing_log($scope, 'rebuild_messages_snapshot', $stepStartedAt);
+    $stepStartedAt = microtime(true);
     $notifications = nammu_fediverse_rebuild_notifications_snapshot($config);
     nammu_fediverse_cli_timing_log($scope, 'rebuild_notifications_snapshot', $stepStartedAt);
-    return ['home' => $home, 'notifications' => $notifications];
+    return ['home' => $home, 'messages' => $messages, 'notifications' => $notifications];
 }
 
 function nammu_fediverse_stream_state(array $tabs = ['home', 'notifications', 'messages', 'network', 'settings']): array
@@ -7351,8 +7354,20 @@ function nammu_fediverse_grouped_messages(): array
         $groups[$actorId][] = $item;
     }
     uasort($groups, static function (array $a, array $b): int {
-        $publishedA = (string) (($a[0]['published'] ?? '') ?: '');
-        $publishedB = (string) (($b[0]['published'] ?? '') ?: '');
+        $publishedA = '';
+        foreach ($a as $message) {
+            $candidate = (string) ($message['published'] ?? '');
+            if ($candidate > $publishedA) {
+                $publishedA = $candidate;
+            }
+        }
+        $publishedB = '';
+        foreach ($b as $message) {
+            $candidate = (string) ($message['published'] ?? '');
+            if ($candidate > $publishedB) {
+                $publishedB = $candidate;
+            }
+        }
         return strcmp($publishedB, $publishedA);
     });
     return $groups;
@@ -7771,7 +7786,7 @@ function nammu_fediverse_verify_inbox_request(array $payload, array $headers, st
     return ['verified' => true, 'error' => '', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
 }
 
-function nammu_fediverse_private_message_activity(array $recipient, string $text, array $config): array
+function nammu_fediverse_private_message_activity(array $recipient, string $text, array $config, string $replyTo = ''): array
 {
     $actorUrl = nammu_fediverse_actor_url($config);
     $messageId = $actorUrl . '/messages/' . substr(sha1($recipient['id'] . '|' . $text . '|' . microtime(true) . '|' . random_int(0, PHP_INT_MAX)), 0, 24);
@@ -7793,6 +7808,23 @@ function nammu_fediverse_private_message_activity(array $recipient, string $text
             'name' => $recipientHandle,
         ];
     }
+    $object = [
+        'id' => $messageId,
+        'type' => 'Note',
+        'attributedTo' => $actorUrl,
+        'to' => [$recipientId],
+        'cc' => [],
+        'content' => $content,
+        'tag' => $tag,
+        'url' => $messageId,
+        'published' => $published,
+    ];
+    $replyTo = trim($replyTo);
+    if ($replyTo !== '') {
+        $object['inReplyTo'] = $replyTo;
+        $object['context'] = $replyTo;
+        $object['conversation'] = $replyTo;
+    }
     return [
         '@context' => 'https://www.w3.org/ns/activitystreams',
         'id' => $messageId . '/activity',
@@ -7800,21 +7832,11 @@ function nammu_fediverse_private_message_activity(array $recipient, string $text
         'actor' => $actorUrl,
         'to' => [$recipientId],
         'cc' => [],
-        'object' => [
-            'id' => $messageId,
-            'type' => 'Note',
-            'attributedTo' => $actorUrl,
-            'to' => [$recipientId],
-            'cc' => [],
-            'content' => $content,
-            'tag' => $tag,
-            'url' => $messageId,
-            'published' => $published,
-        ],
+        'object' => $object,
     ];
 }
 
-function nammu_fediverse_send_private_message(string $recipientId, string $text, array $config): array
+function nammu_fediverse_send_private_message(string $recipientId, string $text, array $config, string $replyTo = ''): array
 {
     $recipientId = trim($recipientId);
     $plainText = trim($text);
@@ -7833,7 +7855,8 @@ function nammu_fediverse_send_private_message(string $recipientId, string $text,
     if ($inboxUrl === '') {
         return ['ok' => false, 'message' => 'Ese actor no expone un inbox usable.'];
     }
-    $activity = nammu_fediverse_private_message_activity($recipient, $plainText, $config);
+    $replyTo = trim($replyTo);
+    $activity = nammu_fediverse_private_message_activity($recipient, $plainText, $config, $replyTo);
     $messageRecord = [
         'id' => (string) ($activity['object']['id'] ?? ''),
         'activity_id' => (string) ($activity['id'] ?? ''),
@@ -7845,6 +7868,8 @@ function nammu_fediverse_send_private_message(string $recipientId, string $text,
         'published' => (string) ($activity['object']['published'] ?? gmdate(DATE_ATOM)),
         'url' => '',
         'delivery_status' => 'pending',
+        'visibility' => 'private',
+        'reply_to_message_id' => $replyTo,
     ];
     if (!nammu_fediverse_post_activity($inboxUrl, $activity, $config)) {
         $messageRecord['delivery_status'] = 'failed';
@@ -8548,6 +8573,8 @@ function nammu_fediverse_handle_inbox_payload(array $payload, array $config, arr
                 'url' => trim((string) ($object['url'] ?? '')),
                 'delivery_status' => 'received',
                 'verified' => true,
+                'visibility' => 'private',
+                'reply_to_message_id' => trim((string) (($object['inReplyTo'] ?? '') ?: ($object['context'] ?? '') ?: ($object['conversation'] ?? ''))),
             ]);
             return ['accepted' => true, 'type' => 'message', 'verified' => true];
         }

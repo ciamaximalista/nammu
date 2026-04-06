@@ -1735,32 +1735,19 @@
                         <?php foreach ($fediverseMessageThreads as $threadKey => $messages): ?>
                             <?php $firstMessage = $messages[0] ?? []; ?>
                             <?php
-                            $threadRootMessage = null;
-                            foreach ($messages as $threadCandidateMessage) {
-                                if (!empty($threadCandidateMessage['is_thread_root'])) {
-                                    $threadRootMessage = $threadCandidateMessage;
-                                    break;
-                                }
+                            $threadDisplayMessages = array_values(array_filter($messages, static function (array $message): bool {
+                                return strtolower(trim((string) ($message['visibility'] ?? 'private'))) !== 'public';
+                            }));
+                            if (empty($threadDisplayMessages)) {
+                                continue;
                             }
-                            $threadHeaderMessage = is_array($threadRootMessage) ? $threadRootMessage : $firstMessage;
+                            $threadHeaderMessage = $threadDisplayMessages[0] ?? $firstMessage;
+                            $lastThreadMessage = $threadDisplayMessages[count($threadDisplayMessages) - 1] ?? $threadHeaderMessage;
                             $actorId = trim((string) ($threadHeaderMessage['actor_id'] ?? ''));
                             $conversationActor = $fediverseActorsById[$actorId] ?? null;
                             $conversationActorName = trim((string) (($threadHeaderMessage['actor_name'] ?? '') ?: ($conversationActor['name'] ?? '') ?: ($conversationActor['preferredUsername'] ?? '') ?: $actorId));
                             $conversationActorIcon = trim((string) (($threadHeaderMessage['actor_icon'] ?? '') ?: ($conversationActor['icon'] ?? '')));
                             $conversationActorHandle = $fediverseActorHandleFor($threadHeaderMessage);
-                            $conversationIsPublic = strtolower(trim((string) ($threadHeaderMessage['visibility'] ?? 'private'))) === 'public';
-                            $threadHasLocalRoot = is_array($threadRootMessage) && (($threadRootMessage['direction'] ?? '') === 'outgoing');
-                            $threadDisplayMessages = [];
-                            $threadRootSeen = false;
-                            foreach ($messages as $threadMessage) {
-                                if (!empty($threadMessage['is_thread_root'])) {
-                                    if ($threadRootSeen) {
-                                        continue;
-                                    }
-                                    $threadRootSeen = true;
-                                }
-                                $threadDisplayMessages[] = $threadMessage;
-                            }
                             ?>
                             <div class="border rounded p-3 mb-4">
                                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
@@ -1775,15 +1762,13 @@
                                         <div class="fediverse-message__identity">
                                             <strong><?= htmlspecialchars($conversationActorName, ENT_QUOTES, 'UTF-8') ?></strong>
                                             <div class="small text-muted mt-1"><?= htmlspecialchars($conversationActorHandle, ENT_QUOTES, 'UTF-8') ?></div>
-                                            <div class="small text-muted mt-1"><?= $conversationIsPublic ? 'Hilo público' : 'Conversación privada' ?></div>
+                                            <div class="small text-muted mt-1">Conversación privada</div>
                                         </div>
                                     </div>
                                 </div>
                                 <?php foreach ($threadDisplayMessages as $message): ?>
                                     <?php $isOutgoing = (($message['direction'] ?? '') === 'outgoing'); ?>
                                     <?php
-                                    $isPublicMessage = (($message['visibility'] ?? '') === 'public');
-                                    $isThreadRoot = !empty($message['is_thread_root']);
                                     $messageActorId = trim((string) ($message['actor_id'] ?? ''));
                                     $messageActor = $messageActorId !== '' ? ($fediverseActorsById[$messageActorId] ?? null) : null;
                                     $messageActorName = trim((string) (($message['actor_name'] ?? '') ?: ($messageActor['name'] ?? '') ?: ($messageActor['preferredUsername'] ?? '') ?: $messageActorId));
@@ -1796,14 +1781,11 @@
                                         $messageActorIcon = trim((string) (($messageActor['icon'] ?? '') ?: ($conversationActor['icon'] ?? '')));
                                     }
                                     $messageClasses = 'mb-3 p-3 rounded';
-                                    if ($isPublicMessage) {
-                                        $messageClasses .= $isThreadRoot ? ' fediverse-conversation__root' : ' fediverse-conversation__reply';
-                                    }
                                     ?>
                                     <div class="<?= htmlspecialchars($messageClasses, ENT_QUOTES, 'UTF-8') ?>" style="background: <?= $isOutgoing ? '#eef6ff' : '#f7f7f7' ?>; border-left: 4px solid <?= $isOutgoing ? '#1b8eed' : '#999' ?>;">
                                         <div class="fediverse-message__visibility">
-                                            <span class="fediverse-visibility-badge fediverse-visibility-badge--<?= $isPublicMessage ? 'public' : 'private' ?>">
-                                                <?= $isPublicMessage ? 'Pública' : 'Privada' ?>
+                                            <span class="fediverse-visibility-badge fediverse-visibility-badge--private">
+                                                Privada
                                             </span>
                                         </div>
                                         <div class="fediverse-message__header">
@@ -1828,9 +1810,6 @@
                                         </div>
                                         <div class="small text-muted mb-2">
                                             <?= $isOutgoing ? 'Enviado' : 'Recibido' ?> · <?= htmlspecialchars($fediverseFormatDate((string) ($message['published'] ?? '')), ENT_QUOTES, 'UTF-8') ?>
-                                            <?php if (!empty($message['is_thread_root'])): ?>
-                                                · Publicación original
-                                            <?php endif; ?>
                                             <?php if (!empty($message['delivery_status'])): ?>
                                                 · <?= htmlspecialchars((string) ($message['delivery_status'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
                                             <?php endif; ?>
@@ -1838,53 +1817,19 @@
                                                 · <?= !empty($message['verified']) ? 'verificado' : 'no verificado' ?>
                                             <?php endif; ?>
                                         </div>
-                                        <?php if (!empty($message['title']) && $isThreadRoot && strcasecmp((string) ($message['content_type'] ?? ''), 'Note') !== 0): ?>
-                                            <div class="font-weight-bold mb-2"><?= htmlspecialchars((string) $message['title'], ENT_QUOTES, 'UTF-8') ?></div>
-                                        <?php endif; ?>
                                         <div><?= nl2br(htmlspecialchars((string) ($message['content'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
-                                        <?php if (!$isOutgoing && $isPublicMessage && !$isThreadRoot && $threadHasLocalRoot): ?>
-                                            <form method="post" class="mt-2" onsubmit="return confirm('¿Ocultar esta respuesta en el blog y dejar de mostrarla públicamente?');">
-                                                <input type="hidden" name="fediverse_tab" value="messages">
-                                                <input type="hidden" name="fediverse_incoming_reply_id" value="<?= htmlspecialchars((string) ($message['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                <input type="hidden" name="fediverse_incoming_reply_url" value="<?= htmlspecialchars((string) ($message['url'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                <input type="hidden" name="fediverse_incoming_reply_target" value="<?= htmlspecialchars((string) ($message['reply_target_url'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                <input type="hidden" name="fediverse_incoming_reply_published" value="<?= htmlspecialchars((string) ($message['published'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                <input type="hidden" name="fediverse_incoming_reply_actor" value="<?= htmlspecialchars((string) ($message['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                <input type="hidden" name="fediverse_incoming_reply_text" value="<?= htmlspecialchars((string) ($message['content'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                <button type="submit" name="fediverse_hide_incoming_reply" class="btn btn-outline-danger btn-sm">Eliminar respuesta</button>
-                                            </form>
-                                        <?php endif; ?>
-                                        <?php if (!$isOutgoing && !$isPublicMessage): ?>
-                                            <details class="fediverse-inline-form mt-3">
-                                                <summary>Responder en privado</summary>
-                                                <form method="post">
-                                                    <input type="hidden" name="fediverse_tab" value="messages">
-                                                    <input type="hidden" name="fediverse_message_actor_id" value="<?= htmlspecialchars((string) ($message['actor_id'] ?? $actorId), ENT_QUOTES, 'UTF-8') ?>">
-                                                    <textarea name="fediverse_private_reply_text" class="form-control form-control-sm" rows="3" placeholder="Escribe tu respuesta privada"></textarea>
-                                                    <button type="submit" name="send_fediverse_private_reply" class="btn btn-primary btn-sm mt-2">Responder</button>
-                                                </form>
-                                            </details>
-                                        <?php endif; ?>
-                                        <?php if ((($message['visibility'] ?? '') === 'public') && !empty($message['reply_target_url']) && (!$isOutgoing || !empty($message['is_thread_root']))): ?>
-                                            <details class="fediverse-inline-form mt-3">
-                                                <summary>Responder</summary>
-                                                <form method="post">
-                                                    <input type="hidden" name="fediverse_tab" value="messages">
-                                                    <?php if (!$isOutgoing): ?>
-                                                        <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars((string) ($message['actor_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                    <?php endif; ?>
-                                                    <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars((string) ($message['reply_target_url'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                    <textarea name="fediverse_reply_text" class="form-control form-control-sm" rows="3" placeholder="Escribe tu respuesta pública"></textarea>
-                                                    <label class="fediverse-inline-check">
-                                                        <input type="checkbox" name="fediverse_reply_as_note" value="1">
-                                                        Publicar también como nota en Actualidad
-                                                    </label>
-                                                    <button type="submit" name="fediverse_reply_item" class="btn btn-primary btn-sm mt-2">Responder</button>
-                                                </form>
-                                            </details>
-                                        <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
+                                <details class="fediverse-inline-form mt-3">
+                                    <summary>Responder</summary>
+                                    <form method="post">
+                                        <input type="hidden" name="fediverse_tab" value="messages">
+                                        <input type="hidden" name="fediverse_message_actor_id" value="<?= htmlspecialchars((string) $actorId, ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="fediverse_reply_to_message_id" value="<?= htmlspecialchars((string) ($lastThreadMessage['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                        <textarea name="fediverse_private_reply_text" class="form-control form-control-sm" rows="3" placeholder="Escribe tu respuesta privada"></textarea>
+                                        <button type="submit" name="send_fediverse_private_reply" class="btn btn-primary btn-sm mt-2">Responder</button>
+                                    </form>
+                                </details>
                             </div>
                         <?php endforeach; ?>
                     <?php endif; ?>

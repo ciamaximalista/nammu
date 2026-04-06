@@ -12227,10 +12227,11 @@ if ($isLoggedIn && $page === 'fediverso') {
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_fediverse_private_reply'])) {
         $recipientId = trim((string) ($_POST['fediverse_message_actor_id'] ?? ''));
         $messageText = trim((string) ($_POST['fediverse_private_reply_text'] ?? ''));
+        $replyToMessageId = trim((string) ($_POST['fediverse_reply_to_message_id'] ?? ''));
         $fediverseMessageRecipient = $recipientId;
         $fediverseMessageText = '';
         $config = load_config_file();
-        $result = nammu_fediverse_send_private_message($recipientId, $messageText, $config);
+        $result = nammu_fediverse_send_private_message($recipientId, $messageText, $config, $replyToMessageId);
         $fediverseFeedback = [
             'type' => !empty($result['ok']) ? 'success' : 'danger',
             'message' => (string) ($result['message'] ?? ''),

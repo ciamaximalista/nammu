@@ -150,11 +150,16 @@ $pushUnsubscribeUrl = $searchBaseNormalized === '' ? '/push-unsubscribe.php' : $
 $showPushPrompt = $pushEnabled && $pushPublicKey !== '' && !$isCrawler;
 $fediverseCtaHandle = '';
 $fediverseCtaUrl = '';
+$fediverseProfileUrl = '';
 $fediverseCtaIcon = function_exists('nammu_fediverse_glyph_svg') ? nammu_fediverse_glyph_svg(24) : '';
 if ($fediverseFloatingCtaEnabled && function_exists('nammu_fediverse_actor_url') && function_exists('nammu_fediverse_acct_uri')) {
-    $fediverseCtaUrl = nammu_fediverse_actor_url($fediverseConfig ?? (function_exists('nammu_load_config') ? nammu_load_config() : []));
-    $fediverseAcctUri = nammu_fediverse_acct_uri($fediverseConfig ?? (function_exists('nammu_load_config') ? nammu_load_config() : []));
+    $fediverseResolvedConfig = $fediverseConfig ?? (function_exists('nammu_load_config') ? nammu_load_config() : []);
+    $fediverseCtaUrl = nammu_fediverse_actor_url($fediverseResolvedConfig);
+    $fediverseAcctUri = nammu_fediverse_acct_uri($fediverseResolvedConfig);
     $fediverseCtaHandle = str_starts_with($fediverseAcctUri, 'acct:') ? '@' . substr($fediverseAcctUri, 5) : $fediverseAcctUri;
+    if (function_exists('nammu_fediverse_profile_page_url')) {
+        $fediverseProfileUrl = nammu_fediverse_profile_page_url($fediverseResolvedConfig);
+    }
 }
 $serverDay = date('Y-m-d');
 $serverDayExpires = date(DATE_RFC2822, strtotime('today 23:59:59'));
@@ -1505,9 +1510,17 @@ if (!empty($baseUrl)) {
                                         <?php
                                         $linkHost = parse_url((string) $link['href'], PHP_URL_HOST) ?? '';
                                         $isExternal = $linkHost !== '' && $baseHost !== '' && $linkHost !== $baseHost;
+                                        $linkLabel = trim((string) ($link['label'] ?? ''));
+                                        $linkHref = trim((string) ($link['href'] ?? ''));
+                                        $footerLinkClass = trim((string) ($link['class'] ?? ''));
+                                        $isFediverseFollowLink = (!empty($link['modal']) && $link['modal'] === 'fediverse-follow')
+                                            || $linkHref === '#fediverse-follow'
+                                            || ($footerLinkClass !== '' && stripos($footerLinkClass, 'fediverse') !== false)
+                                            || ($linkLabel !== '' && stripos($linkLabel, 'fediverso') !== false)
+                                            || ($fediverseCtaUrl !== '' && $linkHref === $fediverseCtaUrl)
+                                            || ($fediverseProfileUrl !== '' && $linkHref === $fediverseProfileUrl);
                                         ?>
-                                        <?php $footerLinkClass = trim((string) ($link['class'] ?? '')); ?>
-                                        <a class="footer-social-link<?= $footerLinkClass !== '' ? ' ' . htmlspecialchars($footerLinkClass, ENT_QUOTES, 'UTF-8') : '' ?>" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= !empty($link['modal']) && $link['modal'] === 'fediverse-follow' ? ' data-fediverse-follow-open' : '' ?><?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
+                                        <a class="footer-social-link<?= $footerLinkClass !== '' ? ' ' . htmlspecialchars($footerLinkClass, ENT_QUOTES, 'UTF-8') : '' ?>" href="<?= htmlspecialchars($linkHref, ENT_QUOTES, 'UTF-8') ?>"<?= $isFediverseFollowLink ? ' data-fediverse-follow-open' : '' ?><?= ($isExternal && !$isFediverseFollowLink) ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($linkLabel, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($linkLabel, ENT_QUOTES, 'UTF-8') ?>">
                                             <?= $link['svg'] ?>
                                         </a>
                                     <?php endforeach; ?>
@@ -1555,9 +1568,17 @@ if (!empty($baseUrl)) {
                                         <?php
                                         $linkHost = parse_url((string) $link['href'], PHP_URL_HOST) ?? '';
                                         $isExternal = $linkHost !== '' && $baseHost !== '' && $linkHost !== $baseHost;
+                                        $linkLabel = trim((string) ($link['label'] ?? ''));
+                                        $linkHref = trim((string) ($link['href'] ?? ''));
+                                        $footerLinkClass = trim((string) ($link['class'] ?? ''));
+                                        $isFediverseFollowLink = (!empty($link['modal']) && $link['modal'] === 'fediverse-follow')
+                                            || $linkHref === '#fediverse-follow'
+                                            || ($footerLinkClass !== '' && stripos($footerLinkClass, 'fediverse') !== false)
+                                            || ($linkLabel !== '' && stripos($linkLabel, 'fediverso') !== false)
+                                            || ($fediverseCtaUrl !== '' && $linkHref === $fediverseCtaUrl)
+                                            || ($fediverseProfileUrl !== '' && $linkHref === $fediverseProfileUrl);
                                         ?>
-                                        <?php $footerLinkClass = trim((string) ($link['class'] ?? '')); ?>
-                                        <a class="footer-social-link<?= $footerLinkClass !== '' ? ' ' . htmlspecialchars($footerLinkClass, ENT_QUOTES, 'UTF-8') : '' ?>" href="<?= htmlspecialchars($link['href'], ENT_QUOTES, 'UTF-8') ?>"<?= !empty($link['modal']) && $link['modal'] === 'fediverse-follow' ? ' data-fediverse-follow-open' : '' ?><?= $isExternal ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8') ?>">
+                                        <a class="footer-social-link<?= $footerLinkClass !== '' ? ' ' . htmlspecialchars($footerLinkClass, ENT_QUOTES, 'UTF-8') : '' ?>" href="<?= htmlspecialchars($linkHref, ENT_QUOTES, 'UTF-8') ?>"<?= $isFediverseFollowLink ? ' data-fediverse-follow-open' : '' ?><?= ($isExternal && !$isFediverseFollowLink) ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($linkLabel, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($linkLabel, ENT_QUOTES, 'UTF-8') ?>">
                                             <?= $link['svg'] ?>
                                         </a>
                                     <?php endforeach; ?>
@@ -1608,6 +1629,9 @@ if (!empty($baseUrl)) {
                         <div class="fediverse-follow-dialog__actions">
                             <button type="button" data-fediverse-follow-copy>Copiar cuenta</button>
                             <button type="button" data-fediverse-follow-copy-full>Copiar identificador completo</button>
+                            <?php if ($fediverseProfileUrl !== ''): ?>
+                                <a href="<?= htmlspecialchars($fediverseProfileUrl, ENT_QUOTES, 'UTF-8') ?>">Visita nuestra página de perfil</a>
+                            <?php endif; ?>
                             <button type="button" data-fediverse-follow-close>Cerrar</button>
                         </div>
                     </div>

@@ -1158,6 +1158,16 @@ function nammu_fediverse_followers_store(): array
     return ['followers' => array_values($followers)];
 }
 
+function nammu_fediverse_following_count(): int
+{
+    return count(nammu_fediverse_following_store()['actors'] ?? []);
+}
+
+function nammu_fediverse_followers_count(): int
+{
+    return count(nammu_fediverse_followers_store()['followers'] ?? []);
+}
+
 function nammu_fediverse_blocked_store(): array
 {
     $store = nammu_fediverse_load_json_store(nammu_fediverse_blocked_file(), ['actors' => []]);
@@ -6378,6 +6388,8 @@ function nammu_fediverse_actor_document(array $config): array
     $siteDescription = trim((string) ($config['site_description'] ?? ''));
     $keys = nammu_fediverse_keypair();
     $avatarUrl = nammu_fediverse_avatar_url($config);
+    $followingCount = nammu_fediverse_following_count();
+    $followersCount = nammu_fediverse_followers_count();
     $document = [
         '@context' => [
             'https://www.w3.org/ns/activitystreams',
@@ -6393,6 +6405,18 @@ function nammu_fediverse_actor_document(array $config): array
         'outbox' => nammu_fediverse_outbox_url($config),
         'followers' => nammu_fediverse_followers_url($config),
         'following' => nammu_fediverse_following_url($config),
+        'attachment' => [
+            [
+                'type' => 'PropertyValue',
+                'name' => 'Siguiendo',
+                'value' => (string) $followingCount,
+            ],
+            [
+                'type' => 'PropertyValue',
+                'name' => 'Seguidores',
+                'value' => (string) $followersCount,
+            ],
+        ],
         'discoverable' => true,
         'manuallyApprovesFollowers' => false,
         'published' => gmdate(DATE_ATOM, is_file(dirname(__DIR__) . '/index.php') ? ((int) @filemtime(dirname(__DIR__) . '/index.php') ?: time()) : time()),

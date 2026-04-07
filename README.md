@@ -228,6 +228,26 @@ Si usas el planificador central multiinstancia, la forma más robusta es ejecuta
 
 Así evitas que un proceso colgado retenga el lock indefinidamente.
 
+Si además quieres refrescar en segundo plano las `link cards` del Fediverso para recuperar `og:image` sin cargar la petición web ni las fases `light`, `maintenance` o `heavy`, añade un cron separado y escalonado por blog. Ese proceso:
+
+- solo descarga el HTML de la URL remota, no la imagen binaria,
+- resuelve `og:title`, `og:description` y `og:image`,
+- guarda el resultado en caché,
+- y deja que la página pública del perfil/hilos lea solo esa caché.
+
+### Bloque recomendado para `link cards` federadas
+
+```bash
+5-55/10 * * * * /usr/bin/flock -n /tmp/memoria-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/memoria/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/memoria/backups/fediverse-link-cards.log 2>&1
+6-56/10 * * * * /usr/bin/flock -n /tmp/maximalismo-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/maximalismo/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/maximalismo/backups/fediverse-link-cards.log 2>&1
+7-57/10 * * * * /usr/bin/flock -n /tmp/terceroslugares-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/terceroslugares/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/terceroslugares/backups/fediverse-link-cards.log 2>&1
+8-58/10 * * * * /usr/bin/flock -n /tmp/lacandela-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/lacandela/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/lacandela/backups/fediverse-link-cards.log 2>&1
+9-59/10 * * * * /usr/bin/flock -n /tmp/communalia-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/communalia/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/communalia/backups/fediverse-link-cards.log 2>&1
+0-50/10 * * * * /usr/bin/flock -n /tmp/juan-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/juan/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/juan/backups/fediverse-link-cards.log 2>&1
+```
+
+Ese escalonado evita que todas las instancias resuelvan metadata remota a la vez y deja la carga separada del planificador central del cluster.
+
 Si además quieres dejar constancia explícita en el log cuando el lock esté ocupado o salte el timeout, puedes envolver esa misma línea con un `bash -lc`, pero la variante simple de arriba suele ser la más fácil de guardar y mantener en `crontab`.
 
 Si mantienes varias instalaciones Nammu en el mismo servidor, no las lances todas en el mismo minuto. Lo recomendable es escalonarlas con ejemplos genéricos como estos:

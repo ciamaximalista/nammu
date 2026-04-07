@@ -495,6 +495,81 @@ function admin_social_broadcast_append_fediverse_link(string $text, string $fedi
     return $text . "\n\n" . $appendix;
 }
 
+function admin_social_broadcast_effective_limit(string $network, bool $hasImages = false): int
+{
+    $limit = (int) (admin_social_broadcast_limits()[$network] ?? 0);
+    if ($network === 'telegram' && $hasImages) {
+        return 1024;
+    }
+    return $limit;
+}
+
+function admin_social_broadcast_measure_for_network(string $network, string $text): int
+{
+    $measureText = $network === 'telegram'
+        ? admin_social_broadcast_plain_without_markup($text)
+        : admin_social_broadcast_plain_text($text);
+    return function_exists('mb_strlen') ? mb_strlen($measureText, 'UTF-8') : strlen($measureText);
+}
+
+function admin_social_broadcast_truncate_text(string $text, int $maxLength): string
+{
+    $text = trim(str_replace(["\r\n", "\r"], "\n", $text));
+    if ($text === '' || $maxLength <= 0) {
+        return '';
+    }
+    $length = function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text);
+    if ($length <= $maxLength) {
+        return $text;
+    }
+    $ellipsis = '…';
+    $reserve = function_exists('mb_strlen') ? mb_strlen($ellipsis, 'UTF-8') : strlen($ellipsis);
+    $cutLength = max(1, $maxLength - $reserve);
+    $cut = function_exists('mb_substr')
+        ? mb_substr($text, 0, $cutLength, 'UTF-8')
+        : substr($text, 0, $cutLength);
+    if (function_exists('mb_strrpos')) {
+        $spacePos = mb_strrpos($cut, ' ', 0, 'UTF-8');
+        if ($spacePos !== false && $spacePos > 0) {
+            $cut = mb_substr($cut, 0, $spacePos, 'UTF-8');
+        }
+    } else {
+        $spacePos = strrpos($cut, ' ');
+        if ($spacePos !== false && $spacePos > 0) {
+            $cut = substr($cut, 0, $spacePos);
+        }
+    }
+    return rtrim($cut, " \t\n\r\0\x0B.,;:") . $ellipsis;
+}
+
+function admin_social_broadcast_fit_text_for_network(string $network, string $text, string $fediverseUrl = '', bool $hasImages = false): string
+{
+    $baseText = trim(str_replace(["\r\n", "\r"], "\n", $text));
+    $fediverseUrl = trim($fediverseUrl);
+    $limit = admin_social_broadcast_effective_limit($network, $hasImages);
+    if ($limit <= 0) {
+        return admin_social_broadcast_append_fediverse_link($baseText, $fediverseUrl);
+    }
+    $footerLabel = $fediverseUrl !== '' ? 'Fediverso: ' . $fediverseUrl : '';
+    if ($footerLabel !== '' && admin_social_broadcast_measure_for_network($network, $footerLabel) >= $limit) {
+        return admin_social_broadcast_truncate_text(trim($fediverseUrl), $limit);
+    }
+    $candidate = admin_social_broadcast_append_fediverse_link($baseText, $fediverseUrl);
+    if (admin_social_broadcast_measure_for_network($network, $candidate) <= $limit) {
+        return $candidate;
+    }
+    $bodyLimit = function_exists('mb_strlen') ? mb_strlen($baseText, 'UTF-8') : strlen($baseText);
+    while ($bodyLimit > 0) {
+        $trimmedBody = admin_social_broadcast_truncate_text($baseText, $bodyLimit);
+        $candidate = admin_social_broadcast_append_fediverse_link($trimmedBody, $fediverseUrl);
+        if (admin_social_broadcast_measure_for_network($network, $candidate) <= $limit) {
+            return $candidate;
+        }
+        $bodyLimit--;
+    }
+    return admin_social_broadcast_truncate_text($footerLabel, $limit);
+}
+
 function admin_social_broadcast_parse_images($images): array
 {
     if (is_array($images)) {
@@ -668,10 +743,8 @@ function admin_send_social_broadcast_to_configured_networks(string $text, $image
 {
     $text = trim($text);
     $imageItems = admin_social_broadcast_parse_images($images);
-    $text = admin_social_broadcast_append_fediverse_link($text, $fediverseUrl);
     $settings = is_array($settings) ? $settings : admin_social_broadcast_runtime_settings();
     $available = admin_social_broadcast_available_networks($settings);
-    $limits = admin_social_broadcast_limits();
     $imageLimits = admin_social_broadcast_network_image_limits();
     $sent = [];
     $failed = [];
@@ -684,10 +757,6 @@ function admin_send_social_broadcast_to_configured_networks(string $text, $image
     }
 
     foreach ($available as $network => $networkMeta) {
-        $limit = (int) ($limits[$network] ?? 0);
-        if ($network === 'telegram' && !empty($imageItems)) {
-            $limit = 1024;
-        }
         $networkImages = $imageItems;
         $allowedImages = (int) ($imageLimits[$network] ?? 0);
         if ($allowedImages <= 0) {
@@ -695,20 +764,19 @@ function admin_send_social_broadcast_to_configured_networks(string $text, $image
         } elseif (count($networkImages) > $allowedImages) {
             $networkImages = array_slice($networkImages, 0, $allowedImages);
         }
-        $measureText = $network === 'telegram'
-            ? admin_social_broadcast_plain_without_markup($text)
-            : admin_social_broadcast_plain_text($text);
-        $length = function_exists('mb_strlen') ? mb_strlen($measureText, 'UTF-8') : strlen($measureText);
-        if ($limit > 0 && $length > $limit) {
-            $failed[] = $networkMeta['label'] . ': el mensaje supera el máximo de ' . $limit . ' caracteres.';
-            continue;
-        }
         if ($network === 'instagram' && empty($networkImages)) {
             $failed[] = 'Instagram: debes elegir una imagen.';
             continue;
         }
+        $networkText = admin_social_broadcast_fit_text_for_network($network, $text, $fediverseUrl, !empty($networkImages));
+        $limit = admin_social_broadcast_effective_limit($network, !empty($networkImages));
+        $length = admin_social_broadcast_measure_for_network($network, $networkText);
+        if ($limit > 0 && $length > $limit) {
+            $failed[] = $networkMeta['label'] . ': el mensaje supera el máximo de ' . $limit . ' caracteres.';
+            continue;
+        }
         $error = null;
-        $ok = admin_send_social_broadcast_message($network, $text, $networkMeta['settings'], $networkImages, $error);
+        $ok = admin_send_social_broadcast_message($network, $networkText, $networkMeta['settings'], $networkImages, $error);
         if ($ok) {
             $sent[] = $networkMeta['label'];
         } else {
@@ -736,7 +804,6 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
     $remaining = [];
     $settings = admin_social_broadcast_runtime_settings();
     $available = admin_social_broadcast_available_networks($settings);
-    $limits = admin_social_broadcast_limits();
     $imageLimits = admin_social_broadcast_network_image_limits();
 
     foreach ($items as $item) {
@@ -757,9 +824,8 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
         $text = trim((string) ($item['text'] ?? ''));
         $images = admin_social_broadcast_parse_images($item['images'] ?? []);
         $fediverseUrl = trim((string) ($item['fediverse_url'] ?? ''));
-        $textWithLink = admin_social_broadcast_append_fediverse_link($text, $fediverseUrl);
 
-        if ($textWithLink === '') {
+        if ($text === '') {
             $failed++;
             continue;
         }
@@ -770,10 +836,6 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
                 $pendingNetworks[] = $network;
                 continue;
             }
-            $limit = (int) ($limits[$network] ?? 0);
-            if ($network === 'telegram' && !empty($images)) {
-                $limit = 1024;
-            }
             $networkImages = $images;
             $allowedImages = (int) ($imageLimits[$network] ?? 0);
             if ($allowedImages <= 0) {
@@ -781,25 +843,26 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
             } elseif (count($networkImages) > $allowedImages) {
                 $networkImages = array_slice($networkImages, 0, $allowedImages);
             }
-            $measureText = $network === 'telegram'
-                ? admin_social_broadcast_plain_without_markup($textWithLink)
-                : admin_social_broadcast_plain_text($textWithLink);
-            $length = function_exists('mb_strlen') ? mb_strlen($measureText, 'UTF-8') : strlen($measureText);
-            if ($limit > 0 && $length > $limit) {
-                $pendingNetworks[] = $network;
+            if ($network === 'instagram' && empty($networkImages)) {
+                $failed++;
                 continue;
             }
-            if ($network === 'instagram' && empty($networkImages)) {
-                $pendingNetworks[] = $network;
+            $networkText = admin_social_broadcast_fit_text_for_network($network, $text, $fediverseUrl, !empty($networkImages));
+            $limit = admin_social_broadcast_effective_limit($network, !empty($networkImages));
+            $length = admin_social_broadcast_measure_for_network($network, $networkText);
+            if ($limit > 0 && $length > $limit) {
+                $failed++;
                 continue;
             }
             $error = null;
-            $ok = admin_send_social_broadcast_message($network, $textWithLink, $networkMeta['settings'], $networkImages, $error);
+            $ok = admin_send_social_broadcast_message($network, $networkText, $networkMeta['settings'], $networkImages, $error);
             if ($ok) {
                 $sentNetworks[] = $network;
                 continue;
             }
             $pendingNetworks[] = $network;
+            $item['last_error'] = (string) ($error ?: ('send_failed:' . $network));
+            $item['last_attempt_at'] = gmdate(DATE_ATOM);
         }
 
         if (!empty($sentNetworks)) {
@@ -811,6 +874,9 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
         if (!empty($pendingNetworks)) {
             $item['networks'] = array_values($pendingNetworks);
             $item['attempts'] = (int) ($item['attempts'] ?? 0) + 1;
+            if (empty($item['last_attempt_at'])) {
+                $item['last_attempt_at'] = gmdate(DATE_ATOM);
+            }
             $remaining[] = $item;
         }
     }

@@ -4188,9 +4188,9 @@ function nammu_fediverse_refresh_link_card_queue(array $config, int $limit = 8, 
         return ['processed' => 0, 'updated' => 0, 'failed' => 0, 'remaining' => 0];
     }
     uasort($queueItems, static function (array $a, array $b): int {
-        $queuedA = (int) ($a['queued_at'] ?? 0);
-        $queuedB = (int) ($b['queued_at'] ?? 0);
-        return $queuedA <=> $queuedB;
+        $requestedA = (int) (($a['last_requested_at'] ?? 0) ?: ($a['queued_at'] ?? 0));
+        $requestedB = (int) (($b['last_requested_at'] ?? 0) ?: ($b['queued_at'] ?? 0));
+        return $requestedB <=> $requestedA;
     });
     $cacheStore = nammu_fediverse_link_cards_store();
     $cacheItems = is_array($cacheStore['items'] ?? null) ? $cacheStore['items'] : [];

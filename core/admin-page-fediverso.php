@@ -454,6 +454,7 @@
         $fediverseTimeline = array_merge(array_values($fediverseSyntheticRemoteItems), $fediverseTimeline);
     }
     $fediverseTimelineDisplay = [];
+    $fediverseAnnounceEntryIndexes = [];
     $fediverseRemoteCanonicalItems = [];
     foreach ($fediverseTimeline as $fediverseTimelineCandidate) {
         if (!is_array($fediverseTimelineCandidate)) {
@@ -474,6 +475,7 @@
     }
     foreach ($fediverseTimeline as $fediverseTimelineItem) {
         $fediverseTimelineType = strtolower(trim((string) ($fediverseTimelineItem['type'] ?? '')));
+        $fediverseAnnounceGroupKey = '';
         if (in_array($fediverseTimelineType, ['like', 'delete'], true)) {
             continue;
         }
@@ -634,6 +636,64 @@
         if (trim((string) ($fediverseTimelineItem['title'] ?? '')) === '' && trim((string) ($fediverseTimelineItem['content'] ?? '')) === '' && empty($fediverseTimelineAttachments)) {
             continue;
         }
+        if ($fediverseTimelineType === 'announce') {
+            $fediverseAnnounceGroupKey = '';
+            foreach (['object_id', 'url', 'id'] as $fediverseAnnounceField) {
+                $fediverseAnnounceValue = trim((string) ($fediverseTimelineItem[$fediverseAnnounceField] ?? ''));
+                if ($fediverseAnnounceValue === '') {
+                    continue;
+                }
+                $fediverseAnnounceVariants = $fediverseEquivalentIdentifiers($fediverseAnnounceValue);
+                if (!empty($fediverseAnnounceVariants)) {
+                    usort($fediverseAnnounceVariants, static function (string $a, string $b): int {
+                        return strlen($a) <=> strlen($b);
+                    });
+                    $fediverseAnnounceGroupKey = (string) ($fediverseAnnounceVariants[0] ?? $fediverseAnnounceValue);
+                } else {
+                    $fediverseAnnounceGroupKey = $fediverseAnnounceValue;
+                }
+                if ($fediverseAnnounceGroupKey !== '') {
+                    break;
+                }
+            }
+            if ($fediverseAnnounceGroupKey !== '' && isset($fediverseAnnounceEntryIndexes[$fediverseAnnounceGroupKey])) {
+                $fediverseExistingEntryIndex = (int) $fediverseAnnounceEntryIndexes[$fediverseAnnounceGroupKey];
+                $fediverseExistingEntry = is_array($fediverseTimelineEntries[$fediverseExistingEntryIndex] ?? null) ? $fediverseTimelineEntries[$fediverseExistingEntryIndex] : null;
+                $fediverseExistingItem = is_array($fediverseExistingEntry['item'] ?? null) ? $fediverseExistingEntry['item'] : [];
+                $fediverseAnnounceActors = is_array($fediverseExistingItem['announce_actors'] ?? null) ? $fediverseExistingItem['announce_actors'] : [];
+                $fediverseAnnounceActorId = trim((string) ($fediverseTimelineItem['actor_id'] ?? ''));
+                $fediverseAnnounceActorKey = $fediverseAnnounceActorId !== ''
+                    ? $fediverseAnnounceActorId
+                    : sha1(json_encode([
+                        'name' => (string) ($fediverseTimelineItem['actor_name'] ?? ''),
+                        'username' => (string) ($fediverseTimelineItem['actor_username'] ?? ''),
+                        'url' => (string) ($fediverseTimelineItem['actor_url'] ?? ''),
+                    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+                $fediverseAnnounceActors[$fediverseAnnounceActorKey] = [
+                    'id' => $fediverseAnnounceActorId,
+                    'name' => trim((string) ($fediverseTimelineItem['actor_name'] ?? '')),
+                    'username' => trim((string) ($fediverseTimelineItem['actor_username'] ?? '')),
+                    'url' => trim((string) (($fediverseTimelineItem['actor_url'] ?? '') ?: $fediverseAnnounceActorId)),
+                    'icon' => trim((string) ($fediverseTimelineItem['actor_icon'] ?? '')),
+                    'published' => trim((string) ($fediverseTimelineItem['published'] ?? '')),
+                ];
+                $fediverseExistingItem['announce_actors'] = $fediverseAnnounceActors;
+                if (strcmp((string) ($fediverseTimelineItem['published'] ?? ''), (string) ($fediverseExistingEntry['sort_key'] ?? '')) > 0) {
+                    $fediverseExistingEntry['sort_key'] = (string) ($fediverseTimelineItem['published'] ?? '');
+                }
+                $fediverseExistingEntry['item'] = $fediverseExistingItem;
+                $fediverseTimelineEntries[$fediverseExistingEntryIndex] = $fediverseExistingEntry;
+                continue;
+            }
+            $fediverseTimelineItem['announce_actors'] = [[
+                'id' => trim((string) ($fediverseTimelineItem['actor_id'] ?? '')),
+                'name' => trim((string) ($fediverseTimelineItem['actor_name'] ?? '')),
+                'username' => trim((string) ($fediverseTimelineItem['actor_username'] ?? '')),
+                'url' => trim((string) (($fediverseTimelineItem['actor_url'] ?? '') ?: ($fediverseTimelineItem['actor_id'] ?? ''))),
+                'icon' => trim((string) ($fediverseTimelineItem['actor_icon'] ?? '')),
+                'published' => trim((string) ($fediverseTimelineItem['published'] ?? '')),
+            ]];
+        }
         $fediverseTimelineDisplay[] = $fediverseTimelineItem;
         $fediverseTimelineEntries[] = [
             'kind' => 'remote',
@@ -641,6 +701,9 @@
             'sort_key' => (string) ($fediverseTimelineItem['published'] ?? ''),
             'item' => $fediverseTimelineItem,
         ];
+        if ($fediverseTimelineType === 'announce' && !empty($fediverseAnnounceGroupKey)) {
+            $fediverseAnnounceEntryIndexes[$fediverseAnnounceGroupKey] = count($fediverseTimelineEntries) - 1;
+        }
     }
     usort($fediverseTimelineEntries, static function (array $a, array $b): int {
         $sortCompare = strcmp((string) ($b['sort_key'] ?? ''), (string) ($a['sort_key'] ?? ''));
@@ -1240,6 +1303,8 @@
                                     'actor_username' => $displayActorUsername,
                                 ]);
                                 $boostedByHandle = $fediverseHandle($item);
+                                $announceActors = is_array($item['announce_actors'] ?? null) ? array_values($item['announce_actors']) : [];
+                                $announceActorCount = count($announceActors);
                                 ?>
                                 <article class="fediverse-status">
                                     <div class="fediverse-status__avatar">
@@ -1255,7 +1320,13 @@
                                                 <strong><?= htmlspecialchars($displayActorName !== '' ? $displayActorName : 'Actor remoto', ENT_QUOTES, 'UTF-8') ?></strong>
                                                 <span class="fediverse-status__handle"><?= htmlspecialchars($displayActorHandle, ENT_QUOTES, 'UTF-8') ?></span>
                                                 <?php if ($isRemoteAnnounce): ?>
-                                                    <span class="fediverse-status__handle">impulsado por <?= htmlspecialchars($boostedByHandle, ENT_QUOTES, 'UTF-8') ?></span>
+                                                    <span class="fediverse-status__handle">
+                                                        <?php if ($announceActorCount > 1): ?>
+                                                            impulsado por varias cuentas
+                                                        <?php else: ?>
+                                                            impulsado por <?= htmlspecialchars($boostedByHandle, ENT_QUOTES, 'UTF-8') ?>
+                                                        <?php endif; ?>
+                                                    </span>
                                                 <?php endif; ?>
                                             </div>
                                             <div class="fediverse-status__meta">

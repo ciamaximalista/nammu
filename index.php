@@ -835,6 +835,13 @@ if (preg_match('#^/fediverso/([a-f0-9]{24})/?$#', $routePath, $fediverseThreadMa
     $threadPageTitle = trim((string) (($threadItem['title'] ?? '') ?: ($siteTitle . ' — Fediverso')));
     $threadDescription = trim((string) (($threadItem['summary'] ?? '') ?: ($threadItem['content'] ?? '')));
     $threadUrl = trim((string) ($threadPayload['thread_url'] ?? ''));
+    $threadOriginalUrl = trim((string) ($threadPayload['original_url'] ?? ''));
+    if ($threadOriginalUrl !== '' && trim((string) ($threadItem['image'] ?? '')) === '' && function_exists('nammu_fediverse_cached_link_card')) {
+        $threadOriginalCard = nammu_fediverse_cached_link_card($threadOriginalUrl, $configData, 259200);
+        if (is_array($threadOriginalCard) && trim((string) ($threadOriginalCard['image'] ?? '')) !== '') {
+            $threadItem['image'] = trim((string) $threadOriginalCard['image']);
+        }
+    }
     $threadImage = trim((string) ($threadItem['image'] ?? ''));
     $threadSocialMeta = function_exists('nammu_build_social_meta')
         ? nammu_build_social_meta([

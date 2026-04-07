@@ -4153,31 +4153,52 @@ function nammu_fediverse_fetch_link_card(string $url, array $config, int $maxAge
     return $card;
 }
 
+function nammu_fediverse_merge_link_cards(?array $baseCard, ?array $overlayCard): ?array
+{
+    $baseCard = is_array($baseCard) ? $baseCard : [];
+    $overlayCard = is_array($overlayCard) ? $overlayCard : [];
+    $url = trim((string) (($baseCard['url'] ?? '') ?: ($overlayCard['url'] ?? '')));
+    if ($url === '') {
+        return null;
+    }
+    return [
+        'url' => $url,
+        'title' => trim((string) (($baseCard['title'] ?? '') !== '' ? $baseCard['title'] : ($overlayCard['title'] ?? ''))),
+        'description' => trim((string) (($baseCard['description'] ?? '') !== '' ? $baseCard['description'] : ($overlayCard['description'] ?? ''))),
+        'image' => trim((string) (($baseCard['image'] ?? '') !== '' ? $baseCard['image'] : ($overlayCard['image'] ?? ''))),
+    ];
+}
+
 function nammu_fediverse_reply_link_card(array $reply, array $config): ?array
 {
     $existing = is_array($reply['link_card'] ?? null) ? $reply['link_card'] : null;
-    if (is_array($existing) && trim((string) ($existing['url'] ?? '')) !== '') {
-        return $existing;
-    }
     $fromAttachments = nammu_fediverse_reply_link_card_from_attachments((array) ($reply['attachments'] ?? []));
-    if ($fromAttachments !== null) {
-        return $fromAttachments;
+    $baseCard = nammu_fediverse_merge_link_cards($existing, $fromAttachments);
+    $baseUrl = trim((string) ($baseCard['url'] ?? ''));
+    if ($baseUrl !== '') {
+        $cachedBase = nammu_fediverse_cached_link_card($baseUrl, $config, 259200);
+        if (is_array($cachedBase) && trim((string) ($cachedBase['url'] ?? '')) !== '') {
+            return nammu_fediverse_merge_link_cards($baseCard, $cachedBase);
+        }
+        if (trim((string) ($baseCard['image'] ?? '')) !== '' || trim((string) ($baseCard['title'] ?? '')) !== '' || trim((string) ($baseCard['description'] ?? '')) !== '') {
+            return $baseCard;
+        }
     }
     $textUrl = nammu_fediverse_extract_first_url_from_text((string) ($reply['reply_text'] ?? ''));
     if ($textUrl === '') {
-        return null;
+        return $baseCard;
     }
     $cached = nammu_fediverse_cached_link_card($textUrl, $config, 259200);
     if (is_array($cached) && trim((string) ($cached['url'] ?? '')) !== '') {
-        return $cached;
+        return nammu_fediverse_merge_link_cards($baseCard, $cached);
     }
     nammu_fediverse_enqueue_link_card_url($textUrl, 'profile-reply');
-    return [
+    return nammu_fediverse_merge_link_cards($baseCard, [
         'url' => $textUrl,
         'title' => '',
         'description' => '',
         'image' => '',
-    ];
+    ]);
 }
 
 function nammu_fediverse_refresh_link_card_queue(array $config, int $limit = 8, int $maxAge = 259200): array

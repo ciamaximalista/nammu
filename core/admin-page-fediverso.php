@@ -364,22 +364,10 @@
     $fediverseTimelineEntries = [];
     foreach ($fediverseLocalItems as $fediverseLocalItem) {
         $fediverseLocalId = trim((string) ($fediverseLocalItem['id'] ?? ''));
-        $fediverseLocalSortKey = (string) ($fediverseLocalItem['published'] ?? '');
-        $fediverseLocalDetail = is_array($fediverseLocalReactionDetails[$fediverseLocalId] ?? null)
-            ? $fediverseLocalReactionDetails[$fediverseLocalId]
-            : ['shares' => [], 'replies' => []];
-        foreach (['shares', 'replies'] as $fediverseLocalBucket) {
-            foreach ((array) ($fediverseLocalDetail[$fediverseLocalBucket] ?? []) as $fediverseLocalActivityEntry) {
-                $fediverseActivityPublished = trim((string) ($fediverseLocalActivityEntry['published'] ?? ''));
-                if ($fediverseActivityPublished !== '' && strcmp($fediverseActivityPublished, $fediverseLocalSortKey) > 0) {
-                    $fediverseLocalSortKey = $fediverseActivityPublished;
-                }
-            }
-        }
         $fediverseTimelineEntries[] = [
             'kind' => 'local',
             'published' => (string) ($fediverseLocalItem['published'] ?? ''),
-            'sort_key' => $fediverseLocalSortKey,
+            'sort_key' => (string) ($fediverseLocalItem['published'] ?? ''),
             'item' => $fediverseLocalItem,
         ];
     }

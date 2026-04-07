@@ -155,6 +155,11 @@ function nammu_fediverse_link_cards_file(): string
     return dirname(__DIR__) . '/config/fediverso-link-cards.json';
 }
 
+function nammu_fediverse_link_card_queue_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-link-card-queue.json';
+}
+
 function nammu_fediverse_keys_file(): string
 {
     return dirname(__DIR__) . '/config/activitypub-keys.json';
@@ -394,6 +399,18 @@ function nammu_fediverse_link_cards_store(): array
 function nammu_fediverse_save_link_cards_store(array $items): void
 {
     nammu_fediverse_save_json_store(nammu_fediverse_link_cards_file(), ['items' => $items]);
+}
+
+function nammu_fediverse_link_card_queue_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_link_card_queue_file(), ['items' => []]);
+    $store['items'] = is_array($store['items'] ?? null) ? $store['items'] : [];
+    return $store;
+}
+
+function nammu_fediverse_save_link_card_queue_store(array $items): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_link_card_queue_file(), ['items' => $items]);
 }
 
 function nammu_fediverse_fragments_cache_store(): array
@@ -3984,7 +4001,7 @@ function nammu_fediverse_resolve_url_like_actuality(string $candidate, string $b
     return $candidate;
 }
 
-function nammu_fediverse_fetch_link_card(string $url, array $config, int $maxAge = 86400): ?array
+function nammu_fediverse_cached_link_card(string $url, array $config, int $maxAge = 86400): ?array
 {
     $url = trim($url);
     if ($url === '') {
@@ -4013,13 +4030,40 @@ function nammu_fediverse_fetch_link_card(string $url, array $config, int $maxAge
             return $sharedCard;
         }
     }
+    return null;
+}
 
+function nammu_fediverse_enqueue_link_card_url(string $url, string $reason = ''): bool
+{
+    $url = trim($url);
+    if ($url === '' || !preg_match('#^https?://#i', $url)) {
+        return false;
+    }
+    $store = nammu_fediverse_link_card_queue_store();
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    $key = sha1($url);
+    $existing = is_array($items[$key] ?? null) ? $items[$key] : [];
+    $items[$key] = [
+        'url' => $url,
+        'reason' => $reason !== '' ? $reason : (string) ($existing['reason'] ?? ''),
+        'queued_at' => (int) ($existing['queued_at'] ?? time()),
+        'last_requested_at' => time(),
+        'last_attempt_at' => (int) ($existing['last_attempt_at'] ?? 0),
+        'attempts' => (int) ($existing['attempts'] ?? 0),
+        'last_error' => (string) ($existing['last_error'] ?? ''),
+    ];
+    nammu_fediverse_save_link_card_queue_store($items);
+    return true;
+}
+
+function nammu_fediverse_fetch_link_card_remote(string $url, array $config): ?array
+{
     if (!function_exists('nammu_actuality_fetch_url') && is_file(dirname(__DIR__) . '/core/actualidad.php')) {
         require_once dirname(__DIR__) . '/core/actualidad.php';
     }
 
     $response = function_exists('nammu_actuality_fetch_url')
-        ? nammu_actuality_fetch_url($url, 'text/html,application/xhtml+xml', 8, $config)
+        ? nammu_actuality_fetch_url($url, 'text/html,application/xhtml+xml', 4, $config)
         : ['body' => @file_get_contents($url) ?: '', 'headers' => []];
     $html = trim((string) ($response['body'] ?? ''));
     if ($html === '') {
@@ -4061,16 +4105,34 @@ function nammu_fediverse_fetch_link_card(string $url, array $config, int $maxAge
         '//meta[@name="twitter:image:src"]/@content',
     ]);
     $image = nammu_fediverse_resolve_url_like_actuality($image, $url);
-
     if ($title === '' && $description === '' && $image === '') {
         return null;
     }
-    $card = [
+    return [
         'url' => $url,
         'title' => $title,
         'description' => $description,
         'image' => $image,
     ];
+}
+
+function nammu_fediverse_fetch_link_card(string $url, array $config, int $maxAge = 86400): ?array
+{
+    $url = trim($url);
+    if ($url === '') {
+        return null;
+    }
+    $card = nammu_fediverse_cached_link_card($url, $config, $maxAge);
+    if (is_array($card) && !empty($card)) {
+        return $card;
+    }
+    $card = nammu_fediverse_fetch_link_card_remote($url, $config);
+    if ($card === null) {
+        return null;
+    }
+    $cacheStore = nammu_fediverse_link_cards_store();
+    $cacheItems = is_array($cacheStore['items'] ?? null) ? $cacheStore['items'] : [];
+    $cacheKey = sha1($url);
     $cacheItems[$cacheKey] = [
         'fetched_at' => time(),
         'card' => $card,
@@ -4105,7 +4167,90 @@ function nammu_fediverse_reply_link_card(array $reply, array $config): ?array
     if ($textUrl === '') {
         return null;
     }
-    return nammu_fediverse_fetch_link_card($textUrl, $config);
+    $cached = nammu_fediverse_cached_link_card($textUrl, $config, 259200);
+    if (is_array($cached) && trim((string) ($cached['url'] ?? '')) !== '') {
+        return $cached;
+    }
+    nammu_fediverse_enqueue_link_card_url($textUrl, 'profile-reply');
+    return [
+        'url' => $textUrl,
+        'title' => '',
+        'description' => '',
+        'image' => '',
+    ];
+}
+
+function nammu_fediverse_refresh_link_card_queue(array $config, int $limit = 8, int $maxAge = 259200): array
+{
+    $queueStore = nammu_fediverse_link_card_queue_store();
+    $queueItems = is_array($queueStore['items'] ?? null) ? $queueStore['items'] : [];
+    if (empty($queueItems)) {
+        return ['processed' => 0, 'updated' => 0, 'failed' => 0, 'remaining' => 0];
+    }
+    uasort($queueItems, static function (array $a, array $b): int {
+        $queuedA = (int) ($a['queued_at'] ?? 0);
+        $queuedB = (int) ($b['queued_at'] ?? 0);
+        return $queuedA <=> $queuedB;
+    });
+    $cacheStore = nammu_fediverse_link_cards_store();
+    $cacheItems = is_array($cacheStore['items'] ?? null) ? $cacheStore['items'] : [];
+    $processed = 0;
+    $updated = 0;
+    $failed = 0;
+    foreach (array_keys($queueItems) as $queueKey) {
+        if ($processed >= $limit) {
+            break;
+        }
+        $entry = is_array($queueItems[$queueKey] ?? null) ? $queueItems[$queueKey] : [];
+        $url = trim((string) ($entry['url'] ?? ''));
+        if ($url === '') {
+            unset($queueItems[$queueKey]);
+            continue;
+        }
+        $processed++;
+        $cached = nammu_fediverse_cached_link_card($url, $config, $maxAge);
+        if (is_array($cached) && trim((string) ($cached['url'] ?? '')) !== '') {
+            unset($queueItems[$queueKey]);
+            continue;
+        }
+        $queueItems[$queueKey]['last_attempt_at'] = time();
+        $queueItems[$queueKey]['attempts'] = (int) (($queueItems[$queueKey]['attempts'] ?? 0) + 1);
+        $card = nammu_fediverse_fetch_link_card_remote($url, $config);
+        if ($card === null) {
+            $failed++;
+            $queueItems[$queueKey]['last_error'] = 'fetch_failed';
+            if ((int) ($queueItems[$queueKey]['attempts'] ?? 0) >= 3) {
+                unset($queueItems[$queueKey]);
+            }
+            continue;
+        }
+        $cacheItems[sha1($url)] = [
+            'fetched_at' => time(),
+            'card' => $card,
+        ];
+        $updated++;
+        unset($queueItems[$queueKey]);
+        if (nammu_fediverse_should_shared_cache_remote_url($url, $config)) {
+            nammu_fediverse_shared_cache_write($config, 'link-card', $url, [
+                'fetched_at' => time(),
+                'card' => $card,
+            ]);
+        }
+    }
+    if (count($cacheItems) > 500) {
+        uasort($cacheItems, static function (array $a, array $b): int {
+            return ((int) ($b['fetched_at'] ?? 0)) <=> ((int) ($a['fetched_at'] ?? 0));
+        });
+        $cacheItems = array_slice($cacheItems, 0, 500, true);
+    }
+    nammu_fediverse_save_link_cards_store($cacheItems);
+    nammu_fediverse_save_link_card_queue_store($queueItems);
+    return [
+        'processed' => $processed,
+        'updated' => $updated,
+        'failed' => $failed,
+        'remaining' => count($queueItems),
+    ];
 }
 
 function nammu_fediverse_reply_collection_url(string $objectId, array $config): string
@@ -6305,6 +6450,14 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
         $object['summary'] = htmlspecialchars($summary, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
     $image = trim((string) ($item['image'] ?? ''));
+    if ($image === '' && $originalObjectUrl !== '') {
+        $prefetchedCard = nammu_fediverse_cached_link_card($originalObjectUrl, $config, 259200);
+        if (is_array($prefetchedCard)) {
+            $image = trim((string) ($prefetchedCard['image'] ?? ''));
+        } else {
+            nammu_fediverse_enqueue_link_card_url($originalObjectUrl, 'outgoing-activity');
+        }
+    }
     $images = array_values(array_unique(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))));
     if ($image !== '' && !in_array($image, $images, true)) {
         array_unshift($images, $image);

@@ -4,9 +4,10 @@ $__nammuRunScheduledOnly = PHP_SAPI === 'cli' && in_array('--run-scheduled', $__
 $__nammuRunScheduledMaintenanceOnly = PHP_SAPI === 'cli' && in_array('--run-scheduled-maintenance', $__nammuCliArgs, true);
 $__nammuRunScheduledHeavyOnly = PHP_SAPI === 'cli' && in_array('--run-scheduled-heavy', $__nammuCliArgs, true);
 $__nammuRunClusterScheduledOnly = PHP_SAPI === 'cli' && in_array('--run-cluster-scheduled', $__nammuCliArgs, true);
+$__nammuRunFediverseLinkCardRefreshOnly = PHP_SAPI === 'cli' && in_array('--run-fediverse-link-card-refresh', $__nammuCliArgs, true);
 $__nammuReplayFediverseDeletesOnly = PHP_SAPI === 'cli' && in_array('--replay-fediverse-deletes', $__nammuCliArgs, true);
 $__nammuCliDebugEnabled = PHP_SAPI === 'cli' && in_array('--debug', $__nammuCliArgs, true);
-if (!$__nammuRunScheduledOnly && !$__nammuRunScheduledMaintenanceOnly && !$__nammuRunScheduledHeavyOnly && !$__nammuRunClusterScheduledOnly && !$__nammuReplayFediverseDeletesOnly) {
+if (!$__nammuRunScheduledOnly && !$__nammuRunScheduledMaintenanceOnly && !$__nammuRunScheduledHeavyOnly && !$__nammuRunClusterScheduledOnly && !$__nammuRunFediverseLinkCardRefreshOnly && !$__nammuReplayFediverseDeletesOnly) {
     session_start();
 }
 
@@ -47,6 +48,7 @@ $runScheduledOnly = $__nammuRunScheduledOnly;
 $runScheduledMaintenanceOnly = $__nammuRunScheduledMaintenanceOnly;
 $runScheduledHeavyOnly = $__nammuRunScheduledHeavyOnly;
 $runClusterScheduledOnly = $__nammuRunClusterScheduledOnly;
+$runFediverseLinkCardRefreshOnly = $__nammuRunFediverseLinkCardRefreshOnly;
 $runReplayFediverseDeletesOnly = $__nammuReplayFediverseDeletesOnly;
 
 // --- Helper Functions ---
@@ -460,6 +462,20 @@ function admin_run_scheduled_heavy_tasks(): array {
         'fediverse_threads_warmed' => $threadsWarmed,
         'fediverse_snapshots_rebuilt' => 1,
     ];
+}
+
+function admin_run_fediverse_link_card_refresh_tasks(): array
+{
+    $config = nammu_load_config();
+    if (!function_exists('nammu_fediverse_refresh_link_card_queue') && is_file(__DIR__ . '/core/fediverso.php')) {
+        require_once __DIR__ . '/core/fediverso.php';
+    }
+    if (!function_exists('nammu_fediverse_refresh_link_card_queue')) {
+        return ['processed' => 0, 'updated' => 0, 'failed' => 0, 'remaining' => 0, 'skipped' => 1];
+    }
+    $stats = nammu_fediverse_refresh_link_card_queue($config, 8, 259200);
+    $stats['skipped'] = 0;
+    return $stats;
 }
 
 function admin_refresh_fediverse_threads(array $config, int $limit = 20): array
@@ -8076,6 +8092,13 @@ if ($runScheduledHeavyOnly) {
 if ($runClusterScheduledOnly) {
     $result = admin_run_cluster_scheduled_tasks();
     $result['mode'] = 'cluster';
+    fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+    exit(0);
+}
+
+if ($runFediverseLinkCardRefreshOnly) {
+    $result = admin_run_with_scheduled_lock('admin_run_fediverse_link_card_refresh_tasks');
+    $result['mode'] = 'fediverse_link_cards';
     fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
     exit(0);
 }

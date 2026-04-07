@@ -66,6 +66,39 @@ if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons'
 $fediverseIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';
 $fediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
 $fediverseConfig = is_array($fediverseConfig) ? $fediverseConfig : [];
+$actualityVisibleLinkCardImage = static function (array $item) use ($fediverseConfig): string {
+    if (!function_exists('nammu_fediverse_cached_link_card')) {
+        return '';
+    }
+    $candidateUrls = [];
+    $boostOriginalUrl = trim((string) ($item['boost_original_url'] ?? ''));
+    if ($boostOriginalUrl !== '') {
+        $candidateUrls[] = $boostOriginalUrl;
+    }
+    $itemLink = trim((string) ($item['link'] ?? ''));
+    if ($itemLink !== '') {
+        $candidateUrls[] = $itemLink;
+    }
+    foreach ((array) ($item['links'] ?? []) as $candidateLink) {
+        $candidateLink = trim((string) $candidateLink);
+        if ($candidateLink !== '') {
+            $candidateUrls[] = $candidateLink;
+        }
+    }
+    $candidateUrls = array_values(array_unique($candidateUrls));
+    foreach ($candidateUrls as $candidateUrl) {
+        $card = nammu_fediverse_cached_link_card($candidateUrl, $fediverseConfig, 259200);
+        if (is_array($card) && trim((string) ($card['image'] ?? '')) !== '') {
+            return trim((string) $card['image']);
+        }
+    }
+    if (function_exists('nammu_fediverse_enqueue_link_card_url')) {
+        foreach ($candidateUrls as $candidateUrl) {
+            nammu_fediverse_enqueue_link_card_url($candidateUrl, 'actuality-visible');
+        }
+    }
+    return '';
+};
 $actualityFediverseMeta = static function (array $item) use ($fediverseConfig): array {
     if (!function_exists('nammu_fediverse_public_thread_meta_for_actuality_item')) {
         return [
@@ -249,11 +282,14 @@ $renderLinks = static function (array $links, array $item = []) use ($fediverseI
     }
     return implode(', ', $bits);
 };
-$renderImages = static function (array $item, bool $isSiteContent = false): string {
+$renderImages = static function (array $item, bool $isSiteContent = false) use ($actualityVisibleLinkCardImage): string {
     $allImages = array_values(array_unique(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))));
     $primaryImage = trim((string) ($item['image'] ?? ''));
     if ($primaryImage === '') {
         $primaryImage = trim((string) ($item['source_image'] ?? ''));
+    }
+    if ($primaryImage === '') {
+        $primaryImage = $actualityVisibleLinkCardImage($item);
     }
     $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
     if ($isBoost) {

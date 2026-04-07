@@ -542,6 +542,61 @@ function admin_social_broadcast_truncate_text(string $text, int $maxLength): str
     return rtrim($cut, " \t\n\r\0\x0B.,;:") . $ellipsis;
 }
 
+function admin_social_broadcast_extract_urls(string $text): array
+{
+    preg_match_all('#https?://[^\s<>"\')]+#iu', $text, $matches);
+    $urls = is_array($matches[0] ?? null) ? $matches[0] : [];
+    return array_values(array_unique(array_filter(array_map(static function ($url): string {
+        return trim((string) $url);
+    }, $urls))));
+}
+
+function admin_social_broadcast_structured_parts(string $text, string $fediverseUrl = ''): array
+{
+    $text = trim(str_replace(["\r\n", "\r"], "\n", $text));
+    $fediverseUrl = trim($fediverseUrl);
+    $lines = preg_split('/\n+/', $text) ?: [];
+    $lines = array_values(array_filter(array_map(static function ($line): string {
+        return trim((string) $line);
+    }, $lines), static fn(string $line): bool => $line !== ''));
+
+    $urls = admin_social_broadcast_extract_urls($text);
+    $primaryUrl = '';
+    foreach ($urls as $candidateUrl) {
+        if ($fediverseUrl !== '' && $candidateUrl === $fediverseUrl) {
+            continue;
+        }
+        $primaryUrl = $candidateUrl;
+        break;
+    }
+
+    $title = '';
+    $descriptionParts = [];
+    foreach ($lines as $line) {
+        if (preg_match('#^fediverso:\s*https?://#iu', $line) === 1) {
+            continue;
+        }
+        if (preg_match('#^https?://#i', $line) === 1) {
+            continue;
+        }
+        if ($primaryUrl !== '' && str_contains($line, $primaryUrl)) {
+            continue;
+        }
+        if ($title === '') {
+            $title = $line;
+            continue;
+        }
+        $descriptionParts[] = $line;
+    }
+
+    $description = trim(implode("\n\n", $descriptionParts));
+    return [
+        'title' => $title,
+        'url' => $primaryUrl,
+        'description' => $description,
+    ];
+}
+
 function admin_social_broadcast_fit_text_for_network(string $network, string $text, string $fediverseUrl = '', bool $hasImages = false): string
 {
     $baseText = trim(str_replace(["\r\n", "\r"], "\n", $text));
@@ -554,20 +609,74 @@ function admin_social_broadcast_fit_text_for_network(string $network, string $te
     if ($footerLabel !== '' && admin_social_broadcast_measure_for_network($network, $footerLabel) >= $limit) {
         return admin_social_broadcast_truncate_text(trim($fediverseUrl), $limit);
     }
-    $candidate = admin_social_broadcast_append_fediverse_link($baseText, $fediverseUrl);
-    if (admin_social_broadcast_measure_for_network($network, $candidate) <= $limit) {
-        return $candidate;
+    $parts = admin_social_broadcast_structured_parts($baseText, $fediverseUrl);
+    $title = trim((string) ($parts['title'] ?? ''));
+    $primaryUrl = trim((string) ($parts['url'] ?? ''));
+    $description = trim((string) ($parts['description'] ?? ''));
+    $requiredParts = [];
+    if ($title !== '') {
+        $requiredParts[] = $title;
     }
-    $bodyLimit = function_exists('mb_strlen') ? mb_strlen($baseText, 'UTF-8') : strlen($baseText);
-    while ($bodyLimit > 0) {
-        $trimmedBody = admin_social_broadcast_truncate_text($baseText, $bodyLimit);
-        $candidate = admin_social_broadcast_append_fediverse_link($trimmedBody, $fediverseUrl);
-        if (admin_social_broadcast_measure_for_network($network, $candidate) <= $limit) {
-            return $candidate;
+    if ($primaryUrl !== '') {
+        $requiredParts[] = $primaryUrl;
+    }
+    $requiredBase = trim(implode("\n\n", $requiredParts));
+    if ($requiredBase === '') {
+        $requiredBase = $title !== '' ? $title : $baseText;
+    }
+
+    $requiredWithFediverse = admin_social_broadcast_append_fediverse_link($requiredBase, $fediverseUrl);
+    if (admin_social_broadcast_measure_for_network($network, $requiredWithFediverse) <= $limit) {
+        if ($description !== '') {
+            $descriptionLimit = function_exists('mb_strlen') ? mb_strlen($description, 'UTF-8') : strlen($description);
+            while ($descriptionLimit > 0) {
+                $descriptionCandidate = admin_social_broadcast_truncate_text($description, $descriptionLimit);
+                $withDescription = admin_social_broadcast_append_fediverse_link(
+                    trim($requiredBase . "\n\n" . $descriptionCandidate),
+                    $fediverseUrl
+                );
+                if (admin_social_broadcast_measure_for_network($network, $withDescription) <= $limit) {
+                    return $withDescription;
+                }
+                $descriptionLimit--;
+            }
         }
-        $bodyLimit--;
+        return $requiredWithFediverse;
     }
-    return admin_social_broadcast_truncate_text($footerLabel, $limit);
+
+    if ($primaryUrl === '' && $fediverseUrl !== '') {
+        $titleWithFediverse = admin_social_broadcast_append_fediverse_link($title !== '' ? $title : '', $fediverseUrl);
+        if (trim($titleWithFediverse) !== '' && admin_social_broadcast_measure_for_network($network, $titleWithFediverse) <= $limit) {
+            if ($description !== '') {
+                $descriptionLimit = function_exists('mb_strlen') ? mb_strlen($description, 'UTF-8') : strlen($description);
+                while ($descriptionLimit > 0) {
+                    $descriptionCandidate = admin_social_broadcast_truncate_text($description, $descriptionLimit);
+                    $withDescription = admin_social_broadcast_append_fediverse_link(
+                        trim(($title !== '' ? $title : '') . "\n\n" . $descriptionCandidate),
+                        $fediverseUrl
+                    );
+                    if (admin_social_broadcast_measure_for_network($network, $withDescription) <= $limit) {
+                        return $withDescription;
+                    }
+                    $descriptionLimit--;
+                }
+            }
+            return $titleWithFediverse;
+        }
+    }
+
+    if ($primaryUrl !== '') {
+        $titleAndUrl = trim(implode("\n\n", array_filter([$title, $primaryUrl], static fn($part): bool => trim((string) $part) !== '')));
+        if ($titleAndUrl !== '' && admin_social_broadcast_measure_for_network($network, $titleAndUrl) <= $limit) {
+            return $titleAndUrl;
+        }
+    }
+
+    if ($title !== '' && admin_social_broadcast_measure_for_network($network, $title) <= $limit) {
+        return $title;
+    }
+
+    return admin_social_broadcast_truncate_text($requiredBase !== '' ? $requiredBase : $footerLabel, $limit);
 }
 
 function admin_social_broadcast_parse_images($images): array

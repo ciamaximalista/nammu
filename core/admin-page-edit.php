@@ -117,15 +117,18 @@ unset($_SESSION['newsletter_custom_recipients']);
         $showNewsTable = ($templateFilter === 'news');
         $showVisibilityColumn = ($templateFilter === 'page');
         $showNewsletterStatusColumn = ($templateFilter === 'newsletter');
-        $showSocialColumn = ($templateFilter !== 'newsletter' && !$showVisibilityColumn && !$showNotesTable && !$showNewsTable);
+        $showSocialColumn = ($templateFilter !== 'newsletter' && !$showNotesTable && !$showNewsTable);
         $columnCount = 4;
         if ($showNewsletterStatusColumn) {
             $columnCount++;
         }
-        $columnCount++;
         if ($showSocialColumn) {
             $columnCount++;
         }
+        if ($showVisibilityColumn) {
+            $columnCount++;
+        }
+        $columnCount++;
         ?>
 
         <?php if ($notesFeedback !== null): ?>
@@ -313,9 +316,11 @@ unset($_SESSION['newsletter_custom_recipients']);
 
                     <?php if ($showNewsletterStatusColumn): ?>
                         <th class="text-center">Envío</th>
-                    <?php elseif ($showVisibilityColumn): ?>
+                    <?php endif; ?>
+                    <?php if ($showVisibilityColumn): ?>
                         <th class="text-center"><i class="fas fa-eye" aria-hidden="true"></i><span class="sr-only">Visibilidad</span></th>
-                    <?php elseif ($showSocialColumn): ?>
+                    <?php endif; ?>
+                    <?php if ($showSocialColumn): ?>
                         <th class="text-center">Redes</th>
                     <?php endif; ?>
 
@@ -423,10 +428,10 @@ unset($_SESSION['newsletter_custom_recipients']);
                                     $availableNetworks[] = $key;
                                 }
                             }
-                            $showFediverseResend = in_array($templateFilter, ['single', 'podcast'], true)
+                            $showFediverseResend = in_array($templateFilter, ['single', 'page', 'podcast'], true)
                                 && (function_exists('nammu_fediverse_actor_url') || is_file(dirname(__DIR__) . '/core/fediverso.php'));
                             ?>
-                            <?php if (in_array($templateFilter, ['single', 'draft', 'podcast'], true)): ?>
+                            <?php if (in_array($templateFilter, ['single', 'page', 'draft', 'podcast'], true)): ?>
                                 <?php foreach ($availableNetworks as $networkKey): ?>
                                     <form method="post" class="d-inline-block mb-1">
                                         <input type="hidden" name="social_network" value="<?= htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') ?>">

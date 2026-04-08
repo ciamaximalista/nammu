@@ -9425,7 +9425,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($postData) {
                 $metadata = $postData['metadata'] ?? [];
                 $template = strtolower(trim((string) ($metadata['Template'] ?? 'post')));
-                if (in_array($template, ['single', 'post', 'podcast'], true)) {
+                if (in_array($template, ['single', 'post', 'page', 'podcast'], true)) {
                     $slug = pathinfo($filename, PATHINFO_FILENAME);
                     $slug = $slug !== '' ? $slug : $filename;
                     $title = (string) ($metadata['Title'] ?? $slug);
@@ -9510,7 +9510,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                 } else {
-                    $feedback['message'] = 'Sólo las entradas y podcasts pueden enviarse a redes sociales.';
+                    $feedback['message'] = 'Sólo las entradas, páginas y podcasts pueden enviarse a redes sociales.';
                 }
             }
         }

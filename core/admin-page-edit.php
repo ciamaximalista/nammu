@@ -400,7 +400,8 @@ unset($_SESSION['newsletter_custom_recipients']);
                                 <span class="badge badge-secondary">No enviado</span>
                             <?php endif; ?>
                         </td>
-                        <?php elseif ($showVisibilityColumn): ?>
+                        <?php endif; ?>
+                        <?php if ($showVisibilityColumn): ?>
                         <td class="text-center">
                             <?php
                             $visibilityValue = strtolower(trim((string) ($post['visibility'] ?? 'public')));
@@ -416,7 +417,8 @@ unset($_SESSION['newsletter_custom_recipients']);
                                 <span title="Pública" aria-label="Pública"><i class="fas fa-eye" aria-hidden="true"></i></span>
                             <?php endif; ?>
                         </td>
-                        <?php elseif ($showSocialColumn): ?>
+                        <?php endif; ?>
+                        <?php if ($showSocialColumn): ?>
                         <td class="text-center">
                             <?php
                             $availableNetworks = [];

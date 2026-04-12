@@ -193,8 +193,48 @@ function admin_save_social_rss_state(array $state): void
     if (!is_dir($dir)) {
         @mkdir($dir, 0775, true);
     }
-    @file_put_contents($file, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    $encoded = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($encoded) || $encoded === '') {
+        return;
+    }
+    $tmpFile = $file . '.tmp';
+    if (@file_put_contents($tmpFile, $encoded, LOCK_EX) === false) {
+        return;
+    }
+    @chmod($tmpFile, 0664);
+    @rename($tmpFile, $file);
     @chmod($file, 0664);
+}
+
+function admin_social_rss_mark_all_seen(array &$feedState, array $items, ?int $seenAt = null): void
+{
+    $timestamp = $seenAt ?? time();
+    foreach ($items as $item) {
+        $itemKey = trim((string) ($item['key'] ?? ''));
+        if ($itemKey === '') {
+            continue;
+        }
+        $feedState['seen'][$itemKey] = $timestamp;
+    }
+}
+
+function admin_social_rss_is_suspicious_state(array $feedState, array $items): bool
+{
+    $seen = is_array($feedState['seen'] ?? null) ? $feedState['seen'] : [];
+    $seenCount = count($seen);
+    $itemCount = count($items);
+    if ($itemCount < 10 || $seenCount > 1) {
+        return false;
+    }
+    $oldItems = 0;
+    $cutoff = time() - 86400;
+    foreach ($items as $item) {
+        $timestamp = (int) ($item['timestamp'] ?? 0);
+        if ($timestamp > 0 && $timestamp < $cutoff) {
+            $oldItems++;
+        }
+    }
+    return $oldItems >= min(5, $itemCount);
 }
 
 function admin_load_social_broadcast_queue(): array
@@ -776,15 +816,23 @@ function admin_process_social_rss_feeds(): array
             continue;
         }
         if (empty($feedState['initialized'])) {
-            foreach ($items as $item) {
-                $feedState['seen'][$item['key']] = time();
-            }
+            admin_social_rss_mark_all_seen($feedState, $items);
             $feedState['initialized'] = true;
+            $state['feeds'][$feedKey] = $feedState;
+            continue;
+        }
+        if (admin_social_rss_is_suspicious_state($feedState, $items)) {
+            admin_social_rss_mark_all_seen($feedState, $items);
             $state['feeds'][$feedKey] = $feedState;
             continue;
         }
         foreach ($items as $item) {
             if (isset($feedState['seen'][$item['key']])) {
+                continue;
+            }
+            $itemTimestamp = (int) ($item['timestamp'] ?? 0);
+            if ($itemTimestamp > 0 && $itemTimestamp < (time() - 86400)) {
+                $feedState['seen'][$item['key']] = time();
                 continue;
             }
             $fediverseUrl = admin_social_broadcast_fediverse_url_for_actuality_item($item);

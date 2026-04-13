@@ -160,6 +160,44 @@ function nammu_fediverse_link_card_queue_file(): string
     return dirname(__DIR__) . '/config/fediverso-link-card-queue.json';
 }
 
+function nammu_fediverse_actuality_item_link_targets(array $item): array
+{
+    return array_values(array_filter(array_map(
+        static fn($value): string => trim((string) $value),
+        is_array($item['links'] ?? null) ? $item['links'] : []
+    )));
+}
+
+function nammu_fediverse_actuality_item_effective_image(array $item): string
+{
+    $isManual = !empty($item['is_manual']);
+    $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
+    $linkTargets = nammu_fediverse_actuality_item_link_targets($item);
+    $boostOriginalUrl = trim((string) ($item['boost_original_url'] ?? ''));
+    $attachedImages = array_values(array_filter(array_map(
+        static fn($value): string => trim((string) $value),
+        is_array($item['images'] ?? null) ? $item['images'] : []
+    )));
+    if (!empty($attachedImages)) {
+        return (string) $attachedImages[0];
+    }
+
+    $primaryImage = trim((string) ($item['image'] ?? ''));
+    $sourceImage = trim((string) ($item['source_image'] ?? ''));
+
+    if ($isBoost && $boostOriginalUrl === '' && empty($linkTargets)) {
+        return '';
+    }
+    if ($isManual && !$isBoost && empty($linkTargets)) {
+        return '';
+    }
+
+    if ($primaryImage !== '') {
+        return $primaryImage;
+    }
+    return $sourceImage;
+}
+
 function nammu_fediverse_keys_file(): string
 {
     return dirname(__DIR__) . '/config/activitypub-keys.json';
@@ -3594,7 +3632,7 @@ function nammu_fediverse_find_local_item_for_thread_hash(string $hash, array $co
             'summary' => trim((string) ($actualityItem['description'] ?? '')),
             'published' => gmdate(DATE_ATOM, (int) (($actualityItem['timestamp'] ?? 0) ?: time())),
             'type' => !empty($actualityItem['is_manual']) ? 'Note' : 'Article',
-            'image' => trim((string) (($actualityItem['source_image'] ?? '') ?: ($actualityItem['image'] ?? ''))),
+            'image' => nammu_fediverse_actuality_item_effective_image($actualityItem),
             'images' => array_values(array_filter(array_map('strval', is_array($actualityItem['images'] ?? null) ? $actualityItem['images'] : []))),
             'alias_ids' => array_values(array_unique(array_filter(array_map('trim', $aliasIds)))),
         ];
@@ -4550,7 +4588,7 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
                 $clusterContent = trim((string) (($clusterActualityItem['raw_text'] ?? '') ?: ($clusterActualityItem['description'] ?? '')));
                 $clusterSummary = trim((string) ($clusterActualityItem['description'] ?? ''));
                 $clusterUrl = trim((string) ($clusterActualityItem['link'] ?? ''));
-                $clusterImage = trim((string) (($clusterActualityItem['source_image'] ?? '') ?: ($clusterActualityItem['image'] ?? '')));
+                $clusterImage = nammu_fediverse_actuality_item_effective_image($clusterActualityItem);
                 if ($clusterTitle !== '') {
                     $object['name'] = $clusterTitle;
                 }
@@ -5378,7 +5416,7 @@ function nammu_fediverse_local_content_items(array $config): array
             'summary' => trim((string) ($item['description'] ?? '')),
             'published' => gmdate(DATE_ATOM, (int) (($item['timestamp'] ?? 0) ?: time())),
             'type' => $isManual ? 'Note' : 'Article',
-            'image' => trim((string) (($item['source_image'] ?? '') ?: ($item['image'] ?? ''))),
+            'image' => nammu_fediverse_actuality_item_effective_image($item),
             'images' => array_values(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))),
             'alias_ids' => $aliasIds,
         ];

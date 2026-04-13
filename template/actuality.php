@@ -71,13 +71,15 @@ $actualityVisibleLinkCardImage = static function (array $item) use ($fediverseCo
         return '';
     }
     $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
+    $isManual = !empty($item['is_manual']);
+    $hasManualLinks = !empty(array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : []))));
     $candidateUrls = [];
     $boostOriginalUrl = trim((string) ($item['boost_original_url'] ?? ''));
     if ($boostOriginalUrl !== '') {
         $candidateUrls[] = $boostOriginalUrl;
     }
     $itemLink = trim((string) ($item['link'] ?? ''));
-    if (!$isBoost && $itemLink !== '') {
+    if (!$isBoost && !($isManual && !$hasManualLinks) && $itemLink !== '') {
         $candidateUrls[] = $itemLink;
     }
     foreach ((array) ($item['links'] ?? []) as $candidateLink) {
@@ -286,8 +288,10 @@ $renderLinks = static function (array $links, array $item = []) use ($fediverseI
 $renderImages = static function (array $item, bool $isSiteContent = false) use ($actualityVisibleLinkCardImage): string {
     $allImages = array_values(array_unique(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))));
     $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
+    $isManual = !empty($item['is_manual']);
+    $hasManualLinks = !empty(array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : []))));
     $primaryImage = trim((string) ($item['image'] ?? ''));
-    if (!$isBoost && $primaryImage === '') {
+    if (!$isBoost && !($isManual && !$hasManualLinks) && $primaryImage === '') {
         $primaryImage = trim((string) ($item['source_image'] ?? ''));
     }
     if ($primaryImage === '') {

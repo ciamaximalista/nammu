@@ -70,13 +70,14 @@ $actualityVisibleLinkCardImage = static function (array $item) use ($fediverseCo
     if (!function_exists('nammu_fediverse_cached_link_card')) {
         return '';
     }
+    $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
     $candidateUrls = [];
     $boostOriginalUrl = trim((string) ($item['boost_original_url'] ?? ''));
     if ($boostOriginalUrl !== '') {
         $candidateUrls[] = $boostOriginalUrl;
     }
     $itemLink = trim((string) ($item['link'] ?? ''));
-    if ($itemLink !== '') {
+    if (!$isBoost && $itemLink !== '') {
         $candidateUrls[] = $itemLink;
     }
     foreach ((array) ($item['links'] ?? []) as $candidateLink) {
@@ -284,14 +285,14 @@ $renderLinks = static function (array $links, array $item = []) use ($fediverseI
 };
 $renderImages = static function (array $item, bool $isSiteContent = false) use ($actualityVisibleLinkCardImage): string {
     $allImages = array_values(array_unique(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))));
+    $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
     $primaryImage = trim((string) ($item['image'] ?? ''));
-    if ($primaryImage === '') {
+    if (!$isBoost && $primaryImage === '') {
         $primaryImage = trim((string) ($item['source_image'] ?? ''));
     }
     if ($primaryImage === '') {
         $primaryImage = $actualityVisibleLinkCardImage($item);
     }
-    $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
     if ($isBoost) {
         $boostActorIcon = trim((string) ($item['boost_actor_icon'] ?? ''));
         $sourceImage = trim((string) ($item['source_image'] ?? ''));

@@ -112,6 +112,29 @@ $renderFediversePublicText = static function (string $text, string $className = 
     if ($text === '') {
         return '';
     }
+    $renderInline = static function (string $value): string {
+        $escaped = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+        return (string) preg_replace_callback(
+            '~https?://[^\s<]+~iu',
+            static function (array $matches): string {
+                $url = trim((string) ($matches[0] ?? ''));
+                if ($url === '') {
+                    return '';
+                }
+                $suffix = '';
+                while ($url !== '' && preg_match('/[)\].,;:!?]$/u', $url) === 1) {
+                    $suffix = mb_substr($url, -1, 1, 'UTF-8') . $suffix;
+                    $url = mb_substr($url, 0, mb_strlen($url, 'UTF-8') - 1, 'UTF-8');
+                }
+                if ($url === '') {
+                    return htmlspecialchars((string) ($matches[0] ?? ''), ENT_QUOTES, 'UTF-8');
+                }
+                $safeUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+                return '<a href="' . $safeUrl . '" target="_blank" rel="noopener">' . $safeUrl . '</a>' . htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8');
+            },
+            $escaped
+        ) ?? $escaped;
+    };
     $paragraphs = preg_split("/(?:\r?\n){2,}/", $text) ?: [];
     $classAttr = $className !== '' ? ' class="' . htmlspecialchars($className, ENT_QUOTES, 'UTF-8') . '"' : '';
     $html = '';
@@ -120,7 +143,7 @@ $renderFediversePublicText = static function (string $text, string $className = 
         if ($paragraph === '') {
             continue;
         }
-        $html .= '<p' . $classAttr . '>' . nl2br(htmlspecialchars($paragraph, ENT_QUOTES, 'UTF-8')) . '</p>';
+        $html .= '<p' . $classAttr . '>' . nl2br($renderInline($paragraph)) . '</p>';
     }
     return $html;
 };
@@ -288,7 +311,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
                 <?php endif; ?>
 
                 <?php if ($threadIsNote): ?>
-                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= nl2br(htmlspecialchars($threadContent, ENT_QUOTES, 'UTF-8')) ?></div>
+                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= $renderFediversePublicText($threadContent) ?></div>
                     <?php if (!empty($threadImageAttachments)): ?>
                         <div class="<?= count($threadImageAttachments) > 1 ? 'fediverse-public-status__media-grid' : 'fediverse-public-status__media' ?>">
                             <?php foreach ($threadImageAttachments as $imageIndex => $imageAttachment): ?>
@@ -311,7 +334,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
                         </div>
                     </a>
                 <?php else: ?>
-                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= nl2br(htmlspecialchars($threadContent, ENT_QUOTES, 'UTF-8')) ?></div>
+                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= $renderFediversePublicText($threadContent) ?></div>
                 <?php endif; ?>
 
                 <div class="fediverse-public-status__footer"<?= $threadOwnNoteFontStyle ?>>
@@ -456,7 +479,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
                                         </span>
                                     <?php endif; ?>
                                 </div>
-                                <div class="fediverse-public-reply__text"><?= nl2br(htmlspecialchars($replyText, ENT_QUOTES, 'UTF-8')) ?></div>
+                                <div class="fediverse-public-reply__text"><?= $renderFediversePublicText($replyText) ?></div>
                                 <?php if (is_array($replyCard) && trim((string) ($replyCard['url'] ?? '')) !== ''): ?>
                                     <a class="fediverse-public-reply__card" href="<?= htmlspecialchars((string) $replyCard['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
                                         <?php if (!empty($replyCard['image'])): ?>

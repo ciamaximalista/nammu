@@ -836,8 +836,22 @@ if (preg_match('#^/fediverso/([a-f0-9]{24})/?$#', $routePath, $fediverseThreadMa
     $threadDescription = trim((string) (($threadItem['summary'] ?? '') ?: ($threadItem['content'] ?? '')));
     $threadUrl = trim((string) ($threadPayload['thread_url'] ?? ''));
     $threadOriginalUrl = trim((string) ($threadPayload['original_url'] ?? ''));
-    if ($threadOriginalUrl !== '' && trim((string) ($threadItem['image'] ?? '')) === '' && function_exists('nammu_fediverse_cached_link_card')) {
-        $threadOriginalCard = nammu_fediverse_cached_link_card($threadOriginalUrl, $configData, 259200);
+    $threadLinkCardUrl = $threadOriginalUrl;
+    if (strcasecmp((string) ($threadItem['type'] ?? ''), 'Note') === 0) {
+        $threadLinks = array_values(array_filter(array_map('strval', is_array($threadItem['links'] ?? null) ? $threadItem['links'] : [])));
+        if (!empty($threadLinks)) {
+            $threadLinkCardUrl = trim((string) ($threadLinks[0] ?? ''));
+        } elseif ($threadLinkCardUrl !== '') {
+            $threadOriginalHost = strtolower(trim((string) (parse_url($threadLinkCardUrl, PHP_URL_HOST) ?? '')));
+            $siteHost = strtolower(trim((string) (parse_url($publicBaseUrl, PHP_URL_HOST) ?? '')));
+            $threadOriginalPath = trim((string) (parse_url($threadLinkCardUrl, PHP_URL_PATH) ?? ''));
+            if ($threadOriginalHost !== '' && $siteHost !== '' && $threadOriginalHost === $siteHost && $threadOriginalPath === '/actualidad.php') {
+                $threadLinkCardUrl = '';
+            }
+        }
+    }
+    if ($threadLinkCardUrl !== '' && trim((string) ($threadItem['image'] ?? '')) === '' && function_exists('nammu_fediverse_cached_link_card')) {
+        $threadOriginalCard = nammu_fediverse_cached_link_card($threadLinkCardUrl, $configData, 259200);
         if (is_array($threadOriginalCard) && trim((string) ($threadOriginalCard['image'] ?? '')) !== '') {
             $threadItem['image'] = trim((string) $threadOriginalCard['image']);
         }

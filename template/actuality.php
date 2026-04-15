@@ -103,7 +103,7 @@ $actualityVisibleLinkCardImage = static function (array $item) use ($fediverseCo
         $candidateUrls[] = $boostOriginalUrl;
     }
     $itemLink = trim((string) ($item['link'] ?? ''));
-    if (!$isBoost && !($isManual && !$hasManualLinks) && $itemLink !== '') {
+    if (!$isBoost && !$isManual && $itemLink !== '') {
         $candidateUrls[] = $itemLink;
     }
     foreach ((array) ($item['links'] ?? []) as $candidateLink) {

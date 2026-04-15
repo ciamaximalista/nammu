@@ -67,12 +67,36 @@ $fediverseIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_foo
 $fediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
 $fediverseConfig = is_array($fediverseConfig) ? $fediverseConfig : [];
 $actualityVisibleLinkCardImage = static function (array $item) use ($fediverseConfig): string {
+    $attachments = array_values(array_filter((array) ($item['attachments'] ?? []), static function ($attachment): bool {
+        return is_array($attachment);
+    }));
     if (!function_exists('nammu_fediverse_cached_link_card')) {
+        if (strtolower(trim((string) ($item['via'] ?? ''))) === 'boost') {
+            foreach ($attachments as $attachment) {
+                $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
+                $attachmentMediaType = strtolower(trim((string) ($attachment['media_type'] ?? '')));
+                $attachmentImage = trim((string) ($attachment['image'] ?? ''));
+                if ($attachmentImage !== '' && ($attachmentType === 'link' || $attachmentMediaType === 'text/html' || str_starts_with($attachmentMediaType, 'text/html'))) {
+                    return $attachmentImage;
+                }
+            }
+        }
         return '';
     }
     $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
     $isManual = !empty($item['is_manual']);
     $hasManualLinks = !empty(array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : []))));
+    if ($isBoost) {
+        foreach ($attachments as $attachment) {
+            $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
+            $attachmentMediaType = strtolower(trim((string) ($attachment['media_type'] ?? '')));
+            $attachmentImage = trim((string) ($attachment['image'] ?? ''));
+            if ($attachmentImage !== '' && ($attachmentType === 'link' || $attachmentMediaType === 'text/html' || str_starts_with($attachmentMediaType, 'text/html'))) {
+                return $attachmentImage;
+            }
+        }
+        return '';
+    }
     $candidateUrls = [];
     $boostOriginalUrl = trim((string) ($item['boost_original_url'] ?? ''));
     if ($boostOriginalUrl !== '') {

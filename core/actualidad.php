@@ -1961,6 +1961,7 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
             'link' => trim((string) ($item['link'] ?? nammu_actuality_manual_anchor_url($publicBaseUrl, $manualId))),
             'image' => nammu_actuality_manual_image_url((string) ($item['image'] ?? ''), $publicBaseUrl),
             'images' => nammu_actuality_manual_images((array) ($item['images'] ?? []), $publicBaseUrl),
+            'attachments' => nammu_actuality_normalize_fediverse_attachments((array) ($item['attachments'] ?? [])),
             'description' => nammu_actuality_manual_plain_text((string) ($item['description'] ?? '')),
             'raw_text' => nammu_actuality_manual_plain_text((string) ($item['raw_text'] ?? '')),
             'links' => array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : []))),

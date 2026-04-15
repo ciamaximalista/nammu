@@ -72,6 +72,32 @@ function admin_social_broadcast_max_images(): int
     return 4;
 }
 
+function admin_social_broadcast_media_type(string $value): string
+{
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+    $path = $value;
+    if (preg_match('#^https?://#i', $value)) {
+        $path = (string) (parse_url($value, PHP_URL_PATH) ?? '');
+    }
+    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    if ($ext === '') {
+        return '';
+    }
+    if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg'], true)) {
+        return 'image';
+    }
+    if (in_array($ext, ['mp4', 'm4v', 'mov', 'webm', 'ogv', 'ogg'], true)) {
+        return 'video';
+    }
+    if (in_array($ext, ['mp3', 'm4a', 'aac', 'wav', 'oga', 'opus'], true)) {
+        return 'audio';
+    }
+    return '';
+}
+
 function admin_social_broadcast_network_image_limits(): array
 {
     return [
@@ -743,9 +769,42 @@ function admin_social_broadcast_parse_images($images): array
     return $items;
 }
 
+function admin_social_broadcast_parse_image_items($images): array
+{
+    return array_values(array_filter(admin_social_broadcast_parse_images($images), static function (string $item): bool {
+        return admin_social_broadcast_media_type($item) === 'image';
+    }));
+}
+
+function admin_social_broadcast_parse_actuality_attachments($images): array
+{
+    $attachments = [];
+    foreach (admin_social_broadcast_parse_images($images) as $item) {
+        $mediaType = admin_social_broadcast_media_type($item);
+        if (!in_array($mediaType, ['video', 'audio'], true)) {
+            continue;
+        }
+        $url = admin_public_asset_url($item);
+        if ($url === '') {
+            continue;
+        }
+        $attachments[] = [
+            'type' => $mediaType,
+            'url' => $url,
+            'name' => basename((string) parse_url($url, PHP_URL_PATH)),
+            'media_type' => $mediaType === 'video'
+                ? admin_video_mime_from_extension(strtolower(pathinfo($item, PATHINFO_EXTENSION)))
+                : '',
+            'image' => '',
+            'summary' => '',
+        ];
+    }
+    return $attachments;
+}
+
 function admin_social_broadcast_primary_image($images): string
 {
-    $parsed = admin_social_broadcast_parse_images($images);
+    $parsed = admin_social_broadcast_parse_image_items($images);
     return $parsed[0] ?? '';
 }
 
@@ -1811,7 +1870,8 @@ function admin_handle_social_broadcast_submission(array $settings, string $text,
         'networks' => [],
     ];
 
-    $imageItems = admin_social_broadcast_parse_images($image);
+    $imageItems = admin_social_broadcast_parse_image_items($image);
+    $actualityAttachments = admin_social_broadcast_parse_actuality_attachments($image);
     $primaryImage = $imageItems[0] ?? '';
     $sendToActuality = true;
     $available = admin_social_broadcast_available_networks($settings);
@@ -1842,6 +1902,7 @@ function admin_handle_social_broadcast_submission(array $settings, string $text,
             }
             $manualItem = nammu_actuality_add_manual_item($text, $baseUrl, $siteTitle, $primaryImage, [
                 'images' => $imageItems,
+                'attachments' => $actualityAttachments,
             ]);
             if (!empty($manualItem)) {
                 if (function_exists('nammu_actuality_add_item_to_snapshots')) {
@@ -1862,7 +1923,7 @@ function admin_handle_social_broadcast_submission(array $settings, string $text,
     }
     $allConfiguredNetworks = array_keys($available);
     if (!empty($allConfiguredNetworks)) {
-        $queueResult = admin_enqueue_social_broadcast($text, $image, $allConfiguredNetworks, $fediverseUrl);
+        $queueResult = admin_enqueue_social_broadcast($text, implode("\n", $imageItems), $allConfiguredNetworks, $fediverseUrl);
         if (!empty($queueResult['ok'])) {
             $sent[] = 'Cola de redes';
         } else {

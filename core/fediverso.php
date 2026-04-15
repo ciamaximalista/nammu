@@ -8942,9 +8942,9 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
     } elseif ($template === 'draft') {
         $template = 'post';
     }
-    $supportedTemplates = ['post', 'podcast'];
+    $supportedTemplates = ['post', 'podcast', 'itinerary'];
     if (!in_array($template, $supportedTemplates, true)) {
-        return ['ok' => false, 'message' => 'Solo las entradas y podcasts pueden reenviarse al Fediverso desde Editar.'];
+        return ['ok' => false, 'message' => 'Solo las entradas, podcasts e itinerarios pueden reenviarse al Fediverso desde Editar.'];
     }
     $followers = nammu_fediverse_followers_store()['followers'];
     if (empty($followers)) {
@@ -8971,6 +8971,37 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
         ) {
             $matchedItem = $item;
             break;
+        }
+    }
+    if (!is_array($matchedItem) && $template === 'itinerary') {
+        $itineraryIndexFile = dirname(__DIR__) . '/itinerarios/' . $slug . '/index.md';
+        if (is_file($itineraryIndexFile) && is_readable($itineraryIndexFile)) {
+            $raw = (string) @file_get_contents($itineraryIndexFile);
+            $meta = nammu_fediverse_parse_front_matter($raw);
+            $status = strtolower(trim((string) ($meta['Status'] ?? $meta['status'] ?? 'published')));
+            if ($status === 'published') {
+                $title = trim((string) (($meta['Title'] ?? $meta['title'] ?? '') ?: $slug));
+                $description = trim((string) (($meta['Description'] ?? $meta['description'] ?? '') ?: ''));
+                $content = nammu_fediverse_strip_front_matter($raw);
+                $baseUrl = nammu_fediverse_base_url($config);
+                $image = nammu_fediverse_asset_url((string) (($meta['Image'] ?? $meta['image'] ?? '') ?: ''), $baseUrl);
+                if ($image === '') {
+                    $image = nammu_fediverse_first_markdown_image($content, $baseUrl);
+                }
+                if ($image === '') {
+                    $image = nammu_fediverse_social_image_for_url($targetUrl);
+                }
+                $matchedItem = [
+                    'id' => $targetId,
+                    'url' => $targetUrl,
+                    'title' => $title,
+                    'content' => $description !== '' ? $description : nammu_fediverse_plain_excerpt($content),
+                    'summary' => $description,
+                    'published' => nammu_fediverse_meta_date($meta, $itineraryIndexFile),
+                    'type' => 'Article',
+                    'image' => $image,
+                ];
+            }
         }
     }
     if (!is_array($matchedItem)) {

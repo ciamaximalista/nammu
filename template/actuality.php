@@ -332,6 +332,40 @@ $renderImages = static function (array $item, bool $isSiteContent = false) use (
     $html .= '</div>';
     return $html;
 };
+$renderMediaAttachments = static function (array $item): string {
+    $attachments = array_values(array_filter((array) ($item['attachments'] ?? []), static function ($attachment): bool {
+        return is_array($attachment) && trim((string) ($attachment['url'] ?? '')) !== '';
+    }));
+    if (empty($attachments)) {
+        return '';
+    }
+    $html = '';
+    foreach ($attachments as $attachment) {
+        $attachmentUrl = trim((string) ($attachment['url'] ?? ''));
+        $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
+        $attachmentMediaType = strtolower(trim((string) ($attachment['media_type'] ?? '')));
+        $attachmentName = trim((string) (($attachment['name'] ?? '') ?: 'Adjunto'));
+        $isImage = $attachmentType === 'image' || str_starts_with($attachmentMediaType, 'image/');
+        $isVideo = $attachmentType === 'video' || str_starts_with($attachmentMediaType, 'video/');
+        $isAudio = $attachmentType === 'audio' || str_starts_with($attachmentMediaType, 'audio/');
+        if ($attachmentUrl === '' || $isImage) {
+            continue;
+        }
+        if ($isVideo) {
+            $html .= '<div class="actuality-media actuality-media--video"><video controls preload="metadata">';
+            $html .= '<source src="' . htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') . '"' . ($attachmentMediaType !== '' ? ' type="' . htmlspecialchars($attachmentMediaType, ENT_QUOTES, 'UTF-8') . '"' : '') . '>';
+            $html .= '</video></div>';
+            continue;
+        }
+        if ($isAudio) {
+            $html .= '<div class="actuality-media actuality-media--audio"><audio controls preload="metadata">';
+            $html .= '<source src="' . htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') . '"' . ($attachmentMediaType !== '' ? ' type="' . htmlspecialchars($attachmentMediaType, ENT_QUOTES, 'UTF-8') . '"' : '') . '>';
+            $html .= '</audio></div>';
+            continue;
+        }
+    }
+    return $html;
+};
 $currentPage = max(1, (int) ($currentPage ?? 1));
 $totalPages = max(1, (int) ($totalPages ?? 1));
 $prevPageUrl = trim((string) ($prevPageUrl ?? ''));
@@ -544,6 +578,10 @@ $manualDisplayText = static function (array $item): string {
                             <?php if (!$isSiteContent && $imagesHtml !== ''): ?>
                                 <?= $imagesHtml ?>
                             <?php endif; ?>
+                            <?php $mediaHtml = $renderMediaAttachments($item); ?>
+                            <?php if ($mediaHtml !== ''): ?>
+                                <?= $mediaHtml ?>
+                            <?php endif; ?>
                             <?php if ($item['description'] !== ''): ?>
                                 <div class="actuality-description"><?= $renderActualityText((string) $item['description'], $item) ?></div>
                             <?php endif; ?>
@@ -588,6 +626,10 @@ $manualDisplayText = static function (array $item): string {
                                 <?php endif; ?>
                                 <?php if (!$isSiteContent && $imagesHtml !== ''): ?>
                                     <?= $imagesHtml ?>
+                                <?php endif; ?>
+                                <?php $mediaHtml = $renderMediaAttachments($item); ?>
+                                <?php if ($mediaHtml !== ''): ?>
+                                    <?= $mediaHtml ?>
                                 <?php endif; ?>
                                 <?php if ((!$isManual && $item['description'] !== '') || ($isManual && $manualBody !== '')): ?>
                                     <?php $descriptionText = $isManual ? $manualBody : (string) $item['description']; ?>
@@ -635,6 +677,10 @@ $manualDisplayText = static function (array $item): string {
                                 <?php endif; ?>
                                 <?php if (!$isSiteContent && $imagesHtml !== ''): ?>
                                     <?= $imagesHtml ?>
+                                <?php endif; ?>
+                                <?php $mediaHtml = $renderMediaAttachments($item); ?>
+                                <?php if ($mediaHtml !== ''): ?>
+                                    <?= $mediaHtml ?>
                                 <?php endif; ?>
                                 <?php if ((!$isManual && $item['description'] !== '') || ($isManual && $manualBody !== '')): ?>
                                     <?php $descriptionText = $isManual ? $manualBody : (string) $item['description']; ?>
@@ -954,6 +1000,21 @@ $manualDisplayText = static function (array $item): string {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 0.5rem;
         margin-bottom: 0.95rem;
+    }
+    .actuality-media {
+        margin-bottom: 0.95rem;
+    }
+    .actuality-media video,
+    .actuality-media audio {
+        display: block;
+        width: 100%;
+        border-radius: 16px;
+    }
+    .actuality-media video {
+        background: #000;
+    }
+    .actuality-media audio {
+        background: #f4f4f4;
     }
     .actuality-image-link--gallery {
         margin-bottom: 0;

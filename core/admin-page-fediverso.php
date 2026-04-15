@@ -1554,6 +1554,7 @@
                                                 ?>
                                                 <input type="hidden" name="fediverse_object_image" value="<?= htmlspecialchars($boostImageUrl, ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="fediverse_object_images" value="<?= htmlspecialchars(json_encode($boostImageUrls, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="fediverse_object_attachments" value="<?= htmlspecialchars(json_encode($attachments, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
                                                 <button type="submit" name="<?= !empty($itemActionState['boosted']) ? 'fediverse_unboost_item' : 'fediverse_boost_item' ?>" class="btn btn-outline-secondary btn-sm"<?= !empty($itemActionState['boosted']) ? ' onclick="return confirm(\'¿Quitar este impulso y borrar la nota local asociada?\');"' : '' ?>><?= !empty($itemActionState['boosted']) ? 'Quitar impulso' : 'Impulsar' ?></button>
                                             </form>
                                             <details class="fediverse-inline-form">

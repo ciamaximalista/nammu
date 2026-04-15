@@ -9684,9 +9684,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ], $content, !empty($itineraryQuizResult['data']['questions']) ? $itineraryQuizResult['data'] : null);
             admin_regenerate_public_artifacts();
             $shouldDispatchPublication = $publishItineraryNow || ($statusValue === 'published' && ($mode === 'new' || $previousStatus === 'draft'));
-            if ($statusValue === 'published' && function_exists('nammu_fediverse_deliver_local_items') && $shouldDispatchPublication) {
+            if ($statusValue === 'published' && function_exists('nammu_fediverse_deliver_named_local_item') && $shouldDispatchPublication) {
                 try {
-                    nammu_fediverse_deliver_local_items(load_config_file());
+                    nammu_fediverse_deliver_named_local_item($saved->getSlug(), 'itinerary', load_config_file());
                 } catch (Throwable $e) {
                     // ignore fediverse delivery errors on publish
                 }
@@ -12305,6 +12305,24 @@ if ($isLoggedIn && $page === 'fediverso') {
         $objectActorUrl = trim((string) ($_POST['fediverse_actor_url'] ?? ''));
         $objectImages = json_decode((string) ($_POST['fediverse_object_images'] ?? '[]'), true);
         $objectImages = array_values(array_unique(array_filter(array_map('strval', is_array($objectImages) ? $objectImages : []))));
+        $objectAttachments = json_decode((string) ($_POST['fediverse_object_attachments'] ?? '[]'), true);
+        $objectAttachments = array_values(array_filter(array_map(static function ($attachment): ?array {
+            if (!is_array($attachment)) {
+                return null;
+            }
+            $url = trim((string) ($attachment['url'] ?? ''));
+            if ($url === '') {
+                return null;
+            }
+            return [
+                'type' => strtolower(trim((string) ($attachment['type'] ?? 'document'))),
+                'url' => $url,
+                'name' => trim((string) ($attachment['name'] ?? '')),
+                'media_type' => trim((string) ($attachment['media_type'] ?? ($attachment['mediaType'] ?? ''))),
+                'image' => trim((string) ($attachment['image'] ?? '')),
+                'summary' => trim((string) ($attachment['summary'] ?? '')),
+            ];
+        }, is_array($objectAttachments) ? $objectAttachments : [])));
         if ($objectImage !== '' && !in_array($objectImage, $objectImages, true)) {
             array_unshift($objectImages, $objectImage);
         }
@@ -12371,6 +12389,7 @@ if ($isLoggedIn && $page === 'fediverso') {
                 $manualItem = nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle, $objectImage, [
                     'via' => 'boost',
                     'images' => $objectImages,
+                    'attachments' => $objectAttachments,
                     'boost_original_url' => $displayUrl,
                     'boost_actor_name' => $objectActorName,
                     'boost_actor_icon' => $objectActorIcon,
@@ -12385,6 +12404,7 @@ if ($isLoggedIn && $page === 'fediverso') {
                     'via' => 'boost',
                     'image' => $objectImage,
                     'images' => $objectImages,
+                    'attachments' => $objectAttachments,
                     'manual_item_id' => (string) ($manualItem['id'] ?? ''),
                     'public_url' => $displayUrl,
                     'boost_actor_name' => $objectActorName,
@@ -17097,7 +17117,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                             }).filter(Boolean);
                             if (currentItems.indexOf(nextValue) === -1) {
                                 if (imageTargetMaxItems > 0 && currentItems.length >= imageTargetMaxItems) {
-                                    alert('Solo puedes añadir hasta ' + imageTargetMaxItems + ' imágenes.');
+                                    alert('Solo puedes añadir hasta ' + imageTargetMaxItems + ' adjuntos.');
                                     return;
                                 }
                                 currentItems.push(nextValue);

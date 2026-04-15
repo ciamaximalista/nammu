@@ -1083,6 +1083,29 @@ function nammu_actuality_images_from_fediverse_attachments(array $attachments): 
     return array_values(array_unique(array_filter($images)));
 }
 
+function nammu_actuality_normalize_fediverse_attachments(array $attachments): array
+{
+    $normalized = [];
+    foreach ($attachments as $attachment) {
+        if (!is_array($attachment)) {
+            continue;
+        }
+        $url = trim((string) ($attachment['url'] ?? ($attachment['href'] ?? '')));
+        if ($url === '') {
+            continue;
+        }
+        $normalized[] = [
+            'type' => strtolower(trim((string) ($attachment['type'] ?? 'document'))),
+            'url' => $url,
+            'name' => trim((string) ($attachment['name'] ?? '')),
+            'media_type' => trim((string) ($attachment['media_type'] ?? ($attachment['mediaType'] ?? ($attachment['mimeType'] ?? '')))),
+            'image' => trim((string) ($attachment['image'] ?? '')),
+            'summary' => trim((string) ($attachment['summary'] ?? '')),
+        ];
+    }
+    return array_values($normalized);
+}
+
 function nammu_actuality_enrich_manual_boost_item_images(array $item): array
 {
     if (strtolower(trim((string) ($item['via'] ?? ''))) !== 'boost') {
@@ -1108,6 +1131,7 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item): array
     $description = nammu_actuality_manual_plain_text((string) ($item['description'] ?? ''));
     $rawText = nammu_actuality_manual_plain_text((string) ($item['raw_text'] ?? ''));
     $fallbackSummary = 'Impulsó una publicación.';
+    $attachments = nammu_actuality_normalize_fediverse_attachments((array) ($item['attachments'] ?? []));
 
     $manualId = trim((string) ($item['id'] ?? ''));
     $candidateIdentifiers = array_values(array_filter(array_map('strval', array_merge(
@@ -1155,6 +1179,13 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item): array
             foreach (array_filter([$actionObjectUrl, $actionPublicUrl]) as $identifier) {
                 if (!in_array($identifier, $candidateIdentifiers, true)) {
                     $candidateIdentifiers[] = $identifier;
+                }
+            }
+            foreach (nammu_actuality_normalize_fediverse_attachments((array) ($action['attachments'] ?? [])) as $attachment) {
+                $attachmentUrl = trim((string) ($attachment['url'] ?? ''));
+                $knownAttachmentUrls = array_map(static fn(array $existing): string => trim((string) ($existing['url'] ?? '')), $attachments);
+                if ($attachmentUrl !== '' && !in_array($attachmentUrl, $knownAttachmentUrls, true)) {
+                    $attachments[] = $attachment;
                 }
             }
         }
@@ -1222,6 +1253,13 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item): array
                 $images[] = $imageUrl;
             }
         }
+        foreach (nammu_actuality_normalize_fediverse_attachments((array) ($timelineItem['attachments'] ?? [])) as $attachment) {
+            $attachmentUrl = trim((string) ($attachment['url'] ?? ''));
+            $knownAttachmentUrls = array_map(static fn(array $existing): string => trim((string) ($existing['url'] ?? '')), $attachments);
+            if ($attachmentUrl !== '' && !in_array($attachmentUrl, $knownAttachmentUrls, true)) {
+                $attachments[] = $attachment;
+            }
+        }
         $timelineImage = trim((string) ($timelineItem['image'] ?? ''));
         if ($timelineImage !== '' && !in_array($timelineImage, $images, true)) {
             $images[] = $timelineImage;
@@ -1258,6 +1296,9 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item): array
     }
     if ($boostActorUrl !== '') {
         $item['boost_actor_url'] = $boostActorUrl;
+    }
+    if (!empty($attachments)) {
+        $item['attachments'] = array_values($attachments);
     }
     return $item;
 }

@@ -51,14 +51,14 @@
                                 </small>
                             </div>
                             <div class="form-group mt-3 mb-0">
-                                <label for="social_broadcast_image">Imagen opcional</label>
+                                <label for="social_broadcast_image">Adjuntos opcionales</label>
                                 <div class="input-group">
                                     <textarea name="social_broadcast_image" id="social_broadcast_image" class="form-control" rows="4" readonly><?= htmlspecialchars($socialBroadcastImage ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
                                     <div class="input-group-append">
-                                        <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="social_broadcast_image" data-target-prefix="" data-target-multi="1" data-target-max-items="<?= $socialBroadcastMaxImages ?>">Añadir imagen</button>
+                                        <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="social_broadcast_image" data-target-prefix="" data-target-multi="1" data-target-max-items="<?= $socialBroadcastMaxImages ?>" data-target-accept="image,video">Añadir adjunto</button>
                                     </div>
                                 </div>
-                                <small class="form-text text-muted">Puedes añadir hasta <?= $socialBroadcastMaxImages ?> imágenes, una por línea. X y Bluesky usarán varias; en las demás redes Nammu usará la primera cuando haga falta. Si marcas Instagram, Nammu la adaptará automáticamente a 1080x1080.</small>
+                                <small class="form-text text-muted">Puedes añadir hasta <?= $socialBroadcastMaxImages ?> adjuntos, una ruta por línea. Las imágenes podrán salir también en redes; los vídeos se conservarán para el Fediverso y la página de perfil. Si marcas Instagram, Nammu solo usará una imagen.</small>
                             </div>
                         </div>
                     </div>

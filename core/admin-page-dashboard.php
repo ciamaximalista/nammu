@@ -2409,9 +2409,6 @@
     usort($topItineraryViews, static function (array $a, array $b): int {
         return $b['count'] <=> $a['count'];
     });
-    $topItineraryViews = array_slice($topItineraryViews, 0, 10);
-    $topItineraryStarts = array_slice($topItineraryStarts, 0, 10);
-    $topItineraryCompletes = array_slice($topItineraryCompletes, 0, 10);
 
     $resourceCounts = [
         'images' => 0,

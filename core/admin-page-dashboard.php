@@ -2356,13 +2356,11 @@
     foreach ($itineraries ?? [] as $itineraryItem) {
         $slug = $itineraryItem->getSlug();
         $viewCount = $itineraryPageUniques[$slug] ?? 0;
-        if ($viewCount > 0) {
-            $topItineraryViews[] = [
-                'slug' => $slug,
-                'title' => $itineraryTitleMap[$slug] ?? $slug,
-                'count' => $viewCount,
-            ];
-        }
+        $topItineraryViews[] = [
+            'slug' => $slug,
+            'title' => $itineraryTitleMap[$slug] ?? $slug,
+            'count' => $viewCount,
+        ];
         $rawStats = admin_get_itinerary_stats($itineraryItem);
         $topicStatsList = array_values($rawStats['topics'] ?? []);
         usort($topicStatsList, static function (array $a, array $b): int {
@@ -2385,20 +2383,16 @@
             $lastTopic = $topicStatsList[count($topicStatsList) - 1];
             $lastTopicCount = (int) ($lastTopic['count'] ?? 0);
         }
-        if ($topicOneStarters > 0 || $presentationReaders > 0) {
-            $topItineraryStarts[] = [
-                'slug' => $slug,
-                'title' => $itineraryTitleMap[$slug] ?? $slug,
-                'count' => $topicOneStarters > 0 ? $topicOneStarters : $presentationReaders,
-            ];
-        }
-        if ($lastTopicCount > 0) {
-            $topItineraryCompletes[] = [
-                'slug' => $slug,
-                'title' => $itineraryTitleMap[$slug] ?? $slug,
-                'count' => $lastTopicCount,
-            ];
-        }
+        $topItineraryStarts[] = [
+            'slug' => $slug,
+            'title' => $itineraryTitleMap[$slug] ?? $slug,
+            'count' => $topicOneStarters > 0 ? $topicOneStarters : $presentationReaders,
+        ];
+        $topItineraryCompletes[] = [
+            'slug' => $slug,
+            'title' => $itineraryTitleMap[$slug] ?? $slug,
+            'count' => $lastTopicCount,
+        ];
     }
     usort($topItineraryStarts, static function (array $a, array $b): int {
         return $b['count'] <=> $a['count'];

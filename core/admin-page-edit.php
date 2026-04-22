@@ -826,9 +826,7 @@ unset($_SESSION['newsletter_custom_recipients']);
 
             <div class="mt-3">
                 <div class="alert alert-warning d-none" data-publish-cancelled>Los cambios no se han guardado.</div>
-                <?php if (!($isNewsletterType && $newsletterSent)): ?>
-                    <button type="submit" name="update" class="btn btn-primary">Actualizar</button>
-                <?php endif; ?>
+                <button type="submit" name="update" class="btn btn-primary"><?= ($isNewsletterType && $newsletterSent) ? 'Guardar cambios' : 'Actualizar' ?></button>
                 <button type="submit" name="update_and_view" value="1" class="btn btn-outline-primary ml-2">Ver en la web</button>
                 <?php if ($isNewsletterType && $newsletterSent && $mailingNewsletterEnabled): ?>
                     <button type="submit" name="resend_newsletter_edit" value="1" class="btn btn-primary">Volver a enviar</button>

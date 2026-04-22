@@ -3549,14 +3549,19 @@ function nammu_newsletter_issue_access_token(string $email, int $ttlSeconds = 36
 
 function nammu_newsletter_validate_access(string $email, string $token): bool
 {
+    return is_array(nammu_newsletter_validate_access_entry($email, $token));
+}
+
+function nammu_newsletter_validate_access_entry(string $email, string $token): ?array
+{
     $email = strtolower(trim($email));
     if ($email === '' || $token === '') {
-        return false;
+        return null;
     }
     $now = time();
     $entries = nammu_newsletter_load_access_entries();
     $entries = nammu_newsletter_purge_access_entries($entries);
-    $valid = false;
+    $validEntry = null;
     foreach ($entries as $entry) {
         if (!is_array($entry)) {
             continue;
@@ -3566,14 +3571,18 @@ function nammu_newsletter_validate_access(string $email, string $token): bool
             continue;
         }
         if (($entry['email'] ?? '') === $email && ($entry['token'] ?? '') === $token) {
-            $valid = true;
+            $validEntry = [
+                'email' => $email,
+                'token' => $token,
+                'expires_at' => $expires,
+            ];
             break;
         }
     }
     if (count($entries) !== count(nammu_newsletter_load_access_entries())) {
         nammu_newsletter_save_access_entries($entries);
     }
-    return $valid;
+    return $validEntry;
 }
 
 function nammu_newsletter_access_cookie_name(): string

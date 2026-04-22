@@ -165,7 +165,7 @@
 
         <div class="form-group description-group">
 
-            <label for="description" data-podcast-label="Descripción" data-post-label="Entradilla">Entradilla</label>
+            <label for="description" data-podcast-label="Descripción" data-post-label="Entradilla" data-newsletter-label="Descripción">Entradilla</label>
 
             <textarea name="description" id="description" class="form-control" rows="3"></textarea>
 
@@ -436,10 +436,12 @@ document.addEventListener('DOMContentLoaded', function() {
             contentLabel.textContent = isMessage ? (contentLabel.dataset.messageLabel || 'Nota') : (contentLabel.dataset.defaultLabel || 'Contenido (Markdown)');
         }
         if (descriptionLabel && descriptionLabel.dataset.podcastLabel && descriptionLabel.dataset.postLabel) {
-            descriptionLabel.textContent = isPodcast ? descriptionLabel.dataset.podcastLabel : descriptionLabel.dataset.postLabel;
+            descriptionLabel.textContent = isNewsletter
+                ? (descriptionLabel.dataset.newsletterLabel || descriptionLabel.dataset.podcastLabel)
+                : (isPodcast ? descriptionLabel.dataset.podcastLabel : descriptionLabel.dataset.postLabel);
         }
         if (descriptionGroup) {
-            descriptionGroup.classList.toggle('d-none', isNewsletter || isMessage);
+            descriptionGroup.classList.toggle('d-none', isMessage);
         }
         if (messageHelp) {
             messageHelp.classList.toggle('d-none', !isMessage);

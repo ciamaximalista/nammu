@@ -716,9 +716,9 @@ unset($_SESSION['newsletter_custom_recipients']);
 
             </div>
 
-            <div class="form-group description-group<?= $currentTypeValue === 'Newsletter' ? ' d-none' : '' ?>">
+            <div class="form-group description-group">
 
-                <label for="description" data-podcast-label="Descripción" data-post-label="Descripción">Descripción</label>
+                <label for="description" data-podcast-label="Descripción" data-post-label="Descripción" data-newsletter-label="Descripción">Descripción</label>
 
                 <textarea name="description" id="description" class="form-control" rows="3"><?= htmlspecialchars($post_data['metadata']['Description'] ?? '') ?></textarea>
 
@@ -976,10 +976,12 @@ unset($_SESSION['newsletter_custom_recipients']);
                         titleLabel.textContent = isPodcast ? titleLabel.dataset.podcastLabel : titleLabel.dataset.postLabel;
                     }
                     if (descriptionLabel && descriptionLabel.dataset.podcastLabel && descriptionLabel.dataset.postLabel) {
-                        descriptionLabel.textContent = isPodcast ? descriptionLabel.dataset.podcastLabel : descriptionLabel.dataset.postLabel;
+                        descriptionLabel.textContent = isNewsletter
+                            ? (descriptionLabel.dataset.newsletterLabel || descriptionLabel.dataset.podcastLabel)
+                            : (isPodcast ? descriptionLabel.dataset.podcastLabel : descriptionLabel.dataset.postLabel);
                     }
                     if (descriptionGroup) {
-                        descriptionGroup.classList.toggle('d-none', isNewsletter);
+                        descriptionGroup.classList.toggle('d-none', false);
                     }
                     if (imageLabel && imageLabel.dataset.podcastLabel && imageLabel.dataset.postLabel) {
                         imageLabel.textContent = isPodcast ? imageLabel.dataset.podcastLabel : imageLabel.dataset.postLabel;

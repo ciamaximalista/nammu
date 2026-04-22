@@ -2359,9 +2359,12 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
     $emailParam = trim((string) ($_GET['email'] ?? ''));
     $tokenParam = trim((string) ($_GET['token'] ?? ''));
     $nextParam = trim((string) ($_GET['next'] ?? ''));
-    if (!$accessGranted && $emailParam !== '' && $tokenParam !== '' && nammu_newsletter_validate_access($emailParam, $tokenParam)) {
-        $expires = time() + 3600;
-        nammu_newsletter_set_access_cookie($emailParam, $tokenParam, $expires);
+    $validatedAccess = (!$accessGranted && $emailParam !== '' && $tokenParam !== '' && function_exists('nammu_newsletter_validate_access_entry'))
+        ? nammu_newsletter_validate_access_entry($emailParam, $tokenParam)
+        : null;
+    if (!$accessGranted && is_array($validatedAccess)) {
+        $expires = (int) ($validatedAccess['expires_at'] ?? 0);
+        nammu_newsletter_set_access_cookie((string) ($validatedAccess['email'] ?? $emailParam), (string) ($validatedAccess['token'] ?? $tokenParam), $expires);
         $redirectTo = '/newsletters';
         if ($nextParam !== '' && str_starts_with($nextParam, '/newsletters')) {
             $redirectTo = $nextParam;
@@ -2515,9 +2518,12 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
     $emailParam = trim((string) ($_GET['email'] ?? ''));
     $tokenParam = trim((string) ($_GET['token'] ?? ''));
     $nextParam = trim((string) ($_GET['next'] ?? ''));
-    if (!$accessGranted && $emailParam !== '' && $tokenParam !== '' && nammu_newsletter_validate_access($emailParam, $tokenParam)) {
-        $expires = time() + 3600;
-        nammu_newsletter_set_access_cookie($emailParam, $tokenParam, $expires);
+    $validatedAccess = (!$accessGranted && $emailParam !== '' && $tokenParam !== '' && function_exists('nammu_newsletter_validate_access_entry'))
+        ? nammu_newsletter_validate_access_entry($emailParam, $tokenParam)
+        : null;
+    if (!$accessGranted && is_array($validatedAccess)) {
+        $expires = (int) ($validatedAccess['expires_at'] ?? 0);
+        nammu_newsletter_set_access_cookie((string) ($validatedAccess['email'] ?? $emailParam), (string) ($validatedAccess['token'] ?? $tokenParam), $expires);
         $redirectTo = '/newsletters/' . rawurlencode($matchNewsletter[1]);
         if ($nextParam !== '' && str_starts_with($nextParam, '/newsletters')) {
             $redirectTo = $nextParam;

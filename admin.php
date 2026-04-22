@@ -9086,7 +9086,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($convertToDraft) {
             $status = 'draft';
         } else {
-            $status = $statusPosted === 'draft' ? 'draft' : 'published';
+            if ($statusPosted === 'draft') {
+                $status = 'draft';
+            } elseif ($statusPosted === 'newsletter' && $type === 'Newsletter') {
+                $status = 'newsletter';
+            } else {
+                $status = 'published';
+            }
         }
 
         $newFilenameInput = trim($_POST['new_filename'] ?? '');

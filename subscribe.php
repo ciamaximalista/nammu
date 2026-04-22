@@ -10,6 +10,12 @@ define('MAILING_TOKENS_FILE', __DIR__ . '/config/mailing-tokens.json');
 define('MAILING_RATE_LIMIT_FILE', __DIR__ . '/config/mailing-rate-limit.json');
 define('MAILING_RATE_LIMIT_WINDOW', 900);
 define('MAILING_RATE_LIMIT_MAX_ATTEMPTS', 5);
+define('MAILING_RATE_LIMIT_GLOBAL_MAX_ATTEMPTS', 30);
+define('MAILING_RATE_LIMIT_DOMAIN_WINDOW', 3600);
+define('MAILING_RATE_LIMIT_DOMAIN_MAX_ATTEMPTS', 8);
+define('MAILING_RATE_LIMIT_EMAIL_WINDOW', 86400);
+define('MAILING_RATE_LIMIT_EMAIL_MAX_ATTEMPTS', 2);
+define('MAILING_PENDING_RESEND_WINDOW', 86400);
 
 function subscription_normalize_email(string $email): string {
     return strtolower(trim($email));
@@ -167,6 +173,15 @@ function subscription_client_ip(): string {
     return $remote !== '' ? substr($remote, 0, 64) : 'unknown';
 }
 
+function subscription_email_domain(string $email): string {
+    $email = subscription_normalize_email($email);
+    $parts = explode('@', $email);
+    if (count($parts) !== 2) {
+        return '';
+    }
+    return strtolower(trim((string) $parts[1]));
+}
+
 function subscription_load_rate_limit_state(): array {
     if (!is_file(MAILING_RATE_LIMIT_FILE)) {
         return [];
@@ -192,28 +207,52 @@ function subscription_save_rate_limit_state(array $state): void {
     @chmod(MAILING_RATE_LIMIT_FILE, 0664);
 }
 
-function subscription_rate_limited(): bool {
+function subscription_rate_limit_register(array &$state, string $key, int $now, int $window, int $max): bool {
+    if ($key === '') {
+        return false;
+    }
+    $existing = $state[$key] ?? [];
+    if (!is_array($existing)) {
+        $existing = [];
+    }
+    $windowStart = $now - $window;
+    $filtered = array_values(array_filter($existing, static function ($timestamp) use ($windowStart) {
+        return is_int($timestamp) && $timestamp >= $windowStart;
+    }));
+    $filtered[] = $now;
+    $state[$key] = $filtered;
+    return count($filtered) > $max;
+}
+
+function subscription_rate_limited(string $email = ''): bool {
     $ip = subscription_client_ip();
+    $email = subscription_normalize_email($email);
+    $domain = subscription_email_domain($email);
     $now = time();
-    $windowStart = $now - MAILING_RATE_LIMIT_WINDOW;
     $state = subscription_load_rate_limit_state();
     $cleaned = [];
     foreach ($state as $key => $timestamps) {
         if (!is_array($timestamps)) {
             continue;
         }
-        $filtered = array_values(array_filter($timestamps, static function ($timestamp) use ($windowStart) {
-            return is_int($timestamp) && $timestamp >= $windowStart;
+        $filtered = array_values(array_filter($timestamps, static function ($timestamp) use ($now) {
+            return is_int($timestamp) && $timestamp >= ($now - MAILING_RATE_LIMIT_EMAIL_WINDOW);
         }));
         if (!empty($filtered)) {
             $cleaned[(string) $key] = $filtered;
         }
     }
-    $attempts = $cleaned[$ip] ?? [];
-    $attempts[] = $now;
-    $cleaned[$ip] = $attempts;
+    $limited = false;
+    $limited = subscription_rate_limit_register($cleaned, 'global', $now, MAILING_RATE_LIMIT_WINDOW, MAILING_RATE_LIMIT_GLOBAL_MAX_ATTEMPTS) || $limited;
+    $limited = subscription_rate_limit_register($cleaned, 'ip:' . $ip, $now, MAILING_RATE_LIMIT_WINDOW, MAILING_RATE_LIMIT_MAX_ATTEMPTS) || $limited;
+    if ($domain !== '') {
+        $limited = subscription_rate_limit_register($cleaned, 'domain:' . $domain, $now, MAILING_RATE_LIMIT_DOMAIN_WINDOW, MAILING_RATE_LIMIT_DOMAIN_MAX_ATTEMPTS) || $limited;
+    }
+    if ($email !== '') {
+        $limited = subscription_rate_limit_register($cleaned, 'email:' . $email, $now, MAILING_RATE_LIMIT_EMAIL_WINDOW, MAILING_RATE_LIMIT_EMAIL_MAX_ATTEMPTS) || $limited;
+    }
     subscription_save_rate_limit_state($cleaned);
-    return count($attempts) > MAILING_RATE_LIMIT_MAX_ATTEMPTS;
+    return $limited;
 }
 
 function subscription_save_pending(array $pending): void {
@@ -227,6 +266,27 @@ function subscription_save_pending(array $pending): void {
     }
     file_put_contents(MAILING_PENDING_FILE, $payload, LOCK_EX);
     @chmod(MAILING_PENDING_FILE, 0664);
+}
+
+function subscription_has_recent_pending(array $pending, string $email, int $window = MAILING_PENDING_RESEND_WINDOW): bool {
+    $email = subscription_normalize_email($email);
+    if ($email === '') {
+        return false;
+    }
+    $minCreatedAt = time() - $window;
+    foreach ($pending as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        if (subscription_normalize_email((string) ($entry['email'] ?? '')) !== $email) {
+            continue;
+        }
+        $createdAt = (int) ($entry['created_at'] ?? 0);
+        if ($createdAt >= $minCreatedAt) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function subscription_base_url(): string {
@@ -400,12 +460,24 @@ if ($honeypot !== '') {
     subscription_redirect($successUrl, ['sub_sent' => 1]);
 }
 
+$formIssuedAt = (int) ($_POST['subscription_issued_at'] ?? 0);
+$formToken = trim((string) ($_POST['subscription_token'] ?? ''));
+if (!function_exists('nammu_public_subscription_form_is_valid') || !nammu_public_subscription_form_is_valid($formToken, $formIssuedAt, 'subscribe')) {
+    $successBase = subscription_base_url();
+    $successPath = rtrim((string) parse_url($successBase, PHP_URL_PATH), '/');
+    if ($successPath === '') {
+        $successPath = '';
+    }
+    $successUrl = $successPath . '/avisos.php';
+    subscription_redirect($successUrl, ['sub_sent' => 1]);
+}
+
 $email = subscription_normalize_email($_POST['subscriber_email'] ?? '');
 if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     subscription_redirect($back, ['sub_error' => 1]);
 }
 
-if (subscription_rate_limited()) {
+if (subscription_rate_limited($email)) {
     $successBase = subscription_base_url();
     $successPath = rtrim((string) parse_url($successBase, PHP_URL_PATH), '/');
     if ($successPath === '') {
@@ -427,6 +499,22 @@ if (isset($suppressed[$email]) || !subscription_email_domain_looks_deliverable($
 }
 
 $pending = subscription_load_pending();
+$pending = array_values(array_filter($pending, static function ($item) {
+    if (!is_array($item)) {
+        return false;
+    }
+    $createdAt = (int) ($item['created_at'] ?? 0);
+    return $createdAt >= (time() - (30 * 86400));
+}));
+if (subscription_has_recent_pending($pending, $email)) {
+    $successBase = subscription_base_url();
+    $successPath = rtrim((string) parse_url($successBase, PHP_URL_PATH), '/');
+    if ($successPath === '') {
+        $successPath = '';
+    }
+    $successUrl = $successPath . '/avisos.php';
+    subscription_redirect($successUrl, ['sub_sent' => 1]);
+}
 $token = bin2hex(random_bytes(16));
 $configData = nammu_load_config();
 $availablePrefs = subscription_available_prefs($configData);

@@ -25,6 +25,12 @@ define('MAILING_SECRET_FILE', __DIR__ . '/config/mailing-secret.key');
 define('MAILING_RATE_LIMIT_FILE', __DIR__ . '/config/mailing-rate-limit.json');
 define('MAILING_RATE_LIMIT_WINDOW', 900);
 define('MAILING_RATE_LIMIT_MAX_ATTEMPTS', 5);
+define('MAILING_RATE_LIMIT_GLOBAL_MAX_ATTEMPTS', 30);
+define('MAILING_RATE_LIMIT_DOMAIN_WINDOW', 3600);
+define('MAILING_RATE_LIMIT_DOMAIN_MAX_ATTEMPTS', 8);
+define('MAILING_RATE_LIMIT_EMAIL_WINDOW', 86400);
+define('MAILING_RATE_LIMIT_EMAIL_MAX_ATTEMPTS', 2);
+define('MAILING_PENDING_RESEND_WINDOW', 86400);
 
 function mailing_normalize_email(string $email): string
 {
@@ -180,6 +186,16 @@ function mailing_client_ip(): string
     return $remote !== '' ? substr($remote, 0, 64) : 'unknown';
 }
 
+function mailing_email_domain(string $email): string
+{
+    $email = mailing_normalize_email($email);
+    $parts = explode('@', $email);
+    if (count($parts) !== 2) {
+        return '';
+    }
+    return strtolower(trim((string) $parts[1]));
+}
+
 function mailing_load_rate_limit_state(): array
 {
     if (!is_file(MAILING_RATE_LIMIT_FILE)) {
@@ -207,29 +223,54 @@ function mailing_save_rate_limit_state(array $state): void
     @chmod(MAILING_RATE_LIMIT_FILE, 0664);
 }
 
-function mailing_rate_limited(): bool
+function mailing_rate_limit_register(array &$state, string $key, int $now, int $window, int $max): bool
+{
+    if ($key === '') {
+        return false;
+    }
+    $existing = $state[$key] ?? [];
+    if (!is_array($existing)) {
+        $existing = [];
+    }
+    $windowStart = $now - $window;
+    $filtered = array_values(array_filter($existing, static function ($timestamp) use ($windowStart) {
+        return is_int($timestamp) && $timestamp >= $windowStart;
+    }));
+    $filtered[] = $now;
+    $state[$key] = $filtered;
+    return count($filtered) > $max;
+}
+
+function mailing_rate_limited(string $email = ''): bool
 {
     $ip = mailing_client_ip();
+    $email = mailing_normalize_email($email);
+    $domain = mailing_email_domain($email);
     $now = time();
-    $windowStart = $now - MAILING_RATE_LIMIT_WINDOW;
     $state = mailing_load_rate_limit_state();
     $cleaned = [];
     foreach ($state as $key => $timestamps) {
         if (!is_array($timestamps)) {
             continue;
         }
-        $filtered = array_values(array_filter($timestamps, static function ($timestamp) use ($windowStart) {
-            return is_int($timestamp) && $timestamp >= $windowStart;
+        $filtered = array_values(array_filter($timestamps, static function ($timestamp) use ($now) {
+            return is_int($timestamp) && $timestamp >= ($now - MAILING_RATE_LIMIT_EMAIL_WINDOW);
         }));
         if (!empty($filtered)) {
             $cleaned[(string) $key] = $filtered;
         }
     }
-    $attempts = $cleaned[$ip] ?? [];
-    $attempts[] = $now;
-    $cleaned[$ip] = $attempts;
+    $limited = false;
+    $limited = mailing_rate_limit_register($cleaned, 'global', $now, MAILING_RATE_LIMIT_WINDOW, MAILING_RATE_LIMIT_GLOBAL_MAX_ATTEMPTS) || $limited;
+    $limited = mailing_rate_limit_register($cleaned, 'ip:' . $ip, $now, MAILING_RATE_LIMIT_WINDOW, MAILING_RATE_LIMIT_MAX_ATTEMPTS) || $limited;
+    if ($domain !== '') {
+        $limited = mailing_rate_limit_register($cleaned, 'domain:' . $domain, $now, MAILING_RATE_LIMIT_DOMAIN_WINDOW, MAILING_RATE_LIMIT_DOMAIN_MAX_ATTEMPTS) || $limited;
+    }
+    if ($email !== '') {
+        $limited = mailing_rate_limit_register($cleaned, 'email:' . $email, $now, MAILING_RATE_LIMIT_EMAIL_WINDOW, MAILING_RATE_LIMIT_EMAIL_MAX_ATTEMPTS) || $limited;
+    }
     mailing_save_rate_limit_state($cleaned);
-    return count($attempts) > MAILING_RATE_LIMIT_MAX_ATTEMPTS;
+    return $limited;
 }
 
 function mailing_save_pending(array $pending): void
@@ -244,6 +285,28 @@ function mailing_save_pending(array $pending): void
     }
     file_put_contents(MAILING_PENDING_FILE, $payload, LOCK_EX);
     @chmod(MAILING_PENDING_FILE, 0664);
+}
+
+function mailing_has_recent_pending(array $pending, string $email, int $window = MAILING_PENDING_RESEND_WINDOW): bool
+{
+    $email = mailing_normalize_email($email);
+    if ($email === '') {
+        return false;
+    }
+    $minCreatedAt = time() - $window;
+    foreach ($pending as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        if (mailing_normalize_email((string) ($entry['email'] ?? '')) !== $email) {
+            continue;
+        }
+        $createdAt = (int) ($entry['created_at'] ?? 0);
+        if ($createdAt >= $minCreatedAt) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function mailing_load_tokens(): array
@@ -610,6 +673,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = mailing_normalize_email($_POST['subscriber_email'] ?? '');
     $action = $_POST['subscription_action'] ?? '';
     $honeypot = trim((string) ($_POST['website'] ?? ''));
+    $formIssuedAt = (int) ($_POST['subscription_issued_at'] ?? 0);
+    $formToken = trim((string) ($_POST['subscription_token'] ?? ''));
     $prefsSelected = $_POST['subscription_prefs'] ?? [];
     $prefsSelected = is_array($prefsSelected) ? $prefsSelected : [];
     $prefsSelected = array_values(array_intersect($prefsSelected, $prefsAvailableKeys));
@@ -626,10 +691,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $messageType = 'success';
         goto subscription_action_done;
     }
+    if (!function_exists('nammu_public_subscription_form_is_valid') || !nammu_public_subscription_form_is_valid($formToken, $formIssuedAt, 'subscribe')) {
+        $message = $successMessage;
+        $messageType = 'success';
+        goto subscription_action_done;
+    }
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $message = 'Introduce un email valido.';
         $messageType = 'danger';
-    } elseif (mailing_rate_limited()) {
+    } elseif (mailing_rate_limited($email)) {
         $message = $successMessage;
         $messageType = 'success';
     } elseif (!empty($prefsAvailableKeys) && empty($prefsSelected) && in_array($action, ['subscribe', 'update'], true)) {
@@ -641,7 +711,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'success';
             goto subscription_action_done;
         }
-        $pending = mailing_load_pending();
+        $pending = array_values(array_filter(mailing_load_pending(), static function ($item) {
+            if (!is_array($item)) {
+                return false;
+            }
+            $createdAt = (int) ($item['created_at'] ?? 0);
+            return $createdAt >= (time() - (30 * 86400));
+        }));
+        if (mailing_has_recent_pending($pending, $email)) {
+            $message = 'Hemos enviado un email de confirmacion. Revisa tu correo.';
+            $messageType = 'success';
+            goto subscription_action_done;
+        }
         $token = bin2hex(random_bytes(16));
         $pending = array_values(array_filter($pending, static function ($item) use ($email) {
             return !is_array($item) || ($item['email'] ?? '') !== $email;
@@ -667,7 +748,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'success';
             goto subscription_action_done;
         }
-        $pending = mailing_load_pending();
+        $pending = array_values(array_filter(mailing_load_pending(), static function ($item) {
+            if (!is_array($item)) {
+                return false;
+            }
+            $createdAt = (int) ($item['created_at'] ?? 0);
+            return $createdAt >= (time() - (30 * 86400));
+        }));
+        if (mailing_has_recent_pending($pending, $email)) {
+            $message = 'Hemos enviado un email para confirmar tus cambios.';
+            $messageType = 'success';
+            goto subscription_action_done;
+        }
         $token = bin2hex(random_bytes(16));
         $pending = array_values(array_filter($pending, static function ($item) use ($email) {
             return !is_array($item) || ($item['email'] ?? '') !== $email;
@@ -774,6 +866,7 @@ ob_start();
                 <form method="post" class="postal-form">
                     <input type="hidden" name="subscription_action" value="subscribe">
                     <input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;">
+                    <?= function_exists('nammu_public_subscription_hidden_fields_html') ? nammu_public_subscription_hidden_fields_html('subscribe') : '' ?>
                     <label>
                         <span>Email</span>
                         <input type="email" name="subscriber_email" required>
@@ -804,6 +897,7 @@ ob_start();
                 <form method="post" class="postal-form">
                     <input type="hidden" name="subscription_action" value="update">
                     <input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;">
+                    <?= function_exists('nammu_public_subscription_hidden_fields_html') ? nammu_public_subscription_hidden_fields_html('subscribe') : '' ?>
                     <label>
                         <span>Email</span>
                         <input type="email" name="subscriber_email" required>
@@ -834,6 +928,7 @@ ob_start();
                 <form method="post" class="postal-form">
                     <input type="hidden" name="subscription_action" value="unsubscribe">
                     <input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;">
+                    <?= function_exists('nammu_public_subscription_hidden_fields_html') ? nammu_public_subscription_hidden_fields_html('subscribe') : '' ?>
                     <label>
                         <span>Email</span>
                         <input type="email" name="subscriber_email" required>

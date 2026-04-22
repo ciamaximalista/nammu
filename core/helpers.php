@@ -4037,6 +4037,40 @@ function nammu_mailing_unsubscribe_token(string $email): string
     return hash_hmac('sha256', strtolower(trim($email)), $secret);
 }
 
+function nammu_public_subscription_form_token(int $issuedAt, string $context = 'subscribe'): string
+{
+    $issuedAt = max(0, $issuedAt);
+    $context = trim($context);
+    if ($context === '') {
+        $context = 'subscribe';
+    }
+    return hash_hmac('sha256', $context . '|' . $issuedAt, nammu_mailing_secret());
+}
+
+function nammu_public_subscription_form_is_valid($token, $issuedAt, string $context = 'subscribe', int $minAge = 3, int $maxAge = 7200): bool
+{
+    $issuedAt = (int) $issuedAt;
+    $token = trim((string) $token);
+    if ($issuedAt <= 0 || $token === '') {
+        return false;
+    }
+    $now = time();
+    $age = $now - $issuedAt;
+    if ($age < max(0, $minAge) || $age > max($minAge, $maxAge)) {
+        return false;
+    }
+    $expected = nammu_public_subscription_form_token($issuedAt, $context);
+    return hash_equals($expected, $token);
+}
+
+function nammu_public_subscription_hidden_fields_html(string $context = 'subscribe'): string
+{
+    $issuedAt = time();
+    $token = nammu_public_subscription_form_token($issuedAt, $context);
+    return '<input type="hidden" name="subscription_issued_at" value="' . htmlspecialchars((string) $issuedAt, ENT_QUOTES, 'UTF-8') . '">' .
+        '<input type="hidden" name="subscription_token" value="' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8') . '">';
+}
+
 function nammu_mailing_unsubscribe_link(string $email): string
 {
     $token = nammu_mailing_unsubscribe_token($email);

@@ -3634,6 +3634,10 @@ function nammu_fediverse_find_local_item_for_thread_hash(string $hash, array $co
             'type' => !empty($actualityItem['is_manual']) ? 'Note' : 'Article',
             'image' => nammu_fediverse_actuality_item_effective_image($actualityItem),
             'images' => array_values(array_filter(array_map('strval', is_array($actualityItem['images'] ?? null) ? $actualityItem['images'] : []))),
+            'attachments' => array_values(array_filter((array) ($actualityItem['attachments'] ?? []), static function ($attachment): bool {
+                return is_array($attachment) && trim((string) ($attachment['url'] ?? '')) !== '';
+            })),
+            'links' => array_values(array_filter(array_map('strval', is_array($actualityItem['links'] ?? null) ? $actualityItem['links'] : []))),
             'alias_ids' => array_values(array_unique(array_filter(array_map('trim', $aliasIds)))),
         ];
         $candidateHashes = [nammu_fediverse_thread_page_hash($itemId)];

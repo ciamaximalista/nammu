@@ -377,6 +377,7 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                             <?php endif; ?>
                         </div>
                     </a>
+                    <?= $threadMediaAttachmentsHtml ?>
                 <?php else: ?>
                     <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= $renderFediversePublicText($threadContent) ?></div>
                     <?= $threadMediaAttachmentsHtml ?>

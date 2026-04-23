@@ -12433,7 +12433,10 @@ if ($isLoggedIn && $page === 'fediverso') {
                     $allConfiguredNetworks = function_exists('admin_social_broadcast_available_networks')
                         ? array_keys(admin_social_broadcast_available_networks(get_settings()))
                         : [];
-                    $queueResult = admin_enqueue_social_broadcast($socialText !== '' ? $socialText : $noteText, $objectImages, $allConfiguredNetworks, '');
+                    $fediverseUrl = function_exists('admin_social_broadcast_fediverse_url_for_actuality_item')
+                        ? admin_social_broadcast_fediverse_url_for_actuality_item($manualItem)
+                        : '';
+                    $queueResult = admin_enqueue_social_broadcast($socialText !== '' ? $socialText : $noteText, $objectImages, $allConfiguredNetworks, $fediverseUrl);
                     if (!empty($queueResult['ok'])) {
                         $result['message'] .= ' Encolada para redes.';
                     }
@@ -12485,11 +12488,23 @@ if ($isLoggedIn && $page === 'fediverso') {
                 $noteText = trim($noteText . "\n\n" . $objectUrl);
             }
             if (function_exists('nammu_actuality_add_manual_item')) {
-                nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle);
+                $manualItem = nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle);
                 if (function_exists('nammu_actuality_rebuild_snapshot')) {
                     nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
                 }
                 nammu_fediverse_record_action('share', '', $objectUrl, ['share_text' => $replyText, 'title' => 'reply-note']);
+                if (!function_exists('admin_enqueue_social_broadcast') && is_file(__DIR__ . '/core/admin-redes.php')) {
+                    require_once __DIR__ . '/core/admin-redes.php';
+                }
+                if (is_array($manualItem) && function_exists('admin_enqueue_social_broadcast') && function_exists('admin_social_broadcast_available_networks')) {
+                    $allConfiguredNetworks = array_keys(admin_social_broadcast_available_networks(get_settings()));
+                    if (!empty($allConfiguredNetworks)) {
+                        $fediverseUrl = function_exists('admin_social_broadcast_fediverse_url_for_actuality_item')
+                            ? admin_social_broadcast_fediverse_url_for_actuality_item($manualItem)
+                            : '';
+                        admin_enqueue_social_broadcast($noteText, [], $allConfiguredNetworks, $fediverseUrl);
+                    }
+                }
                 $deliveryStats = nammu_fediverse_deliver_local_items($config);
                 $result['message'] = rtrim((string) ($result['message'] ?? '')) . ' También publicada como nota. Entregas federadas: ' . (int) ($deliveryStats['delivered'] ?? 0) . '.';
             }
@@ -12567,12 +12582,24 @@ if ($isLoggedIn && $page === 'fediverso') {
             ];
             $fediverseRedirect = true;
         } else {
-            nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle);
+            $manualItem = nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle);
             if (function_exists('nammu_actuality_rebuild_snapshot')) {
                 nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
             }
             if (function_exists('nammu_fediverse_record_action')) {
                 nammu_fediverse_record_action('share', '', $objectUrl, ['share_text' => $shareText, 'title' => $shareTitle]);
+            }
+            if (!function_exists('admin_enqueue_social_broadcast') && is_file(__DIR__ . '/core/admin-redes.php')) {
+                require_once __DIR__ . '/core/admin-redes.php';
+            }
+            if (is_array($manualItem) && function_exists('admin_enqueue_social_broadcast') && function_exists('admin_social_broadcast_available_networks')) {
+                $allConfiguredNetworks = array_keys(admin_social_broadcast_available_networks(get_settings()));
+                if (!empty($allConfiguredNetworks)) {
+                    $fediverseUrl = function_exists('admin_social_broadcast_fediverse_url_for_actuality_item')
+                        ? admin_social_broadcast_fediverse_url_for_actuality_item($manualItem)
+                        : '';
+                    admin_enqueue_social_broadcast($noteText, [], $allConfiguredNetworks, $fediverseUrl);
+                }
             }
             $deliveryStats = nammu_fediverse_deliver_local_items($config);
             $fediverseFeedback = [

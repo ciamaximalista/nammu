@@ -1018,6 +1018,7 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
     $sent = 0;
     $failed = 0;
     $remaining = [];
+    $deferredFailed = [];
     $settings = admin_social_broadcast_runtime_settings();
     $available = admin_social_broadcast_available_networks($settings);
     $imageLimits = admin_social_broadcast_network_image_limits();
@@ -1093,11 +1094,11 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
             if (empty($item['last_attempt_at'])) {
                 $item['last_attempt_at'] = gmdate(DATE_ATOM);
             }
-            $remaining[] = $item;
+            $deferredFailed[] = $item;
         }
     }
 
-    $queue['items'] = $remaining;
+    $queue['items'] = array_merge($remaining, $deferredFailed);
     admin_save_social_broadcast_queue($queue);
 
     return [

@@ -162,6 +162,40 @@ $filterFediverseReplyText = static function (string $text): string {
     $text = trim(preg_replace("/\n{3,}/", "\n\n", $text) ?? $text);
     return $text;
 };
+$renderFediversePublicMediaAttachments = static function (array $attachments, string $classPrefix): string {
+    $attachments = array_values(array_filter($attachments, static function ($attachment): bool {
+        return is_array($attachment) && trim((string) ($attachment['url'] ?? '')) !== '';
+    }));
+    if (empty($attachments)) {
+        return '';
+    }
+    $html = '';
+    foreach ($attachments as $attachment) {
+        $attachmentUrl = trim((string) ($attachment['url'] ?? ''));
+        $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
+        $attachmentMediaType = strtolower(trim((string) ($attachment['media_type'] ?? '')));
+        $isImage = $attachmentType === 'image' || str_starts_with($attachmentMediaType, 'image/');
+        $isVideo = $attachmentType === 'video' || str_starts_with($attachmentMediaType, 'video/');
+        $isAudio = $attachmentType === 'audio' || str_starts_with($attachmentMediaType, 'audio/');
+        if ($attachmentUrl === '' || $isImage) {
+            continue;
+        }
+        if ($isVideo) {
+            $html .= '<div class="' . $classPrefix . '__media ' . $classPrefix . '__media--video"><video controls preload="metadata">';
+            $html .= '<source src="' . htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') . '"' . ($attachmentMediaType !== '' ? ' type="' . htmlspecialchars($attachmentMediaType, ENT_QUOTES, 'UTF-8') . '"' : '') . '>';
+            $html .= '</video></div>';
+            continue;
+        }
+        if ($isAudio) {
+            $html .= '<div class="' . $classPrefix . '__media ' . $classPrefix . '__media--audio"><audio controls preload="metadata">';
+            $html .= '<source src="' . htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') . '"' . ($attachmentMediaType !== '' ? ' type="' . htmlspecialchars($attachmentMediaType, ENT_QUOTES, 'UTF-8') . '"' : '') . '>';
+            $html .= '</audio></div>';
+            continue;
+        }
+    }
+    return $html;
+};
+$threadAttachments = (array) ($threadItem['attachments'] ?? []);
 $threadImageAttachments = array_values(array_filter((array) ($threadItem['attachments'] ?? []), static function ($attachment): bool {
     if (!is_array($attachment)) {
         return false;
@@ -185,6 +219,7 @@ foreach (array_values(array_unique(array_filter(array_map('strval', is_array($th
 if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
     $threadImageAttachments[] = ['url' => (string) $threadItem['image']];
 }
+$threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAttachments, 'fediverse-public-status');
 ?>
 <style>
 .fediverse-public-page { max-width: 860px; margin: 0 auto; }
@@ -239,6 +274,14 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
 .fediverse-public-status__media img,
 .fediverse-public-reply__media img { width: 100%; max-height: 720px; object-fit: cover; display: block; border-radius: 16px; background: #fff; border: 1px solid rgba(0,0,0,.08); }
 .fediverse-public-status__media-grid img { width: 100%; height: 100%; max-height: 420px; object-fit: cover; display: block; border-radius: 16px; background: #fff; border: 1px solid rgba(0,0,0,.08); }
+.fediverse-public-status__media video,
+.fediverse-public-status__media audio,
+.fediverse-public-reply__media video,
+.fediverse-public-reply__media audio { width: 100%; display: block; border-radius: 16px; }
+.fediverse-public-status__media video,
+.fediverse-public-reply__media video { background: #000; max-height: 720px; }
+.fediverse-public-status__media audio,
+.fediverse-public-reply__media audio { background: #f4f4f4; }
 .fediverse-public-status__card { display: block; margin-top: .9rem; border-radius: 16px; overflow: hidden; background: #fff; border: 1px solid rgba(0,0,0,.08); color: inherit; text-decoration: none; }
 .fediverse-public-status__card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
 .fediverse-public-status__card-body { padding: 1rem; }
@@ -319,6 +362,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
                             <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
+                    <?= $threadMediaAttachmentsHtml ?>
                 <?php elseif ($threadOriginalUrl !== ''): ?>
                     <a class="fediverse-public-status__card" href="<?= htmlspecialchars($threadOriginalUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
                         <?php if (!empty($threadItem['image'])): ?>
@@ -335,6 +379,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
                     </a>
                 <?php else: ?>
                     <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= $renderFediversePublicText($threadContent) ?></div>
+                    <?= $threadMediaAttachmentsHtml ?>
                 <?php endif; ?>
 
                 <div class="fediverse-public-status__footer"<?= $threadOwnNoteFontStyle ?>>
@@ -439,6 +484,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
                     $replyCard = is_array($reply['link_card'] ?? null) ? $reply['link_card'] : null;
                     $replySummary = is_array($reply['summary'] ?? null) ? $reply['summary'] : ['likes' => 0, 'shares' => 0];
                     $replyText = $filterFediverseReplyText((string) ($reply['reply_text'] ?? ''));
+                    $replyMediaAttachmentsHtml = $renderFediversePublicMediaAttachments((array) ($reply['attachments'] ?? []), 'fediverse-public-reply');
                     if ($replyActorId === '' && $replyAvatar === '') {
                         $replyAvatar = $fediverseLocalAvatar;
                     }
@@ -498,6 +544,7 @@ if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
                                         <img src="<?= htmlspecialchars((string) $reply['image'], ENT_QUOTES, 'UTF-8') ?>" alt="Imagen adjunta" loading="lazy">
                                     </div>
                                 <?php endif; ?>
+                                <?= $replyMediaAttachmentsHtml ?>
                             </div>
                         </div>
                     </article>

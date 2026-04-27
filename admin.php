@@ -3595,6 +3595,13 @@ function admin_local_asset_path(string $pathOrUrl): string {
 
 function admin_public_itinerary_url(string $slug): string {
     $base = admin_base_url();
+    if ($base === '') {
+        $settings = get_settings();
+        $siteUrl = trim((string) ($settings['site_url'] ?? ''));
+        if ($siteUrl !== '') {
+            $base = rtrim($siteUrl, '/');
+        }
+    }
     $path = '/itinerarios/' . rawurlencode($slug);
     return $base === '' ? $path : $base . $path;
 }

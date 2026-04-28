@@ -12440,10 +12440,8 @@ if ($isLoggedIn && $page === 'fediverso') {
                     $allConfiguredNetworks = function_exists('admin_social_broadcast_available_networks')
                         ? array_keys(admin_social_broadcast_available_networks(get_settings()))
                         : [];
-                    $fediverseUrl = function_exists('admin_social_broadcast_fediverse_url_for_actuality_item')
-                        ? admin_social_broadcast_fediverse_url_for_actuality_item($manualItem)
-                        : '';
-                    $queueResult = admin_enqueue_social_broadcast($socialText !== '' ? $socialText : $noteText, $objectImages, $allConfiguredNetworks, $fediverseUrl);
+                    // For boosts, external socials should point only to the original publication URL.
+                    $queueResult = admin_enqueue_social_broadcast($socialText !== '' ? $socialText : $noteText, $objectImages, $allConfiguredNetworks, '');
                     if (!empty($queueResult['ok'])) {
                         $result['message'] .= ' Encolada para redes.';
                     }

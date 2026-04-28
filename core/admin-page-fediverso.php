@@ -1056,6 +1056,9 @@
                                                     $replyActorName = trim((string) ($reply['actor_name'] ?? ''));
                                                     $replyActorIcon = trim((string) ($reply['actor_icon'] ?? ''));
                                                     $replyBoostImages = [];
+                                                    $replyActionState = function_exists('nammu_fediverse_action_state_for_item')
+                                                        ? nammu_fediverse_action_state_for_item($reply)
+                                                        : ['liked' => false, 'boosted' => false, 'replied' => false, 'shared' => false, 'boost_count' => 0, 'reply_count' => 0, 'share_count' => 0];
                                                     ?>
                                                     <div class="fediverse-thread__reply">
                                                         <div class="fediverse-thread__avatar">
@@ -1084,7 +1087,8 @@
                                                                             <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($replyActorId, ENT_QUOTES, 'UTF-8') ?>">
                                                                             <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($replyObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
                                                                             <input type="hidden" name="fediverse_public_url" value="<?= htmlspecialchars($replyPublicUrl, ENT_QUOTES, 'UTF-8') ?>">
-                                                                            <button type="submit" name="fediverse_like_item" class="btn btn-outline-secondary btn-sm">Favorito</button>
+                                                                            <input type="hidden" name="fediverse_item_id" value="<?= htmlspecialchars((string) ($reply['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <button type="submit" name="<?= !empty($replyActionState['liked']) ? 'fediverse_unlike_item' : 'fediverse_like_item' ?>" class="btn btn-outline-secondary btn-sm"><?= !empty($replyActionState['liked']) ? 'Quitar favorito' : 'Favorito' ?></button>
                                                                         </form>
                                                                         <form method="post" class="mb-0">
                                                                             <input type="hidden" name="fediverse_tab" value="home">
@@ -1099,7 +1103,7 @@
                                                                             <input type="hidden" name="fediverse_actor_url" value="<?= htmlspecialchars($replyActorId, ENT_QUOTES, 'UTF-8') ?>">
                                                                             <input type="hidden" name="fediverse_object_image" value="">
                                                                             <input type="hidden" name="fediverse_object_images" value="<?= htmlspecialchars(json_encode($replyBoostImages, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
-                                                                            <button type="submit" name="fediverse_boost_item" class="btn btn-outline-secondary btn-sm">Impulsar</button>
+                                                                            <button type="submit" name="<?= !empty($replyActionState['boosted']) ? 'fediverse_unboost_item' : 'fediverse_boost_item' ?>" class="btn btn-outline-secondary btn-sm"<?= !empty($replyActionState['boosted']) ? ' onclick="return confirm(\'¿Quitar este impulso y borrar la nota local asociada?\');"' : '' ?>><?= !empty($replyActionState['boosted']) ? 'Quitar impulso' : 'Impulsar' ?></button>
                                                                         </form>
                                                                     <?php endif; ?>
                                                                     <details class="fediverse-inline-form">
@@ -1582,6 +1586,9 @@
                                                     $replyActorName = trim((string) ($reply['actor_name'] ?? ''));
                                                     $replyActorIcon = trim((string) ($reply['actor_icon'] ?? ''));
                                                     $replyBoostImages = [];
+                                                    $replyActionState = function_exists('nammu_fediverse_action_state_for_item')
+                                                        ? nammu_fediverse_action_state_for_item($reply)
+                                                        : ['liked' => false, 'boosted' => false, 'replied' => false, 'shared' => false, 'boost_count' => 0, 'reply_count' => 0, 'share_count' => 0];
                                                     ?>
                                                     <div class="fediverse-thread__reply">
                                                         <div class="fediverse-thread__avatar">
@@ -1611,7 +1618,8 @@
                                                                             <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($replyActorId, ENT_QUOTES, 'UTF-8') ?>">
                                                                             <input type="hidden" name="fediverse_object_url" value="<?= htmlspecialchars($replyObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
                                                                             <input type="hidden" name="fediverse_public_url" value="<?= htmlspecialchars($replyPublicUrl, ENT_QUOTES, 'UTF-8') ?>">
-                                                                            <button type="submit" name="fediverse_like_item" class="btn btn-outline-secondary btn-sm">Favorito</button>
+                                                                            <input type="hidden" name="fediverse_item_id" value="<?= htmlspecialchars((string) ($reply['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                                                            <button type="submit" name="<?= !empty($replyActionState['liked']) ? 'fediverse_unlike_item' : 'fediverse_like_item' ?>" class="btn btn-outline-secondary btn-sm"><?= !empty($replyActionState['liked']) ? 'Quitar favorito' : 'Favorito' ?></button>
                                                                         </form>
                                                                         <form method="post" class="mb-0">
                                                                             <input type="hidden" name="fediverse_tab" value="home">
@@ -1626,7 +1634,7 @@
                                                                             <input type="hidden" name="fediverse_actor_url" value="<?= htmlspecialchars($replyActorId, ENT_QUOTES, 'UTF-8') ?>">
                                                                             <input type="hidden" name="fediverse_object_image" value="">
                                                                             <input type="hidden" name="fediverse_object_images" value="<?= htmlspecialchars(json_encode($replyBoostImages, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
-                                                                            <button type="submit" name="fediverse_boost_item" class="btn btn-outline-secondary btn-sm">Impulsar</button>
+                                                                            <button type="submit" name="<?= !empty($replyActionState['boosted']) ? 'fediverse_unboost_item' : 'fediverse_boost_item' ?>" class="btn btn-outline-secondary btn-sm"<?= !empty($replyActionState['boosted']) ? ' onclick="return confirm(\'¿Quitar este impulso y borrar la nota local asociada?\');"' : '' ?>><?= !empty($replyActionState['boosted']) ? 'Quitar impulso' : 'Impulsar' ?></button>
                                                                         </form>
                                                                     <?php endif; ?>
                                                                     <details class="fediverse-inline-form">

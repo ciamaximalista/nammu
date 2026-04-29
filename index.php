@@ -2485,6 +2485,9 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
         'newsletterHeroImage' => $newsletterHeroImage,
     ]);
     $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/newsletters' : '/newsletters';
+    if (function_exists('nammu_record_pageview')) {
+        nammu_record_pageview('pages', 'newsletters', 'Newsletters');
+    }
     echo $renderer->render('layout', [
         'pageTitle' => 'Newsletters',
         'metaDescription' => 'Archivo de newsletters.',
@@ -2654,6 +2657,9 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
     }
     $newsletterContent = nammu_build_newsletter_html($config, $newsletterTitle, $newsletterHtml, $newsletterImage, $recipientEmail);
     $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/newsletters/' . rawurlencode($slug) : '/newsletters/' . rawurlencode($slug);
+    if (function_exists('nammu_record_pageview')) {
+        nammu_record_pageview('pages', 'newsletters/' . $slug, $newsletterTitle !== '' ? $newsletterTitle : ('Newsletter: ' . $slug));
+    }
     echo $renderer->render('layout', [
         'pageTitle' => $newsletterTitle,
         'metaDescription' => 'Newsletter',

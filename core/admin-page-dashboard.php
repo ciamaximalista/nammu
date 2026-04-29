@@ -2134,14 +2134,15 @@
     $topPostsMonth = array_slice($topPostsMonth, 0, 10);
 
     $isSystemPageSlug = static function (string $slug): bool {
-        if ($slug === 'index' || $slug === 'podcast' || $slug === 'categorias' || $slug === 'letras' || $slug === 'itinerarios' || $slug === 'buscar' || $slug === 'avisos' || $slug === 'correos' || $slug === 'actualidad') {
+        if ($slug === 'index' || $slug === 'podcast' || $slug === 'categorias' || $slug === 'letras' || $slug === 'itinerarios' || $slug === 'buscar' || $slug === 'avisos' || $slug === 'correos' || $slug === 'actualidad' || $slug === 'newsletters') {
             return true;
         }
         if (preg_match('#^pagina/([1-9][0-9]*)$#', $slug)) {
             return true;
         }
         return str_starts_with($slug, 'categoria/')
-            || str_starts_with($slug, 'letra/');
+            || str_starts_with($slug, 'letra/')
+            || str_starts_with($slug, 'newsletters/');
     };
     $isFediverseObjectPageSlug = static function (string $slug): bool {
         return preg_match('#^fediverso/[a-f0-9]{24}$#i', $slug) === 1;
@@ -2371,6 +2372,9 @@
         if ($slug === 'itinerarios') {
             return '/itinerarios';
         }
+        if ($slug === 'newsletters') {
+            return '/newsletters';
+        }
         if (preg_match('#^pagina/([1-9][0-9]*)$#', $slug, $pageMatch)) {
             return '/pagina/' . $pageMatch[1];
         }
@@ -2378,6 +2382,9 @@
             return '/' . $slug;
         }
         if (str_starts_with($slug, 'letra/')) {
+            return '/' . $slug;
+        }
+        if (str_starts_with($slug, 'newsletters/')) {
             return '/' . $slug;
         }
         return '/' . $slug;
@@ -3205,57 +3212,55 @@
                     </div>
                 </div>
 
-                <?php if (!empty($topFediverseObjectPagesToday) || !empty($topFediverseObjectPagesWeek) || !empty($topFediverseObjectPagesMonth)): ?>
-                    <div class="card mb-4 dashboard-stat-block">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                                <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Páginas de objeto Fediverso más leídas</h4>
-                                <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle my-2" role="group" data-stat-toggle="fediverse-objects" data-stat-toggle-type="period">
-                                    <button type="button" class="btn btn-outline-primary active" data-stat-period="today">Hoy</button>
-                                    <button type="button" class="btn btn-outline-primary" data-stat-period="week">Últimos 7 días</button>
-                                    <button type="button" class="btn btn-outline-primary" data-stat-period="month">Últimos 30 días</button>
-                                </div>
+                <div class="card mb-4 dashboard-stat-block">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                            <h4 class="h6 text-uppercase text-muted mb-0 dashboard-card-title">Entradas Fediverso</h4>
+                            <div class="btn-group btn-group-sm btn-group-toggle dashboard-toggle my-2" role="group" data-stat-toggle="fediverse-objects" data-stat-toggle-type="period">
+                                <button type="button" class="btn btn-outline-primary active" data-stat-period="today">Hoy</button>
+                                <button type="button" class="btn btn-outline-primary" data-stat-period="week">Últimos 7 días</button>
+                                <button type="button" class="btn btn-outline-primary" data-stat-period="month">Últimos 30 días</button>
                             </div>
-                            <?php if (empty($topFediverseObjectPagesToday) && empty($topFediverseObjectPagesWeek) && empty($topFediverseObjectPagesMonth)): ?>
-                                <p class="text-muted mb-0">Sin datos todavía.</p>
-                            <?php else: ?>
-                                <ol class="mb-0 dashboard-links" data-stat-list="fediverse-objects" data-stat-period="today">
-                                    <?php foreach ($topFediverseObjectPagesToday as $item): ?>
-                                        <?php $url = $buildFediverseObjectPageUrl($item['slug']); ?>
-                                        <li>
-                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
-                                            </a>
-                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ol>
-                                <ol class="mb-0 dashboard-links d-none" data-stat-list="fediverse-objects" data-stat-period="week">
-                                    <?php foreach ($topFediverseObjectPagesWeek as $item): ?>
-                                        <?php $url = $buildFediverseObjectPageUrl($item['slug']); ?>
-                                        <li>
-                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
-                                            </a>
-                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ol>
-                                <ol class="mb-0 dashboard-links d-none" data-stat-list="fediverse-objects" data-stat-period="month">
-                                    <?php foreach ($topFediverseObjectPagesMonth as $item): ?>
-                                        <?php $url = $buildFediverseObjectPageUrl($item['slug']); ?>
-                                        <li>
-                                            <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                                <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
-                                            </a>
-                                            <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ol>
-                            <?php endif; ?>
                         </div>
+                        <?php if (empty($topFediverseObjectPagesToday) && empty($topFediverseObjectPagesWeek) && empty($topFediverseObjectPagesMonth)): ?>
+                            <p class="text-muted mb-0">Sin datos todavía.</p>
+                        <?php else: ?>
+                            <ol class="mb-0 dashboard-links" data-stat-list="fediverse-objects" data-stat-period="today">
+                                <?php foreach ($topFediverseObjectPagesToday as $item): ?>
+                                    <?php $url = $buildFediverseObjectPageUrl($item['slug']); ?>
+                                    <li>
+                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
+                            <ol class="mb-0 dashboard-links d-none" data-stat-list="fediverse-objects" data-stat-period="week">
+                                <?php foreach ($topFediverseObjectPagesWeek as $item): ?>
+                                    <?php $url = $buildFediverseObjectPageUrl($item['slug']); ?>
+                                    <li>
+                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
+                            <ol class="mb-0 dashboard-links d-none" data-stat-list="fediverse-objects" data-stat-period="month">
+                                <?php foreach ($topFediverseObjectPagesMonth as $item): ?>
+                                    <?php $url = $buildFediverseObjectPageUrl($item['slug']); ?>
+                                    <li>
+                                        <a href="<?= htmlspecialchars($url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                            <?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?>
+                                        </a>
+                                        <span class="text-muted">(<?= (int) $item['count'] ?>)</span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
+                        <?php endif; ?>
                     </div>
-                <?php endif; ?>
+                </div>
 
                 <?php if ($itineraryCount > 0): ?>
                     <div class="card mb-4 dashboard-stat-block">

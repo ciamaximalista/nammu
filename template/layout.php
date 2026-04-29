@@ -61,10 +61,10 @@ $floatingSearchAction = $searchBaseNormalized === '' ? '/buscar.php' : $searchBa
 $floatingCategoriesUrl = $searchBaseNormalized === '' ? '/categorias' : $searchBaseNormalized . '/categorias';
 $showFloatingSearch = $searchFloatingEnabled;
 $floatingSubscriptionAction = $searchBaseNormalized === '' ? '/subscribe.php' : $searchBaseNormalized . '/subscribe.php';
-$avisosUrl = $searchBaseNormalized === '' ? '/avisos.php' : $searchBaseNormalized . '/avisos.php';
+$avisosUrl = $searchBaseNormalized === '' ? '/avisos' : $searchBaseNormalized . '/avisos';
 $showFloatingSubscription = $subscriptionFloatingEnabled;
 $postalEnabled = $postalEnabled ?? false;
-$postalUrl = $postalUrl ?? '/correos.php';
+$postalUrl = $postalUrl ?? '/correos';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $hasCategories = !empty($hasCategories);
 $hasItineraries = $hasItineraries ?? false;

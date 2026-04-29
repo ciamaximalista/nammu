@@ -2093,7 +2093,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
     if (in_array($subscriptionMode, ['home', 'single', 'both'], true)) {
         $links[] = [
             'label' => 'Lista de correo',
-            'href' => ($baseUrl !== '' ? rtrim($baseUrl, '/') : '') . '/avisos.php',
+            'href' => ($baseUrl !== '' ? rtrim($baseUrl, '/') : '') . '/avisos',
             'svg' => $icons['email'],
         ];
     }
@@ -2102,7 +2102,7 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
     if ($postalEnabled) {
         $links[] = [
             'label' => 'Suscripción a envíos postales',
-            'href' => $postalUrl !== '' ? $postalUrl : '/correos.php',
+            'href' => $postalUrl !== '' ? $postalUrl : '/correos',
             'svg' => $icons['postal'],
         ];
     }
@@ -3316,8 +3316,8 @@ function nammu_render_header_buttons(array $options): string
     $lettersUrl = (string) ($options['letters_url'] ?? ($GLOBALS['lettersIndexUrl'] ?? '/letras'));
     $newslettersUrl = (string) ($options['newsletters_url'] ?? ($GLOBALS['newslettersIndexUrl'] ?? '/newsletters'));
     $actualityUrl = (string) ($options['actuality_url'] ?? (($homeUrl !== '' ? rtrim($homeUrl, '/') : '') . nammu_fediverse_profile_alias_path($config, $homeUrl)));
-    $avisosUrl = (string) ($options['avisos_url'] ?? '/avisos.php');
-    $postalUrl = (string) ($options['postal_url'] ?? '/correos.php');
+    $avisosUrl = (string) ($options['avisos_url'] ?? '/avisos');
+    $postalUrl = (string) ($options['postal_url'] ?? '/correos');
     $postalLogoSvg = (string) ($options['postal_svg'] ?? '');
     $hasCategories = !empty($options['has_categories']);
     $hasItineraries = !empty($options['has_itineraries']);
@@ -3447,8 +3447,8 @@ function nammu_render_standard_header_buttons(array $context = []): string
     $lettersUrl = (string) ($context['letterIndexUrlValue'] ?? $context['lettersIndexUrl'] ?? $context['letters_url'] ?? ($GLOBALS['lettersIndexUrl'] ?? ($baseNormalized === '/' ? '/letras' : $baseNormalized . '/letras')));
     $newslettersUrl = (string) ($context['newslettersIndexUrl'] ?? $context['newsletters_url'] ?? ($GLOBALS['newslettersIndexUrl'] ?? ($baseNormalized === '/' ? '/newsletters' : $baseNormalized . '/newsletters')));
     $actualityUrl = (string) ($context['actualityUrl'] ?? $context['actuality_url'] ?? (($baseNormalized === '/' ? '' : $baseNormalized) . nammu_fediverse_profile_alias_path($config, $baseNormalized === '/' ? '' : $baseNormalized)));
-    $avisosUrl = (string) ($context['avisosUrl'] ?? $context['avisos_url'] ?? ($baseNormalized === '/' ? '/avisos.php' : $baseNormalized . '/avisos.php'));
-    $postalUrl = (string) ($context['postalUrl'] ?? $context['postal_url'] ?? '/correos.php');
+    $avisosUrl = (string) ($context['avisosUrl'] ?? $context['avisos_url'] ?? ($baseNormalized === '/' ? '/avisos' : $baseNormalized . '/avisos'));
+    $postalUrl = (string) ($context['postalUrl'] ?? $context['postal_url'] ?? '/correos');
     $postalSvg = (string) ($context['postalLogoSvg'] ?? $context['postal_svg'] ?? '');
 
     $socialRssConfig = is_array($config['social_rss'] ?? null) ? $config['social_rss'] : [];

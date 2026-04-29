@@ -93,7 +93,7 @@ if ($subscriptionSuccess) {
     $subscriptionMessage = 'No pudimos procesar ese correo. Revisa la dirección e inténtalo de nuevo.';
 }
 $postalEnabled = $postalEnabled ?? false;
-$postalUrl = $postalUrl ?? '/correos.php';
+$postalUrl = $postalUrl ?? '/correos';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $fediverseInlineIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';
 $renderFediverseInlineMeta = static function (array $meta) use ($fediverseInlineIcon): string {
@@ -185,7 +185,7 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $search
     return (string) ob_get_clean();
 };
 $renderSubscriptionBox = static function (string $variant) use ($subscriptionAction, $accentColor, $highlight, $textColor, $subscriptionMessage, $currentUrl, $postalEnabled, $postalUrl, $postalLogoSvg): string {
-    $avisosUrl = $subscriptionAction !== '' ? str_replace('/subscribe.php', '/avisos.php', $subscriptionAction) : '/avisos.php';
+    $avisosUrl = $subscriptionAction !== '' ? str_replace('/subscribe.php', '/avisos', $subscriptionAction) : '/avisos';
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?> site-subscription-box">
         <form class="site-search-form subscription-form" method="post" action="<?= htmlspecialchars($subscriptionAction, ENT_QUOTES, 'UTF-8') ?>">

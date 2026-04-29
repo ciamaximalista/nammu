@@ -325,6 +325,15 @@ if (is_string($configBaseUrl)) {
     $configBaseUrl = rtrim(trim($configBaseUrl), '/');
 }
 $publicBaseUrl = $configBaseUrl !== '' ? $configBaseUrl : nammu_base_url();
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/correos', PHP_URL_PATH) ?? '/correos';
+if (preg_match('#/correos\.php$#i', $requestPath) === 1) {
+    $target = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos';
+    if (!empty($_SERVER['QUERY_STRING'])) {
+        $target .= '?' . (string) $_SERVER['QUERY_STRING'];
+    }
+    header('Location: ' . $target, true, 301);
+    exit;
+}
 $homeUrl = $publicBaseUrl !== '' ? $publicBaseUrl : '/';
 $rssUrl = ($publicBaseUrl !== '' ? $publicBaseUrl : '') . '/rss.xml';
 $newsletterItems = function_exists('nammu_newsletter_collect_items')
@@ -360,7 +369,7 @@ if (!is_string($siteLang) || $siteLang === '') {
 }
 
 $postalEnabled = ($config['postal']['enabled'] ?? 'off') === 'on';
-$postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
+$postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos';
 $postalLogoSvg = nammu_postal_icon_svg();
 $itineraryItems = is_dir(__DIR__ . '/itinerarios') ? glob(__DIR__ . '/itinerarios/*') : [];
 $hasItineraries = !empty($itineraryItems);
@@ -383,7 +392,7 @@ if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
         'itineraries_url' => $itinerariesIndexUrl,
         'podcast_url' => $podcastIndexUrl,
         'newsletters_url' => $newslettersIndexUrl,
-        'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php',
+        'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos',
         'postal_url' => $postalUrl,
         'postal_svg' => $postalLogoSvg,
         'has_categories' => !empty(nammu_collect_categories_from_posts($contentRepository->all())),
@@ -636,7 +645,6 @@ $renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseU
 ob_start();
 ?>
 <section class="postal-page">
-    <?= $headerButtonsHtml ?>
     <div class="post-header">
         <div class="postal-hero">
             <div class="postal-hero__content">
@@ -989,24 +997,24 @@ ob_start();
 $content = ob_get_clean();
 
 $postalPost = new Nammu\Core\Post('correo-postal', [
-    'Title' => 'Suscripción Postal',
+    'Title' => 'Envíos Postales',
     'Description' => '',
     'Template' => 'page',
 ], '');
 
 $pageContent = $renderer->render('single', [
-    'pageTitle' => 'Suscripción Postal',
+    'pageTitle' => 'Envíos Postales',
     'post' => $postalPost,
     'htmlContent' => $content,
     'autoTocHtml' => '',
 ]);
 
 if (function_exists('nammu_record_pageview')) {
-    nammu_record_pageview('pages', 'correos', 'Suscripción postal');
+    nammu_record_pageview('pages', 'correos', 'Envíos Postales');
 }
 
 echo $renderer->render('layout', [
-    'pageTitle' => 'Suscripción Postal',
+    'pageTitle' => 'Envíos Postales',
     'metaDescription' => 'Suscripción postal y gestión de direcciones.',
     'content' => $pageContent,
     'jsonLd' => [$siteJsonLd, $orgJsonLd],

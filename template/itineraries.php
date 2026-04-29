@@ -65,7 +65,7 @@ $podcastIndexUrl = $podcastIndexUrl ?? (($baseUrl ?? '/') !== '' ? rtrim($baseUr
 $hasCategories = !empty($hasCategories);
 $hasPodcast = !empty($hasPodcast);
 $postalEnabled = $postalEnabled ?? false;
-$postalUrl = $postalUrl ?? '/correos.php';
+$postalUrl = $postalUrl ?? '/correos';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $itineraryFediverseMetaBySlug = is_array($itineraryFediverseMetaBySlug ?? null) ? $itineraryFediverseMetaBySlug : [];
 $fediverseInlineIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';

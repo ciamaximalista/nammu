@@ -46,7 +46,7 @@ if (!empty($theme['logo_url'])) {
 $displaySiteTitle = $theme['blog'] !== '' ? $theme['blog'] : $siteTitle;
 
 $postalEnabled = ($config['postal']['enabled'] ?? 'off') === 'on';
-$postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
+$postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos';
 $postalLogoSvg = nammu_postal_icon_svg();
 $itineraryItems = is_dir(__DIR__ . '/itinerarios') ? glob(__DIR__ . '/itinerarios/*') : [];
 $hasItineraries = !empty($itineraryItems);

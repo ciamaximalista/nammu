@@ -143,7 +143,7 @@ $sortOrder = in_array($sortOrderValue, ['date', 'alpha'], true) ? $sortOrderValu
 $isAlphabeticalOrder = ($sortOrder === 'alpha');
 $lettersIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/letras';
 $postalEnabled = ($configData['postal']['enabled'] ?? 'off') === 'on';
-$postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
+$postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos';
 $postalLogoSvg = nammu_postal_icon_svg();
 $footerLinks = nammu_build_footer_links($configData, $theme, $homeUrl, $postalUrl, !empty($itineraryListing), $hasPodcast);
 $logoForJsonLd = $theme['logo_url'] ?? '';
@@ -886,6 +886,9 @@ if (preg_match('#^/fediverso/([a-f0-9]{24})/?$#', $routePath, $fediverseThreadMa
         'fediverseLocalName' => trim((string) (($configData['site_name'] ?? '') ?: $siteTitle)),
         'fediverseLocalAvatar' => nammu_fediverse_avatar_url($configData),
     ]);
+    if (function_exists('nammu_record_pageview')) {
+        nammu_record_pageview('pages', 'fediverso/' . $threadHash, $threadPageTitle);
+    }
     echo $renderer->render('layout', [
         'pageTitle' => $threadPageTitle,
         'metaDescription' => $threadDescription,
@@ -2154,7 +2157,7 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
     $searchActionBase = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '';
     $searchAction = ($searchActionBase !== '' ? $searchActionBase : '') . '/buscar.php';
     $subscriptionAction = ($searchActionBase !== '' ? $searchActionBase : '') . '/subscribe.php';
-    $avisosUrl = ($searchActionBase !== '' ? $searchActionBase : '') . '/avisos.php';
+    $avisosUrl = ($searchActionBase !== '' ? $searchActionBase : '') . '/avisos';
     $currentUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . ($_SERVER['REQUEST_URI'] ?? '/');
     $accentColor = htmlspecialchars($theme['colors']['accent'] ?? '#0a4c8a', ENT_QUOTES, 'UTF-8');
     if ($subscriptionBottom) {

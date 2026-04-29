@@ -456,7 +456,7 @@ if ($honeypot !== '') {
     if ($successPath === '') {
         $successPath = '';
     }
-    $successUrl = $successPath . '/avisos.php';
+    $successUrl = $successPath . '/avisos';
     subscription_redirect($successUrl, ['sub_sent' => 1]);
 }
 
@@ -468,7 +468,7 @@ if (!function_exists('nammu_public_subscription_form_is_valid') || !nammu_public
     if ($successPath === '') {
         $successPath = '';
     }
-    $successUrl = $successPath . '/avisos.php';
+    $successUrl = $successPath . '/avisos';
     subscription_redirect($successUrl, ['sub_sent' => 1]);
 }
 
@@ -483,7 +483,7 @@ if (subscription_rate_limited($email)) {
     if ($successPath === '') {
         $successPath = '';
     }
-    $successUrl = $successPath . '/avisos.php';
+    $successUrl = $successPath . '/avisos';
     subscription_redirect($successUrl, ['sub_sent' => 1]);
 }
 
@@ -494,7 +494,7 @@ if (isset($suppressed[$email]) || !subscription_email_domain_looks_deliverable($
     if ($successPath === '') {
         $successPath = '';
     }
-    $successUrl = $successPath . '/avisos.php';
+    $successUrl = $successPath . '/avisos';
     subscription_redirect($successUrl, ['sub_sent' => 1]);
 }
 
@@ -512,7 +512,7 @@ if (subscription_has_recent_pending($pending, $email)) {
     if ($successPath === '') {
         $successPath = '';
     }
-    $successUrl = $successPath . '/avisos.php';
+    $successUrl = $successPath . '/avisos';
     subscription_redirect($successUrl, ['sub_sent' => 1]);
 }
 $token = bin2hex(random_bytes(16));
@@ -551,5 +551,5 @@ $successPath = rtrim((string) parse_url($successBase, PHP_URL_PATH), '/');
 if ($successPath === '') {
     $successPath = '';
 }
-$successUrl = $successPath . '/avisos.php';
+$successUrl = $successPath . '/avisos';
 subscription_redirect($successUrl, ['sub_sent' => 1]);

@@ -66,7 +66,7 @@ $siteLang = $configData['site_lang'] ?? 'es';
 if (!is_string($siteLang) || $siteLang === '') {
     $siteLang = 'es';
 }
-$postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
+$postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos';
 $postalLogoSvg = nammu_postal_icon_svg();
 $hasItineraries = !empty(is_dir(__DIR__ . '/itinerarios') ? glob(__DIR__ . '/itinerarios/*') : []);
 $hasPodcast = !empty(nammu_collect_podcast_items(__DIR__ . '/content', $publicBaseUrl));

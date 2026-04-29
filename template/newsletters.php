@@ -62,7 +62,7 @@ $hasPodcast = !empty($hasPodcast);
 $hasNewsletters = !empty($hasNewsletters);
 $hasActuality = !empty($hasActuality ?? ($GLOBALS['hasActuality'] ?? false));
 $postalEnabled = $postalEnabled ?? false;
-$postalUrl = $postalUrl ?? '/correos.php';
+$postalUrl = $postalUrl ?? '/correos';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $newsletterHeroImage = trim((string) ($newsletterHeroImage ?? ''));
 $newsletterHeroHasImage = $newsletterHeroImage !== '';

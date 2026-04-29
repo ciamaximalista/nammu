@@ -32,7 +32,7 @@ $showHeaderButtons = in_array($headerButtonsMode, ['home', 'both'], true);
 $subscriptionSettings = is_array($theme['subscription'] ?? null) ? $theme['subscription'] : [];
 $subscriptionModeForButtons = $subscriptionSettings['mode'] ?? 'none';
 $postalEnabled = $postalEnabled ?? false;
-$postalUrl = $postalUrl ?? '/correos.php';
+$postalUrl = $postalUrl ?? '/correos';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $headerButtonsHtml = '';
 if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons')) {

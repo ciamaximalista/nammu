@@ -502,6 +502,15 @@ if (is_string($configBaseUrl)) {
     $configBaseUrl = rtrim(trim($configBaseUrl), '/');
 }
 $publicBaseUrl = $configBaseUrl !== '' ? $configBaseUrl : nammu_base_url();
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/avisos', PHP_URL_PATH) ?? '/avisos';
+if (preg_match('#/avisos\.php$#i', $requestPath) === 1) {
+    $target = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/avisos';
+    if (!empty($_SERVER['QUERY_STRING'])) {
+        $target .= '?' . (string) $_SERVER['QUERY_STRING'];
+    }
+    header('Location: ' . $target, true, 301);
+    exit;
+}
 $homeUrl = $publicBaseUrl !== '' ? $publicBaseUrl : '/';
 $rssUrl = ($publicBaseUrl !== '' ? $publicBaseUrl : '') . '/rss.xml';
 $newsletterItems = function_exists('nammu_newsletter_collect_items')
@@ -565,7 +574,7 @@ if ($hasAlerts) {
     }
     $alertsLabel = implode(' y ', $alertsParts);
 }
-$pageLabel = $hasAvisos && $hasNewsletter ? 'Suscripciones electrónicas' : ($hasNewsletter ? 'Newsletter' : 'Avisos');
+$pageLabel = 'Avisos';
 if (!$hasAnySubscription) {
     $pageIntro = 'El administrador del blog no ha configurado todavia ni el sistema de avisos ni las newsletters ni los avisos de podcast.';
 } else {
@@ -596,7 +605,7 @@ $unsubscribeCopy = $hasAvisos && $hasNewsletter
         ? 'Recibe un email para confirmar la baja de la newsletter.'
         : 'Recibe un email para confirmar la baja de los avisos.');
 
-$postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos.php';
+$postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos';
 $postalLogoSvg = nammu_postal_icon_svg();
 $itineraryItems = is_dir(__DIR__ . '/itinerarios') ? glob(__DIR__ . '/itinerarios/*') : [];
 $hasItineraries = !empty($itineraryItems);
@@ -619,7 +628,7 @@ if ($showHeaderButtons && function_exists('nammu_render_header_buttons')) {
         'itineraries_url' => $itinerariesIndexUrl,
         'podcast_url' => $podcastIndexUrl,
         'newsletters_url' => $newslettersIndexUrl,
-        'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos.php',
+        'avisos_url' => rtrim($searchActionBase === '' ? '/' : $searchActionBase, '/') . '/avisos',
         'postal_url' => $postalUrl,
         'postal_svg' => $postalLogoSvg,
         'has_categories' => !empty(nammu_collect_categories_from_posts($contentRepository->all())),
@@ -838,7 +847,6 @@ $prefsOptions = [
 ob_start();
 ?>
 <section class="postal-page">
-    <?= $headerButtonsHtml ?>
     <div class="post-header">
         <div class="postal-hero">
             <div class="postal-hero__content">

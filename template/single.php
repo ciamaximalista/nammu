@@ -101,7 +101,7 @@ if ($subscriptionSuccess) {
     $subscriptionMessage = 'No pudimos procesar ese correo. Revisa la dirección e inténtalo de nuevo.';
 }
 $postalEnabled = $postalEnabled ?? false;
-$postalUrl = $postalUrl ?? '/correos.php';
+$postalUrl = $postalUrl ?? '/correos';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $autoTocHtml = isset($autoTocHtml) ? trim((string) $autoTocHtml) : '';
 $relatedPosts = is_array($relatedPosts ?? null) ? $relatedPosts : [];
@@ -180,7 +180,7 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $colorH
     return (string) ob_get_clean();
 };
 $renderSubscriptionBox = static function (string $variant) use ($subscriptionAction, $colorAccent, $colorHighlight, $colorText, $subscriptionMessage, $currentUrl, $postalEnabled, $postalUrl, $postalLogoSvg): string {
-    $avisosUrl = $subscriptionAction !== '' ? str_replace('/subscribe.php', '/avisos.php', $subscriptionAction) : '/avisos.php';
+    $avisosUrl = $subscriptionAction !== '' ? str_replace('/subscribe.php', '/avisos', $subscriptionAction) : '/avisos';
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?> site-subscription-box">
         <form class="site-search-form subscription-form" method="post" action="<?= htmlspecialchars($subscriptionAction, ENT_QUOTES, 'UTF-8') ?>">
@@ -242,7 +242,7 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
 };
 $headerButtonsHtml = '';
 if (function_exists('nammu_render_standard_header_buttons')) {
-    $avisosUrl = $subscriptionAction !== '' ? str_replace('/subscribe.php', '/avisos.php', $subscriptionAction) : '/avisos.php';
+    $avisosUrl = $subscriptionAction !== '' ? str_replace('/subscribe.php', '/avisos', $subscriptionAction) : '/avisos';
     $headerButtonsHtml = nammu_render_standard_header_buttons(get_defined_vars());
 }
 $siteAuthor = htmlspecialchars($theme['author'] !== '' ? $theme['author'] : ($siteTitle ?? ''), ENT_QUOTES, 'UTF-8');

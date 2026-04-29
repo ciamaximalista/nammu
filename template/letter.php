@@ -70,7 +70,7 @@ $hasPodcast = !empty($hasPodcast);
 $hasCategories = !empty($hasCategories);
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
 $postalEnabled = $postalEnabled ?? false;
-$postalUrl = $postalUrl ?? '/correos.php';
+$postalUrl = $postalUrl ?? '/correos';
 $postalLogoSvg = $postalLogoSvg ?? '';
 $headerButtonsHtml = '';
 if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons')) {

@@ -4983,6 +4983,9 @@ function admin_send_linkedin_post(string $slug, string $title, string $descripti
 }
 
 function admin_send_bluesky_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = '', ?string &$error = null): bool {
+    if (!function_exists('admin_bluesky_build_link_facets') && is_file(__DIR__ . '/core/admin-redes.php')) {
+        require_once __DIR__ . '/core/admin-redes.php';
+    }
     $service = trim((string) ($settings['service'] ?? ''));
     if ($service === '') {
         $service = 'https://bsky.social';
@@ -5073,6 +5076,12 @@ function admin_send_bluesky_post(string $slug, string $title, string $descriptio
         'text' => $text,
         'createdAt' => gmdate('Y-m-d\\TH:i:s\\Z'),
     ];
+    if (function_exists('admin_bluesky_build_link_facets')) {
+        $facets = admin_bluesky_build_link_facets($text);
+        if (!empty($facets)) {
+            $record['facets'] = $facets;
+        }
+    }
     if ($trackedUrl !== '') {
         $embed = [
             '$type' => 'app.bsky.embed.external',
@@ -10917,6 +10926,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         } catch (Throwable $e) {
             $error = "Error guardando la configuración: " . $e->getMessage();
+        }
+
+        header('Location: admin.php?page=configuracion');
+        exit;
+    } elseif (isset($_POST['save_machine_files'])) {
+        $llmsContent = trim((string) ($_POST['llms_content'] ?? ''));
+        $identityContent = trim((string) ($_POST['identity_content'] ?? ''));
+
+        try {
+            $config = load_config_file();
+
+            if ($llmsContent !== '') {
+                $config['llms'] = ['content' => $llmsContent];
+            } else {
+                unset($config['llms']);
+            }
+
+            if ($identityContent !== '') {
+                $config['identity'] = ['content' => $identityContent];
+            } else {
+                unset($config['identity']);
+            }
+
+            save_config_file($config);
+        } catch (Throwable $e) {
+            $error = "Error guardando llms.txt e identity.txt: " . $e->getMessage();
         }
 
         header('Location: admin.php?page=configuracion');

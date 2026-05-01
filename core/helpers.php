@@ -1969,6 +1969,105 @@ function nammu_fediverse_profile_alias_path(array $config = [], string $baseUrl 
     return '/@' . $preferredUsername . '@' . $host;
 }
 
+function nammu_generate_llms_txt(array $config = [], array $options = []): string
+{
+    $baseUrl = trim((string) ($options['base_url'] ?? ($config['site_url'] ?? '')));
+    $baseUrl = $baseUrl !== '' ? rtrim($baseUrl, '/') : '';
+    $siteTitle = trim((string) ($options['site_title'] ?? ($config['site_name'] ?? '')));
+    $siteName = trim((string) ($options['site_name'] ?? ($config['site_name'] ?? '')));
+    $displayName = $siteName !== '' ? $siteName : ($siteTitle !== '' ? $siteTitle : 'Nammu');
+    $description = trim((string) ($options['description'] ?? (($config['social']['default_description'] ?? $config['site_description'] ?? ''))));
+    $searchPath = trim((string) ($options['search_path'] ?? '/buscar.php?q={termino}'));
+    $hasItineraries = !empty($options['has_itineraries']);
+    $hasPodcast = !empty($options['has_podcast']);
+
+    $lines = [];
+    $lines[] = '# ' . $displayName;
+    if ($description !== '') {
+        $lines[] = '';
+        $lines[] = '## Resumen';
+        $lines[] = $description;
+    }
+    $lines[] = '';
+    $lines[] = '## Enlaces principales';
+    $lines[] = '- Portada: ' . ($baseUrl !== '' ? $baseUrl . '/' : '/');
+    $lines[] = '- Sitemap: ' . ($baseUrl !== '' ? $baseUrl . '/sitemap.xml' : '/sitemap.xml');
+    $lines[] = '- RSS: ' . ($baseUrl !== '' ? $baseUrl . '/rss.xml' : '/rss.xml');
+    $lines[] = '- Buscador: ' . ($baseUrl !== '' ? $baseUrl . $searchPath : $searchPath);
+    $lines[] = '- Fediverso: ' . ($baseUrl !== '' ? $baseUrl . '/actualidad.php' : '/actualidad.php');
+    $lines[] = '- Archivo de newsletters: ' . ($baseUrl !== '' ? $baseUrl . '/newsletters' : '/newsletters');
+    if ($hasItineraries) {
+        $lines[] = '- Itinerarios: ' . ($baseUrl !== '' ? $baseUrl . '/itinerarios' : '/itinerarios');
+        $lines[] = '- RSS itinerarios: ' . ($baseUrl !== '' ? $baseUrl . '/itinerarios.xml' : '/itinerarios.xml');
+    }
+    if ($hasPodcast) {
+        $lines[] = '- Podcast: ' . ($baseUrl !== '' ? $baseUrl . '/podcast' : '/podcast');
+        $lines[] = '- RSS podcast: ' . ($baseUrl !== '' ? $baseUrl . '/podcast.xml' : '/podcast.xml');
+    }
+    $lines[] = '';
+    $lines[] = '## Notas para LLMs';
+    $lines[] = '- Usa las URLs canónicas del sitemap.';
+    $lines[] = '- Evita rutas de administración y archivos internos.';
+    $lines[] = '- Prefiere RSS y páginas públicas para contenido reciente.';
+    $lines[] = '';
+    $lines[] = '## Actualización';
+    $lines[] = date('d/m/y');
+
+    return implode("\n", $lines) . "\n";
+}
+
+function nammu_generate_identity_txt(array $config = [], array $options = []): string
+{
+    $baseUrl = trim((string) ($options['base_url'] ?? ($config['site_url'] ?? '')));
+    $baseUrl = $baseUrl !== '' ? rtrim($baseUrl, '/') : '';
+    $siteName = trim((string) ($options['site_name'] ?? ($config['site_name'] ?? '')));
+    $siteAuthor = trim((string) ($options['site_author'] ?? ($config['site_author'] ?? '')));
+    $identityName = $siteAuthor !== '' ? $siteAuthor : ($siteName !== '' ? $siteName : 'Nammu');
+    $description = trim((string) ($options['description'] ?? (($config['social']['default_description'] ?? $config['site_description'] ?? ''))));
+    $fediverseProfileUrl = trim((string) ($options['fediverse_profile_url'] ?? ''));
+    if ($fediverseProfileUrl === '') {
+        $fediversePath = nammu_fediverse_profile_alias_path($config, $baseUrl);
+        if ($fediversePath !== '') {
+            if (preg_match('#^https?://#i', $fediversePath)) {
+                $fediverseProfileUrl = $fediversePath;
+            } elseif ($baseUrl !== '') {
+                $fediverseProfileUrl = $baseUrl . $fediversePath;
+            }
+        }
+    }
+
+    $lines = [];
+    $lines[] = '# ' . $identityName;
+    if ($description !== '') {
+        $lines[] = '';
+        $lines[] = '> ' . $description;
+    }
+    $lines[] = '';
+    $lines[] = '## Background';
+    $lines[] = $siteName !== '' && $siteAuthor !== '' && $siteAuthor !== $siteName
+        ? $siteName . ' es el sitio publicado por ' . $siteAuthor . '.'
+        : ($siteName !== '' ? $siteName . ' es un sitio publicado con Nammu.' : 'Sitio publicado con Nammu.');
+    $lines[] = '';
+    $lines[] = '## Voice';
+    $lines[] = 'Voz editorial directa, clara y orientada a lectura humana en web abierta.';
+    $lines[] = '';
+    $lines[] = '## Expertise';
+    $lines[] = 'Consulta el propio sitio y sus secciones públicas para identificar áreas temáticas y contexto editorial.';
+    $lines[] = '';
+    $lines[] = '## Verification';
+    if ($baseUrl !== '') {
+        $lines[] = '- ' . $baseUrl . '/';
+    }
+    if ($fediverseProfileUrl !== '') {
+        $lines[] = '- ' . $fediverseProfileUrl;
+    }
+    $lines[] = '';
+    $lines[] = '## Terms';
+    $lines[] = 'Usa siempre las URLs canónicas públicas y atribuye las citas al sitio.';
+
+    return implode("\n", $lines) . "\n";
+}
+
 function nammu_build_footer_links(array $config, array $theme, string $baseUrl, string $postalUrl, bool $hasItineraries = false, bool $hasPodcast = false): array
 {
     $icons = nammu_footer_icon_svgs();

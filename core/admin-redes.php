@@ -524,6 +524,35 @@ function admin_build_social_rss_message(string $network, string $title, string $
     return $current;
 }
 
+function admin_bluesky_build_link_facets(string $text): array
+{
+    if ($text === '') {
+        return [];
+    }
+    preg_match_all('#https?://[^\s<>"\')]+#iu', $text, $matches, PREG_OFFSET_CAPTURE);
+    $rawMatches = is_array($matches[0] ?? null) ? $matches[0] : [];
+    $facets = [];
+    foreach ($rawMatches as $match) {
+        $url = trim((string) ($match[0] ?? ''));
+        $byteStart = isset($match[1]) ? (int) $match[1] : -1;
+        if ($url === '' || $byteStart < 0) {
+            continue;
+        }
+        $byteEnd = $byteStart + strlen($url);
+        $facets[] = [
+            'index' => [
+                'byteStart' => $byteStart,
+                'byteEnd' => $byteEnd,
+            ],
+            'features' => [[
+                '$type' => 'app.bsky.richtext.facet#link',
+                'uri' => $url,
+            ]],
+        ];
+    }
+    return $facets;
+}
+
 function admin_social_broadcast_fediverse_url_for_actuality_item(array $item): string
 {
     if (!function_exists('nammu_actuality_news_item_id') && is_file(__DIR__ . '/actualidad.php')) {
@@ -901,11 +930,10 @@ function admin_process_social_rss_feeds(): array
                 $message = admin_build_social_rss_message(
                     $network,
                     (string) ($item['title'] ?? ''),
-                    (string) ($item['link'] ?? ''),
+                    $fediverseUrl !== '' ? $fediverseUrl : (string) ($item['link'] ?? ''),
                     (string) ($item['description'] ?? ''),
                     $image !== ''
                 );
-                $message = admin_social_broadcast_append_fediverse_link($message, $fediverseUrl);
                 admin_send_social_broadcast_message($network, $message, $availableNetworks[$network]['settings'], $image, $error);
             }
             $feedState['seen'][$item['key']] = time();
@@ -1417,14 +1445,19 @@ function admin_send_bluesky_text(string $text, array $settings, ?string &$error 
         $error = 'Respuesta inválida de Bluesky.';
         return false;
     }
+    $record = [
+        '$type' => 'app.bsky.feed.post',
+        'text' => $text,
+        'createdAt' => gmdate('Y-m-d\\TH:i:s\\Z'),
+    ];
+    $facets = admin_bluesky_build_link_facets($text);
+    if (!empty($facets)) {
+        $record['facets'] = $facets;
+    }
     $payload = json_encode([
         'repo' => $session['did'],
         'collection' => 'app.bsky.feed.post',
-        'record' => [
-            '$type' => 'app.bsky.feed.post',
-            'text' => $text,
-            'createdAt' => gmdate('Y-m-d\\TH:i:s\\Z'),
-        ],
+        'record' => $record,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     $headers = [
         'Authorization: Bearer ' . $session['accessJwt'],
@@ -1604,6 +1637,10 @@ function admin_send_bluesky_broadcast(string $text, array $settings, $images = '
         'text' => $text,
         'createdAt' => gmdate('Y-m-d\\TH:i:s\\Z'),
     ];
+    $facets = admin_bluesky_build_link_facets($text);
+    if (!empty($facets)) {
+        $record['facets'] = $facets;
+    }
     $embedImages = [];
     foreach (array_slice(admin_social_broadcast_image_urls(admin_social_broadcast_parse_images($images)), 0, 4) as $imageUrl) {
         if ($imageUrl === '' || !preg_match('#^https?://#i', $imageUrl)) {

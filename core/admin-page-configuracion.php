@@ -103,6 +103,23 @@
         }
         $statsBackups = function_exists('admin_list_stats_backups') ? admin_list_stats_backups(7) : [];
         $fullBackups = function_exists('admin_list_full_backups') ? admin_list_full_backups(8) : [];
+        $siteBaseForMachineFiles = trim((string) ($settings['site_url'] ?? ''));
+        if ($siteBaseForMachineFiles === '' && function_exists('nammu_base_url')) {
+            $siteBaseForMachineFiles = nammu_base_url();
+        }
+        $siteBaseForMachineFiles = $siteBaseForMachineFiles !== '' ? rtrim($siteBaseForMachineFiles, '/') : '';
+        $llmsSettings = is_array($settings['llms'] ?? null) ? $settings['llms'] : [];
+        $identitySettings = is_array($settings['identity'] ?? null) ? $settings['identity'] : [];
+        $llmsCustomContent = trim((string) ($llmsSettings['content'] ?? ''));
+        $identityCustomContent = trim((string) ($identitySettings['content'] ?? ''));
+        $llmsEditorContent = $llmsCustomContent !== ''
+            ? $llmsCustomContent
+            : (function_exists('nammu_generate_llms_txt') ? nammu_generate_llms_txt($settings, ['base_url' => $siteBaseForMachineFiles]) : '');
+        $identityEditorContent = $identityCustomContent !== ''
+            ? $identityCustomContent
+            : (function_exists('nammu_generate_identity_txt') ? nammu_generate_identity_txt($settings, ['base_url' => $siteBaseForMachineFiles]) : '');
+        $llmsPublicUrl = ($siteBaseForMachineFiles !== '' ? $siteBaseForMachineFiles : '') . '/llms.txt';
+        $identityPublicUrl = ($siteBaseForMachineFiles !== '' ? $siteBaseForMachineFiles : '') . '/identity.txt';
         $languageOptions = [
             'es' => 'Español',
             'ca' => 'Català',
@@ -552,6 +569,92 @@
                 </div>
             <?php endif; ?>
 
+            <hr class="my-5">
+            <div class="card border-0 bg-light">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+                        <div>
+                            <h3 class="mb-1">llms.txt e identity.txt</h3>
+                            <p class="text-muted mb-0">Edita aquí los dos archivos públicos de contexto y presentación legibles por agentes, buscadores y otros sistemas automáticos.</p>
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        <div class="form-group">
+                            <label for="llms_content" class="d-flex align-items-center justify-content-between">
+                                <span><strong>llms.txt</strong></span>
+                                <a href="#" data-toggle="modal" data-target="#llmsTxtHelpModal">Qué es esto</a>
+                            </label>
+                            <textarea name="llms_content" id="llms_content" class="form-control font-monospace" rows="16" spellcheck="false"><?= htmlspecialchars($llmsEditorContent, ENT_QUOTES, 'UTF-8') ?></textarea>
+                            <small class="form-text text-muted">URL pública: <code><?= htmlspecialchars($llmsPublicUrl, ENT_QUOTES, 'UTF-8') ?></code>. Si lo dejas vacío al guardar, Nammu volverá a generar una versión básica automáticamente.</small>
+                        </div>
+
+                        <div class="form-group mb-4">
+                            <label for="identity_content" class="d-flex align-items-center justify-content-between">
+                                <span><strong>identity.txt</strong></span>
+                                <a href="#" data-toggle="modal" data-target="#identityTxtHelpModal">Qué es esto</a>
+                            </label>
+                            <textarea name="identity_content" id="identity_content" class="form-control font-monospace" rows="16" spellcheck="false"><?= htmlspecialchars($identityEditorContent, ENT_QUOTES, 'UTF-8') ?></textarea>
+                            <small class="form-text text-muted">URL pública: <code><?= htmlspecialchars($identityPublicUrl, ENT_QUOTES, 'UTF-8') ?></code>. Si lo dejas vacío al guardar, Nammu volverá a generar una versión básica automáticamente.</small>
+                        </div>
+
+                        <div class="text-right">
+                            <button type="submit" name="save_machine_files" class="btn btn-outline-primary">Guardar llms.txt e identity.txt</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="modal fade" id="llmsTxtHelpModal" tabindex="-1" role="dialog" aria-labelledby="llmsTxtHelpModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="llmsTxtHelpModalLabel">Qué es llms.txt</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p><code>llms.txt</code> es un archivo público pensado para orientar a modelos de lenguaje y otros agentes automáticos sobre qué partes del sitio conviene leer primero y qué rutas son relevantes.</p>
+                        <ul class="mb-3">
+                            <li>Suele incluir un resumen breve del sitio.</li>
+                            <li>Enumera enlaces importantes como portada, sitemap, RSS, newsletters o itinerarios.</li>
+                            <li>Puede añadir notas editoriales del tipo “usa URLs canónicas” o “prefiere el RSS para lo reciente”.</li>
+                        </ul>
+                        <p class="mb-0 text-muted">Formato recomendado: texto plano o Markdown simple. Si lo dejas vacío, Nammu genera un bloque básico automáticamente.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="identityTxtHelpModal" tabindex="-1" role="dialog" aria-labelledby="identityTxtHelpModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="identityTxtHelpModalLabel">Qué es identity.txt</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p><code>identity.txt</code> es un archivo público para explicar quién habla en el sitio: una persona, un colectivo, un medio o una organización, y desde qué contexto editorial o institucional lo hace.</p>
+                        <ul class="mb-3">
+                            <li>Puede incluir una descripción corta de la entidad.</li>
+                            <li>Puede señalar tono, áreas de experiencia o propósito del sitio.</li>
+                            <li>Conviene añadir enlaces de verificación como la web principal o el perfil del Fediverso.</li>
+                        </ul>
+                        <p class="mb-0 text-muted">Formato recomendado: texto plano o Markdown simple. Si lo dejas vacío, Nammu genera una versión mínima a partir de la configuración del sitio.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
 <?php endif; ?>

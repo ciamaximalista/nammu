@@ -980,42 +980,52 @@ if ($routePath === '/fediverso.xml') {
 }
 
 if ($routePath === '/llms.txt') {
-    $base = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '';
-    $lines = [];
-    $lines[] = '# ' . ($siteNameForMeta !== '' ? $siteNameForMeta : $siteTitle);
-    if ($homeDescription !== '') {
-        $lines[] = '';
-        $lines[] = '## Resumen';
-        $lines[] = $homeDescription;
+    $llmsConfig = is_array($config['llms'] ?? null) ? $config['llms'] : [];
+    $llmsText = trim((string) ($llmsConfig['content'] ?? ''));
+    if ($llmsText === '') {
+        $llmsText = nammu_generate_llms_txt($config, [
+            'base_url' => $publicBaseUrl,
+            'site_title' => $siteTitle,
+            'site_name' => $siteNameForMeta,
+            'description' => $homeDescription,
+            'has_itineraries' => !empty($itineraryListing),
+            'has_podcast' => !empty($hasPodcast),
+            'search_path' => '/buscar.php?q={termino}',
+        ]);
+    } else {
+        $llmsText .= "\n";
     }
-    $lines[] = '';
-    $lines[] = '## Enlaces principales';
-    $lines[] = '- Portada: ' . ($base !== '' ? $base . '/' : '/');
-    $lines[] = '- Sitemap: ' . ($base !== '' ? $base . '/sitemap.xml' : '/sitemap.xml');
-    $lines[] = '- RSS: ' . ($base !== '' ? $base . '/rss.xml' : '/rss.xml');
-    $lines[] = '- Buscador: ' . ($base !== '' ? $base . '/buscar.php?q={termino}' : '/buscar.php?q={termino}');
-    if (!empty($itineraryListing)) {
-        $lines[] = '- Itinerarios: ' . ($base !== '' ? $base . '/itinerarios' : '/itinerarios');
-        $lines[] = '- RSS itinerarios: ' . ($base !== '' ? $base . '/itinerarios.xml' : '/itinerarios.xml');
-    }
-    if (!empty($hasPodcast)) {
-        $lines[] = '- Podcast: ' . ($base !== '' ? $base . '/podcast' : '/podcast');
-        $lines[] = '- RSS podcast: ' . ($base !== '' ? $base . '/podcast.xml' : '/podcast.xml');
-    }
-    $lines[] = '';
-    $lines[] = '## Notas para LLMs';
-    $lines[] = '- Usa las URLs canónicas del sitemap.';
-    $lines[] = '- Evita rutas de administración y archivos internos.';
-    $lines[] = '- Prefiere el RSS para contenidos recientes.';
-    $lines[] = '';
-    $lines[] = '## Actualización';
-    $lines[] = date('d/m/y');
-    $llmsText = implode("\n", $lines) . "\n";
     header('Content-Type: text/plain; charset=UTF-8');
     echo $llmsText;
-    if ($publicBaseUrl !== '') {
-        @file_put_contents(__DIR__ . '/llms.txt', $llmsText);
+    @file_put_contents(__DIR__ . '/llms.txt', $llmsText);
+    exit;
+}
+
+if ($routePath === '/identity.txt') {
+    $identityConfig = is_array($config['identity'] ?? null) ? $config['identity'] : [];
+    $identityText = trim((string) ($identityConfig['content'] ?? ''));
+    if ($identityText === '') {
+        $fediverseProfileUrl = '';
+        if ($fediverseProfileAliasPath !== '') {
+            if (preg_match('#^https?://#i', $fediverseProfileAliasPath)) {
+                $fediverseProfileUrl = $fediverseProfileAliasPath;
+            } elseif ($publicBaseUrl !== '') {
+                $fediverseProfileUrl = rtrim($publicBaseUrl, '/') . $fediverseProfileAliasPath;
+            }
+        }
+        $identityText = nammu_generate_identity_txt($config, [
+            'base_url' => $publicBaseUrl,
+            'site_name' => $siteNameForMeta,
+            'site_author' => trim((string) ($configData['site_author'] ?? '')),
+            'description' => $homeDescription,
+            'fediverse_profile_url' => $fediverseProfileUrl,
+        ]);
+    } else {
+        $identityText .= "\n";
     }
+    header('Content-Type: text/plain; charset=UTF-8');
+    echo $identityText;
+    @file_put_contents(__DIR__ . '/identity.txt', $identityText);
     exit;
 }
 

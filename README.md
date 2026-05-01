@@ -116,6 +116,7 @@ Nada más entrar, revisa estas pantallas:
 
 1. **Configuración**: nombre del sitio, autor, idioma, modo blog/diccionario, URL del sitio y, si hace falta, declaraciones opcionales de multiinstancia para servidores con varias instalaciones.
    El bloque `Formas de contacto para los lectores` se guarda por separado dentro de esa misma pantalla para no interferir con la configuración general del sitio.
+   Al final de esa pestaña puedes editar también `llms.txt` e `identity.txt`, con ayuda contextual para cada archivo.
 2. **Plantilla**: tipografías, colores, portada, footer y botones de cabecera.
 3. **Difusión**: redes sociales, push, podcast y metadatos sociales.
 4. **Lista**: correo saliente y suscripciones si vas a usar avisos o newsletters.
@@ -558,6 +559,7 @@ Nammu no se limita a generar RSS: también convierte cada blog en una cuenta pro
 - El admin puede separar refrescos ligeros y recalculado de hilos para evitar operaciones pesadas en una sola petición.
 - Parte del estado del Fediverso se guarda en stores locales para acelerar timeline, mensajes y notificaciones.
 - `llms.txt` sigue disponible como archivo adicional para consumo por modelos de lenguaje.
+- `identity.txt` permite publicar una ficha pública simple sobre la identidad editorial o institucional del sitio.
 
 #### Webmention
 
@@ -634,7 +636,7 @@ sudo find . -type f -exec chmod 664 {} \;
 - **Recursos**: biblioteca con tarjetas, filtros por imagen/vídeo/documento, botón “Editar” para abrir el mini editor, subida múltiple con feedback, etiquetado de imágenes, audio, vídeo y documentos (pdf, docx, xlsx, pptx, odt, md, etc., con nube de tags) y buscador instantáneo por nombre o etiquetas.
 - **Plantilla**: controla tipografías, colores, cabeceras, comportamiento del buscador (posición y modo flotante), TOC por defecto y número de entradas por home.
 - **Itinerarios**: crea portadas, define clase (Libro, Curso, Colección, Otros), lógica de uso, quizzes y estadísticas. Cada tema puede añadirse, duplicarse o borrarse desde la misma pestaña.
-- **Configuración**: modo blog/diccionario, búsqueda avanzada, nombre del sitio, autor, redes sociales, API de Google Fonts, correo de lista (Gmail + OAuth) y cambio de contraseña.
+- **Configuración**: modo blog/diccionario, búsqueda avanzada, nombre del sitio, autor, redes sociales, API de Google Fonts, correo de lista (Gmail + OAuth), edición de `llms.txt` e `identity.txt` y cambio de contraseña.
 - **Difusión**: credenciales y guías rápidas por red, usuario público de X para footer y `twitter:site`, App ID de Facebook, tokens de Instagram y LinkedIn y opciones de autoenvío.
 - **Redes**: envío manual de mensajes a varias redes a la vez y configuración de RSS externas para reenvío automático de novedades.
 - **Perfil del Fediverso**: página pública agregada desde las fuentes RSS configuradas en **Redes**, con notas manuales, entradas, podcasts e itinerarios, versión RSS propia en `noticias.xml`, feed de hilos en `fediverso.xml` e integración con el fediverso.
@@ -698,6 +700,17 @@ Ejemplo rápido:
 - `noticias.xml`: feed de la página pública de perfil/actualidad con noticias externas y notas manuales.
 - `fediverso.xml`: feed de las páginas públicas de hilo Fediverso asociadas a lo visible en la página de perfil.
 - `llms.txt`: resumen y enlaces clave para facilitar el consumo por modelos de lenguaje.
+- `identity.txt`: ficha pública editable con identidad, contexto y enlaces de verificación del sitio.
+
+### Edición de llms.txt e identity.txt
+
+- Ambos archivos se editan desde **Admin > Configuración**, en el bloque final de la pestaña.
+- Si dejas vacío cualquiera de los dos y guardas, Nammu vuelve a generar una versión básica automáticamente.
+- Se sirven como texto plano en:
+  - `/llms.txt`
+  - `/identity.txt`
+- `llms.txt` está pensado para resumir el sitio y señalar rutas públicas relevantes para agentes automáticos.
+- `identity.txt` está pensado para explicar quién habla en el sitio y desde qué contexto editorial o institucional.
 
 ## Licencia y soporte
 

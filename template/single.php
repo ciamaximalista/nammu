@@ -1320,7 +1320,7 @@ if ($isPageTemplate && $formattedDate !== '') {
     .post-related-card {
         position: relative;
         display: block;
-        min-height: 130px;
+        height: 170px;
         border-radius: var(--nammu-radius-md);
         overflow: hidden;
         background: transparent;
@@ -1331,8 +1331,9 @@ if ($isPageTemplate && $formattedDate !== '') {
         display: block;
         width: 100%;
         height: 100%;
-        min-height: 130px;
+        min-height: 170px;
         object-fit: cover;
+        object-position: center;
     }
     .post-related-fallback {
         background: <?= $colorHighlight ?>;

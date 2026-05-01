@@ -96,6 +96,8 @@ $threadPublishedLabel = $formatFediversePublicDateTime($threadPublished);
 $fediverseLocalName = trim((string) ($fediverseLocalName ?? 'Blog'));
 $fediverseLocalHandle = trim((string) ($fediverseLocalHandle ?? ''));
 $fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
+$themeColors = is_array($theme['colors'] ?? null) ? $theme['colors'] : [];
+$highlightColor = htmlspecialchars((string) ($themeColors['highlight'] ?? '#f3f6f9'), ENT_QUOTES, 'UTF-8');
 $threadOwnNoteFontStyle = $threadIsOwnNote
     ? ' style="font-family:&quot;' . $noteFont . '&quot;, system-ui, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif !important;"'
     : '';
@@ -107,6 +109,59 @@ if ($fediverseLocalHandle !== '') {
         ? rtrim($baseUrlValue, '/') . $profilePath
         : $profilePath;
 }
+$defaultActualityIndexUrl = ($baseUrlValue !== '' && $baseUrlValue !== '/')
+    ? rtrim($baseUrlValue, '/') . '/actualidad.php'
+    : '/actualidad.php';
+$fediverseProfileIndexUrl = $fediverseProfileUrl !== '' ? $fediverseProfileUrl : $defaultActualityIndexUrl;
+$threadObjectTypeMeta = static function () use ($threadItem, $threadIsBoostNote, $threadOriginalUrl, $baseUrlValue, $fediverseProfileIndexUrl): array {
+    $itemId = trim((string) ($threadItem['id'] ?? ''));
+    $itemType = strtolower(trim((string) ($threadItem['type'] ?? '')));
+    $itemUrl = trim((string) ($threadItem['url'] ?? ''));
+    $baseHost = strtolower(trim((string) (parse_url($baseUrlValue, PHP_URL_HOST) ?? '')));
+    $candidateUrl = $itemUrl !== '' ? $itemUrl : $threadOriginalUrl;
+    $candidatePath = trim((string) (parse_url($candidateUrl, PHP_URL_PATH) ?? ''));
+    $candidateHost = strtolower(trim((string) (parse_url($candidateUrl, PHP_URL_HOST) ?? '')));
+    $isLocalHost = $candidateHost !== '' && $baseHost !== '' && $candidateHost === $baseHost;
+
+    if ($threadIsBoostNote) {
+        return ['slug' => 'boost', 'label' => 'Impulso', 'url' => $fediverseProfileIndexUrl];
+    }
+    if (preg_match('#/ap/objects/podcast-#', $itemId) === 1 || preg_match('#^/podcast(?:/|$)#', $candidatePath) === 1) {
+        return ['slug' => 'podcast', 'label' => 'Podcast', 'url' => ($baseUrlValue !== '' && $baseUrlValue !== '/') ? rtrim($baseUrlValue, '/') . '/podcast' : '/podcast'];
+    }
+    if (preg_match('#/ap/objects/itinerary-#', $itemId) === 1 || preg_match('#^/itinerarios(?:/|$)#', $candidatePath) === 1) {
+        return ['slug' => 'itinerary', 'label' => 'Itinerario', 'url' => ($baseUrlValue !== '' && $baseUrlValue !== '/') ? rtrim($baseUrlValue, '/') . '/itinerarios' : '/itinerarios'];
+    }
+    if (preg_match('#/ap/objects/post-#', $itemId) === 1) {
+        return ['slug' => 'post', 'label' => 'Entrada del blog', 'url' => ($baseUrlValue !== '' && $baseUrlValue !== '/') ? rtrim($baseUrlValue, '/') . '/' : '/'];
+    }
+    if ($isLocalHost && preg_match('#^/newsletters(?:/|$)#', $candidatePath) === 1) {
+        return ['slug' => 'newsletter', 'label' => 'Newsletter', 'url' => ($baseUrlValue !== '' && $baseUrlValue !== '/') ? rtrim($baseUrlValue, '/') . '/newsletters' : '/newsletters'];
+    }
+    if ($isLocalHost && preg_match('#^/actualidad\.php(?:/|$)?$#', $candidatePath) === 1) {
+        return ['slug' => $itemType === 'note' ? 'note' : 'news', 'label' => $itemType === 'note' ? 'Nota' : 'Noticia', 'url' => $fediverseProfileIndexUrl];
+    }
+    if (preg_match('#/ap/objects/actualidad-#', $itemId) === 1) {
+        return ['slug' => $itemType === 'note' ? 'note' : 'news', 'label' => $itemType === 'note' ? 'Nota' : 'Noticia', 'url' => $fediverseProfileIndexUrl];
+    }
+    if ($itemType === 'note') {
+        return ['slug' => 'note', 'label' => 'Nota', 'url' => $fediverseProfileIndexUrl];
+    }
+    if ($isLocalHost && $candidatePath !== '' && preg_match('#^/[^/]+/?$#', $candidatePath) === 1) {
+        return ['slug' => 'post', 'label' => 'Entrada del blog', 'url' => ($baseUrlValue !== '' && $baseUrlValue !== '/') ? rtrim($baseUrlValue, '/') . '/' : '/'];
+    }
+    return ['slug' => 'news', 'label' => 'Noticia', 'url' => $fediverseProfileIndexUrl];
+};
+$threadTypeMeta = $threadObjectTypeMeta();
+$threadTypeSlug = trim((string) ($threadTypeMeta['slug'] ?? 'news'));
+$threadTypeLabel = trim((string) ($threadTypeMeta['label'] ?? 'Contenido'));
+$threadTypeUrl = trim((string) ($threadTypeMeta['url'] ?? ''));
+$threadStatusVariantClass = match ($threadTypeSlug) {
+    'post', 'podcast', 'itinerary', 'newsletter' => ' fediverse-public-status--site',
+    'note' => ' fediverse-public-status--manual',
+    'boost' => ' fediverse-public-status--boost',
+    default => '',
+};
 $renderFediversePublicText = static function (string $text, string $className = ''): string {
     $text = trim($text);
     if ($text === '') {
@@ -225,7 +280,10 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
 .fediverse-public-page { max-width: 860px; margin: 0 auto; }
 .fediverse-public-page__eyebrow { margin: 0 0 1rem; font-size: .85rem; letter-spacing: .08em; text-transform: uppercase; opacity: .7; }
 .fediverse-public-status,
-.fediverse-public-section { background: #f7f7f7; border: 1px solid rgba(0,0,0,.08); border-radius: 18px; padding: 1.25rem; margin-bottom: 1rem; }
+.fediverse-public-section { background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 18px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: 0 16px 36px rgba(0,0,0,.06); }
+.fediverse-public-status--site { background: <?= $highlightColor ?>; border: 1px solid rgba(0,0,0,.05); border-radius: 16px; color: inherit; }
+.fediverse-public-status--manual { background: #fff6a8; border: 1px solid rgba(124, 92, 5, 0.24); box-shadow: 0 20px 30px rgba(91, 74, 12, 0.16); }
+.fediverse-public-status--boost { background: #dff4c2; border: 1px solid rgba(76, 122, 34, 0.24); box-shadow: 0 20px 30px rgba(62, 105, 28, 0.16); }
 .fediverse-public-status__top,
 .fediverse-public-reply__top,
 .fediverse-public-actor { display: flex; gap: .9rem; align-items: flex-start; }
@@ -243,6 +301,8 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
 .fediverse-public-reply__header strong { font-size: 1rem; }
 .fediverse-public-status__handle,
 .fediverse-public-reply__meta { color: rgba(0,0,0,.6); font-size: .92rem; }
+.fediverse-public-status__type-link { color: inherit; text-decoration: underline; text-underline-offset: .16em; }
+.fediverse-public-status__type-link:hover { text-decoration-thickness: 2px; }
 .fediverse-public-status__title { font-size: 1.35rem; font-weight: 700; margin: 0 0 .85rem; line-height: 1.15; }
 .fediverse-public-status__text,
 .fediverse-public-reply__text { font-size: 1rem; line-height: 1.6; }
@@ -329,7 +389,7 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
         <?php endif; ?>
     </p>
 
-    <article class="fediverse-public-status<?= $threadIsOwnNote ? ' fediverse-public-status--note-own' : '' ?>"<?= $threadOwnNoteFontStyle ?>>
+    <article class="fediverse-public-status<?= $threadStatusVariantClass ?><?= $threadIsOwnNote ? ' fediverse-public-status--note-own' : '' ?>"<?= $threadOwnNoteFontStyle ?>>
         <div class="fediverse-public-status__top">
             <div class="fediverse-public-status__avatar">
                 <?php if ($fediverseLocalAvatar !== ''): ?>
@@ -346,6 +406,14 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                     <?php endif; ?>
                     <?php if ($threadPublishedLabel !== ''): ?>
                         <span class="fediverse-public-status__handle"><?= htmlspecialchars($threadPublishedLabel, ENT_QUOTES, 'UTF-8') ?></span>
+                    <?php endif; ?>
+                    <?php if ($threadTypeLabel !== ''): ?>
+                        <span class="fediverse-public-status__handle">·</span>
+                        <?php if ($threadTypeUrl !== ''): ?>
+                            <a class="fediverse-public-status__handle fediverse-public-status__type-link" href="<?= htmlspecialchars($threadTypeUrl, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($threadTypeLabel, ENT_QUOTES, 'UTF-8') ?></a>
+                        <?php else: ?>
+                            <span class="fediverse-public-status__handle"><?= htmlspecialchars($threadTypeLabel, ENT_QUOTES, 'UTF-8') ?></span>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
 

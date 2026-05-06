@@ -1302,6 +1302,9 @@
                                         }
                                     }
                                 }
+                                if ($displayActorIcon === '' && $displayActorId !== '' && isset($fediverseActorsById[$displayActorId])) {
+                                    $displayActorIcon = trim((string) ($fediverseActorsById[$displayActorId]['icon'] ?? ''));
+                                }
                                 $displayActorHandle = $fediverseHandle([
                                     'actor_id' => $displayActorId,
                                     'actor_username' => $displayActorUsername,

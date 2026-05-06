@@ -985,6 +985,84 @@ function nammu_fediverse_extract_actor_icon(array $actor): string
     return '';
 }
 
+function nammu_fediverse_normalize_actor_entry(array $actor, string $fallbackId = ''): array
+{
+    $sharedInbox = '';
+    if (is_array($actor['endpoints'] ?? null)) {
+        $sharedInbox = trim((string) ($actor['endpoints']['sharedInbox'] ?? ''));
+    }
+    if ($sharedInbox === '') {
+        $sharedInbox = trim((string) ($actor['sharedInbox'] ?? ''));
+    }
+    $id = trim((string) ($actor['id'] ?? ''));
+    if ($id === '') {
+        $id = trim($fallbackId);
+    }
+    return [
+        'id' => $id,
+        'preferredUsername' => trim((string) ($actor['preferredUsername'] ?? '')),
+        'name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $id)),
+        'inbox' => trim((string) ($actor['inbox'] ?? '')),
+        'sharedInbox' => $sharedInbox,
+        'outbox' => trim((string) ($actor['outbox'] ?? '')),
+        'url' => nammu_fediverse_extract_url($actor['url'] ?? ($actor['id'] ?? $fallbackId)),
+        'icon' => nammu_fediverse_extract_actor_icon($actor),
+        'public_key_id' => is_array($actor['publicKey'] ?? null) ? trim((string) (($actor['publicKey']['id'] ?? '') ?: '')) : trim((string) ($actor['public_key_id'] ?? '')),
+        'public_key_pem' => is_array($actor['publicKey'] ?? null)
+            ? trim((string) (($actor['publicKey']['publicKeyPem'] ?? '') ?: ''))
+            : trim((string) (($actor['public_key_pem'] ?? '') ?: ($actor['publicKeyPem'] ?? ''))),
+    ];
+}
+
+function nammu_fediverse_known_actor_from_input(string $input): ?array
+{
+    $input = trim($input);
+    if ($input === '') {
+        return null;
+    }
+    $known = nammu_fediverse_known_actors();
+    $normalizedInput = strtolower($input);
+    $inputHost = strtolower((string) (parse_url($input, PHP_URL_HOST) ?? ''));
+    $inputPath = trim((string) (parse_url($input, PHP_URL_PATH) ?? ''));
+    foreach ($known as $actor) {
+        if (!is_array($actor)) {
+            continue;
+        }
+        $normalized = nammu_fediverse_normalize_actor_entry($actor, $input);
+        $actorId = trim((string) ($normalized['id'] ?? ''));
+        $actorUrl = trim((string) ($normalized['url'] ?? ''));
+        if ($actorId !== '' && strtolower($actorId) === $normalizedInput) {
+            return $normalized;
+        }
+        if ($actorUrl !== '' && strtolower($actorUrl) === $normalizedInput) {
+            return $normalized;
+        }
+        $preferredUsername = trim((string) ($normalized['preferredUsername'] ?? ''));
+        if ($preferredUsername !== '') {
+            $actorHost = strtolower((string) (parse_url($actorId !== '' ? $actorId : $actorUrl, PHP_URL_HOST) ?? ''));
+            if ($actorHost !== '') {
+                $acctVariants = [
+                    '@' . $preferredUsername . '@' . $actorHost,
+                    'acct:' . $preferredUsername . '@' . $actorHost,
+                ];
+                foreach ($acctVariants as $variant) {
+                    if (strtolower($variant) === $normalizedInput) {
+                        return $normalized;
+                    }
+                }
+            }
+        }
+        if ($inputHost !== '' && $inputPath !== '') {
+            $actorUrlHost = strtolower((string) (parse_url($actorUrl, PHP_URL_HOST) ?? ''));
+            $actorUrlPath = trim((string) (parse_url($actorUrl, PHP_URL_PATH) ?? ''));
+            if ($actorUrlHost === $inputHost && $actorUrlPath !== '' && rtrim($actorUrlPath, '/') === rtrim($inputPath, '/')) {
+                return $normalized;
+            }
+        }
+    }
+    return null;
+}
+
 function nammu_fediverse_extract_html_image_urls(string $html): array
 {
     $html = trim($html);
@@ -1101,31 +1179,34 @@ function nammu_fediverse_resolve_actor(string $input, ?array $config = null): ?a
     if ($trimmed === '') {
         return null;
     }
+    $knownActor = nammu_fediverse_known_actor_from_input($trimmed);
+    if (is_array($knownActor)) {
+        return $knownActor;
+    }
     if (preg_match('#^https?://#i', $trimmed)) {
         $actor = is_array($config)
             ? nammu_fediverse_signed_fetch_json($trimmed, $config)
             : nammu_fediverse_fetch_json($trimmed);
-        if (!is_array($actor)) {
-            return null;
+        if (is_array($actor)) {
+            return nammu_fediverse_normalize_actor_entry($actor, $trimmed);
         }
-        $sharedInbox = '';
-        if (is_array($actor['endpoints'] ?? null)) {
-            $sharedInbox = trim((string) ($actor['endpoints']['sharedInbox'] ?? ''));
+        $urlHost = strtolower((string) (parse_url($trimmed, PHP_URL_HOST) ?? ''));
+        $urlPath = trim((string) (parse_url($trimmed, PHP_URL_PATH) ?? ''));
+        if ($urlHost !== '' && $urlPath !== '') {
+            if (preg_match('#/@([^/@]+)(?:@[^/]+)?/?$#', $urlPath, $matches) === 1) {
+                $username = trim((string) ($matches[1] ?? ''));
+                if ($username !== '') {
+                    return nammu_fediverse_resolve_actor('@' . $username . '@' . $urlHost, $config);
+                }
+            }
+            if (preg_match('#/(?:users|accounts)/([^/]+)/?$#', $urlPath, $matches) === 1) {
+                $username = trim((string) ($matches[1] ?? ''));
+                if ($username !== '') {
+                    return nammu_fediverse_resolve_actor('@' . $username . '@' . $urlHost, $config);
+                }
+            }
         }
-        return [
-            'id' => (string) ($actor['id'] ?? $trimmed),
-            'preferredUsername' => (string) ($actor['preferredUsername'] ?? ''),
-            'name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? ''))),
-            'inbox' => (string) ($actor['inbox'] ?? ''),
-            'sharedInbox' => $sharedInbox,
-            'outbox' => (string) ($actor['outbox'] ?? ''),
-            'url' => nammu_fediverse_extract_url($actor['url'] ?? ($actor['id'] ?? $trimmed)),
-            'icon' => nammu_fediverse_extract_actor_icon($actor),
-            'public_key_id' => is_array($actor['publicKey'] ?? null) ? (string) (($actor['publicKey']['id'] ?? '') ?: '') : '',
-            'public_key_pem' => is_array($actor['publicKey'] ?? null)
-                ? (string) (($actor['publicKey']['publicKeyPem'] ?? '') ?: '')
-                : trim((string) ($actor['publicKeyPem'] ?? '')),
-        ];
+        return null;
     }
 
     $acct = $trimmed;

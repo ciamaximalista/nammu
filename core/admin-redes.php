@@ -1042,6 +1042,22 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
         return ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => count($items)];
     }
 
+    usort($items, static function (array $a, array $b): int {
+        $attemptsA = (int) ($a['attempts'] ?? 0);
+        $attemptsB = (int) ($b['attempts'] ?? 0);
+        if ($attemptsA !== $attemptsB) {
+            return $attemptsA <=> $attemptsB;
+        }
+
+        $createdA = strtotime((string) ($a['created_at'] ?? '')) ?: 0;
+        $createdB = strtotime((string) ($b['created_at'] ?? '')) ?: 0;
+        if ($createdA !== $createdB) {
+            return $createdB <=> $createdA;
+        }
+
+        return strcmp((string) ($a['id'] ?? ''), (string) ($b['id'] ?? ''));
+    });
+
     $processed = 0;
     $sent = 0;
     $failed = 0;
@@ -1829,10 +1845,20 @@ function admin_send_social_broadcast_message(string $network, string $text, arra
                 return false;
             }
             if (count($imageItems) > 1) {
-                return admin_send_telegram_media_group($token, $channel, admin_social_broadcast_image_urls($imageItems), $telegramHtml, $error);
+                $ok = admin_send_telegram_media_group($token, $channel, admin_social_broadcast_image_urls($imageItems), $telegramHtml, $error);
+                if ($ok) {
+                    return true;
+                }
+                // Keep delivery even if Telegram rejects the media group.
+                return admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML', $error);
             }
             if ($imageUrl !== '') {
-                return admin_send_telegram_photo($token, $channel, $imageUrl, $telegramHtml, $error);
+                $ok = admin_send_telegram_photo($token, $channel, $imageUrl, $telegramHtml, $error);
+                if ($ok) {
+                    return true;
+                }
+                // Keep delivery even if Telegram rejects the photo.
+                return admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML', $error);
             }
             return admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML', $error);
         case 'facebook':

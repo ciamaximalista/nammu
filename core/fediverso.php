@@ -3671,6 +3671,16 @@ function nammu_fediverse_remote_thread_page_url(string $objectId): string
     return rtrim($baseUrl, '/') . '/fediverso/' . nammu_fediverse_thread_page_hash($objectId);
 }
 
+function nammu_fediverse_is_thread_page_url(string $url): bool
+{
+    $url = trim($url);
+    if ($url === '') {
+        return false;
+    }
+    $path = trim((string) (parse_url($url, PHP_URL_PATH) ?? ''));
+    return preg_match('#^/fediverso/[a-f0-9]{24}/?$#', $path) === 1;
+}
+
 function nammu_fediverse_find_local_item_for_thread_hash(string $hash, array $config): ?array
 {
     $hash = trim(strtolower($hash));
@@ -4672,7 +4682,10 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
                 $clusterTitle = trim((string) ($clusterActualityItem['title'] ?? ''));
                 $clusterContent = trim((string) (($clusterActualityItem['raw_text'] ?? '') ?: ($clusterActualityItem['description'] ?? '')));
                 $clusterSummary = trim((string) ($clusterActualityItem['description'] ?? ''));
-                $clusterUrl = trim((string) ($clusterActualityItem['link'] ?? ''));
+                $clusterUrl = nammu_fediverse_public_thread_url_for_actuality_item($clusterActualityItem, $config);
+                if ($clusterUrl === '') {
+                    $clusterUrl = trim((string) ($clusterActualityItem['link'] ?? ''));
+                }
                 $clusterImage = nammu_fediverse_actuality_item_effective_image($clusterActualityItem);
                 if ($clusterTitle !== '') {
                     $object['name'] = $clusterTitle;
@@ -4687,6 +4700,18 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
                 }
                 if ($clusterImage !== '') {
                     $object['image'] = $clusterImage;
+                }
+                $clusterAttachments = array_values(array_filter((array) ($clusterActualityItem['attachments'] ?? []), static function ($attachment): bool {
+                    return is_array($attachment) && trim((string) ($attachment['url'] ?? '')) !== '';
+                }));
+                if (!empty($clusterAttachments)) {
+                    $object['attachment'] = $clusterAttachments;
+                } elseif ($clusterImage !== '') {
+                    $object['attachment'] = [[
+                        'type' => 'Image',
+                        'url' => $clusterImage,
+                        'mediaType' => 'image/*',
+                    ]];
                 }
             }
         }
@@ -5722,6 +5747,18 @@ function nammu_fediverse_canonical_public_object_url(string $objectId, string $f
 {
     $objectId = trim($objectId);
     $fallbackUrl = trim($fallbackUrl);
+    $localHost = strtolower(trim((string) parse_url(nammu_fediverse_base_url($config), PHP_URL_HOST)));
+
+    if ($objectId !== '' && nammu_fediverse_is_thread_page_url($objectId)) {
+        return $objectId;
+    }
+
+    if ($fallbackUrl !== '' && nammu_fediverse_is_thread_page_url($fallbackUrl)) {
+        $fallbackHost = strtolower(trim((string) parse_url($fallbackUrl, PHP_URL_HOST)));
+        if ($fallbackHost !== '' && $fallbackHost !== $localHost) {
+            return $fallbackUrl;
+        }
+    }
 
     if ($objectId !== '') {
         $localUrl = nammu_fediverse_public_url_for_local_identifier($objectId, $config);

@@ -1869,10 +1869,30 @@ function admin_send_telegram_media_group(string $token, string $chatId, array $p
         return admin_send_telegram_photo($token, $chatId, $photoUrls[0] ?? '', $caption, $error);
     }
     $media = [];
+    $payload = [
+        'chat_id' => $chatId,
+    ];
+    $hasUpload = false;
     foreach ($photoUrls as $index => $photoUrl) {
+        $localPath = admin_local_asset_path($photoUrl);
+        $mediaRef = $photoUrl;
+        if ($localPath !== '' && function_exists('curl_file_create')) {
+            $fieldName = 'photo' . $index;
+            $mime = 'application/octet-stream';
+            if (class_exists('finfo')) {
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $detected = $finfo->file($localPath);
+                if (is_string($detected) && $detected !== '') {
+                    $mime = $detected;
+                }
+            }
+            $payload[$fieldName] = curl_file_create($localPath, $mime, basename($localPath));
+            $mediaRef = 'attach://' . $fieldName;
+            $hasUpload = true;
+        }
         $item = [
             'type' => 'photo',
-            'media' => $photoUrl,
+            'media' => $mediaRef,
         ];
         if ($index === 0) {
             $item['caption'] = $caption;
@@ -1881,10 +1901,37 @@ function admin_send_telegram_media_group(string $token, string $chatId, array $p
         $media[] = $item;
     }
     $endpoint = 'https://api.telegram.org/bot' . rawurlencode($token) . '/sendMediaGroup';
-    $payload = [
-        'chat_id' => $chatId,
-        'media' => json_encode($media, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-    ];
+    $payload['media'] = json_encode($media, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($hasUpload && function_exists('curl_init')) {
+        $ch = curl_init($endpoint);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        $responseBody = curl_exec($ch);
+        $httpCode = null;
+        if ($responseBody !== false) {
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        }
+        curl_close($ch);
+        if ($responseBody === false || $responseBody === null) {
+            $error = 'Telegram: no se recibió respuesta de la API al subir el álbum.';
+            return false;
+        }
+        $decoded = json_decode($responseBody, true);
+        if (is_array($decoded) && isset($decoded['ok'])) {
+            if ((bool) $decoded['ok']) {
+                return true;
+            }
+            $error = 'Telegram: ' . (string) ($decoded['description'] ?? 'error desconocido');
+            return false;
+        }
+        if ($httpCode !== null && $httpCode >= 200 && $httpCode < 300) {
+            return true;
+        }
+        $error = 'Telegram: no se pudo enviar el álbum.';
+        return false;
+    }
     $response = admin_http_post_form_json($endpoint, $payload);
     if (is_array($response) && isset($response['ok'])) {
         if ((bool) $response['ok']) {

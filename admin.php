@@ -7037,12 +7037,7 @@ function admin_google_refresh_access_token(string $clientId, string $clientSecre
 
 function admin_gmail_send_message(string $from, string $to, string $subject, string $textBody, string $htmlBody, string $accessToken, ?string $fromName = null): array {
     $boundary = '=_NammuMailer_' . bin2hex(random_bytes(8));
-    $displayName = $fromName && trim($fromName) !== '' ? trim($fromName) : '';
-    $displayName = str_replace(['"', "\r", "\n"], '', $displayName);
-    $encodedName = $displayName !== '' && function_exists('mb_encode_mimeheader')
-        ? mb_encode_mimeheader($displayName, 'UTF-8', 'Q', "\r\n")
-        : ($displayName !== '' ? '=?UTF-8?B?' . base64_encode($displayName) . '?=' : '');
-    $fromHeader = $encodedName !== '' ? $encodedName . ' <' . $from . '>' : $from;
+    $fromHeader = admin_format_email_mailbox($from, $fromName);
     $subjectHeader = function_exists('mb_encode_mimeheader')
         ? mb_encode_mimeheader($subject, 'UTF-8', 'Q', "\r\n")
         : '=?UTF-8?B?' . base64_encode($subject) . '?=';
@@ -7097,6 +7092,30 @@ function admin_gmail_send_message(string $from, string $to, string $subject, str
         return [false, 'Respuesta inesperada al enviar correo'];
     }
     return [true, null];
+}
+
+function admin_format_email_mailbox(string $email, ?string $displayName = null): string
+{
+    $email = admin_normalize_email($email);
+    $displayName = trim((string) $displayName);
+    $displayName = str_replace(["\r", "\n"], '', $displayName);
+    if ($email === '') {
+        return '';
+    }
+    if ($displayName === '') {
+        return $email;
+    }
+
+    $escapedDisplayName = str_replace(['\\', '"'], ['\\\\', '\\"'], $displayName);
+    $isAscii = preg_match('/^[\x20-\x7E]+$/', $displayName) === 1;
+    if ($isAscii) {
+        return '"' . $escapedDisplayName . '" <' . $email . '>';
+    }
+
+    $encodedName = function_exists('mb_encode_mimeheader')
+        ? mb_encode_mimeheader($displayName, 'UTF-8', 'Q', "\r\n")
+        : '=?UTF-8?B?' . base64_encode($displayName) . '?=';
+    return $encodedName . ' <' . $email . '>';
 }
 
 function admin_is_mailing_ready(array $settings): bool {

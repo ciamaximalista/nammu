@@ -3437,6 +3437,9 @@ function nammu_render_header_buttons(array $options): string
         : (function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($config) : (trim((string) ($socialRssConfig['feeds'] ?? '')) !== ''));
     $subscriptionEnabled = !empty($options['subscription_enabled']);
     $postalEnabled = !empty($options['postal_enabled']);
+    $subscriptionLabel = function_exists('nammu_public_subscription_menu_label')
+        ? nammu_public_subscription_menu_label($hasNewsletters)
+        : ($hasNewsletters ? 'Suscripción a Avisos y Newsletter' : 'Suscripción a Avisos');
 
     $items = [];
     $items[] = [
@@ -3489,7 +3492,7 @@ function nammu_render_header_buttons(array $options): string
     }
     if ($subscriptionEnabled) {
         $items[] = [
-            'label' => 'Suscripción a Avisos y Newsletter',
+            'label' => $subscriptionLabel,
             'href' => $avisosUrl,
             'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="14" rx="2" stroke="#fff" stroke-width="2"/><polyline points="3,7 12,13 21,7" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         ];
@@ -3582,6 +3585,11 @@ function nammu_render_standard_header_buttons(array $context = []): string
         'subscription_enabled' => !empty($context['subscriptionEnabled'] ?? $context['subscription_enabled'] ?? (($subscriptionConfig['mode'] ?? 'none') !== 'none')),
         'postal_enabled' => !empty($context['postalEnabled'] ?? $context['postal_enabled'] ?? false),
     ]);
+}
+
+function nammu_public_subscription_menu_label(bool $hasNewsletters): string
+{
+    return $hasNewsletters ? 'Suscripción a Avisos y Newsletter' : 'Suscripción a Avisos';
 }
 
 function nammu_newsletter_access_file(): string

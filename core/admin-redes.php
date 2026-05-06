@@ -1291,6 +1291,95 @@ function admin_social_broadcast_telegram_html(string $text): string
     return trim($result);
 }
 
+function admin_telegram_prepare_upload(string $photoUrl, ?string &$tempPath = null): ?array
+{
+    $photoUrl = trim($photoUrl);
+    $tempPath = null;
+    if ($photoUrl === '' || !function_exists('curl_file_create')) {
+        return null;
+    }
+
+    $localPath = admin_local_asset_path($photoUrl);
+    $mime = 'application/octet-stream';
+    $uploadName = '';
+
+    if ($localPath !== '') {
+        if (class_exists('finfo')) {
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $detected = $finfo->file($localPath);
+            if (is_string($detected) && $detected !== '') {
+                $mime = $detected;
+            }
+        }
+        return [
+            'path' => $localPath,
+            'mime' => $mime,
+            'name' => basename($localPath),
+        ];
+    }
+
+    if (!preg_match('#^https?://#i', $photoUrl)) {
+        return null;
+    }
+
+    $binary = '';
+    if (function_exists('admin_http_get_binary')) {
+        $binary = admin_http_get_binary($photoUrl);
+    }
+    if ($binary === '') {
+        $opts = [
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 15,
+                'ignore_errors' => true,
+                'header' => "User-Agent: Nammu Telegram Uploader\r\n",
+            ],
+        ];
+        $raw = @file_get_contents($photoUrl, false, stream_context_create($opts));
+        $binary = is_string($raw) ? $raw : '';
+    }
+    if ($binary === '') {
+        return null;
+    }
+
+    if (class_exists('finfo')) {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $detected = $finfo->buffer($binary);
+        if (is_string($detected) && $detected !== '') {
+            $mime = $detected;
+        }
+    }
+    if (!str_starts_with(strtolower($mime), 'image/')) {
+        return null;
+    }
+
+    $path = (string) (parse_url($photoUrl, PHP_URL_PATH) ?? '');
+    $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    if ($extension === '') {
+        $extension = match ($mime) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            default => 'img',
+        };
+    }
+    $tmpPath = tempnam(sys_get_temp_dir(), 'nammu_tg_');
+    if ($tmpPath === false || @file_put_contents($tmpPath, $binary) === false) {
+        return null;
+    }
+    $finalTmpPath = $tmpPath . '.' . $extension;
+    @rename($tmpPath, $finalTmpPath);
+    $tempPath = $finalTmpPath;
+    $uploadName = basename($path !== '' ? $path : ('image.' . $extension));
+
+    return [
+        'path' => $tempPath,
+        'mime' => $mime,
+        'name' => $uploadName,
+    ];
+}
+
 function admin_social_broadcast_image_url(string $image): string
 {
     $image = trim($image);
@@ -1873,20 +1962,17 @@ function admin_send_telegram_media_group(string $token, string $chatId, array $p
         'chat_id' => $chatId,
     ];
     $hasUpload = false;
+    $tempFiles = [];
     foreach ($photoUrls as $index => $photoUrl) {
-        $localPath = admin_local_asset_path($photoUrl);
         $mediaRef = $photoUrl;
-        if ($localPath !== '' && function_exists('curl_file_create')) {
+        $tempPath = null;
+        $upload = admin_telegram_prepare_upload($photoUrl, $tempPath);
+        if (is_array($upload)) {
             $fieldName = 'photo' . $index;
-            $mime = 'application/octet-stream';
-            if (class_exists('finfo')) {
-                $finfo = new finfo(FILEINFO_MIME_TYPE);
-                $detected = $finfo->file($localPath);
-                if (is_string($detected) && $detected !== '') {
-                    $mime = $detected;
-                }
+            if ($tempPath !== null && $tempPath !== '') {
+                $tempFiles[] = $tempPath;
             }
-            $payload[$fieldName] = curl_file_create($localPath, $mime, basename($localPath));
+            $payload[$fieldName] = curl_file_create((string) $upload['path'], (string) $upload['mime'], (string) $upload['name']);
             $mediaRef = 'attach://' . $fieldName;
             $hasUpload = true;
         }
@@ -1914,6 +2000,9 @@ function admin_send_telegram_media_group(string $token, string $chatId, array $p
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         }
         curl_close($ch);
+        foreach ($tempFiles as $tempFile) {
+            @unlink($tempFile);
+        }
         if ($responseBody === false || $responseBody === null) {
             $error = 'Telegram: no se recibió respuesta de la API al subir el álbum.';
             return false;
@@ -1933,6 +2022,9 @@ function admin_send_telegram_media_group(string $token, string $chatId, array $p
         return false;
     }
     $response = admin_http_post_form_json($endpoint, $payload);
+    foreach ($tempFiles as $tempFile) {
+        @unlink($tempFile);
+    }
     if (is_array($response) && isset($response['ok'])) {
         if ((bool) $response['ok']) {
             return true;

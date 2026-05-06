@@ -5946,19 +5946,12 @@ function admin_send_telegram_message(string $token, string $chatId, string $text
 
 function admin_send_telegram_photo(string $token, string $chatId, string $photoUrl, string $caption, ?string &$error = null): bool {
     $endpoint = 'https://api.telegram.org/bot' . rawurlencode($token) . '/sendPhoto';
-    $localPath = admin_local_asset_path($photoUrl);
-    if ($localPath !== '' && function_exists('curl_init') && function_exists('curl_file_create')) {
-        $mime = 'application/octet-stream';
-        if (class_exists('finfo')) {
-            $finfo = new finfo(FILEINFO_MIME_TYPE);
-            $detected = $finfo->file($localPath);
-            if (is_string($detected) && $detected !== '') {
-                $mime = $detected;
-            }
-        }
+    $tempPath = null;
+    $upload = function_exists('admin_telegram_prepare_upload') ? admin_telegram_prepare_upload($photoUrl, $tempPath) : null;
+    if (is_array($upload) && function_exists('curl_init') && function_exists('curl_file_create')) {
         $payload = [
             'chat_id' => $chatId,
-            'photo' => curl_file_create($localPath, $mime, basename($localPath)),
+            'photo' => curl_file_create((string) $upload['path'], (string) $upload['mime'], (string) $upload['name']),
             'caption' => $caption,
             'parse_mode' => 'HTML',
             'disable_web_page_preview' => false,
@@ -5974,6 +5967,9 @@ function admin_send_telegram_photo(string $token, string $chatId, string $photoU
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         }
         curl_close($ch);
+        if ($tempPath !== null && $tempPath !== '') {
+            @unlink($tempPath);
+        }
         if ($responseBody === false || $responseBody === null) {
             $error = 'Telegram: no se recibió respuesta de la API al subir la imagen.';
             return false;

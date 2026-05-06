@@ -805,6 +805,75 @@ function admin_social_broadcast_parse_image_items($images): array
     }));
 }
 
+function admin_social_broadcast_images_from_fediverse_item(array $item): array
+{
+    $images = admin_social_broadcast_parse_image_items($item['images'] ?? []);
+    $primaryImage = trim((string) ($item['image'] ?? ''));
+    if ($primaryImage !== '' && !in_array($primaryImage, $images, true)) {
+        array_unshift($images, $primaryImage);
+    }
+
+    $attachments = is_array($item['attachments'] ?? null) ? $item['attachments'] : [];
+    foreach ($attachments as $attachment) {
+        if (!is_array($attachment)) {
+            continue;
+        }
+        $attachmentUrl = trim((string) ($attachment['url'] ?? ''));
+        $attachmentImage = trim((string) ($attachment['image'] ?? ''));
+        $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
+        $attachmentMediaType = strtolower(trim((string) ($attachment['media_type'] ?? ($attachment['mediaType'] ?? ''))));
+
+        if ($attachmentUrl !== '' && ($attachmentType === 'image' || str_starts_with($attachmentMediaType, 'image/')) && !in_array($attachmentUrl, $images, true)) {
+            $images[] = $attachmentUrl;
+        }
+        if ($attachmentImage !== '' && ($attachmentType === 'link' || $attachmentMediaType === 'text/html' || str_starts_with($attachmentMediaType, 'text/html')) && !in_array($attachmentImage, $images, true)) {
+            $images[] = $attachmentImage;
+        }
+    }
+
+    $max = admin_social_broadcast_max_images();
+    if (count($images) > $max) {
+        $images = array_slice($images, 0, $max);
+    }
+    return array_values(array_unique(array_filter($images)));
+}
+
+function admin_social_broadcast_enrich_images_from_fediverse_url($images, string $fediverseUrl): array
+{
+    $parsed = admin_social_broadcast_parse_images($images);
+    if (!empty($parsed)) {
+        return $parsed;
+    }
+
+    $fediverseUrl = trim($fediverseUrl);
+    if ($fediverseUrl === '') {
+        return [];
+    }
+
+    $path = trim((string) (parse_url($fediverseUrl, PHP_URL_PATH) ?? ''));
+    if ($path === '' || preg_match('#/fediverso/([a-f0-9]{24})/?$#', $path, $matches) !== 1) {
+        return [];
+    }
+
+    if (!function_exists('nammu_fediverse_find_local_item_for_thread_hash') && is_file(__DIR__ . '/fediverso.php')) {
+        require_once __DIR__ . '/fediverso.php';
+    }
+    if (!function_exists('load_config_file')) {
+        return [];
+    }
+    if (!function_exists('nammu_fediverse_find_local_item_for_thread_hash')) {
+        return [];
+    }
+
+    $config = load_config_file();
+    $item = nammu_fediverse_find_local_item_for_thread_hash((string) ($matches[1] ?? ''), $config);
+    if (!is_array($item)) {
+        return [];
+    }
+
+    return admin_social_broadcast_images_from_fediverse_item($item);
+}
+
 function admin_social_broadcast_parse_actuality_attachments($images): array
 {
     $attachments = [];
@@ -1083,8 +1152,8 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
         $pendingNetworks = [];
         $sentNetworks = [];
         $text = trim((string) ($item['text'] ?? ''));
-        $images = admin_social_broadcast_parse_images($item['images'] ?? []);
         $fediverseUrl = trim((string) ($item['fediverse_url'] ?? ''));
+        $images = admin_social_broadcast_enrich_images_from_fediverse_url($item['images'] ?? [], $fediverseUrl);
 
         if ($text === '') {
             $failed++;

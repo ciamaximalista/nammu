@@ -12429,7 +12429,9 @@ if ($isLoggedIn && $page === 'fediverso') {
                 $noteParts[] = $objectContent;
             }
             $noteText = trim(implode("\n\n", $noteParts));
-            $displayUrl = $publicUrl !== '' ? $publicUrl : $objectUrl;
+            $displayUrl = function_exists('nammu_fediverse_canonical_public_object_url')
+                ? nammu_fediverse_canonical_public_object_url($objectUrl, $publicUrl, $config)
+                : ($publicUrl !== '' ? $publicUrl : $objectUrl);
             if ($displayUrl !== '' && !str_contains($noteText, $displayUrl)) {
                 $noteText = trim($noteText . "\n\n" . $displayUrl);
             }
@@ -12509,6 +12511,30 @@ if ($isLoggedIn && $page === 'fediverso') {
         $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
         $replyText = trim((string) ($_POST['fediverse_reply_text'] ?? ''));
         $replyAlsoAsNote = !empty($_POST['fediverse_reply_as_note']);
+        $replyObjectImage = trim((string) ($_POST['fediverse_object_image'] ?? ''));
+        $replyObjectImages = json_decode((string) ($_POST['fediverse_object_images'] ?? '[]'), true);
+        $replyObjectImages = array_values(array_unique(array_filter(array_map('strval', is_array($replyObjectImages) ? $replyObjectImages : []))));
+        $replyObjectAttachments = json_decode((string) ($_POST['fediverse_object_attachments'] ?? '[]'), true);
+        $replyObjectAttachments = array_values(array_filter(array_map(static function ($attachment): ?array {
+            if (!is_array($attachment)) {
+                return null;
+            }
+            $url = trim((string) ($attachment['url'] ?? ''));
+            if ($url === '') {
+                return null;
+            }
+            return [
+                'type' => strtolower(trim((string) ($attachment['type'] ?? 'document'))),
+                'url' => $url,
+                'name' => trim((string) ($attachment['name'] ?? '')),
+                'media_type' => trim((string) ($attachment['media_type'] ?? ($attachment['mediaType'] ?? ''))),
+                'image' => trim((string) ($attachment['image'] ?? '')),
+                'summary' => trim((string) ($attachment['summary'] ?? '')),
+            ];
+        }, is_array($replyObjectAttachments) ? $replyObjectAttachments : [])));
+        if ($replyObjectImage !== '' && !in_array($replyObjectImage, $replyObjectImages, true)) {
+            array_unshift($replyObjectImages, $replyObjectImage);
+        }
         $config = load_config_file();
         if ($recipientId === '') {
             $result = nammu_fediverse_send_local_reply($objectUrl, $replyText, $config);
@@ -12528,7 +12554,10 @@ if ($isLoggedIn && $page === 'fediverso') {
                 $noteText = trim($noteText . "\n\n" . $objectUrl);
             }
             if (function_exists('nammu_actuality_add_manual_item')) {
-                $manualItem = nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle);
+                $manualItem = nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle, $replyObjectImage, [
+                    'images' => $replyObjectImages,
+                    'attachments' => $replyObjectAttachments,
+                ]);
                 if (function_exists('nammu_actuality_rebuild_snapshot')) {
                     nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
                 }
@@ -12542,7 +12571,7 @@ if ($isLoggedIn && $page === 'fediverso') {
                         $fediverseUrl = function_exists('admin_social_broadcast_fediverse_url_for_actuality_item')
                             ? admin_social_broadcast_fediverse_url_for_actuality_item($manualItem)
                             : '';
-                        admin_enqueue_social_broadcast($noteText, [], $allConfiguredNetworks, $fediverseUrl);
+                        admin_enqueue_social_broadcast($noteText, $replyObjectImages, $allConfiguredNetworks, $fediverseUrl);
                     }
                 }
                 $deliveryStats = nammu_fediverse_deliver_local_items($config);
@@ -12606,6 +12635,30 @@ if ($isLoggedIn && $page === 'fediverso') {
         $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
         $shareText = trim((string) ($_POST['fediverse_share_text'] ?? ''));
         $shareTitle = trim((string) ($_POST['fediverse_object_title'] ?? ''));
+        $shareObjectImage = trim((string) ($_POST['fediverse_object_image'] ?? ''));
+        $shareObjectImages = json_decode((string) ($_POST['fediverse_object_images'] ?? '[]'), true);
+        $shareObjectImages = array_values(array_unique(array_filter(array_map('strval', is_array($shareObjectImages) ? $shareObjectImages : []))));
+        $shareObjectAttachments = json_decode((string) ($_POST['fediverse_object_attachments'] ?? '[]'), true);
+        $shareObjectAttachments = array_values(array_filter(array_map(static function ($attachment): ?array {
+            if (!is_array($attachment)) {
+                return null;
+            }
+            $url = trim((string) ($attachment['url'] ?? ''));
+            if ($url === '') {
+                return null;
+            }
+            return [
+                'type' => strtolower(trim((string) ($attachment['type'] ?? 'document'))),
+                'url' => $url,
+                'name' => trim((string) ($attachment['name'] ?? '')),
+                'media_type' => trim((string) ($attachment['media_type'] ?? ($attachment['mediaType'] ?? ''))),
+                'image' => trim((string) ($attachment['image'] ?? '')),
+                'summary' => trim((string) ($attachment['summary'] ?? '')),
+            ];
+        }, is_array($shareObjectAttachments) ? $shareObjectAttachments : [])));
+        if ($shareObjectImage !== '' && !in_array($shareObjectImage, $shareObjectImages, true)) {
+            array_unshift($shareObjectImages, $shareObjectImage);
+        }
         $config = load_config_file();
         $baseUrl = rtrim((string) (($config['site_url'] ?? '') ?: nammu_base_url()), '/');
         $siteTitle = trim((string) (($config['site_name'] ?? '') ?: ''));
@@ -12622,7 +12675,10 @@ if ($isLoggedIn && $page === 'fediverso') {
             ];
             $fediverseRedirect = true;
         } else {
-            $manualItem = nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle);
+            $manualItem = nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle, $shareObjectImage, [
+                'images' => $shareObjectImages,
+                'attachments' => $shareObjectAttachments,
+            ]);
             if (function_exists('nammu_actuality_rebuild_snapshot')) {
                 nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
             }
@@ -12638,7 +12694,7 @@ if ($isLoggedIn && $page === 'fediverso') {
                     $fediverseUrl = function_exists('admin_social_broadcast_fediverse_url_for_actuality_item')
                         ? admin_social_broadcast_fediverse_url_for_actuality_item($manualItem)
                         : '';
-                    admin_enqueue_social_broadcast($noteText, [], $allConfiguredNetworks, $fediverseUrl);
+                    admin_enqueue_social_broadcast($noteText, $shareObjectImages, $allConfiguredNetworks, $fediverseUrl);
                 }
             }
             $deliveryStats = nammu_fediverse_deliver_local_items($config);

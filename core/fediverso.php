@@ -5718,6 +5718,33 @@ function nammu_fediverse_public_url_for_local_identifier(string $identifier, arr
     return trim((string) ($item['url'] ?? ''));
 }
 
+function nammu_fediverse_canonical_public_object_url(string $objectId, string $fallbackUrl, array $config): string
+{
+    $objectId = trim($objectId);
+    $fallbackUrl = trim($fallbackUrl);
+
+    if ($objectId !== '') {
+        $localUrl = nammu_fediverse_public_url_for_local_identifier($objectId, $config);
+        if ($localUrl !== '') {
+            return $localUrl;
+        }
+
+        $remoteUrl = nammu_fediverse_remote_thread_page_url($objectId);
+        if ($remoteUrl !== '') {
+            return $remoteUrl;
+        }
+    }
+
+    if ($fallbackUrl !== '') {
+        $localFallbackUrl = nammu_fediverse_public_url_for_local_identifier($fallbackUrl, $config);
+        if ($localFallbackUrl !== '') {
+            return $localFallbackUrl;
+        }
+    }
+
+    return $fallbackUrl !== '' ? $fallbackUrl : $objectId;
+}
+
 function nammu_fediverse_local_reaction_summary(array $config): array
 {
     $index = nammu_fediverse_local_items_index($config);

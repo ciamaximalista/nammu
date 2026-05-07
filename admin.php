@@ -12447,6 +12447,7 @@ if ($isLoggedIn && $page === 'fediverso') {
             $displayUrl = function_exists('nammu_fediverse_canonical_public_object_url')
                 ? nammu_fediverse_canonical_public_object_url($objectUrl, $publicUrl, $config)
                 : ($publicUrl !== '' ? $publicUrl : $objectUrl);
+            $originalPublicUrl = $displayUrl;
             if ($displayUrl !== '' && !str_contains($noteText, $displayUrl)) {
                 $noteText = trim($noteText . "\n\n" . $displayUrl);
             }
@@ -12455,7 +12456,7 @@ if ($isLoggedIn && $page === 'fediverso') {
                     'via' => 'boost',
                     'images' => $objectImages,
                     'attachments' => $objectAttachments,
-                    'boost_original_url' => $displayUrl,
+                    'boost_original_url' => $originalPublicUrl,
                     'boost_actor_name' => $objectActorName,
                     'boost_actor_icon' => $objectActorIcon,
                     'boost_actor_url' => $objectActorUrl,
@@ -12471,7 +12472,7 @@ if ($isLoggedIn && $page === 'fediverso') {
                     'images' => $objectImages,
                     'attachments' => $objectAttachments,
                     'manual_item_id' => (string) ($manualItem['id'] ?? ''),
-                    'public_url' => $displayUrl,
+                    'public_url' => $originalPublicUrl,
                     'boost_actor_name' => $objectActorName,
                     'boost_actor_icon' => $objectActorIcon,
                     'boost_actor_url' => $objectActorUrl,
@@ -12485,8 +12486,8 @@ if ($isLoggedIn && $page === 'fediverso') {
                     if ($objectContent !== '' && $objectContent !== $objectTitle) {
                         $socialTextParts[] = $objectContent;
                     }
-                    if ($displayUrl !== '') {
-                        $socialTextParts[] = 'Via: ' . $displayUrl;
+                    if ($originalPublicUrl !== '') {
+                        $socialTextParts[] = 'Via: ' . $originalPublicUrl;
                     }
                     $socialText = trim(implode("\n\n", array_filter($socialTextParts, static fn(string $part): bool => trim($part) !== '')));
                     $allConfiguredNetworks = function_exists('admin_social_broadcast_available_networks')

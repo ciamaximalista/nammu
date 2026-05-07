@@ -4682,7 +4682,7 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
                 $clusterTitle = trim((string) ($clusterActualityItem['title'] ?? ''));
                 $clusterContent = trim((string) (($clusterActualityItem['raw_text'] ?? '') ?: ($clusterActualityItem['description'] ?? '')));
                 $clusterSummary = trim((string) ($clusterActualityItem['description'] ?? ''));
-                $clusterUrl = nammu_fediverse_public_thread_url_for_actuality_item($clusterActualityItem, $config);
+                $clusterUrl = nammu_fediverse_remote_thread_page_url($objectId);
                 if ($clusterUrl === '') {
                     $clusterUrl = trim((string) ($clusterActualityItem['link'] ?? ''));
                 }

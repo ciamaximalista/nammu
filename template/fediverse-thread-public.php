@@ -436,6 +436,21 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                     <?php endif; ?>
                     <?= $threadMediaAttachmentsHtml ?>
                 <?php elseif ($threadOriginalUrl !== ''): ?>
+                    <?php if ($threadTypeSlug === 'news'): ?>
+                    <div class="fediverse-public-status__card">
+                        <?php if (!empty($threadItem['image'])): ?>
+                            <img src="<?= htmlspecialchars((string) $threadItem['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($threadTitle, ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                        <?php endif; ?>
+                        <div class="fediverse-public-status__card-body">
+                            <span class="fediverse-public-status__card-title"><?= htmlspecialchars((string) ($threadTitle !== '' ? $threadTitle : $threadOriginalUrl), ENT_QUOTES, 'UTF-8') ?></span>
+                            <?php if ($threadSummaryText !== ''): ?>
+                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadSummaryText, '', $threadTextLinkify) ?></div>
+                            <?php elseif ($threadContent !== ''): ?>
+                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadContent, '', $threadTextLinkify) ?></div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php else: ?>
                     <a class="fediverse-public-status__card" href="<?= htmlspecialchars($threadOriginalUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
                         <?php if (!empty($threadItem['image'])): ?>
                             <img src="<?= htmlspecialchars((string) $threadItem['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($threadTitle, ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
@@ -449,6 +464,7 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                             <?php endif; ?>
                         </div>
                     </a>
+                    <?php endif; ?>
                     <?= $threadMediaAttachmentsHtml ?>
                 <?php else: ?>
                     <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= $renderFediversePublicText($threadContent, '', $threadTextLinkify) ?></div>

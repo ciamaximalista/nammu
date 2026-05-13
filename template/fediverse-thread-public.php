@@ -162,13 +162,16 @@ $threadStatusVariantClass = match ($threadTypeSlug) {
     'boost' => ' fediverse-public-status--boost',
     default => '',
 };
-$renderFediversePublicText = static function (string $text, string $className = ''): string {
+$renderFediversePublicText = static function (string $text, string $className = '', bool $linkify = true): string {
     $text = trim($text);
     if ($text === '') {
         return '';
     }
-    $renderInline = static function (string $value): string {
+    $renderInline = static function (string $value) use ($linkify): string {
         $escaped = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+        if (!$linkify) {
+            return $escaped;
+        }
         return (string) preg_replace_callback(
             '~https?://[^\s<]+~iu',
             static function (array $matches): string {
@@ -202,6 +205,7 @@ $renderFediversePublicText = static function (string $text, string $className = 
     }
     return $html;
 };
+$threadTextLinkify = $threadTypeSlug !== 'news';
 $filterFediverseReplyText = static function (string $text): string {
     $text = str_replace(["\r\n", "\r"], "\n", trim($text));
     if ($text === '') {
@@ -422,7 +426,7 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                 <?php endif; ?>
 
                 <?php if ($threadIsNote): ?>
-                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= $renderFediversePublicText($threadContent) ?></div>
+                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= $renderFediversePublicText($threadContent, '', $threadTextLinkify) ?></div>
                     <?php if (!empty($threadImageAttachments)): ?>
                         <div class="<?= count($threadImageAttachments) > 1 ? 'fediverse-public-status__media-grid' : 'fediverse-public-status__media' ?>">
                             <?php foreach ($threadImageAttachments as $imageIndex => $imageAttachment): ?>
@@ -439,21 +443,21 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                         <div class="fediverse-public-status__card-body">
                             <span class="fediverse-public-status__card-title"><?= htmlspecialchars((string) ($threadTitle !== '' ? $threadTitle : $threadOriginalUrl), ENT_QUOTES, 'UTF-8') ?></span>
                             <?php if ($threadSummaryText !== ''): ?>
-                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadSummaryText) ?></div>
+                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadSummaryText, '', $threadTextLinkify) ?></div>
                             <?php elseif ($threadContent !== ''): ?>
-                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadContent) ?></div>
+                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadContent, '', $threadTextLinkify) ?></div>
                             <?php endif; ?>
                         </div>
                     </a>
                     <?= $threadMediaAttachmentsHtml ?>
                 <?php else: ?>
-                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= $renderFediversePublicText($threadContent) ?></div>
+                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= $renderFediversePublicText($threadContent, '', $threadTextLinkify) ?></div>
                     <?= $threadMediaAttachmentsHtml ?>
                 <?php endif; ?>
 
                 <div class="fediverse-public-status__footer"<?= $threadOwnNoteFontStyle ?>>
                     <?php if ($threadOriginalUrl !== ''): ?>
-                        <a href="<?= htmlspecialchars($threadOriginalUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Abrir contenido original</a>
+                        <a href="<?= htmlspecialchars($threadOriginalUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Abrir enlace recomendado</a>
                     <?php endif; ?>
                     <?php if ($threadUrl !== ''): ?>
                         <a href="<?= htmlspecialchars($threadUrl, ENT_QUOTES, 'UTF-8') ?>">Enlace permanente del hilo</a>

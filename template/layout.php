@@ -309,12 +309,70 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
             margin: 0 0 1rem 1.25rem;
             display: block;
         }
+        .nammu-inline-gallery {
+            margin: 2rem 0;
+            border: 1px solid <?= $colorHighlight ?>;
+            border-radius: var(--nammu-radius-lg);
+            background: <?= $colorBackground ?>;
+            overflow: hidden;
+        }
+        .nammu-inline-gallery summary {
+            cursor: pointer;
+            list-style: none;
+            padding: 0.95rem 1.15rem;
+            font-weight: 700;
+            color: <?= $colorAccent ?>;
+            background: <?= $colorHighlight ?>;
+        }
+        .nammu-inline-gallery summary::-webkit-details-marker {
+            display: none;
+        }
+        .nammu-inline-gallery summary::after {
+            content: '▾';
+            float: right;
+            transition: transform 0.2s ease;
+        }
+        .nammu-inline-gallery[open] summary::after {
+            transform: rotate(180deg);
+        }
+        .nammu-inline-gallery__grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.85rem;
+            padding: 1rem;
+        }
+        .nammu-inline-gallery__link {
+            display: block;
+            border-radius: var(--nammu-radius-md);
+            overflow: hidden;
+            background: <?= $colorHighlight ?>;
+        }
+        .nammu-inline-gallery__link:hover {
+            text-decoration: none;
+        }
+        .nammu-inline-gallery__image {
+            display: block;
+            width: 100%;
+            height: 210px;
+            object-fit: cover;
+        }
         @media (max-width: 640px) {
             .nammu-image-vignette {
                 float: none;
                 width: 100%;
                 max-width: 100%;
                 margin: 0 0 1rem 0;
+            }
+            .nammu-inline-gallery__grid {
+                grid-template-columns: 1fr;
+            }
+            .nammu-inline-gallery__image {
+                height: 190px;
+            }
+        }
+        @media (min-width: 641px) and (max-width: 860px) {
+            .nammu-inline-gallery__grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
         .site-header-buttons {

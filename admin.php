@@ -15070,7 +15070,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                                 <div class="col-md-3 mb-3 gallery-item" data-media-search="<?= htmlspecialchars($media_search, ENT_QUOTES, 'UTF-8') ?>">
 
                                     <?php if ($media_type === 'image'): ?>
-                                        <img src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" class="img-thumbnail" style="width: 100%; height: 150px; object-fit: cover; cursor: pointer;" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="image" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" data-media-tags="<?= htmlspecialchars($media_tags_text, ENT_QUOTES, 'UTF-8') ?>">
+                                        <img src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" class="img-thumbnail" style="width: 100%; height: 150px; object-fit: cover; cursor: pointer;" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="image" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" data-media-tags="<?= htmlspecialchars($media_tags_text, ENT_QUOTES, 'UTF-8') ?>" data-media-gallery-target="1">
                                     <?php elseif ($media_type === 'video'): ?>
                                         <div class="video-thumb-wrapper" data-media-name="<?= htmlspecialchars($media_name, ENT_QUOTES, 'UTF-8') ?>" data-media-type="video" data-media-src="<?= htmlspecialchars($media_src, ENT_QUOTES, 'UTF-8') ?>" data-media-mime="<?= htmlspecialchars($media_mime, ENT_QUOTES, 'UTF-8') ?>" data-media-tags="<?= htmlspecialchars($media_tags_text, ENT_QUOTES, 'UTF-8') ?>" style="cursor: pointer; position: relative;">
                                             <video class="img-thumbnail" style="width: 100%; height: 150px; object-fit: cover; pointer-events: none;" muted preload="metadata">
@@ -15133,6 +15133,15 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                                     <div class="btn-group mb-2 d-none" role="group" data-insert-group="video">
                                         <button type="button" class="btn btn-sm btn-primary" data-insert-mode="embed">Vídeo incrustado</button>
                                         <button type="button" class="btn btn-sm btn-outline-primary" data-insert-mode="link">Enlace</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="image-gallery-actions" class="d-none mb-3 mb-md-0">
+                                <div class="d-flex flex-column align-items-start">
+                                    <span class="mb-1">Galería seleccionada: <strong id="image-gallery-count">0</strong></span>
+                                    <div class="btn-group" role="group" aria-label="Acciones de galería">
+                                        <button type="button" class="btn btn-sm btn-primary" id="image-gallery-insert">Insertar galería</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="image-gallery-clear">Vaciar</button>
                                     </div>
                                 </div>
                             </div>
@@ -16615,7 +16624,12 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             var tagsModalRedirect = $('#tagsModalRedirect');
             var insertActions = $('#image-insert-actions');
             var insertActionGroups = insertActions.find('[data-insert-group]');
+            var galleryActions = $('#image-gallery-actions');
+            var galleryCount = $('#image-gallery-count');
+            var galleryInsertBtn = $('#image-gallery-insert');
+            var galleryClearBtn = $('#image-gallery-clear');
             var pendingInsert = null;
+            var pendingGalleryItems = [];
             function getQueryParam(name) {
                 var params = new URLSearchParams(window.location.search);
                 return params.get(name);
@@ -16671,6 +16685,85 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     return { context: 'topic', form: topicForm };
                 }
                 return null;
+            }
+
+            function resetGallerySelection() {
+                pendingGalleryItems = [];
+                $('[data-media-gallery-target]').removeClass('border-primary shadow').attr('aria-pressed', 'false');
+                if (galleryCount.length) {
+                    galleryCount.text('0');
+                }
+                if (galleryActions.length) {
+                    galleryActions.addClass('d-none');
+                }
+            }
+
+            function syncGallerySelectionUi() {
+                if (galleryCount.length) {
+                    galleryCount.text(String(pendingGalleryItems.length));
+                }
+                if (!galleryActions.length) {
+                    return;
+                }
+                if (imageTargetMode === 'editor-gallery' && pendingGalleryItems.length > 0) {
+                    galleryActions.removeClass('d-none');
+                } else {
+                    galleryActions.addClass('d-none');
+                }
+            }
+
+            function toggleGalleryItemSelection($media) {
+                if (!$media || !$media.length) {
+                    return;
+                }
+                var mediaType = ($media.data('mediaType') || '').toString().toLowerCase();
+                if (mediaType !== 'image') {
+                    alert('La galería solo admite imágenes guardadas en Recursos.');
+                    return;
+                }
+                var mediaSrc = ($media.data('mediaSrc') || '').toString();
+                if (!mediaSrc) {
+                    return;
+                }
+                var existingIndex = -1;
+                pendingGalleryItems.forEach(function(item, index) {
+                    if (item.src === mediaSrc) {
+                        existingIndex = index;
+                    }
+                });
+                if (existingIndex >= 0) {
+                    pendingGalleryItems.splice(existingIndex, 1);
+                    $media.removeClass('border-primary shadow').attr('aria-pressed', 'false');
+                } else {
+                    pendingGalleryItems.push({
+                        src: mediaSrc,
+                        name: ($media.data('mediaName') || '').toString(),
+                        tags: ($media.data('mediaTags') || '').toString()
+                    });
+                    $media.addClass('border-primary shadow').attr('aria-pressed', 'true');
+                }
+                syncGallerySelectionUi();
+            }
+
+            function buildGallerySnippet(items) {
+                if (!items || !items.length) {
+                    return '';
+                }
+                var blocks = items.map(function(item) {
+                    var imageText = resolveImageText(item.tags || item.name || '');
+                    var safeAlt = escapeHtmlAttr(imageText || '');
+                    var safeTitle = escapeHtmlAttr(imageText || '');
+                    var safeSrc = escapeHtmlAttr(item.src || '');
+                    return '        <a class="nammu-inline-gallery__link" href="' + safeSrc + '" target="_blank" rel="noopener">\n'
+                        + '            <img src="' + safeSrc + '" alt="' + safeAlt + '"' + (safeTitle ? ' title="' + safeTitle + '"' : '') + ' class="nammu-inline-gallery__image" />\n'
+                        + '        </a>';
+                });
+                return '\n\n<details class="nammu-inline-gallery">\n'
+                    + '    <summary>Galería</summary>\n'
+                    + '    <div class="nammu-inline-gallery__grid">\n'
+                    + blocks.join('\n')
+                    + '\n    </div>\n'
+                    + '</details>\n\n';
             }
 
             function detectContext($form) {
@@ -16899,6 +16992,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     imageTargetMulti = button.data('target-multi') || '';
                     imageTargetMaxItems = parseInt(button.data('target-max-items') || '0', 10) || 0;
                 }
+                resetGallerySelection();
                 if (!skipImageModalSelectionCapture) {
                     imageTargetTextarea = resolveImageTargetTextarea();
                     if (imageTargetTextarea && typeof imageTargetTextarea.selectionStart === 'number') {
@@ -16929,6 +17023,9 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                 if (insertActions.length) {
                     insertActions.addClass('d-none');
                 }
+                if (galleryActions.length) {
+                    galleryActions.addClass('d-none');
+                }
                 if (imageTargetMode === 'uploader') {
                     // Nada especial, solo aseguramos que la búsqueda queda limpia
                     return;
@@ -16939,6 +17036,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             $('#imageModal').on('hidden.bs.modal', function () {
                 imageTargetSelection = null;
                 imageTargetTextarea = null;
+                resetGallerySelection();
             });
 
         
@@ -17236,6 +17334,11 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                 var mediaTags = $media.data('mediaTags') || '';
 
                 if (!mediaName) {
+                    return;
+                }
+
+                if (imageTargetMode === 'editor-gallery') {
+                    toggleGalleryItemSelection($media);
                     return;
                 }
 
@@ -17550,6 +17653,42 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                 $('#imageModal').modal('hide');
                 pendingInsert = null;
                 insertActions.addClass('d-none');
+            });
+
+            galleryInsertBtn.on('click', function() {
+                if (imageTargetMode !== 'editor-gallery' || !pendingGalleryItems.length) {
+                    return;
+                }
+                var snippet = buildGallerySnippet(pendingGalleryItems);
+                if (!snippet) {
+                    return;
+                }
+                var contentTextArea = null;
+                if (imageTargetEditor) {
+                    try {
+                        contentTextArea = document.querySelector(imageTargetEditor);
+                    } catch (selectorError) {
+                        contentTextArea = null;
+                    }
+                }
+                if (!contentTextArea) {
+                    contentTextArea = document.querySelector('[data-markdown-editor]') || document.getElementById('content');
+                }
+                if (!contentTextArea) {
+                    return;
+                }
+                if (imageTargetSelection && imageTargetTextarea === contentTextArea) {
+                    insertTextAtRange(contentTextArea, snippet, imageTargetSelection);
+                    imageTargetSelection = null;
+                    imageTargetTextarea = null;
+                } else {
+                    insertTextAtCursor(contentTextArea, snippet);
+                }
+                $('#imageModal').modal('hide');
+            });
+
+            galleryClearBtn.on('click', function() {
+                resetGallerySelection();
             });
 
             applyUploadedMediaIfNeeded();

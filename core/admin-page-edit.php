@@ -765,8 +765,11 @@ unset($_SESSION['newsletter_custom_recipients']);
 
                 <textarea name="content" id="content_edit" class="form-control" rows="15" data-markdown-editor="1"><?= htmlspecialchars($post_data['content']) ?></textarea>
 
-                <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#content_edit">Insertar recurso</button>
-                <small class="form-text text-muted mt-1">Inserta en la entrada imágenes, vídeos o archivos PDF.</small>
+                <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
+                    <button type="button" class="btn btn-secondary mr-2 mb-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#content_edit">Insertar recurso</button>
+                    <button type="button" class="btn btn-outline-secondary mb-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor-gallery" data-target-editor="#content_edit">Añadir galería</button>
+                </div>
+                <small class="form-text text-muted mt-1">Inserta en la entrada imágenes, vídeos o archivos PDF, o una galería de imágenes desde Recursos.</small>
 
             </div>
 

@@ -234,8 +234,11 @@
 
             <textarea name="content" id="content_publish" class="form-control" rows="15" data-markdown-editor="1"><?= htmlspecialchars($socialBroadcastText ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
 
-            <button type="button" class="btn btn-secondary mt-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#content_publish">Insertar recurso</button>
-            <small class="form-text text-muted mt-1">Inserta en la entrada imágenes, vídeos o archivos PDF.</small>
+            <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
+                <button type="button" class="btn btn-secondary mr-2 mb-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor" data-target-editor="#content_publish">Insertar recurso</button>
+                <button type="button" class="btn btn-outline-secondary mb-2" data-toggle="modal" data-target="#imageModal" data-target-type="editor-gallery" data-target-editor="#content_publish">Añadir galería</button>
+            </div>
+            <small class="form-text text-muted mt-1">Inserta en la entrada imágenes, vídeos o archivos PDF, o una galería de imágenes desde Recursos.</small>
 
         </div>
 

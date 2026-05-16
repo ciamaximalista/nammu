@@ -3029,6 +3029,65 @@ function nammu_fediverse_best_persisted_thread_payload(?array $a, ?array $b): ?a
     return nammu_fediverse_thread_payload_score($b) > nammu_fediverse_thread_payload_score($a) ? $b : $a;
 }
 
+function nammu_fediverse_merge_actor_detail_lists(array $primary, array $secondary): array
+{
+    $merged = [];
+    foreach ([$primary, $secondary] as $list) {
+        foreach ($list as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $key = trim((string) ($entry['id'] ?? ''));
+            if ($key === '') {
+                $key = trim((string) ($entry['url'] ?? ''));
+            }
+            if ($key === '') {
+                $key = sha1(json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            }
+            if (!isset($merged[$key])) {
+                $merged[$key] = $entry;
+                continue;
+            }
+            foreach (['name', 'icon', 'url', 'published'] as $field) {
+                if (trim((string) ($merged[$key][$field] ?? '')) === '' && trim((string) ($entry[$field] ?? '')) !== '') {
+                    $merged[$key][$field] = $entry[$field];
+                }
+            }
+        }
+    }
+    return array_values($merged);
+}
+
+function nammu_fediverse_merge_thread_payload_metrics(array $preferredPayload, ?array $fallbackPayload = null): array
+{
+    $preferredPayload = nammu_fediverse_normalize_thread_payload($preferredPayload);
+    $fallbackPayload = is_array($fallbackPayload) ? nammu_fediverse_normalize_thread_payload($fallbackPayload) : null;
+    if (!is_array($fallbackPayload)) {
+        return $preferredPayload;
+    }
+
+    $preferredSummary = is_array($preferredPayload['summary'] ?? null) ? $preferredPayload['summary'] : [];
+    $fallbackSummary = is_array($fallbackPayload['summary'] ?? null) ? $fallbackPayload['summary'] : [];
+    $preferredDetails = is_array($preferredPayload['details'] ?? null) ? $preferredPayload['details'] : [];
+    $fallbackDetails = is_array($fallbackPayload['details'] ?? null) ? $fallbackPayload['details'] : [];
+
+    $preferredPayload['summary']['likes'] = max((int) ($preferredSummary['likes'] ?? 0), (int) ($fallbackSummary['likes'] ?? 0));
+    $preferredPayload['summary']['shares'] = max((int) ($preferredSummary['shares'] ?? 0), (int) ($fallbackSummary['shares'] ?? 0));
+
+    $preferredPayload['details']['likes'] = nammu_fediverse_merge_actor_detail_lists(
+        (array) ($preferredDetails['likes'] ?? []),
+        (array) ($fallbackDetails['likes'] ?? [])
+    );
+    $preferredPayload['details']['shares'] = nammu_fediverse_merge_actor_detail_lists(
+        (array) ($preferredDetails['shares'] ?? []),
+        (array) ($fallbackDetails['shares'] ?? [])
+    );
+    $preferredPayload['details']['replies'] = nammu_fediverse_thread_reply_actor_details((array) ($preferredPayload['replies'] ?? []));
+    $preferredPayload['summary']['replies'] = count((array) ($preferredPayload['replies'] ?? []));
+
+    return $preferredPayload;
+}
+
 function nammu_fediverse_promote_thread_payloads_to_state_store(array $threadPayloads, array $config): void
 {
     $stateStore = nammu_fediverse_thread_state_store();
@@ -4094,6 +4153,7 @@ function nammu_fediverse_best_thread_page_payload(array $item, array $config): a
     $snapshotPayload = nammu_fediverse_thread_page_snapshot_payload($item, $config);
     $livePayload = nammu_fediverse_thread_page_payload($item, $config);
     if (!is_array($snapshotPayload)) {
+        $livePayload = nammu_fediverse_merge_thread_payload_metrics($livePayload, null);
         nammu_fediverse_persist_thread_page_payload($livePayload, $config);
         return $livePayload;
     }
@@ -4109,10 +4169,11 @@ function nammu_fediverse_best_thread_page_payload(array $item, array $config): a
         || ($liveScore === $snapshotScore
             && json_encode($liveNormalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !== json_encode($snapshotNormalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE))
     ) {
+        $livePayload = nammu_fediverse_merge_thread_payload_metrics($livePayload, $snapshotPayload);
         nammu_fediverse_persist_thread_page_payload($livePayload, $config);
         return $livePayload;
     }
-    return $snapshotPayload;
+    return nammu_fediverse_merge_thread_payload_metrics($snapshotPayload, $livePayload);
 }
 
 function nammu_fediverse_extract_first_url_from_text(string $text): string

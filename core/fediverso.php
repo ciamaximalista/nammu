@@ -4097,7 +4097,15 @@ function nammu_fediverse_best_thread_page_payload(array $item, array $config): a
         nammu_fediverse_persist_thread_page_payload($livePayload, $config);
         return $livePayload;
     }
-    if (nammu_fediverse_thread_payload_score($livePayload) > nammu_fediverse_thread_payload_score($snapshotPayload)) {
+    $liveScore = nammu_fediverse_thread_payload_score($livePayload);
+    $snapshotScore = nammu_fediverse_thread_payload_score($snapshotPayload);
+    $liveNormalized = nammu_fediverse_normalize_thread_payload($livePayload);
+    $snapshotNormalized = nammu_fediverse_normalize_thread_payload($snapshotPayload);
+    if (
+        $liveScore > $snapshotScore
+        || ($liveScore === $snapshotScore
+            && json_encode($liveNormalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !== json_encode($snapshotNormalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE))
+    ) {
         nammu_fediverse_persist_thread_page_payload($livePayload, $config);
         return $livePayload;
     }

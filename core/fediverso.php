@@ -5603,6 +5603,21 @@ function nammu_fediverse_local_items_index(array $config): array
     foreach (nammu_fediverse_local_content_items($config) as $item) {
         $registerItem($item, true);
     }
+    $snapshot = nammu_fediverse_home_snapshot_store();
+    $snapshotData = is_array($snapshot['data'] ?? null) ? $snapshot['data'] : [];
+    foreach ((array) ($snapshotData['local_items'] ?? []) as $item) {
+        if (is_array($item)) {
+            $registerItem($item, false);
+        }
+    }
+    $threadState = nammu_fediverse_thread_state_store();
+    foreach ((array) ($threadState['items'] ?? []) as $threadEntry) {
+        $payload = is_array($threadEntry['payload'] ?? null) ? $threadEntry['payload'] : [];
+        $item = is_array($payload['item'] ?? null) ? $payload['item'] : [];
+        if (is_array($item) && $item !== []) {
+            $registerItem($item, false);
+        }
+    }
     foreach (nammu_fediverse_actions_store()['items'] as $action) {
         $resendItem = nammu_fediverse_resend_item_from_action($action);
         if (is_array($resendItem)) {

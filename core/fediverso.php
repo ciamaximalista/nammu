@@ -4069,14 +4069,36 @@ function nammu_fediverse_thread_page_snapshot_payload(array $item, array $config
     return nammu_fediverse_best_persisted_thread_payload($payload, $statePayload);
 }
 
+function nammu_fediverse_persist_thread_page_payload(array $payload, array $config): void
+{
+    if (!is_array($payload)) {
+        return;
+    }
+    $item = is_array($payload['item'] ?? null) ? $payload['item'] : [];
+    $itemId = trim((string) ($item['id'] ?? ''));
+    if ($itemId === '') {
+        return;
+    }
+    nammu_fediverse_promote_thread_payloads_to_state_store([$itemId => $payload], $config);
+
+    $snapshot = nammu_fediverse_home_snapshot_store();
+    $data = is_array($snapshot['data'] ?? null) ? $snapshot['data'] : [];
+    $threadPayloads = is_array($data['thread_payloads'] ?? null) ? $data['thread_payloads'] : [];
+    $threadPayloads[$itemId] = $payload;
+    $data['thread_payloads'] = $threadPayloads;
+    nammu_fediverse_save_home_snapshot_store($data);
+}
+
 function nammu_fediverse_best_thread_page_payload(array $item, array $config): array
 {
     $snapshotPayload = nammu_fediverse_thread_page_snapshot_payload($item, $config);
     $livePayload = nammu_fediverse_thread_page_payload($item, $config);
     if (!is_array($snapshotPayload)) {
+        nammu_fediverse_persist_thread_page_payload($livePayload, $config);
         return $livePayload;
     }
     if (nammu_fediverse_thread_payload_score($livePayload) > nammu_fediverse_thread_payload_score($snapshotPayload)) {
+        nammu_fediverse_persist_thread_page_payload($livePayload, $config);
         return $livePayload;
     }
     return $snapshotPayload;

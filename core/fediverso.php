@@ -4101,8 +4101,11 @@ function nammu_fediverse_best_thread_page_payload(array $item, array $config): a
     $snapshotScore = nammu_fediverse_thread_payload_score($snapshotPayload);
     $liveNormalized = nammu_fediverse_normalize_thread_payload($livePayload);
     $snapshotNormalized = nammu_fediverse_normalize_thread_payload($snapshotPayload);
+    $liveReplyCount = count((array) ($liveNormalized['replies'] ?? []));
+    $snapshotReplyCount = count((array) ($snapshotNormalized['replies'] ?? []));
     if (
-        $liveScore > $snapshotScore
+        $liveReplyCount > $snapshotReplyCount
+        || $liveScore > $snapshotScore
         || ($liveScore === $snapshotScore
             && json_encode($liveNormalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !== json_encode($snapshotNormalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE))
     ) {

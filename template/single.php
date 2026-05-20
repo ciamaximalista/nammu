@@ -340,12 +340,12 @@ if ($isPageTemplate && $formattedDate !== '') {
     $bottomMetaText = 'Actualizado por última vez el ' . htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') . '.';
 }
 ?>
-<article class="post<?= $isDraftPost ? ' post-draft' : '' ?><?= $isPrivatePage ? ' post-private' : '' ?>">
+<article class="post instapaper_body<?= $isDraftPost ? ' post-draft' : '' ?><?= $isPrivatePage ? ' post-private' : '' ?>">
     <?php if ($isDraftPost || $isPrivatePage): ?>
         <div class="draft-stamp" aria-hidden="true"><?= $isPrivatePage ? 'Zona Privada' : 'Borrador' ?></div>
     <?php endif; ?>
     <div class="post-header">
-        <div class="post-brand">
+        <div class="post-brand instapaper_ignore">
             <?php if ($siteAuthor !== ''): ?>
                 <span class="post-brand-title"><?= $siteAuthor ?></span>
             <?php endif; ?>
@@ -359,7 +359,7 @@ if ($isPageTemplate && $formattedDate !== '') {
             <?php endif; ?>
         </div>
 <?php if ($showHeaderButtonsSingle && $isPageTemplate): ?>
-    <?= $headerButtonsHtml ?>
+    <div class="instapaper_ignore"><?= $headerButtonsHtml ?></div>
 <?php endif; ?>
         <h1><?= htmlspecialchars($post->getTitle(), ENT_QUOTES, 'UTF-8') ?></h1>
 <?php if (!$isPageTemplate && $topMetaText !== '' && empty($hideCategory)): ?>
@@ -369,11 +369,16 @@ if ($isPageTemplate && $formattedDate !== '') {
     <div class="post-meta-band post-meta-band--custom"><?= htmlspecialchars($customMetaBand, ENT_QUOTES, 'UTF-8') ?></div>
 <?php endif; ?>
 <?php if ($showHeaderButtonsSingle && !$isPageTemplate): ?>
-    <?= $headerButtonsHtml ?>
+    <div class="instapaper_ignore"><?= $headerButtonsHtml ?></div>
 <?php endif; ?>
-        <?php if (!$hidePostIntro && $post->getDescription() !== '' && !$isReaderFetcherSingle): ?>
-            <div class="post-intro">
+        <?php if (!$hidePostIntro && $post->getDescription() !== ''): ?>
+            <div class="post-intro instapaper_ignore">
                 <p><?= htmlspecialchars($post->getDescription(), ENT_QUOTES, 'UTF-8') ?></p>
+            </div>
+        <?php endif; ?>
+        <?php if (!$hidePostIntro && $post->getDescription() !== ''): ?>
+            <div class="post-intro post-intro--instapaper" aria-hidden="true">
+                <p><em><?= htmlspecialchars($post->getDescription(), ENT_QUOTES, 'UTF-8') ?></em></p>
             </div>
         <?php endif; ?>
     </div>
@@ -392,27 +397,20 @@ if ($isPageTemplate && $formattedDate !== '') {
         : [];
     ?>
     <div class="post-body">
-        <?php if (!$hidePostIntro && $post->getDescription() !== '' && $isReaderFetcherSingle): ?>
-            <div class="post-intro post-intro--reader">
-                <p><em><?= htmlspecialchars($post->getDescription(), ENT_QUOTES, 'UTF-8') ?></em></p>
-            </div>
-        <?php endif; ?>
         <?php if ($singleSubscriptionTop): ?>
-            <div class="site-search-block placement-top site-subscription-block">
+            <div class="site-search-block placement-top site-subscription-block instapaper_ignore">
                 <?= $renderSubscriptionBox('variant-panel') ?>
             </div>
         <?php endif; ?>
         <?php if ($autoTocHtml !== ''): ?>
-            <section class="post-toc-block" aria-label="Índice de contenidos">
-                <?php if (!$isReaderFetcherSingle): ?>
-                    <div class="post-toc-heading">Contenido</div>
-                <?php endif; ?>
+            <section class="post-toc-block instapaper_ignore" aria-label="Índice de contenidos">
+                <div class="post-toc-heading">Contenido</div>
                 <?= $autoTocHtml ?>
             </section>
         <?php endif; ?>
         <?= $htmlContent ?>
         <?php if (!empty($contactSignatureItems)): ?>
-            <div class="post-contact-signature">
+            <div class="post-contact-signature instapaper_ignore">
                 <?php foreach ($contactSignatureItems as $item): ?>
                     <div class="post-contact-line">
                         <a href="<?= htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?>">
@@ -422,7 +420,7 @@ if ($isPageTemplate && $formattedDate !== '') {
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
-        <?php if ($fediverseThreadUrl !== '' && !$isReaderFetcherSingle): ?>
+        <?php if ($fediverseThreadUrl !== ''): ?>
             <?php
             $fediverseRepliesCount = max(0, (int) ($fediverseThreadSummary['replies'] ?? 0));
             $fediverseLikesCount = max(0, (int) ($fediverseThreadSummary['likes'] ?? 0));
@@ -432,7 +430,7 @@ if ($isPageTemplate && $formattedDate !== '') {
                 ? 'Este itinerario en el Fediverso'
                 : ($isPodcastTemplate ? 'Este episodio en el Fediverso' : 'Esta entrada en el Fediverso');
             ?>
-            <div class="fediverse-object-cta" aria-label="Resumen en el Fediverso">
+            <div class="fediverse-object-cta instapaper_ignore" aria-label="Resumen en el Fediverso">
                 <?php if ($hasFediverseMetrics): ?>
                     <?php
                     $fediverseButtonLabel = $isItineraryTemplate
@@ -521,8 +519,8 @@ if ($isPageTemplate && $formattedDate !== '') {
                 <?php endif; ?>
             </div>
         <?php endif; ?>
-        <?php if (!empty($webmentionMentions) && !$isReaderFetcherSingle): ?>
-            <div class="fediverse-object-cta" aria-label="Menciones en otros blogs">
+        <?php if (!empty($webmentionMentions)): ?>
+            <div class="fediverse-object-cta instapaper_ignore" aria-label="Menciones en otros blogs">
                 <div class="post-related-heading fediverse-object-heading">
                     <span class="fediverse-object-cta-label">Menciones en otros blogs</span>
                 </div>
@@ -1115,8 +1113,8 @@ if ($isPageTemplate && $formattedDate !== '') {
     .post-intro p {
         margin: 0;
     }
-    .post-intro--reader p {
-        font-style: italic;
+    .post-intro--instapaper {
+        display: none !important;
     }
     .post-hero {
         margin: 0;

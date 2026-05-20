@@ -37,6 +37,10 @@ $fediverseThreadMeta = is_array($fediverseThreadMeta ?? null) ? $fediverseThread
 $fediverseThreadSummary = is_array($fediverseThreadMeta['summary'] ?? null) ? $fediverseThreadMeta['summary'] : ['likes' => 0, 'shares' => 0, 'replies' => 0];
 $fediverseThreadDetails = is_array($fediverseThreadMeta['details'] ?? null) ? $fediverseThreadMeta['details'] : ['likes' => [], 'shares' => [], 'replies' => []];
 $fediverseIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';
+$singleUserAgent = (string) ($_SERVER['HTTP_USER_AGENT'] ?? '');
+$singleBotName = function_exists('nammu_detect_bot_name') ? nammu_detect_bot_name($singleUserAgent) : '';
+$singleReaderAgentNames = ['Instapaper', 'Kobo', 'Pocket', 'Wallabag', 'Readability'];
+$isReaderFetcherSingle = in_array($singleBotName, $singleReaderAgentNames, true);
 $searchSettings = $theme['search'] ?? [];
 $searchMode = in_array($searchSettings['mode'] ?? 'none', ['none', 'home', 'single', 'both'], true) ? $searchSettings['mode'] : 'none';
 $searchPositionSetting = in_array($searchSettings['position'] ?? 'title', ['title', 'footer'], true) ? $searchSettings['position'] : 'title';
@@ -367,7 +371,7 @@ if ($isPageTemplate && $formattedDate !== '') {
 <?php if ($showHeaderButtonsSingle && !$isPageTemplate): ?>
     <?= $headerButtonsHtml ?>
 <?php endif; ?>
-        <?php if (!$hidePostIntro && $post->getDescription() !== ''): ?>
+        <?php if (!$hidePostIntro && $post->getDescription() !== '' && !$isReaderFetcherSingle): ?>
             <div class="post-intro">
                 <p><?= htmlspecialchars($post->getDescription(), ENT_QUOTES, 'UTF-8') ?></p>
             </div>
@@ -388,6 +392,11 @@ if ($isPageTemplate && $formattedDate !== '') {
         : [];
     ?>
     <div class="post-body">
+        <?php if (!$hidePostIntro && $post->getDescription() !== '' && $isReaderFetcherSingle): ?>
+            <div class="post-intro post-intro--reader">
+                <p><em><?= htmlspecialchars($post->getDescription(), ENT_QUOTES, 'UTF-8') ?></em></p>
+            </div>
+        <?php endif; ?>
         <?php if ($singleSubscriptionTop): ?>
             <div class="site-search-block placement-top site-subscription-block">
                 <?= $renderSubscriptionBox('variant-panel') ?>
@@ -395,7 +404,9 @@ if ($isPageTemplate && $formattedDate !== '') {
         <?php endif; ?>
         <?php if ($autoTocHtml !== ''): ?>
             <section class="post-toc-block" aria-label="Índice de contenidos">
-                <div class="post-toc-heading">Contenido</div>
+                <?php if (!$isReaderFetcherSingle): ?>
+                    <div class="post-toc-heading">Contenido</div>
+                <?php endif; ?>
                 <?= $autoTocHtml ?>
             </section>
         <?php endif; ?>
@@ -411,7 +422,7 @@ if ($isPageTemplate && $formattedDate !== '') {
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
-        <?php if ($fediverseThreadUrl !== ''): ?>
+        <?php if ($fediverseThreadUrl !== '' && !$isReaderFetcherSingle): ?>
             <?php
             $fediverseRepliesCount = max(0, (int) ($fediverseThreadSummary['replies'] ?? 0));
             $fediverseLikesCount = max(0, (int) ($fediverseThreadSummary['likes'] ?? 0));
@@ -510,7 +521,7 @@ if ($isPageTemplate && $formattedDate !== '') {
                 <?php endif; ?>
             </div>
         <?php endif; ?>
-        <?php if (!empty($webmentionMentions)): ?>
+        <?php if (!empty($webmentionMentions) && !$isReaderFetcherSingle): ?>
             <div class="fediverse-object-cta" aria-label="Menciones en otros blogs">
                 <div class="post-related-heading fediverse-object-heading">
                     <span class="fediverse-object-cta-label">Menciones en otros blogs</span>
@@ -1103,6 +1114,9 @@ if ($isPageTemplate && $formattedDate !== '') {
     }
     .post-intro p {
         margin: 0;
+    }
+    .post-intro--reader p {
+        font-style: italic;
     }
     .post-hero {
         margin: 0;

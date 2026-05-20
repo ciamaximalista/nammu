@@ -702,6 +702,12 @@ Ejemplo rápido:
 - `llms.txt`: resumen y enlaces clave para facilitar el consumo por modelos de lenguaje.
 - `identity.txt`: ficha pública editable con identidad, contexto y enlaces de verificación del sitio.
 
+### Lectores guardados y servicios de lectura diferida
+
+- Nammu detecta agentes de lectura como `Instapaper`, `Kobo`, `Pocket`, `Wallabag` o `Readability` y les sirve una versión más limpia del artículo.
+- Esa versión mantiene el contenido principal, pero evita bloques accesorios que entorpecen la lectura guardada, como avisos de consentimiento, resúmenes sociales o cierres visuales no esenciales.
+- La adaptación solo afecta a esos lectores automáticos: la vista normal en móvil y escritorio no cambia.
+
 ### Edición de llms.txt e identity.txt
 
 - Ambos archivos se editan desde **Admin > Configuración**, en el bloque final de la pestaña.

@@ -1618,7 +1618,12 @@ function nammu_actuality_has_manual_items(): bool
 
 function nammu_actuality_has_content(array $config): bool
 {
-    return nammu_actuality_has_feeds($config) || nammu_actuality_has_manual_items() || nammu_actuality_has_persisted_news_items();
+    if (nammu_actuality_has_feeds($config) || nammu_actuality_has_manual_items() || nammu_actuality_has_persisted_news_items()) {
+        return true;
+    }
+    $contentDir = dirname(__DIR__) . '/content';
+    $itinerariesDir = dirname(__DIR__) . '/itinerarios';
+    return nammu_actuality_has_published_site_items($contentDir, $itinerariesDir);
 }
 
 function nammu_actuality_has_published_site_items(string $contentDir, string $itinerariesDir): bool

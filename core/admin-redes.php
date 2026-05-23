@@ -948,11 +948,25 @@ function admin_process_social_rss_feeds(): array
     $availableNetworks = admin_social_broadcast_available_networks($settings);
     $networks = array_keys($availableNetworks);
     if (empty($feeds) || empty($networks)) {
-        return ['sent' => 0, 'checked' => 0];
+        return ['sent' => 0, 'checked' => 0, 'discovered' => 0, 'queued_link_cards' => 0];
     }
     $state = admin_load_social_rss_state();
     $state['feeds'] = is_array($state['feeds'] ?? null) ? $state['feeds'] : [];
+    $newsStore = function_exists('nammu_actuality_load_news_store') ? nammu_actuality_load_news_store() : ['items' => []];
+    $newsItems = array_values(array_filter((array) ($newsStore['items'] ?? []), static function ($item): bool {
+        return is_array($item);
+    }));
+    $newsById = [];
+    foreach ($newsItems as $storedNewsItem) {
+        $storedId = trim((string) ($storedNewsItem['id'] ?? ''));
+        if ($storedId !== '') {
+            $newsById[$storedId] = $storedNewsItem;
+        }
+    }
     $sentCount = 0;
+    $discoveredCount = 0;
+    $queuedLinkCardsCount = 0;
+    $newsStoreChanged = false;
     foreach ($feeds as $feedUrl) {
         $feedKey = sha1($feedUrl);
         $items = admin_fetch_social_rss_items($feedUrl);
@@ -992,21 +1006,55 @@ function admin_process_social_rss_feeds(): array
                 $feedState['seen'][$item['key']] = time();
                 continue;
             }
-            $fediverseUrl = admin_social_broadcast_fediverse_url_for_actuality_item($item);
-            foreach ($networks as $network) {
-                $error = null;
-                $image = trim((string) ($item['image'] ?? ''));
-                $message = admin_build_social_rss_message(
-                    $network,
-                    (string) ($item['title'] ?? ''),
-                    $fediverseUrl !== '' ? $fediverseUrl : (string) ($item['link'] ?? ''),
-                    (string) ($item['description'] ?? ''),
-                    $image !== ''
-                );
-                admin_send_social_broadcast_message($network, $message, $availableNetworks[$network]['settings'], $image, $error);
+            $newsItem = [
+                'id' => function_exists('nammu_actuality_news_item_id') ? nammu_actuality_news_item_id([
+                    'feed_item_key' => (string) ($item['key'] ?? ''),
+                    'link' => (string) ($item['link'] ?? ''),
+                    'title' => (string) ($item['title'] ?? ''),
+                ]) : trim((string) ($item['key'] ?? '')),
+                'feed_item_key' => (string) ($item['key'] ?? ''),
+                'feed_url' => $feedUrl,
+                'title' => trim((string) ($item['title'] ?? '')),
+                'link' => trim((string) ($item['link'] ?? '')),
+                'image' => trim((string) ($item['image'] ?? '')),
+                'images' => array_values(array_filter([trim((string) ($item['image'] ?? ''))])),
+                'description' => trim((string) ($item['description'] ?? '')),
+                'raw_text' => trim((string) ($item['description'] ?? '')),
+                'timestamp' => $itemTimestamp,
+                'source' => parse_url((string) ($item['link'] ?? ''), PHP_URL_HOST) ?: '',
+                'source_kind' => 'news',
+            ];
+            $newsId = trim((string) ($newsItem['id'] ?? ''));
+            if ($newsId !== '') {
+                $existingNewsItem = is_array($newsById[$newsId] ?? null) ? $newsById[$newsId] : [];
+                $newsItem['social_broadcast_pending'] = !empty($existingNewsItem)
+                    ? !empty($existingNewsItem['social_broadcast_pending'])
+                    : true;
+                $newsItem['social_broadcast_enqueued_at'] = (int) ($existingNewsItem['social_broadcast_enqueued_at'] ?? 0);
+                $newsItem['rss_discovered_at'] = !empty($existingNewsItem)
+                    ? (int) ($existingNewsItem['rss_discovered_at'] ?? time())
+                    : time();
+                $newsItem['link_card_stage'] = !empty($existingNewsItem)
+                    ? trim((string) ($existingNewsItem['link_card_stage'] ?? 'discovered'))
+                    : 'discovered';
+                if (!empty($existingNewsItem)) {
+                    foreach ($existingNewsItem as $field => $value) {
+                        if (!array_key_exists($field, $newsItem)) {
+                            $newsItem[$field] = $value;
+                        }
+                    }
+                } else {
+                    $discoveredCount++;
+                }
+                $newsById[$newsId] = $newsItem;
+                $newsStoreChanged = true;
+                foreach (admin_social_rss_candidate_link_card_urls($newsItem) as $candidateUrl) {
+                    if (function_exists('nammu_fediverse_enqueue_link_card_url') && nammu_fediverse_enqueue_link_card_url($candidateUrl, 'social-rss-news')) {
+                        $queuedLinkCardsCount++;
+                    }
+                }
             }
             $feedState['seen'][$item['key']] = time();
-            $sentCount++;
         }
         $cutoff = time() - (30 * 86400);
         foreach ($feedState['seen'] as $itemKey => $seenAt) {
@@ -1017,7 +1065,101 @@ function admin_process_social_rss_feeds(): array
         $state['feeds'][$feedKey] = $feedState;
     }
     admin_save_social_rss_state($state);
-    return ['sent' => $sentCount, 'checked' => count($feeds)];
+    if ($newsStoreChanged && function_exists('nammu_actuality_save_news_store')) {
+        $persistedNews = array_values($newsById);
+        usort($persistedNews, static function (array $a, array $b): int {
+            return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
+        });
+        nammu_actuality_save_news_store($persistedNews);
+    }
+    return ['sent' => $sentCount, 'checked' => count($feeds), 'discovered' => $discoveredCount, 'queued_link_cards' => $queuedLinkCardsCount];
+}
+
+function admin_social_rss_candidate_link_card_urls(array $item): array
+{
+    $urls = [];
+    $link = trim((string) ($item['link'] ?? ''));
+    if ($link !== '') {
+        $urls[] = $link;
+    }
+    foreach ((array) ($item['links'] ?? []) as $candidate) {
+        $candidate = trim((string) $candidate);
+        if ($candidate !== '') {
+            $urls[] = $candidate;
+        }
+    }
+    return array_values(array_unique(array_filter($urls, static function (string $url): bool {
+        return preg_match('#^https?://#i', $url) === 1;
+    })));
+}
+
+function admin_social_rss_enqueue_pending_broadcasts(int $maxItems = 12): array
+{
+    if (!function_exists('nammu_actuality_load_news_store') || !function_exists('nammu_actuality_save_news_store')) {
+        return ['queued' => 0, 'remaining' => 0];
+    }
+    $settings = get_settings();
+    $availableNetworks = admin_social_broadcast_available_networks($settings);
+    $networks = array_keys($availableNetworks);
+    if (empty($networks)) {
+        return ['queued' => 0, 'remaining' => 0];
+    }
+    $newsStore = nammu_actuality_load_news_store();
+    $newsItems = array_values(array_filter((array) ($newsStore['items'] ?? []), static function ($item): bool {
+        return is_array($item);
+    }));
+    if (empty($newsItems)) {
+        return ['queued' => 0, 'remaining' => 0];
+    }
+    $snapshotStore = function_exists('nammu_actuality_load_items_snapshot') ? nammu_actuality_load_items_snapshot() : ['items' => []];
+    $snapshotItems = array_values(array_filter((array) ($snapshotStore['items'] ?? []), static function ($item): bool {
+        return is_array($item);
+    }));
+    $snapshotById = [];
+    foreach ($snapshotItems as $snapshotItem) {
+        $snapshotId = trim((string) ($snapshotItem['id'] ?? ''));
+        if ($snapshotId !== '') {
+            $snapshotById[$snapshotId] = $snapshotItem;
+        }
+    }
+    usort($newsItems, static function (array $a, array $b): int {
+        return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
+    });
+    $queued = 0;
+    $remaining = 0;
+    foreach ($newsItems as $index => $newsItem) {
+        if (trim((string) ($newsItem['source_kind'] ?? '')) !== 'news') {
+            continue;
+        }
+        if (empty($newsItem['social_broadcast_pending'])) {
+            continue;
+        }
+        $newsId = trim((string) ($newsItem['id'] ?? ''));
+        $profileItem = ($newsId !== '' && isset($snapshotById[$newsId]) && is_array($snapshotById[$newsId])) ? $snapshotById[$newsId] : $newsItem;
+        $fediverseUrl = admin_social_broadcast_fediverse_url_for_actuality_item($profileItem);
+        if ($fediverseUrl === '') {
+            $remaining++;
+            continue;
+        }
+        if ($queued >= $maxItems) {
+            $remaining++;
+            continue;
+        }
+        $title = trim((string) ($profileItem['title'] ?? ''));
+        $description = trim((string) (($profileItem['raw_text'] ?? '') !== '' ? $profileItem['raw_text'] : ($profileItem['description'] ?? '')));
+        $text = $title !== '' ? $title : $description;
+        if ($title !== '' && $description !== '') {
+            $text .= "\n\n" . $description;
+        }
+        $images = implode("\n", admin_social_broadcast_images_from_fediverse_item($profileItem));
+        admin_enqueue_social_broadcast($text, $images, $networks, $fediverseUrl);
+        $newsItems[$index]['social_broadcast_pending'] = false;
+        $newsItems[$index]['social_broadcast_enqueued_at'] = time();
+        $newsItems[$index]['link_card_stage'] = 'published';
+        $queued++;
+    }
+    nammu_actuality_save_news_store($newsItems);
+    return ['queued' => $queued, 'remaining' => $remaining];
 }
 
 function admin_social_broadcast_labels(): array

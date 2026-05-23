@@ -231,6 +231,8 @@ function admin_run_scheduled_maintenance_tasks(): array {
         })
         : ['scanned' => 0, 'suppressed' => 0];
     $rssStats = ['sent' => 0, 'checked' => 0];
+    $linkCardRefreshStats = ['processed' => 0, 'updated' => 0, 'failed' => 0, 'remaining' => 0];
+    $socialRssBroadcastQueueStats = ['queued' => 0, 'remaining' => 0];
     $socialBroadcastQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $webmentionSyncStats = ['scanned' => 0, 'enqueued' => 0, 'remaining' => 0];
     $webmentionQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
@@ -249,38 +251,49 @@ function admin_run_scheduled_maintenance_tasks(): array {
         : ['items' => []];
     $actualityBeforeSignature = $snapshotSignature($actualityBefore);
 
-    if (function_exists('nammu_actuality_rebuild_snapshot')) {
-        $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
-        $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
-        $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
-        $baseUrl = trim((string) ($config['site_url'] ?? ''));
-        if ($baseUrl === '') {
-            $baseUrl = nammu_base_url();
-        }
-        $rebuiltActuality = $traceStep('actuality_rebuild_snapshot', static function () use ($baseUrl, $config, $siteName, $siteDescription, $siteLang) {
-            return nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
-        });
-        $actualityChanged = $snapshotSignature(is_array($rebuiltActuality) ? $rebuiltActuality : ['items' => []]) !== $actualityBeforeSignature;
+    $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
+    $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
+    $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
+    $baseUrl = trim((string) ($config['site_url'] ?? ''));
+    if ($baseUrl === '') {
+        $baseUrl = nammu_base_url();
     }
     if (function_exists('admin_process_social_rss_feeds')) {
         $rssStats = $traceStep('social_rss_feeds', static function () {
             return admin_process_social_rss_feeds();
         });
-        if ((int) ($rssStats['sent'] ?? 0) > 0 && function_exists('nammu_actuality_rebuild_snapshot')) {
-            $siteName = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
-            $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
-            $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
-            $baseUrl = trim((string) ($config['site_url'] ?? ''));
-            if ($baseUrl === '') {
-                $baseUrl = nammu_base_url();
+    }
+    if (function_exists('nammu_fediverse_refresh_link_card_queue')) {
+        $linkCardRefreshStats = $traceStep('fediverse_link_card_refresh', static function () use ($config) {
+            return nammu_fediverse_refresh_link_card_queue($config, 8, 259200);
+        });
+    }
+    $pendingSocialRssLinkCards = 0;
+    if (function_exists('nammu_fediverse_link_card_queue_store')) {
+        $linkCardQueueStore = nammu_fediverse_link_card_queue_store();
+        foreach ((array) ($linkCardQueueStore['items'] ?? []) as $queueEntry) {
+            if (!is_array($queueEntry)) {
+                continue;
             }
-            $rebuiltActuality = $traceStep('actuality_rebuild_snapshot_after_social_rss', static function () use ($baseUrl, $config, $siteName, $siteDescription, $siteLang) {
-                return nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
-            });
-            $actualityChanged = $actualityChanged || ($snapshotSignature(is_array($rebuiltActuality) ? $rebuiltActuality : ['items' => []]) !== $actualityBeforeSignature);
+            $reason = trim((string) ($queueEntry['reason'] ?? ''));
+            if ($reason === 'social-rss-news') {
+                $pendingSocialRssLinkCards++;
+            }
         }
     }
-    if (function_exists('admin_process_social_broadcast_queue')) {
+    $shouldDeferActualityPublish = (int) ($rssStats['discovered'] ?? 0) > 0 || $pendingSocialRssLinkCards > 0;
+    if (!$shouldDeferActualityPublish && function_exists('nammu_actuality_rebuild_snapshot')) {
+        $rebuiltActuality = $traceStep('actuality_rebuild_snapshot', static function () use ($baseUrl, $config, $siteName, $siteDescription, $siteLang) {
+            return nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);
+        });
+        $actualityChanged = $snapshotSignature(is_array($rebuiltActuality) ? $rebuiltActuality : ['items' => []]) !== $actualityBeforeSignature;
+        if (function_exists('admin_social_rss_enqueue_pending_broadcasts')) {
+            $socialRssBroadcastQueueStats = $traceStep('social_rss_enqueue_pending_broadcasts', static function () {
+                return admin_social_rss_enqueue_pending_broadcasts(12);
+            });
+        }
+    }
+    if (function_exists('admin_process_social_broadcast_queue') && (int) ($socialRssBroadcastQueueStats['queued'] ?? 0) === 0) {
         $socialBroadcastQueueStats = $traceStep('social_broadcast_queue', static function () {
             return admin_process_social_broadcast_queue(3);
         });

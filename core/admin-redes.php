@@ -297,6 +297,8 @@ function admin_enqueue_social_broadcast(string $text, $images, array $networks, 
     $text = trim($text);
     $imageItems = admin_social_broadcast_parse_images($images);
     $networks = array_values(array_unique(array_filter(array_map('strval', $networks))));
+    $availableNetworks = array_keys(admin_social_broadcast_available_networks(admin_social_broadcast_runtime_settings()));
+    $networks = array_values(array_intersect($networks, $availableNetworks));
     if ($text === '' || empty($networks)) {
         return ['ok' => false, 'message' => 'No hay envío a redes que encolar.'];
     }
@@ -336,6 +338,46 @@ function admin_enqueue_social_broadcast(string $text, $images, array $networks, 
     $queue['items'] = $items;
     admin_save_social_broadcast_queue($queue);
     return ['ok' => true, 'id' => $job['id'], 'queued' => count($items)];
+}
+
+function admin_purge_social_broadcast_queue_unconfigured_networks(?array $queue = null, ?array $settings = null): array
+{
+    $queue = is_array($queue) ? $queue : admin_load_social_broadcast_queue();
+    $settings = is_array($settings) ? $settings : admin_social_broadcast_runtime_settings();
+    $availableNetworks = array_keys(admin_social_broadcast_available_networks($settings));
+    $availableLookup = array_fill_keys($availableNetworks, true);
+    $items = is_array($queue['items'] ?? null) ? array_values($queue['items']) : [];
+    $keptItems = [];
+    $droppedNetworks = 0;
+    $droppedItems = 0;
+
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $networks = array_values(array_unique(array_filter(array_map('strval', $item['networks'] ?? []))));
+        $filteredNetworks = [];
+        foreach ($networks as $network) {
+            if (isset($availableLookup[$network])) {
+                $filteredNetworks[] = $network;
+            } else {
+                $droppedNetworks++;
+            }
+        }
+        if (empty($filteredNetworks)) {
+            $droppedItems++;
+            continue;
+        }
+        $item['networks'] = $filteredNetworks;
+        $keptItems[] = $item;
+    }
+
+    $queue['items'] = $keptItems;
+    return [
+        'queue' => $queue,
+        'dropped_items' => $droppedItems,
+        'dropped_networks' => $droppedNetworks,
+    ];
 }
 
 function admin_fetch_social_rss_items(string $url): array
@@ -1245,11 +1287,52 @@ function admin_send_social_broadcast_to_configured_networks(string $text, $image
     ];
 }
 
+function admin_social_broadcast_is_permanent_error(string $network, string $error): bool
+{
+    $network = strtolower(trim($network));
+    $error = strtolower(trim($error));
+    if ($error === '') {
+        return false;
+    }
+
+    $commonPermanentMarkers = [
+        'falta token',
+        'faltan credenciales',
+        'not permitted',
+        'not authorized',
+        'unauthorized',
+        'access denied',
+        'invalid oauth',
+        'invalid token',
+        'expired token',
+        'invalid app password',
+        'author urn',
+        'debes elegir una imagen',
+        'requiere una imagen',
+        'url de imagen no es accesible como imagen pública',
+        'no se pudo cargar la imagen para instagram',
+    ];
+    foreach ($commonPermanentMarkers as $marker) {
+        if (str_contains($error, $marker)) {
+            return true;
+        }
+    }
+
+    if ($network === 'twitter' || $network === 'x') {
+        return str_contains($error, 'you are not permitted to perform this action');
+    }
+
+    return false;
+}
+
 function admin_process_social_broadcast_queue(int $maxJobs = 1): array
 {
-    $queue = admin_load_social_broadcast_queue();
+    $settings = admin_social_broadcast_runtime_settings();
+    $purgeResult = admin_purge_social_broadcast_queue_unconfigured_networks(null, $settings);
+    $queue = is_array($purgeResult['queue'] ?? null) ? $purgeResult['queue'] : ['items' => []];
     $items = is_array($queue['items'] ?? null) ? array_values($queue['items']) : [];
     if (empty($items) || $maxJobs < 1) {
+        admin_save_social_broadcast_queue($queue);
         return ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => count($items)];
     }
 
@@ -1274,7 +1357,6 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
     $failed = 0;
     $remaining = [];
     $deferredFailed = [];
-    $settings = admin_social_broadcast_runtime_settings();
     $available = admin_social_broadcast_available_networks($settings);
     $imageLimits = admin_social_broadcast_network_image_limits();
 
@@ -1305,7 +1387,8 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
         foreach ($networks as $network) {
             $networkMeta = $available[$network] ?? null;
             if (!is_array($networkMeta)) {
-                $pendingNetworks[] = $network;
+                $item['last_error'] = 'La red "' . $network . '" ya no está configurada en este blog.';
+                $item['last_attempt_at'] = gmdate(DATE_ATOM);
                 continue;
             }
             $networkImages = $images;
@@ -1332,9 +1415,11 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
                 $sentNetworks[] = $network;
                 continue;
             }
-            $pendingNetworks[] = $network;
             $item['last_error'] = (string) ($error ?: ('send_failed:' . $network));
             $item['last_attempt_at'] = gmdate(DATE_ATOM);
+            if (!admin_social_broadcast_is_permanent_error($network, (string) $item['last_error'])) {
+                $pendingNetworks[] = $network;
+            }
         }
 
         if (!empty($sentNetworks)) {

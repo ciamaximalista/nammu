@@ -1472,6 +1472,35 @@ function nammu_actuality_cache_social_image(string $pageUrl, string $imageUrl, s
     return ($base !== '' ? $base : '') . '/assets/actualidad-cache/' . $filename;
 }
 
+function nammu_actuality_is_local_image_url(string $imageUrl, string $publicBaseUrl): bool
+{
+    $imageUrl = trim($imageUrl);
+    if ($imageUrl === '') {
+        return false;
+    }
+    if (!preg_match('#^https?://#i', $imageUrl)) {
+        return true;
+    }
+
+    $imagePath = trim((string) (parse_url($imageUrl, PHP_URL_PATH) ?? ''));
+    if ($imagePath !== '' && str_starts_with($imagePath, '/assets/actualidad-cache/')) {
+        return true;
+    }
+
+    $base = rtrim($publicBaseUrl, '/');
+    if ($base === '' || !preg_match('#^https?://#i', $base)) {
+        return false;
+    }
+
+    $baseHost = strtolower(trim((string) (parse_url($base, PHP_URL_HOST) ?? '')));
+    $imageHost = strtolower(trim((string) (parse_url($imageUrl, PHP_URL_HOST) ?? '')));
+    if ($baseHost === '' || $imageHost === '' || $baseHost !== $imageHost) {
+        return false;
+    }
+
+    return $imagePath !== '' && str_starts_with($imagePath, '/assets/');
+}
+
 function nammu_actuality_prune_cache(array &$cache, array $activeKeys): void
 {
     $items = is_array($cache['items'] ?? null) ? $cache['items'] : [];
@@ -1538,9 +1567,7 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
         $key = sha1($targetLink);
         $activeKeys[] = $key;
         $currentImage = trim((string) ($item['image'] ?? ''));
-        if ($currentImage !== '') {
-            continue;
-        }
+        $currentImages = nammu_actuality_manual_images((array) ($item['images'] ?? []), $publicBaseUrl);
         $entry = is_array($cache['items'][$key] ?? null) ? $cache['items'][$key] : [];
         $localPath = (string) ($entry['local_path'] ?? '');
         $cachedUrl = (string) ($entry['public_url'] ?? '');
@@ -1550,6 +1577,21 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
         }
         if ($localPath !== '' && is_file($localPath) && $cachedUrl !== '') {
             $items[$index]['image'] = $cachedUrl;
+            if ($sourceImage === '' && $currentImage !== '' && preg_match('#^https?://#i', $currentImage)) {
+                $items[$index]['source_image'] = $currentImage;
+                $cache['items'][$key]['source_image'] = $currentImage;
+            }
+            if (!empty($currentImages)) {
+                foreach ($currentImages as &$imageUrl) {
+                    if ($imageUrl === $sourceImage || $imageUrl === $currentImage) {
+                        $imageUrl = $cachedUrl;
+                    }
+                }
+                unset($imageUrl);
+                $items[$index]['images'] = array_values(array_unique(array_filter($currentImages)));
+            } elseif ($cachedUrl !== '') {
+                $items[$index]['images'] = [$cachedUrl];
+            }
             $cache['items'][$key]['last_used'] = time();
             if (!$skipRemoteDiscovery && $sourceImage === '') {
                 $refreshedSourceImage = nammu_actuality_extract_social_image($targetLink);
@@ -1558,6 +1600,37 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
                     $cache['items'][$key]['source_image'] = $refreshedSourceImage;
                 }
             }
+            continue;
+        }
+        if ($currentImage !== '' && !$skipRemoteDiscovery && !nammu_actuality_is_local_image_url($currentImage, $publicBaseUrl)) {
+            $cachedPublicUrl = nammu_actuality_cache_social_image($targetLink, $currentImage, $publicBaseUrl);
+            if ($cachedPublicUrl !== '') {
+                $path = parse_url($cachedPublicUrl, PHP_URL_PATH);
+                $localCachedPath = $path !== null && $path !== '' ? dirname(__DIR__) . $path : '';
+                $items[$index]['image'] = $cachedPublicUrl;
+                $items[$index]['source_image'] = $currentImage;
+                if (!empty($currentImages)) {
+                    foreach ($currentImages as &$imageUrl) {
+                        if ($imageUrl === $currentImage) {
+                            $imageUrl = $cachedPublicUrl;
+                        }
+                    }
+                    unset($imageUrl);
+                    $items[$index]['images'] = array_values(array_unique(array_filter($currentImages)));
+                } else {
+                    $items[$index]['images'] = [$cachedPublicUrl];
+                }
+                $cache['items'][$key] = [
+                    'page_url' => $targetLink,
+                    'source_image' => $currentImage,
+                    'public_url' => $cachedPublicUrl,
+                    'local_path' => $localCachedPath,
+                    'last_used' => time(),
+                ];
+                continue;
+            }
+        }
+        if ($currentImage !== '') {
             continue;
         }
         if ($skipRemoteDiscovery) {

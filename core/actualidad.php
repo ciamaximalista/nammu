@@ -1991,6 +1991,14 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
             ];
             $newsId = trim((string) ($newsItem['id'] ?? ''));
             if ($newsId !== '') {
+                $existingNewsItem = is_array($persistedNewsById[$newsId] ?? null) ? $persistedNewsById[$newsId] : [];
+                if (!empty($existingNewsItem)) {
+                    foreach ($existingNewsItem as $field => $value) {
+                        if (!array_key_exists($field, $newsItem)) {
+                            $newsItem[$field] = $value;
+                        }
+                    }
+                }
                 $persistedNewsById[$newsId] = $newsItem;
             }
             $newsItem = $normalizeNewsItem($newsItem);

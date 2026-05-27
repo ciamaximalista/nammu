@@ -7209,6 +7209,210 @@ function admin_mailing_batch_size(): int
     return 40;
 }
 
+function admin_mailing_deliveries_file(): string
+{
+    return __DIR__ . '/config/mailing-deliveries.json';
+}
+
+function admin_load_mailing_deliveries(): array
+{
+    $file = admin_mailing_deliveries_file();
+    if (!is_file($file)) {
+        return ['items' => []];
+    }
+    $raw = file_get_contents($file);
+    if ($raw === false) {
+        return ['items' => []];
+    }
+    $data = json_decode($raw, true);
+    return is_array($data) ? $data : ['items' => []];
+}
+
+function admin_save_mailing_deliveries(array $data): void
+{
+    $items = is_array($data['items'] ?? null) ? $data['items'] : [];
+    $campaigns = is_array($data['campaigns'] ?? null) ? $data['campaigns'] : [];
+    if (count($items) > 8000) {
+        uasort($items, static function ($a, $b): int {
+            return (int) (($a['sent_at'] ?? 0)) <=> (int) (($b['sent_at'] ?? 0));
+        });
+        $items = array_slice($items, -8000, null, true);
+    }
+    $payload = [
+        'updated_at' => time(),
+        'campaigns' => $campaigns,
+        'items' => $items,
+    ];
+    file_put_contents(admin_mailing_deliveries_file(), json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+}
+
+function admin_mailing_content_key(string $context, array $payload): string
+{
+    $context = strtolower(trim($context));
+    $slug = trim((string) ($payload['slug'] ?? ''));
+    if ($slug !== '') {
+        return $context . ':slug:' . $slug;
+    }
+    $filename = trim((string) ($payload['filename'] ?? ''));
+    if ($filename !== '') {
+        return $context . ':file:' . $filename;
+    }
+    if ($context === 'newsletter') {
+        $title = trim((string) ($payload['title'] ?? ''));
+        $html = (string) ($payload['content_html'] ?? '');
+        $text = (string) ($payload['content_text'] ?? '');
+        return $context . ':body:' . sha1($title . "\n" . $html . "\n" . $text);
+    }
+    $title = trim((string) ($payload['title'] ?? ''));
+    return $context . ':payload:' . sha1(json_encode([$title, $payload], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+}
+
+function admin_mailing_delivery_key(string $contentKey, string $email): string
+{
+    return sha1($contentKey . '|' . admin_normalize_email($email));
+}
+
+function admin_mailing_sent_map_for_content(string $contentKey): array
+{
+    $data = admin_load_mailing_deliveries();
+    $items = is_array($data['items'] ?? null) ? $data['items'] : [];
+    $map = [];
+    foreach ($items as $key => $item) {
+        if (($item['content_key'] ?? '') === $contentKey && !empty($item['email'])) {
+            $map[admin_normalize_email((string) $item['email'])] = true;
+            continue;
+        }
+        if (is_string($key) && isset($item['sent_at'])) {
+            $parts = explode('|', $key, 2);
+            if (count($parts) === 2 && $parts[0] === $contentKey) {
+                $map[admin_normalize_email($parts[1])] = true;
+            }
+        }
+    }
+    return $map;
+}
+
+function admin_mailing_campaign_exists(string $contentKey): bool
+{
+    $data = admin_load_mailing_deliveries();
+    $campaigns = is_array($data['campaigns'] ?? null) ? $data['campaigns'] : [];
+    if (isset($campaigns[$contentKey])) {
+        return true;
+    }
+    if (!function_exists('nammu_load_scheduled_notifications')) {
+        return false;
+    }
+    foreach (nammu_load_scheduled_notifications() as $payload) {
+        if (!is_array($payload)) {
+            continue;
+        }
+        if (strtolower(trim((string) ($payload['notification_kind'] ?? ''))) !== 'mailing_batch') {
+            continue;
+        }
+        $existingContentKey = trim((string) ($payload['mailing_content_key'] ?? ''));
+        if ($existingContentKey === '') {
+            $existingContentKey = admin_mailing_content_key((string) ($payload['mailing_context'] ?? ''), $payload);
+        }
+        if ($existingContentKey === $contentKey) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function admin_mark_mailing_campaign_queued(string $context, array $payload, array $recipients): void
+{
+    $contentKey = admin_mailing_content_key($context, $payload);
+    $recipients = admin_normalize_recipient_batch($recipients);
+    if ($contentKey === '' || empty($recipients)) {
+        return;
+    }
+    $data = admin_load_mailing_deliveries();
+    $campaigns = is_array($data['campaigns'] ?? null) ? $data['campaigns'] : [];
+    $campaigns[$contentKey] = [
+        'content_key' => $contentKey,
+        'context' => strtolower(trim($context)),
+        'slug' => trim((string) ($payload['slug'] ?? '')),
+        'filename' => trim((string) ($payload['filename'] ?? '')),
+        'title' => trim((string) ($payload['title'] ?? '')),
+        'queued_recipients' => count($recipients),
+        'queued_at' => time(),
+    ];
+    $data['campaigns'] = $campaigns;
+    admin_save_mailing_deliveries($data);
+}
+
+function admin_mailing_pending_map_for_content(string $contentKey): array
+{
+    if (!function_exists('nammu_load_scheduled_notifications')) {
+        return [];
+    }
+    $map = [];
+    foreach (nammu_load_scheduled_notifications() as $payload) {
+        if (!is_array($payload)) {
+            continue;
+        }
+        if (strtolower(trim((string) ($payload['notification_kind'] ?? ''))) !== 'mailing_batch') {
+            continue;
+        }
+        $existingContentKey = trim((string) ($payload['mailing_content_key'] ?? ''));
+        if ($existingContentKey === '') {
+            $existingContentKey = admin_mailing_content_key((string) ($payload['mailing_context'] ?? ''), $payload);
+        }
+        if ($existingContentKey !== $contentKey) {
+            continue;
+        }
+        foreach ((array) ($payload['recipients'] ?? []) as $recipient) {
+            $email = admin_normalize_email((string) $recipient);
+            if ($email !== '') {
+                $map[$email] = true;
+            }
+        }
+    }
+    return $map;
+}
+
+function admin_mark_mailing_delivered(string $context, array $payload, array $recipients): void
+{
+    $contentKey = trim((string) ($payload['mailing_content_key'] ?? ''));
+    if ($contentKey === '') {
+        $contentKey = admin_mailing_content_key($context, $payload);
+    }
+    $recipients = admin_normalize_recipient_batch($recipients);
+    if ($contentKey === '' || empty($recipients)) {
+        return;
+    }
+    $data = admin_load_mailing_deliveries();
+    $items = is_array($data['items'] ?? null) ? $data['items'] : [];
+    $campaigns = is_array($data['campaigns'] ?? null) ? $data['campaigns'] : [];
+    $now = time();
+    if (!isset($campaigns[$contentKey])) {
+        $campaigns[$contentKey] = [
+            'content_key' => $contentKey,
+            'context' => strtolower(trim($context)),
+            'slug' => trim((string) ($payload['slug'] ?? '')),
+            'filename' => trim((string) ($payload['filename'] ?? '')),
+            'title' => trim((string) ($payload['title'] ?? '')),
+            'queued_recipients' => count($recipients),
+            'queued_at' => $now,
+        ];
+    }
+    foreach ($recipients as $email) {
+        $items[admin_mailing_delivery_key($contentKey, $email)] = [
+            'content_key' => $contentKey,
+            'context' => strtolower(trim($context)),
+            'email' => $email,
+            'slug' => trim((string) ($payload['slug'] ?? '')),
+            'filename' => trim((string) ($payload['filename'] ?? '')),
+            'title' => trim((string) ($payload['title'] ?? '')),
+            'sent_at' => $now,
+        ];
+    }
+    $data['campaigns'] = $campaigns;
+    $data['items'] = $items;
+    admin_save_mailing_deliveries($data);
+}
+
 function admin_normalize_recipient_batch(array $recipients): array
 {
     $suppressed = function_exists('admin_mailing_suppressed_map') ? admin_mailing_suppressed_map() : [];
@@ -7235,13 +7439,27 @@ function admin_enqueue_mailing_batches(string $context, array $payload, array $r
     if (empty($recipients)) {
         return ['queued_batches' => 0, 'queued_recipients' => 0];
     }
+    $contentKey = admin_mailing_content_key($context, $payload);
+    if (admin_mailing_campaign_exists($contentKey)) {
+        return ['queued_batches' => 0, 'queued_recipients' => 0, 'skipped_campaign' => true];
+    }
+    $alreadySent = admin_mailing_sent_map_for_content($contentKey);
+    $alreadyPending = admin_mailing_pending_map_for_content($contentKey);
+    $recipients = array_values(array_filter($recipients, static function ($email) use ($alreadySent, $alreadyPending): bool {
+        return !isset($alreadySent[$email]) && !isset($alreadyPending[$email]);
+    }));
+    if (empty($recipients)) {
+        return ['queued_batches' => 0, 'queued_recipients' => 0, 'skipped_recipients' => count($alreadySent) + count($alreadyPending)];
+    }
+    admin_mark_mailing_campaign_queued($context, $payload, $recipients);
     $batchSize = admin_mailing_batch_size();
     $chunks = array_chunk($recipients, $batchSize);
-    $jobId = substr(sha1($context . '|' . json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '|' . microtime(true)), 0, 20);
+    $jobId = substr(sha1($context . '|' . $contentKey), 0, 20);
     foreach ($chunks as $index => $chunk) {
         nammu_enqueue_scheduled_notification([
             'notification_kind' => 'mailing_batch',
             'mailing_context' => $context,
+            'mailing_content_key' => $contentKey,
             'mailing_job_id' => $jobId,
             'batch_index' => $index + 1,
             'batch_total' => count($chunks),
@@ -7335,6 +7553,10 @@ function admin_try_send_queued_mailing_batch(array $payload): array
         isset($delivery['fromName']) ? (string) $delivery['fromName'] : null
     );
     $failedRecipients = admin_normalize_recipient_batch((array) ($result['failed_recipients'] ?? []));
+    $deliveredRecipients = array_values(array_diff($recipients, $failedRecipients));
+    if (!empty($deliveredRecipients)) {
+        admin_mark_mailing_delivered($context, $payload, $deliveredRecipients);
+    }
     return [
         'ok' => empty($failedRecipients),
         'sent' => (int) ($result['sent'] ?? 0),

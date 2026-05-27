@@ -1069,16 +1069,17 @@ function admin_process_social_rss_feeds(): array
             $newsId = trim((string) ($newsItem['id'] ?? ''));
             if ($newsId !== '') {
                 $existingNewsItem = is_array($newsById[$newsId] ?? null) ? $newsById[$newsId] : [];
+                $existingBroadcastEnqueuedAt = (int) ($existingNewsItem['social_broadcast_enqueued_at'] ?? 0);
+                $existingLinkCardStage = trim((string) ($existingNewsItem['link_card_stage'] ?? 'discovered'));
+                $existingBroadcastFinished = $existingBroadcastEnqueuedAt > 0 || $existingLinkCardStage === 'published';
                 $newsItem['social_broadcast_pending'] = !empty($existingNewsItem)
-                    ? !empty($existingNewsItem['social_broadcast_pending'])
+                    ? (!empty($existingNewsItem['social_broadcast_pending']) || (!$existingBroadcastFinished && $existingLinkCardStage === 'discovered'))
                     : true;
-                $newsItem['social_broadcast_enqueued_at'] = (int) ($existingNewsItem['social_broadcast_enqueued_at'] ?? 0);
+                $newsItem['social_broadcast_enqueued_at'] = $existingBroadcastEnqueuedAt;
                 $newsItem['rss_discovered_at'] = !empty($existingNewsItem)
                     ? (int) ($existingNewsItem['rss_discovered_at'] ?? time())
                     : time();
-                $newsItem['link_card_stage'] = !empty($existingNewsItem)
-                    ? trim((string) ($existingNewsItem['link_card_stage'] ?? 'discovered'))
-                    : 'discovered';
+                $newsItem['link_card_stage'] = !empty($existingNewsItem) ? $existingLinkCardStage : 'discovered';
                 if (!empty($existingNewsItem)) {
                     foreach ($existingNewsItem as $field => $value) {
                         if (!array_key_exists($field, $newsItem)) {
@@ -1194,7 +1195,11 @@ function admin_social_rss_enqueue_pending_broadcasts(int $maxItems = 12): array
             $text .= "\n\n" . $description;
         }
         $images = implode("\n", admin_social_broadcast_images_from_fediverse_item($profileItem));
-        admin_enqueue_social_broadcast($text, $images, $networks, $fediverseUrl);
+        $queueResult = admin_enqueue_social_broadcast($text, $images, $networks, $fediverseUrl);
+        if (empty($queueResult['ok'])) {
+            $remaining++;
+            continue;
+        }
         $newsItems[$index]['social_broadcast_pending'] = false;
         $newsItems[$index]['social_broadcast_enqueued_at'] = time();
         $newsItems[$index]['link_card_stage'] = 'published';

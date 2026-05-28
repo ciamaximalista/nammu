@@ -293,9 +293,10 @@ function admin_run_scheduled_maintenance_tasks(): array {
             });
         }
     }
-    if (function_exists('admin_process_social_broadcast_queue') && (int) ($socialRssBroadcastQueueStats['queued'] ?? 0) === 0) {
-        $socialBroadcastQueueStats = $traceStep('social_broadcast_queue', static function () {
-            return admin_process_social_broadcast_queue(3);
+    if (function_exists('admin_process_social_broadcast_queue')) {
+        $socialBroadcastMaxJobs = max(12, (int) ($socialRssBroadcastQueueStats['queued'] ?? 0));
+        $socialBroadcastQueueStats = $traceStep('social_broadcast_queue', static function () use ($socialBroadcastMaxJobs) {
+            return admin_process_social_broadcast_queue($socialBroadcastMaxJobs);
         });
     }
     if (function_exists('nammu_webmention_sync_sources')) {

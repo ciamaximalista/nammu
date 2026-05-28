@@ -303,7 +303,7 @@ function admin_save_social_broadcast_queue(array $queue): void
     @chmod($file, 0664);
 }
 
-function admin_enqueue_social_broadcast(string $text, $images, array $networks, string $fediverseUrl = ''): array
+function admin_enqueue_social_broadcast(string $text, $images, array $networks, string $fediverseUrl = '', array $meta = []): array
 {
     $text = trim($text);
     $imageItems = admin_social_broadcast_parse_images($images);
@@ -345,6 +345,11 @@ function admin_enqueue_social_broadcast(string $text, $images, array $networks, 
         'created_at' => gmdate(DATE_ATOM),
         'attempts' => 0,
     ];
+    foreach ($meta as $key => $value) {
+        if (is_scalar($value) || $value === null) {
+            $job[(string) $key] = $value;
+        }
+    }
     $items[] = $job;
     $queue['items'] = $items;
     admin_save_social_broadcast_queue($queue);
@@ -891,6 +896,73 @@ function admin_social_broadcast_images_from_fediverse_item(array $item): array
     return array_values(array_unique(array_filter($images)));
 }
 
+function admin_social_broadcast_fediverse_item_for_url(string $fediverseUrl): ?array
+{
+    $fediverseUrl = trim($fediverseUrl);
+    if ($fediverseUrl === '') {
+        return null;
+    }
+
+    $path = trim((string) (parse_url($fediverseUrl, PHP_URL_PATH) ?? ''));
+    if ($path === '' || preg_match('#/fediverso/([a-f0-9]{24})/?$#', $path, $matches) !== 1) {
+        return null;
+    }
+
+    if (!function_exists('nammu_fediverse_find_local_item_for_thread_hash') && is_file(__DIR__ . '/fediverso.php')) {
+        require_once __DIR__ . '/fediverso.php';
+    }
+    if (!function_exists('load_config_file')) {
+        return null;
+    }
+    if (!function_exists('nammu_fediverse_find_local_item_for_thread_hash')) {
+        return null;
+    }
+
+    $config = load_config_file();
+    $item = nammu_fediverse_find_local_item_for_thread_hash((string) ($matches[1] ?? ''), $config);
+    if (!is_array($item)) {
+        return null;
+    }
+    return $item;
+}
+
+function admin_social_broadcast_source_timestamp(array $item): int
+{
+    $timestamp = (int) ($item['source_timestamp'] ?? 0);
+    if ($timestamp > 0) {
+        return $timestamp;
+    }
+    $published = trim((string) ($item['published'] ?? ''));
+    if ($published !== '') {
+        $parsed = strtotime($published);
+        if ($parsed !== false) {
+            return (int) $parsed;
+        }
+    }
+    return 0;
+}
+
+function admin_social_broadcast_is_stale_actuality_job(array $job): bool
+{
+    $fediverseUrl = trim((string) ($job['fediverse_url'] ?? ''));
+    if ($fediverseUrl === '') {
+        return false;
+    }
+    $item = admin_social_broadcast_fediverse_item_for_url($fediverseUrl);
+    if (!is_array($item)) {
+        return false;
+    }
+    $itemId = trim((string) ($item['id'] ?? ''));
+    if ($itemId === '' || !str_contains($itemId, '/ap/objects/actualidad-')) {
+        return false;
+    }
+    $timestamp = admin_social_broadcast_source_timestamp($item);
+    if ($timestamp <= 0) {
+        return false;
+    }
+    return $timestamp < (time() - 36 * 3600);
+}
+
 function admin_social_broadcast_enrich_images_from_fediverse_url($images, string $fediverseUrl): array
 {
     $parsed = admin_social_broadcast_parse_images($images);
@@ -898,28 +970,7 @@ function admin_social_broadcast_enrich_images_from_fediverse_url($images, string
         return $parsed;
     }
 
-    $fediverseUrl = trim($fediverseUrl);
-    if ($fediverseUrl === '') {
-        return [];
-    }
-
-    $path = trim((string) (parse_url($fediverseUrl, PHP_URL_PATH) ?? ''));
-    if ($path === '' || preg_match('#/fediverso/([a-f0-9]{24})/?$#', $path, $matches) !== 1) {
-        return [];
-    }
-
-    if (!function_exists('nammu_fediverse_find_local_item_for_thread_hash') && is_file(__DIR__ . '/fediverso.php')) {
-        require_once __DIR__ . '/fediverso.php';
-    }
-    if (!function_exists('load_config_file')) {
-        return [];
-    }
-    if (!function_exists('nammu_fediverse_find_local_item_for_thread_hash')) {
-        return [];
-    }
-
-    $config = load_config_file();
-    $item = nammu_fediverse_find_local_item_for_thread_hash((string) ($matches[1] ?? ''), $config);
+    $item = admin_social_broadcast_fediverse_item_for_url($fediverseUrl);
     if (!is_array($item)) {
         return [];
     }
@@ -1190,6 +1241,13 @@ function admin_social_rss_enqueue_pending_broadcasts(int $maxItems = 12): array
         if (!$shouldBroadcast) {
             continue;
         }
+        $newsTimestamp = (int) ($newsItem['timestamp'] ?? 0);
+        if ($newsTimestamp > 0 && $newsTimestamp < (time() - 36 * 3600)) {
+            $newsItems[$index]['social_broadcast_pending'] = false;
+            $newsItems[$index]['link_card_stage'] = 'stale';
+            $newsItems[$index]['social_broadcast_skipped_at'] = time();
+            continue;
+        }
         $newsId = trim((string) ($newsItem['id'] ?? ''));
         $profileItem = ($newsId !== '' && isset($snapshotById[$newsId]) && is_array($snapshotById[$newsId])) ? $snapshotById[$newsId] : $newsItem;
         $fediverseUrl = admin_social_broadcast_fediverse_url_for_actuality_item($profileItem);
@@ -1208,7 +1266,11 @@ function admin_social_rss_enqueue_pending_broadcasts(int $maxItems = 12): array
             $text .= "\n\n" . $description;
         }
         $images = implode("\n", admin_social_broadcast_images_from_fediverse_item($profileItem));
-        $queueResult = admin_enqueue_social_broadcast($text, $images, $networks, $fediverseUrl);
+        $queueResult = admin_enqueue_social_broadcast($text, $images, $networks, $fediverseUrl, [
+            'source' => 'social-rss-news',
+            'source_id' => $newsId,
+            'source_timestamp' => $newsTimestamp,
+        ]);
         if (empty($queueResult['ok'])) {
             $remaining++;
             continue;
@@ -1354,11 +1416,32 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
         return ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => count($items)];
     }
 
+    $items = array_values(array_filter($items, static function ($item): bool {
+        return is_array($item) && !admin_social_broadcast_is_stale_actuality_job($item);
+    }));
+
+    foreach ($items as $index => $item) {
+        $sourceTimestamp = (int) ($item['source_timestamp'] ?? 0);
+        if ($sourceTimestamp <= 0) {
+            $fediverseItem = admin_social_broadcast_fediverse_item_for_url((string) ($item['fediverse_url'] ?? ''));
+            if (is_array($fediverseItem)) {
+                $sourceTimestamp = admin_social_broadcast_source_timestamp($fediverseItem);
+            }
+        }
+        $items[$index]['_source_timestamp'] = $sourceTimestamp;
+    }
+
     usort($items, static function (array $a, array $b): int {
         $attemptsA = (int) ($a['attempts'] ?? 0);
         $attemptsB = (int) ($b['attempts'] ?? 0);
         if ($attemptsA !== $attemptsB) {
             return $attemptsA <=> $attemptsB;
+        }
+
+        $sourceA = (int) ($a['_source_timestamp'] ?? 0);
+        $sourceB = (int) ($b['_source_timestamp'] ?? 0);
+        if ($sourceA !== $sourceB) {
+            return $sourceB <=> $sourceA;
         }
 
         $createdA = strtotime((string) ($a['created_at'] ?? '')) ?: 0;
@@ -1383,9 +1466,11 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
             continue;
         }
         if ($processed >= $maxJobs) {
+            unset($item['_source_timestamp']);
             $remaining[] = $item;
             continue;
         }
+        unset($item['_source_timestamp']);
         $processed++;
         $networks = array_values(array_unique(array_filter(array_map('strval', $item['networks'] ?? []))));
         if (empty($networks)) {

@@ -9297,10 +9297,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Preserve existing Ordo value on update
         $normalizedFilename = nammu_normalize_filename($filename);
         $previousStatus = 'published';
+        $existingFediverseId = '';
+        $previousFediverseTemplate = '';
         if ($normalizedFilename !== '') {
             $existing_post_data = get_post_content($normalizedFilename);
             $ordo = $existing_post_data['metadata']['Ordo'] ?? '';
             $previousStatus = strtolower($existing_post_data['metadata']['Status'] ?? 'published');
+            $previousFediverseTemplate = strtolower(trim((string) ($existing_post_data['metadata']['Template'] ?? 'post')));
+            if ($previousFediverseTemplate === 'single' || $previousFediverseTemplate === 'draft') {
+                $previousFediverseTemplate = 'post';
+            }
+            $existingFediverseId = trim((string) (($existing_post_data['metadata']['FediverseId'] ?? '') ?: ($existing_post_data['metadata']['fediverse_id'] ?? '')));
             if ($lang === '') {
                 $lang = trim((string) ($existing_post_data['metadata']['Lang'] ?? ''));
             }
@@ -9498,6 +9505,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if (!empty($relatedSlugs) && in_array($template, ['post', 'podcast'], true)) {
                 $file_content .= "Related: " . implode(', ', $relatedSlugs) . "
+";
+            }
+            $fediverseIdToPreserve = $existingFediverseId;
+            if ($fediverseIdToPreserve === ''
+                && $renameRequested
+                && $normalizedFilename !== ''
+                && $previousStatus === 'published'
+                && in_array($previousFediverseTemplate, ['post', 'page', 'podcast'], true)
+            ) {
+                $baseForFediverseId = function_exists('nammu_fediverse_base_url')
+                    ? nammu_fediverse_base_url(load_config_file())
+                    : rtrim(admin_base_url(), '/');
+                $previousSlug = pathinfo($normalizedFilename, PATHINFO_FILENAME);
+                if ($baseForFediverseId !== '' && $previousSlug !== '') {
+                    $fediverseIdToPreserve = rtrim($baseForFediverseId, '/') . '/ap/objects/' . rawurlencode($previousFediverseTemplate) . '-' . rawurlencode($previousSlug);
+                }
+            }
+            if ($fediverseIdToPreserve !== '') {
+                $file_content .= "FediverseId: " . $fediverseIdToPreserve . "
 ";
             }
             $file_content .= "Status: " . $status . "

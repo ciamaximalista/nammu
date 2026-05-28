@@ -2238,7 +2238,12 @@ function nammu_fediverse_public_action_activities(array $config): array
         if ($type === 'resend') {
             $resendItem = nammu_fediverse_resend_item_from_action($action);
             if (is_array($resendItem)) {
-                $activities[] = nammu_fediverse_activity_for_local_item($resendItem, $config);
+                $activity = nammu_fediverse_activity_for_local_item($resendItem, $config);
+                $activityId = trim((string) ($action['activity_id'] ?? ''));
+                if ($activityId !== '') {
+                    $activity['id'] = $activityId;
+                }
+                $activities[] = $activity;
             }
             continue;
         }
@@ -2331,7 +2336,7 @@ function nammu_fediverse_resend_item_from_action(array $action): ?array
         'title' => trim((string) ($action['title'] ?? '')),
         'content' => trim((string) ($action['content'] ?? '')),
         'summary' => trim((string) ($action['summary'] ?? '')),
-        'published' => trim((string) ($action['published'] ?? gmdate(DATE_ATOM))),
+        'published' => trim((string) (($action['object_published'] ?? '') ?: ($action['published'] ?? gmdate(DATE_ATOM)))),
         'type' => trim((string) ($action['object_type'] ?? 'Article')) ?: 'Article',
         'image' => trim((string) ($action['image'] ?? '')),
         'images' => array_values(array_filter(array_map('strval', is_array($action['images'] ?? null) ? $action['images'] : []))),
@@ -5490,6 +5495,15 @@ function nammu_fediverse_meta_date(array $meta, ?string $filePath = null): strin
     return nammu_fediverse_parse_date_with_fallback('', $filePath);
 }
 
+function nammu_fediverse_meta_object_id(array $meta, string $fallbackId): string
+{
+    $objectId = trim((string) (($meta['FediverseId'] ?? '') ?: ($meta['fediverse_id'] ?? '')));
+    if ($objectId !== '' && preg_match('#^https?://[^\\s]+/ap/objects/[^\\s]+$#i', $objectId) === 1) {
+        return $objectId;
+    }
+    return $fallbackId;
+}
+
 function nammu_fediverse_local_content_items(array $config): array
 {
     static $cache = [];
@@ -5536,7 +5550,7 @@ function nammu_fediverse_local_content_items(array $config): array
             $image = nammu_fediverse_social_image_for_url($url);
         }
         $objectType = $template === 'podcast' ? 'Article' : 'Article';
-        $itemId = $baseUrl . '/ap/objects/' . rawurlencode($template) . '-' . rawurlencode($slug);
+        $itemId = nammu_fediverse_meta_object_id($meta, $baseUrl . '/ap/objects/' . rawurlencode($template) . '-' . rawurlencode($slug));
         if (isset($deletedIds[$itemId])) {
             continue;
         }
@@ -5575,7 +5589,7 @@ function nammu_fediverse_local_content_items(array $config): array
         if ($image === '') {
             $image = nammu_fediverse_social_image_for_url($baseUrl . '/itinerarios/' . rawurlencode($slug));
         }
-        $itemId = $baseUrl . '/ap/objects/itinerary-' . rawurlencode($slug);
+        $itemId = nammu_fediverse_meta_object_id($meta, $baseUrl . '/ap/objects/itinerary-' . rawurlencode($slug));
         if (isset($deletedIds[$itemId])) {
             continue;
         }
@@ -9250,7 +9264,7 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
                     $image = nammu_fediverse_social_image_for_url($targetUrl);
                 }
                 $matchedItem = [
-                    'id' => $targetId,
+                    'id' => nammu_fediverse_meta_object_id($meta, $targetId),
                     'url' => $targetUrl,
                     'title' => $title,
                     'content' => $description !== '' ? $description : nammu_fediverse_plain_excerpt($content),
@@ -9281,7 +9295,7 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
                 $description = trim((string) (($meta['Description'] ?? $meta['description'] ?? '') ?: ''));
                 $content = nammu_fediverse_strip_front_matter($raw);
                 $matchedItem = [
-                    'id' => $targetId,
+                    'id' => nammu_fediverse_meta_object_id($meta, $targetId),
                     'url' => $targetUrl,
                     'title' => $title,
                     'content' => $description !== '' ? $description : nammu_fediverse_plain_excerpt($content),
@@ -9303,12 +9317,14 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
 
     $deliveryStore = nammu_fediverse_deliveries_store();
     $deliveryFollowers = is_array($deliveryStore['followers'] ?? null) ? $deliveryStore['followers'] : [];
-    $resendPublished = gmdate(DATE_ATOM);
-    $resendId = nammu_fediverse_base_url($config) . '/ap/objects/resend-' . substr(sha1($slug . '|' . $template . '|' . microtime(true)), 0, 24);
     $resendItem = $matchedItem;
-    $resendItem['id'] = $resendId;
-    $resendItem['published'] = $resendPublished;
     $activity = nammu_fediverse_activity_for_local_item($resendItem, $config);
+    $resendPublished = gmdate(DATE_ATOM);
+    $stableObjectId = trim((string) ($matchedItem['id'] ?? ''));
+    if ($stableObjectId !== '') {
+        $activity['id'] = $stableObjectId . '/activity-resend-' . substr(sha1($slug . '|' . $template . '|' . $resendPublished), 0, 16);
+        $activity['published'] = $resendPublished;
+    }
     $delivered = 0;
     foreach ($followers as $follower) {
         $followerId = trim((string) ($follower['id'] ?? ''));
@@ -9329,7 +9345,7 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
     }
     nammu_fediverse_save_deliveries_store($deliveryFollowers);
     nammu_fediverse_record_action('resend', '', (string) ($matchedItem['url'] ?? ''), [
-        'resend_object_id' => $resendId,
+        'resend_object_id' => trim((string) ($matchedItem['id'] ?? '')),
         'activity_id' => (string) ($activity['id'] ?? ''),
         'title' => trim((string) ($matchedItem['title'] ?? '')),
         'content' => trim((string) ($matchedItem['content'] ?? '')),
@@ -9337,6 +9353,7 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
         'image' => trim((string) ($matchedItem['image'] ?? '')),
         'images' => array_values(array_filter(array_map('strval', is_array($matchedItem['images'] ?? null) ? $matchedItem['images'] : []))),
         'object_type' => trim((string) ($matchedItem['type'] ?? 'Article')),
+        'object_published' => trim((string) ($matchedItem['published'] ?? '')),
         'published' => $resendPublished,
     ]);
 

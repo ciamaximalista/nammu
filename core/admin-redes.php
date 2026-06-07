@@ -1405,6 +1405,11 @@ function admin_social_broadcast_is_permanent_error(string $network, string $erro
     return false;
 }
 
+function admin_social_broadcast_max_attempts(): int
+{
+    return 3;
+}
+
 function admin_process_social_broadcast_queue(int $maxJobs = 1): array
 {
     $settings = admin_social_broadcast_runtime_settings();
@@ -1520,7 +1525,11 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
             }
             $item['last_error'] = (string) ($error ?: ('send_failed:' . $network));
             $item['last_attempt_at'] = gmdate(DATE_ATOM);
-            if (!admin_social_broadcast_is_permanent_error($network, (string) $item['last_error'])) {
+            $nextAttempts = (int) ($item['attempts'] ?? 0) + 1;
+            if (
+                $nextAttempts < admin_social_broadcast_max_attempts()
+                && !admin_social_broadcast_is_permanent_error($network, (string) $item['last_error'])
+            ) {
                 $pendingNetworks[] = $network;
             }
         }

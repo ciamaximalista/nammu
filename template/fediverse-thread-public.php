@@ -63,6 +63,9 @@ $threadIsOwnNote = $threadIsNote && !$threadIsBoostNote;
 $threadTitle = trim((string) ($threadItem['title'] ?? ''));
 $threadContent = trim((string) ($threadItem['content'] ?? ''));
 $threadSummaryText = trim((string) ($threadItem['summary'] ?? ''));
+if ($threadContent !== '' && preg_match('/<video\b[^>]*\bsrc\s*=\s*(["\'])https?:\/\//iu', $threadContent) === 1) {
+    $threadSummaryText = '';
+}
 $threadPublished = trim((string) ($threadItem['published'] ?? ''));
 $formatFediversePublicDateTime = static function (string $value): string {
     $value = trim($value);
@@ -167,6 +170,58 @@ $renderFediversePublicText = static function (string $text, string $className = 
     if ($text === '') {
         return '';
     }
+    $renderVideo = static function (string $tag): string {
+        $readAttr = static function (string $name, string $html): string {
+            $pattern = '/\b' . preg_quote($name, '/') . '\s*=\s*(["\'])(.*?)\1/isu';
+            if (preg_match($pattern, $html, $matches) !== 1) {
+                return '';
+            }
+            return html_entity_decode((string) ($matches[2] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        };
+        $safeUrl = static function (string $url): string {
+            $url = trim($url);
+            if ($url === '' || preg_match('#^https?://#i', $url) !== 1) {
+                return '';
+            }
+            return $url;
+        };
+        $videoSrc = $safeUrl($readAttr('src', $tag));
+        $poster = $safeUrl($readAttr('poster', $tag));
+        $alt = trim($readAttr('alt', $tag));
+        $sources = [];
+        if ($videoSrc !== '') {
+            $sources[] = ['src' => $videoSrc, 'type' => trim($readAttr('type', $tag))];
+        }
+        if (preg_match_all('/<source\b[^>]*>/isu', $tag, $sourceMatches) === 1) {
+            foreach ($sourceMatches[0] as $sourceTag) {
+                $sourceSrc = $safeUrl($readAttr('src', (string) $sourceTag));
+                if ($sourceSrc === '') {
+                    continue;
+                }
+                $sources[] = ['src' => $sourceSrc, 'type' => trim($readAttr('type', (string) $sourceTag))];
+            }
+        }
+        if (empty($sources)) {
+            return '<p>' . nl2br(htmlspecialchars($tag, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</p>';
+        }
+        $html = '<div class="fediverse-public-status__media fediverse-public-status__media--video"><video controls preload="metadata"';
+        if ($poster !== '') {
+            $html .= ' poster="' . htmlspecialchars($poster, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"';
+        }
+        if ($alt !== '') {
+            $html .= ' aria-label="' . htmlspecialchars($alt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"';
+        }
+        $html .= '>';
+        foreach ($sources as $source) {
+            $html .= '<source src="' . htmlspecialchars((string) $source['src'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"';
+            if ((string) $source['type'] !== '') {
+                $html .= ' type="' . htmlspecialchars((string) $source['type'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"';
+            }
+            $html .= '>';
+        }
+        $html .= '</video></div>';
+        return $html;
+    };
     $renderInline = static function (string $value) use ($linkify): string {
         $escaped = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
         if (!$linkify) {
@@ -201,7 +256,29 @@ $renderFediversePublicText = static function (string $text, string $className = 
         if ($paragraph === '') {
             continue;
         }
-        $html .= '<p' . $classAttr . '>' . nl2br($renderInline($paragraph)) . '</p>';
+        $parts = preg_split('/(<video\b[^>]*>.*?<\/video>)/isu', $paragraph, -1, PREG_SPLIT_DELIM_CAPTURE);
+        if (!is_array($parts)) {
+            $html .= '<p' . $classAttr . '>' . nl2br($renderInline($paragraph)) . '</p>';
+            continue;
+        }
+        $paragraphHtml = '';
+        foreach ($parts as $part) {
+            if ($part === '') {
+                continue;
+            }
+            if (preg_match('/^<video\b/iu', $part) === 1) {
+                if ($paragraphHtml !== '') {
+                    $html .= '<p' . $classAttr . '>' . $paragraphHtml . '</p>';
+                    $paragraphHtml = '';
+                }
+                $html .= $renderVideo($part);
+                continue;
+            }
+            $paragraphHtml .= nl2br($renderInline($part));
+        }
+        if ($paragraphHtml !== '') {
+            $html .= '<p' . $classAttr . '>' . $paragraphHtml . '</p>';
+        }
     }
     return $html;
 };

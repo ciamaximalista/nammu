@@ -15401,6 +15401,14 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                             <div id="image-gallery-actions" class="d-none mb-3 mb-md-0">
                                 <div class="d-flex flex-column align-items-start">
                                     <span class="mb-1">Galería seleccionada: <strong id="image-gallery-count">0</strong></span>
+                                    <div class="btn-group btn-group-sm mb-2" role="group" aria-label="Orden de galería">
+                                        <input type="radio" class="btn-check d-none" name="image_gallery_order" id="image-gallery-order-manual" value="manual" checked>
+                                        <label class="btn btn-outline-secondary active" for="image-gallery-order-manual" data-gallery-order="manual">Orden manual</label>
+                                        <input type="radio" class="btn-check d-none" name="image_gallery_order" id="image-gallery-order-asc" value="asc">
+                                        <label class="btn btn-outline-secondary" for="image-gallery-order-asc" data-gallery-order="asc">A-Z</label>
+                                        <input type="radio" class="btn-check d-none" name="image_gallery_order" id="image-gallery-order-desc" value="desc">
+                                        <label class="btn btn-outline-secondary" for="image-gallery-order-desc" data-gallery-order="desc">Z-A</label>
+                                    </div>
                                     <div class="btn-group" role="group" aria-label="Acciones de galería">
                                         <button type="button" class="btn btn-sm btn-primary" id="image-gallery-insert">Insertar galería</button>
                                         <button type="button" class="btn btn-sm btn-outline-secondary" id="image-gallery-clear">Vaciar</button>
@@ -16890,6 +16898,8 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             var galleryCount = $('#image-gallery-count');
             var galleryInsertBtn = $('#image-gallery-insert');
             var galleryClearBtn = $('#image-gallery-clear');
+            var galleryOrderInputs = $('[name="image_gallery_order"]');
+            var galleryOrderLabels = $('[data-gallery-order]');
             var pendingInsert = null;
             var pendingGalleryItems = [];
             function getQueryParam(name) {
@@ -16952,6 +16962,9 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             function resetGallerySelection() {
                 pendingGalleryItems = [];
                 $('[data-media-gallery-target]').removeClass('border-primary shadow').attr('aria-pressed', 'false');
+                galleryOrderInputs.filter('[value="manual"]').prop('checked', true);
+                galleryOrderLabels.removeClass('active');
+                galleryOrderLabels.filter('[data-gallery-order="manual"]').addClass('active');
                 if (galleryCount.length) {
                     galleryCount.text('0');
                 }
@@ -17005,6 +17018,22 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     $media.addClass('border-primary shadow').attr('aria-pressed', 'true');
                 }
                 syncGallerySelectionUi();
+            }
+
+            function galleryItemSortLabel(item) {
+                return (item && (item.name || item.src) ? (item.name || item.src) : '').toString().toLocaleLowerCase();
+            }
+
+            function orderedGalleryItems(items) {
+                var order = (galleryOrderInputs.filter(':checked').val() || 'manual').toString();
+                var ordered = (items || []).slice();
+                if (order === 'asc' || order === 'desc') {
+                    ordered.sort(function(a, b) {
+                        var result = galleryItemSortLabel(a).localeCompare(galleryItemSortLabel(b), undefined, { numeric: true, sensitivity: 'base' });
+                        return order === 'desc' ? -result : result;
+                    });
+                }
+                return ordered;
             }
 
             function buildGallerySnippet(items) {
@@ -17921,7 +17950,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                 if (imageTargetMode !== 'editor-gallery' || !pendingGalleryItems.length) {
                     return;
                 }
-                var snippet = buildGallerySnippet(pendingGalleryItems);
+                var snippet = buildGallerySnippet(orderedGalleryItems(pendingGalleryItems));
                 if (!snippet) {
                     return;
                 }
@@ -17951,6 +17980,13 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
             galleryClearBtn.on('click', function() {
                 resetGallerySelection();
+            });
+
+            galleryOrderLabels.on('click', function() {
+                var order = ($(this).data('gallery-order') || 'manual').toString();
+                galleryOrderInputs.filter('[value="' + order + '"]').prop('checked', true);
+                galleryOrderLabels.removeClass('active');
+                $(this).addClass('active');
             });
 
             applyUploadedMediaIfNeeded();

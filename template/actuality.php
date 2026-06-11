@@ -162,8 +162,89 @@ $actualityMetricIcon = static function (string $type): string {
         default => '',
     };
 };
-$renderActualityText = static function (string $text, array $item) use ($fediverseIcon, $actualityFediverseMeta, $actualityMetricIcon): string {
-    $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
+$renderSafeMediaText = static function (string $text): string {
+    $text = trim($text);
+    if ($text === '') {
+        return '';
+    }
+
+    $renderPlain = static function (string $chunk): string {
+        return nl2br(htmlspecialchars($chunk, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+    };
+    $renderVideo = static function (string $tag): string {
+        $readAttr = static function (string $name, string $html): string {
+            $pattern = '/\b' . preg_quote($name, '/') . '\s*=\s*(["\'])(.*?)\1/isu';
+            if (preg_match($pattern, $html, $matches) !== 1) {
+                return '';
+            }
+            return html_entity_decode((string) ($matches[2] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        };
+        $safeUrl = static function (string $url): string {
+            $url = trim($url);
+            if ($url === '' || preg_match('#^https?://#i', $url) !== 1) {
+                return '';
+            }
+            return $url;
+        };
+        $videoSrc = $safeUrl($readAttr('src', $tag));
+        $poster = $safeUrl($readAttr('poster', $tag));
+        $alt = trim($readAttr('alt', $tag));
+        $sources = [];
+        if ($videoSrc !== '') {
+            $sources[] = [
+                'src' => $videoSrc,
+                'type' => trim($readAttr('type', $tag)),
+            ];
+        }
+        if (preg_match_all('/<source\b[^>]*>/isu', $tag, $sourceMatches) === 1) {
+            foreach ($sourceMatches[0] as $sourceTag) {
+                $sourceSrc = $safeUrl($readAttr('src', (string) $sourceTag));
+                if ($sourceSrc === '') {
+                    continue;
+                }
+                $sources[] = [
+                    'src' => $sourceSrc,
+                    'type' => trim($readAttr('type', (string) $sourceTag)),
+                ];
+            }
+        }
+        if (empty($sources)) {
+            return $renderPlain($tag);
+        }
+        $html = '<div class="actuality-media actuality-media--video"><video controls preload="metadata"';
+        if ($poster !== '') {
+            $html .= ' poster="' . htmlspecialchars($poster, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"';
+        }
+        if ($alt !== '') {
+            $html .= ' aria-label="' . htmlspecialchars($alt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"';
+        }
+        $html .= '>';
+        foreach ($sources as $source) {
+            $html .= '<source src="' . htmlspecialchars((string) $source['src'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"';
+            if ((string) $source['type'] !== '') {
+                $html .= ' type="' . htmlspecialchars((string) $source['type'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"';
+            }
+            $html .= '>';
+        }
+        $html .= '</video></div>';
+        return $html;
+    };
+
+    $parts = preg_split('/(<video\b[^>]*>.*?<\/video>)/isu', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+    if (!is_array($parts)) {
+        return $renderPlain($text);
+    }
+    $html = '';
+    foreach ($parts as $part) {
+        if ($part === '') {
+            continue;
+        }
+        $html .= preg_match('/^<video\b/iu', $part) === 1 ? $renderVideo($part) : $renderPlain($part);
+    }
+    return $html;
+};
+$renderActualityText = static function (string $text, array $item) use ($fediverseIcon, $actualityFediverseMeta, $actualityMetricIcon, $renderSafeMediaText): string {
+    $html = $renderSafeMediaText($text);
     if (strtolower(trim((string) ($item['via'] ?? ''))) === 'boost') {
         return $html;
     }
@@ -472,7 +553,13 @@ $renderProfileHeroText = static function () use ($homeBrandTitle, $homeHeroTitle
 $manualDisplayText = static function (array $item): string {
     $rawText = trim((string) ($item['raw_text'] ?? ''));
     if ($rawText !== '') {
-        $text = preg_replace('#https?://[^\s<>"\')]+#iu', '', $rawText) ?? $rawText;
+        $text = '';
+        foreach (preg_split('/(<[^>]+>)/u', $rawText, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$rawText] as $chunk) {
+            if ($chunk === '') {
+                continue;
+            }
+            $text .= str_starts_with($chunk, '<') ? $chunk : (preg_replace('#https?://[^\s<>"\')]+#iu', '', $chunk) ?? $chunk);
+        }
         $text = preg_replace("/[ \t]+\n/", "\n", $text) ?? $text;
         $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
         $text = trim($text);

@@ -45,6 +45,17 @@
             </div>
         <?php endif; ?>
         <?php
+        $rejectedOriginsFeedback = $_SESSION['rejected_origins_feedback'] ?? null;
+        if (isset($_SESSION['rejected_origins_feedback'])) {
+            unset($_SESSION['rejected_origins_feedback']);
+        }
+        ?>
+        <?php if (is_array($rejectedOriginsFeedback)): ?>
+            <div class="alert alert-<?= ($rejectedOriginsFeedback['type'] ?? '') === 'success' ? 'success' : 'danger' ?>">
+                <?= htmlspecialchars((string) ($rejectedOriginsFeedback['message'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
+        <?php
         $telegramSettings = $settings['telegram'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
         $telegramAutoEnabled = ($telegramSettings['auto_post'] ?? 'off') === 'on';
         $facebookSettings = $settings['facebook'] ?? ['token' => '', 'channel' => '', 'auto_post' => 'off'];
@@ -120,6 +131,9 @@
             : (function_exists('nammu_generate_identity_txt') ? nammu_generate_identity_txt($settings, ['base_url' => $siteBaseForMachineFiles]) : '');
         $llmsPublicUrl = ($siteBaseForMachineFiles !== '' ? $siteBaseForMachineFiles : '') . '/llms.txt';
         $identityPublicUrl = ($siteBaseForMachineFiles !== '' ? $siteBaseForMachineFiles : '') . '/identity.txt';
+        $rejectedOriginsSettings = is_array($settings['rejected_origins'] ?? null) ? $settings['rejected_origins'] : [];
+        $rejectedOriginDomains = array_values(array_filter(array_map('strval', is_array($rejectedOriginsSettings['domains'] ?? null) ? $rejectedOriginsSettings['domains'] : [])));
+        $rejectedOriginDomainsValue = implode("\n", $rejectedOriginDomains);
         $languageOptions = [
             'es' => 'Español',
             'ca' => 'Català',
@@ -255,6 +269,23 @@
                 <button type="submit" name="save_settings" class="btn btn-primary">Guardar configuración general</button>
             </div>
 
+        </form>
+
+        <form method="post" class="mt-4" id="rejected-origins">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h4 class="mt-0">Orígenes rechazados</h4>
+                    <p class="text-muted mb-3">Añade un dominio por línea. Cuando una visita humana llegue siguiendo un enlace desde alguno de estos dominios, se le mostrará “Contenido no encontrado” y se guardará una cookie para mantener el bloqueo en visitas posteriores.</p>
+                    <div class="form-group">
+                        <label for="rejected_origin_domains">Dominios</label>
+                        <textarea name="rejected_origin_domains" id="rejected_origin_domains" class="form-control" rows="6" placeholder="dominio-ejemplo.com&#10;otro-dominio.org"><?= htmlspecialchars($rejectedOriginDomainsValue, ENT_QUOTES, 'UTF-8') ?></textarea>
+                        <small class="form-text text-muted">No incluyas rutas. <code>example.com</code> bloqueará también subdominios como <code>www.example.com</code>.</small>
+                    </div>
+                    <div class="text-right">
+                        <button type="submit" name="save_rejected_origins" class="btn btn-primary">Guardar orígenes rechazados</button>
+                    </div>
+                </div>
+            </div>
         </form>
 
         <form method="post" class="mt-4">

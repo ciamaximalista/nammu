@@ -11114,6 +11114,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         header('Location: admin.php?page=configuracion');
         exit;
+    } elseif (isset($_POST['save_rejected_origins'])) {
+        $rawDomains = trim((string) ($_POST['rejected_origin_domains'] ?? ''));
+        $domains = [];
+        foreach (preg_split('/[\r\n,]+/', $rawDomains) ?: [] as $entry) {
+            $entry = strtolower(trim((string) $entry));
+            if ($entry === '') {
+                continue;
+            }
+            if (preg_match('#^https?://#i', $entry) !== 1) {
+                $entry = 'https://' . $entry;
+            }
+            $host = strtolower(trim((string) (parse_url($entry, PHP_URL_HOST) ?? '')));
+            $host = preg_replace('/^www\./i', '', $host) ?? $host;
+            $host = trim($host, ". \t\n\r\0\x0B");
+            if ($host === '' || preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/i', $host) !== 1) {
+                continue;
+            }
+            $domains[$host] = true;
+        }
+        try {
+            $config = load_config_file();
+            if (!empty($domains)) {
+                $config['rejected_origins'] = [
+                    'domains' => array_keys($domains),
+                ];
+                sort($config['rejected_origins']['domains'], SORT_NATURAL | SORT_FLAG_CASE);
+                $_SESSION['rejected_origins_feedback'] = [
+                    'type' => 'success',
+                    'message' => 'Orígenes rechazados guardados correctamente.',
+                ];
+            } else {
+                unset($config['rejected_origins']);
+                $_SESSION['rejected_origins_feedback'] = [
+                    'type' => 'success',
+                    'message' => 'Lista de orígenes rechazados vaciada.',
+                ];
+            }
+            save_config_file($config);
+        } catch (Throwable $e) {
+            $_SESSION['rejected_origins_feedback'] = [
+                'type' => 'danger',
+                'message' => 'Error guardando orígenes rechazados: ' . $e->getMessage(),
+            ];
+        }
+        header('Location: admin.php?page=configuracion#rejected-origins');
+        exit;
     } elseif (isset($_POST['save_settings'])) {
         $sort_order = $_POST['sort_order'] ?? 'date';
         $sort_order = $sort_order === 'alpha' ? 'alpha' : 'date';

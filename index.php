@@ -702,6 +702,65 @@ $renderNotFound = static function (string $title, string $description, string $p
     ]);
     exit;
 };
+$normalizeRejectedOriginHost = static function (string $value): string {
+    $value = strtolower(trim($value));
+    if ($value === '') {
+        return '';
+    }
+    if (preg_match('#^https?://#i', $value) !== 1) {
+        $value = 'https://' . $value;
+    }
+    $host = strtolower(trim((string) (parse_url($value, PHP_URL_HOST) ?? '')));
+    $host = preg_replace('/^www\./i', '', $host) ?? $host;
+    return trim($host, ". \t\n\r\0\x0B");
+};
+$hostMatchesRejectedOrigin = static function (string $host, array $domains) use ($normalizeRejectedOriginHost): bool {
+    $host = $normalizeRejectedOriginHost($host);
+    if ($host === '') {
+        return false;
+    }
+    foreach ($domains as $domain) {
+        $domain = $normalizeRejectedOriginHost((string) $domain);
+        if ($domain === '') {
+            continue;
+        }
+        if ($host === $domain || str_ends_with($host, '.' . $domain)) {
+            return true;
+        }
+    }
+    return false;
+};
+$isLikelyHumanVisitor = static function (): bool {
+    $ua = strtolower(trim((string) ($_SERVER['HTTP_USER_AGENT'] ?? '')));
+    if ($ua === '') {
+        return true;
+    }
+    return preg_match('/bot|crawl|spider|slurp|mediapartners|facebookexternalhit|facebookcatalog|twitterbot|telegrambot|whatsapp|preview|monitor|uptime|curl|wget|python-requests|go-http-client/iu', $ua) !== 1;
+};
+$rejectedOriginDomains = is_array($configData['rejected_origins']['domains'] ?? null)
+    ? array_values(array_filter(array_map('strval', $configData['rejected_origins']['domains'])))
+    : [];
+if (!$isAdminLogged && !empty($rejectedOriginDomains) && $isLikelyHumanVisitor()) {
+    $rejectedCookieName = 'nammu_rejected_origin';
+    $isRejectedVisitor = isset($_COOKIE[$rejectedCookieName]) && trim((string) $_COOKIE[$rejectedCookieName]) === '1';
+    if (!$isRejectedVisitor) {
+        $refererHost = trim((string) (parse_url((string) ($_SERVER['HTTP_REFERER'] ?? ''), PHP_URL_HOST) ?? ''));
+        $isRejectedVisitor = $hostMatchesRejectedOrigin($refererHost, $rejectedOriginDomains);
+        if ($isRejectedVisitor) {
+            setcookie($rejectedCookieName, '1', [
+                'expires' => time() + 31536000,
+                'path' => '/',
+                'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+            $_COOKIE[$rejectedCookieName] = '1';
+        }
+    }
+    if ($isRejectedVisitor) {
+        $renderNotFound('Contenido no encontrado', 'La página solicitada no se encuentra disponible.', $routePath);
+    }
+}
 $isCategoriesIndex = (bool) preg_match('#^/categorias/?$#i', $routePath);
 $categorySlugRequest = null;
 if (!$isCategoriesIndex && preg_match('#^/categoria/([^/]+)/?$#i', $routePath, $matchCategory)) {

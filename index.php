@@ -1039,10 +1039,98 @@ if ($routePath === '/fediverso.xml') {
     exit;
 }
 
+if ($routePath === '/llms-posts.txt') {
+    $allPostsForLlms = $contentRepository->all();
+    $llmsPageSize = 30;
+    $llmsTotalPages = max(1, (int) ceil(count($allPostsForLlms) / $llmsPageSize));
+    $llmsPage = filter_input(INPUT_GET, 'pagina', FILTER_VALIDATE_INT, [
+        'options' => ['min_range' => 1],
+    ]);
+    if ($llmsPage === null || $llmsPage === false) {
+        $llmsPage = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1],
+        ]);
+    }
+    if ($llmsPage === null || $llmsPage === false) {
+        $llmsPage = 1;
+    }
+    $llmsPage = min((int) $llmsPage, $llmsTotalPages);
+    $llmsBase = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '';
+    $llmsCurrentUrl = ($llmsBase !== '' ? $llmsBase : '') . '/llms-posts.txt';
+    $llmsPageUrl = static function (int $page) use ($llmsCurrentUrl): string {
+        return $page <= 1 ? $llmsCurrentUrl : $llmsCurrentUrl . '?pagina=' . $page;
+    };
+    $llmsSlice = array_slice($allPostsForLlms, ($llmsPage - 1) * $llmsPageSize, $llmsPageSize);
+    $llmsLines = [
+        '# Archivo cronologico de ' . $siteNameForMeta,
+        '',
+        'Entradas publicas del blog ordenadas de mas reciente a mas antigua.',
+        'Pagina ' . $llmsPage . ' de ' . $llmsTotalPages . '. Total de entradas: ' . count($allPostsForLlms) . '.',
+        '',
+        '## Navegacion',
+        '- Inicio del archivo: ' . $llmsPageUrl(1),
+        '- RSS completo: ' . ($rssUrl !== '' ? $rssUrl : (($llmsBase !== '' ? $llmsBase : '') . '/rss.xml')),
+        '- Sitemap completo: ' . (($llmsBase !== '' ? $llmsBase : '') . '/sitemap.xml'),
+    ];
+    if ($llmsPage > 1) {
+        $llmsLines[] = '- Pagina anterior: ' . $llmsPageUrl($llmsPage - 1);
+    }
+    if ($llmsPage < $llmsTotalPages) {
+        $llmsLines[] = '- Siguiente pagina: ' . $llmsPageUrl($llmsPage + 1);
+    } else {
+        $llmsLines[] = '- Siguiente pagina: no hay mas entradas.';
+    }
+    $llmsLines[] = '';
+    $llmsLines[] = '## Entradas';
+    foreach ($llmsSlice as $llmsPost) {
+        if (!$llmsPost instanceof Post) {
+            continue;
+        }
+        $llmsDate = $llmsPost->getDate();
+        $llmsDateText = $llmsDate !== null ? $llmsDate->format('Y-m-d') : trim((string) ($llmsPost->getRawDate() ?? ''));
+        $llmsPostUrl = ($llmsBase !== '' ? $llmsBase : '') . '/' . rawurlencode($llmsPost->getSlug());
+        $llmsDescription = trim(preg_replace('/\s+/u', ' ', $llmsPost->getDescription()) ?? '');
+        $llmsLine = '- ';
+        if ($llmsDateText !== '') {
+            $llmsLine .= $llmsDateText . ' - ';
+        }
+        $llmsLine .= $llmsPost->getTitle() . ': ' . $llmsPostUrl;
+        if ($llmsDescription !== '') {
+            $llmsLine .= ' - ' . $llmsDescription;
+        }
+        $llmsLines[] = $llmsLine;
+    }
+    $llmsLines[] = '';
+    $llmsLines[] = '## Uso recomendado';
+    $llmsLines[] = '- Para resumir un rango de fechas, avanza pagina a pagina hasta cubrir todo el intervalo pedido.';
+    $llmsLines[] = '- Lee las URLs canonicas de cada entrada incluida en el rango antes de resumir.';
+    if ($llmsPage < $llmsTotalPages) {
+        $llmsLines[] = '- Continua en: ' . $llmsPageUrl($llmsPage + 1);
+    }
+    header('Content-Type: text/plain; charset=UTF-8');
+    echo implode("\n", $llmsLines) . "\n";
+    exit;
+}
+
 if ($routePath === '/llms.txt') {
     $llmsConfig = is_array($config['llms'] ?? null) ? $config['llms'] : [];
     $llmsText = trim((string) ($llmsConfig['content'] ?? ''));
     if ($llmsText === '') {
+        $recentPostsForLlms = [];
+        foreach (array_slice($contentRepository->all(), 0, 30) as $recentPostForLlms) {
+            if (!$recentPostForLlms instanceof Post) {
+                continue;
+            }
+            $recentDate = $recentPostForLlms->getDate();
+            $recentPostsForLlms[] = [
+                'title' => $recentPostForLlms->getTitle(),
+                'url' => $publicBaseUrl !== ''
+                    ? rtrim($publicBaseUrl, '/') . '/' . rawurlencode($recentPostForLlms->getSlug())
+                    : '/' . rawurlencode($recentPostForLlms->getSlug()),
+                'date' => $recentDate !== null ? $recentDate->format('Y-m-d') : (string) ($recentPostForLlms->getRawDate() ?? ''),
+                'description' => $recentPostForLlms->getDescription(),
+            ];
+        }
         $llmsText = nammu_generate_llms_txt($config, [
             'base_url' => $publicBaseUrl,
             'site_title' => $siteTitle,
@@ -1051,6 +1139,9 @@ if ($routePath === '/llms.txt') {
             'has_itineraries' => !empty($itineraryListing),
             'has_podcast' => !empty($hasPodcast),
             'search_path' => '/buscar.php?q={termino}',
+            'recent_posts' => $recentPostsForLlms,
+            'chronological_archive_url' => $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/llms-posts.txt' : '/llms-posts.txt',
+            'older_posts_url' => $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/llms-posts.txt?pagina=2' : '/llms-posts.txt?pagina=2',
         ]);
     } else {
         $llmsText .= "\n";

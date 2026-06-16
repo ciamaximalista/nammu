@@ -259,7 +259,8 @@ function nammu_webmention_http_request(string $url, string $method = 'GET', arra
         ],
     ]);
     $responseBody = @file_get_contents($url, false, $context);
-    $rawHeaders = isset($http_response_header) && is_array($http_response_header) ? $http_response_header : [];
+    $lastHeaders = function_exists('http_get_last_response_headers') ? http_get_last_response_headers() : null;
+    $rawHeaders = is_array($lastHeaders) ? $lastHeaders : [];
     foreach ($rawHeaders as $header) {
         $responseHeaders[] = trim((string) $header);
     }

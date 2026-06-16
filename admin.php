@@ -2880,6 +2880,10 @@ function get_settings() {
     if (!in_array($multiInstance['scheduler_strategy'], ['fixed', 'activity'], true)) {
         $multiInstance['scheduler_strategy'] = 'fixed';
     }
+    $rejectedOrigins = is_array($config['rejected_origins'] ?? null) ? $config['rejected_origins'] : [];
+    if (!is_array($rejectedOrigins['domains'] ?? null)) {
+        $rejectedOrigins['domains'] = [];
+    }
 
     return [
         'sort_order' => $sort_order,
@@ -2920,6 +2924,7 @@ function get_settings() {
         'contact' => $contact,
         'social_rss' => $socialRss,
         'multi_instance' => $multiInstance,
+        'rejected_origins' => $rejectedOrigins,
         'entry' => $entry,
     ];
 }

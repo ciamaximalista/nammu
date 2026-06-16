@@ -10,9 +10,13 @@
     RewriteCond %{REQUEST_FILENAME}.webp -f
     RewriteRule ^ %{REQUEST_URI}.webp [T=image/webp,E=serve_webp:1,L]
 
-    # Friendly URLs: delegate RSS to the front controller too
+    # Friendly URLs and machine-readable files delegated to the front controller.
     RewriteRule ^rss\.xml$ index.php [L]
+    RewriteRule ^sitemap\.xml$ index.php [L]
     RewriteRule ^podcast\.xml$ index.php [L]
+    RewriteRule ^llms\.txt$ index.php [L]
+    RewriteRule ^llms-posts\.txt$ index.php [L]
+    RewriteRule ^identity\.txt$ index.php [L]
     RewriteRule ^itinerarios(/.*)?$ index.php [L]
     RewriteRule ^avisos/?$ avisos.php [L]
     RewriteRule ^correos/?$ correos.php [L]

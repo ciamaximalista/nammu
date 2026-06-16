@@ -1986,6 +1986,15 @@ function nammu_generate_llms_txt(array $config = [], array $options = []): strin
     $searchPath = trim((string) ($options['search_path'] ?? '/buscar.php?q={termino}'));
     $hasItineraries = !empty($options['has_itineraries']);
     $hasPodcast = !empty($options['has_podcast']);
+    $recentPosts = is_array($options['recent_posts'] ?? null) ? $options['recent_posts'] : [];
+    $chronologicalArchiveUrl = trim((string) ($options['chronological_archive_url'] ?? ''));
+    if ($chronologicalArchiveUrl === '') {
+        $chronologicalArchiveUrl = $baseUrl !== '' ? $baseUrl . '/llms-posts.txt' : '/llms-posts.txt';
+    }
+    $olderPostsUrl = trim((string) ($options['older_posts_url'] ?? ''));
+    if ($olderPostsUrl === '') {
+        $olderPostsUrl = $baseUrl !== '' ? $baseUrl . '/llms-posts.txt?pagina=2' : '/llms-posts.txt?pagina=2';
+    }
 
     $lines = [];
     $lines[] = '# ' . $displayName;
@@ -1999,6 +2008,7 @@ function nammu_generate_llms_txt(array $config = [], array $options = []): strin
     $lines[] = '- Portada: ' . ($baseUrl !== '' ? $baseUrl . '/' : '/');
     $lines[] = '- Sitemap: ' . ($baseUrl !== '' ? $baseUrl . '/sitemap.xml' : '/sitemap.xml');
     $lines[] = '- RSS: ' . ($baseUrl !== '' ? $baseUrl . '/rss.xml' : '/rss.xml');
+    $lines[] = '- Archivo cronologico para IAs: ' . $chronologicalArchiveUrl;
     $lines[] = '- Buscador: ' . ($baseUrl !== '' ? $baseUrl . $searchPath : $searchPath);
     $lines[] = '- Fediverso: ' . ($baseUrl !== '' ? $baseUrl . '/actualidad.php' : '/actualidad.php');
     $lines[] = '- Archivo de newsletters: ' . ($baseUrl !== '' ? $baseUrl . '/newsletters' : '/newsletters');
@@ -2010,11 +2020,44 @@ function nammu_generate_llms_txt(array $config = [], array $options = []): strin
         $lines[] = '- Podcast: ' . ($baseUrl !== '' ? $baseUrl . '/podcast' : '/podcast');
         $lines[] = '- RSS podcast: ' . ($baseUrl !== '' ? $baseUrl . '/podcast.xml' : '/podcast.xml');
     }
+    if (!empty($recentPosts)) {
+        $lines[] = '';
+        $lines[] = '## Entradas recientes';
+        $lines[] = 'Estas son URLs publicas del blog, ordenadas de mas reciente a mas antigua. Para seguir con entradas anteriores, abre: ' . $olderPostsUrl;
+        $listed = 0;
+        foreach ($recentPosts as $post) {
+            if (!is_array($post)) {
+                continue;
+            }
+            $title = trim((string) ($post['title'] ?? ''));
+            $url = trim((string) ($post['url'] ?? ''));
+            if ($title === '' || $url === '') {
+                continue;
+            }
+            $date = trim((string) ($post['date'] ?? ''));
+            $description = trim((string) ($post['description'] ?? ''));
+            $line = '- ';
+            if ($date !== '') {
+                $line .= $date . ' - ';
+            }
+            $line .= $title . ': ' . $url;
+            if ($description !== '') {
+                $line .= ' - ' . preg_replace('/\s+/u', ' ', $description);
+            }
+            $lines[] = $line;
+            $listed++;
+            if ($listed >= 30) {
+                break;
+            }
+        }
+    }
     $lines[] = '';
     $lines[] = '## Notas para LLMs';
     $lines[] = '- Usa las URLs canónicas del sitemap.';
     $lines[] = '- Evita rutas de administración y archivos internos.';
-    $lines[] = '- Prefiere RSS y páginas públicas para contenido reciente.';
+    $lines[] = '- Prefiere RSS, sitemap y paginas publicas del blog para contenido reciente.';
+    $lines[] = '- Para explorar todo el blog en orden cronologico inverso, empieza en ' . $chronologicalArchiveUrl . ' y sigue el enlace "Siguiente pagina" hasta el final.';
+    $lines[] = '- Si el usuario pide resumir un rango de fechas, filtra por la fecha de publicacion de cada entrada y lee las paginas canonicas incluidas en ese rango.';
     $lines[] = '';
     $lines[] = '## Actualización';
     $lines[] = date('d/m/y');
@@ -4302,7 +4345,8 @@ function nammu_gmail_send_message(string $from, string $to, string $subject, str
     $context = stream_context_create($opts);
     $response = @file_get_contents('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', false, $context);
     if ($response === false) {
-        $status = isset($http_response_header[0]) ? $http_response_header[0] : 'sin respuesta';
+        $responseHeaders = function_exists('http_get_last_response_headers') ? http_get_last_response_headers() : null;
+        $status = is_array($responseHeaders) && isset($responseHeaders[0]) ? (string) $responseHeaders[0] : 'sin respuesta';
         return [false, 'HTTP ' . $status];
     }
     $decoded = json_decode($response, true);

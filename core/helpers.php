@@ -2662,15 +2662,12 @@ function nammu_prepare_podcast_feed_artwork(string $imageUrl, string $baseUrl): 
     $scaledH = (int) ceil($height * $scale);
     $tmp = imagecreatetruecolor($scaledW, $scaledH);
     if (!$tmp) {
-        imagedestroy($src);
         return $imageUrl;
     }
     imagecopyresampled($tmp, $src, 0, 0, 0, 0, $scaledW, $scaledH, $width, $height);
 
     $dst = imagecreatetruecolor($target, $target);
     if (!$dst) {
-        imagedestroy($tmp);
-        imagedestroy($src);
         return $imageUrl;
     }
     $srcX = (int) floor(($scaledW - $target) / 2);
@@ -2685,10 +2682,6 @@ function nammu_prepare_podcast_feed_artwork(string $imageUrl, string $baseUrl): 
     $fileName = 'feed_' . substr(sha1($hashBase), 0, 20) . '.jpg';
     $outAbsolute = $outDir . '/' . $fileName;
     $ok = @imagejpeg($dst, $outAbsolute, 90);
-
-    imagedestroy($dst);
-    imagedestroy($tmp);
-    imagedestroy($src);
 
     if (!$ok) {
         return $imageUrl;

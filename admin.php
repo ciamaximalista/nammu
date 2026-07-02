@@ -7549,6 +7549,19 @@ function admin_try_send_queued_mailing_batch(array $payload): array
     if (empty($recipients)) {
         return ['ok' => true, 'sent' => 0, 'failed' => 0, 'failed_recipients' => []];
     }
+    $contentKey = trim((string) ($payload['mailing_content_key'] ?? ''));
+    if ($contentKey === '') {
+        $contentKey = admin_mailing_content_key($context, $payload);
+    }
+    if ($contentKey !== '') {
+        $alreadySent = admin_mailing_sent_map_for_content($contentKey);
+        $recipients = array_values(array_filter(admin_normalize_recipient_batch($recipients), static function (string $email) use ($alreadySent): bool {
+            return !isset($alreadySent[$email]);
+        }));
+    }
+    if (empty($recipients)) {
+        return ['ok' => true, 'sent' => 0, 'failed' => 0, 'failed_recipients' => []];
+    }
     $result = admin_send_mailing_broadcast(
         (string) ($delivery['subject'] ?? ''),
         '',

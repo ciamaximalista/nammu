@@ -3042,6 +3042,38 @@ function nammu_scheduled_notifications_file(): string
     return __DIR__ . '/../config/scheduled-notifications.json';
 }
 
+function nammu_scheduled_notifications_lock_file(): string
+{
+    return nammu_scheduled_notifications_file() . '.lock';
+}
+
+function nammu_open_scheduled_notifications_lock(bool $blocking = false)
+{
+    $file = nammu_scheduled_notifications_lock_file();
+    nammu_ensure_directory(dirname($file));
+    $handle = @fopen($file, 'c');
+    if (!is_resource($handle)) {
+        return null;
+    }
+    $operation = LOCK_EX;
+    if (!$blocking) {
+        $operation |= LOCK_NB;
+    }
+    if (!@flock($handle, $operation)) {
+        fclose($handle);
+        return null;
+    }
+    return $handle;
+}
+
+function nammu_close_scheduled_notifications_lock($handle): void
+{
+    if (is_resource($handle)) {
+        @flock($handle, LOCK_UN);
+        fclose($handle);
+    }
+}
+
 function nammu_load_scheduled_notifications(): array
 {
     $file = nammu_scheduled_notifications_file();
@@ -3065,11 +3097,13 @@ function nammu_save_scheduled_notifications(array $queue): void
 
 function nammu_enqueue_scheduled_notification(array $payload): void
 {
+    $lock = nammu_open_scheduled_notifications_lock(true);
     $queue = nammu_load_scheduled_notifications();
     $dedupeKey = trim((string) ($payload['dedupe_key'] ?? ''));
     if ($dedupeKey !== '') {
         foreach ($queue as $existing) {
             if (trim((string) ($existing['dedupe_key'] ?? '')) === $dedupeKey) {
+                nammu_close_scheduled_notifications_lock($lock);
                 return;
             }
         }
@@ -3078,6 +3112,7 @@ function nammu_enqueue_scheduled_notification(array $payload): void
         if ($filename !== '') {
             foreach ($queue as $existing) {
                 if (($existing['filename'] ?? '') === $filename) {
+                    nammu_close_scheduled_notifications_lock($lock);
                     return;
                 }
             }
@@ -3085,6 +3120,7 @@ function nammu_enqueue_scheduled_notification(array $payload): void
     }
     $queue[] = $payload;
     nammu_save_scheduled_notifications($queue);
+    nammu_close_scheduled_notifications_lock($lock);
 }
 
 function nammu_handle_scheduled_post_notifications(array $payload): void
@@ -3203,42 +3239,51 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
 
 function nammu_process_scheduled_notifications_queue(): array
 {
-    $queue = nammu_load_scheduled_notifications();
-    if (empty($queue)) {
-        return ['processed' => 0, 'remaining' => 0];
+    $lock = nammu_open_scheduled_notifications_lock(false);
+    if ($lock === null) {
+        $queue = nammu_load_scheduled_notifications();
+        return ['processed' => 0, 'remaining' => count($queue), 'locked' => true];
     }
-    $remaining = [];
-    $processed = 0;
-    $mailingBatchProcessed = 0;
-    foreach ($queue as $payload) {
-        $payload = is_array($payload) ? $payload : [];
-        $isMailingBatch = strtolower(trim((string) ($payload['notification_kind'] ?? ''))) === 'mailing_batch';
-        if ($isMailingBatch && $mailingBatchProcessed >= 1) {
-            $remaining[] = $payload;
-            continue;
+    try {
+        $queue = nammu_load_scheduled_notifications();
+        if (empty($queue)) {
+            return ['processed' => 0, 'remaining' => 0];
         }
-        if ($isMailingBatch && function_exists('admin_try_send_queued_mailing_batch')) {
-            $result = admin_try_send_queued_mailing_batch($payload);
-            $processed++;
-            $mailingBatchProcessed++;
-            $failedRecipients = is_array($result['failed_recipients'] ?? null) ? array_values($result['failed_recipients']) : [];
-            if (!empty($failedRecipients)) {
-                $payload['recipients'] = $failedRecipients;
-                $payload['attempts'] = (int) (($payload['attempts'] ?? 0)) + 1;
-                $payload['last_error'] = (string) ($result['error'] ?? ('Mailing batch retry #' . $payload['attempts']));
-                $payload['last_attempt_at'] = gmdate(DATE_ATOM);
+        $remaining = [];
+        $processed = 0;
+        $mailingBatchProcessed = 0;
+        foreach ($queue as $payload) {
+            $payload = is_array($payload) ? $payload : [];
+            $isMailingBatch = strtolower(trim((string) ($payload['notification_kind'] ?? ''))) === 'mailing_batch';
+            if ($isMailingBatch && $mailingBatchProcessed >= 1) {
                 $remaining[] = $payload;
+                continue;
             }
-            continue;
+            if ($isMailingBatch && function_exists('admin_try_send_queued_mailing_batch')) {
+                $result = admin_try_send_queued_mailing_batch($payload);
+                $processed++;
+                $mailingBatchProcessed++;
+                $failedRecipients = is_array($result['failed_recipients'] ?? null) ? array_values($result['failed_recipients']) : [];
+                if (!empty($failedRecipients)) {
+                    $payload['recipients'] = $failedRecipients;
+                    $payload['attempts'] = (int) (($payload['attempts'] ?? 0)) + 1;
+                    $payload['last_error'] = (string) ($result['error'] ?? ('Mailing batch retry #' . $payload['attempts']));
+                    $payload['last_attempt_at'] = gmdate(DATE_ATOM);
+                    $remaining[] = $payload;
+                }
+                continue;
+            }
+            if (nammu_try_send_scheduled_post_notifications($payload)) {
+                $processed++;
+                continue;
+            }
+            $remaining[] = $payload;
         }
-        if (nammu_try_send_scheduled_post_notifications($payload)) {
-            $processed++;
-            continue;
-        }
-        $remaining[] = $payload;
+        nammu_save_scheduled_notifications($remaining);
+        return ['processed' => $processed, 'remaining' => count($remaining)];
+    } finally {
+        nammu_close_scheduled_notifications_lock($lock);
     }
-    nammu_save_scheduled_notifications($remaining);
-    return ['processed' => $processed, 'remaining' => count($remaining)];
 }
 
 function nammu_letter_key_from_title(string $title): string

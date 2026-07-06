@@ -358,6 +358,7 @@ function admin_run_scheduled_maintenance_tasks(): array {
         'published' => $published,
         'notifications_processed' => (int) ($queueStats['processed'] ?? 0),
         'notifications_remaining' => (int) ($queueStats['remaining'] ?? 0),
+        'notifications_locked' => !empty($queueStats['locked']) ? 1 : 0,
         'mailing_bounces_scanned' => (int) ($mailingBounceStats['scanned'] ?? 0),
         'mailing_bounces_suppressed' => (int) ($mailingBounceStats['suppressed'] ?? 0),
         'actuality_changed' => $actualityChanged ? 1 : 0,
@@ -7511,19 +7512,28 @@ function admin_mailing_dashboard_status(): array
             'status' => $status,
         ];
     }
-    usort($rows, static function (array $a, array $b): int {
+    $rowsByActivity = $rows;
+    usort($rowsByActivity, static function (array $a, array $b): int {
         return ((int) ($b['last_activity'] ?? 0)) <=> ((int) ($a['last_activity'] ?? 0));
     });
-    $alerts = array_values(array_filter($rows, static function (array $row): bool {
+    $rowsByQueuedAt = $rows;
+    usort($rowsByQueuedAt, static function (array $a, array $b): int {
+        $queuedCompare = ((int) ($b['queued_at'] ?? 0)) <=> ((int) ($a['queued_at'] ?? 0));
+        if ($queuedCompare !== 0) {
+            return $queuedCompare;
+        }
+        return ((int) ($b['last_activity'] ?? 0)) <=> ((int) ($a['last_activity'] ?? 0));
+    });
+    $alerts = array_values(array_filter($rowsByQueuedAt, static function (array $row): bool {
         return in_array((string) ($row['context'] ?? ''), ['post', 'podcast', 'itinerary'], true);
     }));
-    $newsletters = array_values(array_filter($rows, static function (array $row): bool {
+    $newsletters = array_values(array_filter($rowsByQueuedAt, static function (array $row): bool {
         return (string) ($row['context'] ?? '') === 'newsletter';
     }));
     return [
         'alerts' => $alerts[0] ?? null,
         'newsletter' => $newsletters[0] ?? null,
-        'all' => $rows,
+        'all' => $rowsByActivity,
     ];
 }
 

@@ -2693,7 +2693,11 @@
                                 <?php if ($mailingTitle !== ''): ?>
                                     <p class="mb-2"><?= htmlspecialchars($mailingTitle, ENT_QUOTES, 'UTF-8') ?></p>
                                 <?php endif; ?>
-                                <p class="text-muted mb-2">Último intento: <?= htmlspecialchars($mailingDateLabel($mailingDisplayDate), ENT_QUOTES, 'UTF-8') ?></p>
+                                <?php if ($mailingLastAttempt > 0): ?>
+                                    <p class="text-muted mb-2">Último intento: <?= htmlspecialchars($mailingDateLabel($mailingLastAttempt), ENT_QUOTES, 'UTF-8') ?></p>
+                                <?php else: ?>
+                                    <p class="text-muted mb-2">Encolado: <?= htmlspecialchars($mailingDateLabel($mailingQueuedAt), ENT_QUOTES, 'UTF-8') ?> · Aún sin intentos</p>
+                                <?php endif; ?>
                                 <p class="mb-2">
                                     <strong>Enviados:</strong> <?= (int) ($mailingRow['sent'] ?? 0) ?>
                                     · <strong>Pendientes:</strong> <?= (int) ($mailingRow['pending'] ?? 0) ?>

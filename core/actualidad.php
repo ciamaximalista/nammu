@@ -795,7 +795,7 @@ function nammu_actuality_fetch_rss_items(string $url): array
                 foreach ($item->enclosure as $enclosure) {
                     $type = strtolower(trim((string) ($enclosure['type'] ?? '')));
                     $candidate = trim((string) ($enclosure['url'] ?? ''));
-                    if ($candidate !== '' && ($type === '' || str_starts_with($type, 'image/'))) {
+                    if ($candidate !== '' && ($type === '' || str_starts_with($type, 'image/')) && nammu_actuality_is_probable_image_url($candidate, $link)) {
                         $image = $candidate;
                         break;
                     }
@@ -807,7 +807,7 @@ function nammu_actuality_fetch_rss_items(string $url): array
                     foreach ($media->content as $mediaContent) {
                         $candidate = trim((string) ($mediaContent['url'] ?? ''));
                         $type = strtolower(trim((string) ($mediaContent['type'] ?? '')));
-                        if ($candidate !== '' && ($type === '' || str_starts_with($type, 'image/'))) {
+                        if ($candidate !== '' && ($type === '' || str_starts_with($type, 'image/')) && nammu_actuality_is_probable_image_url($candidate, $link)) {
                             $image = $candidate;
                             break;
                         }
@@ -816,7 +816,7 @@ function nammu_actuality_fetch_rss_items(string $url): array
                 if ($image === '' && isset($media->thumbnail)) {
                     foreach ($media->thumbnail as $thumbnail) {
                         $candidate = trim((string) ($thumbnail['url'] ?? ''));
-                        if ($candidate !== '') {
+                        if ($candidate !== '' && nammu_actuality_is_probable_image_url($candidate, $link)) {
                             $image = $candidate;
                             break;
                         }
@@ -824,7 +824,10 @@ function nammu_actuality_fetch_rss_items(string $url): array
                 }
             }
             if ($image === '' && preg_match('/<img[^>]+src=["\']([^"\']+)["\']/i', $description, $imageMatch)) {
-                $image = trim((string) ($imageMatch[1] ?? ''));
+                $candidate = trim((string) ($imageMatch[1] ?? ''));
+                if (nammu_actuality_is_probable_image_url($candidate, $link)) {
+                    $image = nammu_actuality_resolve_url($candidate, $link);
+                }
             }
             $keyBase = $guid !== '' ? $guid : ($link !== '' ? $link : $title);
             if ($keyBase === '' || $link === '') {
@@ -909,6 +912,61 @@ function nammu_actuality_resolve_url(string $candidate, string $baseUrl): string
     $path = $base['path'] ?? '/';
     $dir = rtrim(str_replace('\\', '/', dirname($path)), '/');
     return $origin . ($dir !== '' ? $dir . '/' : '/') . $candidate;
+}
+
+function nammu_actuality_normalize_url_for_compare(string $url): string
+{
+    $url = trim($url);
+    if ($url === '') {
+        return '';
+    }
+    $parts = parse_url($url);
+    if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+        return rtrim($url, '/');
+    }
+    $scheme = strtolower((string) $parts['scheme']);
+    $host = strtolower((string) $parts['host']);
+    $path = (string) ($parts['path'] ?? '');
+    $query = isset($parts['query']) ? '?' . (string) $parts['query'] : '';
+    return rtrim($scheme . '://' . $host . $path . $query, '/');
+}
+
+function nammu_actuality_is_probable_image_url(string $candidate, string $pageUrl = ''): bool
+{
+    $candidate = trim(html_entity_decode($candidate, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    $pageUrl = trim($pageUrl);
+    if ($candidate === '') {
+        return false;
+    }
+    if ($pageUrl !== '') {
+        $candidate = nammu_actuality_resolve_url($candidate, $pageUrl);
+    }
+    if (!preg_match('#^https?://#i', $candidate)) {
+        return false;
+    }
+    if ($pageUrl !== '' && nammu_actuality_normalize_url_for_compare($candidate) === nammu_actuality_normalize_url_for_compare($pageUrl)) {
+        return false;
+    }
+
+    $path = strtolower((string) (parse_url($candidate, PHP_URL_PATH) ?? ''));
+    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg'], true)) {
+        return true;
+    }
+    if (in_array($ext, ['html', 'htm', 'php', 'asp', 'aspx', 'jsp', 'xml', 'rss'], true)) {
+        return false;
+    }
+    if (in_array($ext, ['mp4', 'm4v', 'mov', 'webm', 'ogv', 'ogg', 'mp3', 'm4a', 'aac', 'wav', 'oga', 'opus', 'pdf'], true)) {
+        return false;
+    }
+
+    $host = strtolower((string) (parse_url($candidate, PHP_URL_HOST) ?? ''));
+    $pageHost = strtolower((string) (parse_url($pageUrl, PHP_URL_HOST) ?? ''));
+    if ($pageHost !== '' && $host === $pageHost) {
+        return preg_match('#/(?:image|images|img|media|photo|photos|thumb|thumbnail|uploads|assets|wp-content|cdn)/#i', $path) === 1;
+    }
+
+    return $path !== '';
 }
 
 function nammu_actuality_html_to_text_preserving_breaks(string $html): string
@@ -1374,7 +1432,7 @@ function nammu_actuality_extract_social_image(string $pageUrl): string
         $nodes = $xpath->query($query);
         if ($nodes instanceof DOMNodeList && $nodes->length > 0) {
             $value = trim((string) $nodes->item(0)?->nodeValue);
-            if ($value !== '') {
+            if ($value !== '' && nammu_actuality_is_probable_image_url($value, $pageUrl)) {
                 return nammu_actuality_resolve_url($value, $pageUrl);
             }
         }
@@ -1415,6 +1473,9 @@ function nammu_actuality_extract_social_image(string $pageUrl): string
             if (preg_match('/(?:sprite|icon|logo|avatar|pixel|spacer)/i', $resolvedLower)) {
                 continue;
             }
+            if (!nammu_actuality_is_probable_image_url($resolved, $pageUrl)) {
+                continue;
+            }
             return $resolved;
         }
     }
@@ -1447,6 +1508,9 @@ function nammu_actuality_extension_from_headers(string $url, array $headers): st
 
 function nammu_actuality_cache_social_image(string $pageUrl, string $imageUrl, string $publicBaseUrl): string
 {
+    if (!nammu_actuality_is_probable_image_url($imageUrl, $pageUrl)) {
+        return '';
+    }
     $response = nammu_actuality_fetch_url($imageUrl, 'image/*', 10);
     $body = $response['body'] ?? '';
     if (!is_string($body) || $body === '') {
@@ -1567,11 +1631,25 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
         $key = sha1($targetLink);
         $activeKeys[] = $key;
         $currentImage = trim((string) ($item['image'] ?? ''));
-        $currentImages = nammu_actuality_manual_images((array) ($item['images'] ?? []), $publicBaseUrl);
+        if ($currentImage !== '' && !nammu_actuality_is_probable_image_url($currentImage, $targetLink)) {
+            $currentImage = '';
+            $items[$index]['image'] = '';
+        }
+        $currentImages = array_values(array_filter(
+            nammu_actuality_manual_images((array) ($item['images'] ?? []), $publicBaseUrl),
+            static function (string $imageUrl) use ($targetLink): bool {
+                return nammu_actuality_is_probable_image_url($imageUrl, $targetLink);
+            }
+        ));
+        $items[$index]['images'] = $currentImages;
         $entry = is_array($cache['items'][$key] ?? null) ? $cache['items'][$key] : [];
         $localPath = (string) ($entry['local_path'] ?? '');
         $cachedUrl = (string) ($entry['public_url'] ?? '');
         $sourceImage = trim((string) ($entry['source_image'] ?? ''));
+        if ($sourceImage !== '' && !nammu_actuality_is_probable_image_url($sourceImage, $targetLink)) {
+            $sourceImage = '';
+            $cache['items'][$key]['source_image'] = '';
+        }
         if ($sourceImage !== '') {
             $items[$index]['source_image'] = $sourceImage;
         }

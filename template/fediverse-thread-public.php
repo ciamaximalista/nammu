@@ -56,6 +56,22 @@ $threadReplyActors = array_values($threadReplyActors);
 $threadOriginalUrl = trim((string) ($threadPayload['original_url'] ?? ''));
 $threadUrl = trim((string) ($threadPayload['thread_url'] ?? ''));
 $threadItemUrl = trim((string) ($threadItem['url'] ?? ''));
+$threadFediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
+$threadFediverseConfig = is_array($threadFediverseConfig) ? $threadFediverseConfig : [];
+$threadIsProbableImageUrl = static function (string $candidate, string $pageUrl = ''): bool {
+    if (function_exists('nammu_actuality_is_probable_image_url')) {
+        return nammu_actuality_is_probable_image_url($candidate, $pageUrl);
+    }
+    $candidate = trim($candidate);
+    if ($candidate === '' || !preg_match('#^https?://#i', $candidate)) {
+        return false;
+    }
+    if ($pageUrl !== '' && rtrim(strtolower($candidate), '/') === rtrim(strtolower($pageUrl), '/')) {
+        return false;
+    }
+    $ext = strtolower(pathinfo((string) (parse_url($candidate, PHP_URL_PATH) ?? ''), PATHINFO_EXTENSION));
+    return in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg'], true);
+};
 $threadIsNote = strcasecmp((string) ($threadItem['type'] ?? ''), 'Note') === 0;
 $threadOriginalUrlIsOwnItem = $threadOriginalUrl !== '' && $threadItemUrl !== '' && rtrim($threadOriginalUrl, '/') === rtrim($threadItemUrl, '/');
 $threadIsBoostNote = $threadIsNote && $threadOriginalUrl !== '' && !$threadOriginalUrlIsOwnItem;
@@ -332,15 +348,19 @@ $renderFediversePublicMediaAttachments = static function (array $attachments, st
     return $html;
 };
 $threadAttachments = (array) ($threadItem['attachments'] ?? []);
-$threadImageAttachments = array_values(array_filter((array) ($threadItem['attachments'] ?? []), static function ($attachment): bool {
+$threadImageAttachments = array_values(array_filter((array) ($threadItem['attachments'] ?? []), static function ($attachment) use ($threadIsProbableImageUrl, $threadOriginalUrl, $threadItemUrl): bool {
     if (!is_array($attachment)) {
         return false;
     }
     $type = strtolower(trim((string) ($attachment['type'] ?? '')));
     $mediaType = strtolower(trim((string) ($attachment['media_type'] ?? '')));
-    return ($type === 'image' || str_starts_with($mediaType, 'image/')) && trim((string) ($attachment['url'] ?? '')) !== '';
+    $attachmentUrl = trim((string) ($attachment['url'] ?? ''));
+    return ($type === 'image' || str_starts_with($mediaType, 'image/')) && $threadIsProbableImageUrl($attachmentUrl, $threadOriginalUrl ?: $threadItemUrl);
 }));
 foreach (array_values(array_unique(array_filter(array_map('strval', is_array($threadItem['images'] ?? null) ? $threadItem['images'] : [])))) as $threadImageUrl) {
+    if (!$threadIsProbableImageUrl($threadImageUrl, $threadOriginalUrl ?: $threadItemUrl)) {
+        continue;
+    }
     $alreadyPresent = false;
     foreach ($threadImageAttachments as $existingThreadImageAttachment) {
         if (trim((string) ($existingThreadImageAttachment['url'] ?? '')) === $threadImageUrl) {
@@ -352,8 +372,27 @@ foreach (array_values(array_unique(array_filter(array_map('strval', is_array($th
         $threadImageAttachments[] = ['url' => $threadImageUrl];
     }
 }
-if (empty($threadImageAttachments) && !empty($threadItem['image'])) {
-    $threadImageAttachments[] = ['url' => (string) $threadItem['image']];
+$threadCardImage = '';
+$threadItemImage = trim((string) ($threadItem['image'] ?? ''));
+if ($threadIsProbableImageUrl($threadItemImage, $threadOriginalUrl ?: $threadItemUrl)) {
+    $threadCardImage = $threadItemImage;
+}
+if (empty($threadImageAttachments) && $threadCardImage !== '') {
+    $threadImageAttachments[] = ['url' => $threadCardImage];
+}
+if ($threadCardImage === '' && !empty($threadImageAttachments)) {
+    $threadCardImage = trim((string) ($threadImageAttachments[0]['url'] ?? ''));
+}
+if ($threadCardImage === '' && $threadOriginalUrl !== '' && function_exists('nammu_fediverse_cached_link_card')) {
+    $threadCard = nammu_fediverse_cached_link_card($threadOriginalUrl, $threadFediverseConfig, 259200);
+    if (is_array($threadCard) && $threadIsProbableImageUrl((string) ($threadCard['image'] ?? ''), $threadOriginalUrl)) {
+        $threadCardImage = trim((string) ($threadCard['image'] ?? ''));
+        if (empty($threadImageAttachments)) {
+            $threadImageAttachments[] = ['url' => $threadCardImage];
+        }
+    } elseif (function_exists('nammu_fediverse_enqueue_link_card_url')) {
+        nammu_fediverse_enqueue_link_card_url($threadOriginalUrl, 'fediverse-public-thread');
+    }
 }
 $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAttachments, 'fediverse-public-status');
 ?>
@@ -515,8 +554,8 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                 <?php elseif ($threadOriginalUrl !== ''): ?>
                     <?php if ($threadTypeSlug === 'news'): ?>
                     <div class="fediverse-public-status__card">
-                        <?php if (!empty($threadItem['image'])): ?>
-                            <img src="<?= htmlspecialchars((string) $threadItem['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($threadTitle, ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                        <?php if ($threadCardImage !== ''): ?>
+                            <img src="<?= htmlspecialchars($threadCardImage, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($threadTitle, ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                         <?php endif; ?>
                         <div class="fediverse-public-status__card-body">
                             <span class="fediverse-public-status__card-title"><?= htmlspecialchars((string) ($threadTitle !== '' ? $threadTitle : $threadOriginalUrl), ENT_QUOTES, 'UTF-8') ?></span>
@@ -529,8 +568,8 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                     </div>
                     <?php else: ?>
                     <a class="fediverse-public-status__card" href="<?= htmlspecialchars($threadOriginalUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                        <?php if (!empty($threadItem['image'])): ?>
-                            <img src="<?= htmlspecialchars((string) $threadItem['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($threadTitle, ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                        <?php if ($threadCardImage !== ''): ?>
+                            <img src="<?= htmlspecialchars($threadCardImage, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($threadTitle, ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                         <?php endif; ?>
                         <div class="fediverse-public-status__card-body">
                             <span class="fediverse-public-status__card-title"><?= htmlspecialchars((string) ($threadTitle !== '' ? $threadTitle : $threadOriginalUrl), ENT_QUOTES, 'UTF-8') ?></span>

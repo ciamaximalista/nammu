@@ -66,7 +66,21 @@ if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons'
 $fediverseIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';
 $fediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
 $fediverseConfig = is_array($fediverseConfig) ? $fediverseConfig : [];
-$actualityVisibleLinkCardImage = static function (array $item) use ($fediverseConfig): string {
+$actualityIsProbableImageUrl = static function (string $candidate, string $pageUrl = ''): bool {
+    if (function_exists('nammu_actuality_is_probable_image_url')) {
+        return nammu_actuality_is_probable_image_url($candidate, $pageUrl);
+    }
+    $candidate = trim($candidate);
+    if ($candidate === '' || !preg_match('#^https?://#i', $candidate)) {
+        return false;
+    }
+    if ($pageUrl !== '' && rtrim(strtolower($candidate), '/') === rtrim(strtolower($pageUrl), '/')) {
+        return false;
+    }
+    $ext = strtolower(pathinfo((string) (parse_url($candidate, PHP_URL_PATH) ?? ''), PATHINFO_EXTENSION));
+    return in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg'], true);
+};
+$actualityVisibleLinkCardImage = static function (array $item) use ($fediverseConfig, $actualityIsProbableImageUrl): string {
     $attachments = array_values(array_filter((array) ($item['attachments'] ?? []), static function ($attachment): bool {
         return is_array($attachment);
     }));
@@ -76,7 +90,7 @@ $actualityVisibleLinkCardImage = static function (array $item) use ($fediverseCo
                 $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
                 $attachmentMediaType = strtolower(trim((string) ($attachment['media_type'] ?? '')));
                 $attachmentImage = trim((string) ($attachment['image'] ?? ''));
-                if ($attachmentImage !== '' && ($attachmentType === 'link' || $attachmentMediaType === 'text/html' || str_starts_with($attachmentMediaType, 'text/html'))) {
+                if ($attachmentImage !== '' && $actualityIsProbableImageUrl($attachmentImage, trim((string) ($attachment['url'] ?? ''))) && ($attachmentType === 'link' || $attachmentMediaType === 'text/html' || str_starts_with($attachmentMediaType, 'text/html'))) {
                     return $attachmentImage;
                 }
             }
@@ -91,7 +105,7 @@ $actualityVisibleLinkCardImage = static function (array $item) use ($fediverseCo
             $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
             $attachmentMediaType = strtolower(trim((string) ($attachment['media_type'] ?? '')));
             $attachmentImage = trim((string) ($attachment['image'] ?? ''));
-            if ($attachmentImage !== '' && ($attachmentType === 'link' || $attachmentMediaType === 'text/html' || str_starts_with($attachmentMediaType, 'text/html'))) {
+            if ($attachmentImage !== '' && $actualityIsProbableImageUrl($attachmentImage, trim((string) ($attachment['url'] ?? ''))) && ($attachmentType === 'link' || $attachmentMediaType === 'text/html' || str_starts_with($attachmentMediaType, 'text/html'))) {
                 return $attachmentImage;
             }
         }
@@ -115,7 +129,7 @@ $actualityVisibleLinkCardImage = static function (array $item) use ($fediverseCo
     $candidateUrls = array_values(array_unique($candidateUrls));
     foreach ($candidateUrls as $candidateUrl) {
         $card = nammu_fediverse_cached_link_card($candidateUrl, $fediverseConfig, 259200);
-        if (is_array($card) && trim((string) ($card['image'] ?? '')) !== '') {
+        if (is_array($card) && trim((string) ($card['image'] ?? '')) !== '' && $actualityIsProbableImageUrl((string) ($card['image'] ?? ''), $candidateUrl)) {
             return trim((string) $card['image']);
         }
     }
@@ -390,14 +404,23 @@ $renderLinks = static function (array $links, array $item = []) use ($fediverseI
     }
     return implode(', ', $bits);
 };
-$renderImages = static function (array $item, bool $isSiteContent = false) use ($actualityVisibleLinkCardImage): string {
-    $allImages = array_values(array_unique(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))));
+$renderImages = static function (array $item, bool $isSiteContent = false) use ($actualityVisibleLinkCardImage, $actualityIsProbableImageUrl): string {
+    $itemLinkForImages = trim((string) ($item['link'] ?? ''));
+    $allImages = array_values(array_unique(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []), static function (string $imageUrl) use ($actualityIsProbableImageUrl, $itemLinkForImages): bool {
+        return $actualityIsProbableImageUrl($imageUrl, $itemLinkForImages);
+    })));
     $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
     $isManual = !empty($item['is_manual']);
     $hasManualLinks = !empty(array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : []))));
     $primaryImage = trim((string) ($item['image'] ?? ''));
+    if ($primaryImage !== '' && !$actualityIsProbableImageUrl($primaryImage, $itemLinkForImages)) {
+        $primaryImage = '';
+    }
     if (!$isBoost && !($isManual && !$hasManualLinks) && $primaryImage === '') {
         $primaryImage = trim((string) ($item['source_image'] ?? ''));
+    }
+    if ($primaryImage !== '' && !$actualityIsProbableImageUrl($primaryImage, $itemLinkForImages)) {
+        $primaryImage = '';
     }
     if ($primaryImage === '') {
         $primaryImage = $actualityVisibleLinkCardImage($item);

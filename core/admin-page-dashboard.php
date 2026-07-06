@@ -84,6 +84,33 @@
     $indexnowTimestamp = isset($indexnowLog['timestamp']) ? (int) $indexnowLog['timestamp'] : 0;
     $indexnowHasErrors = !empty($indexnowErrors);
     $indexnowHasLog = $indexnowTimestamp > 0;
+    $mailingDashboardStatus = function_exists('admin_mailing_dashboard_status') ? admin_mailing_dashboard_status() : ['alerts' => null, 'newsletter' => null];
+    $mailingDashboardItems = array_values(array_filter([
+        is_array($mailingDashboardStatus['alerts'] ?? null) ? $mailingDashboardStatus['alerts'] : null,
+        is_array($mailingDashboardStatus['newsletter'] ?? null) ? $mailingDashboardStatus['newsletter'] : null,
+    ]));
+    $mailingStatusLabel = static function (array $row): string {
+        $status = (string) ($row['status'] ?? '');
+        return match ($status) {
+            'pending' => 'En curso',
+            'error' => 'Con errores',
+            'partial' => 'Parcial',
+            'sent' => 'Completado',
+            default => 'Sin datos',
+        };
+    };
+    $mailingStatusColor = static function (array $row): string {
+        $status = (string) ($row['status'] ?? '');
+        return match ($status) {
+            'error' => '#ea2f28',
+            'partial', 'pending' => '#b36b00',
+            'sent' => '#167a3a',
+            default => '#6c757d',
+        };
+    };
+    $mailingDateLabel = static function (int $timestamp): string {
+        return $timestamp > 0 ? date('d/m/y H:i', $timestamp) : 'Sin intentos registrados';
+    };
     $gscSettings = $settings['search_console'] ?? [];
     $gscProperty = trim((string) ($gscSettings['property'] ?? ''));
     $gscClientId = trim((string) ($gscSettings['client_id'] ?? ''));
@@ -2645,6 +2672,45 @@
                 <p class="text-muted mb-0">Resumen general de publicaciones y estadísticas del sitio.</p>
             </div>
         </div>
+        <?php if (!empty($mailingDashboardItems)): ?>
+            <div class="mb-4" style="border:1px solid #d8eadf;background:#f6fbf8;border-radius:12px;padding:16px;">
+                <h3 class="h6 text-uppercase mb-3" style="color:#167a3a;">Envíos por email</h3>
+                <div class="row">
+                    <?php foreach ($mailingDashboardItems as $mailingRow): ?>
+                        <?php
+                        $mailingTitle = trim((string) ($mailingRow['title'] ?? ''));
+                        $mailingLastAttempt = (int) ($mailingRow['last_attempt_at'] ?? 0);
+                        $mailingQueuedAt = (int) ($mailingRow['queued_at'] ?? 0);
+                        $mailingDisplayDate = $mailingLastAttempt > 0 ? $mailingLastAttempt : $mailingQueuedAt;
+                        $mailingError = trim((string) ($mailingRow['last_error'] ?? ''));
+                        ?>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <div style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:12px;height:100%;">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <strong><?= htmlspecialchars((string) ($mailingRow['label'] ?? 'Correo'), ENT_QUOTES, 'UTF-8') ?></strong>
+                                    <span style="font-size:.8rem;color:<?= htmlspecialchars($mailingStatusColor($mailingRow), ENT_QUOTES, 'UTF-8') ?>;font-weight:700;"><?= htmlspecialchars($mailingStatusLabel($mailingRow), ENT_QUOTES, 'UTF-8') ?></span>
+                                </div>
+                                <?php if ($mailingTitle !== ''): ?>
+                                    <p class="mb-2"><?= htmlspecialchars($mailingTitle, ENT_QUOTES, 'UTF-8') ?></p>
+                                <?php endif; ?>
+                                <p class="text-muted mb-2">Último intento: <?= htmlspecialchars($mailingDateLabel($mailingDisplayDate), ENT_QUOTES, 'UTF-8') ?></p>
+                                <p class="mb-2">
+                                    <strong>Enviados:</strong> <?= (int) ($mailingRow['sent'] ?? 0) ?>
+                                    · <strong>Pendientes:</strong> <?= (int) ($mailingRow['pending'] ?? 0) ?>
+                                    · <strong>Total:</strong> <?= (int) ($mailingRow['queued'] ?? 0) ?>
+                                </p>
+                                <?php if ((int) ($mailingRow['last_failed'] ?? 0) > 0): ?>
+                                    <p class="mb-2"><strong>Fallidos en la última tanda:</strong> <?= (int) ($mailingRow['last_failed'] ?? 0) ?></p>
+                                <?php endif; ?>
+                                <?php if ($mailingError !== ''): ?>
+                                    <p class="mb-0" style="color:#ea2f28;"><strong>Error:</strong> <?= htmlspecialchars($mailingError, ENT_QUOTES, 'UTF-8') ?></p>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
         <?php if ($indexnowHasErrors): ?>
             <div class="mb-4" style="border:1px solid #ea2f28;background:#fff5f5;border-radius:12px;padding:16px;">
                 <h3 class="h6 text-uppercase mb-2" style="color:#ea2f28;">Errores al enviar IndexNow</h3>

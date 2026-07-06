@@ -7238,15 +7238,20 @@ function admin_save_mailing_deliveries(array $data): void
 {
     $items = is_array($data['items'] ?? null) ? $data['items'] : [];
     $campaigns = is_array($data['campaigns'] ?? null) ? $data['campaigns'] : [];
+    $attempts = is_array($data['attempts'] ?? null) ? array_values($data['attempts']) : [];
     if (count($items) > 8000) {
         uasort($items, static function ($a, $b): int {
             return (int) (($a['sent_at'] ?? 0)) <=> (int) (($b['sent_at'] ?? 0));
         });
         $items = array_slice($items, -8000, null, true);
     }
+    if (count($attempts) > 80) {
+        $attempts = array_slice($attempts, -80);
+    }
     $payload = [
         'updated_at' => time(),
         'campaigns' => $campaigns,
+        'attempts' => $attempts,
         'items' => $items,
     ];
     file_put_contents(admin_mailing_deliveries_file(), json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
@@ -7346,6 +7351,180 @@ function admin_mark_mailing_campaign_queued(string $context, array $payload, arr
     ];
     $data['campaigns'] = $campaigns;
     admin_save_mailing_deliveries($data);
+}
+
+function admin_record_mailing_batch_attempt(string $context, array $payload, array $result, array $attemptedRecipients, array $deliveredRecipients): void
+{
+    $contentKey = trim((string) ($payload['mailing_content_key'] ?? ''));
+    if ($contentKey === '') {
+        $contentKey = admin_mailing_content_key($context, $payload);
+    }
+    if ($contentKey === '') {
+        return;
+    }
+    $attemptedRecipients = admin_normalize_recipient_batch($attemptedRecipients);
+    $deliveredRecipients = admin_normalize_recipient_batch($deliveredRecipients);
+    $failedRecipients = admin_normalize_recipient_batch((array) ($result['failed_recipients'] ?? []));
+    $data = admin_load_mailing_deliveries();
+    $campaigns = is_array($data['campaigns'] ?? null) ? $data['campaigns'] : [];
+    $attempts = is_array($data['attempts'] ?? null) ? array_values($data['attempts']) : [];
+    $now = time();
+    if (!isset($campaigns[$contentKey]) || !is_array($campaigns[$contentKey])) {
+        $campaigns[$contentKey] = [
+            'content_key' => $contentKey,
+            'context' => strtolower(trim($context)),
+            'slug' => trim((string) ($payload['slug'] ?? '')),
+            'filename' => trim((string) ($payload['filename'] ?? '')),
+            'title' => trim((string) ($payload['title'] ?? '')),
+            'queued_recipients' => count($attemptedRecipients),
+            'queued_at' => $now,
+        ];
+    }
+    $campaign = $campaigns[$contentKey];
+    $campaign['last_attempt_at'] = $now;
+    $campaign['last_batch_index'] = (int) ($payload['batch_index'] ?? 0);
+    $campaign['last_batch_total'] = (int) ($payload['batch_total'] ?? 0);
+    $campaign['last_attempt_recipients'] = count($attemptedRecipients);
+    $campaign['last_sent'] = (int) ($result['sent'] ?? count($deliveredRecipients));
+    $campaign['last_failed'] = (int) ($result['failed'] ?? count($failedRecipients));
+    $campaign['last_error'] = trim((string) ($result['error'] ?? ''));
+    if (empty($campaign['queued_recipients'])) {
+        $campaign['queued_recipients'] = count($attemptedRecipients);
+    }
+    if (!empty($deliveredRecipients)) {
+        $campaign['last_sent_at'] = $now;
+    }
+    $campaigns[$contentKey] = $campaign;
+    $attempts[] = [
+        'content_key' => $contentKey,
+        'context' => strtolower(trim($context)),
+        'title' => trim((string) ($payload['title'] ?? '')),
+        'batch_index' => (int) ($payload['batch_index'] ?? 0),
+        'batch_total' => (int) ($payload['batch_total'] ?? 0),
+        'attempted' => count($attemptedRecipients),
+        'sent' => (int) ($result['sent'] ?? count($deliveredRecipients)),
+        'failed' => (int) ($result['failed'] ?? count($failedRecipients)),
+        'error' => trim((string) ($result['error'] ?? '')),
+        'at' => $now,
+    ];
+    $data['campaigns'] = $campaigns;
+    $data['attempts'] = $attempts;
+    admin_save_mailing_deliveries($data);
+}
+
+function admin_mailing_context_label(string $context): string
+{
+    return match (strtolower(trim($context))) {
+        'newsletter' => 'Newsletter',
+        'podcast' => 'Podcast',
+        'itinerary' => 'Itinerario',
+        'post' => 'Post',
+        default => 'Correo',
+    };
+}
+
+function admin_mailing_dashboard_status(): array
+{
+    $data = admin_load_mailing_deliveries();
+    $campaigns = is_array($data['campaigns'] ?? null) ? $data['campaigns'] : [];
+    $items = is_array($data['items'] ?? null) ? $data['items'] : [];
+    $pendingByContent = [];
+    if (function_exists('nammu_load_scheduled_notifications')) {
+        foreach (nammu_load_scheduled_notifications() as $payload) {
+            if (!is_array($payload)) {
+                continue;
+            }
+            if (strtolower(trim((string) ($payload['notification_kind'] ?? ''))) !== 'mailing_batch') {
+                continue;
+            }
+            $contentKey = trim((string) ($payload['mailing_content_key'] ?? ''));
+            if ($contentKey === '') {
+                $contentKey = admin_mailing_content_key((string) ($payload['mailing_context'] ?? ''), $payload);
+            }
+            if ($contentKey === '') {
+                continue;
+            }
+            $recipients = admin_normalize_recipient_batch((array) ($payload['recipients'] ?? []));
+            $pendingByContent[$contentKey] = ($pendingByContent[$contentKey] ?? 0) + count($recipients);
+            if (!isset($campaigns[$contentKey])) {
+                $campaigns[$contentKey] = [
+                    'content_key' => $contentKey,
+                    'context' => strtolower(trim((string) ($payload['mailing_context'] ?? ''))),
+                    'title' => trim((string) ($payload['title'] ?? '')),
+                    'queued_recipients' => count($recipients),
+                    'queued_at' => 0,
+                ];
+            }
+            if (!empty($payload['last_error'])) {
+                $campaigns[$contentKey]['last_error'] = trim((string) $payload['last_error']);
+                $campaigns[$contentKey]['last_attempt_at'] = strtotime((string) ($payload['last_attempt_at'] ?? '')) ?: (int) ($campaigns[$contentKey]['last_attempt_at'] ?? 0);
+            }
+        }
+    }
+    $sentByContent = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $contentKey = trim((string) ($item['content_key'] ?? ''));
+        if ($contentKey === '') {
+            continue;
+        }
+        $sentByContent[$contentKey] = ($sentByContent[$contentKey] ?? 0) + 1;
+    }
+    $rows = [];
+    foreach ($campaigns as $contentKey => $campaign) {
+        if (!is_array($campaign)) {
+            continue;
+        }
+        $contentKey = trim((string) (($campaign['content_key'] ?? '') ?: $contentKey));
+        if ($contentKey === '') {
+            continue;
+        }
+        $context = strtolower(trim((string) ($campaign['context'] ?? '')));
+        $sent = (int) ($sentByContent[$contentKey] ?? 0);
+        $pending = (int) ($pendingByContent[$contentKey] ?? 0);
+        $queued = max((int) ($campaign['queued_recipients'] ?? 0), $sent + $pending);
+        $lastAttempt = (int) ($campaign['last_attempt_at'] ?? 0);
+        $queuedAt = (int) ($campaign['queued_at'] ?? 0);
+        $lastActivity = max($lastAttempt, (int) ($campaign['last_sent_at'] ?? 0), $queuedAt);
+        $lastError = trim((string) ($campaign['last_error'] ?? ''));
+        $status = $pending > 0 ? 'pending' : 'sent';
+        if ($lastError !== '' && $pending > 0) {
+            $status = 'error';
+        } elseif ($lastError !== '' && $pending === 0 && (int) ($campaign['last_failed'] ?? 0) > 0) {
+            $status = 'partial';
+        }
+        $rows[] = [
+            'content_key' => $contentKey,
+            'context' => $context,
+            'label' => admin_mailing_context_label($context),
+            'title' => trim((string) ($campaign['title'] ?? '')),
+            'queued' => $queued,
+            'sent' => $sent,
+            'pending' => $pending,
+            'last_failed' => (int) ($campaign['last_failed'] ?? 0),
+            'last_error' => $lastError,
+            'last_attempt_at' => $lastAttempt,
+            'queued_at' => $queuedAt,
+            'last_activity' => $lastActivity,
+            'status' => $status,
+        ];
+    }
+    usort($rows, static function (array $a, array $b): int {
+        return ((int) ($b['last_activity'] ?? 0)) <=> ((int) ($a['last_activity'] ?? 0));
+    });
+    $alerts = array_values(array_filter($rows, static function (array $row): bool {
+        return in_array((string) ($row['context'] ?? ''), ['post', 'podcast', 'itinerary'], true);
+    }));
+    $newsletters = array_values(array_filter($rows, static function (array $row): bool {
+        return (string) ($row['context'] ?? '') === 'newsletter';
+    }));
+    return [
+        'alerts' => $alerts[0] ?? null,
+        'newsletter' => $newsletters[0] ?? null,
+        'all' => $rows,
+    ];
 }
 
 function admin_mailing_pending_map_for_content(string $contentKey): array
@@ -7576,6 +7755,7 @@ function admin_try_send_queued_mailing_batch(array $payload): array
     if (!empty($deliveredRecipients)) {
         admin_mark_mailing_delivered($context, $payload, $deliveredRecipients);
     }
+    admin_record_mailing_batch_attempt($context, $payload, $result, $recipients, $deliveredRecipients);
     return [
         'ok' => empty($failedRecipients),
         'sent' => (int) ($result['sent'] ?? 0),

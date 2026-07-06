@@ -98,6 +98,31 @@ function admin_social_broadcast_media_type(string $value): string
     return '';
 }
 
+function admin_social_broadcast_is_probable_image_url(string $candidate, string $pageUrl = ''): bool
+{
+    if (function_exists('nammu_actuality_is_probable_image_url')) {
+        return nammu_actuality_is_probable_image_url($candidate, $pageUrl);
+    }
+    $candidate = trim(html_entity_decode($candidate, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    if ($candidate === '' || !preg_match('#^https?://#i', $candidate)) {
+        return false;
+    }
+    $candidateNorm = rtrim(strtolower($candidate), '/');
+    $pageNorm = rtrim(strtolower(trim($pageUrl)), '/');
+    if ($pageNorm !== '' && $candidateNorm === $pageNorm) {
+        return false;
+    }
+    $path = strtolower((string) (parse_url($candidate, PHP_URL_PATH) ?? ''));
+    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg'], true)) {
+        return true;
+    }
+    if (in_array($ext, ['html', 'htm', 'php', 'asp', 'aspx', 'jsp', 'xml', 'rss', 'pdf'], true)) {
+        return false;
+    }
+    return $path !== '';
+}
+
 function admin_social_broadcast_network_image_limits(): array
 {
     return [
@@ -429,7 +454,7 @@ function admin_fetch_social_rss_items(string $url): array
                 foreach ($item->enclosure as $enclosure) {
                     $type = strtolower(trim((string) ($enclosure['type'] ?? '')));
                     $candidate = trim((string) ($enclosure['url'] ?? ''));
-                    if ($candidate !== '' && ($type === '' || str_starts_with($type, 'image/'))) {
+                    if ($candidate !== '' && ($type === '' || str_starts_with($type, 'image/')) && admin_social_broadcast_is_probable_image_url($candidate, $link)) {
                         $image = $candidate;
                         break;
                     }
@@ -441,7 +466,7 @@ function admin_fetch_social_rss_items(string $url): array
                     foreach ($media->content as $mediaContent) {
                         $candidate = trim((string) ($mediaContent['url'] ?? ''));
                         $type = strtolower(trim((string) ($mediaContent['type'] ?? '')));
-                        if ($candidate !== '' && ($type === '' || str_starts_with($type, 'image/'))) {
+                        if ($candidate !== '' && ($type === '' || str_starts_with($type, 'image/')) && admin_social_broadcast_is_probable_image_url($candidate, $link)) {
                             $image = $candidate;
                             break;
                         }
@@ -450,7 +475,7 @@ function admin_fetch_social_rss_items(string $url): array
                 if ($image === '' && isset($media->thumbnail)) {
                     foreach ($media->thumbnail as $thumbnail) {
                         $candidate = trim((string) ($thumbnail['url'] ?? ''));
-                        if ($candidate !== '') {
+                        if ($candidate !== '' && admin_social_broadcast_is_probable_image_url($candidate, $link)) {
                             $image = $candidate;
                             break;
                         }
@@ -458,7 +483,10 @@ function admin_fetch_social_rss_items(string $url): array
                 }
             }
             if ($image === '' && preg_match('/<img[^>]+src=["\']([^"\']+)["\']/i', $description, $imageMatch)) {
-                $image = trim((string) ($imageMatch[1] ?? ''));
+                $candidate = trim((string) ($imageMatch[1] ?? ''));
+                if (admin_social_broadcast_is_probable_image_url($candidate, $link)) {
+                    $image = $candidate;
+                }
             }
             $keyBase = $guid !== '' ? $guid : ($link !== '' ? $link : $title);
             if ($keyBase === '' || $link === '') {
@@ -865,9 +893,15 @@ function admin_social_broadcast_parse_image_items($images): array
 
 function admin_social_broadcast_images_from_fediverse_item(array $item): array
 {
-    $images = admin_social_broadcast_parse_image_items($item['images'] ?? []);
+    $pageUrl = trim((string) (($item['url'] ?? '') ?: ($item['id'] ?? '')));
+    $images = array_values(array_filter(
+        admin_social_broadcast_parse_image_items($item['images'] ?? []),
+        static function (string $imageUrl) use ($pageUrl): bool {
+            return admin_social_broadcast_is_probable_image_url($imageUrl, $pageUrl);
+        }
+    ));
     $primaryImage = trim((string) ($item['image'] ?? ''));
-    if ($primaryImage !== '' && !in_array($primaryImage, $images, true)) {
+    if ($primaryImage !== '' && admin_social_broadcast_is_probable_image_url($primaryImage, $pageUrl) && !in_array($primaryImage, $images, true)) {
         array_unshift($images, $primaryImage);
     }
 
@@ -881,10 +915,10 @@ function admin_social_broadcast_images_from_fediverse_item(array $item): array
         $attachmentType = strtolower(trim((string) ($attachment['type'] ?? '')));
         $attachmentMediaType = strtolower(trim((string) ($attachment['media_type'] ?? ($attachment['mediaType'] ?? ''))));
 
-        if ($attachmentUrl !== '' && ($attachmentType === 'image' || str_starts_with($attachmentMediaType, 'image/')) && !in_array($attachmentUrl, $images, true)) {
+        if ($attachmentUrl !== '' && ($attachmentType === 'image' || str_starts_with($attachmentMediaType, 'image/')) && admin_social_broadcast_is_probable_image_url($attachmentUrl, $pageUrl) && !in_array($attachmentUrl, $images, true)) {
             $images[] = $attachmentUrl;
         }
-        if ($attachmentImage !== '' && ($attachmentType === 'link' || $attachmentMediaType === 'text/html' || str_starts_with($attachmentMediaType, 'text/html')) && !in_array($attachmentImage, $images, true)) {
+        if ($attachmentImage !== '' && ($attachmentType === 'link' || $attachmentMediaType === 'text/html' || str_starts_with($attachmentMediaType, 'text/html')) && admin_social_broadcast_is_probable_image_url($attachmentImage, $attachmentUrl ?: $pageUrl) && !in_array($attachmentImage, $images, true)) {
             $images[] = $attachmentImage;
         }
     }

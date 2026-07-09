@@ -111,6 +111,63 @@
     $mailingDateLabel = static function (int $timestamp): string {
         return $timestamp > 0 ? date('d/m/y H:i', $timestamp) : 'Sin intentos registrados';
     };
+    $dashboardReadJsonFile = static function (string $path): array {
+        if (!is_file($path)) {
+            return [];
+        }
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || $raw === '') {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? $decoded : [];
+    };
+    $dashboardConfigDir = dirname(__DIR__) . '/config';
+    $socialQueuePath = $dashboardConfigDir . '/social-broadcast-queue.json';
+    $socialQueue = $dashboardReadJsonFile($socialQueuePath);
+    $socialQueueItems = is_array($socialQueue['items'] ?? null) ? array_values(array_filter($socialQueue['items'], 'is_array')) : [];
+    $socialPendingNetworks = 0;
+    $socialFailedItems = 0;
+    $socialLastTimestamp = is_file($socialQueuePath) ? (int) @filemtime($socialQueuePath) : 0;
+    foreach ($socialQueueItems as $socialItem) {
+        $socialPendingNetworks += count(array_values(array_filter(array_map('strval', $socialItem['networks'] ?? []))));
+        if ((int) ($socialItem['attempts'] ?? 0) > 0 || trim((string) ($socialItem['last_error'] ?? '')) !== '') {
+            $socialFailedItems++;
+        }
+        $createdAt = strtotime((string) ($socialItem['created_at'] ?? '')) ?: 0;
+        $attemptAt = strtotime((string) ($socialItem['last_attempt_at'] ?? '')) ?: 0;
+        $socialLastTimestamp = max($socialLastTimestamp, $createdAt, $attemptAt);
+    }
+    $fediverseQueueFiles = [
+        'announce' => $dashboardConfigDir . '/fediverso-announce-queue.json',
+        'delete' => $dashboardConfigDir . '/fediverso-delete-queue.json',
+        'undo' => $dashboardConfigDir . '/fediverso-undo-announce-queue.json',
+    ];
+    $fediversePending = 0;
+    $fediverseLastTimestamp = 0;
+    foreach ($fediverseQueueFiles as $fediverseQueueFile) {
+        $queueStore = $dashboardReadJsonFile($fediverseQueueFile);
+        $fediversePending += count(is_array($queueStore['items'] ?? null) ? $queueStore['items'] : []);
+        if (is_file($fediverseQueueFile)) {
+            $fediverseLastTimestamp = max($fediverseLastTimestamp, (int) @filemtime($fediverseQueueFile));
+        }
+    }
+    $fediverseDeliveriesPath = $dashboardConfigDir . '/fediverso-deliveries.json';
+    if (is_file($fediverseDeliveriesPath)) {
+        $fediverseLastTimestamp = max($fediverseLastTimestamp, (int) @filemtime($fediverseDeliveriesPath));
+    }
+    $socialFediverseStatus = [
+        'social_pending_items' => count($socialQueueItems),
+        'social_pending_networks' => $socialPendingNetworks,
+        'social_failed_items' => $socialFailedItems,
+        'social_last_at' => $socialLastTimestamp,
+        'fediverse_pending' => $fediversePending,
+        'fediverse_last_at' => $fediverseLastTimestamp,
+    ];
+    $socialFediverseHasErrors = $socialFailedItems > 0;
+    $socialFediverseHasPending = count($socialQueueItems) > 0 || $fediversePending > 0;
+    $socialFediverseColor = $socialFediverseHasErrors ? '#ea2f28' : ($socialFediverseHasPending ? '#b36b00' : '#1b8eed');
+    $socialFediverseLabel = $socialFediverseHasErrors ? 'Con errores' : ($socialFediverseHasPending ? 'En curso' : 'Sin pendientes');
     $gscSettings = $settings['search_console'] ?? [];
     $gscProperty = trim((string) ($gscSettings['property'] ?? ''));
     $gscClientId = trim((string) ($gscSettings['client_id'] ?? ''));
@@ -2672,20 +2729,21 @@
                 <p class="text-muted mb-0">Resumen general de publicaciones y estadísticas del sitio.</p>
             </div>
         </div>
-        <?php if (!empty($mailingDashboardItems)): ?>
-            <div class="mb-4" style="border:1px solid #d8eadf;background:#f6fbf8;border-radius:12px;padding:16px;">
-                <h3 class="h6 text-uppercase mb-3" style="color:#167a3a;">Envíos por email</h3>
-                <div class="row">
-                    <?php foreach ($mailingDashboardItems as $mailingRow): ?>
-                        <?php
-                        $mailingTitle = trim((string) ($mailingRow['title'] ?? ''));
-                        $mailingLastAttempt = (int) ($mailingRow['last_attempt_at'] ?? 0);
-                        $mailingQueuedAt = (int) ($mailingRow['queued_at'] ?? 0);
-                        $mailingDisplayDate = $mailingLastAttempt > 0 ? $mailingLastAttempt : $mailingQueuedAt;
-                        $mailingError = trim((string) ($mailingRow['last_error'] ?? ''));
-                        ?>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <div style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:12px;height:100%;">
+        <div class="row mb-4">
+            <div class="col-lg-6 mb-3 mb-lg-0">
+                <div style="border:1px solid #d8eadf;background:#f6fbf8;border-radius:12px;padding:16px;height:100%;">
+                    <h3 class="h6 text-uppercase mb-3" style="color:#167a3a;">Envíos por email</h3>
+                    <?php if (empty($mailingDashboardItems)): ?>
+                        <p class="text-muted mb-0">Sin campañas recientes.</p>
+                    <?php else: ?>
+                        <?php foreach ($mailingDashboardItems as $mailingRow): ?>
+                            <?php
+                            $mailingTitle = trim((string) ($mailingRow['title'] ?? ''));
+                            $mailingLastAttempt = (int) ($mailingRow['last_attempt_at'] ?? 0);
+                            $mailingQueuedAt = (int) ($mailingRow['queued_at'] ?? 0);
+                            $mailingError = trim((string) ($mailingRow['last_error'] ?? ''));
+                            ?>
+                            <div style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:12px;margin-bottom:12px;">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
                                     <strong><?= htmlspecialchars((string) ($mailingRow['label'] ?? 'Correo'), ENT_QUOTES, 'UTF-8') ?></strong>
                                     <span style="font-size:.8rem;color:<?= htmlspecialchars($mailingStatusColor($mailingRow), ENT_QUOTES, 'UTF-8') ?>;font-weight:700;"><?= htmlspecialchars($mailingStatusLabel($mailingRow), ENT_QUOTES, 'UTF-8') ?></span>
@@ -2710,11 +2768,35 @@
                                     <p class="mb-0" style="color:#ea2f28;"><strong>Error:</strong> <?= htmlspecialchars($mailingError, ENT_QUOTES, 'UTF-8') ?></p>
                                 <?php endif; ?>
                             </div>
-                        </div>
-                    <?php endforeach; ?>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </div>
-        <?php endif; ?>
+            <div class="col-lg-6">
+                <div style="border:1px solid #cce2ff;background:#f5f9ff;border-radius:12px;padding:16px;height:100%;">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <h3 class="h6 text-uppercase mb-0" style="color:#1b8eed;">Envíos Fediverso y RRSS</h3>
+                        <span style="font-size:.8rem;color:<?= htmlspecialchars($socialFediverseColor, ENT_QUOTES, 'UTF-8') ?>;font-weight:700;"><?= htmlspecialchars($socialFediverseLabel, ENT_QUOTES, 'UTF-8') ?></span>
+                    </div>
+                    <div style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:12px;margin-bottom:12px;">
+                        <strong>RRSS</strong>
+                        <p class="mb-2 text-muted">Última actividad: <?= htmlspecialchars($mailingDateLabel((int) ($socialFediverseStatus['social_last_at'] ?? 0)), ENT_QUOTES, 'UTF-8') ?></p>
+                        <p class="mb-0">
+                            <strong>Mensajes pendientes:</strong> <?= (int) ($socialFediverseStatus['social_pending_items'] ?? 0) ?>
+                            · <strong>Redes pendientes:</strong> <?= (int) ($socialFediverseStatus['social_pending_networks'] ?? 0) ?>
+                            <?php if ((int) ($socialFediverseStatus['social_failed_items'] ?? 0) > 0): ?>
+                                · <strong>Con error:</strong> <?= (int) ($socialFediverseStatus['social_failed_items'] ?? 0) ?>
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                    <div style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:12px;">
+                        <strong>Fediverso</strong>
+                        <p class="mb-2 text-muted">Última actividad: <?= htmlspecialchars($mailingDateLabel((int) ($socialFediverseStatus['fediverse_last_at'] ?? 0)), ENT_QUOTES, 'UTF-8') ?></p>
+                        <p class="mb-0"><strong>Acciones pendientes:</strong> <?= (int) ($socialFediverseStatus['fediverse_pending'] ?? 0) ?></p>
+                    </div>
+                </div>
+            </div>
+        </div>
         <?php if ($indexnowHasErrors): ?>
             <div class="mb-4" style="border:1px solid #ea2f28;background:#fff5f5;border-radius:12px;padding:16px;">
                 <h3 class="h6 text-uppercase mb-2" style="color:#ea2f28;">Errores al enviar IndexNow</h3>

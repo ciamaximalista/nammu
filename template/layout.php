@@ -179,9 +179,8 @@ if (
     $allowContentWithoutStatsConsent = true;
 }
 $contentOutput = $content;
-if (!$statsConsentGiven && !$isCrawler && !$allowContentWithoutStatsConsent) {
-    $contentOutput = '<section class="consent-required-notice"><p>Debes aceptar las cookies de estadisticas para poder leer el contenido.</p></section>';
-}
+// El contenido publico debe estar disponible en el HTML aunque no haya consentimiento
+// de estadisticas; el consentimiento solo afecta al registro de visitas.
 if ($isCrawler) {
     if (function_exists('nammu_record_bot_visit')) {
         nammu_record_bot_visit($userAgent);
@@ -1673,16 +1672,17 @@ if (!empty($baseUrl)) {
             <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
         </a>
     <?php endif; ?>
-    <?php if (($fediverseCtaUrl !== '' && $fediverseCtaHandle !== '') || $showFloatingSearch || $showFloatingSubscription): ?>
+    <?php $showFediverseFollowCta = !$isCrawler && $fediverseCtaUrl !== '' && $fediverseCtaHandle !== ''; ?>
+    <?php if ($showFediverseFollowCta || $showFloatingSearch || $showFloatingSubscription): ?>
         <div class="floating-stack">
-            <?php if ($fediverseCtaUrl !== '' && $fediverseCtaHandle !== ''): ?>
-                <div class="floating-fediverse">
+            <?php if ($showFediverseFollowCta): ?>
+                <div class="floating-fediverse" data-nosnippet>
                     <button type="button" class="floating-fediverse__button" data-fediverse-follow-open title="Sigue esta cuenta en el Fediverso desde tu servidor">
                         Síguenos en el Fediverso
                         <?= $fediverseCtaIcon ?>
                     </button>
                 </div>
-                <dialog class="fediverse-follow-dialog" data-fediverse-follow-dialog>
+                <dialog class="fediverse-follow-dialog" data-fediverse-follow-dialog data-nosnippet>
                     <div class="fediverse-follow-dialog__card">
                         <h2>Síguenos en el Fediverso</h2>
                         <p>Si tienes un blog en Nammu o cuenta en un servidor Mastodon, Smac2, Akkoma o compatible con Activity Pub, pega el siguiente nombre de cuenta en el buscador de usuarios o perfiles y síguela como a cualquier otro perfil.</p>

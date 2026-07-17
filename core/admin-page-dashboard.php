@@ -175,14 +175,14 @@
         $rssState = admin_load_social_rss_state();
         $rssStateFeeds = is_array($rssState['feeds'] ?? null) ? $rssState['feeds'] : [];
         $newsStore = function_exists('nammu_actuality_load_news_store') ? nammu_actuality_load_news_store() : ['items' => []];
-        $storedFeedKeys = [];
+        $storedByFeedKey = [];
         foreach ((array) ($newsStore['items'] ?? []) as $storedNewsItem) {
             if (!is_array($storedNewsItem)) {
                 continue;
             }
             $storedKey = trim((string) ($storedNewsItem['feed_item_key'] ?? ''));
             if ($storedKey !== '') {
-                $storedFeedKeys[$storedKey] = true;
+                $storedByFeedKey[$storedKey] = $storedNewsItem;
             }
         }
         $rssUnprocessedItems = [];
@@ -193,8 +193,6 @@
                 continue;
             }
             $rssFeedKey = sha1($rssFeedUrl);
-            $rssFeedState = is_array($rssStateFeeds[$rssFeedKey] ?? null) ? $rssStateFeeds[$rssFeedKey] : [];
-            $rssSeen = is_array($rssFeedState['seen'] ?? null) ? $rssFeedState['seen'] : [];
             foreach (admin_fetch_social_rss_items($rssFeedUrl) as $rssItem) {
                 if (!is_array($rssItem)) {
                     continue;
@@ -207,13 +205,27 @@
                 if ($rssTimestamp > 0 && $rssTimestamp < $recentRssCutoff) {
                     continue;
                 }
-                if (isset($rssSeen[$rssItemKey]) || isset($storedFeedKeys[$rssItemKey])) {
+                $storedNewsItem = is_array($storedByFeedKey[$rssItemKey] ?? null) ? $storedByFeedKey[$rssItemKey] : null;
+                $rssPendingReason = '';
+                if ($storedNewsItem === null) {
+                    $rssPendingReason = 'sin almacenar';
+                } else {
+                    $broadcastEnqueuedAt = (int) ($storedNewsItem['social_broadcast_enqueued_at'] ?? 0);
+                    $linkCardStage = trim((string) ($storedNewsItem['link_card_stage'] ?? ''));
+                    $shouldBroadcast = !empty($storedNewsItem['social_broadcast_pending'])
+                        || ($broadcastEnqueuedAt <= 0 && ($linkCardStage === '' || $linkCardStage === 'discovered'));
+                    if ($shouldBroadcast) {
+                        $rssPendingReason = 'pendiente de RRSS';
+                    }
+                }
+                if ($rssPendingReason === '') {
                     continue;
                 }
                 $rssUnprocessedItems[] = [
                     'feed' => $rssFeedUrl,
                     'title' => trim((string) ($rssItem['title'] ?? '')),
                     'timestamp' => $rssTimestamp,
+                    'reason' => $rssPendingReason,
                 ];
             }
         }
@@ -2854,8 +2866,9 @@
                                     <?php
                                     $rssPendingTitle = trim((string) ($rssPendingItem['title'] ?? ''));
                                     $rssPendingTimestamp = (int) ($rssPendingItem['timestamp'] ?? 0);
+                                    $rssPendingReason = trim((string) ($rssPendingItem['reason'] ?? ''));
                                     ?>
-                                    <li><?= htmlspecialchars($rssPendingTitle !== '' ? $rssPendingTitle : 'Ítem RSS sin título', ENT_QUOTES, 'UTF-8') ?><?php if ($rssPendingTimestamp > 0): ?> · <?= htmlspecialchars(date('d/m/y H:i', $rssPendingTimestamp), ENT_QUOTES, 'UTF-8') ?><?php endif; ?></li>
+                                    <li><?= htmlspecialchars($rssPendingTitle !== '' ? $rssPendingTitle : 'Ítem RSS sin título', ENT_QUOTES, 'UTF-8') ?><?php if ($rssPendingTimestamp > 0): ?> · <?= htmlspecialchars(date('d/m/y H:i', $rssPendingTimestamp), ENT_QUOTES, 'UTF-8') ?><?php endif; ?><?php if ($rssPendingReason !== ''): ?> · <?= htmlspecialchars($rssPendingReason, ENT_QUOTES, 'UTF-8') ?><?php endif; ?></li>
                                 <?php endforeach; ?>
                             </ul>
                         <?php endif; ?>

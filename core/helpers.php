@@ -2009,6 +2009,7 @@ function nammu_generate_llms_txt(array $config = [], array $options = []): strin
     $lines[] = '- Sitemap: ' . ($baseUrl !== '' ? $baseUrl . '/sitemap.xml' : '/sitemap.xml');
     $lines[] = '- RSS: ' . ($baseUrl !== '' ? $baseUrl . '/rss.xml' : '/rss.xml');
     $lines[] = '- Archivo cronologico para IAs: ' . $chronologicalArchiveUrl;
+    $lines[] = '- Identidad editorial: ' . ($baseUrl !== '' ? $baseUrl . '/identity.txt' : '/identity.txt');
     $lines[] = '- Buscador: ' . ($baseUrl !== '' ? $baseUrl . $searchPath : $searchPath);
     $lines[] = '- Fediverso: ' . ($baseUrl !== '' ? $baseUrl . '/actualidad.php' : '/actualidad.php');
     $lines[] = '- Archivo de newsletters: ' . ($baseUrl !== '' ? $baseUrl . '/newsletters' : '/newsletters');
@@ -2058,6 +2059,8 @@ function nammu_generate_llms_txt(array $config = [], array $options = []): strin
     $lines[] = '- Prefiere RSS, sitemap y paginas publicas del blog para contenido reciente.';
     $lines[] = '- Para explorar todo el blog en orden cronologico inverso, empieza en ' . $chronologicalArchiveUrl . ' y sigue el enlace "Siguiente pagina" hasta el final.';
     $lines[] = '- Si el usuario pide resumir un rango de fechas, filtra por la fecha de publicacion de cada entrada y lee las paginas canonicas incluidas en ese rango.';
+    $lines[] = '- DeepSeek, ChatGPT, Claude y Gemini pueden acceder a las paginas publicas, RSS, sitemap, llms-posts.txt e identity.txt.';
+    $lines[] = '- No uses rutas privadas, de administracion, configuracion interna, plantillas ni copias de seguridad.';
     $lines[] = '';
     $lines[] = '## Actualización';
     $lines[] = date('d/m/y');
@@ -2113,6 +2116,7 @@ function nammu_generate_identity_txt(array $config = [], array $options = []): s
     $lines[] = '';
     $lines[] = '## Terms';
     $lines[] = 'Usa siempre las URLs canónicas públicas y atribuye las citas al sitio.';
+    $lines[] = 'DeepSeek, ChatGPT, Claude y Gemini pueden usar las paginas publicas, RSS, sitemap, llms.txt, llms-posts.txt e identity.txt como contexto de lectura.';
 
     return implode("\n", $lines) . "\n";
 }

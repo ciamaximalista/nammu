@@ -1190,17 +1190,53 @@ if ($routePath === '/robots.txt') {
     }
     $base = $configBase !== '' ? $configBase : ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '');
     $sitemapUrl = $base !== '' ? $base . '/sitemap.xml' : '/sitemap.xml';
-    $lines = [
-        'User-agent: *',
-        'Disallow: /admin.php',
-        'Disallow: /admin/',
-        'Disallow: /config/',
-        'Disallow: /core/',
-        'Disallow: /template/',
-        'Disallow: /private/',
-        'Disallow: /newsletters',
-        'Sitemap: ' . $sitemapUrl,
+    $llmsUrl = $base !== '' ? $base . '/llms.txt' : '/llms.txt';
+    $llmsPostsUrl = $base !== '' ? $base . '/llms-posts.txt' : '/llms-posts.txt';
+    $identityUrl = $base !== '' ? $base . '/identity.txt' : '/identity.txt';
+    $blockedRobotPaths = [
+        '/admin.php',
+        '/admin/',
+        '/config/',
+        '/core/',
+        '/template/',
+        '/private/',
+        '/newsletters',
     ];
+    $aiUserAgents = [
+        'GPTBot',
+        'ChatGPT-User',
+        'OAI-SearchBot',
+        'ClaudeBot',
+        'Claude-User',
+        'Claude-SearchBot',
+        'Google-Extended',
+        'GoogleOther',
+        'GoogleOther-Image',
+        'GoogleOther-Video',
+        'Gemini',
+        'DeepSeekBot',
+        'DeepSeek',
+    ];
+    $lines = [
+        '# Archivos de contexto para IAs',
+        'LLM: ' . $llmsUrl,
+        'LLM-Posts: ' . $llmsPostsUrl,
+        'Identity: ' . $identityUrl,
+        '',
+    ];
+    foreach ($aiUserAgents as $agent) {
+        $lines[] = 'User-agent: ' . $agent;
+        $lines[] = 'Allow: /';
+        foreach ($blockedRobotPaths as $path) {
+            $lines[] = 'Disallow: ' . $path;
+        }
+        $lines[] = '';
+    }
+    $lines[] = 'User-agent: *';
+    foreach ($blockedRobotPaths as $path) {
+        $lines[] = 'Disallow: ' . $path;
+    }
+    $lines[] = 'Sitemap: ' . $sitemapUrl;
     $robotsText = implode("\n", $lines) . "\n";
     header('Content-Type: text/plain; charset=UTF-8');
     echo $robotsText;

@@ -96,12 +96,22 @@ function admin_cli_timing_log(string $scope, string $step, float $startedAt, arr
 
 function admin_run_scheduled_tasks(): array {
     $config = nammu_load_config();
+    if (!function_exists('admin_process_social_rss_feeds') && is_file(__DIR__ . '/core/admin-redes.php')) {
+        require_once __DIR__ . '/core/admin-redes.php';
+    }
     if (!function_exists('nammu_fediverse_refresh_following') && is_file(__DIR__ . '/core/fediverso.php')) {
         require_once __DIR__ . '/core/fediverso.php';
     }
     $fediverseStats = ['checked' => 0, 'new' => 0, 'followers_checked' => 0, 'followers_removed' => 0];
     $fediverseInboxSyncStats = ['scanned' => 0, 'new' => 0];
     $fediverseRecentThreadsWarmed = 0;
+    $published = function_exists('nammu_publish_scheduled_posts')
+        ? (int) nammu_publish_scheduled_posts(CONTENT_DIR)
+        : 0;
+    $scheduledDeliveryStats = ['followers' => 0, 'delivered' => 0];
+    if ($published > 0 && function_exists('nammu_fediverse_deliver_local_items')) {
+        $scheduledDeliveryStats = nammu_fediverse_deliver_local_items($config);
+    }
     if (function_exists('nammu_fediverse_refresh_following')) {
         $stepStartedAt = microtime(true);
         $fediverseStats = nammu_fediverse_refresh_following([
@@ -142,7 +152,7 @@ function admin_run_scheduled_tasks(): array {
         }
     }
     return [
-        'published' => 0,
+        'published' => $published,
         'notifications_processed' => 0,
         'notifications_remaining' => 0,
         'social_rss_sent' => 0,
@@ -153,10 +163,10 @@ function admin_run_scheduled_tasks(): array {
         'social_broadcast_queue_remaining' => 0,
         'fediverse_checked' => (int) ($fediverseStats['checked'] ?? 0),
         'fediverse_new' => (int) ($fediverseStats['new'] ?? 0) + (int) ($fediverseInboxSyncStats['new'] ?? 0),
-        'fediverse_followers' => 0,
+        'fediverse_followers' => (int) ($scheduledDeliveryStats['followers'] ?? 0),
         'fediverse_followers_checked' => (int) ($fediverseStats['followers_checked'] ?? 0),
         'fediverse_followers_removed' => (int) ($fediverseStats['followers_removed'] ?? 0),
-        'fediverse_delivered' => 0,
+        'fediverse_delivered' => (int) ($scheduledDeliveryStats['delivered'] ?? 0),
         'fediverse_recent_threads_warmed' => $fediverseRecentThreadsWarmed,
         'fediverse_follow_accepts_checked' => 0,
         'fediverse_follow_accepts_sent' => 0,

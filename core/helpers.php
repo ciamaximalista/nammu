@@ -3202,12 +3202,14 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
 
     $settings = get_settings();
     $mailing = $settings['mailing'] ?? [];
+    $mailingQueuedBatches = 0;
+    $mailingQueuedRecipients = 0;
     if ($template === 'podcast') {
         $audioUrl = admin_public_asset_url($audio);
         if (($mailing['auto_podcast'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
             $subscribers = admin_mailing_recipients_for_type('podcast', $settings);
             if (!empty($subscribers) && $audioUrl !== '') {
-                admin_schedule_mailing_broadcast('podcast', $subscribers, [
+                $mailingResult = admin_schedule_mailing_broadcast('podcast', $subscribers, [
                     'filename' => $filename,
                     'slug' => $slug,
                     'title' => $title,
@@ -3216,6 +3218,8 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
                     'audio' => $audio,
                     'template' => 'podcast',
                 ]);
+                $mailingQueuedBatches = (int) ($mailingResult['queued_batches'] ?? 0);
+                $mailingQueuedRecipients = (int) ($mailingResult['queued_recipients'] ?? 0);
             }
         }
     } else {
@@ -3223,7 +3227,7 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
         if (($mailing['auto_posts'] ?? 'off') === 'on' && admin_is_mailing_ready($settings)) {
             $subscribers = admin_mailing_recipients_for_type('posts', $settings);
             if (!empty($subscribers) && $link !== '') {
-                admin_schedule_mailing_broadcast('post', $subscribers, [
+                $mailingResult = admin_schedule_mailing_broadcast('post', $subscribers, [
                     'filename' => $filename,
                     'slug' => $slug,
                     'title' => $title,
@@ -3231,11 +3235,23 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
                     'image' => $image,
                     'template' => 'single',
                 ]);
+                $mailingQueuedBatches = (int) ($mailingResult['queued_batches'] ?? 0);
+                $mailingQueuedRecipients = (int) ($mailingResult['queued_recipients'] ?? 0);
             }
         }
         if (!$mailingOnly && $link !== '') {
             admin_maybe_enqueue_push_notification('post', $title, $description, $link, $image);
         }
+    }
+    if (function_exists('admin_maintenance_trace')) {
+        admin_maintenance_trace([
+            'scope' => 'scheduled_notifications',
+            'event' => 'dispatched',
+            'slug' => $slug,
+            'template' => $template,
+            'mailing_queued_batches' => $mailingQueuedBatches,
+            'mailing_queued_recipients' => $mailingQueuedRecipients,
+        ]);
     }
 
     return true;

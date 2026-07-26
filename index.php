@@ -1018,7 +1018,10 @@ if ($routePath === '/noticias.xml') {
         exit;
     }
     $feedPath = __DIR__ . '/noticias.xml';
-    if (!is_file($feedPath) || trim((string) @file_get_contents($feedPath)) === '') {
+    $feedIsStale = function_exists('nammu_actuality_feed_is_stale')
+        ? nammu_actuality_feed_is_stale($feedPath)
+        : (!is_file($feedPath) || trim((string) @file_get_contents($feedPath)) === '');
+    if ($feedIsStale) {
         nammu_actuality_rebuild_snapshot($publicBaseUrl, $config, $siteTitle, $siteDescription, $siteLang);
     }
     $actualityFeed = is_file($feedPath) ? (string) file_get_contents($feedPath) : '';

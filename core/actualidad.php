@@ -104,6 +104,30 @@ function nammu_actuality_save_items_snapshot(array $items): void
     @chmod($file, 0664);
 }
 
+function nammu_actuality_feed_is_stale(string $feedPath): bool
+{
+    if (!is_file($feedPath) || trim((string) @file_get_contents($feedPath)) === '') {
+        return true;
+    }
+    $feedMtime = (int) @filemtime($feedPath);
+    if ($feedMtime <= 0) {
+        return true;
+    }
+    $sourceFiles = [
+        nammu_actuality_items_file(),
+        nammu_actuality_manual_items_file(),
+        nammu_actuality_news_store_file(),
+        nammu_actuality_news_overrides_file(),
+        nammu_actuality_social_rss_state_file(),
+    ];
+    foreach ($sourceFiles as $sourceFile) {
+        if (is_file($sourceFile) && (int) @filemtime($sourceFile) > $feedMtime) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function nammu_actuality_load_manual_items(): array
 {
     $file = nammu_actuality_manual_items_file();

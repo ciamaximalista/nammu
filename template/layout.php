@@ -1575,11 +1575,7 @@ if (!empty($baseUrl)) {
                                         $linkHref = trim((string) ($link['href'] ?? ''));
                                         $footerLinkClass = trim((string) ($link['class'] ?? ''));
                                         $isFediverseFollowLink = (!empty($link['modal']) && $link['modal'] === 'fediverse-follow')
-                                            || $linkHref === '#fediverse-follow'
-                                            || ($footerLinkClass !== '' && stripos($footerLinkClass, 'fediverse') !== false)
-                                            || ($linkLabel !== '' && stripos($linkLabel, 'fediverso') !== false)
-                                            || ($fediverseCtaUrl !== '' && $linkHref === $fediverseCtaUrl)
-                                            || ($fediverseProfileUrl !== '' && $linkHref === $fediverseProfileUrl);
+                                            || $linkHref === '#fediverse-follow';
                                         ?>
                                         <a class="footer-social-link<?= $footerLinkClass !== '' ? ' ' . htmlspecialchars($footerLinkClass, ENT_QUOTES, 'UTF-8') : '' ?>" href="<?= htmlspecialchars($linkHref, ENT_QUOTES, 'UTF-8') ?>"<?= $isFediverseFollowLink ? ' data-fediverse-follow-open' : '' ?><?= ($isExternal && !$isFediverseFollowLink) ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($linkLabel, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($linkLabel, ENT_QUOTES, 'UTF-8') ?>">
                                             <?= $link['svg'] ?>
@@ -1633,11 +1629,7 @@ if (!empty($baseUrl)) {
                                         $linkHref = trim((string) ($link['href'] ?? ''));
                                         $footerLinkClass = trim((string) ($link['class'] ?? ''));
                                         $isFediverseFollowLink = (!empty($link['modal']) && $link['modal'] === 'fediverse-follow')
-                                            || $linkHref === '#fediverse-follow'
-                                            || ($footerLinkClass !== '' && stripos($footerLinkClass, 'fediverse') !== false)
-                                            || ($linkLabel !== '' && stripos($linkLabel, 'fediverso') !== false)
-                                            || ($fediverseCtaUrl !== '' && $linkHref === $fediverseCtaUrl)
-                                            || ($fediverseProfileUrl !== '' && $linkHref === $fediverseProfileUrl);
+                                            || $linkHref === '#fediverse-follow';
                                         ?>
                                         <a class="footer-social-link<?= $footerLinkClass !== '' ? ' ' . htmlspecialchars($footerLinkClass, ENT_QUOTES, 'UTF-8') : '' ?>" href="<?= htmlspecialchars($linkHref, ENT_QUOTES, 'UTF-8') ?>"<?= $isFediverseFollowLink ? ' data-fediverse-follow-open' : '' ?><?= ($isExternal && !$isFediverseFollowLink) ? ' target="_blank" rel="noopener"' : '' ?> aria-label="<?= htmlspecialchars($linkLabel, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($linkLabel, ENT_QUOTES, 'UTF-8') ?>">
                                             <?= $link['svg'] ?>

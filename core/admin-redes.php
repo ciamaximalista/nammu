@@ -170,12 +170,22 @@ function admin_social_rss_selected_networks(array $settings): array
 {
     $availableNetworks = admin_social_broadcast_available_networks($settings);
     $availableKeys = array_keys($availableNetworks);
+    $telegramAutoEnabled = trim((string) ($settings['telegram']['auto_post'] ?? 'off')) === 'on';
     $configured = is_array($settings['social_rss'] ?? null) ? $settings['social_rss'] : [];
     $selected = array_values(array_unique(array_filter(array_map('strval', $configured['networks'] ?? []))));
     if (empty($selected)) {
-        return $availableKeys;
+        $selected = $availableKeys;
+    } else {
+        $selected = array_values(array_intersect($selected, $availableKeys));
     }
-    return array_values(array_intersect($selected, $availableKeys));
+    if (!$telegramAutoEnabled) {
+        $selected = array_values(array_filter($selected, static function (string $network): bool {
+            return $network !== 'telegram';
+        }));
+    } elseif (!empty($selected) && in_array('telegram', $availableKeys, true) && !in_array('telegram', $selected, true)) {
+        $selected[] = 'telegram';
+    }
+    return $selected;
 }
 
 function admin_social_rss_feed_urls_from_settings(array $settings): array
@@ -1044,6 +1054,53 @@ function admin_social_broadcast_primary_image($images): string
     return $parsed[0] ?? '';
 }
 
+function admin_social_rss_mark_broadcast_result(array $job, string $status, array $meta = []): void
+{
+    if (!function_exists('nammu_actuality_load_news_store') || !function_exists('nammu_actuality_save_news_store')) {
+        return;
+    }
+    if (trim((string) ($job['source'] ?? '')) !== 'social-rss-news') {
+        return;
+    }
+    $sourceId = trim((string) ($job['source_id'] ?? ''));
+    if ($sourceId === '') {
+        return;
+    }
+    $newsStore = nammu_actuality_load_news_store();
+    $items = is_array($newsStore['items'] ?? null) ? $newsStore['items'] : [];
+    $changed = false;
+    $now = time();
+    foreach ($items as $index => $item) {
+        if (!is_array($item) || trim((string) ($item['id'] ?? '')) !== $sourceId) {
+            continue;
+        }
+        $item['social_broadcast_pending'] = false;
+        if ($status === 'sent') {
+            $previousSentNetworks = array_values(array_unique(array_filter(array_map('strval', $item['social_broadcast_sent_networks'] ?? []))));
+            $newSentNetworks = array_values(array_unique(array_filter(array_map('strval', $meta['sent_networks'] ?? []))));
+            $item['social_broadcast_sent_at'] = $now;
+            $item['social_broadcast_stage'] = 'sent';
+            $item['social_broadcast_sent_networks'] = array_values(array_unique(array_merge($previousSentNetworks, $newSentNetworks)));
+            unset($item['social_broadcast_failed_at'], $item['social_broadcast_last_error']);
+        } elseif ($status === 'failed') {
+            $item['social_broadcast_failed_at'] = $now;
+            $item['social_broadcast_stage'] = 'failed';
+            $item['social_broadcast_last_error'] = trim((string) ($meta['error'] ?? 'send_failed'));
+            $item['social_broadcast_failed_networks'] = array_values(array_unique(array_filter(array_map('strval', $meta['failed_networks'] ?? []))));
+        } elseif ($status === 'stale') {
+            $item['social_broadcast_skipped_at'] = $now;
+            $item['social_broadcast_stage'] = 'stale';
+            $item['social_broadcast_last_error'] = 'stale_actuality_job';
+        }
+        $items[$index] = $item;
+        $changed = true;
+        break;
+    }
+    if ($changed) {
+        nammu_actuality_save_news_store($items);
+    }
+}
+
 function admin_handle_social_rss_settings_request(array $settings): array
 {
     $result = [
@@ -1259,6 +1316,17 @@ function admin_social_rss_enqueue_pending_broadcasts(int $maxItems = 12): array
             $snapshotById[$snapshotId] = $snapshotItem;
         }
     }
+    $queuedSourceIds = [];
+    $broadcastQueue = admin_load_social_broadcast_queue();
+    foreach ((array) ($broadcastQueue['items'] ?? []) as $queuedItem) {
+        if (!is_array($queuedItem) || trim((string) ($queuedItem['source'] ?? '')) !== 'social-rss-news') {
+            continue;
+        }
+        $queuedSourceId = trim((string) ($queuedItem['source_id'] ?? ''));
+        if ($queuedSourceId !== '') {
+            $queuedSourceIds[$queuedSourceId] = true;
+        }
+    }
     usort($newsItems, static function (array $a, array $b): int {
         return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
     });
@@ -1269,9 +1337,22 @@ function admin_social_rss_enqueue_pending_broadcasts(int $maxItems = 12): array
             continue;
         }
         $broadcastEnqueuedAt = (int) ($newsItem['social_broadcast_enqueued_at'] ?? 0);
+        $broadcastSentAt = (int) ($newsItem['social_broadcast_sent_at'] ?? 0);
+        $broadcastFailedAt = (int) ($newsItem['social_broadcast_failed_at'] ?? 0);
+        $sentNetworks = array_values(array_unique(array_filter(array_map('strval', $newsItem['social_broadcast_sent_networks'] ?? []))));
+        $missingSentNetworks = $broadcastSentAt > 0 ? array_values(array_diff($networks, $sentNetworks)) : [];
         $linkCardStage = trim((string) ($newsItem['link_card_stage'] ?? ''));
+        $newsId = trim((string) ($newsItem['id'] ?? ''));
+        $isQueued = $newsId !== '' && isset($queuedSourceIds[$newsId]);
+        $isOrphanedEnqueue = $broadcastEnqueuedAt > 0
+            && $broadcastSentAt <= 0
+            && $broadcastFailedAt <= 0
+            && !$isQueued
+            && $broadcastEnqueuedAt < (time() - 60);
         $shouldBroadcast = !empty($newsItem['social_broadcast_pending'])
-            || ($broadcastEnqueuedAt <= 0 && ($linkCardStage === '' || $linkCardStage === 'discovered'));
+            || ($broadcastEnqueuedAt <= 0 && ($linkCardStage === '' || $linkCardStage === 'discovered'))
+            || $isOrphanedEnqueue
+            || (!empty($missingSentNetworks) && !$isQueued);
         if (!$shouldBroadcast) {
             continue;
         }
@@ -1282,7 +1363,6 @@ function admin_social_rss_enqueue_pending_broadcasts(int $maxItems = 12): array
             $newsItems[$index]['social_broadcast_skipped_at'] = time();
             continue;
         }
-        $newsId = trim((string) ($newsItem['id'] ?? ''));
         $profileItem = ($newsId !== '' && isset($snapshotById[$newsId]) && is_array($snapshotById[$newsId])) ? $snapshotById[$newsId] : $newsItem;
         $fediverseUrl = admin_social_broadcast_fediverse_url_for_actuality_item($profileItem);
         if ($fediverseUrl === '') {
@@ -1300,7 +1380,8 @@ function admin_social_rss_enqueue_pending_broadcasts(int $maxItems = 12): array
             $text .= "\n\n" . $description;
         }
         $images = implode("\n", admin_social_broadcast_images_from_fediverse_item($profileItem));
-        $queueResult = admin_enqueue_social_broadcast($text, $images, $networks, $fediverseUrl, [
+        $targetNetworks = !empty($missingSentNetworks) ? $missingSentNetworks : $networks;
+        $queueResult = admin_enqueue_social_broadcast($text, $images, $targetNetworks, $fediverseUrl, [
             'source' => 'social-rss-news',
             'source_id' => $newsId,
             'source_timestamp' => $newsTimestamp,
@@ -1455,9 +1536,18 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
         return ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => count($items)];
     }
 
-    $items = array_values(array_filter($items, static function ($item): bool {
-        return is_array($item) && !admin_social_broadcast_is_stale_actuality_job($item);
-    }));
+    $activeItems = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        if (admin_social_broadcast_is_stale_actuality_job($item)) {
+            admin_social_rss_mark_broadcast_result($item, 'stale');
+            continue;
+        }
+        $activeItems[] = $item;
+    }
+    $items = $activeItems;
 
     foreach ($items as $index => $item) {
         $sourceTimestamp = (int) ($item['source_timestamp'] ?? 0);
@@ -1517,12 +1607,17 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
         }
         $pendingNetworks = [];
         $sentNetworks = [];
+        $failedNetworks = [];
         $text = trim((string) ($item['text'] ?? ''));
         $fediverseUrl = trim((string) ($item['fediverse_url'] ?? ''));
         $images = admin_social_broadcast_enrich_images_from_fediverse_url($item['images'] ?? [], $fediverseUrl);
 
         if ($text === '') {
             $failed++;
+            admin_social_rss_mark_broadcast_result($item, 'failed', [
+                'error' => 'empty_text',
+                'failed_networks' => $networks,
+            ]);
             continue;
         }
 
@@ -1531,6 +1626,7 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
             if (!is_array($networkMeta)) {
                 $item['last_error'] = 'La red "' . $network . '" ya no está configurada en este blog.';
                 $item['last_attempt_at'] = gmdate(DATE_ATOM);
+                $failedNetworks[] = $network;
                 continue;
             }
             $networkImages = $images;
@@ -1542,6 +1638,7 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
             }
             if ($network === 'instagram' && empty($networkImages)) {
                 $failed++;
+                $failedNetworks[] = $network;
                 continue;
             }
             $networkText = admin_social_broadcast_fit_text_for_network($network, $text, $fediverseUrl, !empty($networkImages));
@@ -1549,6 +1646,7 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
             $length = admin_social_broadcast_measure_for_network($network, $networkText);
             if ($limit > 0 && $length > $limit) {
                 $failed++;
+                $failedNetworks[] = $network;
                 continue;
             }
             $error = null;
@@ -1559,6 +1657,7 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
             }
             $item['last_error'] = (string) ($error ?: ('send_failed:' . $network));
             $item['last_attempt_at'] = gmdate(DATE_ATOM);
+            $failedNetworks[] = $network;
             $nextAttempts = (int) ($item['attempts'] ?? 0) + 1;
             if (
                 $nextAttempts < admin_social_broadcast_max_attempts()
@@ -1581,6 +1680,16 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
                 $item['last_attempt_at'] = gmdate(DATE_ATOM);
             }
             $deferredFailed[] = $item;
+        } elseif (!empty($sentNetworks)) {
+            admin_social_rss_mark_broadcast_result($item, 'sent', [
+                'sent_networks' => $sentNetworks,
+                'failed_networks' => $failedNetworks,
+            ]);
+        } else {
+            admin_social_rss_mark_broadcast_result($item, 'failed', [
+                'error' => (string) ($item['last_error'] ?? 'send_failed'),
+                'failed_networks' => !empty($failedNetworks) ? $failedNetworks : $networks,
+            ]);
         }
     }
 

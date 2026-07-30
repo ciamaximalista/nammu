@@ -4989,6 +4989,8 @@ function nammu_fediverse_extract_outbox_items(
     $knownTimelineIds = array_fill_keys(array_values(array_filter(array_map('strval', $knownTimelineIds))), true);
     $inspectLimit = $inspectLimit !== null ? max(1, $inspectLimit) : max($limit * 6, 24);
     $inspected = 0;
+    $rawInspected = 0;
+    $rawInspectLimit = max($inspectLimit * 5, $inspectLimit + 80);
     $pageQueue = [];
     $queuedPages = [];
     $enqueuePage = static function (string $url) use (&$pageQueue, &$queuedPages): void {
@@ -5007,7 +5009,7 @@ function nammu_fediverse_extract_outbox_items(
             : (is_array($outbox['items'] ?? null) ? $outbox['items'] : []);
     }
 
-    while ($inspected < $inspectLimit && (!empty($rawItems) || !empty($pageQueue))) {
+    while ($inspected < $inspectLimit && $rawInspected < $rawInspectLimit && (!empty($rawItems) || !empty($pageQueue))) {
         if (empty($rawItems) && !empty($pageQueue)) {
             $nextPageUrl = array_shift($pageQueue);
             $pagePayload = nammu_fediverse_signed_fetch_json($nextPageUrl, $config);
@@ -5032,12 +5034,16 @@ function nammu_fediverse_extract_outbox_items(
         if ($rawItem === null) {
             continue;
         }
-        $inspected++;
+        $rawInspected++;
         $rawItemLabel = '';
         if (is_string($rawItem)) {
             $rawItemLabel = trim($rawItem);
         } elseif (is_array($rawItem)) {
             $rawItemLabel = trim((string) (($rawItem['id'] ?? '') ?: (is_string($rawItem['url'] ?? null) ? $rawItem['url'] : '')));
+            $rawType = strtolower(trim((string) ($rawItem['type'] ?? '')));
+            if (in_array($rawType, ['delete', 'tombstone'], true)) {
+                continue;
+            }
         }
         if (is_string($rawItem) && preg_match('#^https?://#i', $rawItem)) {
             $rawItemPayload = nammu_fediverse_signed_fetch_json($rawItem, $config);
@@ -5051,6 +5057,11 @@ function nammu_fediverse_extract_outbox_items(
         if (!is_array($rawItem)) {
             continue;
         }
+        $rawType = strtolower(trim((string) ($rawItem['type'] ?? '')));
+        if (in_array($rawType, ['delete', 'tombstone'], true)) {
+            continue;
+        }
+        $inspected++;
         $normalized = nammu_fediverse_normalize_remote_item($rawItem, $actor, $config);
         if ($normalized !== null) {
             $normalizedId = trim((string) ($normalized['id'] ?? ''));

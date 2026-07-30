@@ -1571,6 +1571,20 @@ function get_post_content($filename) {
     ];
 }
 
+function admin_chmod_content_file(string $path): void
+{
+    $contentDir = realpath(CONTENT_DIR);
+    $realPath = realpath($path);
+    if ($contentDir === false || $realPath === false || !is_file($realPath)) {
+        return;
+    }
+    $contentPrefix = rtrim($contentDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+    if ($realPath !== $contentDir && strncmp($realPath, $contentPrefix, strlen($contentPrefix)) !== 0) {
+        return;
+    }
+    @chmod($realPath, 0664);
+}
+
 function nammu_allowed_media_extensions(): array {
     return [
         'jpg','jpeg','png','gif','webp','svg',
@@ -8529,6 +8543,7 @@ function admin_autosave_from_payload($jsonPayload): array {
         $result['message'] = 'No se pudieron guardar los cambios antes de recargar la página.';
         return $result;
     }
+    admin_chmod_content_file($tempPath);
 
     $writeSucceeded = false;
     if (@rename($tempPath, $finalPath)) {
@@ -8541,6 +8556,7 @@ function admin_autosave_from_payload($jsonPayload): array {
     }
 
     if ($writeSucceeded) {
+        admin_chmod_content_file($finalPath);
         $result['saved'] = true;
         $result['filename'] = $targetFilename;
         $result['message'] = $isExistingFile
@@ -8925,6 +8941,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (file_put_contents($filepath, $file_content) === false) {
                     $error = 'No se pudo guardar la newsletter. Revisa los permisos de la carpeta content/.';
                 } else {
+                    admin_chmod_content_file($filepath);
                     if (is_array($newsletterSendResult)) {
                         $queuedCount = (int) ($newsletterSendResult['queued_recipients'] ?? 0);
                         $batchCount = (int) ($newsletterSendResult['queued_batches'] ?? 0);
@@ -9150,6 +9167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (file_put_contents($filepath, $file_content) === false) {
                     $error = 'No se pudo guardar el contenido. Revisa los permisos de la carpeta content/.';
                 } else {
+                    admin_chmod_content_file($filepath);
                     if (!$isDraft && $type === 'Entrada') {
                         $imageUrl = admin_public_asset_url($image);
                         admin_maybe_auto_post_to_social_networks($targetFilename, $title, $description, $image, '', $imageUrl);
@@ -9480,7 +9498,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 ";
             $fileContent .= $content;
-            @file_put_contents($filepath, $fileContent);
+            if (@file_put_contents($filepath, $fileContent) !== false) {
+                admin_chmod_content_file($filepath);
+            }
         }
         $_SESSION['mailing_feedback'] = [
             'type' => 'success',
@@ -9765,6 +9785,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 @unlink($tempPath);
                 $error = 'No se pudo guardar el contenido actualizado. Revisa los permisos de la carpeta content/.';
             } else {
+                admin_chmod_content_file($tempPath);
                 $writeSucceeded = false;
                 if (@rename($tempPath, $finalPath)) {
                     $writeSucceeded = true;
@@ -9776,6 +9797,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 if ($writeSucceeded) {
+                    admin_chmod_content_file($finalPath);
                     $shouldAutoShare = false;
                     $shouldAutoSharePodcast = false;
                     if ($template === 'post' && $status === 'published') {
@@ -11153,7 +11175,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
                 $file_content .= $post_data['content'];
 
-                file_put_contents(CONTENT_DIR . '/' . $sorted_post['filename'], $file_content);
+                $sortedPath = CONTENT_DIR . '/' . $sorted_post['filename'];
+                if (file_put_contents($sortedPath, $file_content) !== false) {
+                    admin_chmod_content_file($sortedPath);
+                }
                 $ordo++;
             }
         }

@@ -234,6 +234,7 @@ class ItineraryRepository
         if (file_put_contents($file, $payload) === false) {
             throw new RuntimeException("No se pudo escribir el archivo {$file}");
         }
+        @chmod($file, 0664);
     }
 
     private function itineraryQuizFile(string $directory): string
@@ -294,6 +295,7 @@ class ItineraryRepository
         if (file_put_contents($file, $payload) === false) {
             throw new RuntimeException("No se pudo escribir la autoevaluación {$file}");
         }
+        @chmod($file, 0664);
     }
 
     public function getItineraryStats(string $slug): array
@@ -415,6 +417,7 @@ class ItineraryRepository
         if (file_put_contents($file, $payload) === false) {
             throw new RuntimeException("No se pudieron escribir las estadísticas {$file}");
         }
+        @chmod($file, 0664);
     }
 
     private function sanitizeQuizData(?array $quiz): array

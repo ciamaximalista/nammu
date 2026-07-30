@@ -3016,6 +3016,7 @@ function nammu_publish_scheduled_posts(string $contentDir): int
             rewind($fp);
             if (ftruncate($fp, 0) && fwrite($fp, $newContent) !== false) {
                 fflush($fp);
+                @chmod($file, 0664);
                 $saved = true;
             }
         }

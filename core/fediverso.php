@@ -2968,8 +2968,8 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
         ];
         $threadPayloads[$localId] = is_array($existingPayload)
             && nammu_fediverse_thread_payload_score($existingPayload) > nammu_fediverse_thread_payload_score($candidatePayload)
-            ? $existingPayload
-            : $candidatePayload;
+            ? nammu_fediverse_merge_thread_payload_metrics($existingPayload, $candidatePayload)
+            : nammu_fediverse_merge_thread_payload_metrics($candidatePayload, $existingPayload);
         $threadPayloads[$localId]['replies'] = nammu_fediverse_filter_visible_replies((array) ($threadPayloads[$localId]['replies'] ?? []));
         $threadPayloads[$localId]['summary']['replies'] = count((array) $threadPayloads[$localId]['replies']);
         $threadPayloads[$localId]['details']['replies'] = nammu_fediverse_thread_reply_actor_details((array) $threadPayloads[$localId]['replies']);
@@ -3031,7 +3031,9 @@ function nammu_fediverse_best_persisted_thread_payload(?array $a, ?array $b): ?a
     if (!is_array($b)) {
         return $a;
     }
-    return nammu_fediverse_thread_payload_score($b) > nammu_fediverse_thread_payload_score($a) ? $b : $a;
+    return nammu_fediverse_thread_payload_score($b) > nammu_fediverse_thread_payload_score($a)
+        ? nammu_fediverse_merge_thread_payload_metrics($b, $a)
+        : nammu_fediverse_merge_thread_payload_metrics($a, $b);
 }
 
 function nammu_fediverse_merge_actor_detail_lists(array $primary, array $secondary): array
@@ -3076,9 +3078,6 @@ function nammu_fediverse_merge_thread_payload_metrics(array $preferredPayload, ?
     $preferredDetails = is_array($preferredPayload['details'] ?? null) ? $preferredPayload['details'] : [];
     $fallbackDetails = is_array($fallbackPayload['details'] ?? null) ? $fallbackPayload['details'] : [];
 
-    $preferredPayload['summary']['likes'] = max((int) ($preferredSummary['likes'] ?? 0), (int) ($fallbackSummary['likes'] ?? 0));
-    $preferredPayload['summary']['shares'] = max((int) ($preferredSummary['shares'] ?? 0), (int) ($fallbackSummary['shares'] ?? 0));
-
     $preferredPayload['details']['likes'] = nammu_fediverse_merge_actor_detail_lists(
         (array) ($preferredDetails['likes'] ?? []),
         (array) ($fallbackDetails['likes'] ?? [])
@@ -3086,6 +3085,20 @@ function nammu_fediverse_merge_thread_payload_metrics(array $preferredPayload, ?
     $preferredPayload['details']['shares'] = nammu_fediverse_merge_actor_detail_lists(
         (array) ($preferredDetails['shares'] ?? []),
         (array) ($fallbackDetails['shares'] ?? [])
+    );
+    $preferredPayload['summary']['likes'] = max(
+        (int) ($preferredSummary['likes'] ?? 0),
+        (int) ($fallbackSummary['likes'] ?? 0),
+        count((array) ($preferredPayload['details']['likes'] ?? []))
+    );
+    $preferredPayload['summary']['shares'] = max(
+        (int) ($preferredSummary['shares'] ?? 0),
+        (int) ($fallbackSummary['shares'] ?? 0),
+        count((array) ($preferredPayload['details']['shares'] ?? []))
+    );
+    $preferredPayload['replies'] = nammu_fediverse_stable_reply_list(
+        (array) ($preferredPayload['replies'] ?? []),
+        (array) ($fallbackPayload['replies'] ?? [])
     );
     $preferredPayload['details']['replies'] = nammu_fediverse_thread_reply_actor_details((array) ($preferredPayload['replies'] ?? []));
     $preferredPayload['summary']['replies'] = count((array) ($preferredPayload['replies'] ?? []));

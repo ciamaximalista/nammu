@@ -9649,6 +9649,8 @@ function nammu_fediverse_public_thread_meta_for_named_local_item(string $slug, s
         $data = is_array($snapshot['data'] ?? null) ? $snapshot['data'] : [];
         $localItems = is_array($data['local_items'] ?? null) ? $data['local_items'] : [];
         $threadPayloads = is_array($data['thread_payloads'] ?? null) ? $data['thread_payloads'] : [];
+        $threadState = nammu_fediverse_thread_state_store();
+        $threadStateItems = is_array($threadState['items'] ?? null) ? $threadState['items'] : [];
         foreach ($localItems as $localItem) {
             if (!is_array($localItem)) {
                 continue;
@@ -9677,7 +9679,9 @@ function nammu_fediverse_public_thread_meta_for_named_local_item(string $slug, s
             if ($key === null) {
                 continue;
             }
-            $payload = is_array($threadPayloads[$itemId] ?? null) ? $threadPayloads[$itemId] : null;
+            $snapshotPayload = is_array($threadPayloads[$itemId] ?? null) ? $threadPayloads[$itemId] : null;
+            $statePayload = is_array($threadStateItems[$itemId]['payload'] ?? null) ? $threadStateItems[$itemId]['payload'] : null;
+            $payload = nammu_fediverse_best_persisted_thread_payload($snapshotPayload, $statePayload);
             $candidate = [
                 'thread_url' => nammu_fediverse_thread_page_url($itemId, $config),
                 'summary' => is_array($payload['summary'] ?? null)
@@ -9687,16 +9691,29 @@ function nammu_fediverse_public_thread_meta_for_named_local_item(string $slug, s
                     ? $payload['details']
                     : ['likes' => [], 'shares' => [], 'replies' => []],
             ];
-            $candidateScore = (int) ($candidate['summary']['likes'] ?? 0)
-                + (int) ($candidate['summary']['shares'] ?? 0)
-                + (int) ($candidate['summary']['replies'] ?? 0);
             $existing = is_array($snapshotMaps[$cacheKey][$key] ?? null) ? $snapshotMaps[$cacheKey][$key] : null;
-            $existingScore = is_array($existing)
-                ? ((int) ($existing['summary']['likes'] ?? 0) + (int) ($existing['summary']['shares'] ?? 0) + (int) ($existing['summary']['replies'] ?? 0))
-                : -1;
-            if (!is_array($existing) || $candidateScore >= $existingScore) {
-                $snapshotMaps[$cacheKey][$key] = $candidate;
+            if (is_array($existing)) {
+                $existingPayload = [
+                    'item' => $localItem,
+                    'thread_url' => trim((string) ($existing['thread_url'] ?? '')),
+                    'original_url' => $itemUrl,
+                    'summary' => is_array($existing['summary'] ?? null) ? $existing['summary'] : ['likes' => 0, 'shares' => 0, 'replies' => 0],
+                    'details' => is_array($existing['details'] ?? null) ? $existing['details'] : ['likes' => [], 'shares' => [], 'replies' => []],
+                    'replies' => [],
+                ];
+                $candidatePayload = [
+                    'item' => $localItem,
+                    'thread_url' => trim((string) ($candidate['thread_url'] ?? '')),
+                    'original_url' => $itemUrl,
+                    'summary' => is_array($candidate['summary'] ?? null) ? $candidate['summary'] : ['likes' => 0, 'shares' => 0, 'replies' => 0],
+                    'details' => is_array($candidate['details'] ?? null) ? $candidate['details'] : ['likes' => [], 'shares' => [], 'replies' => []],
+                    'replies' => [],
+                ];
+                $mergedPayload = nammu_fediverse_merge_thread_payload_metrics($candidatePayload, $existingPayload);
+                $candidate['summary'] = $mergedPayload['summary'] ?? $candidate['summary'];
+                $candidate['details'] = $mergedPayload['details'] ?? $candidate['details'];
             }
+            $snapshotMaps[$cacheKey][$key] = $candidate;
         }
     }
 
@@ -9704,6 +9721,9 @@ function nammu_fediverse_public_thread_meta_for_named_local_item(string $slug, s
     $snapshotKeyMeta = ($normalizedSlug !== '' && isset($snapshotMaps[$cacheKey][$snapshotKey]) && is_array($snapshotMaps[$cacheKey][$snapshotKey]))
         ? $snapshotMaps[$cacheKey][$snapshotKey]
         : null;
+    if (is_array($snapshotKeyMeta)) {
+        return $snapshotKeyMeta;
+    }
 
     $baseUrl = nammu_fediverse_base_url($config);
     $candidateUrl = match ($normalizedTemplate) {
@@ -9739,11 +9759,6 @@ function nammu_fediverse_public_thread_meta_for_named_local_item(string $slug, s
     $payload = null;
     if (is_array($item)) {
         $payload = nammu_fediverse_thread_page_snapshot_payload($item, $config);
-        $itemId = trim((string) ($item['id'] ?? ''));
-        if (nammu_fediverse_is_named_local_object_id($itemId, $config)) {
-            $bestPayload = nammu_fediverse_best_thread_page_payload($item, $config);
-            $payload = nammu_fediverse_merge_thread_payload_metrics($bestPayload, $payload);
-        }
     }
 
     if (is_array($snapshotMeta)) {

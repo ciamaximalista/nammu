@@ -673,6 +673,40 @@ function nammu_actuality_fetch_url(string $url, string $accept = 'text/html,appl
         nammu_multi_instance_remote_host_before_request($url, $config);
     }
     $headers = [];
+    if (function_exists('curl_init')) {
+        $responseHeaders = [];
+        $ch = curl_init($url);
+        if ($ch !== false) {
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS => 5,
+                CURLOPT_CONNECTTIMEOUT => min(5, max(1, $timeout)),
+                CURLOPT_TIMEOUT => $timeout,
+                CURLOPT_USERAGENT => 'Nammu Actualidad',
+                CURLOPT_HTTPHEADER => ['Accept: ' . $accept],
+                CURLOPT_HEADERFUNCTION => static function ($curl, string $headerLine) use (&$responseHeaders): int {
+                    if (str_contains($headerLine, ':')) {
+                        [$name, $value] = explode(':', $headerLine, 2);
+                        $responseHeaders[strtolower(trim($name))] = trim($value);
+                    }
+                    return strlen($headerLine);
+                },
+            ]);
+            $body = curl_exec($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            curl_close($ch);
+            if (is_string($body) && $body !== '') {
+                if (is_array($config) && function_exists('nammu_multi_instance_remote_host_after_request')) {
+                    nammu_multi_instance_remote_host_after_request($url, $config, $status);
+                }
+                return [
+                    'body' => $body,
+                    'headers' => $responseHeaders,
+                ];
+            }
+        }
+    }
     $context = stream_context_create([
         'http' => [
             'method' => 'GET',

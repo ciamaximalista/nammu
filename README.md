@@ -60,36 +60,89 @@ mkdir -p config content assets itinerarios backups
 
 ### 3. Ajusta permisos
 
-Configuración recomendada en un servidor típico con `www-data`:
+Nammu escribe archivos desde varios sitios: el editor web, los cron, las colas de Fediverso/redes sociales, las cachés de imágenes, `git pull` y, a veces, tareas manuales desde consola. Para que todo funcione desde la primera instalación, usa siempre un **grupo compartido** entre el usuario del servidor web/PHP y el usuario con el que administras el repositorio.
+
+Primero identifica los usuarios reales:
 
 ```bash
-sudo chown -R <tu-usuario>:www-data /var/www/html/<carpeta-publica>
-sudo find /var/www/html/<carpeta-publica> -type d -exec chmod 2775 {} \;
-sudo find /var/www/html/<carpeta-publica> -type f -exec chmod 664 {} \;
+ps -eo user,group,comm,args | grep -E 'apache|www-data|php-fpm|nginx' | grep -v grep
+id <tu-usuario>
 ```
 
-Sustituye:
+En Debian/Ubuntu lo normal es `www-data:www-data`. En otros servidores puede ser `apache:apache`, `nginx:nginx` o `nobody:nogroup`.
 
-- `<tu-usuario>` por tu usuario del sistema.
-- `<carpeta-publica>` por la carpeta real del sitio.
+Define estos valores sustituyéndolos por los de tu servidor:
 
-Si tu servidor usa otro grupo para PHP o Apache (`apache`, `nginx`, etc.), cambia `www-data` por el correspondiente.
+```bash
+SITE=/var/www/html/<carpeta-publica>
+DEPLOY_USER=<tu-usuario>
+WEB_USER=www-data
+SHARED_GROUP=www-data
+```
 
-Importante:
+Si PHP/Apache corre como `nobody:nogroup`, usa:
 
-- Si el cron o PHP-FPM corren como `www-data`, `www-data` debe poder escribir de verdad los JSON de `config/`.
-- Esto afecta especialmente a stores que Nammu reescribe continuamente, como `fediverso-following.json`, `fediverso-timeline.json`, snapshots, colas sociales y otros ficheros de estado.
-- En entornos multiinstancia, `www-data` también debe poder escribir `_shared-cache/` y `_shared-queue/` si los activas.
+```bash
+WEB_USER=nobody
+SHARED_GROUP=nogroup
+```
+
+Añade el usuario de despliegue al grupo compartido y vuelve a entrar en sesión para que el cambio tenga efecto:
+
+```bash
+sudo usermod -aG "$SHARED_GROUP" "$DEPLOY_USER"
+```
+
+Aplica propietario, grupo, escritura de grupo y bit `setgid` en directorios. El `setgid` hace que los archivos nuevos hereden el grupo correcto aunque los cree PHP, cron o Git:
+
+```bash
+sudo chown -R "$DEPLOY_USER:$SHARED_GROUP" "$SITE"
+sudo find "$SITE" -type d -exec chmod 2775 {} \;
+sudo find "$SITE" -type f -exec chmod 664 {} \;
+```
+
+Configura Git para no quitar escritura de grupo al hacer checkout o pull:
+
+```bash
+cd "$SITE"
+git config core.sharedRepository group
+```
+
+Usa `umask 0002` en operaciones manuales y cron para que los archivos nuevos nazcan escribibles por el grupo:
+
+```bash
+umask 0002
+```
+
+En crontab, puedes aplicarlo por línea:
+
+```bash
+*/5 * * * * umask 0002; flock -n /tmp/<carpeta-publica>-run-scheduled.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
+```
+
+Directorios que deben ser escribibles por el usuario web y por el usuario de despliegue:
+
+- `config/`
+- `content/`
+- `assets/`
+- `assets/actualidad-cache/`
+- `content/uploads/`
+- `itinerarios/`
+- `backups/`
+- `vendor/` si instalas dependencias con Composer dentro del sitio
+
+Esto afecta especialmente a stores que Nammu reescribe continuamente: `config/*.json`, snapshots de Fediverso, colas sociales, cachés de link cards, estadísticas, avisos por email, Webmentions y cachés de imágenes.
 
 Comprobación rápida recomendada:
 
 ```bash
-ls -ld /var/www/html/<carpeta-publica>/config
-ls -l /var/www/html/<carpeta-publica>/config/*.json
-id www-data
+id "$DEPLOY_USER"
+id "$WEB_USER"
+ls -ld "$SITE" "$SITE/config" "$SITE/assets" "$SITE/assets/actualidad-cache" "$SITE/backups"
+find "$SITE/config" -maxdepth 1 -type f -name '*.json' -printf '%M %u %g %p\n' | head
 ```
 
-Si el cron va a ejecutarse con `www-data`, esos ficheros no pueden quedarse en un grupo sin permisos efectivos de escritura para ese usuario.
+Los directorios deben verse como `drwxrwsr-x` o compatible, con el grupo compartido. Si ves archivos creados por otro propietario pero sin escritura de grupo, corrige permisos antes de activar cron o publicar.
 
 ### 4. Configura el dominio o virtual host
 
@@ -188,19 +241,19 @@ Además, Nammu incluye:
 La forma recomendada es editar el cron del usuario del servidor web:
 
 ```bash
-sudo crontab -u www-data -e
+sudo crontab -u "$WEB_USER" -e
 ```
 
-Si usas ese comando, las líneas van **sin** la columna `www-data`.
+Si usas ese comando, las líneas van **sin** la columna del usuario.
 
 Antes de dar el cron por bueno, conviene comprobar dos cosas:
 
 ```bash
-sudo crontab -u www-data -l
+sudo crontab -u "$WEB_USER" -l
 sudo systemctl status cron --no-pager
 ```
 
-Si editas el cron de `www-data`, las tareas se ejecutarán con ese usuario. Por tanto, todos los JSON y directorios que Nammu actualiza en caliente deben ser escribibles por `www-data`.
+Si editas el cron de `WEB_USER`, las tareas se ejecutarán con ese usuario. Por tanto, todos los JSON y directorios que Nammu actualiza en caliente deben ser escribibles por ese usuario y por el grupo compartido. Mantén `umask 0002` en las líneas de cron para que los archivos nuevos no pierdan escritura de grupo.
 
 Para que **Fediverso** cargue ágilmente en el admin sin provocar solapes ni picos de CPU, conviene separar el cron en tres fases:
 
@@ -213,18 +266,18 @@ Las tres deben ejecutarse con el usuario del servidor web, escalonando las disti
 ### Bloque de cron recomendado
 
 ```bash
-*/5 * * * * flock -n /tmp/<carpeta-publica>-run-scheduled.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
-12,27,42,57 * * * * flock -n /tmp/<carpeta-publica>-run-scheduled-maintenance.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-maintenance >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
-7 * * * * flock -n /tmp/<carpeta-publica>-run-scheduled-heavy.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-heavy >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
-15 3 * * * flock -n /tmp/<carpeta-publica>-backup-daily.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
-30 3 * * 0 flock -n /tmp/<carpeta-publica>-backup-cleanup.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
-45 3 * * 0 flock -n /tmp/<carpeta-publica>-backup-weekly.lock php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> /var/www/html/<carpeta-publica>/backups/backup-full.log 2>&1
+*/5 * * * * umask 0002; flock -n /tmp/<carpeta-publica>-run-scheduled.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
+12,27,42,57 * * * * umask 0002; flock -n /tmp/<carpeta-publica>-run-scheduled-maintenance.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-maintenance >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
+7 * * * * umask 0002; flock -n /tmp/<carpeta-publica>-run-scheduled-heavy.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-heavy >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
+15 3 * * * umask 0002; flock -n /tmp/<carpeta-publica>-backup-daily.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
+30 3 * * 0 umask 0002; flock -n /tmp/<carpeta-publica>-backup-cleanup.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
+45 3 * * 0 umask 0002; flock -n /tmp/<carpeta-publica>-backup-weekly.lock php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> /var/www/html/<carpeta-publica>/backups/backup-full.log 2>&1
 ```
 
 Si usas el planificador central multiinstancia, la forma más robusta es ejecutarlo con rutas absolutas y `timeout`:
 
 ```bash
-* * * * * /usr/bin/timeout -k 10s 50s /usr/bin/flock -n /tmp/<cluster>-run-cluster.lock /usr/bin/php /var/www/html/<carpeta-publica>/admin.php --run-cluster-scheduled >> /var/www/html/<carpeta-publica>/backups/cluster-cron.log 2>&1
+* * * * * umask 0002; /usr/bin/timeout -k 10s 50s /usr/bin/flock -n /tmp/<cluster>-run-cluster.lock /usr/bin/php /var/www/html/<carpeta-publica>/admin.php --run-cluster-scheduled >> /var/www/html/<carpeta-publica>/backups/cluster-cron.log 2>&1
 ```
 
 Así evitas que un proceso colgado retenga el lock indefinidamente.
@@ -239,12 +292,12 @@ Si además quieres refrescar en segundo plano las `link cards` del Fediverso par
 ### Bloque recomendado para `link cards` federadas
 
 ```bash
-5-55/10 * * * * /usr/bin/flock -n /tmp/memoria-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/memoria/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/memoria/backups/fediverse-link-cards.log 2>&1
-6-56/10 * * * * /usr/bin/flock -n /tmp/maximalismo-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/maximalismo/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/maximalismo/backups/fediverse-link-cards.log 2>&1
-7-57/10 * * * * /usr/bin/flock -n /tmp/terceroslugares-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/terceroslugares/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/terceroslugares/backups/fediverse-link-cards.log 2>&1
-8-58/10 * * * * /usr/bin/flock -n /tmp/lacandela-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/lacandela/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/lacandela/backups/fediverse-link-cards.log 2>&1
-9-59/10 * * * * /usr/bin/flock -n /tmp/communalia-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/communalia/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/communalia/backups/fediverse-link-cards.log 2>&1
-0-50/10 * * * * /usr/bin/flock -n /tmp/juan-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/juan/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/juan/backups/fediverse-link-cards.log 2>&1
+5-55/10 * * * * umask 0002; /usr/bin/flock -n /tmp/memoria-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/memoria/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/memoria/backups/fediverse-link-cards.log 2>&1
+6-56/10 * * * * umask 0002; /usr/bin/flock -n /tmp/maximalismo-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/maximalismo/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/maximalismo/backups/fediverse-link-cards.log 2>&1
+7-57/10 * * * * umask 0002; /usr/bin/flock -n /tmp/terceroslugares-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/terceroslugares/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/terceroslugares/backups/fediverse-link-cards.log 2>&1
+8-58/10 * * * * umask 0002; /usr/bin/flock -n /tmp/lacandela-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/lacandela/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/lacandela/backups/fediverse-link-cards.log 2>&1
+9-59/10 * * * * umask 0002; /usr/bin/flock -n /tmp/communalia-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/communalia/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/communalia/backups/fediverse-link-cards.log 2>&1
+0-50/10 * * * * umask 0002; /usr/bin/flock -n /tmp/juan-fediverse-link-cards.lock /usr/bin/php /var/www/html/blogs/juan/admin.php --run-fediverse-link-card-refresh >> /var/www/html/blogs/juan/backups/fediverse-link-cards.log 2>&1
 ```
 
 Ese escalonado evita que todas las instancias resuelvan metadata remota a la vez y deja la carga separada del planificador central del cluster.
@@ -254,17 +307,17 @@ Si además quieres dejar constancia explícita en el log cuando el lock esté oc
 Si mantienes varias instalaciones Nammu en el mismo servidor, no las lances todas en el mismo minuto. Lo recomendable es escalonarlas con ejemplos genéricos como estos:
 
 ```bash
-*/5 * * * * flock -n /tmp/sitio-a-run-scheduled.lock php /var/www/html/sitio-a/admin.php --run-scheduled >> /var/www/html/sitio-a/backups/cron.log 2>&1
-1-56/5 * * * * flock -n /tmp/sitio-b-run-scheduled.lock php /var/www/html/sitio-b/admin.php --run-scheduled >> /var/www/html/sitio-b/backups/cron.log 2>&1
-2-57/5 * * * * flock -n /tmp/sitio-c-run-scheduled.lock php /var/www/html/sitio-c/admin.php --run-scheduled >> /var/www/html/sitio-c/backups/cron.log 2>&1
+*/5 * * * * umask 0002; flock -n /tmp/sitio-a-run-scheduled.lock php /var/www/html/sitio-a/admin.php --run-scheduled >> /var/www/html/sitio-a/backups/cron.log 2>&1
+1-56/5 * * * * umask 0002; flock -n /tmp/sitio-b-run-scheduled.lock php /var/www/html/sitio-b/admin.php --run-scheduled >> /var/www/html/sitio-b/backups/cron.log 2>&1
+2-57/5 * * * * umask 0002; flock -n /tmp/sitio-c-run-scheduled.lock php /var/www/html/sitio-c/admin.php --run-scheduled >> /var/www/html/sitio-c/backups/cron.log 2>&1
 
-12,27,42,57 * * * * flock -n /tmp/sitio-a-run-scheduled-maintenance.lock php /var/www/html/sitio-a/admin.php --run-scheduled-maintenance >> /var/www/html/sitio-a/backups/cron.log 2>&1
-13,28,43,58 * * * * flock -n /tmp/sitio-b-run-scheduled-maintenance.lock php /var/www/html/sitio-b/admin.php --run-scheduled-maintenance >> /var/www/html/sitio-b/backups/cron.log 2>&1
-14,29,44,59 * * * * flock -n /tmp/sitio-c-run-scheduled-maintenance.lock php /var/www/html/sitio-c/admin.php --run-scheduled-maintenance >> /var/www/html/sitio-c/backups/cron.log 2>&1
+12,27,42,57 * * * * umask 0002; flock -n /tmp/sitio-a-run-scheduled-maintenance.lock php /var/www/html/sitio-a/admin.php --run-scheduled-maintenance >> /var/www/html/sitio-a/backups/cron.log 2>&1
+13,28,43,58 * * * * umask 0002; flock -n /tmp/sitio-b-run-scheduled-maintenance.lock php /var/www/html/sitio-b/admin.php --run-scheduled-maintenance >> /var/www/html/sitio-b/backups/cron.log 2>&1
+14,29,44,59 * * * * umask 0002; flock -n /tmp/sitio-c-run-scheduled-maintenance.lock php /var/www/html/sitio-c/admin.php --run-scheduled-maintenance >> /var/www/html/sitio-c/backups/cron.log 2>&1
 
-7 * * * * flock -n /tmp/sitio-a-run-scheduled-heavy.lock php /var/www/html/sitio-a/admin.php --run-scheduled-heavy >> /var/www/html/sitio-a/backups/cron.log 2>&1
-17 * * * * flock -n /tmp/sitio-b-run-scheduled-heavy.lock php /var/www/html/sitio-b/admin.php --run-scheduled-heavy >> /var/www/html/sitio-b/backups/cron.log 2>&1
-27 * * * * flock -n /tmp/sitio-c-run-scheduled-heavy.lock php /var/www/html/sitio-c/admin.php --run-scheduled-heavy >> /var/www/html/sitio-c/backups/cron.log 2>&1
+7 * * * * umask 0002; flock -n /tmp/sitio-a-run-scheduled-heavy.lock php /var/www/html/sitio-a/admin.php --run-scheduled-heavy >> /var/www/html/sitio-a/backups/cron.log 2>&1
+17 * * * * umask 0002; flock -n /tmp/sitio-b-run-scheduled-heavy.lock php /var/www/html/sitio-b/admin.php --run-scheduled-heavy >> /var/www/html/sitio-b/backups/cron.log 2>&1
+27 * * * * umask 0002; flock -n /tmp/sitio-c-run-scheduled-heavy.lock php /var/www/html/sitio-c/admin.php --run-scheduled-heavy >> /var/www/html/sitio-c/backups/cron.log 2>&1
 ```
 
 Ese patrón evita dos problemas comunes:
@@ -322,14 +375,15 @@ Ese runner:
 
 Para que funcione bien en multiinstancia:
 
-- `config/*.json` de cada instalación deben ser escribibles por el usuario real del cron, normalmente `www-data`
+- `config/*.json` de cada instalación deben ser escribibles por el usuario real del cron, normalmente el mismo `WEB_USER` definido en la instalación
 - `_shared-cache/` y `_shared-queue/` deben ser escribibles por ese mismo usuario
 - `backups/cluster-cron.log` debe ser escribible por ese usuario
 
-Una configuración típica y coherente para las rutas compartidas es:
+Una configuración típica y coherente para las rutas compartidas, usando las mismas variables de permisos de la instalación, es:
 
 ```bash
-sudo chown -R <tu-usuario>:www-data /var/www/html/blogs/_shared-cache /var/www/html/blogs/_shared-queue
+sudo mkdir -p /var/www/html/blogs/_shared-cache /var/www/html/blogs/_shared-queue
+sudo chown -R "$DEPLOY_USER:$SHARED_GROUP" /var/www/html/blogs/_shared-cache /var/www/html/blogs/_shared-queue
 sudo find /var/www/html/blogs/_shared-cache -type d -exec chmod 2775 {} \;
 sudo find /var/www/html/blogs/_shared-cache -type f -exec chmod 664 {} \;
 sudo find /var/www/html/blogs/_shared-queue -type d -exec chmod 2775 {} \;
@@ -410,7 +464,7 @@ Cuando un sitio está en `scheduler_mode = central`, el dashboard muestra ademá
 
 En el bloque `Origen de los usuarios únicos`, las referencias federadas se muestran como `Fediverso`. Eso incluye dominios como `mastodon.social` o `maximalismo.red`, que no deben computar en `Sitios web` sino en `Redes sociales`.
 
-Si en vez de eso editas `/etc/crontab` o usas `sudo crontab -e`, entonces sí debes añadir `www-data` delante del comando.
+Si en vez de eso editas `/etc/crontab` o usas `sudo crontab -e`, entonces sí debes añadir el usuario web real delante del comando, por ejemplo `www-data`, `apache`, `nginx` o `nobody`.
 
 ### Qué guarda cada backup
 
@@ -615,9 +669,10 @@ Nammu no se limita a generar RSS: también convierte cada blog en una cuenta pro
 ```bash
 cd /var/www/html/<carpeta-publica>
 git pull origin main
-sudo chown -R <tu-usuario>:www-data .
+sudo chown -R "$DEPLOY_USER:$SHARED_GROUP" .
 sudo find . -type d -exec chmod 2775 {} \;
 sudo find . -type f -exec chmod 664 {} \;
+git config core.sharedRepository group
 ```
 
 ## Migración desde PicoCMS

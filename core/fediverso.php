@@ -198,6 +198,109 @@ function nammu_fediverse_actuality_item_effective_image(array $item): string
     return $sourceImage;
 }
 
+function nammu_fediverse_actuality_item_primary_url(array $item, array $config): string
+{
+    $baseUrl = nammu_fediverse_base_url($config);
+    $isManual = !empty($item['is_manual']);
+    $linkTargets = nammu_fediverse_actuality_item_link_targets($item);
+    if ($isManual && !empty($linkTargets)) {
+        return nammu_fediverse_resolve_url_like_actuality((string) $linkTargets[0], $baseUrl);
+    }
+    $boostOriginalUrl = trim((string) ($item['boost_original_url'] ?? ''));
+    if ($boostOriginalUrl !== '') {
+        return nammu_fediverse_resolve_url_like_actuality($boostOriginalUrl, $baseUrl);
+    }
+    return nammu_fediverse_resolve_url_like_actuality(trim((string) ($item['link'] ?? '')), $baseUrl);
+}
+
+function nammu_fediverse_localize_remote_image_for_url(string $pageUrl, string $imageUrl, array $config): string
+{
+    static $requestCache = [];
+
+    $pageUrl = trim($pageUrl);
+    $imageUrl = trim($imageUrl);
+    if ($pageUrl === '' || $imageUrl === '') {
+        return $imageUrl;
+    }
+
+    if (!function_exists('nammu_actuality_cache_social_image')
+        || !function_exists('nammu_actuality_load_cache')
+        || !function_exists('nammu_actuality_save_cache')
+    ) {
+        return $imageUrl;
+    }
+
+    $publicBaseUrl = nammu_fediverse_base_url($config);
+    $cacheKey = sha1($pageUrl);
+    $cache = nammu_actuality_load_cache();
+    $cache['items'] = is_array($cache['items'] ?? null) ? $cache['items'] : [];
+    $entry = is_array($cache['items'][$cacheKey] ?? null) ? $cache['items'][$cacheKey] : [];
+    $sourceImage = trim((string) ($entry['source_image'] ?? ''));
+    if (function_exists('nammu_actuality_is_local_image_url') && nammu_actuality_is_local_image_url($imageUrl, $publicBaseUrl)) {
+        $imagePath = trim((string) (parse_url($imageUrl, PHP_URL_PATH) ?? ''));
+        $localImagePath = $imagePath !== '' ? dirname(__DIR__) . $imagePath : '';
+        if ($localImagePath !== '' && is_file($localImagePath)) {
+            return $imageUrl;
+        }
+        if ($imagePath === '' || !str_starts_with($imagePath, '/assets/actualidad-cache/')) {
+            return $imageUrl;
+        }
+        if ($sourceImage === '') {
+            return '';
+        }
+        $imageUrl = $sourceImage;
+    }
+
+    $requestKey = $cacheKey . '|' . sha1($imageUrl);
+    if (array_key_exists($requestKey, $requestCache)) {
+        return $requestCache[$requestKey] !== '' ? $requestCache[$requestKey] : $imageUrl;
+    }
+
+    $localPath = trim((string) ($entry['local_path'] ?? ''));
+    $publicUrl = trim((string) ($entry['public_url'] ?? ''));
+    if ($localPath !== '' && $publicUrl !== '' && is_file($localPath)) {
+        $cache['items'][$cacheKey]['last_used'] = time();
+        nammu_actuality_save_cache($cache);
+        $requestCache[$requestKey] = $publicUrl;
+        return $publicUrl;
+    }
+
+    $cachedPublicUrl = nammu_actuality_cache_social_image($pageUrl, $imageUrl, $publicBaseUrl);
+    if ($cachedPublicUrl === '') {
+        $requestCache[$requestKey] = '';
+        return $imageUrl;
+    }
+
+    $path = parse_url($cachedPublicUrl, PHP_URL_PATH);
+    $localCachedPath = $path !== null && $path !== '' ? dirname(__DIR__) . $path : '';
+    $cache['items'][$cacheKey] = [
+        'page_url' => $pageUrl,
+        'source_image' => $imageUrl,
+        'public_url' => $cachedPublicUrl,
+        'local_path' => $localCachedPath,
+        'last_used' => time(),
+    ];
+    nammu_actuality_save_cache($cache);
+    $requestCache[$requestKey] = $cachedPublicUrl;
+    return $cachedPublicUrl;
+}
+
+function nammu_fediverse_actuality_item_fediverse_image(array $item, array $config): string
+{
+    $pageUrl = nammu_fediverse_actuality_item_primary_url($item, $config);
+    $image = nammu_fediverse_actuality_item_effective_image($item);
+    if ($image === '' && $pageUrl !== '') {
+        $card = nammu_fediverse_cached_link_card($pageUrl, $config, 2592000);
+        if (is_array($card)) {
+            $image = trim((string) ($card['image'] ?? ''));
+        }
+    }
+    if ($image === '' || $pageUrl === '') {
+        return $image;
+    }
+    return nammu_fediverse_localize_remote_image_for_url($pageUrl, $image, $config);
+}
+
 function nammu_fediverse_keys_file(): string
 {
     return dirname(__DIR__) . '/config/activitypub-keys.json';
@@ -3792,6 +3895,11 @@ function nammu_fediverse_find_local_item_for_thread_hash(string $hash, array $co
                 $aliasIds[] = trim((string) $legacyId);
             }
         }
+        $fediverseImage = nammu_fediverse_actuality_item_fediverse_image($actualityItem, $config);
+        $fediverseImages = array_values(array_filter(array_map('strval', is_array($actualityItem['images'] ?? null) ? $actualityItem['images'] : [])));
+        if ($fediverseImage !== '' && !in_array($fediverseImage, $fediverseImages, true)) {
+            array_unshift($fediverseImages, $fediverseImage);
+        }
         $localItem = [
             'id' => $itemId,
             'url' => trim((string) (($actualityItem['link'] ?? '') ?: ($baseUrl . '/actualidad.php'))),
@@ -3800,8 +3908,8 @@ function nammu_fediverse_find_local_item_for_thread_hash(string $hash, array $co
             'summary' => trim((string) ($actualityItem['description'] ?? '')),
             'published' => gmdate(DATE_ATOM, (int) (($actualityItem['timestamp'] ?? 0) ?: time())),
             'type' => !empty($actualityItem['is_manual']) ? 'Note' : 'Article',
-            'image' => nammu_fediverse_actuality_item_effective_image($actualityItem),
-            'images' => array_values(array_filter(array_map('strval', is_array($actualityItem['images'] ?? null) ? $actualityItem['images'] : []))),
+            'image' => $fediverseImage,
+            'images' => $fediverseImages,
             'attachments' => array_values(array_filter((array) ($actualityItem['attachments'] ?? []), static function ($attachment): bool {
                 return is_array($attachment) && trim((string) ($attachment['url'] ?? '')) !== '';
             })),
@@ -4798,7 +4906,7 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
                 if ($clusterUrl === '') {
                     $clusterUrl = trim((string) ($clusterActualityItem['link'] ?? ''));
                 }
-                $clusterImage = nammu_fediverse_actuality_item_effective_image($clusterActualityItem);
+                $clusterImage = nammu_fediverse_actuality_item_fediverse_image($clusterActualityItem, $config);
                 if ($clusterTitle !== '') {
                     $object['name'] = $clusterTitle;
                 }
@@ -5650,6 +5758,11 @@ function nammu_fediverse_local_content_items(array $config): array
                 $aliasIds[] = trim((string) $legacyId);
             }
         }
+        $fediverseImage = nammu_fediverse_actuality_item_fediverse_image($item, $config);
+        $fediverseImages = array_values(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : [])));
+        if ($fediverseImage !== '' && !in_array($fediverseImage, $fediverseImages, true)) {
+            array_unshift($fediverseImages, $fediverseImage);
+        }
         $items[] = [
             'id' => $itemId,
             'url' => trim((string) (($item['link'] ?? '') ?: ($baseUrl . '/actualidad.php'))),
@@ -5658,8 +5771,8 @@ function nammu_fediverse_local_content_items(array $config): array
             'summary' => trim((string) ($item['description'] ?? '')),
             'published' => gmdate(DATE_ATOM, (int) (($item['timestamp'] ?? 0) ?: time())),
             'type' => $isManual ? 'Note' : 'Article',
-            'image' => nammu_fediverse_actuality_item_effective_image($item),
-            'images' => array_values(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []))),
+            'image' => $fediverseImage,
+            'images' => $fediverseImages,
             'alias_ids' => $aliasIds,
         ];
     }
@@ -6809,6 +6922,9 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
         $prefetchedCard = nammu_fediverse_cached_link_card($originalObjectUrl, $config, 259200);
         if (is_array($prefetchedCard)) {
             $image = trim((string) ($prefetchedCard['image'] ?? ''));
+            if ($image !== '') {
+                $image = nammu_fediverse_localize_remote_image_for_url($originalObjectUrl, $image, $config);
+            }
         } else {
             nammu_fediverse_enqueue_link_card_url($originalObjectUrl, 'outgoing-activity');
         }

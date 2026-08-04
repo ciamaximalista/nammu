@@ -913,7 +913,11 @@ if (preg_match('#^/fediverso/([a-f0-9]{24})/?$#', $routePath, $fediverseThreadMa
     if ($threadLinkCardUrl !== '' && trim((string) ($threadItem['image'] ?? '')) === '' && function_exists('nammu_fediverse_cached_link_card')) {
         $threadOriginalCard = nammu_fediverse_cached_link_card($threadLinkCardUrl, $configData, 259200);
         if (is_array($threadOriginalCard) && trim((string) ($threadOriginalCard['image'] ?? '')) !== '') {
-            $threadItem['image'] = trim((string) $threadOriginalCard['image']);
+            $threadCardImage = trim((string) $threadOriginalCard['image']);
+            if (function_exists('nammu_fediverse_localize_remote_image_for_url')) {
+                $threadCardImage = nammu_fediverse_localize_remote_image_for_url($threadLinkCardUrl, $threadCardImage, $configData);
+            }
+            $threadItem['image'] = $threadCardImage;
         }
     }
     $threadImage = trim((string) ($threadItem['image'] ?? ''));

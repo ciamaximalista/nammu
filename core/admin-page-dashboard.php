@@ -165,6 +165,8 @@
         'fediverse_last_at' => $fediverseLastTimestamp,
         'rss_unprocessed' => 0,
         'rss_unprocessed_items' => [],
+        'rss_fetch_failed' => 0,
+        'rss_fetch_failed_items' => [],
     ];
     if (
         function_exists('admin_social_rss_feed_urls_from_settings')
@@ -172,6 +174,14 @@
         && function_exists('admin_load_social_rss_state')
     ) {
         $rssFeeds = admin_social_rss_feed_urls_from_settings($settings);
+        if (function_exists('nammu_actuality_feed_urls')) {
+            $rssFeeds = array_merge($rssFeeds, nammu_actuality_feed_urls($settings));
+        }
+        $rssFeeds = array_values(array_unique(array_filter(array_map(static function ($url): string {
+            return trim((string) $url);
+        }, $rssFeeds), static function (string $url): bool {
+            return $url !== '' && preg_match('#^https?://#i', $url);
+        })));
         $rssState = admin_load_social_rss_state();
         $rssStateFeeds = is_array($rssState['feeds'] ?? null) ? $rssState['feeds'] : [];
         $newsStore = function_exists('nammu_actuality_load_news_store') ? nammu_actuality_load_news_store() : ['items' => []];
@@ -186,6 +196,7 @@
             }
         }
         $rssUnprocessedItems = [];
+        $rssFetchFailedItems = [];
         $recentRssCutoff = time() - (72 * 3600);
         foreach ($rssFeeds as $rssFeedUrl) {
             $rssFeedUrl = trim((string) $rssFeedUrl);
@@ -193,7 +204,16 @@
                 continue;
             }
             $rssFeedKey = sha1($rssFeedUrl);
-            foreach (admin_fetch_social_rss_items($rssFeedUrl) as $rssItem) {
+            $rssFetchError = null;
+            $rssItems = admin_fetch_social_rss_items($rssFeedUrl, $rssFetchError);
+            if (is_string($rssFetchError) && trim($rssFetchError) !== '') {
+                $rssFetchFailedItems[] = [
+                    'feed' => $rssFeedUrl,
+                    'error' => trim($rssFetchError),
+                ];
+                continue;
+            }
+            foreach ($rssItems as $rssItem) {
                 if (!is_array($rssItem)) {
                     continue;
                 }
@@ -234,8 +254,10 @@
         });
         $socialFediverseStatus['rss_unprocessed'] = count($rssUnprocessedItems);
         $socialFediverseStatus['rss_unprocessed_items'] = array_slice($rssUnprocessedItems, 0, 5);
+        $socialFediverseStatus['rss_fetch_failed'] = count($rssFetchFailedItems);
+        $socialFediverseStatus['rss_fetch_failed_items'] = array_slice($rssFetchFailedItems, 0, 5);
     }
-    $socialFediverseHasErrors = $socialFailedItems > 0;
+    $socialFediverseHasErrors = $socialFailedItems > 0 || (int) ($socialFediverseStatus['rss_fetch_failed'] ?? 0) > 0;
     $socialFediverseHasPending = count($socialQueueItems) > 0 || $fediversePending > 0 || (int) ($socialFediverseStatus['rss_unprocessed'] ?? 0) > 0;
     $socialFediverseColor = $socialFediverseHasErrors ? '#ea2f28' : ($socialFediverseHasPending ? '#b36b00' : '#1b8eed');
     $socialFediverseLabel = $socialFediverseHasErrors ? 'Con errores' : ($socialFediverseHasPending ? 'En curso' : 'Sin pendientes');
@@ -2922,6 +2944,9 @@
                             <strong>Mensajes pendientes:</strong> <?= (int) ($socialFediverseStatus['social_pending_items'] ?? 0) ?>
                             · <strong>Redes pendientes:</strong> <?= (int) ($socialFediverseStatus['social_pending_networks'] ?? 0) ?>
                             · <strong>RSS sin procesar:</strong> <?= (int) ($socialFediverseStatus['rss_unprocessed'] ?? 0) ?>
+                            <?php if ((int) ($socialFediverseStatus['rss_fetch_failed'] ?? 0) > 0): ?>
+                                · <strong>No comprobadas:</strong> <?= (int) ($socialFediverseStatus['rss_fetch_failed'] ?? 0) ?>
+                            <?php endif; ?>
                             <?php if ((int) ($socialFediverseStatus['social_failed_items'] ?? 0) > 0): ?>
                                 · <strong>Con error:</strong> <?= (int) ($socialFediverseStatus['social_failed_items'] ?? 0) ?>
                             <?php endif; ?>
@@ -2935,6 +2960,17 @@
                                     $rssPendingReason = trim((string) ($rssPendingItem['reason'] ?? ''));
                                     ?>
                                     <li><?= htmlspecialchars($rssPendingTitle !== '' ? $rssPendingTitle : 'Ítem RSS sin título', ENT_QUOTES, 'UTF-8') ?><?php if ($rssPendingTimestamp > 0): ?> · <?= htmlspecialchars(date('d/m/y H:i', $rssPendingTimestamp), ENT_QUOTES, 'UTF-8') ?><?php endif; ?><?php if ($rssPendingReason !== ''): ?> · <?= htmlspecialchars($rssPendingReason, ENT_QUOTES, 'UTF-8') ?><?php endif; ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
+                        <?php if (!empty($socialFediverseStatus['rss_fetch_failed_items']) && is_array($socialFediverseStatus['rss_fetch_failed_items'])): ?>
+                            <ul class="mb-0 mt-2 pl-3" style="color:#ea2f28;">
+                                <?php foreach ($socialFediverseStatus['rss_fetch_failed_items'] as $rssFailedItem): ?>
+                                    <?php
+                                    $rssFailedFeed = trim((string) ($rssFailedItem['feed'] ?? ''));
+                                    $rssFailedError = trim((string) ($rssFailedItem['error'] ?? ''));
+                                    ?>
+                                    <li><?= htmlspecialchars($rssFailedFeed !== '' ? $rssFailedFeed : 'Feed RSS', ENT_QUOTES, 'UTF-8') ?><?php if ($rssFailedError !== ''): ?> · <?= htmlspecialchars($rssFailedError, ENT_QUOTES, 'UTF-8') ?><?php endif; ?></li>
                                 <?php endforeach; ?>
                             </ul>
                         <?php endif; ?>

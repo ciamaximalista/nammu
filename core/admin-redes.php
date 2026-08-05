@@ -431,8 +431,9 @@ function admin_purge_social_broadcast_queue_unconfigured_networks(?array $queue 
     ];
 }
 
-function admin_fetch_social_rss_items(string $url): array
+function admin_fetch_social_rss_items(string $url, ?string &$error = null): array
 {
+    $error = null;
     $context = stream_context_create([
         'http' => [
             'method' => 'GET',
@@ -443,11 +444,13 @@ function admin_fetch_social_rss_items(string $url): array
     ]);
     $raw = @file_get_contents($url, false, $context);
     if (!is_string($raw) || trim($raw) === '') {
+        $error = 'Sin respuesta o respuesta vacía';
         return [];
     }
     libxml_use_internal_errors(true);
     $xml = @simplexml_load_string($raw, 'SimpleXMLElement', LIBXML_NOCDATA);
     if (!$xml instanceof SimpleXMLElement) {
+        $error = 'XML no válido';
         return [];
     }
     $items = [];

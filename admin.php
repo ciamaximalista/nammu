@@ -944,6 +944,18 @@ function admin_multi_instance_mark_phase_run(array &$state, string $siteKey, str
     $state['runs'][$siteKey][$phase . '_last_at'] = $now;
 }
 
+function admin_multi_instance_run_completed(array $run): bool
+{
+    if ((int) ($run['exit_code'] ?? 1) !== 0) {
+        return false;
+    }
+    $result = is_array($run['result'] ?? null) ? $run['result'] : null;
+    if (is_array($result) && (int) ($result['skipped'] ?? 0) > 0) {
+        return false;
+    }
+    return true;
+}
+
 function admin_multi_instance_run_site_phase(string $adminFile, string $phase): array
 {
     $map = [
@@ -1028,7 +1040,7 @@ function admin_run_cluster_scheduled_tasks(): array
         ];
         $runs = [];
         if ($strategy === 'activity') {
-            foreach (['light', 'maintenance', 'heavy'] as $phase) {
+            foreach (['maintenance', 'light', 'heavy'] as $phase) {
                 $elapsedMs = (int) round(max(0, microtime(true) - $clusterStartedAt) * 1000);
                 if ($elapsedMs >= $clusterBudgetMs) {
                     admin_multi_instance_trace($config, [
@@ -1112,13 +1124,15 @@ function admin_run_cluster_scheduled_tasks(): array
                     'exit_code' => (int) ($run['exit_code'] ?? 1),
                     'result' => $run['result'] ?? null,
                 ];
-                admin_multi_instance_mark_phase_run($state, $siteKey, $phase, $now);
-                admin_multi_instance_scheduler_state_save($config, $state);
+                if (admin_multi_instance_run_completed($run)) {
+                    admin_multi_instance_mark_phase_run($state, $siteKey, $phase, $now);
+                    admin_multi_instance_scheduler_state_save($config, $state);
+                }
             }
         } else {
             foreach ($sites as $index => $site) {
                 $siteKey = (string) ($site['site_dir'] ?? ('site-' . $index));
-                foreach (['light', 'maintenance', 'heavy'] as $phase) {
+                foreach (['maintenance', 'light', 'heavy'] as $phase) {
                     $elapsedMs = (int) round(max(0, microtime(true) - $clusterStartedAt) * 1000);
                     if ($elapsedMs >= $clusterBudgetMs) {
                         admin_multi_instance_trace($config, [
@@ -1181,8 +1195,10 @@ function admin_run_cluster_scheduled_tasks(): array
                         'exit_code' => (int) ($run['exit_code'] ?? 1),
                         'result' => $run['result'] ?? null,
                     ];
-                    admin_multi_instance_mark_phase_run($state, $siteKey, $phase, $now);
-                    admin_multi_instance_scheduler_state_save($config, $state);
+                    if (admin_multi_instance_run_completed($run)) {
+                        admin_multi_instance_mark_phase_run($state, $siteKey, $phase, $now);
+                        admin_multi_instance_scheduler_state_save($config, $state);
+                    }
                 }
             }
         }

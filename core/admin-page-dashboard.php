@@ -1,5 +1,11 @@
 <?php if ($page === 'dashboard'): ?>
     <?php
+    if (!function_exists('admin_social_rss_feed_urls_from_settings') && is_file(__DIR__ . '/admin-redes.php')) {
+        require_once __DIR__ . '/admin-redes.php';
+    }
+    if (!function_exists('nammu_actuality_feed_urls') && is_file(__DIR__ . '/actualidad.php')) {
+        require_once __DIR__ . '/actualidad.php';
+    }
     $postsMetadata = get_all_posts_metadata();
     $postCount = 0;
     $pageCount = 0;

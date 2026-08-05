@@ -3181,7 +3181,6 @@ function admin_bing_api_get(string $method, array $params): array {
                 if (is_string($effectiveUrl) && $effectiveUrl !== '') {
                     $finalUrl = $effectiveUrl;
                 }
-                curl_close($ch);
             }
         }
 
@@ -3448,7 +3447,6 @@ function admin_bing_fetch_token(array $payload): array {
                 $resp = curl_exec($ch);
                 $response = is_string($resp) ? $resp : '';
                 $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
             }
         }
         if ($response === '') {
@@ -4841,7 +4839,6 @@ function admin_twitter_upload_media(string $imageRef, string $imageUrl, array $s
         if ($responseBody !== false) {
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         }
-        curl_close($ch);
     } finally {
         if ($tmpPath !== '') {
             @unlink($tmpPath);
@@ -5417,7 +5414,6 @@ function admin_prepare_instagram_image_url(string $imageTrim, string $baseUrl, ?
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 15);
             $rawImage = curl_exec($ch);
-            curl_close($ch);
         }
         if (is_string($rawImage) && $rawImage !== '') {
             $src = @imagecreatefromstring($rawImage);
@@ -5540,7 +5536,6 @@ function admin_prepare_podcast_artwork_image(string $imageValue, string $siteUrl
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 15);
             $rawImage = curl_exec($ch);
-            curl_close($ch);
         }
         if (is_string($rawImage) && $rawImage !== '') {
             $src = @imagecreatefromstring($rawImage);
@@ -5808,7 +5803,6 @@ function admin_http_post_multipart_json(string $url, array $params, array $heade
     if ($responseBody !== false) {
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     }
-    curl_close($ch);
     if (!is_string($responseBody) || $responseBody === '') {
         return null;
     }
@@ -5849,7 +5843,6 @@ function admin_http_post_body_response(string $url, string $body, array $headers
         if ($responseBody !== false) {
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         }
-        curl_close($ch);
     } else {
         $context = stream_context_create([
             'http' => [
@@ -5890,7 +5883,6 @@ function admin_http_get_json(string $url, array $headers = []): ?array {
         if ($responseBody !== false) {
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         }
-        curl_close($ch);
     } else {
         $context = stream_context_create([
             'http' => [
@@ -5945,7 +5937,6 @@ function admin_send_telegram_message(string $token, string $chatId, string $text
         if ($responseBody !== false) {
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         }
-        curl_close($ch);
     } else {
         $context = stream_context_create([
             'http' => [
@@ -6010,7 +6001,6 @@ function admin_send_telegram_photo(string $token, string $chatId, string $photoU
         if ($responseBody !== false) {
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         }
-        curl_close($ch);
         if ($tempPath !== null && $tempPath !== '') {
             @unlink($tempPath);
         }

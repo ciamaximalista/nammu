@@ -2481,7 +2481,6 @@ function admin_send_telegram_media_group(string $token, string $chatId, array $p
         if ($responseBody !== false) {
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         }
-        curl_close($ch);
         foreach ($tempFiles as $tempFile) {
             @unlink($tempFile);
         }

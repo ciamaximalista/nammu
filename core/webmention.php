@@ -241,7 +241,6 @@ function nammu_webmention_http_request(string $url, string $method = 'GET', arra
         }
         $responseBody = (string) curl_exec($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        curl_close($ch);
         $result = ['status' => $status, 'headers' => $responseHeaders, 'body' => $responseBody];
         if (function_exists('nammu_multi_instance_remote_host_after_request')) {
             nammu_multi_instance_remote_host_after_request($url, $config, (int) ($result['status'] ?? 0));

@@ -695,7 +695,6 @@ function nammu_actuality_fetch_url(string $url, string $accept = 'text/html,appl
             ]);
             $body = curl_exec($ch);
             $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-            curl_close($ch);
             if (is_string($body) && $body !== '') {
                 if (is_array($config) && function_exists('nammu_multi_instance_remote_host_after_request')) {
                     nammu_multi_instance_remote_host_after_request($url, $config, $status);

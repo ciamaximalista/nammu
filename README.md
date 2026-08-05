@@ -87,6 +87,13 @@ WEB_USER=nobody
 SHARED_GROUP=nogroup
 ```
 
+Elige como `SHARED_GROUP` un grupo al que pertenezcan tanto `DEPLOY_USER` como `WEB_USER`. Si dudas, compruébalo antes de seguir:
+
+```bash
+id "$DEPLOY_USER"
+id "$WEB_USER"
+```
+
 Añade el usuario de despliegue al grupo compartido y vuelve a entrar en sesión para que el cambio tenga efecto:
 
 ```bash
@@ -101,11 +108,15 @@ sudo find "$SITE" -type d -exec chmod 2775 {} \;
 sudo find "$SITE" -type f -exec chmod 664 {} \;
 ```
 
+Nammu ejecuta las tareas PHP como `php archivo.php`, por lo que los scripts del proyecto no necesitan bit ejecutable. Mantener los ficheros en `664` y Git con `core.fileMode=false` evita conflictos de actualización por cambios `100755`/`100644`.
+
 Configura Git para no quitar escritura de grupo al hacer checkout o pull:
 
 ```bash
 cd "$SITE"
 git config core.sharedRepository group
+git config core.fileMode false
+git config --global --add safe.directory "$SITE"
 ```
 
 Usa `umask 0002` en operaciones manuales y cron para que los archivos nuevos nazcan escribibles por el grupo:
@@ -130,6 +141,7 @@ Directorios que deben ser escribibles por el usuario web y por el usuario de des
 - `itinerarios/`
 - `backups/`
 - `vendor/` si instalas dependencias con Composer dentro del sitio
+- `.git/` si actualizas la instalación con Git desde ese mismo directorio
 
 Esto afecta especialmente a stores que Nammu reescribe continuamente: `config/*.json`, snapshots de Fediverso, colas sociales, cachés de link cards, estadísticas, avisos por email, Webmentions y cachés de imágenes.
 
@@ -138,11 +150,16 @@ Comprobación rápida recomendada:
 ```bash
 id "$DEPLOY_USER"
 id "$WEB_USER"
-ls -ld "$SITE" "$SITE/config" "$SITE/assets" "$SITE/assets/actualidad-cache" "$SITE/backups"
+ls -ld "$SITE" "$SITE/.git" "$SITE/config" "$SITE/assets" "$SITE/assets/actualidad-cache" "$SITE/backups"
 find "$SITE/config" -maxdepth 1 -type f -name '*.json' -printf '%M %u %g %p\n' | head
+cd "$SITE"
+touch .git/test-write config/test-write assets/test-write backups/test-write
+rm .git/test-write config/test-write assets/test-write backups/test-write
+git config --get core.sharedRepository
+git config --get core.fileMode
 ```
 
-Los directorios deben verse como `drwxrwsr-x` o compatible, con el grupo compartido. Si ves archivos creados por otro propietario pero sin escritura de grupo, corrige permisos antes de activar cron o publicar.
+Los directorios deben verse como `drwxrwsr-x` o compatible, con el grupo compartido. `core.sharedRepository` debe devolver `group` y `core.fileMode` debe devolver `false`. Si ves archivos creados por otro propietario, sin escritura de grupo, o Git falla con `index.lock`, `FETCH_HEAD` o `dubious ownership`, corrige permisos antes de activar cron o publicar.
 
 ### 4. Configura el dominio o virtual host
 
@@ -673,6 +690,8 @@ sudo chown -R "$DEPLOY_USER:$SHARED_GROUP" .
 sudo find . -type d -exec chmod 2775 {} \;
 sudo find . -type f -exec chmod 664 {} \;
 git config core.sharedRepository group
+git config core.fileMode false
+git config --global --add safe.directory "$(pwd)"
 ```
 
 ## Migración desde PicoCMS

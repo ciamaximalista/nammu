@@ -2824,6 +2824,41 @@
             #gsc-period-28:checked ~ .gsc-content .gsc-period-7 {
                 display: none;
             }
+            .dashboard-line-chart {
+                display: block !important;
+                width: 100% !important;
+                height: 170px !important;
+                max-width: 100% !important;
+                overflow: visible !important;
+                background: transparent !important;
+            }
+            .dashboard-line-chart__axis {
+                fill: none !important;
+                stroke: #ccd6e0 !important;
+                stroke-width: 1 !important;
+                vector-effect: non-scaling-stroke;
+            }
+            .dashboard-line-chart__line {
+                fill: none !important;
+                stroke-width: 2 !important;
+                stroke-linecap: round !important;
+                stroke-linejoin: round !important;
+                vector-effect: non-scaling-stroke;
+            }
+            .dashboard-line-chart__point {
+                stroke: #ffffff !important;
+                stroke-width: 1 !important;
+                vector-effect: non-scaling-stroke;
+            }
+            .dashboard-line-chart__label {
+                font-family: sans-serif !important;
+                font-size: 10px !important;
+                font-weight: 400 !important;
+                line-height: 1 !important;
+                fill: #6c757d !important;
+                stroke: none !important;
+                paint-order: normal !important;
+            }
         </style>
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-2">
             <div>
@@ -2959,21 +2994,21 @@
                             $last30CoordCount = count($last30Line['coords']);
                             $last30TodayPoint = $last30CoordCount > 0 ? $last30Line['coords'][$last30CoordCount - 1] : null;
                             ?>
-                            <svg width="100%" height="170" viewBox="0 0 320 170" preserveAspectRatio="none" aria-hidden="true">
-                                <line x1="30" y1="<?= (int) $chartTop ?>" x2="30" y2="<?= (int) $chartBottom ?>" stroke="#ccd6e0" stroke-width="1"></line>
-                                <line x1="30" y1="<?= (int) $chartBottom ?>" x2="300" y2="<?= (int) $chartBottom ?>" stroke="#ccd6e0" stroke-width="1"></line>
-                                <text x="4" y="<?= (int) $chartTop ?>" font-size="10" fill="#6c757d"><?= (int) $last30DailyMax ?></text>
-                                <text x="12" y="<?= (int) $chartBottom ?>" font-size="10" fill="#6c757d">0</text>
-                                <text x="30" y="166" font-size="10" text-anchor="start" fill="#6c757d"><?= htmlspecialchars($formatDayMonthEs($last30LabelStart), ENT_QUOTES, 'UTF-8') ?></text>
-                                <text x="165" y="166" font-size="10" text-anchor="middle" fill="#6c757d"><?= htmlspecialchars($formatDayMonthEs($last30LabelMid), ENT_QUOTES, 'UTF-8') ?></text>
-                                <text x="300" y="166" font-size="10" text-anchor="end" fill="#6c757d"><?= htmlspecialchars($formatDayMonthEs($last30LabelEnd), ENT_QUOTES, 'UTF-8') ?></text>
+                            <svg class="dashboard-line-chart" width="320" height="170" viewBox="0 0 320 170" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                                <line class="dashboard-line-chart__axis" x1="30" y1="<?= (int) $chartTop ?>" x2="30" y2="<?= (int) $chartBottom ?>"></line>
+                                <line class="dashboard-line-chart__axis" x1="30" y1="<?= (int) $chartBottom ?>" x2="300" y2="<?= (int) $chartBottom ?>"></line>
+                                <text class="dashboard-line-chart__label" x="4" y="<?= (int) $chartTop ?>"><?= (int) $last30DailyMax ?></text>
+                                <text class="dashboard-line-chart__label" x="12" y="<?= (int) $chartBottom ?>">0</text>
+                                <text class="dashboard-line-chart__label" x="30" y="166" text-anchor="start"><?= htmlspecialchars($formatDayMonthEs($last30LabelStart), ENT_QUOTES, 'UTF-8') ?></text>
+                                <text class="dashboard-line-chart__label" x="165" y="166" text-anchor="middle"><?= htmlspecialchars($formatDayMonthEs($last30LabelMid), ENT_QUOTES, 'UTF-8') ?></text>
+                                <text class="dashboard-line-chart__label" x="300" y="166" text-anchor="end"><?= htmlspecialchars($formatDayMonthEs($last30LabelEnd), ENT_QUOTES, 'UTF-8') ?></text>
                                 <g transform="translate(30,0)">
-                                    <path fill="none" stroke="#1b8eed" stroke-width="2" d="<?= htmlspecialchars((string) ($last30Line['path'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"></path>
+                                    <path class="dashboard-line-chart__line" style="stroke:#1b8eed !important;" d="<?= htmlspecialchars((string) ($last30Line['path'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"></path>
                                     <?php foreach ($last30Line['coords'] as $point): ?>
-                                        <circle cx="<?= htmlspecialchars((string) $point['x'], ENT_QUOTES, 'UTF-8') ?>" cy="<?= htmlspecialchars((string) $point['y'], ENT_QUOTES, 'UTF-8') ?>" r="2.5" fill="#1b8eed"></circle>
+                                        <circle class="dashboard-line-chart__point" cx="<?= htmlspecialchars((string) $point['x'], ENT_QUOTES, 'UTF-8') ?>" cy="<?= htmlspecialchars((string) $point['y'], ENT_QUOTES, 'UTF-8') ?>" r="2.5" style="fill:#1b8eed !important;"></circle>
                                     <?php endforeach; ?>
                                     <?php if ($last30TodayPoint): ?>
-                                        <text x="<?= htmlspecialchars((string) $last30TodayPoint['x'], ENT_QUOTES, 'UTF-8') ?>" y="<?= (int) max(12, (float) $last30TodayPoint['y'] - 6) ?>" font-size="10" text-anchor="middle" fill="#1b8eed">
+                                        <text class="dashboard-line-chart__label" x="<?= htmlspecialchars((string) $last30TodayPoint['x'], ENT_QUOTES, 'UTF-8') ?>" y="<?= (int) max(12, (float) $last30TodayPoint['y'] - 6) ?>" text-anchor="middle" style="fill:#1b8eed !important;">
                                             <?= (int) $last30TodayPoint['value'] ?>
                                         </text>
                                     <?php endif; ?>
@@ -2994,21 +3029,21 @@
                             $last12CoordCount = count($last12Line['coords']);
                             $last12CurrentPoint = $last12CoordCount > 0 ? $last12Line['coords'][$last12CoordCount - 1] : null;
                             ?>
-                            <svg width="100%" height="170" viewBox="0 0 320 170" preserveAspectRatio="none" aria-hidden="true">
-                                <line x1="30" y1="<?= (int) $chartTop ?>" x2="30" y2="<?= (int) $chartBottom ?>" stroke="#ccd6e0" stroke-width="1"></line>
-                                <line x1="30" y1="<?= (int) $chartBottom ?>" x2="300" y2="<?= (int) $chartBottom ?>" stroke="#ccd6e0" stroke-width="1"></line>
-                                <text x="4" y="<?= (int) $chartTop ?>" font-size="10" fill="#6c757d"><?= (int) $last12MonthsMax ?></text>
-                                <text x="12" y="<?= (int) $chartBottom ?>" font-size="10" fill="#6c757d">0</text>
-                                <text x="30" y="166" font-size="10" text-anchor="start" fill="#6c757d"><?= htmlspecialchars($formatMonthEs($last12LabelStart . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
-                                <text x="165" y="166" font-size="10" text-anchor="middle" fill="#6c757d"><?= htmlspecialchars($formatMonthEs($last12LabelMid . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
-                                <text x="300" y="166" font-size="10" text-anchor="end" fill="#6c757d"><?= htmlspecialchars($formatMonthEs($last12LabelEnd . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
+                            <svg class="dashboard-line-chart" width="320" height="170" viewBox="0 0 320 170" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                                <line class="dashboard-line-chart__axis" x1="30" y1="<?= (int) $chartTop ?>" x2="30" y2="<?= (int) $chartBottom ?>"></line>
+                                <line class="dashboard-line-chart__axis" x1="30" y1="<?= (int) $chartBottom ?>" x2="300" y2="<?= (int) $chartBottom ?>"></line>
+                                <text class="dashboard-line-chart__label" x="4" y="<?= (int) $chartTop ?>"><?= (int) $last12MonthsMax ?></text>
+                                <text class="dashboard-line-chart__label" x="12" y="<?= (int) $chartBottom ?>">0</text>
+                                <text class="dashboard-line-chart__label" x="30" y="166" text-anchor="start"><?= htmlspecialchars($formatMonthEs($last12LabelStart . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
+                                <text class="dashboard-line-chart__label" x="165" y="166" text-anchor="middle"><?= htmlspecialchars($formatMonthEs($last12LabelMid . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
+                                <text class="dashboard-line-chart__label" x="300" y="166" text-anchor="end"><?= htmlspecialchars($formatMonthEs($last12LabelEnd . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
                                 <g transform="translate(30,0)">
-                                    <path fill="none" stroke="#0a4c8a" stroke-width="2" d="<?= htmlspecialchars((string) ($last12Line['path'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"></path>
+                                    <path class="dashboard-line-chart__line" style="stroke:#0a4c8a !important;" d="<?= htmlspecialchars((string) ($last12Line['path'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"></path>
                                     <?php foreach ($last12Line['coords'] as $point): ?>
-                                        <circle cx="<?= htmlspecialchars((string) $point['x'], ENT_QUOTES, 'UTF-8') ?>" cy="<?= htmlspecialchars((string) $point['y'], ENT_QUOTES, 'UTF-8') ?>" r="2.5" fill="#0a4c8a"></circle>
+                                        <circle class="dashboard-line-chart__point" cx="<?= htmlspecialchars((string) $point['x'], ENT_QUOTES, 'UTF-8') ?>" cy="<?= htmlspecialchars((string) $point['y'], ENT_QUOTES, 'UTF-8') ?>" r="2.5" style="fill:#0a4c8a !important;"></circle>
                                     <?php endforeach; ?>
                                     <?php if ($last12CurrentPoint): ?>
-                                        <text x="<?= htmlspecialchars((string) $last12CurrentPoint['x'], ENT_QUOTES, 'UTF-8') ?>" y="<?= (int) max(12, (float) $last12CurrentPoint['y'] - 6) ?>" font-size="10" text-anchor="middle" fill="#0a4c8a">
+                                        <text class="dashboard-line-chart__label" x="<?= htmlspecialchars((string) $last12CurrentPoint['x'], ENT_QUOTES, 'UTF-8') ?>" y="<?= (int) max(12, (float) $last12CurrentPoint['y'] - 6) ?>" text-anchor="middle" style="fill:#0a4c8a !important;">
                                             <?= (int) $last12CurrentPoint['value'] ?>
                                         </text>
                                     <?php endif; ?>

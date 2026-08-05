@@ -350,6 +350,8 @@ function admin_enqueue_social_broadcast(string $text, $images, array $networks, 
     }
     $queue = admin_load_social_broadcast_queue();
     $items = is_array($queue['items'] ?? null) ? $queue['items'] : [];
+    $source = trim((string) ($meta['source'] ?? ''));
+    $sourceId = trim((string) ($meta['source_id'] ?? ''));
     $signature = sha1(json_encode([
         'text' => $text,
         'images' => $imageItems,
@@ -362,6 +364,33 @@ function admin_enqueue_social_broadcast(string $text, $images, array $networks, 
         }
         $queuedSignature = trim((string) ($queuedItem['signature'] ?? ''));
         if ($queuedSignature !== '' && hash_equals($queuedSignature, $signature)) {
+            return [
+                'ok' => true,
+                'id' => (string) ($queuedItem['id'] ?? ''),
+                'queued' => count($items),
+                'duplicate' => true,
+            ];
+        }
+    }
+    if ($source !== '' && $sourceId !== '') {
+        foreach ($items as $index => $queuedItem) {
+            if (!is_array($queuedItem)) {
+                continue;
+            }
+            if (trim((string) ($queuedItem['source'] ?? '')) !== $source || trim((string) ($queuedItem['source_id'] ?? '')) !== $sourceId) {
+                continue;
+            }
+            $queuedNetworks = array_values(array_unique(array_filter(array_map('strval', $queuedItem['networks'] ?? []))));
+            $mergedNetworks = array_values(array_unique(array_merge($queuedNetworks, $networks)));
+            $items[$index]['networks'] = $mergedNetworks;
+            if (trim((string) ($items[$index]['fediverse_url'] ?? '')) === '' && trim($fediverseUrl) !== '') {
+                $items[$index]['fediverse_url'] = trim($fediverseUrl);
+            }
+            if (empty($items[$index]['images']) && !empty($imageItems)) {
+                $items[$index]['images'] = $imageItems;
+            }
+            $queue['items'] = $items;
+            admin_save_social_broadcast_queue($queue);
             return [
                 'ok' => true,
                 'id' => (string) ($queuedItem['id'] ?? ''),
@@ -1540,6 +1569,7 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
     }
 
     $activeItems = [];
+    $activeSourceKeys = [];
     foreach ($items as $item) {
         if (!is_array($item)) {
             continue;
@@ -1547,6 +1577,22 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
         if (admin_social_broadcast_is_stale_actuality_job($item)) {
             admin_social_rss_mark_broadcast_result($item, 'stale');
             continue;
+        }
+        $source = trim((string) ($item['source'] ?? ''));
+        $sourceId = trim((string) ($item['source_id'] ?? ''));
+        if ($source !== '' && $sourceId !== '') {
+            $sourceKey = $source . '|' . $sourceId;
+            if (isset($activeSourceKeys[$sourceKey])) {
+                $existingIndex = $activeSourceKeys[$sourceKey];
+                $existingNetworks = array_values(array_unique(array_filter(array_map('strval', $activeItems[$existingIndex]['networks'] ?? []))));
+                $itemNetworks = array_values(array_unique(array_filter(array_map('strval', $item['networks'] ?? []))));
+                $activeItems[$existingIndex]['networks'] = array_values(array_unique(array_merge($existingNetworks, $itemNetworks)));
+                if (trim((string) ($activeItems[$existingIndex]['fediverse_url'] ?? '')) === '' && trim((string) ($item['fediverse_url'] ?? '')) !== '') {
+                    $activeItems[$existingIndex]['fediverse_url'] = trim((string) ($item['fediverse_url'] ?? ''));
+                }
+                continue;
+            }
+            $activeSourceKeys[$sourceKey] = count($activeItems);
         }
         $activeItems[] = $item;
     }

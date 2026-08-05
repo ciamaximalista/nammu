@@ -1304,14 +1304,26 @@
         }
     }
 
+    $dailyUniqueUidSeries = static function (array $dailyUids, DateTimeImmutable $start, DateTimeImmutable $end): array {
+        $series = [];
+        $cursor = $start;
+        while ($cursor <= $end) {
+            $dayKey = $cursor->format('Y-m-d');
+            $series[$dayKey] = is_array($dailyUids[$dayKey] ?? null) ? $dailyUids[$dayKey] : [];
+            $cursor = $cursor->modify('+1 day');
+        }
+        return $series;
+    };
+
+    $last30UidSeries = $dailyUniqueUidSeries($combinedDailyUids, $last30Start, $today);
     $unique30 = [];
     $startKey = $last30Start->format('Y-m-d');
-    foreach ($combinedDailyUids as $day => $uids) {
-        if (!is_string($day) || $day < $startKey) {
-            continue;
-        }
+    $endKey = $today->format('Y-m-d');
+    foreach ($last30UidSeries as $uids) {
         foreach ($uids as $uid => $flag) {
-            $unique30[$uid] = true;
+            if ($uid !== '') {
+                $unique30[$uid] = true;
+            }
         }
     }
     $unique30Count = count($unique30);
@@ -1926,9 +1938,7 @@
     ksort($monthlyUids);
 
     $last30Daily = [];
-    for ($i = 29; $i >= 0; $i--) {
-        $dayKey = $today->modify('-' . $i . ' days')->format('Y-m-d');
-        $uids = is_array($combinedDailyUids[$dayKey] ?? null) ? $combinedDailyUids[$dayKey] : [];
+    foreach ($last30UidSeries as $dayKey => $uids) {
         $last30Daily[$dayKey] = count($uids);
     }
     $last30DailyMax = max(1, max($last30Daily));
@@ -1985,6 +1995,7 @@
         $height = $bottom - $top;
         $step = $count > 1 ? ($width / ($count - 1)) : 0;
         $points = [];
+        $pathCommands = [];
         $coords = [];
         $maxValue = 0;
         $maxIndex = null;
@@ -1993,8 +2004,11 @@
             $x = $step * $index;
             $ratio = $max > 0 ? ($value / $max) : 0;
             $y = $bottom - ($ratio * $height);
-            $points[] = sprintf('%.2f,%.2f', $x, $y);
-            $coords[] = ['x' => $x, 'y' => $y, 'value' => (int) $value];
+            $xFormatted = number_format($x, 2, '.', '');
+            $yFormatted = number_format($y, 2, '.', '');
+            $points[] = $xFormatted . ',' . $yFormatted;
+            $pathCommands[] = ($index === 0 ? 'M ' : 'L ') . $xFormatted . ' ' . $yFormatted;
+            $coords[] = ['x' => $xFormatted, 'y' => $yFormatted, 'value' => (int) $value];
             if ($value >= $maxValue) {
                 $maxValue = (int) $value;
                 $maxIndex = $index;
@@ -2003,6 +2017,7 @@
         }
         return [
             'points' => implode(' ', $points),
+            'path' => implode(' ', $pathCommands),
             'coords' => $coords,
             'max' => $maxValue,
             'maxIndex' => $maxIndex,
@@ -2180,6 +2195,8 @@
 
     $image30ViewsPages = 0;
     $image30ViewsItineraries = 0;
+    $image30ViewsFediverseObjects = 0;
+    $image30FediverseObjectUids = [];
     foreach ($pagesStats as $slug => $item) {
         if (!is_array($item)) {
             continue;
@@ -2189,14 +2206,28 @@
         if ($views30 <= 0) {
             continue;
         }
-        if (is_string($slug) && str_starts_with($slug, 'itinerarios/')) {
+        if (is_string($slug) && preg_match('#^fediverso/[a-f0-9]{24}$#i', $slug) === 1) {
+            $image30ViewsFediverseObjects += $views30;
+            foreach ($daily as $day => $payload) {
+                if (!is_string($day) || $day < $startKey || $day > $endKey || !is_array($payload)) {
+                    continue;
+                }
+                $uids = is_array($payload['uids'] ?? null) ? $payload['uids'] : [];
+                foreach ($uids as $uid => $flag) {
+                    if ($uid !== '') {
+                        $image30FediverseObjectUids[$uid] = true;
+                    }
+                }
+            }
+        } elseif (is_string($slug) && str_starts_with($slug, 'itinerarios/')) {
             $image30ViewsItineraries += $views30;
         } else {
             $image30ViewsPages += $views30;
         }
     }
+    $image30FediverseObjectUnique = count($image30FediverseObjectUids);
 
-    $image30TotalViews = $image30ViewsPosts + $image30ViewsPages + $image30ViewsItineraries + $image30ViewsNewsletter + $image30ViewsPodcast;
+    $image30TotalViews = $image30ViewsPosts + $image30ViewsPages + $image30ViewsItineraries + $image30ViewsNewsletter + $image30ViewsPodcast + $image30ViewsFediverseObjects;
     $image30PagesPerUser = $unique30Count > 0 ? ($image30TotalViews / $unique30Count) : 0.0;
 
     $image30UserDays = [];
@@ -2937,12 +2968,12 @@
                                 <text x="165" y="166" font-size="10" text-anchor="middle" fill="#6c757d"><?= htmlspecialchars($formatDayMonthEs($last30LabelMid), ENT_QUOTES, 'UTF-8') ?></text>
                                 <text x="300" y="166" font-size="10" text-anchor="end" fill="#6c757d"><?= htmlspecialchars($formatDayMonthEs($last30LabelEnd), ENT_QUOTES, 'UTF-8') ?></text>
                                 <g transform="translate(30,0)">
-                                    <polyline fill="none" stroke="#1b8eed" stroke-width="2" points="<?= htmlspecialchars($last30Line['points'], ENT_QUOTES, 'UTF-8') ?>"></polyline>
+                                    <path fill="none" stroke="#1b8eed" stroke-width="2" d="<?= htmlspecialchars((string) ($last30Line['path'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"></path>
                                     <?php foreach ($last30Line['coords'] as $point): ?>
                                         <circle cx="<?= htmlspecialchars((string) $point['x'], ENT_QUOTES, 'UTF-8') ?>" cy="<?= htmlspecialchars((string) $point['y'], ENT_QUOTES, 'UTF-8') ?>" r="2.5" fill="#1b8eed"></circle>
                                     <?php endforeach; ?>
                                     <?php if ($last30TodayPoint): ?>
-                                        <text x="<?= htmlspecialchars((string) $last30TodayPoint['x'], ENT_QUOTES, 'UTF-8') ?>" y="<?= (int) max(12, $last30TodayPoint['y'] - 6) ?>" font-size="10" text-anchor="middle" fill="#1b8eed">
+                                        <text x="<?= htmlspecialchars((string) $last30TodayPoint['x'], ENT_QUOTES, 'UTF-8') ?>" y="<?= (int) max(12, (float) $last30TodayPoint['y'] - 6) ?>" font-size="10" text-anchor="middle" fill="#1b8eed">
                                             <?= (int) $last30TodayPoint['value'] ?>
                                         </text>
                                     <?php endif; ?>
@@ -2972,12 +3003,12 @@
                                 <text x="165" y="166" font-size="10" text-anchor="middle" fill="#6c757d"><?= htmlspecialchars($formatMonthEs($last12LabelMid . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
                                 <text x="300" y="166" font-size="10" text-anchor="end" fill="#6c757d"><?= htmlspecialchars($formatMonthEs($last12LabelEnd . '-01'), ENT_QUOTES, 'UTF-8') ?></text>
                                 <g transform="translate(30,0)">
-                                    <polyline fill="none" stroke="#0a4c8a" stroke-width="2" points="<?= htmlspecialchars($last12Line['points'], ENT_QUOTES, 'UTF-8') ?>"></polyline>
+                                    <path fill="none" stroke="#0a4c8a" stroke-width="2" d="<?= htmlspecialchars((string) ($last12Line['path'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"></path>
                                     <?php foreach ($last12Line['coords'] as $point): ?>
                                         <circle cx="<?= htmlspecialchars((string) $point['x'], ENT_QUOTES, 'UTF-8') ?>" cy="<?= htmlspecialchars((string) $point['y'], ENT_QUOTES, 'UTF-8') ?>" r="2.5" fill="#0a4c8a"></circle>
                                     <?php endforeach; ?>
                                     <?php if ($last12CurrentPoint): ?>
-                                        <text x="<?= htmlspecialchars((string) $last12CurrentPoint['x'], ENT_QUOTES, 'UTF-8') ?>" y="<?= (int) max(12, $last12CurrentPoint['y'] - 6) ?>" font-size="10" text-anchor="middle" fill="#0a4c8a">
+                                        <text x="<?= htmlspecialchars((string) $last12CurrentPoint['x'], ENT_QUOTES, 'UTF-8') ?>" y="<?= (int) max(12, (float) $last12CurrentPoint['y'] - 6) ?>" font-size="10" text-anchor="middle" fill="#0a4c8a">
                                             <?= (int) $last12CurrentPoint['value'] ?>
                                         </text>
                                     <?php endif; ?>
@@ -3022,8 +3053,9 @@
                     <div class="card-body">
                         <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Imagen 30 días</h4>
                         <p class="mb-2"><strong>Usuarios únicos humanos:</strong> <?= (int) $unique30Count ?></p>
+                        <p class="mb-2"><strong>Objetos Fediverso:</strong> <?= (int) $image30FediverseObjectUnique ?> usuarios · <?= (int) $image30ViewsFediverseObjects ?> vistas</p>
                         <p class="mb-2"><strong>Recurrentes (2+ días):</strong> <?= (int) $image30RecurringUsers ?> (<?= number_format($image30RecurringRate, 2, ',', '.') ?>%)</p>
-                        <p class="mb-2"><strong>Vistas totales (posts + páginas + itinerarios + newsletter + podcast):</strong> <?= (int) $image30TotalViews ?></p>
+                        <p class="mb-2"><strong>Vistas totales (posts + páginas + objetos Fediverso + itinerarios + newsletter + podcast):</strong> <?= (int) $image30TotalViews ?></p>
                         <p class="mb-2"><strong>Páginas por usuario:</strong> <?= number_format($image30PagesPerUser, 2, ',', '.') ?></p>
                         <p class="mb-0"><strong>Promedio diario:</strong> <?= number_format($image30DailyAverage, 2, ',', '.') ?> · <strong>Mediana:</strong> <?= number_format($image30DailyMedian, 2, ',', '.') ?> · <strong>Pico:</strong> <?= (int) $image30DailyPeak ?></p>
                     </div>

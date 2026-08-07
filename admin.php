@@ -161,6 +161,14 @@ function admin_run_scheduled_tasks(): array {
         'social_broadcast_queue_sent' => 0,
         'social_broadcast_queue_failed' => 0,
         'social_broadcast_queue_remaining' => 0,
+        'push_queue_sent' => 0,
+        'push_queue_failed' => 0,
+        'push_queue_skipped' => 1,
+        'indexnow_queue_processed' => 0,
+        'indexnow_queue_remaining' => 0,
+        'public_artifacts_queue_processed' => 0,
+        'public_artifacts_queue_remaining' => 0,
+        'public_artifacts_queue_reasons' => 0,
         'fediverse_checked' => (int) ($fediverseStats['checked'] ?? 0),
         'fediverse_new' => (int) ($fediverseStats['new'] ?? 0) + (int) ($fediverseInboxSyncStats['new'] ?? 0),
         'fediverse_followers' => (int) ($scheduledDeliveryStats['followers'] ?? 0),
@@ -244,6 +252,9 @@ function admin_run_scheduled_maintenance_tasks(): array {
     $linkCardRefreshStats = ['processed' => 0, 'updated' => 0, 'failed' => 0, 'remaining' => 0];
     $socialRssBroadcastQueueStats = ['queued' => 0, 'remaining' => 0];
     $socialBroadcastQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
+    $pushQueueStats = ['sent' => 0, 'failed' => 0, 'skipped' => true];
+    $indexnowQueueStats = ['processed' => 0, 'remaining' => 0];
+    $publicArtifactsQueueStats = ['processed' => 0, 'remaining' => 0, 'reasons' => 0];
     $webmentionSyncStats = ['scanned' => 0, 'enqueued' => 0, 'remaining' => 0];
     $webmentionQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $fediverseDeleteQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
@@ -307,6 +318,21 @@ function admin_run_scheduled_maintenance_tasks(): array {
         $socialBroadcastMaxJobs = max(12, (int) ($socialRssBroadcastQueueStats['queued'] ?? 0));
         $socialBroadcastQueueStats = $traceStep('social_broadcast_queue', static function () use ($socialBroadcastMaxJobs) {
             return admin_process_social_broadcast_queue($socialBroadcastMaxJobs);
+        });
+    }
+    if (function_exists('nammu_dispatch_push_queue')) {
+        $pushQueueStats = $traceStep('push_queue', static function () {
+            return nammu_dispatch_push_queue();
+        });
+    }
+    if (function_exists('admin_process_indexnow_queue')) {
+        $indexnowQueueStats = $traceStep('indexnow_queue', static function () {
+            return admin_process_indexnow_queue(50);
+        });
+    }
+    if (function_exists('admin_process_public_artifacts_refresh_queue')) {
+        $publicArtifactsQueueStats = $traceStep('public_artifacts_refresh_queue', static function () {
+            return admin_process_public_artifacts_refresh_queue();
         });
     }
     if (function_exists('nammu_webmention_sync_sources')) {
@@ -378,6 +404,14 @@ function admin_run_scheduled_maintenance_tasks(): array {
         'social_broadcast_queue_sent' => (int) ($socialBroadcastQueueStats['sent'] ?? 0),
         'social_broadcast_queue_failed' => (int) ($socialBroadcastQueueStats['failed'] ?? 0),
         'social_broadcast_queue_remaining' => (int) ($socialBroadcastQueueStats['remaining'] ?? 0),
+        'push_queue_sent' => (int) ($pushQueueStats['sent'] ?? 0),
+        'push_queue_failed' => (int) ($pushQueueStats['failed'] ?? 0),
+        'push_queue_skipped' => !empty($pushQueueStats['skipped']) ? 1 : 0,
+        'indexnow_queue_processed' => (int) ($indexnowQueueStats['processed'] ?? 0),
+        'indexnow_queue_remaining' => (int) ($indexnowQueueStats['remaining'] ?? 0),
+        'public_artifacts_queue_processed' => (int) ($publicArtifactsQueueStats['processed'] ?? 0),
+        'public_artifacts_queue_remaining' => (int) ($publicArtifactsQueueStats['remaining'] ?? 0),
+        'public_artifacts_queue_reasons' => (int) ($publicArtifactsQueueStats['reasons'] ?? 0),
         'webmention_scanned' => (int) ($webmentionSyncStats['scanned'] ?? 0),
         'webmention_enqueued' => (int) ($webmentionSyncStats['enqueued'] ?? 0),
         'webmention_queue_processed' => (int) ($webmentionQueueStats['processed'] ?? 0),
@@ -2386,7 +2420,61 @@ function admin_regenerate_sitemap(): void {
     }
 }
 
-function admin_regenerate_public_artifacts(): void {
+function admin_public_artifacts_refresh_queue_file(): string
+{
+    return __DIR__ . '/config/public-artifacts-refresh.json';
+}
+
+function admin_load_public_artifacts_refresh_queue(): array
+{
+    $file = admin_public_artifacts_refresh_queue_file();
+    if (!is_file($file)) {
+        return ['pending' => false, 'reasons' => []];
+    }
+    $decoded = json_decode((string) @file_get_contents($file), true);
+    if (!is_array($decoded)) {
+        return ['pending' => false, 'reasons' => []];
+    }
+    $decoded['pending'] = !empty($decoded['pending']);
+    $decoded['reasons'] = is_array($decoded['reasons'] ?? null)
+        ? array_values(array_filter(array_map('strval', $decoded['reasons'])))
+        : [];
+    return $decoded;
+}
+
+function admin_save_public_artifacts_refresh_queue(array $queue): void
+{
+    $file = admin_public_artifacts_refresh_queue_file();
+    $dir = dirname($file);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $payload = [
+        'pending' => !empty($queue['pending']),
+        'updated_at' => time(),
+        'reasons' => is_array($queue['reasons'] ?? null)
+            ? array_values(array_unique(array_filter(array_map('strval', $queue['reasons']))))
+            : [],
+    ];
+    @file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    @chmod($file, 0664);
+}
+
+function admin_enqueue_public_artifacts_refresh(string $reason = ''): void
+{
+    $queue = admin_load_public_artifacts_refresh_queue();
+    $reasons = is_array($queue['reasons'] ?? null) ? $queue['reasons'] : [];
+    $reason = trim($reason);
+    if ($reason !== '') {
+        $reasons[] = $reason;
+    }
+    admin_save_public_artifacts_refresh_queue([
+        'pending' => true,
+        'reasons' => $reasons,
+    ]);
+}
+
+function admin_regenerate_public_artifacts_now(): void {
     $lockPath = __DIR__ . '/config/public-artifacts-refresh.lock';
     $fp = @fopen($lockPath, 'c');
     if ($fp === false) {
@@ -2405,6 +2493,26 @@ function admin_regenerate_public_artifacts(): void {
         @flock($fp, LOCK_UN);
         @fclose($fp);
     }
+}
+
+function admin_regenerate_public_artifacts(string $reason = ''): void {
+    if (PHP_SAPI !== 'cli') {
+        admin_enqueue_public_artifacts_refresh($reason);
+        return;
+    }
+    admin_regenerate_public_artifacts_now();
+}
+
+function admin_process_public_artifacts_refresh_queue(): array
+{
+    $queue = admin_load_public_artifacts_refresh_queue();
+    if (empty($queue['pending'])) {
+        return ['processed' => 0, 'remaining' => 0, 'reasons' => 0];
+    }
+    admin_regenerate_public_artifacts_now();
+    $reasons = is_array($queue['reasons'] ?? null) ? count($queue['reasons']) : 0;
+    admin_save_public_artifacts_refresh_queue(['pending' => false, 'reasons' => []]);
+    return ['processed' => 1, 'remaining' => 0, 'reasons' => $reasons];
 }
 
 /**
@@ -3892,12 +4000,78 @@ function admin_indexnow_status(): array {
     ];
 }
 
+function admin_indexnow_queue_file(): string
+{
+    return __DIR__ . '/config/indexnow-queue.json';
+}
+
+function admin_load_indexnow_queue(): array
+{
+    $file = admin_indexnow_queue_file();
+    if (!is_file($file)) {
+        return ['urls' => []];
+    }
+    $decoded = json_decode((string) @file_get_contents($file), true);
+    if (!is_array($decoded)) {
+        return ['urls' => []];
+    }
+    $decoded['urls'] = is_array($decoded['urls'] ?? null) ? array_values(array_filter(array_map('strval', $decoded['urls']))) : [];
+    return $decoded;
+}
+
+function admin_save_indexnow_queue(array $urls): void
+{
+    $file = admin_indexnow_queue_file();
+    $dir = dirname($file);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $payload = [
+        'updated_at' => time(),
+        'urls' => array_values(array_unique(array_filter(array_map('strval', $urls)))),
+    ];
+    @file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    @chmod($file, 0664);
+}
+
+function admin_enqueue_indexnow_urls(array $urls): void
+{
+    $urls = array_values(array_unique(array_filter(array_map(static function ($url) {
+        $url = trim((string) $url);
+        return preg_match('#^https?://#i', $url) ? $url : '';
+    }, $urls))));
+    if (empty($urls)) {
+        return;
+    }
+    $queue = admin_load_indexnow_queue();
+    $queuedUrls = is_array($queue['urls'] ?? null) ? $queue['urls'] : [];
+    admin_save_indexnow_queue(array_merge($queuedUrls, $urls));
+}
+
+function admin_process_indexnow_queue(int $maxUrls = 50): array
+{
+    $queue = admin_load_indexnow_queue();
+    $urls = array_values(array_unique(array_filter(array_map('strval', $queue['urls'] ?? []))));
+    if (empty($urls)) {
+        return ['processed' => 0, 'remaining' => 0];
+    }
+    $batch = array_slice($urls, 0, max(1, $maxUrls));
+    $remaining = array_slice($urls, count($batch));
+    admin_maybe_send_indexnow($batch);
+    admin_save_indexnow_queue($remaining);
+    return ['processed' => count($batch), 'remaining' => count($remaining)];
+}
+
 function admin_maybe_send_indexnow(array $urls): void {
     $urls = array_values(array_unique(array_filter(array_map(static function ($url) {
         $url = trim((string) $url);
         return preg_match('#^https?://#i', $url) ? $url : '';
     }, $urls))));
     if (empty($urls)) {
+        return;
+    }
+    if (PHP_SAPI !== 'cli') {
+        admin_enqueue_indexnow_urls($urls);
         return;
     }
 
@@ -6063,26 +6237,35 @@ function admin_maybe_auto_post_to_social_networks(string $filename, string $titl
         $slug = $filename;
     }
     $settings = admin_cached_social_settings();
-    if (($settings['telegram']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('telegram', $settings['telegram'])) {
-        admin_send_post_to_telegram($slug, $title, $description, $settings['telegram'], $urlOverride, $imageUrl);
-    }
-    if (($settings['facebook']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('facebook', $settings['facebook'])) {
-        admin_send_facebook_post($slug, $title, $description, $settings['facebook'], $urlOverride, $imageUrl);
-    }
-    if (($settings['twitter']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('twitter', $settings['twitter'])) {
-        admin_send_twitter_post($slug, $title, $description, $settings['twitter'], $urlOverride, $imageUrl);
-    }
-    if (($settings['linkedin']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('linkedin', $settings['linkedin'])) {
-        admin_send_linkedin_post($slug, $title, $description, $settings['linkedin'], $urlOverride, $imageUrl);
-    }
-    if (($settings['bluesky']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('bluesky', $settings['bluesky'])) {
-        admin_send_bluesky_post($slug, $title, $description, $settings['bluesky'], $urlOverride, $imageUrl);
-    }
-    if (($settings['instagram']['auto_post'] ?? 'off') === 'on' && admin_is_social_network_configured('instagram', $settings['instagram'])) {
-        if (trim($image) !== '') {
-            admin_send_instagram_post($slug, $title, $image, $settings['instagram'], $description, $urlOverride);
+    $networks = [];
+    foreach (['telegram', 'facebook', 'twitter', 'linkedin', 'bluesky', 'instagram'] as $network) {
+        $networkSettings = is_array($settings[$network] ?? null) ? $settings[$network] : [];
+        if (($networkSettings['auto_post'] ?? 'off') !== 'on' || !admin_is_social_network_configured($network, $networkSettings)) {
+            continue;
         }
+        if ($network === 'instagram' && trim($image) === '') {
+            continue;
+        }
+        $networks[] = $network;
     }
+    if (empty($networks)) {
+        return;
+    }
+    if (!function_exists('admin_enqueue_social_broadcast') && is_file(__DIR__ . '/core/admin-redes.php')) {
+        require_once __DIR__ . '/core/admin-redes.php';
+    }
+    if (!function_exists('admin_enqueue_social_broadcast')) {
+        return;
+    }
+    $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
+    $fediverseTemplate = admin_social_fediverse_template($slug, $urlOverride);
+    $fediverseUrl = admin_social_fediverse_thread_url($slug, $fediverseTemplate);
+    $message = admin_build_sentence_limited_social_message($title, $description, $targetUrl, 1200, 'admin_bold_unicode_text');
+    $imageRef = trim($image) !== '' ? $image : $imageUrl;
+    admin_enqueue_social_broadcast($message, $imageRef, $networks, $fediverseUrl, [
+        'source' => 'site-content',
+        'source_id' => $fediverseTemplate . '|' . $slug,
+    ]);
 }
 
 function admin_maybe_enqueue_push_notification(string $type, string $title, string $description, string $url, string $image = ''): void {
@@ -6112,10 +6295,7 @@ function admin_maybe_enqueue_push_notification(string $type, string $title, stri
         'url' => $trackedUrl,
         'icon' => $image,
     ];
-    $result = function_exists('nammu_send_push_notification') ? nammu_send_push_notification($payload) : ['skipped' => true];
-    if (!empty($result['skipped'])) {
-        nammu_enqueue_push_notification($payload);
-    }
+    nammu_enqueue_push_notification($payload);
 }
 
 function get_default_template_settings(): array {
@@ -9874,13 +10054,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                     admin_regenerate_public_artifacts();
-                    if ($status === 'published' && function_exists('nammu_fediverse_deliver_local_items')) {
-                        try {
-                            nammu_fediverse_deliver_local_items(load_config_file());
-                        } catch (Throwable $e) {
-                            // ignore fediverse delivery errors on publish
-                        }
-                    }
                     if ($status === 'published') {
                         $shouldIndexnow = $previousStatus === 'published' || $previousStatus === 'draft' || $publishDraftAsEntry || $publishDraftAsPage || $publishDraftAsPodcast || $renameRequested;
                         if ($shouldIndexnow) {
@@ -10229,13 +10402,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ], $content, !empty($itineraryQuizResult['data']['questions']) ? $itineraryQuizResult['data'] : null);
             admin_regenerate_public_artifacts();
             $shouldDispatchPublication = $publishItineraryNow || ($statusValue === 'published' && ($mode === 'new' || $previousStatus === 'draft'));
-            if ($statusValue === 'published' && function_exists('nammu_fediverse_deliver_named_local_item') && $shouldDispatchPublication) {
-                try {
-                    nammu_fediverse_deliver_named_local_item($saved->getSlug(), 'itinerary', load_config_file());
-                } catch (Throwable $e) {
-                    // ignore fediverse delivery errors on publish
-                }
-            }
             $shouldAutoMail = $statusValue === 'published' && $shouldDispatchPublication;
             if ($shouldAutoMail) {
                 $settings = get_settings();

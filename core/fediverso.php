@@ -1419,6 +1419,91 @@ function nammu_fediverse_save_followers_store(array $followers): void
     nammu_fediverse_save_json_store(nammu_fediverse_followers_file(), ['followers' => array_values($followers)]);
 }
 
+function nammu_fediverse_cache_actor_avatar(string $actorId, string $avatarUrl, array $config): string
+{
+    $avatarUrl = trim($avatarUrl);
+    if ($avatarUrl === '') {
+        return '';
+    }
+    if (!function_exists('nammu_actuality_cache_remote_avatar') && is_file(dirname(__DIR__) . '/core/actualidad.php')) {
+        require_once dirname(__DIR__) . '/core/actualidad.php';
+    }
+    if (!function_exists('nammu_actuality_cache_remote_avatar')) {
+        return $avatarUrl;
+    }
+    return nammu_actuality_cache_remote_avatar($avatarUrl, $actorId, nammu_fediverse_base_url($config));
+}
+
+function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): array
+{
+    $actorId = trim($actorId);
+    if ($actorId === '') {
+        return ['ok' => false, 'message' => 'No se recibió el actor.'];
+    }
+
+    $resolvedActor = nammu_fediverse_resolve_actor($actorId, $config);
+    $resolvedActor = is_array($resolvedActor) ? $resolvedActor : [];
+    $resolvedIcon = trim((string) ($resolvedActor['icon'] ?? ''));
+    $updated = 0;
+    $cachedIcon = '';
+    $sources = [];
+
+    $following = nammu_fediverse_following_store()['actors'];
+    foreach ($following as &$actor) {
+        if (trim((string) ($actor['id'] ?? '')) !== $actorId) {
+            continue;
+        }
+        $sourceIcon = $resolvedIcon !== '' ? $resolvedIcon : trim((string) ($actor['icon'] ?? ''));
+        if ($sourceIcon === '') {
+            continue;
+        }
+        $cachedIcon = nammu_fediverse_cache_actor_avatar($actorId, $sourceIcon, $config);
+        $actor = array_merge($actor, $resolvedActor);
+        $actor['icon'] = $cachedIcon;
+        $actor['avatar_cached_at'] = gmdate(DATE_ATOM);
+        $updated++;
+        $sources[] = 'seguidos';
+    }
+    unset($actor);
+    if ($updated > 0) {
+        nammu_fediverse_save_following_store($following);
+    }
+
+    $followers = nammu_fediverse_followers_store()['followers'];
+    $followersUpdated = 0;
+    foreach ($followers as &$follower) {
+        if (trim((string) ($follower['id'] ?? '')) !== $actorId) {
+            continue;
+        }
+        $sourceIcon = $resolvedIcon !== '' ? $resolvedIcon : trim((string) ($follower['icon'] ?? ''));
+        if ($sourceIcon === '') {
+            continue;
+        }
+        $cachedIcon = $cachedIcon !== '' ? $cachedIcon : nammu_fediverse_cache_actor_avatar($actorId, $sourceIcon, $config);
+        $follower = array_merge($follower, $resolvedActor);
+        $follower['icon'] = $cachedIcon;
+        $follower['avatar_cached_at'] = gmdate(DATE_ATOM);
+        $updated++;
+        $followersUpdated++;
+    }
+    unset($follower);
+    if ($followersUpdated > 0) {
+        nammu_fediverse_save_followers_store($followers);
+        $sources[] = 'seguidores';
+    }
+
+    if ($updated <= 0) {
+        return ['ok' => false, 'message' => 'No se encontró un avatar cacheable para ese actor.'];
+    }
+
+    return [
+        'ok' => true,
+        'message' => 'Avatar recacheado en ' . implode(' y ', array_values(array_unique($sources))) . '.',
+        'icon' => $cachedIcon,
+        'updated' => $updated,
+    ];
+}
+
 function nammu_fediverse_save_blocked_store(array $actors): void
 {
     nammu_fediverse_save_json_store(nammu_fediverse_blocked_file(), ['actors' => array_values($actors)]);

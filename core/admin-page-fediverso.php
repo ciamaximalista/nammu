@@ -2010,11 +2010,20 @@
                                                         <div class="small text-muted text-truncate"><?= htmlspecialchars($actorHandle, ENT_QUOTES, 'UTF-8') ?></div>
                                                     </div>
                                                 </div>
-                                                <form method="post" onsubmit="return confirm('¿Dejar de seguir este actor?');">
-                                                    <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($actorId, ENT_QUOTES, 'UTF-8') ?>">
-                                                    <input type="hidden" name="fediverse_tab" value="network">
-                                                    <button type="submit" name="unfollow_fediverse_actor" class="btn btn-outline-danger btn-sm">Dejar de seguir</button>
-                                                </form>
+                                                <?php if ($actorId !== ''): ?>
+                                                    <div class="d-flex align-items-center" style="gap:0.5rem;">
+                                                        <form method="post">
+                                                            <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($actorId, ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="fediverse_tab" value="network">
+                                                            <button type="submit" name="recache_fediverse_actor_avatar" class="btn btn-outline-secondary btn-sm">Recachear avatar</button>
+                                                        </form>
+                                                        <form method="post" onsubmit="return confirm('¿Dejar de seguir este actor?');">
+                                                            <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($actorId, ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="fediverse_tab" value="network">
+                                                            <button type="submit" name="unfollow_fediverse_actor" class="btn btn-outline-danger btn-sm">Dejar de seguir</button>
+                                                        </form>
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                     <?php endforeach; ?>
@@ -2057,6 +2066,11 @@
                                                 </div>
                                                 <?php if ($followerId !== ''): ?>
                                                     <div class="d-flex align-items-center" style="gap:0.5rem;">
+                                                        <form method="post">
+                                                            <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($followerId, ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="fediverse_tab" value="network">
+                                                            <button type="submit" name="recache_fediverse_actor_avatar" class="btn btn-outline-secondary btn-sm">Recachear avatar</button>
+                                                        </form>
                                                         <?php if ($isMutualFollow): ?>
                                                             <form method="post" onsubmit="return confirm('¿Dejar de seguir este actor?');">
                                                                 <input type="hidden" name="fediverse_actor_id" value="<?= htmlspecialchars($followerId, ENT_QUOTES, 'UTF-8') ?>">

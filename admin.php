@@ -13294,13 +13294,16 @@ if ($isLoggedIn && $page === 'fediverso') {
             }
             if (function_exists('nammu_actuality_add_manual_item')) {
                 $manualItem = nammu_actuality_add_manual_item($noteText, $baseUrl, $siteTitle, $replyObjectImage, [
+                    'via' => 'reply',
                     'images' => $replyObjectImages,
                     'attachments' => $replyObjectAttachments,
+                    'reply_target_url' => (string) (($result['object_url'] ?? '') ?: $objectUrl),
+                    'reply_note_id' => (string) ($result['note_id'] ?? ''),
+                    'reply_activity_id' => (string) ($result['activity_id'] ?? ''),
                 ]);
                 if (function_exists('nammu_actuality_rebuild_snapshot')) {
                     nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
                 }
-                nammu_fediverse_record_action('share', '', $objectUrl, ['share_text' => $replyText, 'title' => 'reply-note']);
                 if (!function_exists('admin_enqueue_social_broadcast') && is_file(__DIR__ . '/core/admin-redes.php')) {
                     require_once __DIR__ . '/core/admin-redes.php';
                 }

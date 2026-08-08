@@ -9052,7 +9052,13 @@ function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, stri
         'activity_id' => (string) ($activity['id'] ?? ''),
         'mention_actor' => 1,
     ]);
-    return ['ok' => true, 'message' => 'Respuesta enviada.'];
+    return [
+        'ok' => true,
+        'message' => 'Respuesta enviada.',
+        'note_id' => $noteId,
+        'activity_id' => (string) ($activity['id'] ?? ''),
+        'object_url' => $objectUrl,
+    ];
 }
 
 function nammu_fediverse_send_local_reply(string $objectUrl, string $text, array $config): array
@@ -9102,7 +9108,14 @@ function nammu_fediverse_send_local_reply(string $objectUrl, string $text, array
         'is_local_root' => 1,
         'published' => $published,
     ]);
-    return ['ok' => true, 'message' => 'Respuesta enviada. Entregas: ' . $delivered . '.'];
+    return [
+        'ok' => true,
+        'message' => 'Respuesta enviada. Entregas: ' . $delivered . '.',
+        'note_id' => $noteId,
+        'activity_id' => (string) ($activity['id'] ?? ''),
+        'object_url' => (string) ($localTarget['id'] ?? $objectUrl),
+        'delivered' => $delivered,
+    ];
 }
 
 function nammu_fediverse_delete_public_reply(string $actionId, array $config): array

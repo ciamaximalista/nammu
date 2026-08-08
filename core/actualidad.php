@@ -1394,6 +1394,10 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item): array
     if ($boostOriginalUrl !== '') {
         $item['boost_original_url'] = $boostOriginalUrl;
     }
+    if ($boostActorIcon !== '') {
+        $publicBaseUrl = function_exists('nammu_base_url') ? nammu_base_url() : '';
+        $boostActorIcon = nammu_actuality_cache_remote_avatar($boostActorIcon, $boostActorUrl, $publicBaseUrl);
+    }
     if ($title !== '') {
         $item['title'] = $title;
     }
@@ -1430,6 +1434,13 @@ function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $
     $timestamp = time();
     $metaImages = nammu_actuality_manual_images((array) ($meta['images'] ?? []), $baseUrl);
     $primaryImage = nammu_actuality_manual_image_url($image, $baseUrl);
+    if (trim((string) ($meta['boost_actor_icon'] ?? '')) !== '') {
+        $meta['boost_actor_icon'] = nammu_actuality_cache_remote_avatar(
+            (string) $meta['boost_actor_icon'],
+            (string) ($meta['boost_actor_url'] ?? ''),
+            $baseUrl
+        );
+    }
     $images = $metaImages;
     if ($primaryImage !== '') {
         array_unshift($images, $primaryImage);
@@ -1591,6 +1602,20 @@ function nammu_actuality_cache_social_image(string $pageUrl, string $imageUrl, s
     @chmod($path, 0664);
     $base = rtrim($publicBaseUrl, '/');
     return ($base !== '' ? $base : '') . '/assets/actualidad-cache/' . $filename;
+}
+
+function nammu_actuality_cache_remote_avatar(string $avatarUrl, string $actorUrl, string $publicBaseUrl): string
+{
+    $avatarUrl = trim($avatarUrl);
+    if ($avatarUrl === '') {
+        return '';
+    }
+    if (nammu_actuality_is_local_image_url($avatarUrl, $publicBaseUrl)) {
+        return $avatarUrl;
+    }
+    $cacheKeyUrl = trim($actorUrl) !== '' ? trim($actorUrl) . '#avatar' : $avatarUrl . '#avatar';
+    $cached = nammu_actuality_cache_social_image($cacheKeyUrl, $avatarUrl, $publicBaseUrl);
+    return $cached !== '' ? $cached : $avatarUrl;
 }
 
 function nammu_actuality_is_local_image_url(string $imageUrl, string $publicBaseUrl): bool

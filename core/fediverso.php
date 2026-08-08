@@ -1425,13 +1425,20 @@ function nammu_fediverse_cache_actor_avatar(string $actorId, string $avatarUrl, 
     if ($avatarUrl === '') {
         return '';
     }
-    if (!function_exists('nammu_actuality_cache_remote_avatar') && is_file(dirname(__DIR__) . '/core/actualidad.php')) {
+    if (!function_exists('nammu_actuality_cache_social_image') && is_file(dirname(__DIR__) . '/core/actualidad.php')) {
         require_once dirname(__DIR__) . '/core/actualidad.php';
     }
-    if (!function_exists('nammu_actuality_cache_remote_avatar')) {
-        return $avatarUrl;
+    $publicBaseUrl = nammu_fediverse_base_url($config);
+    if (function_exists('nammu_actuality_is_local_image_url') && nammu_actuality_is_local_image_url($avatarUrl, $publicBaseUrl)) {
+        $imagePath = trim((string) (parse_url($avatarUrl, PHP_URL_PATH) ?? ''));
+        $localImagePath = $imagePath !== '' ? dirname(__DIR__) . $imagePath : '';
+        return ($localImagePath !== '' && is_file($localImagePath)) ? $avatarUrl : '';
     }
-    return nammu_actuality_cache_remote_avatar($avatarUrl, $actorId, nammu_fediverse_base_url($config));
+    if (!function_exists('nammu_actuality_cache_social_image')) {
+        return '';
+    }
+    $cacheKeyUrl = $actorId !== '' ? $actorId . '#avatar' : $avatarUrl . '#avatar';
+    return nammu_actuality_cache_social_image($cacheKeyUrl, $avatarUrl, $publicBaseUrl);
 }
 
 function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): array
@@ -1461,6 +1468,7 @@ function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): a
         $actor = array_merge($actor, $resolvedActor);
         $actor['icon'] = $cachedIcon;
         $actor['avatar_cached_at'] = gmdate(DATE_ATOM);
+        $actor['avatar_cache_error'] = $cachedIcon === '' ? 'No se pudo descargar el avatar remoto.' : '';
         $updated++;
         $sources[] = 'seguidos';
     }
@@ -1483,6 +1491,7 @@ function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): a
         $follower = array_merge($follower, $resolvedActor);
         $follower['icon'] = $cachedIcon;
         $follower['avatar_cached_at'] = gmdate(DATE_ATOM);
+        $follower['avatar_cache_error'] = $cachedIcon === '' ? 'No se pudo descargar el avatar remoto.' : '';
         $updated++;
         $followersUpdated++;
     }
@@ -1496,9 +1505,13 @@ function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): a
         return ['ok' => false, 'message' => 'No se encontró un avatar cacheable para ese actor.'];
     }
 
+    $message = $cachedIcon !== ''
+        ? 'Avatar recacheado en ' . implode(' y ', array_values(array_unique($sources))) . '.'
+        : 'No se pudo descargar el avatar remoto; se ha limpiado la URL rota y se mostrará el fallback.';
+
     return [
         'ok' => true,
-        'message' => 'Avatar recacheado en ' . implode(' y ', array_values(array_unique($sources))) . '.',
+        'message' => $message,
         'icon' => $cachedIcon,
         'updated' => $updated,
     ];

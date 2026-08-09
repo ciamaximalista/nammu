@@ -2031,7 +2031,7 @@
                 <div class="col-lg-6 mb-4">
                     <div class="card h-100">
                         <div class="card-body">
-                            <h3 class="h5 mb-3">Actores seguidos</h3>
+                            <h3 class="h5 mb-3">Actores seguidos (<?= count($fediverseFollowing) ?>)</h3>
                             <?php if (empty($fediverseFollowing)): ?>
                                 <p class="text-muted mb-0">Todavía no sigues ningún actor.</p>
                             <?php else: ?>
@@ -2087,7 +2087,7 @@
                 <div class="col-lg-6 mb-4">
                     <div class="card h-100">
                         <div class="card-body">
-                            <h3 class="h5 mb-3">Seguidores</h3>
+                            <h3 class="h5 mb-3">Seguidores (<?= count($fediverseFollowers) ?>)</h3>
                             <?php if (empty($fediverseFollowers)): ?>
                                 <p class="text-muted mb-0">Todavía nadie sigue este actor federado.</p>
                             <?php else: ?>

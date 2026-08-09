@@ -257,6 +257,37 @@ $renderSafeMediaText = static function (string $text): string {
     }
     return $html;
 };
+$youtubeEmbedUrl = static function (string $url): string {
+    $url = trim($url);
+    if ($url === '' || !preg_match('#^https?://#i', $url)) {
+        return '';
+    }
+    $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?? ''));
+    $path = trim((string) (parse_url($url, PHP_URL_PATH) ?? ''));
+    $query = [];
+    parse_str((string) (parse_url($url, PHP_URL_QUERY) ?? ''), $query);
+    $videoId = '';
+    if (in_array($host, ['youtu.be', 'www.youtu.be'], true)) {
+        $videoId = trim((string) basename($path));
+    } elseif (in_array($host, ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com'], true)) {
+        if (isset($query['v']) && is_scalar($query['v'])) {
+            $videoId = trim((string) $query['v']);
+        } elseif (preg_match('#^/(?:shorts|embed)/([^/?#]+)#i', $path, $matches) === 1) {
+            $videoId = trim((string) ($matches[1] ?? ''));
+        }
+    }
+    if ($videoId === '' || preg_match('/^[A-Za-z0-9_-]{6,32}$/', $videoId) !== 1) {
+        return '';
+    }
+    return 'https://www.youtube-nocookie.com/embed/' . rawurlencode($videoId);
+};
+$renderYoutubeEmbed = static function (string $url) use ($youtubeEmbedUrl): string {
+    $embedUrl = $youtubeEmbedUrl($url);
+    if ($embedUrl === '') {
+        return '';
+    }
+    return '<div class="actuality-media actuality-media--youtube"><iframe src="' . htmlspecialchars($embedUrl, ENT_QUOTES, 'UTF-8') . '" title="Vídeo de YouTube" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>';
+};
 $renderActualityText = static function (string $text, array $item) use ($fediverseIcon, $actualityFediverseMeta, $actualityMetricIcon, $renderSafeMediaText): string {
     $html = $renderSafeMediaText($text);
     if (strtolower(trim((string) ($item['via'] ?? ''))) === 'boost') {
@@ -380,7 +411,7 @@ $splitColumns = static function (array $dayItems): array {
     }
     return [$left, $right];
 };
-$renderLinks = static function (array $links, array $item = []) use ($fediverseIcon): string {
+$renderLinks = static function (array $links, array $item = []) use ($fediverseIcon, $renderYoutubeEmbed): string {
     $links = array_values(array_filter(array_map('strval', $links)));
     if (empty($links)) {
         return '';
@@ -393,6 +424,11 @@ $renderLinks = static function (array $links, array $item = []) use ($fediverseI
             // The original boosted post is rendered inline next to the text.
         }
         foreach ($links as $index => $url) {
+            $youtubeEmbed = $renderYoutubeEmbed($url);
+            if ($youtubeEmbed !== '') {
+                $bits[] = $youtubeEmbed;
+                continue;
+            }
             $label = count($links) === 1 ? 'Enlace relacionado' : ('Enlace relacionado ' . ($index + 1));
             $bits[] = '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">' . $label . '</a>';
         }
@@ -1146,6 +1182,13 @@ $manualDisplayText = static function (array $item): string {
     }
     .actuality-media video {
         background: #000;
+    }
+    .actuality-media--youtube iframe {
+        aspect-ratio: 16 / 9;
+        border: 0;
+        border-radius: 16px;
+        display: block;
+        width: 100%;
     }
     .actuality-media audio {
         background: #f4f4f4;

@@ -1328,6 +1328,9 @@
                                     $displayActorIcon = trim((string) ($fediverseActorsById[$displayActorId]['icon'] ?? ''));
                                 }
                                 $displayActorIcon = $fediverseValidAvatarUrl($displayActorIcon);
+                                if ($displayActorIcon === '' && $displayActorId !== '' && isset($fediverseActorsById[$displayActorId])) {
+                                    $displayActorIcon = $fediverseValidAvatarUrl(trim((string) ($fediverseActorsById[$displayActorId]['avatar_remote_url'] ?? '')));
+                                }
                                 $displayActorHandle = $fediverseHandle([
                                     'actor_id' => $displayActorId,
                                     'actor_username' => $displayActorUsername,
@@ -2038,6 +2041,9 @@
                                         $actorName = trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? 'Actor')));
                                         $actorId = trim((string) ($actor['id'] ?? ''));
                                         $actorIcon = $fediverseValidAvatarUrl(trim((string) ($actor['icon'] ?? '')));
+                                        if ($actorIcon === '') {
+                                            $actorIcon = $fediverseValidAvatarUrl(trim((string) ($actor['avatar_remote_url'] ?? '')));
+                                        }
                                         $actorUsername = trim((string) ($actor['preferredUsername'] ?? ''));
                                         $actorHost = is_string(parse_url($actorId, PHP_URL_HOST)) ? (string) parse_url($actorId, PHP_URL_HOST) : '';
                                         $actorHandle = $actorUsername !== '' ? '@' . $actorUsername . ($actorHost !== '' ? '@' . $actorHost : '') : $actorId;
@@ -2091,6 +2097,9 @@
                                         $followerName = trim((string) (($follower['name'] ?? '') ?: ($follower['preferredUsername'] ?? 'Actor remoto')));
                                         $followerId = trim((string) ($follower['id'] ?? ''));
                                         $followerIcon = $fediverseValidAvatarUrl(trim((string) ($follower['icon'] ?? '')));
+                                        if ($followerIcon === '') {
+                                            $followerIcon = $fediverseValidAvatarUrl(trim((string) ($follower['avatar_remote_url'] ?? '')));
+                                        }
                                         $followerUsername = trim((string) ($follower['preferredUsername'] ?? ''));
                                         $followerHost = is_string(parse_url($followerId, PHP_URL_HOST)) ? (string) parse_url($followerId, PHP_URL_HOST) : '';
                                         $followerHandle = $followerUsername !== '' ? '@' . $followerUsername . ($followerHost !== '' ? '@' . $followerHost : '') : $followerId;
@@ -2158,6 +2167,9 @@
                                 $blockedName = trim((string) (($blockedActor['name'] ?? '') ?: ($blockedActor['preferredUsername'] ?? 'Actor remoto')));
                                 $blockedId = trim((string) ($blockedActor['id'] ?? ''));
                                 $blockedIcon = $fediverseValidAvatarUrl(trim((string) ($blockedActor['icon'] ?? '')));
+                                if ($blockedIcon === '') {
+                                    $blockedIcon = $fediverseValidAvatarUrl(trim((string) ($blockedActor['avatar_remote_url'] ?? '')));
+                                }
                                 $blockedUsername = trim((string) ($blockedActor['preferredUsername'] ?? ''));
                                 $blockedHost = is_string(parse_url($blockedId, PHP_URL_HOST)) ? (string) parse_url($blockedId, PHP_URL_HOST) : '';
                                 $blockedHandle = $blockedUsername !== '' ? '@' . $blockedUsername . ($blockedHost !== '' ? '@' . $blockedHost : '') : $blockedId;

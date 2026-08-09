@@ -1437,11 +1437,31 @@ function nammu_fediverse_cache_actor_avatar(string $actorId, string $avatarUrl, 
         $localImagePath = $imagePath !== '' ? dirname(__DIR__) . $imagePath : '';
         return ($localImagePath !== '' && is_file($localImagePath)) ? $avatarUrl : '';
     }
-    if (!function_exists('nammu_actuality_cache_social_image')) {
+    if (!function_exists('nammu_actuality_cache_remote_avatar')) {
         return '';
     }
-    $cacheKeyUrl = $actorId !== '' ? $actorId . '#avatar' : $avatarUrl . '#avatar';
-    return nammu_actuality_cache_social_image($cacheKeyUrl, $avatarUrl, $publicBaseUrl, $config);
+    return nammu_actuality_cache_remote_avatar($avatarUrl, $actorId, $publicBaseUrl, $config);
+}
+
+function nammu_fediverse_actor_avatar_source_url(string $iconUrl, array $config): string
+{
+    $iconUrl = trim($iconUrl);
+    if ($iconUrl === '') {
+        return '';
+    }
+    if (!function_exists('nammu_actuality_is_local_image_url')) {
+        return $iconUrl;
+    }
+    $publicBaseUrl = nammu_fediverse_base_url($config);
+    if (!nammu_actuality_is_local_image_url($iconUrl, $publicBaseUrl)) {
+        return $iconUrl;
+    }
+    $imagePath = trim((string) (parse_url($iconUrl, PHP_URL_PATH) ?? ''));
+    if ($imagePath === '' && !preg_match('#^https?://#i', $iconUrl)) {
+        $imagePath = '/' . ltrim($iconUrl, '/');
+    }
+    $localImagePath = $imagePath !== '' ? dirname(__DIR__) . $imagePath : '';
+    return ($localImagePath !== '' && is_file($localImagePath)) ? $iconUrl : '';
 }
 
 function nammu_fediverse_actor_reference_key(string $value): string
@@ -1664,13 +1684,16 @@ function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): a
         if (trim((string) ($actor['id'] ?? '')) !== $actorId) {
             continue;
         }
-        $sourceIcon = $resolvedIcon !== '' ? $resolvedIcon : trim((string) ($actor['icon'] ?? ''));
+        $storedIcon = nammu_fediverse_actor_avatar_source_url((string) ($actor['icon'] ?? ''), $config);
+        $storedRemoteIcon = nammu_fediverse_actor_avatar_source_url((string) ($actor['avatar_remote_url'] ?? ''), $config);
+        $sourceIcon = $resolvedIcon !== '' ? $resolvedIcon : ($storedRemoteIcon !== '' ? $storedRemoteIcon : $storedIcon);
         if ($sourceIcon === '') {
             continue;
         }
         $cachedIcon = nammu_fediverse_cache_actor_avatar($actorId, $sourceIcon, $config);
         $actor = array_merge($actor, $resolvedActor);
         $actor['icon'] = $cachedIcon;
+        $actor['avatar_remote_url'] = $sourceIcon;
         $actor['avatar_cached_at'] = gmdate(DATE_ATOM);
         $actor['avatar_cache_error'] = $cachedIcon === '' ? 'No se pudo descargar el avatar remoto.' : '';
         $synced = nammu_fediverse_sync_cached_actor_avatar_references($actorId, $actor, $cachedIcon);
@@ -1691,13 +1714,16 @@ function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): a
         if (trim((string) ($follower['id'] ?? '')) !== $actorId) {
             continue;
         }
-        $sourceIcon = $resolvedIcon !== '' ? $resolvedIcon : trim((string) ($follower['icon'] ?? ''));
+        $storedIcon = nammu_fediverse_actor_avatar_source_url((string) ($follower['icon'] ?? ''), $config);
+        $storedRemoteIcon = nammu_fediverse_actor_avatar_source_url((string) ($follower['avatar_remote_url'] ?? ''), $config);
+        $sourceIcon = $resolvedIcon !== '' ? $resolvedIcon : ($storedRemoteIcon !== '' ? $storedRemoteIcon : $storedIcon);
         if ($sourceIcon === '') {
             continue;
         }
         $cachedIcon = $cachedIcon !== '' ? $cachedIcon : nammu_fediverse_cache_actor_avatar($actorId, $sourceIcon, $config);
         $follower = array_merge($follower, $resolvedActor);
         $follower['icon'] = $cachedIcon;
+        $follower['avatar_remote_url'] = $sourceIcon;
         $follower['avatar_cached_at'] = gmdate(DATE_ATOM);
         $follower['avatar_cache_error'] = $cachedIcon === '' ? 'No se pudo descargar el avatar remoto.' : '';
         $synced = nammu_fediverse_sync_cached_actor_avatar_references($actorId, $follower, $cachedIcon);

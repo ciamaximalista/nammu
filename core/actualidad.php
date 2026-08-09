@@ -1221,7 +1221,7 @@ function nammu_actuality_normalize_fediverse_attachments(array $attachments): ar
     return array_values($normalized);
 }
 
-function nammu_actuality_enrich_manual_boost_item_images(array $item): array
+function nammu_actuality_enrich_manual_boost_item_images(array $item, array $config = []): array
 {
     if (strtolower(trim((string) ($item['via'] ?? ''))) !== 'boost') {
         return $item;
@@ -1395,7 +1395,7 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item): array
         $item['boost_original_url'] = $boostOriginalUrl;
     }
     if ($boostActorUrl !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
-        $cachedActorIcon = nammu_fediverse_cached_actor_avatar_for_reference($boostActorUrl);
+        $cachedActorIcon = nammu_fediverse_cached_actor_avatar_for_reference($boostActorUrl, $config);
         if ($cachedActorIcon !== '') {
             $boostActorIcon = $cachedActorIcon;
         }
@@ -1403,6 +1403,9 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item): array
     if ($boostActorIcon !== '') {
         $publicBaseUrl = function_exists('nammu_base_url') ? nammu_base_url() : '';
         $boostActorIcon = nammu_actuality_cache_remote_avatar($boostActorIcon, $boostActorUrl, $publicBaseUrl);
+    }
+    if ($boostActorIcon === '') {
+        unset($item['boost_actor_icon']);
     }
     if ($title !== '') {
         $item['title'] = $title;
@@ -2210,7 +2213,7 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
         if ($manualId === '') {
             continue;
         }
-        $item = nammu_actuality_enrich_manual_boost_item_images($item);
+        $item = nammu_actuality_enrich_manual_boost_item_images($item, $config);
         $seen['manual:' . $manualId] = true;
         $items[] = [
             'id' => $manualId,

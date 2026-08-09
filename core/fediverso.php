@@ -1471,7 +1471,7 @@ function nammu_fediverse_actor_reference_matches(string $value, array $keys): bo
     return $key !== '' && isset($keys[$key]);
 }
 
-function nammu_fediverse_cached_actor_avatar_for_reference(string $actorReference): string
+function nammu_fediverse_cached_actor_avatar_for_reference(string $actorReference, array $config = []): string
 {
     $actorReference = trim($actorReference);
     if ($actorReference === '') {
@@ -1499,7 +1499,7 @@ function nammu_fediverse_cached_actor_avatar_for_reference(string $actorReferenc
             continue;
         }
         if (function_exists('nammu_actuality_is_local_image_url')) {
-            $baseUrl = function_exists('nammu_base_url') ? nammu_base_url() : '';
+            $baseUrl = !empty($config) ? nammu_fediverse_base_url($config) : (function_exists('nammu_base_url') ? nammu_base_url() : '');
             if (nammu_actuality_is_local_image_url($icon, $baseUrl)) {
                 $imagePath = trim((string) (parse_url($icon, PHP_URL_PATH) ?? ''));
                 if ($imagePath === '' && !preg_match('#^https?://#i', $icon)) {
@@ -1631,7 +1631,9 @@ function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): a
         return ['ok' => false, 'message' => 'No se recibió el actor.'];
     }
 
-    $resolvedActor = nammu_fediverse_resolve_actor($actorId, $config);
+    $refreshConfig = $config;
+    $refreshConfig['__force_actor_refresh'] = true;
+    $resolvedActor = nammu_fediverse_resolve_actor($actorId, $refreshConfig);
     $resolvedActor = is_array($resolvedActor) ? $resolvedActor : [];
     $resolvedIcon = trim((string) ($resolvedActor['icon'] ?? ''));
     $updated = 0;

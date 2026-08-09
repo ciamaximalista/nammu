@@ -1975,7 +1975,21 @@
                         <button type="submit" name="follow_fediverse_actor" class="btn btn-primary">Seguir actor</button>
                         <button type="submit" name="refresh_fediverse_timeline" class="btn btn-outline-secondary ml-2">Refrescar ahora</button>
                         <button type="submit" name="refresh_fediverse_threads" class="btn btn-outline-secondary ml-2">Actualizar hilos</button>
-                        <button type="submit" name="recache_all_fediverse_actor_avatars" class="btn btn-outline-secondary ml-2" onclick="return confirm('¿Recachear desde cero los avatares de todos los seguidos y seguidores?');">Recachear avatares</button>
+                    </div>
+                </div>
+            </form>
+
+            <form method="post" class="mb-4">
+                <div class="card border-info">
+                    <div class="card-body d-flex flex-wrap align-items-center justify-content-between" style="gap:0.75rem;">
+                        <div>
+                            <h3 class="h5 mb-1">Avatares de la red</h3>
+                            <p class="text-muted mb-0">Consulta de nuevo los servidores de todos los seguidos y seguidores y guarda copias locales de sus avatares.</p>
+                        </div>
+                        <div>
+                            <input type="hidden" name="fediverse_tab" value="network">
+                            <button type="submit" name="recache_all_fediverse_actor_avatars" class="btn btn-info" onclick="return confirm('¿Recachear desde cero los avatares de todos los seguidos y seguidores?');">Recachear todos los avatares</button>
+                        </div>
                     </div>
                 </div>
             </form>

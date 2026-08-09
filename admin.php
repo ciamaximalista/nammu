@@ -12938,6 +12938,24 @@ if ($isLoggedIn && $page === 'publish') {
 }
 if ($isLoggedIn && $page === 'fediverso') {
     require_once __DIR__ . '/core/fediverso.php';
+    $refreshFediverseAvatarSnapshots = static function (array $config): void {
+        if (!function_exists('nammu_actuality_rebuild_snapshot') && is_file(__DIR__ . '/core/actualidad.php')) {
+            require_once __DIR__ . '/core/actualidad.php';
+        }
+        $baseUrl = trim((string) (($config['site_url'] ?? '') ?: nammu_base_url()));
+        $siteTitle = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
+        $siteDescription = trim((string) (($config['site_description'] ?? '') ?: ''));
+        $siteLang = trim((string) (($config['site_lang'] ?? '') ?: 'es'));
+        if (function_exists('nammu_actuality_rebuild_snapshot')) {
+            nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        }
+        if (function_exists('nammu_fediverse_rebuild_light_snapshots')) {
+            nammu_fediverse_rebuild_light_snapshots($config);
+        }
+        if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
+            nammu_fediverse_save_fragments_cache_store([]);
+        }
+    };
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['follow_fediverse_actor'])) {
         $fediverseActorInput = trim((string) ($_POST['fediverse_actor_input'] ?? ''));
         $followResult = nammu_fediverse_follow_actor($fediverseActorInput);
@@ -12959,6 +12977,9 @@ if ($isLoggedIn && $page === 'fediverso') {
         $actorId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
         $config = load_config_file();
         $recacheResult = nammu_fediverse_recache_actor_avatar($actorId, $config);
+        if (!empty($recacheResult['ok'])) {
+            $refreshFediverseAvatarSnapshots($config);
+        }
         $fediverseFeedback = [
             'type' => !empty($recacheResult['ok']) ? 'success' : 'danger',
             'message' => (string) ($recacheResult['message'] ?? ''),
@@ -12967,6 +12988,9 @@ if ($isLoggedIn && $page === 'fediverso') {
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['recache_all_fediverse_actor_avatars'])) {
         $config = load_config_file();
         $recacheResult = nammu_fediverse_recache_all_actor_avatars($config);
+        if (!empty($recacheResult['ok'])) {
+            $refreshFediverseAvatarSnapshots($config);
+        }
         $fediverseFeedback = [
             'type' => !empty($recacheResult['ok']) ? 'success' : 'danger',
             'message' => (string) ($recacheResult['message'] ?? ''),

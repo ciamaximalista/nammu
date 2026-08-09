@@ -1444,6 +1444,140 @@ function nammu_fediverse_cache_actor_avatar(string $actorId, string $avatarUrl, 
     return nammu_actuality_cache_social_image($cacheKeyUrl, $avatarUrl, $publicBaseUrl);
 }
 
+function nammu_fediverse_actor_reference_key(string $value): string
+{
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+    return strtolower(rtrim($value, '/'));
+}
+
+function nammu_fediverse_actor_reference_keys(array $actor, string $fallbackActorId = ''): array
+{
+    $keys = [];
+    foreach ([$fallbackActorId, (string) ($actor['id'] ?? ''), (string) ($actor['url'] ?? '')] as $value) {
+        $key = nammu_fediverse_actor_reference_key($value);
+        if ($key !== '') {
+            $keys[$key] = true;
+        }
+    }
+    return $keys;
+}
+
+function nammu_fediverse_actor_reference_matches(string $value, array $keys): bool
+{
+    $key = nammu_fediverse_actor_reference_key($value);
+    return $key !== '' && isset($keys[$key]);
+}
+
+function nammu_fediverse_sync_cached_actor_avatar_references(string $actorId, array $actor, string $cachedIcon): array
+{
+    $keys = nammu_fediverse_actor_reference_keys($actor, $actorId);
+    if (empty($keys)) {
+        return ['actions' => 0, 'timeline' => 0, 'manual' => 0, 'snapshot' => 0];
+    }
+    $stats = ['actions' => 0, 'timeline' => 0, 'manual' => 0, 'snapshot' => 0];
+
+    $actions = nammu_fediverse_actions_store()['items'];
+    foreach ($actions as &$action) {
+        if (!is_array($action)) {
+            continue;
+        }
+        $actionChanged = false;
+        if (nammu_fediverse_actor_reference_matches((string) ($action['actor_id'] ?? ''), $keys)) {
+            $action['actor_icon'] = $cachedIcon;
+            $actionChanged = true;
+        }
+        if (nammu_fediverse_actor_reference_matches((string) ($action['boost_actor_url'] ?? ''), $keys)
+            || nammu_fediverse_actor_reference_matches((string) ($action['boost_actor_id'] ?? ''), $keys)
+        ) {
+            $action['boost_actor_icon'] = $cachedIcon;
+            $actionChanged = true;
+        }
+        if ($actionChanged) {
+            $stats['actions']++;
+        }
+    }
+    unset($action);
+    if ($stats['actions'] > 0) {
+        nammu_fediverse_save_actions_store($actions);
+    }
+
+    $timeline = nammu_fediverse_timeline_store()['items'];
+    foreach ($timeline as &$item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $itemChanged = false;
+        if (nammu_fediverse_actor_reference_matches((string) ($item['actor_id'] ?? ''), $keys)
+            || nammu_fediverse_actor_reference_matches((string) ($item['actor_url'] ?? ''), $keys)
+        ) {
+            $item['actor_icon'] = $cachedIcon;
+            $itemChanged = true;
+        }
+        if (nammu_fediverse_actor_reference_matches((string) ($item['target_actor_id'] ?? ''), $keys)
+            || nammu_fediverse_actor_reference_matches((string) ($item['target_actor_url'] ?? ''), $keys)
+            || nammu_fediverse_actor_reference_matches((string) ($item['object_actor_id'] ?? ''), $keys)
+        ) {
+            $item['target_actor_icon'] = $cachedIcon;
+            $itemChanged = true;
+        }
+        if ($itemChanged) {
+            $stats['timeline']++;
+        }
+    }
+    unset($item);
+    if ($stats['timeline'] > 0) {
+        nammu_fediverse_save_timeline_store($timeline);
+    }
+
+    if (!function_exists('nammu_actuality_load_manual_items') && is_file(dirname(__DIR__) . '/core/actualidad.php')) {
+        require_once dirname(__DIR__) . '/core/actualidad.php';
+    }
+    if (function_exists('nammu_actuality_load_manual_items') && function_exists('nammu_actuality_save_manual_items')) {
+        $manualStore = nammu_actuality_load_manual_items();
+        $manualItems = is_array($manualStore['items'] ?? null) ? $manualStore['items'] : [];
+        foreach ($manualItems as &$manualItem) {
+            if (!is_array($manualItem)) {
+                continue;
+            }
+            if (nammu_fediverse_actor_reference_matches((string) ($manualItem['boost_actor_url'] ?? ''), $keys)
+                || nammu_fediverse_actor_reference_matches((string) ($manualItem['boost_actor_id'] ?? ''), $keys)
+            ) {
+                $manualItem['boost_actor_icon'] = $cachedIcon;
+                $stats['manual']++;
+            }
+        }
+        unset($manualItem);
+        if ($stats['manual'] > 0) {
+            nammu_actuality_save_manual_items($manualItems);
+        }
+    }
+
+    if (function_exists('nammu_actuality_load_items_snapshot') && function_exists('nammu_actuality_save_items_snapshot')) {
+        $snapshot = nammu_actuality_load_items_snapshot();
+        $snapshotItems = is_array($snapshot['items'] ?? null) ? $snapshot['items'] : [];
+        foreach ($snapshotItems as &$snapshotItem) {
+            if (!is_array($snapshotItem)) {
+                continue;
+            }
+            if (nammu_fediverse_actor_reference_matches((string) ($snapshotItem['boost_actor_url'] ?? ''), $keys)
+                || nammu_fediverse_actor_reference_matches((string) ($snapshotItem['boost_actor_id'] ?? ''), $keys)
+            ) {
+                $snapshotItem['boost_actor_icon'] = $cachedIcon;
+                $stats['snapshot']++;
+            }
+        }
+        unset($snapshotItem);
+        if ($stats['snapshot'] > 0) {
+            nammu_actuality_save_items_snapshot($snapshotItems);
+        }
+    }
+
+    return $stats;
+}
+
 function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): array
 {
     $actorId = trim($actorId);
@@ -1457,6 +1591,7 @@ function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): a
     $updated = 0;
     $cachedIcon = '';
     $sources = [];
+    $referenceStats = ['actions' => 0, 'timeline' => 0, 'manual' => 0, 'snapshot' => 0];
 
     $following = nammu_fediverse_following_store()['actors'];
     foreach ($following as &$actor) {
@@ -1472,6 +1607,10 @@ function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): a
         $actor['icon'] = $cachedIcon;
         $actor['avatar_cached_at'] = gmdate(DATE_ATOM);
         $actor['avatar_cache_error'] = $cachedIcon === '' ? 'No se pudo descargar el avatar remoto.' : '';
+        $synced = nammu_fediverse_sync_cached_actor_avatar_references($actorId, $actor, $cachedIcon);
+        foreach ($referenceStats as $key => $value) {
+            $referenceStats[$key] = $value + (int) ($synced[$key] ?? 0);
+        }
         $updated++;
         $sources[] = 'seguidos';
     }
@@ -1495,6 +1634,10 @@ function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): a
         $follower['icon'] = $cachedIcon;
         $follower['avatar_cached_at'] = gmdate(DATE_ATOM);
         $follower['avatar_cache_error'] = $cachedIcon === '' ? 'No se pudo descargar el avatar remoto.' : '';
+        $synced = nammu_fediverse_sync_cached_actor_avatar_references($actorId, $follower, $cachedIcon);
+        foreach ($referenceStats as $key => $value) {
+            $referenceStats[$key] = $value + (int) ($synced[$key] ?? 0);
+        }
         $updated++;
         $followersUpdated++;
     }
@@ -1517,6 +1660,7 @@ function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): a
         'message' => $message,
         'icon' => $cachedIcon,
         'updated' => $updated,
+        'references' => $referenceStats,
     ];
 }
 

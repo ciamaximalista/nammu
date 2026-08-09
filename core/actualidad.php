@@ -1221,7 +1221,7 @@ function nammu_actuality_normalize_fediverse_attachments(array $attachments): ar
     return array_values($normalized);
 }
 
-function nammu_actuality_enrich_manual_boost_item_images(array $item, array $config = []): array
+function nammu_actuality_enrich_manual_boost_item_images(array $item, array $config = [], string $publicBaseUrl = ''): array
 {
     if (strtolower(trim((string) ($item['via'] ?? ''))) !== 'boost') {
         return $item;
@@ -1400,9 +1400,49 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item, array $con
             $boostActorIcon = $cachedActorIcon;
         }
     }
+    $resolveRemoteBoostActor = static function () use (&$boostActorIcon, &$boostActorName, &$boostActorUrl, $config): void {
+        if ($boostActorUrl === '' || !function_exists('nammu_fediverse_resolve_actor')) {
+            return;
+        }
+        $refreshConfig = $config;
+        $refreshConfig['__force_actor_refresh'] = true;
+        $remoteActor = nammu_fediverse_resolve_actor($boostActorUrl, $refreshConfig);
+        if (!is_array($remoteActor)) {
+            return;
+        }
+        $remoteActorIcon = trim((string) ($remoteActor['icon'] ?? ''));
+        if ($remoteActorIcon !== '') {
+            $boostActorIcon = $remoteActorIcon;
+        }
+        if ($boostActorName === '') {
+            $boostActorName = trim((string) (($remoteActor['name'] ?? '') ?: ($remoteActor['preferredUsername'] ?? '')));
+        }
+        $remoteActorUrl = trim((string) (($remoteActor['url'] ?? '') ?: ($remoteActor['id'] ?? '')));
+        if ($remoteActorUrl !== '') {
+            $boostActorUrl = $remoteActorUrl;
+        }
+    };
+    if ($boostActorIcon === '') {
+        $resolveRemoteBoostActor();
+    }
     if ($boostActorIcon !== '') {
-        $publicBaseUrl = function_exists('nammu_base_url') ? nammu_base_url() : '';
-        $boostActorIcon = nammu_actuality_cache_remote_avatar($boostActorIcon, $boostActorUrl, $publicBaseUrl);
+        $boostActorIcon = nammu_actuality_cache_remote_avatar(
+            $boostActorIcon,
+            $boostActorUrl,
+            $publicBaseUrl !== '' ? $publicBaseUrl : (function_exists('nammu_base_url') ? nammu_base_url() : ''),
+            $config
+        );
+        if ($boostActorIcon === '') {
+            $resolveRemoteBoostActor();
+            if ($boostActorIcon !== '') {
+                $boostActorIcon = nammu_actuality_cache_remote_avatar(
+                    $boostActorIcon,
+                    $boostActorUrl,
+                    $publicBaseUrl !== '' ? $publicBaseUrl : (function_exists('nammu_base_url') ? nammu_base_url() : ''),
+                    $config
+                );
+            }
+        }
     }
     if ($boostActorIcon === '') {
         unset($item['boost_actor_icon']);
@@ -1447,7 +1487,8 @@ function nammu_actuality_add_manual_item(string $text, string $baseUrl, string $
         $meta['boost_actor_icon'] = nammu_actuality_cache_remote_avatar(
             (string) $meta['boost_actor_icon'],
             (string) ($meta['boost_actor_url'] ?? ''),
-            $baseUrl
+            $baseUrl,
+            function_exists('nammu_load_config') ? nammu_load_config() : null
         );
     }
     $images = $metaImages;
@@ -1583,12 +1624,12 @@ function nammu_actuality_extension_from_headers(string $url, array $headers): st
     return in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'], true) ? ($ext === 'jpeg' ? 'jpg' : $ext) : 'jpg';
 }
 
-function nammu_actuality_cache_social_image(string $pageUrl, string $imageUrl, string $publicBaseUrl): string
+function nammu_actuality_cache_social_image(string $pageUrl, string $imageUrl, string $publicBaseUrl, ?array $config = null): string
 {
     if (!nammu_actuality_is_probable_image_url($imageUrl, $pageUrl)) {
         return '';
     }
-    $response = nammu_actuality_fetch_url($imageUrl, 'image/*', 10);
+    $response = nammu_actuality_fetch_url($imageUrl, 'image/*', 10, $config);
     $body = $response['body'] ?? '';
     if (!is_string($body) || $body === '') {
         return '';
@@ -1613,7 +1654,7 @@ function nammu_actuality_cache_social_image(string $pageUrl, string $imageUrl, s
     return ($base !== '' ? $base : '') . '/assets/actualidad-cache/' . $filename;
 }
 
-function nammu_actuality_cache_remote_avatar(string $avatarUrl, string $actorUrl, string $publicBaseUrl): string
+function nammu_actuality_cache_remote_avatar(string $avatarUrl, string $actorUrl, string $publicBaseUrl, ?array $config = null): string
 {
     $avatarUrl = trim($avatarUrl);
     if ($avatarUrl === '') {
@@ -1628,8 +1669,28 @@ function nammu_actuality_cache_remote_avatar(string $avatarUrl, string $actorUrl
         return ($localImagePath !== '' && is_file($localImagePath)) ? $avatarUrl : '';
     }
     $cacheKeyUrl = trim($actorUrl) !== '' ? trim($actorUrl) . '#avatar' : $avatarUrl . '#avatar';
-    $cached = nammu_actuality_cache_social_image($cacheKeyUrl, $avatarUrl, $publicBaseUrl);
-    return $cached !== '' ? $cached : '';
+    $response = nammu_actuality_fetch_url($avatarUrl, 'image/*', 10, $config);
+    $body = $response['body'] ?? '';
+    if (!is_string($body) || $body === '') {
+        return '';
+    }
+    $headers = is_array($response['headers'] ?? null) ? $response['headers'] : [];
+    $contentType = strtolower((string) ($headers['content-type'] ?? ''));
+    if ($contentType !== '' && !str_starts_with($contentType, 'image/')) {
+        return '';
+    }
+    $dir = nammu_actuality_cache_dir();
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $filename = sha1($cacheKeyUrl) . '.' . nammu_actuality_extension_from_headers($avatarUrl, $headers);
+    $path = $dir . '/' . $filename;
+    if (@file_put_contents($path, $body) === false) {
+        return '';
+    }
+    @chmod($path, 0664);
+    $base = rtrim($publicBaseUrl, '/');
+    return ($base !== '' ? $base : '') . '/assets/actualidad-cache/' . $filename;
 }
 
 function nammu_actuality_is_local_image_url(string $imageUrl, string $publicBaseUrl): bool
@@ -1717,6 +1778,7 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
     $activeKeys = [];
     foreach ($items as $index => $item) {
         $isManual = !empty($item['is_manual']);
+        $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
         $manualLinks = array_values(array_filter(array_map('strval', is_array($item['links'] ?? null) ? $item['links'] : [])));
         $targetLink = ($isManual && !empty($manualLinks))
             ? trim((string) ($manualLinks[0] ?? ''))
@@ -1737,6 +1799,19 @@ function nammu_actuality_enrich_items(array $items, string $publicBaseUrl): arra
                 return nammu_actuality_is_probable_image_url($imageUrl, $targetLink);
             }
         ));
+        if ($isBoost) {
+            $attachmentImages = array_fill_keys(nammu_actuality_images_from_fediverse_attachments((array) ($item['attachments'] ?? [])), true);
+            $currentImages = array_values(array_filter($currentImages, static function (string $imageUrl) use ($attachmentImages): bool {
+                return isset($attachmentImages[$imageUrl]);
+            }));
+            if ($currentImage !== '' && !isset($attachmentImages[$currentImage])) {
+                $currentImage = '';
+                $items[$index]['image'] = '';
+            }
+            $items[$index]['images'] = $currentImages;
+            unset($items[$index]['source_image']);
+            continue;
+        }
         $items[$index]['images'] = $currentImages;
         $entry = is_array($cache['items'][$key] ?? null) ? $cache['items'][$key] : [];
         $localPath = (string) ($entry['local_path'] ?? '');
@@ -2213,7 +2288,7 @@ function nammu_actuality_collect_items(array $config, string $publicBaseUrl): ar
         if ($manualId === '') {
             continue;
         }
-        $item = nammu_actuality_enrich_manual_boost_item_images($item, $config);
+        $item = nammu_actuality_enrich_manual_boost_item_images($item, $config, $publicBaseUrl);
         $seen['manual:' . $manualId] = true;
         $items[] = [
             'id' => $manualId,

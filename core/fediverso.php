@@ -1441,7 +1441,7 @@ function nammu_fediverse_cache_actor_avatar(string $actorId, string $avatarUrl, 
         return '';
     }
     $cacheKeyUrl = $actorId !== '' ? $actorId . '#avatar' : $avatarUrl . '#avatar';
-    return nammu_actuality_cache_social_image($cacheKeyUrl, $avatarUrl, $publicBaseUrl);
+    return nammu_actuality_cache_social_image($cacheKeyUrl, $avatarUrl, $publicBaseUrl, $config);
 }
 
 function nammu_fediverse_actor_reference_key(string $value): string
@@ -1460,6 +1460,24 @@ function nammu_fediverse_actor_reference_keys(array $actor, string $fallbackActo
         $key = nammu_fediverse_actor_reference_key($value);
         if ($key !== '') {
             $keys[$key] = true;
+        }
+    }
+    $preferredUsername = trim((string) ($actor['preferredUsername'] ?? ''));
+    foreach ([(string) ($actor['id'] ?? ''), (string) ($actor['url'] ?? ''), $fallbackActorId] as $value) {
+        $host = strtolower(trim((string) (parse_url($value, PHP_URL_HOST) ?? '')));
+        if ($host === '' || $preferredUsername === '') {
+            continue;
+        }
+        foreach ([
+            'https://' . $host . '/@' . $preferredUsername,
+            'https://' . $host . '/' . $preferredUsername,
+            '@' . $preferredUsername . '@' . $host,
+            'acct:' . $preferredUsername . '@' . $host,
+        ] as $variant) {
+            $key = nammu_fediverse_actor_reference_key($variant);
+            if ($key !== '') {
+                $keys[$key] = true;
+            }
         }
     }
     return $keys;

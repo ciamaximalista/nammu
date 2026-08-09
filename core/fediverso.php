@@ -1552,6 +1552,19 @@ function nammu_fediverse_cached_actor_avatar_for_reference(string $actorReferenc
         return $icon;
     }
 
+    foreach ($actors as $actor) {
+        if (!is_array($actor)) {
+            continue;
+        }
+        if (!isset(nammu_fediverse_actor_reference_keys($actor)[$referenceKey])) {
+            continue;
+        }
+        $remoteIcon = trim((string) ($actor['avatar_remote_url'] ?? ''));
+        if ($remoteIcon !== '') {
+            return $remoteIcon;
+        }
+    }
+
     return '';
 }
 

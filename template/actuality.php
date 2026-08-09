@@ -314,7 +314,23 @@ $renderActualityText = static function (string $text, array $item) use ($fediver
     }
     return $html;
 };
-$renderBoostHeader = static function (array $item): string {
+$actualityValidAvatarUrl = static function (string $avatarUrl) use ($baseUrl): string {
+    $avatarUrl = trim($avatarUrl);
+    if ($avatarUrl === '') {
+        return '';
+    }
+    $base = trim((string) ($baseUrl ?? ''));
+    if (function_exists('nammu_actuality_is_local_image_url') && nammu_actuality_is_local_image_url($avatarUrl, $base)) {
+        $imagePath = trim((string) (parse_url($avatarUrl, PHP_URL_PATH) ?? ''));
+        if ($imagePath === '' && !preg_match('#^https?://#i', $avatarUrl)) {
+            $imagePath = '/' . ltrim($avatarUrl, '/');
+        }
+        $localImagePath = $imagePath !== '' ? dirname(__DIR__) . $imagePath : '';
+        return ($localImagePath !== '' && is_file($localImagePath)) ? $avatarUrl : '';
+    }
+    return $avatarUrl;
+};
+$renderBoostHeader = static function (array $item) use ($actualityValidAvatarUrl, $fediverseConfig): string {
     if (strtolower(trim((string) ($item['via'] ?? ''))) !== 'boost') {
         return '';
     }
@@ -329,7 +345,11 @@ $renderBoostHeader = static function (array $item): string {
         return '';
     }
     $actorName = trim((string) ($item['boost_actor_name'] ?? ''));
-    $actorIcon = trim((string) ($item['boost_actor_icon'] ?? ''));
+    $actorIcon = $actualityValidAvatarUrl(trim((string) ($item['boost_actor_icon'] ?? '')));
+    $actorUrl = trim((string) ($item['boost_actor_url'] ?? ''));
+    if ($actorIcon === '' && $actorUrl !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
+        $actorIcon = $actualityValidAvatarUrl(nammu_fediverse_cached_actor_avatar_for_reference($actorUrl, $fediverseConfig));
+    }
     $fallback = mb_substr($actorName !== '' ? $actorName : 'F', 0, 1, 'UTF-8');
     $avatarHtml = $actorIcon !== ''
         ? '<img class="actuality-boost-origin__avatar" src="' . htmlspecialchars($actorIcon, ENT_QUOTES, 'UTF-8') . '" alt="' . htmlspecialchars($actorName !== '' ? $actorName : 'Autor original', ENT_QUOTES, 'UTF-8') . '" loading="lazy">'

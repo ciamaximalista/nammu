@@ -3,12 +3,31 @@
     if (!function_exists('nammu_fediverse_actor_url')) {
         require_once __DIR__ . '/fediverso.php';
     }
+    if (!function_exists('nammu_actuality_is_local_image_url') && is_file(__DIR__ . '/actualidad.php')) {
+        require_once __DIR__ . '/actualidad.php';
+    }
     $fediverseConfig = load_config_file();
     $fediverseBaseUrl = nammu_fediverse_base_url($fediverseConfig);
     $fediverseActorUrl = nammu_fediverse_actor_url($fediverseConfig);
     $fediverseAcct = nammu_fediverse_acct_uri($fediverseConfig);
     $fediverseLocalName = trim((string) (($fediverseConfig['site_name'] ?? '') ?: ($siteTitle ?? 'Blog')));
     $fediverseLocalAvatar = function_exists('nammu_fediverse_avatar_url') ? nammu_fediverse_avatar_url($fediverseConfig) : '';
+    $fediverseValidAvatarUrl = static function (string $avatarUrl) use ($fediverseBaseUrl): string {
+        $avatarUrl = trim($avatarUrl);
+        if ($avatarUrl === '') {
+            return '';
+        }
+        if (function_exists('nammu_actuality_is_local_image_url') && nammu_actuality_is_local_image_url($avatarUrl, $fediverseBaseUrl)) {
+            $imagePath = trim((string) (parse_url($avatarUrl, PHP_URL_PATH) ?? ''));
+            if ($imagePath === '' && !preg_match('#^https?://#i', $avatarUrl)) {
+                $imagePath = '/' . ltrim($avatarUrl, '/');
+            }
+            $localImagePath = $imagePath !== '' ? dirname(__DIR__) . $imagePath : '';
+            return ($localImagePath !== '' && is_file($localImagePath)) ? $avatarUrl : '';
+        }
+        return $avatarUrl;
+    };
+    $fediverseLocalAvatar = $fediverseValidAvatarUrl($fediverseLocalAvatar);
     $fediverseLocalHandle = '';
     if (str_starts_with($fediverseAcct, 'acct:')) {
         $fediverseLocalHandle = '@' . substr($fediverseAcct, 5);
@@ -914,7 +933,7 @@
                                         'actor_id' => $replyActorId,
                                         'actor_name' => (string) (($reply['actor_name'] ?? '') ?: ($replySource === 'local' ? $fediverseLocalName : 'Actor remoto')),
                                         'actor_handle' => $replyActorHandle,
-                                        'actor_icon' => (string) (($reply['actor_icon'] ?? '') ?: ($replySource === 'local' ? $fediverseLocalAvatar : '')),
+                                        'actor_icon' => $fediverseValidAvatarUrl((string) (($reply['actor_icon'] ?? '') ?: ($replySource === 'local' ? $fediverseLocalAvatar : ''))),
                                         'source' => $replySource,
                                     ];
                                 }
@@ -1013,10 +1032,13 @@
                                                         <div class="modal-body">
                                                             <div class="list-group list-group-flush">
                                                                 <?php foreach ($localReactionDetails['shares'] as $shareActor): ?>
-                                                                    <?php $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: '#')); ?>
+                                                                    <?php
+                                                                    $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: '#'));
+                                                                    $shareActorIcon = $fediverseValidAvatarUrl(trim((string) ($shareActor['icon'] ?? '')));
+                                                                    ?>
                                                                     <a class="list-group-item list-group-item-action d-flex align-items-center" href="<?= htmlspecialchars($shareActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                                                        <?php if (!empty($shareActor['icon'])): ?>
-                                                                            <img src="<?= htmlspecialchars((string) $shareActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy" style="width:40px;height:40px;border-radius:999px;object-fit:cover;margin-right:0.75rem;">
+                                                                        <?php if ($shareActorIcon !== ''): ?>
+                                                                            <img src="<?= htmlspecialchars($shareActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy" style="width:40px;height:40px;border-radius:999px;object-fit:cover;margin-right:0.75rem;">
                                                                         <?php else: ?>
                                                                             <span class="d-inline-flex align-items-center justify-content-center mr-3" style="width:40px;height:40px;border-radius:999px;background:#e9ecef;font-weight:700;">
                                                                                 <?= htmlspecialchars(mb_substr((string) (($shareActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
@@ -1054,7 +1076,7 @@
                                                     $replyPublicUrl = trim((string) ($reply['url'] ?? ''));
                                                     $replyActorId = trim((string) ($reply['actor_id'] ?? ''));
                                                     $replyActorName = trim((string) ($reply['actor_name'] ?? ''));
-                                                    $replyActorIcon = trim((string) ($reply['actor_icon'] ?? ''));
+                                                    $replyActorIcon = $fediverseValidAvatarUrl(trim((string) ($reply['actor_icon'] ?? '')));
                                                     $replyBoostImages = [];
                                                     $replyActionState = function_exists('nammu_fediverse_action_state_for_item')
                                                         ? nammu_fediverse_action_state_for_item($reply)
@@ -1062,8 +1084,8 @@
                                                     ?>
                                                     <div class="fediverse-thread__reply">
                                                         <div class="fediverse-thread__avatar">
-                                                            <?php if (!empty($reply['actor_icon'])): ?>
-                                                                <img src="<?= htmlspecialchars((string) $reply['actor_icon'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                                            <?php if ($replyActorIcon !== ''): ?>
+                                                                <img src="<?= htmlspecialchars($replyActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
                                                             <?php else: ?>
                                                                 <div class="fediverse-thread__avatar-fallback"><?= htmlspecialchars(mb_substr((string) (($reply['actor_name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
                                                             <?php endif; ?>
@@ -1305,6 +1327,7 @@
                                 if ($displayActorIcon === '' && $displayActorId !== '' && isset($fediverseActorsById[$displayActorId])) {
                                     $displayActorIcon = trim((string) ($fediverseActorsById[$displayActorId]['icon'] ?? ''));
                                 }
+                                $displayActorIcon = $fediverseValidAvatarUrl($displayActorIcon);
                                 $displayActorHandle = $fediverseHandle([
                                     'actor_id' => $displayActorId,
                                     'actor_username' => $displayActorUsername,
@@ -1468,10 +1491,13 @@
                                                     <?php if (!empty($historyBoostActors)): ?>
                                                         <span class="fediverse-status__actor-icons">
                                                             <?php foreach ($historyBoostActors as $remoteBoostActor): ?>
-                                                                <?php $remoteBoostActorUrl = trim((string) (($remoteBoostActor['url'] ?? '') ?: '#')); ?>
+                                                                <?php
+                                                                $remoteBoostActorUrl = trim((string) (($remoteBoostActor['url'] ?? '') ?: '#'));
+                                                                $remoteBoostActorIcon = $fediverseValidAvatarUrl(trim((string) ($remoteBoostActor['icon'] ?? '')));
+                                                                ?>
                                                                 <a href="<?= htmlspecialchars($remoteBoostActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($remoteBoostActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                                    <?php if (!empty($remoteBoostActor['icon'])): ?>
-                                                                        <img src="<?= htmlspecialchars((string) $remoteBoostActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($remoteBoostActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                                                    <?php if ($remoteBoostActorIcon !== ''): ?>
+                                                                        <img src="<?= htmlspecialchars($remoteBoostActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($remoteBoostActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                                                                     <?php else: ?>
                                                                         <?= htmlspecialchars(mb_substr((string) (($remoteBoostActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
                                                                     <?php endif; ?>
@@ -1485,10 +1511,13 @@
                                                     <?php if (!empty($historyFavoriteActors)): ?>
                                                         <span class="fediverse-status__actor-icons">
                                                             <?php foreach ($historyFavoriteActors as $historyFavoriteActor): ?>
-                                                                <?php $historyFavoriteActorUrl = trim((string) (($historyFavoriteActor['url'] ?? '') ?: '#')); ?>
+                                                                <?php
+                                                                $historyFavoriteActorUrl = trim((string) (($historyFavoriteActor['url'] ?? '') ?: '#'));
+                                                                $historyFavoriteActorIcon = $fediverseValidAvatarUrl(trim((string) ($historyFavoriteActor['icon'] ?? '')));
+                                                                ?>
                                                                 <a href="<?= htmlspecialchars($historyFavoriteActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($historyFavoriteActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                                    <?php if (!empty($historyFavoriteActor['icon'])): ?>
-                                                                        <img src="<?= htmlspecialchars((string) $historyFavoriteActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($historyFavoriteActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                                                    <?php if ($historyFavoriteActorIcon !== ''): ?>
+                                                                        <img src="<?= htmlspecialchars($historyFavoriteActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($historyFavoriteActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                                                                     <?php else: ?>
                                                                         <?= htmlspecialchars(mb_substr((string) (($historyFavoriteActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
                                                                     <?php endif; ?>
@@ -1587,7 +1616,7 @@
                                                     $replyPublicUrl = trim((string) ($reply['url'] ?? ''));
                                                     $replyActorId = trim((string) ($reply['actor_id'] ?? ''));
                                                     $replyActorName = trim((string) ($reply['actor_name'] ?? ''));
-                                                    $replyActorIcon = trim((string) ($reply['actor_icon'] ?? ''));
+                                                    $replyActorIcon = $fediverseValidAvatarUrl(trim((string) ($reply['actor_icon'] ?? '')));
                                                     $replyBoostImages = [];
                                                     $replyActionState = function_exists('nammu_fediverse_action_state_for_item')
                                                         ? nammu_fediverse_action_state_for_item($reply)
@@ -1595,8 +1624,8 @@
                                                     ?>
                                                     <div class="fediverse-thread__reply">
                                                         <div class="fediverse-thread__avatar">
-                                                            <?php if (!empty($reply['actor_icon'])): ?>
-                                                                <img src="<?= htmlspecialchars((string) $reply['actor_icon'], ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                                            <?php if ($replyActorIcon !== ''): ?>
+                                                                <img src="<?= htmlspecialchars($replyActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
                                                             <?php elseif (($reply['source'] ?? '') === 'incoming-remote'): ?>
                                                                 <div class="fediverse-thread__avatar-fallback"><?= htmlspecialchars(mb_substr((string) (($reply['actor_name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></div>
                                                             <?php elseif ($fediverseLocalAvatar !== ''): ?>
@@ -1699,7 +1728,7 @@
                             <?php foreach ($fediverseNotifications as $entry): ?>
                                 <?php
                                 $notificationMeta = $notificationContext($entry);
-                                $notificationAvatar = trim((string) ($notificationMeta['actor_icon'] ?? ''));
+                                $notificationAvatar = $fediverseValidAvatarUrl(trim((string) ($notificationMeta['actor_icon'] ?? '')));
                                 $notificationActorName = trim((string) ($notificationMeta['actor_name'] ?? ''));
                                 $notificationTargetUrl = trim((string) ($notificationMeta['target_url'] ?? ''));
                                 ?>
@@ -1817,7 +1846,7 @@
                             $actorId = trim((string) ($threadHeaderMessage['actor_id'] ?? ''));
                             $conversationActor = $fediverseActorsById[$actorId] ?? null;
                             $conversationActorName = trim((string) (($threadHeaderMessage['actor_name'] ?? '') ?: ($conversationActor['name'] ?? '') ?: ($conversationActor['preferredUsername'] ?? '') ?: $actorId));
-                            $conversationActorIcon = trim((string) (($threadHeaderMessage['actor_icon'] ?? '') ?: ($conversationActor['icon'] ?? '')));
+                            $conversationActorIcon = $fediverseValidAvatarUrl(trim((string) (($threadHeaderMessage['actor_icon'] ?? '') ?: ($conversationActor['icon'] ?? ''))));
                             $conversationActorHandle = $fediverseActorHandleFor($threadHeaderMessage);
                             ?>
                             <div class="border rounded p-3 mb-4">
@@ -1851,6 +1880,7 @@
                                     if (!$isOutgoing && $messageActorIcon === '') {
                                         $messageActorIcon = trim((string) (($messageActor['icon'] ?? '') ?: ($conversationActor['icon'] ?? '')));
                                     }
+                                    $messageActorIcon = $fediverseValidAvatarUrl($messageActorIcon);
                                     $messageClasses = 'mb-3 p-3 rounded';
                                     ?>
                                     <div class="<?= htmlspecialchars($messageClasses, ENT_QUOTES, 'UTF-8') ?>" style="background: <?= $isOutgoing ? '#eef6ff' : '#f7f7f7' ?>; border-left: 4px solid <?= $isOutgoing ? '#1b8eed' : '#999' ?>;">
@@ -1919,7 +1949,7 @@
                                 <?php
                                 $mentionSignature = trim((string) ($mention['signature'] ?? ''));
                                 $mentionBlogName = trim((string) (($mention['blog_name'] ?? '') ?: ((string) (parse_url((string) ($mention['source'] ?? ''), PHP_URL_HOST) ?? ''))));
-                                $mentionBlogIcon = trim((string) ($mention['blog_icon'] ?? ''));
+                                $mentionBlogIcon = $fediverseValidAvatarUrl(trim((string) ($mention['blog_icon'] ?? '')));
                                 $mentionSource = trim((string) ($mention['source'] ?? ''));
                                 $mentionTarget = trim((string) ($mention['target'] ?? ''));
                                 $mentionTitle = trim((string) (($mention['source_title'] ?? '') ?: $mentionSource));
@@ -2007,7 +2037,7 @@
                                         <?php
                                         $actorName = trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? 'Actor')));
                                         $actorId = trim((string) ($actor['id'] ?? ''));
-                                        $actorIcon = trim((string) ($actor['icon'] ?? ''));
+                                        $actorIcon = $fediverseValidAvatarUrl(trim((string) ($actor['icon'] ?? '')));
                                         $actorUsername = trim((string) ($actor['preferredUsername'] ?? ''));
                                         $actorHost = is_string(parse_url($actorId, PHP_URL_HOST)) ? (string) parse_url($actorId, PHP_URL_HOST) : '';
                                         $actorHandle = $actorUsername !== '' ? '@' . $actorUsername . ($actorHost !== '' ? '@' . $actorHost : '') : $actorId;
@@ -2060,7 +2090,7 @@
                                         <?php
                                         $followerName = trim((string) (($follower['name'] ?? '') ?: ($follower['preferredUsername'] ?? 'Actor remoto')));
                                         $followerId = trim((string) ($follower['id'] ?? ''));
-                                        $followerIcon = trim((string) ($follower['icon'] ?? ''));
+                                        $followerIcon = $fediverseValidAvatarUrl(trim((string) ($follower['icon'] ?? '')));
                                         $followerUsername = trim((string) ($follower['preferredUsername'] ?? ''));
                                         $followerHost = is_string(parse_url($followerId, PHP_URL_HOST)) ? (string) parse_url($followerId, PHP_URL_HOST) : '';
                                         $followerHandle = $followerUsername !== '' ? '@' . $followerUsername . ($followerHost !== '' ? '@' . $followerHost : '') : $followerId;
@@ -2127,7 +2157,7 @@
                                 <?php
                                 $blockedName = trim((string) (($blockedActor['name'] ?? '') ?: ($blockedActor['preferredUsername'] ?? 'Actor remoto')));
                                 $blockedId = trim((string) ($blockedActor['id'] ?? ''));
-                                $blockedIcon = trim((string) ($blockedActor['icon'] ?? ''));
+                                $blockedIcon = $fediverseValidAvatarUrl(trim((string) ($blockedActor['icon'] ?? '')));
                                 $blockedUsername = trim((string) ($blockedActor['preferredUsername'] ?? ''));
                                 $blockedHost = is_string(parse_url($blockedId, PHP_URL_HOST)) ? (string) parse_url($blockedId, PHP_URL_HOST) : '';
                                 $blockedHandle = $blockedUsername !== '' ? '@' . $blockedUsername . ($blockedHost !== '' ? '@' . $blockedHost : '') : $blockedId;

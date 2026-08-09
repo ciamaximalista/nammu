@@ -1394,6 +1394,12 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item): array
     if ($boostOriginalUrl !== '') {
         $item['boost_original_url'] = $boostOriginalUrl;
     }
+    if ($boostActorUrl !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
+        $cachedActorIcon = nammu_fediverse_cached_actor_avatar_for_reference($boostActorUrl);
+        if ($cachedActorIcon !== '') {
+            $boostActorIcon = $cachedActorIcon;
+        }
+    }
     if ($boostActorIcon !== '') {
         $publicBaseUrl = function_exists('nammu_base_url') ? nammu_base_url() : '';
         $boostActorIcon = nammu_actuality_cache_remote_avatar($boostActorIcon, $boostActorUrl, $publicBaseUrl);
@@ -1611,11 +1617,16 @@ function nammu_actuality_cache_remote_avatar(string $avatarUrl, string $actorUrl
         return '';
     }
     if (nammu_actuality_is_local_image_url($avatarUrl, $publicBaseUrl)) {
-        return $avatarUrl;
+        $imagePath = trim((string) (parse_url($avatarUrl, PHP_URL_PATH) ?? ''));
+        if ($imagePath === '' && !preg_match('#^https?://#i', $avatarUrl)) {
+            $imagePath = '/' . ltrim($avatarUrl, '/');
+        }
+        $localImagePath = $imagePath !== '' ? dirname(__DIR__) . $imagePath : '';
+        return ($localImagePath !== '' && is_file($localImagePath)) ? $avatarUrl : '';
     }
     $cacheKeyUrl = trim($actorUrl) !== '' ? trim($actorUrl) . '#avatar' : $avatarUrl . '#avatar';
     $cached = nammu_actuality_cache_social_image($cacheKeyUrl, $avatarUrl, $publicBaseUrl);
-    return $cached !== '' ? $cached : $avatarUrl;
+    return $cached !== '' ? $cached : '';
 }
 
 function nammu_actuality_is_local_image_url(string $imageUrl, string $publicBaseUrl): bool

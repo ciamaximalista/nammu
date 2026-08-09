@@ -1471,6 +1471,52 @@ function nammu_fediverse_actor_reference_matches(string $value, array $keys): bo
     return $key !== '' && isset($keys[$key]);
 }
 
+function nammu_fediverse_cached_actor_avatar_for_reference(string $actorReference): string
+{
+    $actorReference = trim($actorReference);
+    if ($actorReference === '') {
+        return '';
+    }
+
+    $referenceKey = nammu_fediverse_actor_reference_key($actorReference);
+    if ($referenceKey === '') {
+        return '';
+    }
+
+    $actors = array_merge(
+        nammu_fediverse_following_store()['actors'],
+        nammu_fediverse_followers_store()['followers']
+    );
+    foreach ($actors as $actor) {
+        if (!is_array($actor)) {
+            continue;
+        }
+        if (!isset(nammu_fediverse_actor_reference_keys($actor)[$referenceKey])) {
+            continue;
+        }
+        $icon = trim((string) ($actor['icon'] ?? ''));
+        if ($icon === '') {
+            continue;
+        }
+        if (function_exists('nammu_actuality_is_local_image_url')) {
+            $baseUrl = function_exists('nammu_base_url') ? nammu_base_url() : '';
+            if (nammu_actuality_is_local_image_url($icon, $baseUrl)) {
+                $imagePath = trim((string) (parse_url($icon, PHP_URL_PATH) ?? ''));
+                if ($imagePath === '' && !preg_match('#^https?://#i', $icon)) {
+                    $imagePath = '/' . ltrim($icon, '/');
+                }
+                $localImagePath = $imagePath !== '' ? dirname(__DIR__) . $imagePath : '';
+                if ($localImagePath === '' || !is_file($localImagePath)) {
+                    continue;
+                }
+            }
+        }
+        return $icon;
+    }
+
+    return '';
+}
+
 function nammu_fediverse_sync_cached_actor_avatar_references(string $actorId, array $actor, string $cachedIcon): array
 {
     $keys = nammu_fediverse_actor_reference_keys($actor, $actorId);
@@ -6062,6 +6108,12 @@ function nammu_fediverse_local_content_items(array $config): array
             'image' => $fediverseImage,
             'images' => $fediverseImages,
             'alias_ids' => $aliasIds,
+            'via' => trim((string) ($item['via'] ?? '')),
+            'boost_original_url' => trim((string) ($item['boost_original_url'] ?? '')),
+            'boost_actor_name' => trim((string) ($item['boost_actor_name'] ?? '')),
+            'boost_actor_icon' => trim((string) ($item['boost_actor_icon'] ?? '')),
+            'boost_actor_url' => trim((string) ($item['boost_actor_url'] ?? '')),
+            'boost_actor_id' => trim((string) ($item['boost_actor_id'] ?? '')),
         ];
     }
     $knownIds = [];

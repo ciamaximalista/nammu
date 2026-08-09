@@ -12964,6 +12964,14 @@ if ($isLoggedIn && $page === 'fediverso') {
             'message' => (string) ($recacheResult['message'] ?? ''),
         ];
         $fediverseRedirect = true;
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['recache_all_fediverse_actor_avatars'])) {
+        $config = load_config_file();
+        $recacheResult = nammu_fediverse_recache_all_actor_avatars($config);
+        $fediverseFeedback = [
+            'type' => !empty($recacheResult['ok']) ? 'success' : 'danger',
+            'message' => (string) ($recacheResult['message'] ?? ''),
+        ];
+        $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unfollow_fediverse_actor'])) {
         $actorId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
         $ok = $actorId !== '' && nammu_fediverse_unfollow_actor($actorId);

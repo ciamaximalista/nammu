@@ -1282,9 +1282,12 @@ function nammu_fediverse_resolve_actor(string $input, ?array $config = null): ?a
     if ($trimmed === '') {
         return null;
     }
-    $knownActor = nammu_fediverse_known_actor_from_input($trimmed);
-    if (is_array($knownActor)) {
-        return $knownActor;
+    $forceRefresh = is_array($config) && !empty($config['__force_actor_refresh']);
+    if (!$forceRefresh) {
+        $knownActor = nammu_fediverse_known_actor_from_input($trimmed);
+        if (is_array($knownActor)) {
+            return $knownActor;
+        }
     }
     if (preg_match('#^https?://#i', $trimmed)) {
         $actor = is_array($config)
@@ -1326,7 +1329,7 @@ function nammu_fediverse_resolve_actor(string $input, ?array $config = null): ?a
     }
     $webfingerUrl = 'https://' . $domain . '/.well-known/webfinger?resource=' . $resource;
     $webfinger = null;
-    if (is_array($config) && nammu_fediverse_should_shared_cache_remote_url($webfingerUrl, $config)) {
+    if (!$forceRefresh && is_array($config) && nammu_fediverse_should_shared_cache_remote_url($webfingerUrl, $config)) {
         $cached = nammu_fediverse_shared_cache_read($config, 'webfinger', $webfingerUrl, 21600);
         $webfinger = is_array($cached['payload'] ?? null) ? $cached['payload'] : null;
     }
@@ -1514,6 +1517,49 @@ function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): a
         'message' => $message,
         'icon' => $cachedIcon,
         'updated' => $updated,
+    ];
+}
+
+function nammu_fediverse_recache_all_actor_avatars(array $config): array
+{
+    $actorIds = [];
+    foreach (nammu_fediverse_following_store()['actors'] as $actor) {
+        $actorId = trim((string) ($actor['id'] ?? ''));
+        if ($actorId !== '') {
+            $actorIds[$actorId] = true;
+        }
+    }
+    foreach (nammu_fediverse_followers_store()['followers'] as $follower) {
+        $actorId = trim((string) ($follower['id'] ?? ''));
+        if ($actorId !== '') {
+            $actorIds[$actorId] = true;
+        }
+    }
+
+    $total = count($actorIds);
+    if ($total === 0) {
+        return ['ok' => false, 'message' => 'No hay seguidos ni seguidores con avatar que recachear.', 'total' => 0, 'updated' => 0, 'failed' => 0];
+    }
+
+    $refreshConfig = $config;
+    $refreshConfig['__force_actor_refresh'] = true;
+    $updated = 0;
+    $failed = 0;
+    foreach (array_keys($actorIds) as $actorId) {
+        $result = nammu_fediverse_recache_actor_avatar($actorId, $refreshConfig);
+        if (!empty($result['ok']) && trim((string) ($result['icon'] ?? '')) !== '') {
+            $updated++;
+        } else {
+            $failed++;
+        }
+    }
+
+    return [
+        'ok' => true,
+        'message' => 'Recaché de avatares completada. Actores: ' . $total . '. Actualizados: ' . $updated . '. Sin avatar válido: ' . $failed . '.',
+        'total' => $total,
+        'updated' => $updated,
+        'failed' => $failed,
     ];
 }
 

@@ -22,8 +22,11 @@ $threadValidAvatarUrl = static function (string $avatarUrl, string $actorReferen
         $localImagePath = $imagePath !== '' ? dirname(__DIR__) . $imagePath : '';
         $avatarUrl = ($localImagePath !== '' && is_file($localImagePath)) ? $avatarUrl : '';
     }
-    if ($avatarUrl === '' && $actorReference !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
-        $avatarUrl = trim((string) nammu_fediverse_cached_actor_avatar_for_reference($actorReference, $threadFediverseConfig));
+    if ($actorReference !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
+        $knownAvatarUrl = trim((string) nammu_fediverse_cached_actor_avatar_for_reference($actorReference, $threadFediverseConfig));
+        if ($knownAvatarUrl !== '') {
+            return $knownAvatarUrl;
+        }
     }
     return $avatarUrl;
 };

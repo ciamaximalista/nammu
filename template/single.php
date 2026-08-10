@@ -53,8 +53,11 @@ $singleValidFediverseAvatarUrl = static function (string $avatarUrl, string $act
         $localImagePath = $imagePath !== '' ? dirname(__DIR__) . $imagePath : '';
         $avatarUrl = ($localImagePath !== '' && is_file($localImagePath)) ? $avatarUrl : '';
     }
-    if ($avatarUrl === '' && $actorReference !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
-        $avatarUrl = trim((string) nammu_fediverse_cached_actor_avatar_for_reference($actorReference, $singleFediverseConfig));
+    if ($actorReference !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
+        $knownAvatarUrl = trim((string) nammu_fediverse_cached_actor_avatar_for_reference($actorReference, $singleFediverseConfig));
+        if ($knownAvatarUrl !== '') {
+            return $knownAvatarUrl;
+        }
     }
     return $avatarUrl;
 };

@@ -1242,6 +1242,10 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item, array $con
     $boostActorName = trim((string) ($item['boost_actor_name'] ?? ''));
     $boostActorIcon = trim((string) ($item['boost_actor_icon'] ?? ''));
     $boostActorUrl = trim((string) ($item['boost_actor_url'] ?? ''));
+    $resolvedPublicBaseUrl = $publicBaseUrl !== '' ? $publicBaseUrl : (function_exists('nammu_base_url') ? nammu_base_url() : '');
+    if (nammu_actuality_is_missing_local_avatar_url($boostActorIcon, $resolvedPublicBaseUrl)) {
+        $boostActorIcon = '';
+    }
     $title = trim((string) ($item['title'] ?? ''));
     $description = nammu_actuality_manual_plain_text((string) ($item['description'] ?? ''));
     $rawText = nammu_actuality_manual_plain_text((string) ($item['raw_text'] ?? ''));
@@ -1328,13 +1332,19 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item, array $con
             }
         }
         if ($boostActorName === '') {
-            $boostActorName = trim((string) ($timelineItem['actor_name'] ?? ''));
+            $boostActorName = trim((string) (($timelineItem['target_actor_name'] ?? '') ?: ($timelineItem['actor_name'] ?? '')));
         }
         if ($boostActorIcon === '') {
-            $boostActorIcon = trim((string) ($timelineItem['actor_icon'] ?? ''));
+            $boostActorIcon = trim((string) (($timelineItem['target_actor_icon'] ?? '') ?: ($timelineItem['actor_icon'] ?? '')));
         }
         if ($boostActorUrl === '') {
-            $boostActorUrl = trim((string) (($timelineItem['actor_url'] ?? '') ?: ($timelineItem['actor_id'] ?? '')));
+            $boostActorUrl = trim((string) (
+                ($timelineItem['target_actor_url'] ?? '')
+                ?: ($timelineItem['target_actor_id'] ?? '')
+                ?: ($timelineItem['object_actor_id'] ?? '')
+                ?: ($timelineItem['actor_url'] ?? '')
+                ?: ($timelineItem['actor_id'] ?? '')
+            ));
         }
         $timelineTitle = trim((string) ($timelineItem['title'] ?? ''));
         $timelineContent = nammu_actuality_manual_plain_text((string) ($timelineItem['content'] ?? ''));
@@ -1426,21 +1436,29 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item, array $con
         $resolveRemoteBoostActor();
     }
     if ($boostActorIcon !== '') {
+        $candidateBoostActorIcon = $boostActorIcon;
         $boostActorIcon = nammu_actuality_cache_remote_avatar(
             $boostActorIcon,
             $boostActorUrl,
-            $publicBaseUrl !== '' ? $publicBaseUrl : (function_exists('nammu_base_url') ? nammu_base_url() : ''),
+            $resolvedPublicBaseUrl,
             $config
         );
+        if ($boostActorIcon === '' && nammu_actuality_is_remote_image_url($candidateBoostActorIcon, $resolvedPublicBaseUrl)) {
+            $boostActorIcon = $candidateBoostActorIcon;
+        }
         if ($boostActorIcon === '') {
             $resolveRemoteBoostActor();
             if ($boostActorIcon !== '') {
+                $candidateBoostActorIcon = $boostActorIcon;
                 $boostActorIcon = nammu_actuality_cache_remote_avatar(
                     $boostActorIcon,
                     $boostActorUrl,
-                    $publicBaseUrl !== '' ? $publicBaseUrl : (function_exists('nammu_base_url') ? nammu_base_url() : ''),
+                    $resolvedPublicBaseUrl,
                     $config
                 );
+                if ($boostActorIcon === '' && nammu_actuality_is_remote_image_url($candidateBoostActorIcon, $resolvedPublicBaseUrl)) {
+                    $boostActorIcon = $candidateBoostActorIcon;
+                }
             }
         }
     }
@@ -1720,6 +1738,27 @@ function nammu_actuality_is_local_image_url(string $imageUrl, string $publicBase
     }
 
     return $imagePath !== '' && str_starts_with($imagePath, '/assets/');
+}
+
+function nammu_actuality_is_missing_local_avatar_url(string $avatarUrl, string $publicBaseUrl): bool
+{
+    $avatarUrl = trim($avatarUrl);
+    if ($avatarUrl === '' || !nammu_actuality_is_local_image_url($avatarUrl, $publicBaseUrl)) {
+        return false;
+    }
+    $imagePath = trim((string) (parse_url($avatarUrl, PHP_URL_PATH) ?? ''));
+    if ($imagePath === '' && !preg_match('#^https?://#i', $avatarUrl)) {
+        $imagePath = '/' . ltrim($avatarUrl, '/');
+    }
+    return $imagePath === '' || !is_file(dirname(__DIR__) . $imagePath);
+}
+
+function nammu_actuality_is_remote_image_url(string $imageUrl, string $publicBaseUrl): bool
+{
+    $imageUrl = trim($imageUrl);
+    return $imageUrl !== ''
+        && preg_match('#^https?://#i', $imageUrl) === 1
+        && !nammu_actuality_is_local_image_url($imageUrl, $publicBaseUrl);
 }
 
 function nammu_actuality_prune_cache(array &$cache, array $activeKeys): void

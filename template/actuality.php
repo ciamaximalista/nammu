@@ -330,7 +330,7 @@ $actualityValidAvatarUrl = static function (string $avatarUrl) use ($baseUrl): s
     }
     return $avatarUrl;
 };
-$renderBoostHeader = static function (array $item) use ($actualityValidAvatarUrl, $fediverseConfig): string {
+$renderBoostHeader = static function (array $item) use ($actualityValidAvatarUrl, $fediverseConfig, $baseUrl): string {
     if (strtolower(trim((string) ($item['via'] ?? ''))) !== 'boost') {
         return '';
     }
@@ -347,6 +347,12 @@ $renderBoostHeader = static function (array $item) use ($actualityValidAvatarUrl
     $actorName = trim((string) ($item['boost_actor_name'] ?? ''));
     $actorIcon = $actualityValidAvatarUrl(trim((string) ($item['boost_actor_icon'] ?? '')));
     $actorUrl = trim((string) ($item['boost_actor_url'] ?? ''));
+    if ($actorIcon === '' && function_exists('nammu_actuality_enrich_manual_boost_item_images')) {
+        $item = nammu_actuality_enrich_manual_boost_item_images($item, $fediverseConfig, (string) ($baseUrl ?? ''));
+        $actorName = trim((string) ($item['boost_actor_name'] ?? $actorName));
+        $actorIcon = $actualityValidAvatarUrl(trim((string) ($item['boost_actor_icon'] ?? '')));
+        $actorUrl = trim((string) ($item['boost_actor_url'] ?? $actorUrl));
+    }
     if ($actorIcon === '' && $actorUrl !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
         $actorIcon = $actualityValidAvatarUrl(nammu_fediverse_cached_actor_avatar_for_reference($actorUrl, $fediverseConfig));
     }

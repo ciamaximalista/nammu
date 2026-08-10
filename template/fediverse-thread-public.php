@@ -1,4 +1,7 @@
 <?php
+if (!function_exists('nammu_actuality_is_local_image_url') && is_file(dirname(__DIR__) . '/core/actualidad.php')) {
+    require_once dirname(__DIR__) . '/core/actualidad.php';
+}
 $threadItem = is_array($threadItem ?? null) ? $threadItem : [];
 $themeFonts = is_array($theme['fonts'] ?? null) ? $theme['fonts'] : [];
 $noteFont = htmlspecialchars((string) ($themeFonts['note'] ?? ($themeFonts['body'] ?? 'Roboto')), ENT_QUOTES, 'UTF-8');
@@ -6,6 +9,24 @@ $threadPayload = is_array($threadPayload ?? null) ? $threadPayload : [];
 $threadSummary = is_array($threadPayload['summary'] ?? null) ? $threadPayload['summary'] : ['likes' => 0, 'shares' => 0, 'replies' => 0];
 $threadDetails = is_array($threadPayload['details'] ?? null) ? $threadPayload['details'] : ['likes' => [], 'shares' => [], 'replies' => []];
 $threadReplies = is_array($threadPayload['replies'] ?? null) ? $threadPayload['replies'] : [];
+$threadFediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
+$threadFediverseConfig = is_array($threadFediverseConfig) ? $threadFediverseConfig : [];
+$threadValidAvatarUrl = static function (string $avatarUrl, string $actorReference = '') use ($threadFediverseConfig): string {
+    $avatarUrl = trim($avatarUrl);
+    $baseUrl = function_exists('nammu_fediverse_base_url') ? nammu_fediverse_base_url($threadFediverseConfig) : '';
+    if ($avatarUrl !== '' && function_exists('nammu_actuality_is_local_image_url') && nammu_actuality_is_local_image_url($avatarUrl, $baseUrl)) {
+        $imagePath = trim((string) (parse_url($avatarUrl, PHP_URL_PATH) ?? ''));
+        if ($imagePath === '' && !preg_match('#^https?://#i', $avatarUrl)) {
+            $imagePath = '/' . ltrim($avatarUrl, '/');
+        }
+        $localImagePath = $imagePath !== '' ? dirname(__DIR__) . $imagePath : '';
+        $avatarUrl = ($localImagePath !== '' && is_file($localImagePath)) ? $avatarUrl : '';
+    }
+    if ($avatarUrl === '' && $actorReference !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
+        $avatarUrl = trim((string) nammu_fediverse_cached_actor_avatar_for_reference($actorReference, $threadFediverseConfig));
+    }
+    return $avatarUrl;
+};
 $threadReplyActors = [];
 foreach ($threadReplies as $threadReplyEntry) {
     if (!is_array($threadReplyEntry)) {
@@ -15,7 +36,7 @@ foreach ($threadReplies as $threadReplyEntry) {
     $replyActorUsername = trim((string) ($threadReplyEntry['actor_username'] ?? ''));
     $replyActorName = trim((string) (($threadReplyEntry['actor_name'] ?? '') ?: $replyActorUsername ?: $replyActorId));
     $replyActorUrl = trim((string) (($threadReplyEntry['url'] ?? '') ?: $replyActorId));
-    $replyActorIcon = trim((string) ($threadReplyEntry['actor_icon'] ?? ''));
+    $replyActorIcon = $threadValidAvatarUrl(trim((string) ($threadReplyEntry['actor_icon'] ?? '')), $replyActorId !== '' ? $replyActorId : $replyActorUrl);
     $replyActorKey = $replyActorId !== ''
         ? $replyActorId
         : strtolower($replyActorUsername . '|' . $replyActorName . '|' . $replyActorUrl);
@@ -37,7 +58,7 @@ if (empty($threadReplyActors) && !empty($threadDetails['replies']) && is_array($
         $replyActorId = trim((string) ($replyActor['id'] ?? ''));
         $replyActorName = trim((string) (($replyActor['name'] ?? '') ?: $replyActorId));
         $replyActorUrl = trim((string) (($replyActor['url'] ?? '') ?: $replyActorId));
-        $replyActorIcon = trim((string) ($replyActor['icon'] ?? ''));
+        $replyActorIcon = $threadValidAvatarUrl(trim((string) ($replyActor['icon'] ?? '')), $replyActorId !== '' ? $replyActorId : $replyActorUrl);
         $replyActorKey = $replyActorId !== ''
             ? $replyActorId
             : strtolower($replyActorName . '|' . $replyActorUrl);
@@ -56,8 +77,6 @@ $threadReplyActors = array_values($threadReplyActors);
 $threadOriginalUrl = trim((string) ($threadPayload['original_url'] ?? ''));
 $threadUrl = trim((string) ($threadPayload['thread_url'] ?? ''));
 $threadItemUrl = trim((string) ($threadItem['url'] ?? ''));
-$threadFediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
-$threadFediverseConfig = is_array($threadFediverseConfig) ? $threadFediverseConfig : [];
 $threadIsProbableImageUrl = static function (string $candidate, string $pageUrl = ''): bool {
     if (function_exists('nammu_actuality_is_probable_image_url')) {
         return nammu_actuality_is_probable_image_url($candidate, $pageUrl);
@@ -114,7 +133,7 @@ $formatFediversePublicDateTime = static function (string $value): string {
 $threadPublishedLabel = $formatFediversePublicDateTime($threadPublished);
 $fediverseLocalName = trim((string) ($fediverseLocalName ?? 'Blog'));
 $fediverseLocalHandle = trim((string) ($fediverseLocalHandle ?? ''));
-$fediverseLocalAvatar = trim((string) ($fediverseLocalAvatar ?? ''));
+$fediverseLocalAvatar = $threadValidAvatarUrl(trim((string) ($fediverseLocalAvatar ?? '')), function_exists('nammu_fediverse_actor_url') ? nammu_fediverse_actor_url($threadFediverseConfig) : '');
 $themeColors = is_array($theme['colors'] ?? null) ? $theme['colors'] : [];
 $highlightColor = htmlspecialchars((string) ($themeColors['highlight'] ?? '#f3f6f9'), ENT_QUOTES, 'UTF-8');
 $threadOwnNoteFontStyle = $threadIsOwnNote
@@ -619,10 +638,13 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                         <?php if (!empty($threadDetails['likes'])): ?>
                             <span class="fediverse-public-status__actor-icons">
                                 <?php foreach ($threadDetails['likes'] as $likeActor): ?>
-                                    <?php $likeActorUrl = trim((string) (($likeActor['url'] ?? '') ?: '#')); ?>
+                                    <?php
+                                    $likeActorUrl = trim((string) (($likeActor['url'] ?? '') ?: '#'));
+                                    $likeActorIcon = $threadValidAvatarUrl(trim((string) ($likeActor['icon'] ?? '')), trim((string) (($likeActor['id'] ?? '') ?: $likeActorUrl)));
+                                    ?>
                                     <a href="<?= htmlspecialchars($likeActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                        <?php if (!empty($likeActor['icon'])): ?>
-                                            <img src="<?= htmlspecialchars((string) $likeActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                        <?php if ($likeActorIcon !== ''): ?>
+                                            <img src="<?= htmlspecialchars($likeActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                                         <?php else: ?>
                                             <?= htmlspecialchars(mb_substr((string) (($likeActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
                                         <?php endif; ?>
@@ -636,10 +658,13 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                         <?php if (!empty($threadDetails['shares'])): ?>
                             <span class="fediverse-public-status__actor-icons">
                                 <?php foreach ($threadDetails['shares'] as $shareActor): ?>
-                                    <?php $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: '#')); ?>
+                                    <?php
+                                    $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: '#'));
+                                    $shareActorIcon = $threadValidAvatarUrl(trim((string) ($shareActor['icon'] ?? '')), trim((string) (($shareActor['id'] ?? '') ?: $shareActorUrl)));
+                                    ?>
                                     <a href="<?= htmlspecialchars($shareActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                        <?php if (!empty($shareActor['icon'])): ?>
-                                            <img src="<?= htmlspecialchars((string) $shareActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                        <?php if ($shareActorIcon !== ''): ?>
+                                            <img src="<?= htmlspecialchars($shareActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                                         <?php else: ?>
                                             <?= htmlspecialchars(mb_substr((string) (($shareActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
                                         <?php endif; ?>
@@ -685,7 +710,7 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                             $replyHandle = $fediverseLocalHandle;
                         }
                     }
-                    $replyAvatar = trim((string) ($reply['actor_icon'] ?? ''));
+                    $replyAvatar = $threadValidAvatarUrl(trim((string) ($reply['actor_icon'] ?? '')), $replyActorId !== '' ? $replyActorId : trim((string) ($reply['url'] ?? '')));
                     $replyCard = is_array($reply['link_card'] ?? null) ? $reply['link_card'] : null;
                     $replySummary = is_array($reply['summary'] ?? null) ? $reply['summary'] : ['likes' => 0, 'shares' => 0];
                     $replyText = $filterFediverseReplyText((string) ($reply['reply_text'] ?? ''));

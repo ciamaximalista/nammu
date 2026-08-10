@@ -1,4 +1,7 @@
 <?php
+if (!function_exists('nammu_actuality_is_local_image_url') && is_file(dirname(__DIR__) . '/core/actualidad.php')) {
+    require_once dirname(__DIR__) . '/core/actualidad.php';
+}
 $colors = $theme['colors'] ?? [];
 $colorMeta = htmlspecialchars($colors['h3'] ?? '#777777', ENT_QUOTES, 'UTF-8');
 $colorText = htmlspecialchars($colors['text'] ?? '#222222', ENT_QUOTES, 'UTF-8');
@@ -37,6 +40,24 @@ $fediverseThreadMeta = is_array($fediverseThreadMeta ?? null) ? $fediverseThread
 $fediverseThreadSummary = is_array($fediverseThreadMeta['summary'] ?? null) ? $fediverseThreadMeta['summary'] : ['likes' => 0, 'shares' => 0, 'replies' => 0];
 $fediverseThreadDetails = is_array($fediverseThreadMeta['details'] ?? null) ? $fediverseThreadMeta['details'] : ['likes' => [], 'shares' => [], 'replies' => []];
 $fediverseIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';
+$singleFediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
+$singleFediverseConfig = is_array($singleFediverseConfig) ? $singleFediverseConfig : [];
+$singleValidFediverseAvatarUrl = static function (string $avatarUrl, string $actorReference = '') use ($singleFediverseConfig): string {
+    $avatarUrl = trim($avatarUrl);
+    $baseUrl = function_exists('nammu_fediverse_base_url') ? nammu_fediverse_base_url($singleFediverseConfig) : '';
+    if ($avatarUrl !== '' && function_exists('nammu_actuality_is_local_image_url') && nammu_actuality_is_local_image_url($avatarUrl, $baseUrl)) {
+        $imagePath = trim((string) (parse_url($avatarUrl, PHP_URL_PATH) ?? ''));
+        if ($imagePath === '' && !preg_match('#^https?://#i', $avatarUrl)) {
+            $imagePath = '/' . ltrim($avatarUrl, '/');
+        }
+        $localImagePath = $imagePath !== '' ? dirname(__DIR__) . $imagePath : '';
+        $avatarUrl = ($localImagePath !== '' && is_file($localImagePath)) ? $avatarUrl : '';
+    }
+    if ($avatarUrl === '' && $actorReference !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
+        $avatarUrl = trim((string) nammu_fediverse_cached_actor_avatar_for_reference($actorReference, $singleFediverseConfig));
+    }
+    return $avatarUrl;
+};
 $singleUserAgent = (string) ($_SERVER['HTTP_USER_AGENT'] ?? '');
 $singleBotName = function_exists('nammu_detect_bot_name') ? nammu_detect_bot_name($singleUserAgent) : '';
 $singleReaderAgentNames = ['Instapaper', 'Kobo', 'Pocket', 'Wallabag', 'Readability'];
@@ -454,10 +475,13 @@ if ($isPageTemplate && $formattedDate !== '') {
                                 <?php if (!empty($fediverseThreadDetails['replies'])): ?>
                                     <span class="fediverse-inline-actor-icons">
                                         <?php foreach ((array) $fediverseThreadDetails['replies'] as $replyActor): ?>
-                                            <?php $replyActorUrl = trim((string) (($replyActor['url'] ?? '') ?: $fediverseThreadUrl)); ?>
+                                            <?php
+                                            $replyActorUrl = trim((string) (($replyActor['url'] ?? '') ?: $fediverseThreadUrl));
+                                            $replyActorIcon = $singleValidFediverseAvatarUrl(trim((string) ($replyActor['icon'] ?? '')), trim((string) (($replyActor['id'] ?? '') ?: $replyActorUrl)));
+                                            ?>
                                             <a href="<?= htmlspecialchars($replyActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                <?php if (!empty($replyActor['icon'])): ?>
-                                                    <img src="<?= htmlspecialchars((string) $replyActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                                <?php if ($replyActorIcon !== ''): ?>
+                                                    <img src="<?= htmlspecialchars($replyActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                                                 <?php else: ?>
                                                     <?= htmlspecialchars(mb_substr((string) (($replyActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
                                                 <?php endif; ?>
@@ -473,10 +497,13 @@ if ($isPageTemplate && $formattedDate !== '') {
                                 <?php if (!empty($fediverseThreadDetails['likes'])): ?>
                                     <span class="fediverse-inline-actor-icons">
                                         <?php foreach ((array) $fediverseThreadDetails['likes'] as $likeActor): ?>
-                                            <?php $likeActorUrl = trim((string) (($likeActor['url'] ?? '') ?: $fediverseThreadUrl)); ?>
+                                            <?php
+                                            $likeActorUrl = trim((string) (($likeActor['url'] ?? '') ?: $fediverseThreadUrl));
+                                            $likeActorIcon = $singleValidFediverseAvatarUrl(trim((string) ($likeActor['icon'] ?? '')), trim((string) (($likeActor['id'] ?? '') ?: $likeActorUrl)));
+                                            ?>
                                             <a href="<?= htmlspecialchars($likeActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                <?php if (!empty($likeActor['icon'])): ?>
-                                                    <img src="<?= htmlspecialchars((string) $likeActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                                <?php if ($likeActorIcon !== ''): ?>
+                                                    <img src="<?= htmlspecialchars($likeActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                                                 <?php else: ?>
                                                     <?= htmlspecialchars(mb_substr((string) (($likeActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
                                                 <?php endif; ?>
@@ -492,10 +519,13 @@ if ($isPageTemplate && $formattedDate !== '') {
                                 <?php if (!empty($fediverseThreadDetails['shares'])): ?>
                                     <span class="fediverse-inline-actor-icons">
                                         <?php foreach ((array) $fediverseThreadDetails['shares'] as $shareActor): ?>
-                                            <?php $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: $fediverseThreadUrl)); ?>
+                                            <?php
+                                            $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: $fediverseThreadUrl));
+                                            $shareActorIcon = $singleValidFediverseAvatarUrl(trim((string) ($shareActor['icon'] ?? '')), trim((string) (($shareActor['id'] ?? '') ?: $shareActorUrl)));
+                                            ?>
                                             <a href="<?= htmlspecialchars($shareActorUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                                <?php if (!empty($shareActor['icon'])): ?>
-                                                    <img src="<?= htmlspecialchars((string) $shareActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                                <?php if ($shareActorIcon !== ''): ?>
+                                                    <img src="<?= htmlspecialchars($shareActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                                                 <?php else: ?>
                                                     <?= htmlspecialchars(mb_substr((string) (($shareActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
                                                 <?php endif; ?>

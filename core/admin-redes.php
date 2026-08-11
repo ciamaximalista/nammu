@@ -720,11 +720,32 @@ function admin_social_broadcast_append_fediverse_link(string $text, string $fedi
 
 function admin_social_broadcast_effective_limit(string $network, bool $hasImages = false): int
 {
-    $limit = (int) (admin_social_broadcast_limits()[$network] ?? 0);
-    if ($network === 'telegram' && $hasImages) {
-        return 1024;
+    return (int) (admin_social_broadcast_limits()[$network] ?? 0);
+}
+
+function admin_social_broadcast_telegram_caption_limit(): int
+{
+    return 1024;
+}
+
+function admin_social_broadcast_telegram_media_caption(string $text): string
+{
+    $captionLimit = admin_social_broadcast_telegram_caption_limit();
+    if (admin_social_broadcast_measure_for_network('telegram', $text) <= $captionLimit) {
+        return $text;
     }
-    return $limit;
+
+    $parts = admin_social_broadcast_structured_parts($text);
+    $title = trim((string) ($parts['title'] ?? ''));
+    $url = trim((string) ($parts['url'] ?? ''));
+    $caption = trim(implode("\n\n", array_filter([$title, $url], static fn(string $part): bool => trim($part) !== '')));
+    if ($caption === '') {
+        $caption = 'Texto completo en el siguiente mensaje.';
+    }
+    if (admin_social_broadcast_measure_for_network('telegram', $caption) > $captionLimit) {
+        $caption = admin_social_broadcast_truncate_text($caption, $captionLimit);
+    }
+    return $caption;
 }
 
 function admin_social_broadcast_measure_for_network(string $network, string $text): int
@@ -774,6 +795,11 @@ function admin_social_broadcast_extract_urls(string $text): array
     }, $urls))));
 }
 
+function admin_social_broadcast_markdown_links_to_text(string $text): string
+{
+    return preg_replace('/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/iu', '$1', $text) ?? $text;
+}
+
 function admin_social_broadcast_structured_parts(string $text, string $fediverseUrl = ''): array
 {
     $text = trim(str_replace(["\r\n", "\r"], "\n", $text));
@@ -802,14 +828,19 @@ function admin_social_broadcast_structured_parts(string $text, string $fediverse
         if (preg_match('#^https?://#i', $line) === 1) {
             continue;
         }
-        if ($primaryUrl !== '' && str_contains($line, $primaryUrl)) {
+        $lineText = admin_social_broadcast_markdown_links_to_text($line);
+        if ($primaryUrl !== '' && str_contains($lineText, $primaryUrl)) {
+            $lineText = trim(str_replace($primaryUrl, '', $lineText));
+        }
+        $lineText = trim(preg_replace('#https?://[^\s<>"\')]+#iu', '', $lineText) ?? $lineText);
+        if ($lineText === '') {
             continue;
         }
         if ($title === '') {
-            $title = $line;
+            $title = $lineText;
             continue;
         }
-        $descriptionParts[] = $line;
+        $descriptionParts[] = $lineText;
     }
 
     $description = trim(implode("\n\n", $descriptionParts));
@@ -1791,6 +1822,7 @@ function admin_social_broadcast_bold_unicode(string $text): string
 function admin_social_broadcast_plain_text(string $text): string
 {
     $text = str_replace(["\r\n", "\r"], "\n", $text);
+    $text = admin_social_broadcast_markdown_links_to_text($text);
     $text = preg_replace_callback('/\*\*(.+?)\*\*/su', static function (array $matches): string {
         return admin_social_broadcast_bold_unicode($matches[1]);
     }, $text) ?? $text;
@@ -1800,6 +1832,7 @@ function admin_social_broadcast_plain_text(string $text): string
 function admin_social_broadcast_plain_without_markup(string $text): string
 {
     $text = str_replace(["\r\n", "\r"], "\n", $text);
+    $text = admin_social_broadcast_markdown_links_to_text($text);
     $text = preg_replace('/\*\*(.+?)\*\*/su', '$1', $text) ?? $text;
     return trim($text);
 }
@@ -1807,6 +1840,7 @@ function admin_social_broadcast_plain_without_markup(string $text): string
 function admin_social_broadcast_telegram_html(string $text): string
 {
     $text = str_replace(["\r\n", "\r"], "\n", $text);
+    $text = admin_social_broadcast_markdown_links_to_text($text);
     $parts = preg_split('/(\*\*.+?\*\*)/su', $text, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$text];
     $result = '';
     foreach ($parts as $part) {
@@ -2582,18 +2616,25 @@ function admin_send_social_broadcast_message(string $network, string $text, arra
                 $error = 'Faltan credenciales de Telegram.';
                 return false;
             }
+            $telegramCaptionHtml = admin_social_broadcast_telegram_html(admin_social_broadcast_telegram_media_caption($text));
+            $sendTextAfterMedia = !empty($imageItems)
+                && admin_social_broadcast_measure_for_network('telegram', $text) > admin_social_broadcast_telegram_caption_limit();
             if (count($imageItems) > 1) {
-                $ok = admin_send_telegram_media_group($token, $channel, admin_social_broadcast_image_urls($imageItems), $telegramHtml, $error);
+                $ok = admin_send_telegram_media_group($token, $channel, admin_social_broadcast_image_urls($imageItems), $telegramCaptionHtml, $error);
                 if ($ok) {
-                    return true;
+                    return $sendTextAfterMedia
+                        ? admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML', $error)
+                        : true;
                 }
                 // Keep delivery even if Telegram rejects the media group.
                 return admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML', $error);
             }
             if ($imageUrl !== '') {
-                $ok = admin_send_telegram_photo($token, $channel, $imageUrl, $telegramHtml, $error);
+                $ok = admin_send_telegram_photo($token, $channel, $imageUrl, $telegramCaptionHtml, $error);
                 if ($ok) {
-                    return true;
+                    return $sendTextAfterMedia
+                        ? admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML', $error)
+                        : true;
                 }
                 // Keep delivery even if Telegram rejects the photo.
                 return admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML', $error);

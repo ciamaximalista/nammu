@@ -809,7 +809,10 @@ function admin_social_broadcast_structured_parts(string $text, string $fediverse
         return trim((string) $line);
     }, $lines), static fn(string $line): bool => $line !== ''));
 
-    $urls = admin_social_broadcast_extract_urls($text);
+    $urlSourceLines = array_values(array_filter($lines, static function (string $line): bool {
+        return preg_match('#^(fediverso|via|vía):\s*https?://#iu', $line) !== 1;
+    }));
+    $urls = admin_social_broadcast_extract_urls(implode("\n", $urlSourceLines));
     $primaryUrl = '';
     foreach ($urls as $candidateUrl) {
         if ($fediverseUrl !== '' && $candidateUrl === $fediverseUrl) {
@@ -822,6 +825,7 @@ function admin_social_broadcast_structured_parts(string $text, string $fediverse
     $title = '';
     $descriptionParts = [];
     foreach ($lines as $line) {
+        $isViaLine = preg_match('#^(via|vía):\s*https?://#iu', $line) === 1;
         if (preg_match('#^fediverso:\s*https?://#iu', $line) === 1) {
             continue;
         }
@@ -829,10 +833,12 @@ function admin_social_broadcast_structured_parts(string $text, string $fediverse
             continue;
         }
         $lineText = admin_social_broadcast_markdown_links_to_text($line);
-        if ($primaryUrl !== '' && str_contains($lineText, $primaryUrl)) {
+        if (!$isViaLine && $primaryUrl !== '' && str_contains($lineText, $primaryUrl)) {
             $lineText = trim(str_replace($primaryUrl, '', $lineText));
         }
-        $lineText = trim(preg_replace('#https?://[^\s<>"\')]+#iu', '', $lineText) ?? $lineText);
+        if (!$isViaLine) {
+            $lineText = trim(preg_replace('#https?://[^\s<>"\')]+#iu', '', $lineText) ?? $lineText);
+        }
         if ($lineText === '') {
             continue;
         }

@@ -13246,7 +13246,7 @@ if ($isLoggedIn && $page === 'fediverso') {
             $displayUrl = function_exists('nammu_fediverse_canonical_public_object_url')
                 ? nammu_fediverse_canonical_public_object_url($objectUrl, $publicUrl, $config)
                 : ($publicUrl !== '' ? $publicUrl : $objectUrl);
-            $originalPublicUrl = $displayUrl;
+            $originalPublicUrl = trim((string) ($displayUrl ?: ($publicUrl ?: $objectUrl)));
             if ($displayUrl !== '' && !str_contains($noteText, $displayUrl)) {
                 $noteText = trim($noteText . "\n\n" . $displayUrl);
             }

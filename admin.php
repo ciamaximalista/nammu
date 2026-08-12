@@ -10784,7 +10784,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (function_exists('nammu_actuality_rebuild_snapshot')) {
             nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
         }
-        $_SESSION['news_feedback'] = ['type' => 'success', 'message' => 'Noticia actualizada.'];
+        $fediverseUpdateDelivered = null;
+        if (!function_exists('nammu_fediverse_notify_followers_of_object_update') && is_file(__DIR__ . '/core/fediverso.php')) {
+            require_once __DIR__ . '/core/fediverso.php';
+        }
+        if (function_exists('nammu_fediverse_notify_followers_of_object_update') && function_exists('nammu_fediverse_local_content_items')) {
+            $fediverseItemId = rtrim($baseUrl, '/') . '/ap/objects/actualidad-' . rawurlencode($newsId);
+            foreach (nammu_fediverse_local_content_items($config) as $localItem) {
+                if (trim((string) ($localItem['id'] ?? '')) !== $fediverseItemId) {
+                    continue;
+                }
+                $fediverseUpdateDelivered = nammu_fediverse_notify_followers_of_object_update($localItem, $config);
+                break;
+            }
+        }
+        $message = 'Noticia actualizada.';
+        if ($fediverseUpdateDelivered !== null) {
+            $message .= ' Update federado: ' . (int) $fediverseUpdateDelivered . ' entrega' . ((int) $fediverseUpdateDelivered === 1 ? '' : 's') . '.';
+        }
+        $_SESSION['news_feedback'] = ['type' => 'success', 'message' => $message];
         header('Location: admin.php?page=edit&template=news');
         exit;
     } elseif (isset($_POST['delete_actuality_note'])) {

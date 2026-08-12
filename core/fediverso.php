@@ -6163,6 +6163,7 @@ function nammu_fediverse_local_content_items(array $config): array
             'content' => $content,
             'summary' => trim((string) ($item['description'] ?? '')),
             'published' => gmdate(DATE_ATOM, (int) (($item['timestamp'] ?? 0) ?: time())),
+            'updated_at' => (int) ($item['updated_at'] ?? 0),
             'type' => $isManual ? 'Note' : 'Article',
             'image' => $fediverseImage,
             'images' => $fediverseImages,
@@ -7688,22 +7689,29 @@ function nammu_fediverse_notify_followers_of_object_update(array $item, array $c
     if (!is_array($object)) {
         return 0;
     }
-    $object['updated'] = gmdate(DATE_ATOM);
+    $updatedAt = (int) ($item['updated_at'] ?? 0);
+    $updatedIso = $updatedAt > 0 ? gmdate(DATE_ATOM, $updatedAt) : gmdate(DATE_ATOM);
+    $object['updated'] = $updatedIso;
     if (trim((string) ($object['id'] ?? '')) !== '') {
         $object['replies'] = nammu_fediverse_reply_collection_summary((string) $object['id'], $config);
     }
+    $updateSuffix = gmdate('Ymd\THis\Z', $updatedAt > 0 ? $updatedAt : time()) . '-' . substr(sha1($itemId . '|' . microtime(true)), 0, 8);
     $updateActivity = [
         '@context' => 'https://www.w3.org/ns/activitystreams',
-        'id' => nammu_fediverse_actor_url($config) . '/updates/' . substr(sha1($itemId . '|' . microtime(true)), 0, 24),
+        'id' => $itemId . '#update-' . $updateSuffix,
         'type' => 'Update',
         'actor' => nammu_fediverse_actor_url($config),
         'to' => ['https://www.w3.org/ns/activitystreams#Public'],
         'cc' => [nammu_fediverse_followers_url($config)],
-        'published' => gmdate(DATE_ATOM),
+        'published' => $updatedIso,
         'object' => $object,
     ];
     $delivered = 0;
     foreach ($followers as $follower) {
+        $followerId = trim((string) ($follower['id'] ?? ''));
+        if ($followerId !== '' && nammu_fediverse_is_blocked_actor($followerId)) {
+            continue;
+        }
         $inboxUrl = nammu_fediverse_remote_inbox_for_actor($follower);
         if ($inboxUrl === '') {
             continue;

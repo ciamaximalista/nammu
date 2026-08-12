@@ -4664,6 +4664,17 @@ function admin_social_sentences_from_text(string $text): array {
     return array_values(array_filter(array_map('trim', $parts), static fn($item) => $item !== ''));
 }
 
+function admin_social_clean_description_for_message(string $text): string {
+    $text = str_replace(["\r\n", "\r"], "\n", html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    $lines = explode("\n", $text);
+    $lines = array_map(static function (string $line): string {
+        return trim(preg_replace('/[ \t]+/u', ' ', $line) ?? $line);
+    }, $lines);
+    $text = implode("\n", $lines);
+    $text = preg_replace("/\n{3,}/u", "\n\n", $text) ?? $text;
+    return trim($text);
+}
+
 function admin_unicode_bold_char(string $char): string {
     $codepoint = mb_ord($char, 'UTF-8');
     if ($codepoint >= 65 && $codepoint <= 90) {
@@ -4696,49 +4707,72 @@ function admin_build_sentence_limited_social_message(
     string $appendix = ''
 ): string {
     $title = trim($title);
-    $description = trim($description);
+    $description = admin_social_clean_description_for_message($description);
     $url = trim($url);
 
-    $parts = [];
+    $baseParts = [];
     if ($title !== '') {
-        $parts[] = $titleFormatter !== null ? (string) $titleFormatter($title) : $title;
+        $baseParts[] = $titleFormatter !== null ? (string) $titleFormatter($title) : $title;
     }
-    if ($url !== '') {
-        $parts[] = $url;
+    if ($description !== '') {
+        $baseParts[] = $description;
     }
-    $base = $parts !== [] ? implode("\n\n", $parts) : 'Nueva publicación disponible';
+    $base = $baseParts !== [] ? implode("\n\n", $baseParts) : 'Nueva publicación disponible';
     $appendix = trim($appendix);
-    $appendixSuffix = $appendix !== '' ? ("\n\n" . $appendix) : '';
-
-    $sentences = admin_social_sentences_from_text($description);
-    foreach ($sentences as $sentence) {
-        $candidate = $base . "\n\n" . $sentence . $appendixSuffix;
-        if (function_exists('mb_strlen')) {
-            if (mb_strlen($candidate, 'UTF-8') <= $maxLen) {
-                $base .= "\n\n" . $sentence;
-                continue;
-            }
-        } elseif (strlen($candidate) <= $maxLen) {
-            $base .= "\n\n" . $sentence;
-            continue;
-        }
-        break;
+    $suffixParts = [];
+    if ($url !== '') {
+        $suffixParts[] = $url;
     }
+    if ($appendix !== '') {
+        $suffixParts[] = $appendix;
+    }
+    $suffix = $suffixParts !== [] ? ("\n\n" . implode("\n\n", $suffixParts)) : '';
 
-    if ($appendixSuffix !== '') {
-        $base .= $appendixSuffix;
+    $candidate = $base . $suffix;
+    if (function_exists('mb_strlen') && mb_strlen($candidate, 'UTF-8') > $maxLen && $description !== '') {
+        $requiredTitle = $title !== '' ? ($titleFormatter !== null ? (string) $titleFormatter($title) : $title) : 'Nueva publicación disponible';
+        $reserved = mb_strlen($requiredTitle . $suffix . "\n\n", 'UTF-8');
+        $available = max(0, $maxLen - $reserved);
+        $description = $available > 0 ? admin_social_truncate_preserving_text($description, $available) : '';
+        $base = trim(implode("\n\n", array_filter([$requiredTitle, $description], static fn(string $part): bool => trim($part) !== '')));
+        $candidate = $base . $suffix;
+    } elseif (!function_exists('mb_strlen') && strlen($candidate) > $maxLen && $description !== '') {
+        $requiredTitle = $title !== '' ? ($titleFormatter !== null ? (string) $titleFormatter($title) : $title) : 'Nueva publicación disponible';
+        $reserved = strlen($requiredTitle . $suffix . "\n\n");
+        $available = max(0, $maxLen - $reserved);
+        $description = $available > 0 ? admin_social_truncate_preserving_text($description, $available) : '';
+        $base = trim(implode("\n\n", array_filter([$requiredTitle, $description], static fn(string $part): bool => trim($part) !== '')));
+        $candidate = $base . $suffix;
     }
 
     if (function_exists('mb_strlen')) {
-        if (mb_strlen($base, 'UTF-8') > $maxLen) {
-            return mb_substr($base, 0, max(0, $maxLen - 1), 'UTF-8') . '…';
+        if (mb_strlen($candidate, 'UTF-8') > $maxLen) {
+            return mb_substr($candidate, 0, max(0, $maxLen - 1), 'UTF-8') . '…';
         }
-        return $base;
+        return $candidate;
     }
-    if (strlen($base) > $maxLen) {
-        return substr($base, 0, max(0, $maxLen - 1)) . '…';
+    if (strlen($candidate) > $maxLen) {
+        return substr($candidate, 0, max(0, $maxLen - 1)) . '…';
     }
-    return $base;
+    return $candidate;
+}
+
+function admin_social_truncate_preserving_text(string $text, int $maxLen): string {
+    $text = trim($text);
+    if ($text === '' || $maxLen <= 0) {
+        return '';
+    }
+    $length = function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text);
+    if ($length <= $maxLen) {
+        return $text;
+    }
+    $cutLen = max(1, $maxLen - 1);
+    $cut = function_exists('mb_substr') ? mb_substr($text, 0, $cutLen, 'UTF-8') : substr($text, 0, $cutLen);
+    $spacePos = function_exists('mb_strrpos') ? mb_strrpos($cut, ' ', 0, 'UTF-8') : strrpos($cut, ' ');
+    if ($spacePos !== false && $spacePos > 0) {
+        $cut = function_exists('mb_substr') ? mb_substr($cut, 0, $spacePos, 'UTF-8') : substr($cut, 0, $spacePos);
+    }
+    return rtrim($cut, " \t\n\r\0\x0B.,;:") . '…';
 }
 
 function admin_build_twitter_post_message(string $title, string $description, string $url): string {
@@ -6260,7 +6294,8 @@ function admin_maybe_auto_post_to_social_networks(string $filename, string $titl
     $targetUrl = $urlOverride !== '' ? $urlOverride : admin_public_post_url($slug);
     $fediverseTemplate = admin_social_fediverse_template($slug, $urlOverride);
     $fediverseUrl = admin_social_fediverse_thread_url($slug, $fediverseTemplate);
-    $message = admin_build_sentence_limited_social_message($title, $description, $targetUrl, 1200, 'admin_bold_unicode_text');
+    $messageTitle = trim($title) !== '' ? '**' . trim($title) . '**' : '';
+    $message = admin_build_sentence_limited_social_message($messageTitle, $description, $targetUrl, 1200);
     $imageRef = trim($image) !== '' ? $image : $imageUrl;
     admin_enqueue_social_broadcast($message, $imageRef, $networks, $fediverseUrl, [
         'source' => 'site-content',

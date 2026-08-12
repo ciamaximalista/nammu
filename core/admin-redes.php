@@ -1438,7 +1438,7 @@ function admin_social_rss_enqueue_pending_broadcasts(int $maxItems = 12): array
         }
         $title = trim((string) ($profileItem['title'] ?? ''));
         $description = trim((string) (($profileItem['raw_text'] ?? '') !== '' ? $profileItem['raw_text'] : ($profileItem['description'] ?? '')));
-        $text = $title !== '' ? $title : $description;
+        $text = $title !== '' ? '**' . $title . '**' : $description;
         if ($title !== '' && $description !== '') {
             $text .= "\n\n" . $description;
         }

@@ -10779,7 +10779,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: admin.php?page=edit-news&id=' . urlencode($newsId));
             exit;
         }
-        if (function_exists('nammu_actuality_rebuild_snapshot')) {
+        if (function_exists('nammu_actuality_replace_news_item_in_snapshots')) {
+            nammu_actuality_replace_news_item_in_snapshots($newsId, $baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
+        } elseif (function_exists('nammu_actuality_rebuild_snapshot')) {
             nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
         }
         $_SESSION['news_feedback'] = ['type' => 'success', 'message' => 'Noticia actualizada.'];

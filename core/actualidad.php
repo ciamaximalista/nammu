@@ -318,6 +318,14 @@ function nammu_actuality_list_news_items(): array
             if (!empty($override['deleted'])) {
                 continue;
             }
+            foreach (['title', 'description', 'raw_text', 'link', 'image'] as $field) {
+                if (array_key_exists($field, $override)) {
+                    $item[$field] = is_string($override[$field]) ? trim((string) $override[$field]) : (string) $override[$field];
+                }
+            }
+            if (array_key_exists('images', $override)) {
+                $item['images'] = array_values(array_unique(array_filter(array_map('strval', (array) ($override['images'] ?? [])))));
+            }
         }
         if (trim((string) ($item['source_kind'] ?? '')) === '') {
             $item['source_kind'] = 'news';
@@ -448,6 +456,27 @@ function nammu_actuality_update_news_item(string $id, string $title, string $des
         ];
     }
     nammu_actuality_save_news_overrides($items);
+    return true;
+}
+
+function nammu_actuality_replace_news_item_in_snapshots(string $id, string $baseUrl, array $config, string $siteTitle, string $siteDescription, string $siteLang = 'es'): bool
+{
+    $item = nammu_actuality_get_news_item($id);
+    if (!is_array($item)) {
+        return false;
+    }
+
+    nammu_actuality_add_item_to_snapshots($item);
+
+    $snapshot = nammu_actuality_load_items_snapshot();
+    $items = is_array($snapshot['items'] ?? null) ? $snapshot['items'] : [];
+    $feed = nammu_generate_actuality_feed($baseUrl, $config, $siteTitle, $siteDescription, $siteLang, $items);
+    if ($baseUrl !== '') {
+        $feedFile = dirname(__DIR__) . '/noticias.xml';
+        @file_put_contents($feedFile, $feed);
+        @chmod($feedFile, 0664);
+    }
+
     return true;
 }
 

@@ -600,6 +600,7 @@ function nammu_actuality_update_manual_item(string $id, string $text, string $ba
             $item['image'] = $normalizedImages[0] ?? '';
         }
         $item['is_manual'] = true;
+        $item['updated_at'] = time();
         $updated = true;
         break;
     }

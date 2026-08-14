@@ -9721,7 +9721,16 @@ function nammu_fediverse_should_deliver_item_to_follower(array $item, array $fol
         return false;
     }
     $sent = is_array($deliveryState['sent_ids'] ?? null) ? $deliveryState['sent_ids'] : [];
-    return !in_array($itemId, array_map('strval', $sent), true);
+    if (in_array($itemId, array_map('strval', $sent), true)) {
+        return false;
+    }
+
+    $publishedTimestamp = $published !== '' ? (int) (strtotime($published) ?: 0) : 0;
+    if ($publishedTimestamp > 0 && $publishedTimestamp < (time() - 3 * 24 * 60 * 60)) {
+        return false;
+    }
+
+    return true;
 }
 
 function nammu_fediverse_deliver_local_items(array $config): array

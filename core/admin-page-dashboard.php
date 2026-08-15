@@ -2791,6 +2791,37 @@
             $socialCounts['Instagram'] = $instagramCount;
         }
     }
+    $subscriberCounts = [];
+    if ($avisosPostsCount > 0) {
+        $subscriberCounts[] = ['label' => 'Avisos entradas', 'count' => $avisosPostsCount];
+    }
+    if ($avisosItinerariesCount > 0) {
+        $subscriberCounts[] = ['label' => 'Avisos itinerarios', 'count' => $avisosItinerariesCount];
+    }
+    if ($avisosPodcastCount > 0) {
+        $subscriberCounts[] = ['label' => 'Avisos podcast', 'count' => $avisosPodcastCount];
+    }
+    if ($newsletterSubscriberCount > 0) {
+        $subscriberCounts[] = ['label' => 'Newsletter', 'count' => $newsletterSubscriberCount];
+    }
+    if ($postalSubscriberCount > 0) {
+        $subscriberCounts[] = ['label' => 'Correo postal', 'count' => $postalSubscriberCount];
+    }
+    if ($pushEnabled && $pushSubscriberCount > 0) {
+        $subscriberCounts[] = ['label' => 'Notificaciones Push', 'count' => $pushSubscriberCount];
+    }
+    foreach ($socialCounts as $label => $count) {
+        if ((int) $count > 0) {
+            $subscriberCounts[] = ['label' => (string) $label, 'count' => (int) $count];
+        }
+    }
+    usort($subscriberCounts, static function (array $a, array $b): int {
+        $byCount = ((int) $b['count']) <=> ((int) $a['count']);
+        if ($byCount !== 0) {
+            return $byCount;
+        }
+        return strcasecmp((string) $a['label'], (string) $b['label']);
+    });
     ?>
 
     <div class="tab-pane active">
@@ -3140,29 +3171,9 @@
                 <div class="card mb-4">
                     <div class="card-body">
                         <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Suscriptores</h4>
-                        <?php if ($avisosPostsCount > 0): ?>
-                            <p class="mb-2"><strong>Avisos entradas:</strong> <?= (int) $avisosPostsCount ?></p>
-                        <?php endif; ?>
-                        <?php if ($avisosItinerariesCount > 0): ?>
-                            <p class="mb-2"><strong>Avisos itinerarios:</strong> <?= (int) $avisosItinerariesCount ?></p>
-                        <?php endif; ?>
-                        <?php if ($avisosPodcastCount > 0): ?>
-                            <p class="mb-2"><strong>Avisos podcast:</strong> <?= (int) $avisosPodcastCount ?></p>
-                        <?php endif; ?>
-                        <?php if ($newsletterSubscriberCount > 0): ?>
-                            <p class="mb-2"><strong>Newsletter:</strong> <?= (int) $newsletterSubscriberCount ?></p>
-                        <?php endif; ?>
-                        <?php if ($postalSubscriberCount > 0): ?>
-                            <p class="mb-2"><strong>Correo postal:</strong> <?= (int) $postalSubscriberCount ?></p>
-                        <?php endif; ?>
-                        <?php if ($pushEnabled && $pushSubscriberCount > 0): ?>
-                            <p class="mb-2"><strong>Notificaciones Push:</strong> <?= (int) $pushSubscriberCount ?></p>
-                        <?php endif; ?>
-                        <?php if (!empty($socialCounts)): ?>
-                            <?php foreach ($socialCounts as $label => $count): ?>
-                                <p class="mb-2"><strong><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>:</strong> <?= (int) $count ?></p>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                        <?php foreach ($subscriberCounts as $subscriberCount): ?>
+                            <p class="mb-2"><strong><?= htmlspecialchars((string) $subscriberCount['label'], ENT_QUOTES, 'UTF-8') ?>:</strong> <?= (int) $subscriberCount['count'] ?></p>
+                        <?php endforeach; ?>
                     </div>
                 </div>
                 <div class="card mb-4 dashboard-stat-block">

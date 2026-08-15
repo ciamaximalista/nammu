@@ -3314,6 +3314,7 @@ function nammu_fediverse_merge_thread_replies(array ...$replyGroups): array
 {
     $merged = [];
     $seen = [];
+    $seenIndexes = [];
     foreach ($replyGroups as $replyGroup) {
         foreach ($replyGroup as $reply) {
             if (!is_array($reply)) {
@@ -3331,19 +3332,36 @@ function nammu_fediverse_merge_thread_replies(array ...$replyGroups): array
                 $dedupKeys[] = 'fallback:' . $fallback;
             }
             $alreadySeen = false;
+            $existingIndex = null;
             foreach ($dedupKeys as $dedupKey) {
                 if (isset($seen[$dedupKey])) {
                     $alreadySeen = true;
+                    $existingIndex = $seenIndexes[$dedupKey] ?? null;
                     break;
                 }
             }
             if ($alreadySeen) {
+                if (is_int($existingIndex) && isset($merged[$existingIndex])) {
+                    foreach ($reply as $field => $value) {
+                        if (is_array($value)) {
+                            if (empty($merged[$existingIndex][$field]) && !empty($value)) {
+                                $merged[$existingIndex][$field] = $value;
+                            }
+                            continue;
+                        }
+                        if (trim((string) ($merged[$existingIndex][$field] ?? '')) === '' && trim((string) $value) !== '') {
+                            $merged[$existingIndex][$field] = $value;
+                        }
+                    }
+                }
                 continue;
             }
+            $merged[] = $reply;
+            $newIndex = count($merged) - 1;
             foreach ($dedupKeys as $dedupKey) {
                 $seen[$dedupKey] = true;
+                $seenIndexes[$dedupKey] = $newIndex;
             }
-            $merged[] = $reply;
         }
     }
     usort($merged, static function (array $a, array $b): int {
@@ -3621,6 +3639,10 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
             && nammu_fediverse_thread_payload_score($existingPayload) > nammu_fediverse_thread_payload_score($candidatePayload)
             ? nammu_fediverse_merge_thread_payload_metrics($existingPayload, $candidatePayload)
             : nammu_fediverse_merge_thread_payload_metrics($candidatePayload, $existingPayload);
+        $threadPayloads[$localId]['replies'] = nammu_fediverse_stable_reply_list(
+            $mergedReplies,
+            (array) ($threadPayloads[$localId]['replies'] ?? [])
+        );
         $threadPayloads[$localId]['replies'] = nammu_fediverse_filter_visible_replies((array) ($threadPayloads[$localId]['replies'] ?? []));
         $threadPayloads[$localId]['summary']['replies'] = count((array) $threadPayloads[$localId]['replies']);
         $threadPayloads[$localId]['details']['replies'] = nammu_fediverse_thread_reply_actor_details((array) $threadPayloads[$localId]['replies']);
@@ -3650,8 +3672,14 @@ function nammu_fediverse_promote_thread_payloads_to_threads_cache(array $threadP
         }
         $existing = is_array($cacheItems[$objectId] ?? null) ? $cacheItems[$objectId] : [];
         $existingReplies = is_array($existing['replies'] ?? null) ? $existing['replies'] : [];
-        $stableReplies = nammu_fediverse_stable_reply_list($existingReplies, $payloadReplies);
-        if (nammu_fediverse_reply_list_score($stableReplies) <= nammu_fediverse_reply_list_score($existingReplies)) {
+        $stableReplies = nammu_fediverse_stable_reply_list($payloadReplies, $existingReplies);
+        if (
+            $stableReplies == $existingReplies
+            || (
+                nammu_fediverse_reply_list_score($stableReplies) < nammu_fediverse_reply_list_score($existingReplies)
+                && nammu_fediverse_reply_list_score($existingReplies) > 0
+            )
+        ) {
             continue;
         }
         $cacheItems[$objectId] = [
@@ -7217,6 +7245,23 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
             }
         }
         if ($alreadyPresent) {
+            foreach ($grouped[$localId] as $existingIndex => $existingReply) {
+                if (!is_array($existingReply)) {
+                    continue;
+                }
+                $existingId = trim((string) ($existingReply['id'] ?? ''));
+                $existingUrl = trim((string) ($existingReply['url'] ?? ''));
+                if (
+                    ($replyIdKey !== '' && ($existingId === $replyIdKey || $existingUrl === $replyIdKey))
+                    || ($replyUrlKey !== '' && ($existingId === $replyUrlKey || $existingUrl === $replyUrlKey))
+                ) {
+                    $grouped[$localId][$existingIndex] = array_merge($existingReply, $replyEntry);
+                    foreach ($dedupKeys as $dedupKey) {
+                        $seenReplies[$localId][$dedupKey] = true;
+                    }
+                    break;
+                }
+            }
             continue;
         }
         $grouped[$localId][] = $replyEntry;

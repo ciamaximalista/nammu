@@ -2095,7 +2095,7 @@ function admin_build_sitemap_entries(array $posts, array $theme, string $publicB
     $settings = get_settings();
     $sortOrder = strtolower(trim((string) ($settings['sort_order'] ?? 'date')));
     $isAlphabeticalOrder = $sortOrder === 'alphabetical';
-    $podcastItems = nammu_podcast_load_items();
+    $podcastItems = nammu_collect_podcast_items(__DIR__ . '/content', $publicBaseUrl);
     $hasPodcast = !empty($podcastItems);
 
     $entries = [];
@@ -2360,15 +2360,16 @@ function admin_build_sitemap_entries(array $posts, array $theme, string $publicB
 
 function admin_regenerate_podcast_feed(): void {
     try {
-        $podcastItems = nammu_podcast_load_items();
+        $baseUrl = nammu_base_url();
+        $podcastItems = nammu_collect_podcast_items(__DIR__ . '/content', $baseUrl);
         if (empty($podcastItems)) {
             @unlink(__DIR__ . '/podcast.xml');
             return;
         }
-        $baseUrl = nammu_base_url();
         $config = load_config_file();
         $feed = nammu_generate_podcast_feed($baseUrl, $config);
         @file_put_contents(__DIR__ . '/podcast.xml', $feed);
+        @chmod(__DIR__ . '/podcast.xml', 0664);
     } catch (Throwable $e) {
         error_log('No se pudo regenerar podcast.xml: ' . $e->getMessage());
     }
@@ -2410,11 +2411,12 @@ function admin_regenerate_sitemap(): void {
         $repository = new \Nammu\Core\ContentRepository(CONTENT_DIR);
         $posts = $repository->all();
         $config = load_config_file();
-        $theme = nammu_theme_config($config);
+        $theme = nammu_template_settings();
         $entries = admin_build_sitemap_entries($posts, $theme, $baseUrl);
         $generator = new SitemapGenerator($baseUrl);
         $sitemapXml = $generator->generate($entries);
         @file_put_contents(__DIR__ . '/sitemap.xml', $sitemapXml);
+        @chmod(__DIR__ . '/sitemap.xml', 0664);
     } catch (Throwable $e) {
         error_log('No se pudo regenerar sitemap.xml: ' . $e->getMessage());
     }

@@ -9263,8 +9263,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if ($relatedSlugsInput !== '' && count($relatedSlugs) < 2) {
                 $error = 'Entradas o itinerarios relacionados: indica al menos 2 slugs válidos.';
-            } elseif (count($relatedSlugs) > 6) {
-                $error = 'Entradas o itinerarios relacionados: el máximo son 6 slugs.';
+            } elseif (count($relatedSlugs) > 8) {
+                $error = 'Entradas o itinerarios relacionados: el máximo son 8 slugs.';
             }
         }
 
@@ -9867,8 +9867,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $relatedSlugs = admin_parse_related_slugs_input($relatedSlugsInput);
             if ($relatedSlugsInput !== '' && count($relatedSlugs) < 2) {
                 $error = 'Entradas o itinerarios relacionados: indica al menos 2 slugs válidos.';
-            } elseif (count($relatedSlugs) > 6) {
-                $error = 'Entradas o itinerarios relacionados: el máximo son 6 slugs.';
+            } elseif (count($relatedSlugs) > 8) {
+                $error = 'Entradas o itinerarios relacionados: el máximo son 8 slugs.';
             }
         }
 
@@ -10029,6 +10029,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($template === 'podcast' && $status === 'published') {
                         if ($publishDraftAsPodcast || $previousStatus === 'draft') {
                             $shouldAutoSharePodcast = true;
+                        }
+                    }
+                    if (
+                        $status === 'published'
+                        && $previousStatus === 'published'
+                        && !$shouldAutoShare
+                        && !$shouldAutoSharePodcast
+                        && in_array($template, ['post', 'podcast', 'page'], true)
+                    ) {
+                        if (!function_exists('nammu_fediverse_mark_item_delivered_to_followers') && is_file(__DIR__ . '/core/fediverso.php')) {
+                            require_once __DIR__ . '/core/fediverso.php';
+                        }
+                        if (function_exists('nammu_fediverse_mark_item_delivered_to_followers')) {
+                            $fediverseConfig = load_config_file();
+                            $fediverseObjectId = trim((string) ($fediverseIdToPreserve ?? ''));
+                            if ($fediverseObjectId === '') {
+                                $fediverseBaseUrl = function_exists('nammu_fediverse_base_url')
+                                    ? nammu_fediverse_base_url($fediverseConfig)
+                                    : rtrim(admin_base_url(), '/');
+                                $fediverseSlug = pathinfo($targetFilename, PATHINFO_FILENAME);
+                                if ($fediverseBaseUrl !== '' && $fediverseSlug !== '') {
+                                    $fediverseObjectId = rtrim($fediverseBaseUrl, '/') . '/ap/objects/' . rawurlencode($template) . '-' . rawurlencode($fediverseSlug);
+                                }
+                            }
+                            if ($fediverseObjectId !== '') {
+                                nammu_fediverse_mark_item_delivered_to_followers($fediverseObjectId, $fediverseConfig);
+                            }
                         }
                     }
                     if ($shouldAutoShare) {

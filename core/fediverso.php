@@ -1829,6 +1829,35 @@ function nammu_fediverse_save_deliveries_store(array $followers): void
     nammu_fediverse_save_json_store(nammu_fediverse_deliveries_file(), ['followers' => $followers]);
 }
 
+function nammu_fediverse_mark_item_delivered_to_followers(string $itemId, array $config): int
+{
+    $itemId = trim($itemId);
+    if ($itemId === '') {
+        return 0;
+    }
+    $deliveryStore = nammu_fediverse_deliveries_store();
+    $deliveryFollowers = is_array($deliveryStore['followers'] ?? null) ? $deliveryStore['followers'] : [];
+    $marked = 0;
+    foreach (nammu_fediverse_followers_store()['followers'] as $follower) {
+        $followerId = trim((string) ($follower['id'] ?? ''));
+        if ($followerId === '') {
+            continue;
+        }
+        $state = is_array($deliveryFollowers[$followerId] ?? null) ? $deliveryFollowers[$followerId] : ['sent_ids' => []];
+        $sentIds = array_values(array_unique(array_map('strval', is_array($state['sent_ids'] ?? null) ? $state['sent_ids'] : [])));
+        if (!in_array($itemId, $sentIds, true)) {
+            $sentIds[] = $itemId;
+            $marked++;
+        }
+        $state['sent_ids'] = array_slice($sentIds, -1000);
+        $deliveryFollowers[$followerId] = $state;
+    }
+    if ($marked > 0) {
+        nammu_fediverse_save_deliveries_store($deliveryFollowers);
+    }
+    return $marked;
+}
+
 function nammu_fediverse_messages_store(): array
 {
     $store = nammu_fediverse_load_json_store(nammu_fediverse_messages_file(), ['items' => []]);

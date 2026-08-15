@@ -806,7 +806,7 @@ unset($_SESSION['newsletter_custom_recipients']);
             </div>
 
             <div class="form-group entry-podcast-only">
-                <label for="related_slugs">Entradas o itinerarios relacionados (2 a 6 slugs)</label>
+                <label for="related_slugs">Entradas o itinerarios relacionados (2 a 8 slugs)</label>
                 <textarea name="related_slugs" id="related_slugs" class="form-control" rows="3" placeholder="slug-entrada-1&#10;podcast/mi-episodio&#10;itinerarios/mi-itinerario"><?= htmlspecialchars($relatedInput, ENT_QUOTES, 'UTF-8') ?></textarea>
                 <small class="form-text text-muted">Solo para entradas y podcasts. Escribe un slug por línea (o separados por coma).</small>
             </div>

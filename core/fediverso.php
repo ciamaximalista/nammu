@@ -2633,6 +2633,132 @@ function nammu_fediverse_timeline_item_for_identifier(string $identifier): ?arra
     return null;
 }
 
+function nammu_fediverse_remote_activity_object_identifiers(array $payload): array
+{
+    $ids = [];
+    $addId = static function ($value) use (&$ids): void {
+        $id = nammu_fediverse_extract_url($value);
+        if ($id === '') {
+            $id = trim((string) $value);
+        }
+        if ($id !== '') {
+            $ids[$id] = true;
+        }
+    };
+    $object = $payload['object'] ?? null;
+    if (is_string($object)) {
+        $addId($object);
+    } elseif (is_array($object)) {
+        foreach (['id', 'url', 'atomUri'] as $field) {
+            $addId($object[$field] ?? '');
+        }
+    }
+    return array_keys($ids);
+}
+
+function nammu_fediverse_remote_update_matches_existing_item(array $existing, string $activityActorId, string $objectActorId): bool
+{
+    $actorCandidates = array_values(array_filter([
+        trim((string) ($existing['actor_id'] ?? '')),
+        trim((string) ($existing['actor_url'] ?? '')),
+        trim((string) ($existing['target_actor_id'] ?? '')),
+        trim((string) ($existing['target_actor_url'] ?? '')),
+        trim((string) ($existing['object_actor_id'] ?? '')),
+    ]));
+    foreach ([trim($activityActorId), trim($objectActorId)] as $candidate) {
+        if ($candidate !== '' && in_array($candidate, $actorCandidates, true)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function nammu_fediverse_apply_remote_object_update(array $payload, array $actor, array $config): bool
+{
+    if (strtolower(trim((string) ($payload['type'] ?? ''))) !== 'update' || !is_array($payload['object'] ?? null)) {
+        return false;
+    }
+    $object = $payload['object'];
+    $identifiers = nammu_fediverse_remote_activity_object_identifiers($payload);
+    if (empty($identifiers)) {
+        return false;
+    }
+    $timeline = nammu_fediverse_timeline_store()['items'];
+    $matchedIndex = null;
+    foreach ($timeline as $index => $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        foreach (['id', 'activity_id', 'object_id', 'url'] as $field) {
+            $value = trim((string) ($item[$field] ?? ''));
+            if ($value !== '' && in_array($value, $identifiers, true)) {
+                $matchedIndex = $index;
+                break 2;
+            }
+        }
+    }
+    if ($matchedIndex === null) {
+        return false;
+    }
+
+    $existing = $timeline[$matchedIndex];
+    $activityActorId = trim((string) ($payload['actor'] ?? ''));
+    $objectActorId = trim((string) (($object['attributedTo'] ?? '') ?: ($object['actor'] ?? '')));
+    if (!nammu_fediverse_remote_update_matches_existing_item($existing, $activityActorId, $objectActorId)) {
+        return false;
+    }
+
+    $fakeCreate = [
+        'id' => trim((string) (($existing['activity_id'] ?? '') ?: ($existing['id'] ?? ''))),
+        'type' => 'Create',
+        'actor' => $activityActorId !== '' ? $activityActorId : trim((string) ($actor['id'] ?? '')),
+        'published' => trim((string) ($existing['published'] ?? '')),
+        'object' => $object,
+    ];
+    $normalized = nammu_fediverse_normalize_remote_item($fakeCreate, $actor, $config);
+    if (!is_array($normalized)) {
+        return false;
+    }
+
+    $updated = $existing;
+    foreach (['title', 'content', 'content_html', 'url', 'target_url', 'image'] as $field) {
+        $value = trim((string) ($normalized[$field] ?? ''));
+        if ($value !== '') {
+            $updated[$field] = $value;
+        }
+    }
+    if (!empty($normalized['attachments']) && is_array($normalized['attachments'])) {
+        $updated['attachments'] = $normalized['attachments'];
+    }
+    if (trim((string) ($updated['published'] ?? '')) === '' && trim((string) ($normalized['published'] ?? '')) !== '') {
+        $updated['published'] = trim((string) ($normalized['published'] ?? ''));
+    }
+    foreach (['target_actor_id', 'target_actor_name', 'target_actor_username', 'target_actor_icon'] as $field) {
+        $value = trim((string) ($normalized[$field] ?? ''));
+        if ($value !== '') {
+            $updated[$field] = $value;
+        }
+    }
+    $updated['id'] = trim((string) (($existing['id'] ?? '') ?: ($normalized['id'] ?? '')));
+    $updated['activity_id'] = trim((string) (($existing['activity_id'] ?? '') ?: ($existing['id'] ?? '') ?: ($normalized['activity_id'] ?? '')));
+    $updated['object_id'] = trim((string) (($existing['object_id'] ?? '') ?: ($normalized['object_id'] ?? '')));
+    $updated['type'] = trim((string) (($existing['type'] ?? '') ?: ($normalized['type'] ?? 'note')));
+    $updated['update_activity_id'] = trim((string) ($payload['id'] ?? ''));
+    $updated['updated'] = trim((string) (($object['updated'] ?? '') ?: ($payload['updated'] ?? '') ?: gmdate(DATE_ATOM)));
+
+    if ($updated == $existing) {
+        return false;
+    }
+    $timeline[$matchedIndex] = $updated;
+    nammu_fediverse_save_timeline_store($timeline);
+    nammu_fediverse_clear_threads_cache();
+    nammu_fediverse_save_fragments_cache_store([]);
+    if (function_exists('nammu_fediverse_rebuild_light_snapshots')) {
+        nammu_fediverse_rebuild_light_snapshots($config);
+    }
+    return true;
+}
+
 function nammu_fediverse_timeline_entries_targeting_local_items(array $config): array
 {
     $index = nammu_fediverse_local_items_index($config);
@@ -5604,6 +5730,10 @@ function nammu_fediverse_extract_outbox_items(
         if (in_array($rawType, ['delete', 'tombstone'], true)) {
             continue;
         }
+        if ($rawType === 'update') {
+            nammu_fediverse_apply_remote_object_update($rawItem, $actor, $config);
+            continue;
+        }
         $inspected++;
         $normalized = nammu_fediverse_normalize_remote_item($rawItem, $actor, $config);
         if ($normalized !== null) {
@@ -5682,6 +5812,7 @@ function nammu_fediverse_refresh_following(array $options = []): array
         }
         $actor = array_merge($actor, $actorDoc);
         $actor['resolved_at'] = gmdate(DATE_ATOM);
+        nammu_fediverse_save_timeline_store(array_values($timelineById));
         $outbox = nammu_fediverse_signed_fetch_json((string) $actor['outbox'], $config);
         if (!is_array($outbox)) {
             $actor['last_error'] = 'No se pudo leer su outbox.';
@@ -5689,6 +5820,13 @@ function nammu_fediverse_refresh_following(array $options = []): array
         }
         $actor['last_error'] = '';
         $items = nammu_fediverse_extract_outbox_items($outbox, $actor, $config, $outboxLimit, array_keys($timelineById), $outboxInspectLimit);
+        $timelineById = [];
+        foreach (nammu_fediverse_timeline_store()['items'] as $timelineItem) {
+            $timelineItemId = trim((string) ($timelineItem['id'] ?? ''));
+            if ($timelineItemId !== '') {
+                $timelineById[$timelineItemId] = $timelineItem;
+            }
+        }
         $actorNewItems = 0;
         foreach ($items as $item) {
             if (isset($timelineById[$item['id']])) {
@@ -5743,12 +5881,29 @@ function nammu_fediverse_sync_recent_followed_inbox_items(array $config, int $li
             $timelineById[$primaryId] = $item;
         }
     }
+    $reloadTimelineIndexes = static function () use (&$timelineById, &$knownTimelineIds): void {
+        $timelineById = [];
+        $knownTimelineIds = [];
+        foreach (nammu_fediverse_timeline_store()['items'] as $item) {
+            foreach (['id', 'activity_id', 'object_id', 'url'] as $field) {
+                $itemId = trim((string) ($item[$field] ?? ''));
+                if ($itemId !== '') {
+                    $knownTimelineIds[$itemId] = true;
+                }
+            }
+            $primaryId = trim((string) ($item['id'] ?? ''));
+            if ($primaryId !== '') {
+                $timelineById[$primaryId] = $item;
+            }
+        }
+    };
 
     $inboxStore = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
     $activities = is_array($inboxStore['activities'] ?? null) ? $inboxStore['activities'] : [];
     $activities = array_reverse($activities);
     $scanned = 0;
     $newItems = 0;
+    $updatedItems = 0;
     $activityCandidateIds = static function (array $payload): array {
         $ids = [];
         $activityId = trim((string) ($payload['id'] ?? ''));
@@ -5791,6 +5946,16 @@ function nammu_fediverse_sync_recent_followed_inbox_items(array $config, int $li
         if (nammu_fediverse_is_direct_message_activity($payload, $config)) {
             continue;
         }
+        if (strtolower(trim((string) ($payload['type'] ?? ''))) === 'update') {
+            if ($newItems > 0) {
+                nammu_fediverse_save_timeline_store(array_values($timelineById));
+            }
+            if (nammu_fediverse_apply_remote_object_update($payload, $followingIds[$actorId], $config)) {
+                $updatedItems++;
+                $reloadTimelineIndexes();
+            }
+            continue;
+        }
         $candidateIds = $activityCandidateIds($payload);
         $alreadyKnown = false;
         foreach ($candidateIds as $candidateId) {
@@ -5824,7 +5989,7 @@ function nammu_fediverse_sync_recent_followed_inbox_items(array $config, int $li
         nammu_fediverse_save_timeline_store(array_values($timelineById));
     }
 
-    return ['scanned' => $scanned, 'new' => $newItems];
+    return ['scanned' => $scanned, 'new' => $newItems, 'updated' => $updatedItems];
 }
 
 function nammu_fediverse_refresh_followers(array $config): array
@@ -9703,6 +9868,14 @@ function nammu_fediverse_handle_inbox_payload(array $payload, array $config, arr
             nammu_fediverse_notify_followers_of_object_update($affectedLocalTarget, $config);
         }
         return ['accepted' => true, 'type' => 'delete', 'verified' => true];
+    }
+    if ($type === 'update' && is_array($payload['object'] ?? null)) {
+        $remoteActor = $actorId !== '' ? nammu_fediverse_resolve_actor($actorId, $config) : [];
+        if (!is_array($remoteActor) || empty($remoteActor)) {
+            $remoteActor = ['id' => $actorId];
+        }
+        $updated = nammu_fediverse_apply_remote_object_update($payload, $remoteActor, $config);
+        return ['accepted' => true, 'type' => 'update', 'verified' => true, 'updated' => $updated];
     }
     if ($type === 'create' && is_array($payload['object'] ?? null)) {
         $object = $payload['object'];

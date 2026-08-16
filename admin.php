@@ -1644,6 +1644,12 @@ function nammu_allowed_media_extensions(): array {
     ];
 }
 
+function nammu_upload_limits_label(): string {
+    $uploadMax = ini_get('upload_max_filesize') ?: 'desconocido';
+    $postMax = ini_get('post_max_size') ?: 'desconocido';
+    return 'upload_max_filesize=' . $uploadMax . ', post_max_size=' . $postMax;
+}
+
 function nammu_is_generated_webp_variant(string $pathOrName): bool {
     $name = strtolower(basename($pathOrName));
     return (bool) preg_match('/\.(?:jpe?g|png|gif)\.webp$/i', $name);
@@ -11125,7 +11131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $originalName = $file['name'] ?? 'archivo';
                 $errorCode = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
                 if ($errorCode === UPLOAD_ERR_INI_SIZE || $errorCode === UPLOAD_ERR_FORM_SIZE) {
-                    $errorMessages[] = $originalName . ': supera el tamaño máximo permitido por el servidor.';
+                    $errorMessages[] = $originalName . ': supera el tamaño máximo permitido por el servidor (' . nammu_upload_limits_label() . ').';
                     continue;
                 }
                 if ($errorCode === UPLOAD_ERR_NO_FILE) {

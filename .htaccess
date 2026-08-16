@@ -39,6 +39,12 @@
 # Prevent file browsing
 Options -Indexes -MultiViews
 
+<IfModule mod_php.c>
+    php_value upload_max_filesize 64M
+    php_value post_max_size 72M
+    php_value max_file_uploads 20
+</IfModule>
+
 <IfModule mod_headers.c>
     Header append Vary Accept env=serve_webp
     <FilesMatch "\.(?:css|js|mjs|json|xml|txt|svg|ico|gif|jpe?g|png|webp|avif|mp4|webm|ogv|mp3|wav|m4a|flac|pdf|woff2?|ttf|otf)$">

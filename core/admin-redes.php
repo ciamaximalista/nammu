@@ -1170,6 +1170,28 @@ function admin_social_rss_mark_broadcast_result(array $job, string $status, arra
     }
 }
 
+function admin_social_rss_sent_networks_for_job(array $job): array
+{
+    if (!function_exists('nammu_actuality_load_news_store')) {
+        return [];
+    }
+    if (trim((string) ($job['source'] ?? '')) !== 'social-rss-news') {
+        return [];
+    }
+    $sourceId = trim((string) ($job['source_id'] ?? ''));
+    if ($sourceId === '') {
+        return [];
+    }
+    $newsStore = nammu_actuality_load_news_store();
+    foreach ((array) ($newsStore['items'] ?? []) as $item) {
+        if (!is_array($item) || trim((string) ($item['id'] ?? '')) !== $sourceId) {
+            continue;
+        }
+        return array_values(array_unique(array_filter(array_map('strval', $item['social_broadcast_sent_networks'] ?? []))));
+    }
+    return [];
+}
+
 function admin_handle_social_rss_settings_request(array $settings): array
 {
     $result = [
@@ -1688,6 +1710,11 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
         unset($item['_source_timestamp']);
         $processed++;
         $networks = array_values(array_unique(array_filter(array_map('strval', $item['networks'] ?? []))));
+        $alreadySentNetworks = admin_social_rss_sent_networks_for_job($item);
+        if (!empty($alreadySentNetworks)) {
+            $networks = array_values(array_diff($networks, $alreadySentNetworks));
+            $item['networks'] = $networks;
+        }
         if (empty($networks)) {
             continue;
         }
@@ -1755,6 +1782,10 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
 
         if (!empty($sentNetworks)) {
             $sent++;
+            admin_social_rss_mark_broadcast_result($item, 'sent', [
+                'sent_networks' => $sentNetworks,
+                'failed_networks' => $failedNetworks,
+            ]);
         }
         if (!empty($pendingNetworks) || empty($sentNetworks)) {
             $failed++;
@@ -1767,10 +1798,7 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
             }
             $deferredFailed[] = $item;
         } elseif (!empty($sentNetworks)) {
-            admin_social_rss_mark_broadcast_result($item, 'sent', [
-                'sent_networks' => $sentNetworks,
-                'failed_networks' => $failedNetworks,
-            ]);
+            continue;
         } else {
             admin_social_rss_mark_broadcast_result($item, 'failed', [
                 'error' => (string) ($item['last_error'] ?? 'send_failed'),

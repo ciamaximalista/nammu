@@ -160,7 +160,8 @@
         }
         return trim((string) ($item['actor_id'] ?? ''));
     };
-    $fediverseActorHandleFor = static function (array $item) use ($fediverseActorsById, $fediverseActorUrl, $fediverseLocalHandle): string {
+    $fediverseActorsById = [];
+    $fediverseActorHandleFor = static function (array $item) use (&$fediverseActorsById, $fediverseActorUrl, $fediverseLocalHandle): string {
         $actorId = trim((string) ($item['actor_id'] ?? ''));
         if ($actorId !== '' && $actorId === $fediverseActorUrl) {
             return $fediverseLocalHandle;
@@ -220,7 +221,6 @@
             $fediverseKnownActors = array_values($fediverseNotificationsSnapshot['actors_by_id']);
         }
     }
-    $fediverseActorsById = [];
     foreach ($fediverseKnownActors as $fediverseKnownActor) {
         $fediverseKnownActorId = trim((string) ($fediverseKnownActor['id'] ?? ''));
         if ($fediverseKnownActorId !== '') {

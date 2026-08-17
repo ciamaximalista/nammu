@@ -157,6 +157,42 @@ function admin_social_broadcast_queue_file(): string
     return __DIR__ . '/../config/social-broadcast-queue.json';
 }
 
+function admin_social_broadcast_queue_lock_file(): string
+{
+    return admin_social_broadcast_queue_file() . '.lock';
+}
+
+function admin_social_broadcast_open_queue_lock(bool $blocking = false)
+{
+    $file = admin_social_broadcast_queue_lock_file();
+    $dir = dirname($file);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $handle = @fopen($file, 'c+');
+    if (!is_resource($handle)) {
+        return null;
+    }
+    $operation = LOCK_EX;
+    if (!$blocking) {
+        $operation |= LOCK_NB;
+    }
+    if (!@flock($handle, $operation)) {
+        @fclose($handle);
+        return null;
+    }
+    @chmod($file, 0664);
+    return $handle;
+}
+
+function admin_social_broadcast_close_queue_lock($handle): void
+{
+    if (is_resource($handle)) {
+        @flock($handle, LOCK_UN);
+        @fclose($handle);
+    }
+}
+
 function admin_social_rss_settings(array $settings): array
 {
     $feeds = admin_social_rss_feed_urls_from_settings($settings);
@@ -348,6 +384,10 @@ function admin_enqueue_social_broadcast(string $text, $images, array $networks, 
     if ($text === '' || empty($networks)) {
         return ['ok' => false, 'message' => 'No hay envío a redes que encolar.'];
     }
+    $lock = admin_social_broadcast_open_queue_lock(true);
+    if ($lock === null) {
+        return ['ok' => false, 'message' => 'No se pudo bloquear la cola de redes.'];
+    }
     $queue = admin_load_social_broadcast_queue();
     $items = is_array($queue['items'] ?? null) ? $queue['items'] : [];
     $source = trim((string) ($meta['source'] ?? ''));
@@ -364,6 +404,7 @@ function admin_enqueue_social_broadcast(string $text, $images, array $networks, 
         }
         $queuedSignature = trim((string) ($queuedItem['signature'] ?? ''));
         if ($queuedSignature !== '' && hash_equals($queuedSignature, $signature)) {
+            admin_social_broadcast_close_queue_lock($lock);
             return [
                 'ok' => true,
                 'id' => (string) ($queuedItem['id'] ?? ''),
@@ -391,6 +432,7 @@ function admin_enqueue_social_broadcast(string $text, $images, array $networks, 
             }
             $queue['items'] = $items;
             admin_save_social_broadcast_queue($queue);
+            admin_social_broadcast_close_queue_lock($lock);
             return [
                 'ok' => true,
                 'id' => (string) ($queuedItem['id'] ?? ''),
@@ -417,6 +459,7 @@ function admin_enqueue_social_broadcast(string $text, $images, array $networks, 
     $items[] = $job;
     $queue['items'] = $items;
     admin_save_social_broadcast_queue($queue);
+    admin_social_broadcast_close_queue_lock($lock);
     return ['ok' => true, 'id' => $job['id'], 'queued' => count($items)];
 }
 
@@ -1619,11 +1662,18 @@ function admin_social_broadcast_max_attempts(): int
 function admin_process_social_broadcast_queue(int $maxJobs = 1): array
 {
     $settings = admin_social_broadcast_runtime_settings();
+    $lock = admin_social_broadcast_open_queue_lock(false);
+    if ($lock === null) {
+        $queue = admin_load_social_broadcast_queue();
+        $items = is_array($queue['items'] ?? null) ? array_values($queue['items']) : [];
+        return ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => count($items), 'locked' => true];
+    }
     $purgeResult = admin_purge_social_broadcast_queue_unconfigured_networks(null, $settings);
     $queue = is_array($purgeResult['queue'] ?? null) ? $purgeResult['queue'] : ['items' => []];
     $items = is_array($queue['items'] ?? null) ? array_values($queue['items']) : [];
     if (empty($items) || $maxJobs < 1) {
         admin_save_social_broadcast_queue($queue);
+        admin_social_broadcast_close_queue_lock($lock);
         return ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => count($items)];
     }
 
@@ -1809,6 +1859,7 @@ function admin_process_social_broadcast_queue(int $maxJobs = 1): array
 
     $queue['items'] = array_merge($remaining, $deferredFailed);
     admin_save_social_broadcast_queue($queue);
+    admin_social_broadcast_close_queue_lock($lock);
 
     return [
         'processed' => $processed,

@@ -1195,6 +1195,40 @@ function nammu_fediverse_html_to_text(string $html): string
     return trim($text);
 }
 
+function nammu_fediverse_mention_profile_url(string $username, string $host): string
+{
+    $username = trim($username);
+    $host = strtolower(trim($host));
+    if ($username === '' || $host === '' || preg_match('/^[A-Za-z0-9._-]+$/', $username) !== 1 || preg_match('/^[A-Za-z0-9.-]+$/', $host) !== 1) {
+        return '';
+    }
+    return 'https://' . $host . '/@' . rawurlencode($username);
+}
+
+function nammu_fediverse_link_plain_text_mentions(string $text, array $config = [], string $senderActorId = ''): string
+{
+    $senderHost = strtolower(trim((string) (parse_url($senderActorId, PHP_URL_HOST) ?? '')));
+    if ($senderHost === '' && function_exists('nammu_fediverse_actor_url')) {
+        $senderHost = strtolower(trim((string) (parse_url(nammu_fediverse_actor_url($config), PHP_URL_HOST) ?? '')));
+    }
+    $escaped = htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $linked = preg_replace_callback(
+        '/(?<![A-Za-z0-9._\/-])@([A-Za-z0-9._-]+)(?:@([A-Za-z0-9.-]+))?/u',
+        static function (array $matches) use ($senderHost): string {
+            $username = trim((string) ($matches[1] ?? ''));
+            $host = trim((string) (($matches[2] ?? '') ?: $senderHost));
+            $label = '@' . $username . ($host !== '' && isset($matches[2]) && trim((string) $matches[2]) !== '' ? '@' . $host : '');
+            $url = nammu_fediverse_mention_profile_url($username, $host);
+            if ($url === '') {
+                return htmlspecialchars((string) ($matches[0] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            }
+            return '<a href="' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" class="mention">' . htmlspecialchars($label, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</a>';
+        },
+        $escaped
+    );
+    return nl2br(is_string($linked) ? $linked : $escaped);
+}
+
 function nammu_fediverse_parse_digest_value(string $header): array
 {
     $header = trim($header);
@@ -2922,7 +2956,7 @@ function nammu_fediverse_public_action_activities(array $config): array
             $mentionHtml = $mentionActor && $targetActorId !== '' && $targetHandle !== ''
                 ? '<a href="' . htmlspecialchars($targetActorId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" class="mention">' . htmlspecialchars($targetHandle, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</a>'
                 : '';
-            $contentHtml = trim($mentionHtml . ($replyText !== '' ? ' ' . nl2br(htmlspecialchars($replyText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) : ''));
+            $contentHtml = trim($mentionHtml . ($replyText !== '' ? ' ' . nammu_fediverse_link_plain_text_mentions($replyText, $config, nammu_fediverse_actor_url($config)) : ''));
             $cc = [];
             if ($mentionActor && $targetActorId !== '') {
                 $cc[] = $targetActorId;
@@ -9654,7 +9688,7 @@ function nammu_fediverse_send_reply(string $recipientId, string $objectUrl, stri
     $mentionHtml = $recipientId !== '' && $recipientHandle !== ''
         ? '<a href="' . htmlspecialchars($recipientId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" class="mention">' . htmlspecialchars($recipientHandle, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</a>'
         : '';
-    $contentHtml = trim($mentionHtml . ($plainText !== '' ? ' ' . nl2br(htmlspecialchars($plainText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) : ''));
+    $contentHtml = trim($mentionHtml . ($plainText !== '' ? ' ' . nammu_fediverse_link_plain_text_mentions($plainText, $config, nammu_fediverse_actor_url($config)) : ''));
     $tag = [];
     if ($recipientId !== '' && $recipientHandle !== '') {
         $tag[] = [

@@ -203,13 +203,14 @@ unset($_SESSION['newsletter_custom_recipients']);
             $offset = ($current_page - 1) * $perPage;
             $pageNotes = array_slice($manualItems, $offset, $perPage);
             ?>
-            <table class="table table-striped">
+            <div class="table-responsive">
+            <table class="table table-striped actuality-edit-table actuality-edit-table--notes">
                 <thead>
                     <tr>
                         <th>Texto</th>
                         <th>Fecha</th>
                         <th class="text-center">Redes</th>
-                        <th></th>
+                        <th class="text-right actuality-edit-actions-column">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -235,7 +236,7 @@ unset($_SESSION['newsletter_custom_recipients']);
                                 <td style="white-space: pre-wrap; min-width: 28rem;"><?= htmlspecialchars($excerpt, ENT_QUOTES, 'UTF-8') ?></td>
                                 <td><?= htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') ?></td>
                                 <td class="text-center"><?= $renderActualitySocialForms($note, 'notes') ?></td>
-                                <td class="text-right">
+                                <td class="text-right actuality-edit-actions-column">
                                     <div class="d-flex flex-column align-items-end">
                                         <a href="?page=edit-note&id=<?= urlencode((string) ($note['id'] ?? '')) ?>" class="btn btn-sm btn-primary mb-2">Editar</a>
                                         <form method="post" onsubmit="return confirm('¿Borrar esta nota definitivamente?');">
@@ -249,6 +250,7 @@ unset($_SESSION['newsletter_custom_recipients']);
                     <?php endif; ?>
                 </tbody>
             </table>
+            </div>
             <nav aria-label="Page navigation">
                 <ul class="pagination pagination-break">
                     <?php for ($i = 1; $i <= $pagesCount; $i++): ?>
@@ -285,7 +287,8 @@ unset($_SESSION['newsletter_custom_recipients']);
             $offset = ($current_page - 1) * $perPage;
             $pageNews = array_slice($newsItems, $offset, $perPage);
             ?>
-            <table class="table table-striped">
+            <div class="table-responsive">
+            <table class="table table-striped actuality-edit-table actuality-edit-table--news">
                 <thead>
                     <tr>
                         <th>Título</th>
@@ -293,7 +296,7 @@ unset($_SESSION['newsletter_custom_recipients']);
                         <th>Fecha</th>
                         <th>Origen</th>
                         <th class="text-center">Redes</th>
-                        <th></th>
+                        <th class="text-right actuality-edit-actions-column">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -315,7 +318,7 @@ unset($_SESSION['newsletter_custom_recipients']);
                                 <td><?= htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') ?></td>
                                 <td><?= htmlspecialchars((string) ($news['source'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
                                 <td class="text-center"><?= $renderActualitySocialForms($news, 'news') ?></td>
-                                <td class="text-right">
+                                <td class="text-right actuality-edit-actions-column">
                                     <div class="d-flex flex-column align-items-end">
                                         <a href="?page=edit-news&id=<?= urlencode((string) ($news['id'] ?? '')) ?>" class="btn btn-sm btn-primary mb-2">Editar</a>
                                         <form method="post" onsubmit="return confirm('¿Borrar esta noticia del perfil y de las vistas públicas?');">
@@ -329,6 +332,7 @@ unset($_SESSION['newsletter_custom_recipients']);
                     <?php endif; ?>
                 </tbody>
             </table>
+            </div>
             <nav aria-label="Page navigation">
                 <ul class="pagination pagination-break">
                     <?php for ($i = 1; $i <= $pagesCount; $i++): ?>
@@ -528,6 +532,38 @@ unset($_SESSION['newsletter_custom_recipients']);
         </table>
 
         <style>
+            .actuality-edit-table {
+                table-layout: auto;
+                min-width: 980px;
+            }
+
+            .actuality-edit-table--news td:nth-child(1) {
+                max-width: 16rem;
+            }
+
+            .actuality-edit-table--news td:nth-child(2) {
+                max-width: 24rem;
+            }
+
+            .actuality-edit-table--notes td:nth-child(1) {
+                max-width: 34rem;
+            }
+
+            .actuality-edit-table td {
+                vertical-align: top;
+            }
+
+            .actuality-edit-table td:nth-child(1),
+            .actuality-edit-table td:nth-child(2) {
+                overflow-wrap: anywhere;
+            }
+
+            .actuality-edit-actions-column {
+                width: 6.5rem;
+                min-width: 6.5rem;
+                white-space: nowrap;
+            }
+
             .draft-schedule-badge {
                 display: inline-block;
                 margin-top: 0.4rem;

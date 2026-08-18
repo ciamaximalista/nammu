@@ -11,6 +11,10 @@ $threadDetails = is_array($threadPayload['details'] ?? null) ? $threadPayload['d
 $threadReplies = is_array($threadPayload['replies'] ?? null) ? $threadPayload['replies'] : [];
 $threadFediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
 $threadFediverseConfig = is_array($threadFediverseConfig) ? $threadFediverseConfig : [];
+$threadRootActorId = trim((string) ($threadItem['actor_id'] ?? ''));
+if ($threadRootActorId === '' && function_exists('nammu_fediverse_actor_url')) {
+    $threadRootActorId = nammu_fediverse_actor_url($threadFediverseConfig);
+}
 $threadValidAvatarUrl = static function (string $avatarUrl, string $actorReference = '') use ($threadFediverseConfig): string {
     $avatarUrl = trim($avatarUrl);
     $baseUrl = function_exists('nammu_fediverse_base_url') ? nammu_fediverse_base_url($threadFediverseConfig) : '';
@@ -203,7 +207,7 @@ $threadStatusVariantClass = match ($threadTypeSlug) {
     'boost' => ' fediverse-public-status--boost',
     default => '',
 };
-$renderFediversePublicText = static function (string $text, string $className = '', bool $linkify = true): string {
+$renderFediversePublicText = static function (string $text, string $className = '', bool $linkify = true, string $actorId = '') use ($baseUrl): string {
     $text = trim($text);
     if ($text === '') {
         return '';
@@ -260,12 +264,22 @@ $renderFediversePublicText = static function (string $text, string $className = 
         $html .= '</video></div>';
         return $html;
     };
-    $renderInline = static function (string $value) use ($linkify): string {
-        $escaped = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-        if (!$linkify) {
-            return $escaped;
+    $mentionProfileUrl = static function (string $username, string $host): string {
+        $username = trim($username);
+        $host = strtolower(trim($host));
+        if ($username === '' || $host === '' || preg_match('/^[A-Za-z0-9._-]+$/', $username) !== 1 || preg_match('/^[A-Za-z0-9.-]+$/', $host) !== 1) {
+            return '';
         }
-        return (string) preg_replace_callback(
+        return 'https://' . $host . '/@' . rawurlencode($username);
+    };
+    $renderInline = static function (string $value) use ($linkify, $actorId, $baseUrl, $mentionProfileUrl): string {
+        $escaped = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+        $senderHost = strtolower(trim((string) (parse_url($actorId, PHP_URL_HOST) ?? '')));
+        if ($senderHost === '') {
+            $senderHost = strtolower(trim((string) (parse_url((string) $baseUrl, PHP_URL_HOST) ?? '')));
+        }
+        if ($linkify) {
+            $escaped = (string) preg_replace_callback(
             '~https?://[^\s<]+~iu',
             static function (array $matches): string {
                 $url = trim((string) ($matches[0] ?? ''));
@@ -282,6 +296,22 @@ $renderFediversePublicText = static function (string $text, string $className = 
                 }
                 $safeUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
                 return '<a href="' . $safeUrl . '" target="_blank" rel="noopener">' . $safeUrl . '</a>' . htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8');
+            },
+            $escaped
+            ) ?? $escaped;
+        }
+        return preg_replace_callback(
+            '/(?<![A-Za-z0-9._\/"-])@([A-Za-z0-9._-]+)(?:@([A-Za-z0-9.-]+))?/u',
+            static function (array $matches) use ($senderHost, $mentionProfileUrl): string {
+                $username = trim((string) ($matches[1] ?? ''));
+                $explicitHost = trim((string) ($matches[2] ?? ''));
+                $host = $explicitHost !== '' ? $explicitHost : $senderHost;
+                $url = $mentionProfileUrl($username, $host);
+                if ($url === '') {
+                    return htmlspecialchars((string) ($matches[0] ?? ''), ENT_QUOTES, 'UTF-8');
+                }
+                $label = '@' . $username . ($explicitHost !== '' ? '@' . $explicitHost : '');
+                return '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" class="mention" target="_blank" rel="noopener">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</a>';
             },
             $escaped
         ) ?? $escaped;
@@ -326,13 +356,6 @@ $filterFediverseReplyText = static function (string $text): string {
     if ($text === '') {
         return '';
     }
-    $mentionBlock = '@[A-Za-z0-9._-]+(?:@[A-Za-z0-9.-]+)?';
-    $text = preg_replace('/^\s*CC:\s*(?:' . $mentionBlock . '(?:[\s,;:]+|$))+/iu', '', $text) ?? $text;
-    $text = preg_replace('/^\s*(?:' . $mentionBlock . '(?:[\s,;:]+|$))+(?=\S)/u', '', $text) ?? $text;
-    $text = preg_replace('/(?:\n|\A)\s*CC:\s*(?:' . $mentionBlock . '(?:[\s,;:]+|$))+\s*(?=\n|\z)/iu', "\n", $text) ?? $text;
-    $text = preg_replace('/(?:\n|\A)\s*(?:' . $mentionBlock . '(?:[\s,;:]+|$))+\s*(?=\n|\z)/u', "\n", $text) ?? $text;
-    $text = preg_replace('/\s+CC:\s*(?:' . $mentionBlock . '(?:[\s,;:]+|$))+\s*$/iu', '', $text) ?? $text;
-    $text = preg_replace('/\s+(?:' . $mentionBlock . '(?:[\s,;:]+|$))+\s*$/u', '', $text) ?? $text;
     $text = trim(preg_replace("/\n{3,}/", "\n\n", $text) ?? $text);
     return $text;
 };
@@ -564,7 +587,7 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                 <?php endif; ?>
 
                 <?php if ($threadIsNote): ?>
-                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= $renderFediversePublicText($threadContent, '', $threadTextLinkify) ?></div>
+                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= $renderFediversePublicText($threadContent, '', $threadTextLinkify, $threadRootActorId) ?></div>
                     <?php if (!empty($threadImageAttachments)): ?>
                         <div class="<?= count($threadImageAttachments) > 1 ? 'fediverse-public-status__media-grid' : 'fediverse-public-status__media' ?>">
                             <?php foreach ($threadImageAttachments as $imageIndex => $imageAttachment): ?>
@@ -582,9 +605,9 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                         <div class="fediverse-public-status__card-body">
                             <span class="fediverse-public-status__card-title"><?= htmlspecialchars((string) ($threadTitle !== '' ? $threadTitle : $threadOriginalUrl), ENT_QUOTES, 'UTF-8') ?></span>
                             <?php if ($threadSummaryText !== ''): ?>
-                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadSummaryText, '', $threadTextLinkify) ?></div>
+                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadSummaryText, '', $threadTextLinkify, $threadRootActorId) ?></div>
                             <?php elseif ($threadContent !== ''): ?>
-                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadContent, '', $threadTextLinkify) ?></div>
+                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadContent, '', $threadTextLinkify, $threadRootActorId) ?></div>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -596,16 +619,16 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                         <div class="fediverse-public-status__card-body">
                             <span class="fediverse-public-status__card-title"><?= htmlspecialchars((string) ($threadTitle !== '' ? $threadTitle : $threadOriginalUrl), ENT_QUOTES, 'UTF-8') ?></span>
                             <?php if ($threadSummaryText !== ''): ?>
-                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadSummaryText, '', $threadTextLinkify) ?></div>
+                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadSummaryText, '', $threadTextLinkify, $threadRootActorId) ?></div>
                             <?php elseif ($threadContent !== ''): ?>
-                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadContent, '', $threadTextLinkify) ?></div>
+                                <div class="fediverse-public-status__card-description"><?= $renderFediversePublicText($threadContent, '', $threadTextLinkify, $threadRootActorId) ?></div>
                             <?php endif; ?>
                         </div>
                     </a>
                     <?php endif; ?>
                     <?= $threadMediaAttachmentsHtml ?>
                 <?php else: ?>
-                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= $renderFediversePublicText($threadContent, '', $threadTextLinkify) ?></div>
+                    <div class="fediverse-public-status__text<?= !$threadIsBoostNote ? ' fediverse-public-status__text--note' : '' ?>"<?= $threadOwnNoteFontStyle ?>><?= $renderFediversePublicText($threadContent, '', $threadTextLinkify, $threadRootActorId) ?></div>
                     <?= $threadMediaAttachmentsHtml ?>
                 <?php endif; ?>
 
@@ -758,7 +781,7 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                                         </span>
                                     <?php endif; ?>
                                 </div>
-                                <div class="fediverse-public-reply__text"><?= $renderFediversePublicText($replyText) ?></div>
+                                <div class="fediverse-public-reply__text"><?= $renderFediversePublicText($replyText, '', true, $replyActorId) ?></div>
                                 <?php if (is_array($replyCard) && trim((string) ($replyCard['url'] ?? '')) !== ''): ?>
                                     <a class="fediverse-public-reply__card" href="<?= htmlspecialchars((string) $replyCard['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
                                         <?php if (!empty($replyCard['image'])): ?>

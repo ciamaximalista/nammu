@@ -7532,6 +7532,12 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
         $contentHtml = nl2br(htmlspecialchars($plainContent, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
     } else {
         $contentParts = [];
+        $itemId = trim((string) ($item['id'] ?? ''));
+        $isActualityItem = $itemId !== '' && preg_match('#/ap/objects/actualidad-[^/]+$#', $itemId) === 1;
+        $title = trim((string) ($item['title'] ?? ''));
+        if ($isActualityItem && $title !== '') {
+            $contentParts[] = '<p><strong>' . htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</strong></p>';
+        }
         if ($originalObjectUrl !== '') {
             $escapedUrl = htmlspecialchars($originalObjectUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             $contentParts[] = '<p><a href="' . $escapedUrl . '">' . $escapedUrl . '</a></p>';

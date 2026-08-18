@@ -10024,6 +10024,73 @@ function nammu_fediverse_deliver_local_items(array $config): array
     return ['followers' => count($followers), 'delivered' => $delivered];
 }
 
+function nammu_fediverse_resend_local_item_to_followers(array $matchedItem, array $config, string $resendKey = ''): array
+{
+    $itemId = trim((string) ($matchedItem['id'] ?? ''));
+    if ($itemId === '') {
+        return ['ok' => false, 'message' => 'No se pudo identificar el objeto a reenviar.'];
+    }
+    $followers = nammu_fediverse_followers_store()['followers'];
+    if (empty($followers)) {
+        return ['ok' => false, 'message' => 'No hay seguidores en el Fediverso a los que enviar este contenido.'];
+    }
+
+    $deletedIds = array_values(array_filter(nammu_fediverse_deleted_store()['ids'], static function (string $deletedId) use ($itemId): bool {
+        return $deletedId !== $itemId;
+    }));
+    nammu_fediverse_save_deleted_store($deletedIds);
+
+    $deliveryStore = nammu_fediverse_deliveries_store();
+    $deliveryFollowers = is_array($deliveryStore['followers'] ?? null) ? $deliveryStore['followers'] : [];
+    $activity = nammu_fediverse_activity_for_local_item($matchedItem, $config);
+    $resendPublished = gmdate(DATE_ATOM);
+    if ($resendKey === '') {
+        $resendKey = $itemId;
+    }
+    $activity['id'] = $itemId . '/activity-resend-' . substr(sha1($resendKey . '|' . $resendPublished), 0, 16);
+    $activity['published'] = $resendPublished;
+
+    $delivered = 0;
+    foreach ($followers as $follower) {
+        $followerId = trim((string) ($follower['id'] ?? ''));
+        $inboxUrl = nammu_fediverse_remote_inbox_for_actor($follower);
+        if ($followerId === '' || $inboxUrl === '' || nammu_fediverse_is_blocked_actor($followerId)) {
+            continue;
+        }
+        $state = is_array($deliveryFollowers[$followerId] ?? null) ? $deliveryFollowers[$followerId] : ['sent_ids' => []];
+        if (nammu_fediverse_post_activity($inboxUrl, $activity, $config)) {
+            $state['sent_ids'][] = $itemId;
+            $state['last_success_at'] = gmdate(DATE_ATOM);
+            $delivered++;
+        } else {
+            $state['last_error_at'] = gmdate(DATE_ATOM);
+        }
+        $state['sent_ids'] = array_slice(array_values(array_unique(array_map('strval', is_array($state['sent_ids'] ?? null) ? $state['sent_ids'] : []))), -300);
+        $deliveryFollowers[$followerId] = $state;
+    }
+    nammu_fediverse_save_deliveries_store($deliveryFollowers);
+    nammu_fediverse_record_action('resend', '', (string) ($matchedItem['url'] ?? ''), [
+        'resend_object_id' => $itemId,
+        'activity_id' => (string) ($activity['id'] ?? ''),
+        'title' => trim((string) ($matchedItem['title'] ?? '')),
+        'content' => trim((string) ($matchedItem['content'] ?? '')),
+        'summary' => trim((string) ($matchedItem['summary'] ?? '')),
+        'image' => trim((string) ($matchedItem['image'] ?? '')),
+        'images' => array_values(array_filter(array_map('strval', is_array($matchedItem['images'] ?? null) ? $matchedItem['images'] : []))),
+        'object_type' => trim((string) ($matchedItem['type'] ?? 'Article')),
+        'object_published' => trim((string) ($matchedItem['published'] ?? '')),
+        'published' => $resendPublished,
+    ]);
+
+    if ($delivered === 0) {
+        return ['ok' => false, 'message' => 'No se pudo reenviar el contenido al Fediverso.'];
+    }
+    return [
+        'ok' => true,
+        'message' => 'El contenido se reenvió al Fediverso. Entregas: ' . $delivered . '.',
+    ];
+}
+
 function nammu_fediverse_deliver_named_local_item(string $slug, string $template, array $config): array
 {
     $slug = trim($slug);
@@ -10036,13 +10103,9 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
     } elseif ($template === 'draft') {
         $template = 'post';
     }
-    $supportedTemplates = ['post', 'podcast', 'itinerary'];
+    $supportedTemplates = ['post', 'page', 'podcast', 'itinerary'];
     if (!in_array($template, $supportedTemplates, true)) {
-        return ['ok' => false, 'message' => 'Solo las entradas, podcasts e itinerarios pueden reenviarse al Fediverso desde Editar.'];
-    }
-    $followers = nammu_fediverse_followers_store()['followers'];
-    if (empty($followers)) {
-        return ['ok' => false, 'message' => 'No hay seguidores en el Fediverso a los que enviar este contenido.'];
+        return ['ok' => false, 'message' => 'Solo las entradas, páginas, podcasts e itinerarios pueden reenviarse al Fediverso desde Editar.'];
     }
 
     $targetUrl = $template === 'podcast'
@@ -10110,7 +10173,7 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
             if (
                 $status === 'published'
                 && $visibility !== 'private'
-                && in_array($normalizedTemplate, ['post', 'podcast'], true)
+                && in_array($normalizedTemplate, ['post', 'page', 'podcast'], true)
                 && $normalizedTemplate === $template
             ) {
                 $title = trim((string) (($meta['Title'] ?? $meta['title'] ?? '') ?: $slug));
@@ -10132,60 +10195,28 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
     if (!is_array($matchedItem)) {
         return ['ok' => false, 'message' => 'No se encontró ese contenido publicado para enviarlo al Fediverso.'];
     }
-    $deletedIds = array_values(array_filter(nammu_fediverse_deleted_store()['ids'], static function (string $deletedId) use ($matchedItem): bool {
-        return $deletedId !== trim((string) ($matchedItem['id'] ?? ''));
-    }));
-    nammu_fediverse_save_deleted_store($deletedIds);
+    return nammu_fediverse_resend_local_item_to_followers($matchedItem, $config, $slug . '|' . $template);
+}
 
-    $deliveryStore = nammu_fediverse_deliveries_store();
-    $deliveryFollowers = is_array($deliveryStore['followers'] ?? null) ? $deliveryStore['followers'] : [];
-    $resendItem = $matchedItem;
-    $activity = nammu_fediverse_activity_for_local_item($resendItem, $config);
-    $resendPublished = gmdate(DATE_ATOM);
-    $stableObjectId = trim((string) ($matchedItem['id'] ?? ''));
-    if ($stableObjectId !== '') {
-        $activity['id'] = $stableObjectId . '/activity-resend-' . substr(sha1($slug . '|' . $template . '|' . $resendPublished), 0, 16);
-        $activity['published'] = $resendPublished;
+function nammu_fediverse_deliver_actuality_item(string $id, array $config): array
+{
+    $id = trim($id);
+    if ($id === '') {
+        return ['ok' => false, 'message' => 'No se pudo identificar el contenido de actualidad a reenviar.'];
     }
-    $delivered = 0;
-    foreach ($followers as $follower) {
-        $followerId = trim((string) ($follower['id'] ?? ''));
-        $inboxUrl = nammu_fediverse_remote_inbox_for_actor($follower);
-        if ($followerId === '' || $inboxUrl === '' || nammu_fediverse_is_blocked_actor($followerId)) {
-            continue;
+    $baseUrl = rtrim(nammu_fediverse_base_url($config), '/');
+    $targetId = $baseUrl . '/ap/objects/actualidad-' . rawurlencode($id);
+    $matchedItem = null;
+    foreach (nammu_fediverse_local_content_items($config) as $item) {
+        if (trim((string) ($item['id'] ?? '')) === $targetId) {
+            $matchedItem = $item;
+            break;
         }
-        $state = is_array($deliveryFollowers[$followerId] ?? null) ? $deliveryFollowers[$followerId] : ['sent_ids' => []];
-        if (nammu_fediverse_post_activity($inboxUrl, $activity, $config)) {
-            $state['sent_ids'][] = (string) ($matchedItem['id'] ?? '');
-            $state['last_success_at'] = gmdate(DATE_ATOM);
-            $delivered++;
-        } else {
-            $state['last_error_at'] = gmdate(DATE_ATOM);
-        }
-        $state['sent_ids'] = array_slice(array_values(array_unique(array_map('strval', is_array($state['sent_ids'] ?? null) ? $state['sent_ids'] : []))), -300);
-        $deliveryFollowers[$followerId] = $state;
     }
-    nammu_fediverse_save_deliveries_store($deliveryFollowers);
-    nammu_fediverse_record_action('resend', '', (string) ($matchedItem['url'] ?? ''), [
-        'resend_object_id' => trim((string) ($matchedItem['id'] ?? '')),
-        'activity_id' => (string) ($activity['id'] ?? ''),
-        'title' => trim((string) ($matchedItem['title'] ?? '')),
-        'content' => trim((string) ($matchedItem['content'] ?? '')),
-        'summary' => trim((string) ($matchedItem['summary'] ?? '')),
-        'image' => trim((string) ($matchedItem['image'] ?? '')),
-        'images' => array_values(array_filter(array_map('strval', is_array($matchedItem['images'] ?? null) ? $matchedItem['images'] : []))),
-        'object_type' => trim((string) ($matchedItem['type'] ?? 'Article')),
-        'object_published' => trim((string) ($matchedItem['published'] ?? '')),
-        'published' => $resendPublished,
-    ]);
-
-    if ($delivered === 0) {
-        return ['ok' => false, 'message' => 'No se pudo reenviar el contenido al Fediverso.'];
+    if (!is_array($matchedItem)) {
+        return ['ok' => false, 'message' => 'No se encontró ese contenido de actualidad publicado para enviarlo al Fediverso.'];
     }
-    return [
-        'ok' => true,
-        'message' => 'El contenido se reenvió al Fediverso. Entregas: ' . $delivered . '.',
-    ];
+    return nammu_fediverse_resend_local_item_to_followers($matchedItem, $config, 'actuality|' . $id);
 }
 
 function nammu_fediverse_normalize_named_template(string $template): string

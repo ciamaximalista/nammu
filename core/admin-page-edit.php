@@ -92,6 +92,41 @@ unset($_SESSION['newsletter_custom_recipients']);
             'instagram' => 'Instagram',
             'fediverse' => 'Fediverso',
         ];
+        $availableSocialNetworks = [];
+        foreach ($networkConfigs as $key => $cfg) {
+            if ($key === 'fediverse') {
+                continue;
+            }
+            if (admin_is_social_network_configured($key, $cfg)) {
+                $availableSocialNetworks[] = $key;
+            }
+        }
+        $showActualityFediverseResend = (function_exists('nammu_fediverse_actor_url') || is_file(dirname(__DIR__) . '/core/fediverso.php'));
+        $renderActualitySocialForms = static function (array $item, string $type) use ($availableSocialNetworks, $networkLabels, $showActualityFediverseResend): string {
+            $itemId = trim((string) ($item['id'] ?? ''));
+            if ($itemId === '') {
+                return '<span class="text-muted">—</span>';
+            }
+            $html = '';
+            foreach ($availableSocialNetworks as $networkKey) {
+                $label = htmlspecialchars($networkLabels[$networkKey] ?? ucfirst($networkKey), ENT_QUOTES, 'UTF-8');
+                $html .= '<form method="post" class="d-inline-block mb-1">'
+                    . '<input type="hidden" name="social_network" value="' . htmlspecialchars($networkKey, ENT_QUOTES, 'UTF-8') . '">'
+                    . '<input type="hidden" name="actuality_type" value="' . htmlspecialchars($type, ENT_QUOTES, 'UTF-8') . '">'
+                    . '<input type="hidden" name="actuality_id" value="' . htmlspecialchars($itemId, ENT_QUOTES, 'UTF-8') . '">'
+                    . '<button type="submit" name="send_social_actuality" class="btn btn-sm btn-outline-primary">' . $label . '</button>'
+                    . '</form> ';
+            }
+            if ($showActualityFediverseResend) {
+                $html .= '<form method="post" class="d-inline-block mb-1">'
+                    . '<input type="hidden" name="social_network" value="fediverse">'
+                    . '<input type="hidden" name="actuality_type" value="' . htmlspecialchars($type, ENT_QUOTES, 'UTF-8') . '">'
+                    . '<input type="hidden" name="actuality_id" value="' . htmlspecialchars($itemId, ENT_QUOTES, 'UTF-8') . '">'
+                    . '<button type="submit" name="send_social_actuality" class="btn btn-sm btn-outline-primary">Fediverso</button>'
+                    . '</form>';
+            }
+            return trim($html) !== '' ? $html : '<span class="text-muted">—</span>';
+        };
         $mailingReady = admin_is_mailing_ready($settings);
         $mailingSettings = $settings['mailing'] ?? (function_exists('get_settings') ? (get_settings()['mailing'] ?? []) : []);
         $mailingNewsletterEnabled = (($mailingSettings['auto_newsletter'] ?? (($mailingSettings['gmail_address'] ?? '') !== '' ? 'on' : 'off')) === 'on');
@@ -173,13 +208,14 @@ unset($_SESSION['newsletter_custom_recipients']);
                     <tr>
                         <th>Texto</th>
                         <th>Fecha</th>
+                        <th class="text-center">Redes</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($pageNotes)): ?>
                         <tr>
-                            <td colspan="3" class="text-center text-muted">No hay notas disponibles.</td>
+                            <td colspan="4" class="text-center text-muted">No hay notas disponibles.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($pageNotes as $note): ?>
@@ -198,6 +234,7 @@ unset($_SESSION['newsletter_custom_recipients']);
                             <tr>
                                 <td style="white-space: pre-wrap; min-width: 28rem;"><?= htmlspecialchars($excerpt, ENT_QUOTES, 'UTF-8') ?></td>
                                 <td><?= htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') ?></td>
+                                <td class="text-center"><?= $renderActualitySocialForms($note, 'notes') ?></td>
                                 <td class="text-right">
                                     <div class="d-flex flex-column align-items-end">
                                         <a href="?page=edit-note&id=<?= urlencode((string) ($note['id'] ?? '')) ?>" class="btn btn-sm btn-primary mb-2">Editar</a>
@@ -255,13 +292,14 @@ unset($_SESSION['newsletter_custom_recipients']);
                         <th>Texto</th>
                         <th>Fecha</th>
                         <th>Origen</th>
+                        <th class="text-center">Redes</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($pageNews)): ?>
                         <tr>
-                            <td colspan="5" class="text-center text-muted">No hay noticias disponibles.</td>
+                            <td colspan="6" class="text-center text-muted">No hay noticias disponibles.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($pageNews as $news): ?>
@@ -276,6 +314,7 @@ unset($_SESSION['newsletter_custom_recipients']);
                                 <td style="min-width: 24rem;"><?= htmlspecialchars($excerpt, ENT_QUOTES, 'UTF-8') ?></td>
                                 <td><?= htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') ?></td>
                                 <td><?= htmlspecialchars((string) ($news['source'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
+                                <td class="text-center"><?= $renderActualitySocialForms($news, 'news') ?></td>
                                 <td class="text-right">
                                     <div class="d-flex flex-column align-items-end">
                                         <a href="?page=edit-news&id=<?= urlencode((string) ($news['id'] ?? '')) ?>" class="btn btn-sm btn-primary mb-2">Editar</a>
@@ -421,15 +460,7 @@ unset($_SESSION['newsletter_custom_recipients']);
                         <?php if ($showSocialColumn): ?>
                         <td class="text-center">
                             <?php
-                            $availableNetworks = [];
-                            foreach ($networkConfigs as $key => $cfg) {
-                                if ($key === 'fediverse') {
-                                    continue;
-                                }
-                                if (admin_is_social_network_configured($key, $cfg)) {
-                                    $availableNetworks[] = $key;
-                                }
-                            }
+                            $availableNetworks = $availableSocialNetworks;
                             $showFediverseResend = in_array($templateFilter, ['single', 'page', 'podcast'], true)
                                 && (function_exists('nammu_fediverse_actor_url') || is_file(dirname(__DIR__) . '/core/fediverso.php'));
                             ?>

@@ -6273,6 +6273,85 @@ function admin_send_telegram_photo(string $token, string $chatId, string $photoU
     return false;
 }
 
+function admin_social_network_labels(bool $includeFediverse = false): array
+{
+    $labels = [
+        'telegram' => 'Telegram',
+        'facebook' => 'Facebook',
+        'twitter' => 'X',
+        'linkedin' => 'LinkedIn',
+        'bluesky' => 'Bluesky',
+        'instagram' => 'Instagram',
+    ];
+    if ($includeFediverse) {
+        $labels['fediverse'] = 'Fediverso';
+    }
+    return $labels;
+}
+
+function admin_send_content_to_social_network(
+    string $networkKey,
+    string $slug,
+    string $title,
+    string $description,
+    string $image,
+    array $networkSettings,
+    string $urlOverride = '',
+    string $imageUrl = '',
+    string $contentLabel = 'publicación'
+): array {
+    $labels = admin_social_network_labels();
+    $label = $labels[$networkKey] ?? ucfirst($networkKey);
+    if (!isset($labels[$networkKey])) {
+        return ['ok' => false, 'message' => 'Red social no válida.'];
+    }
+    if (!admin_is_social_network_configured($networkKey, $networkSettings)) {
+        return ['ok' => false, 'message' => 'Configura correctamente ' . $label . ' en la pestaña Difusión antes de enviar.'];
+    }
+
+    $sent = false;
+    $customError = null;
+    switch ($networkKey) {
+        case 'telegram':
+            $sent = admin_send_post_to_telegram($slug, $title, $description, $networkSettings, $urlOverride, $imageUrl);
+            break;
+        case 'facebook':
+            error_log('Facebook manual send: slug=' . $slug . ' pageId=' . ($networkSettings['channel'] ?? ''));
+            $sent = admin_send_facebook_post($slug, $title, $description, $networkSettings, $urlOverride, $imageUrl);
+            if (!$sent) {
+                error_log('Facebook manual send failed for slug=' . $slug);
+            }
+            break;
+        case 'twitter':
+            $sent = admin_send_twitter_post($slug, $title, $description, $networkSettings, $urlOverride, $imageUrl, $customError);
+            break;
+        case 'linkedin':
+            $sent = admin_send_linkedin_post($slug, $title, $description, $networkSettings, $urlOverride, $imageUrl, $customError);
+            break;
+        case 'bluesky':
+            $sent = admin_send_bluesky_post($slug, $title, $description, $networkSettings, $urlOverride, $imageUrl, $customError);
+            break;
+        case 'instagram':
+            if (trim($image) === '') {
+                $customError = 'Instagram requiere una imagen destacada para enviar la publicación.';
+                break;
+            }
+            $sent = admin_send_instagram_post($slug, $title, $image, $networkSettings, $description, $urlOverride, $customError);
+            break;
+    }
+
+    if ($sent) {
+        return [
+            'ok' => true,
+            'message' => ucfirst($contentLabel) . ' enviada correctamente a ' . $label . '.',
+        ];
+    }
+    if ($customError !== null) {
+        return ['ok' => false, 'message' => $customError];
+    }
+    return ['ok' => false, 'message' => 'No se pudo enviar ' . $contentLabel . ' a ' . $label . '. Comprueba las credenciales.'];
+}
+
 function admin_maybe_auto_post_to_social_networks(string $filename, string $title, string $description, string $image = '', string $urlOverride = '', string $imageUrl = ''): void {
     $slug = pathinfo($filename, PATHINFO_FILENAME);
     if ($slug === '') {
@@ -10189,15 +10268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $templateTarget = $_POST['social_template'] ?? 'single';
         $templateTarget = in_array($templateTarget, ['single', 'page', 'draft', 'newsletter', 'podcast'], true) ? $templateTarget : 'single';
         $redirectTemplate = urlencode($templateTarget);
-        $networkLabels = [
-            'telegram' => 'Telegram',
-            'facebook' => 'Facebook',
-            'twitter' => 'X',
-            'linkedin' => 'LinkedIn',
-            'bluesky' => 'Bluesky',
-            'instagram' => 'Instagram',
-            'fediverse' => 'Fediverso',
-        ];
+        $networkLabels = admin_social_network_labels(true);
         if (!isset($networkLabels[$networkKey])) {
             $_SESSION['social_feedback'] = ['type' => 'danger', 'message' => 'Red social no válida.'];
             header('Location: admin.php?page=edit&template=' . $redirectTemplate);
@@ -10253,50 +10324,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     $allSocialSettings = admin_cached_social_settings();
                     $networkSettings = $allSocialSettings[$networkKey] ?? [];
-                    if (!admin_is_social_network_configured($networkKey, $networkSettings)) {
-                        $feedback['message'] = 'Configura correctamente ' . $networkLabels[$networkKey] . ' en la pestaña Difusión antes de enviar.';
-                    } else {
-                        $sent = false;
-                        $customError = null;
-                        switch ($networkKey) {
-                            case 'telegram':
-                                $sent = admin_send_post_to_telegram($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
-                                break;
-                            case 'facebook':
-                                error_log('Facebook manual send: slug=' . $slug . ' pageId=' . ($networkSettings['channel'] ?? ''));
-                                $sent = admin_send_facebook_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl);
-                                if (!$sent) {
-                                    error_log('Facebook manual send failed for slug=' . $slug);
-                                }
-                                break;
-                            case 'twitter':
-                                $sent = admin_send_twitter_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
-                                break;
-                            case 'linkedin':
-                                $sent = admin_send_linkedin_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
-                                break;
-                            case 'bluesky':
-                                $sent = admin_send_bluesky_post($slug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
-                                break;
-                            case 'instagram':
-                                if (trim($image) === '') {
-                                    $customError = 'Instagram requiere una imagen destacada para enviar la publicación.';
-                                    break;
-                                }
-                                $sent = admin_send_instagram_post($slug, $title, $image, $networkSettings, $description, $customUrl, $customError);
-                                break;
-                        }
-                        if ($sent) {
-                            $feedback = [
-                                'type' => 'success',
-                                'message' => 'La publicación se envió correctamente a ' . $networkLabels[$networkKey] . '.',
-                            ];
-                        } elseif ($customError !== null) {
-                            $feedback['message'] = $customError;
-                        } else {
-                            $feedback['message'] = 'No se pudo enviar la publicación a ' . $networkLabels[$networkKey] . '. Comprueba las credenciales.';
-                        }
-                    }
+                    $sendResult = admin_send_content_to_social_network($networkKey, $slug, $title, $description, (string) $image, $networkSettings, $customUrl, $imageUrl, 'publicación');
+                    $feedback = [
+                        'type' => !empty($sendResult['ok']) ? 'success' : 'danger',
+                        'message' => (string) ($sendResult['message'] ?? ''),
+                    ];
                 } else {
                     $feedback['message'] = 'Sólo las entradas, páginas y podcasts pueden enviarse a redes sociales.';
                 }
@@ -10305,17 +10337,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['social_feedback'] = $feedback;
         header('Location: admin.php?page=edit&template=' . $redirectTemplate);
         exit;
+    } elseif (isset($_POST['send_social_actuality'])) {
+        $networkKey = trim((string) ($_POST['social_network'] ?? ''));
+        $actualityType = trim((string) ($_POST['actuality_type'] ?? ''));
+        $actualityId = preg_replace('/[^a-f0-9]/i', '', (string) ($_POST['actuality_id'] ?? '')) ?? '';
+        $templateTarget = $actualityType === 'news' ? 'news' : 'notes';
+        $networkLabels = admin_social_network_labels(true);
+        $feedback = [
+            'type' => 'danger',
+            'message' => 'No se pudo encontrar el contenido solicitado.',
+        ];
+        if (!isset($networkLabels[$networkKey])) {
+            $feedback['message'] = 'Red social no válida.';
+        } elseif ($actualityId !== '') {
+            if (!function_exists('nammu_actuality_get_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
+                require_once __DIR__ . '/core/actualidad.php';
+            }
+            $item = null;
+            if ($actualityType === 'news' && function_exists('nammu_actuality_get_news_item')) {
+                $item = nammu_actuality_get_news_item($actualityId);
+            } elseif ($actualityType === 'notes' && function_exists('nammu_actuality_get_manual_item')) {
+                $item = nammu_actuality_get_manual_item($actualityId);
+            }
+            if (is_array($item)) {
+                if ($networkKey === 'fediverse') {
+                    if (!function_exists('nammu_fediverse_deliver_actuality_item') && is_file(__DIR__ . '/core/fediverso.php')) {
+                        require_once __DIR__ . '/core/fediverso.php';
+                    }
+                    if (!function_exists('nammu_fediverse_deliver_actuality_item')) {
+                        $feedback['message'] = 'La integración con Fediverso no está disponible en esta instalación.';
+                    } else {
+                        $fediverseResult = nammu_fediverse_deliver_actuality_item($actualityId, load_config_file());
+                        $feedback = [
+                            'type' => !empty($fediverseResult['ok']) ? 'success' : 'danger',
+                            'message' => (string) ($fediverseResult['message'] ?? 'No se pudo reenviar el contenido al Fediverso.'),
+                        ];
+                    }
+                } else {
+                    if (!function_exists('admin_social_broadcast_fediverse_url_for_actuality_item') && is_file(__DIR__ . '/core/admin-redes.php')) {
+                        require_once __DIR__ . '/core/admin-redes.php';
+                    }
+                    $title = trim((string) ($item['title'] ?? ''));
+                    $description = trim((string) (($item['raw_text'] ?? '') ?: ($item['description'] ?? '')));
+                    if ($title === '' && $actualityType === 'notes') {
+                        $title = 'Nota';
+                    }
+                    $fediverseUrl = function_exists('admin_social_broadcast_fediverse_url_for_actuality_item')
+                        ? admin_social_broadcast_fediverse_url_for_actuality_item($item)
+                        : '';
+                    $images = array_values(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : [])));
+                    $image = trim((string) (($item['image'] ?? '') ?: ($images[0] ?? '')));
+                    $allSocialSettings = admin_cached_social_settings();
+                    $networkSettings = $allSocialSettings[$networkKey] ?? [];
+                    $sendResult = admin_send_content_to_social_network($networkKey, $actualityId, $title, $description, $image, $networkSettings, $fediverseUrl, $image, $actualityType === 'news' ? 'noticia' : 'nota');
+                    $feedback = [
+                        'type' => !empty($sendResult['ok']) ? 'success' : 'danger',
+                        'message' => (string) ($sendResult['message'] ?? ''),
+                    ];
+                }
+            }
+        }
+        if ($templateTarget === 'news') {
+            $_SESSION['news_feedback'] = $feedback;
+        } else {
+            $_SESSION['notes_feedback'] = $feedback;
+        }
+        header('Location: admin.php?page=edit&template=' . urlencode($templateTarget));
+        exit;
     } elseif (isset($_POST['send_social_itinerary'])) {
         $networkKey = $_POST['social_network'] ?? '';
         $itinerarySlug = ItineraryRepository::normalizeSlug($_POST['itinerary_slug'] ?? '');
-        $networkLabels = [
-            'telegram' => 'Telegram',
-            'facebook' => 'Facebook',
-            'twitter' => 'X',
-            'linkedin' => 'LinkedIn',
-            'bluesky' => 'Bluesky',
-            'instagram' => 'Instagram',
-        ];
+        $networkLabels = admin_social_network_labels();
         $feedback = [
             'type' => 'danger',
             'message' => 'No se pudo encontrar el itinerario solicitado.',
@@ -10332,46 +10424,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $imageUrl = admin_public_asset_url($image);
                 $allSocialSettings = admin_cached_social_settings();
                 $networkSettings = $allSocialSettings[$networkKey] ?? [];
-                if (!admin_is_social_network_configured($networkKey, $networkSettings)) {
-                    $feedback['message'] = 'Configura correctamente ' . $networkLabels[$networkKey] . ' en la pestaña Difusión antes de enviar.';
-                } else {
-                    $sent = false;
-                    $customError = null;
-                    switch ($networkKey) {
-                        case 'telegram':
-                            $sent = admin_send_post_to_telegram($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
-                            break;
-                        case 'facebook':
-                            $sent = admin_send_facebook_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl);
-                            break;
-                        case 'twitter':
-                            $sent = admin_send_twitter_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
-                            break;
-                        case 'linkedin':
-                            $sent = admin_send_linkedin_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
-                            break;
-                        case 'bluesky':
-                            $sent = admin_send_bluesky_post($itinerarySlug, $title, $description, $networkSettings, $customUrl, $imageUrl, $customError);
-                            break;
-                        case 'instagram':
-                            if (trim($image) === '') {
-                                $customError = 'Instagram requiere una imagen destacada para enviar la publicación.';
-                                break;
-                            }
-                            $sent = admin_send_instagram_post($itinerarySlug, $title, $image, $networkSettings, $description, $customUrl, $customError);
-                            break;
-                    }
-                    if ($sent) {
-                        $feedback = [
-                            'type' => 'success',
-                            'message' => 'El itinerario se envió correctamente a ' . $networkLabels[$networkKey] . '.',
-                        ];
-                    } elseif ($customError !== null) {
-                        $feedback['message'] = $customError;
-                    } else {
-                        $feedback['message'] = 'No se pudo enviar el itinerario a ' . $networkLabels[$networkKey] . '. Comprueba las credenciales.';
-                    }
-                }
+                $sendResult = admin_send_content_to_social_network($networkKey, $itinerarySlug, $title, $description, (string) $image, $networkSettings, $customUrl, $imageUrl, 'itinerario');
+                $feedback = [
+                    'type' => !empty($sendResult['ok']) ? 'success' : 'danger',
+                    'message' => (string) ($sendResult['message'] ?? ''),
+                ];
             }
         }
         $_SESSION['itinerary_feedback'] = $feedback;

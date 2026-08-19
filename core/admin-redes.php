@@ -2704,12 +2704,13 @@ function admin_send_social_broadcast_message(string $network, string $text, arra
             $telegramCaptionHtml = admin_social_broadcast_telegram_html(admin_social_broadcast_telegram_media_caption($text));
             $sendTextAfterMedia = !empty($imageItems)
                 && admin_social_broadcast_measure_for_network('telegram', $text) > admin_social_broadcast_telegram_caption_limit();
+            if ($sendTextAfterMedia) {
+                return admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML', $error);
+            }
             if (count($imageItems) > 1) {
                 $ok = admin_send_telegram_media_group($token, $channel, admin_social_broadcast_image_urls($imageItems), $telegramCaptionHtml, $error);
                 if ($ok) {
-                    return $sendTextAfterMedia
-                        ? admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML', $error)
-                        : true;
+                    return true;
                 }
                 // Keep delivery even if Telegram rejects the media group.
                 return admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML', $error);
@@ -2717,9 +2718,7 @@ function admin_send_social_broadcast_message(string $network, string $text, arra
             if ($imageUrl !== '') {
                 $ok = admin_send_telegram_photo($token, $channel, $imageUrl, $telegramCaptionHtml, $error);
                 if ($ok) {
-                    return $sendTextAfterMedia
-                        ? admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML', $error)
-                        : true;
+                    return true;
                 }
                 // Keep delivery even if Telegram rejects the photo.
                 return admin_send_telegram_message($token, $channel, $telegramHtml, 'HTML', $error);

@@ -10390,6 +10390,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $allSocialSettings = admin_cached_social_settings();
                     $networkSettings = $allSocialSettings[$networkKey] ?? [];
                     $sendResult = admin_send_content_to_social_network($networkKey, $actualityId, $title, $description, $image, $networkSettings, $fediverseUrl, $image, $actualityType === 'news' ? 'noticia' : 'nota');
+                    if (!empty($sendResult['ok']) && $actualityType === 'news' && function_exists('admin_social_rss_mark_broadcast_result')) {
+                        admin_social_rss_mark_broadcast_result([
+                            'source' => 'social-rss-news',
+                            'source_id' => $actualityId,
+                        ], 'sent', [
+                            'sent_networks' => [$networkKey],
+                        ]);
+                    }
                     $feedback = [
                         'type' => !empty($sendResult['ok']) ? 'success' : 'danger',
                         'message' => (string) ($sendResult['message'] ?? ''),

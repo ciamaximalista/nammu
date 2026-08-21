@@ -6285,10 +6285,13 @@ function nammu_fediverse_meta_object_id(array $meta, string $fallbackId): string
     return $fallbackId;
 }
 
-function nammu_fediverse_local_content_items(array $config): array
+function nammu_fediverse_local_content_items(array $config, bool $refresh = false): array
 {
     static $cache = [];
     $cacheKey = md5(nammu_fediverse_base_url($config));
+    if ($refresh) {
+        unset($cache[$cacheKey]);
+    }
     if (isset($cache[$cacheKey]) && is_array($cache[$cacheKey])) {
         return $cache[$cacheKey];
     }
@@ -10026,7 +10029,7 @@ function nammu_fediverse_deliver_local_items(array $config): array
     if (empty($followers)) {
         return ['followers' => 0, 'delivered' => 0];
     }
-    $items = nammu_fediverse_local_content_items($config);
+    $items = nammu_fediverse_local_content_items($config, true);
     $deliveryStore = nammu_fediverse_deliveries_store();
     $deliveryFollowers = is_array($deliveryStore['followers'] ?? null) ? $deliveryStore['followers'] : [];
     $delivered = 0;
@@ -10149,7 +10152,7 @@ function nammu_fediverse_deliver_named_local_item(string $slug, string $template
     $targetObjectSuffix = '-' . rawurlencode($slug);
 
     $matchedItem = null;
-    foreach (nammu_fediverse_local_content_items($config) as $item) {
+    foreach (nammu_fediverse_local_content_items($config, true) as $item) {
         $itemId = trim((string) ($item['id'] ?? ''));
         $itemUrl = trim((string) ($item['url'] ?? ''));
         $itemPath = trim((string) (parse_url($itemUrl, PHP_URL_PATH) ?? ''));
@@ -10241,7 +10244,7 @@ function nammu_fediverse_deliver_actuality_item(string $id, array $config): arra
     $baseUrl = rtrim(nammu_fediverse_base_url($config), '/');
     $targetId = $baseUrl . '/ap/objects/actualidad-' . rawurlencode($id);
     $matchedItem = null;
-    foreach (nammu_fediverse_local_content_items($config) as $item) {
+    foreach (nammu_fediverse_local_content_items($config, true) as $item) {
         if (trim((string) ($item['id'] ?? '')) === $targetId) {
             $matchedItem = $item;
             break;

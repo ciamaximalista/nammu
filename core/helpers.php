@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 use Nammu\Core\Post;
 
-function nammu_ensure_directory(string $directory, int $permissions = 0775): bool
+function nammu_ensure_directory(string $directory, int $permissions = 02775): bool
 {
     $directory = rtrim($directory, '/');
     if ($directory === '') {
         return false;
     }
+    $permissions |= 02000;
 
     clearstatcache(true, $directory);
     if (is_dir($directory)) {
@@ -23,6 +24,19 @@ function nammu_ensure_directory(string $directory, int $permissions = 0775): boo
     }
 
     return false;
+}
+
+function nammu_apply_shared_permissions(string $path, int $permissions = 0664, ?string $referenceDirectory = null): void
+{
+    $referenceDirectory = $referenceDirectory !== null && $referenceDirectory !== ''
+        ? $referenceDirectory
+        : dirname($path);
+    clearstatcache(true, $referenceDirectory);
+    $group = @filegroup($referenceDirectory);
+    if (is_int($group)) {
+        @chgrp($path, $group);
+    }
+    @chmod($path, $permissions);
 }
 
 function nammu_base_url(): string
@@ -339,7 +353,7 @@ function nammu_decode_analytics_payload(string $raw): ?array
 function nammu_atomic_write_file(string $file, string $payload): bool
 {
     $dir = dirname($file);
-    nammu_ensure_directory($dir, 0775);
+    nammu_ensure_directory($dir);
     try {
         $suffix = bin2hex(random_bytes(4));
     } catch (Throwable $e) {
@@ -351,11 +365,12 @@ function nammu_atomic_write_file(string $file, string $payload): bool
         @unlink($tmp);
         return false;
     }
+    nammu_apply_shared_permissions($tmp, 0664, $dir);
     if (!@rename($tmp, $file)) {
         @unlink($tmp);
         return false;
     }
-    @chmod($file, 0664);
+    nammu_apply_shared_permissions($file, 0664, $dir);
     return true;
 }
 
@@ -1641,8 +1656,10 @@ function nammu_ensure_push_vapid_keys(): array
         'created_at' => date('c'),
     ];
 
-    nammu_ensure_directory(dirname($file));
-    @file_put_contents($file, json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    if (is_string($json)) {
+        nammu_atomic_write_file($file, $json);
+    }
 
     return $payload;
 }
@@ -1717,15 +1734,19 @@ function nammu_enqueue_push_notification(array $payload): void
         'created_at' => date('c'),
     ];
     $file = nammu_push_queue_file();
-    nammu_ensure_directory(dirname($file));
-    file_put_contents($file, json_encode($queue, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    $json = json_encode($queue, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    if (is_string($json)) {
+        nammu_atomic_write_file($file, $json);
+    }
 }
 
 function nammu_save_push_subscriptions(array $subscriptions): void
 {
     $file = nammu_push_subscriptions_file();
-    nammu_ensure_directory(dirname($file));
-    file_put_contents($file, json_encode($subscriptions, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    $json = json_encode($subscriptions, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    if (is_string($json)) {
+        nammu_atomic_write_file($file, $json);
+    }
 }
 
 function nammu_store_push_subscription(array $subscription): bool
@@ -3096,8 +3117,10 @@ function nammu_load_scheduled_notifications(): array
 function nammu_save_scheduled_notifications(array $queue): void
 {
     $file = nammu_scheduled_notifications_file();
-    nammu_ensure_directory(dirname($file));
-    file_put_contents($file, json_encode(array_values($queue), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    $json = json_encode(array_values($queue), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    if (is_string($json)) {
+        nammu_atomic_write_file($file, $json);
+    }
 }
 
 function nammu_enqueue_scheduled_notification(array $payload): void
@@ -3731,8 +3754,7 @@ function nammu_newsletter_save_access_entries(array $entries): void
     if ($payload === false) {
         return;
     }
-    file_put_contents($file, $payload, LOCK_EX);
-    @chmod($file, 0664);
+    nammu_atomic_write_file($file, $payload);
 }
 
 function nammu_newsletter_purge_access_entries(array $entries): array

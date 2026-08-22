@@ -297,21 +297,21 @@ function admin_load_social_rss_state(): array
 function admin_save_social_rss_state(array $state): void
 {
     $file = admin_social_rss_state_file();
-    $dir = dirname($file);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
-    }
     $encoded = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if (!is_string($encoded) || $encoded === '') {
         return;
     }
-    $tmpFile = $file . '.tmp';
-    if (@file_put_contents($tmpFile, $encoded, LOCK_EX) === false) {
-        return;
+    if (function_exists('nammu_atomic_write_file')) {
+        nammu_atomic_write_file($file, $encoded);
+    } else {
+        $dir = dirname($file);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        if (@file_put_contents($file, $encoded, LOCK_EX) !== false) {
+            @chmod($file, 0664);
+        }
     }
-    @chmod($tmpFile, 0664);
-    @rename($tmpFile, $file);
-    @chmod($file, 0664);
 }
 
 function admin_social_rss_mark_all_seen(array &$feedState, array $items, ?int $seenAt = null): void
@@ -366,12 +366,21 @@ function admin_load_social_broadcast_queue(): array
 function admin_save_social_broadcast_queue(array $queue): void
 {
     $file = admin_social_broadcast_queue_file();
-    $dir = dirname($file);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
+    $encoded = json_encode($queue, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($encoded)) {
+        return;
     }
-    @file_put_contents($file, json_encode($queue, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
-    @chmod($file, 0664);
+    if (function_exists('nammu_atomic_write_file')) {
+        nammu_atomic_write_file($file, $encoded);
+    } else {
+        $dir = dirname($file);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        if (@file_put_contents($file, $encoded, LOCK_EX) !== false) {
+            @chmod($file, 0664);
+        }
+    }
 }
 
 function admin_enqueue_social_broadcast(string $text, $images, array $networks, string $fediverseUrl = '', array $meta = []): array

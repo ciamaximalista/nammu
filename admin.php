@@ -1461,7 +1461,11 @@ function admin_restore_stats_backup(string $archiveFile, ?string &$error = null)
             @mkdir($dstDir, 0775, true);
         }
         if (@copy($src, $dst)) {
-            @chmod($dst, 0664);
+            if (function_exists('nammu_apply_shared_permissions')) {
+                nammu_apply_shared_permissions($dst, 0664, $dstDir);
+            } else {
+                @chmod($dst, 0664);
+            }
             $restored++;
         }
     }
@@ -1476,7 +1480,11 @@ function admin_restore_stats_backup(string $archiveFile, ?string &$error = null)
             @mkdir($dstDir, 0775, true);
         }
         if (@copy($srcStats, $dst)) {
-            @chmod($dst, 0664);
+            if (function_exists('nammu_apply_shared_permissions')) {
+                nammu_apply_shared_permissions($dst, 0664, $dstDir);
+            } else {
+                @chmod($dst, 0664);
+            }
             $restored++;
         }
     }
@@ -1636,7 +1644,11 @@ function admin_chmod_content_file(string $path): void
     if ($realPath !== $contentDir && strncmp($realPath, $contentPrefix, strlen($contentPrefix)) !== 0) {
         return;
     }
-    @chmod($realPath, 0664);
+    if (function_exists('nammu_apply_shared_permissions')) {
+        nammu_apply_shared_permissions($realPath, 0664, dirname($realPath));
+    } else {
+        @chmod($realPath, 0664);
+    }
 }
 
 function nammu_allowed_media_extensions(): array {
@@ -1701,7 +1713,11 @@ function nammu_generate_webp_variant_for_asset(string $absolutePath): ?string {
         @unlink($tmp);
         return null;
     }
-    @chmod($target, 0664);
+    if (function_exists('nammu_apply_shared_permissions')) {
+        nammu_apply_shared_permissions($target, 0664, dirname($target));
+    } else {
+        @chmod($target, 0664);
+    }
     return $target;
 }
 
@@ -1848,7 +1864,12 @@ function save_media_tags(array $tags): void {
     if ($json === false) {
         $json = '{}';
     }
-    @file_put_contents(MEDIA_TAGS_FILE, $json);
+    if (function_exists('nammu_atomic_write_file')) {
+        nammu_atomic_write_file(MEDIA_TAGS_FILE, $json);
+    } else {
+        @file_put_contents(MEDIA_TAGS_FILE, $json);
+        @chmod(MEDIA_TAGS_FILE, 0664);
+    }
     load_media_tags(true);
 }
 
@@ -2085,10 +2106,21 @@ function admin_regenerate_itinerary_feed(): void {
             false
         );
 
-        @file_put_contents(__DIR__ . '/itinerarios.xml', $feedContent);
+        admin_write_public_artifact(__DIR__ . '/itinerarios.xml', $feedContent);
     } catch (Throwable $e) {
         error_log('No se pudo regenerar itinerarios.xml: ' . $e->getMessage());
     }
+}
+
+function admin_write_public_artifact(string $path, string $payload): bool {
+    if (function_exists('nammu_atomic_write_file')) {
+        return nammu_atomic_write_file($path, $payload);
+    }
+    $saved = @file_put_contents($path, $payload, LOCK_EX) !== false;
+    if ($saved) {
+        @chmod($path, 0664);
+    }
+    return $saved;
 }
 
 function admin_build_sitemap_entries(array $posts, array $theme, string $publicBaseUrl): array {
@@ -2378,8 +2410,7 @@ function admin_regenerate_podcast_feed(): void {
         }
         $config = load_config_file();
         $feed = nammu_generate_podcast_feed($baseUrl, $config);
-        @file_put_contents(__DIR__ . '/podcast.xml', $feed);
-        @chmod(__DIR__ . '/podcast.xml', 0664);
+        admin_write_public_artifact(__DIR__ . '/podcast.xml', $feed);
     } catch (Throwable $e) {
         error_log('No se pudo regenerar podcast.xml: ' . $e->getMessage());
     }
@@ -2409,7 +2440,7 @@ function admin_regenerate_rss_feed(): void {
             static fn (Post $post): string => '/' . rawurlencode($post->getSlug()),
             $markdown
         );
-        @file_put_contents(__DIR__ . '/rss.xml', $rss);
+        admin_write_public_artifact(__DIR__ . '/rss.xml', $rss);
     } catch (Throwable $e) {
         error_log('No se pudo regenerar rss.xml: ' . $e->getMessage());
     }
@@ -2425,8 +2456,7 @@ function admin_regenerate_sitemap(): void {
         $entries = admin_build_sitemap_entries($posts, $theme, $baseUrl);
         $generator = new SitemapGenerator($baseUrl);
         $sitemapXml = $generator->generate($entries);
-        @file_put_contents(__DIR__ . '/sitemap.xml', $sitemapXml);
-        @chmod(__DIR__ . '/sitemap.xml', 0664);
+        admin_write_public_artifact(__DIR__ . '/sitemap.xml', $sitemapXml);
     } catch (Throwable $e) {
         error_log('No se pudo regenerar sitemap.xml: ' . $e->getMessage());
     }
@@ -2468,8 +2498,15 @@ function admin_save_public_artifacts_refresh_queue(array $queue): void
             ? array_values(array_unique(array_filter(array_map('strval', $queue['reasons']))))
             : [],
     ];
-    @file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), LOCK_EX);
-    @chmod($file, 0664);
+    $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (is_string($json)) {
+        if (function_exists('nammu_atomic_write_file')) {
+            nammu_atomic_write_file($file, $json);
+        } else {
+            @file_put_contents($file, $json, LOCK_EX);
+            @chmod($file, 0664);
+        }
+    }
 }
 
 function admin_enqueue_public_artifacts_refresh(string $reason = ''): void
@@ -4042,8 +4079,15 @@ function admin_save_indexnow_queue(array $urls): void
         'updated_at' => time(),
         'urls' => array_values(array_unique(array_filter(array_map('strval', $urls)))),
     ];
-    @file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), LOCK_EX);
-    @chmod($file, 0664);
+    $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (is_string($json)) {
+        if (function_exists('nammu_atomic_write_file')) {
+            nammu_atomic_write_file($file, $json);
+        } else {
+            @file_put_contents($file, $json, LOCK_EX);
+            @chmod($file, 0664);
+        }
+    }
 }
 
 function admin_enqueue_indexnow_urls(array $urls): void
@@ -7591,7 +7635,15 @@ function admin_save_mailing_deliveries(array $data): void
         'attempts' => $attempts,
         'items' => $items,
     ];
-    file_put_contents(admin_mailing_deliveries_file(), json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    if (is_string($json)) {
+        if (function_exists('nammu_atomic_write_file')) {
+            nammu_atomic_write_file(admin_mailing_deliveries_file(), $json);
+        } else {
+            file_put_contents(admin_mailing_deliveries_file(), $json);
+            @chmod(admin_mailing_deliveries_file(), 0664);
+        }
+    }
 }
 
 function admin_mailing_content_key(string $context, array $payload): string
@@ -11224,6 +11276,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $targetName = nammu_unique_asset_filename($targetName);
                 $targetPath = ASSETS_DIR . '/' . $targetName;
                 if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+                    if (function_exists('nammu_apply_shared_permissions')) {
+                        nammu_apply_shared_permissions($targetPath, 0664, dirname($targetPath));
+                    } else {
+                        @chmod($targetPath, 0664);
+                    }
                     $successCount++;
                     nammu_generate_webp_variant_for_asset($targetPath);
                     $savedAssets[] = [
@@ -11296,7 +11353,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $target_path = ASSETS_DIR . '/' . $image_name;
 
-            file_put_contents($target_path, $image_data);
+            if (function_exists('nammu_atomic_write_file')) {
+                nammu_atomic_write_file($target_path, $image_data);
+            } else {
+                file_put_contents($target_path, $image_data);
+                @chmod($target_path, 0664);
+            }
             nammu_generate_webp_variant_for_asset($target_path);
             update_media_tags_entry($image_name, parse_media_tags_input($tagsInput));
             $_SESSION['asset_feedback'] = [

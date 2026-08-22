@@ -87,7 +87,9 @@ WEB_USER=nobody
 SHARED_GROUP=nogroup
 ```
 
-Elige como `SHARED_GROUP` un grupo al que pertenezcan tanto `DEPLOY_USER` como `WEB_USER`. Si dudas, compruébalo antes de seguir:
+Elige como `SHARED_GROUP` un grupo al que pertenezcan tanto `DEPLOY_USER` como `WEB_USER`. En Debian/Ubuntu, normalmente debe ser `www-data`. No uses `nogroup` salvo que el proceso web realmente se ejecute como `nobody:nogroup`; si mezclas `www-data` con `nogroup`, el cron y Apache no podrán reescribir stores como `config/fediverso-deliveries.json`.
+
+Si dudas, compruébalo antes de seguir:
 
 ```bash
 id "$DEPLOY_USER"
@@ -108,6 +110,8 @@ sudo find "$SITE" -type d -exec chmod 2775 {} \;
 sudo find "$SITE" -type f -exec chmod 664 {} \;
 ```
 
+Desde el arranque, Nammu aplica `umask(0002)` y sus escrituras principales usan permisos compartidos: directorios con `setgid`, ficheros `0664` y grupo heredado del directorio padre. Eso evita que nuevos JSON, feeds, colas, assets o cachés queden bloqueados para el otro usuario. Pero esta protección solo funciona si el árbol inicial ya tiene el grupo correcto.
+
 Nammu ejecuta las tareas PHP como `php archivo.php`, por lo que los scripts del proyecto no necesitan bit ejecutable. Mantener los ficheros en `664` y Git con `core.fileMode=false` evita conflictos de actualización por cambios `100755`/`100644`.
 
 Configura Git para no quitar escritura de grupo al hacer checkout o pull:
@@ -119,7 +123,7 @@ git config core.fileMode false
 git config --global --add safe.directory "$SITE"
 ```
 
-Usa `umask 0002` en operaciones manuales y cron para que los archivos nuevos nazcan escribibles por el grupo:
+Nammu ya fija `umask(0002)` en PHP, pero conviene usar también `umask 0002` en operaciones manuales, scripts de despliegue y cron para cubrir Git, Composer, herramientas externas y redirecciones de log:
 
 ```bash
 umask 0002
@@ -145,6 +149,14 @@ Directorios que deben ser escribibles por el usuario web y por el usuario de des
 
 Esto afecta especialmente a stores que Nammu reescribe continuamente: `config/*.json`, snapshots de Fediverso, colas sociales, cachés de link cards, estadísticas, avisos por email, Webmentions y cachés de imágenes.
 
+Si corriges una instalación existente, empieza por las rutas mutables y por `.git` si actualizas desde ese mismo directorio:
+
+```bash
+sudo chown -R "$DEPLOY_USER:$SHARED_GROUP" "$SITE/config" "$SITE/content" "$SITE/assets" "$SITE/itinerarios" "$SITE/backups" "$SITE/.git"
+sudo find "$SITE/config" "$SITE/content" "$SITE/assets" "$SITE/itinerarios" "$SITE/backups" "$SITE/.git" -type d -exec chmod 2775 {} \;
+sudo find "$SITE/config" "$SITE/content" "$SITE/assets" "$SITE/itinerarios" "$SITE/backups" "$SITE/.git" -type f -exec chmod 664 {} \;
+```
+
 Comprobación rápida recomendada:
 
 ```bash
@@ -160,6 +172,16 @@ git config --get core.fileMode
 ```
 
 Los directorios deben verse como `drwxrwsr-x` o compatible, con el grupo compartido. `core.sharedRepository` debe devolver `group` y `core.fileMode` debe devolver `false`. Si ves archivos creados por otro propietario, sin escritura de grupo, o Git falla con `index.lock`, `FETCH_HEAD` o `dubious ownership`, corrige permisos antes de activar cron o publicar.
+
+Diagnóstico rápido de permisos en Fediverso y colas:
+
+```bash
+stat -c '%a %U:%G %n' "$SITE/config" "$SITE/config/fediverso-deliveries.json" "$SITE/config/actualidad-items.json" "$SITE/config/social-rss-state.json"
+sudo -u "$WEB_USER" test -w "$SITE/config/fediverso-deliveries.json" && echo "fediverso-deliveries escribible"
+sudo -u "$WEB_USER" test -w "$SITE/config" && echo "config escribible"
+```
+
+Si una nota o noticia aparece en el perfil público pero `maintenance` no la entrega a seguidores, revisa primero `config/fediverso-deliveries.json`. Debe ser escribible por `WEB_USER`; si no lo es, Nammu no puede registrar entregas y las detendrá con `fediverse_delivery_error=deliveries_store_not_writable`.
 
 ### 4. Configura el dominio o virtual host
 
@@ -683,16 +705,28 @@ Nammu no se limita a generar RSS: también convierte cada blog en una cuenta pro
 
 ### Desde Git
 
+Antes de actualizar, asegúrate de tener definidas las mismas variables de permisos de la instalación:
+
 ```bash
-cd /var/www/html/<carpeta-publica>
+SITE=/var/www/html/<carpeta-publica>
+DEPLOY_USER=<tu-usuario>
+SHARED_GROUP=www-data
+```
+
+Actualiza y normaliza permisos en las rutas que se escriben en caliente:
+
+```bash
+cd "$SITE"
 git pull origin main
-sudo chown -R "$DEPLOY_USER:$SHARED_GROUP" .
-sudo find . -type d -exec chmod 2775 {} \;
-sudo find . -type f -exec chmod 664 {} \;
+sudo chown -R "$DEPLOY_USER:$SHARED_GROUP" config content assets itinerarios backups .git
+sudo find config content assets itinerarios backups .git -type d -exec chmod 2775 {} \;
+sudo find config content assets itinerarios backups .git -type f -exec chmod 664 {} \;
 git config core.sharedRepository group
 git config core.fileMode false
-git config --global --add safe.directory "$(pwd)"
+git config --global --add safe.directory "$SITE"
 ```
+
+Si mantienes dependencias con Composer dentro del sitio, incluye también `vendor` en los tres comandos de permisos. Si algún directorio opcional aún no existe, créalo antes con `mkdir -p`.
 
 ## Migración desde PicoCMS
 

@@ -528,8 +528,10 @@ function nammu_fediverse_save_json_store(string $file, array $payload): bool
         error_log('Nammu Fediverso: no se pudo codificar el almacén JSON ' . $file);
         return false;
     }
-    $written = @file_put_contents($file, $json);
-    if ($written === false) {
+    $saved = function_exists('nammu_atomic_write_file')
+        ? nammu_atomic_write_file($file, $json)
+        : (@file_put_contents($file, $json, LOCK_EX) !== false);
+    if (!$saved) {
         error_log('Nammu Fediverso: no se pudo guardar el almacén JSON ' . $file);
         return false;
     }

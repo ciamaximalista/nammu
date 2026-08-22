@@ -45,6 +45,31 @@ function nammu_actuality_cache_dir(): string
     return dirname(__DIR__) . '/assets/actualidad-cache';
 }
 
+function nammu_actuality_write_json_file(string $file, array $payload): bool
+{
+    $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($json)) {
+        error_log('Nammu Actualidad: no se pudo codificar JSON ' . $file);
+        return false;
+    }
+    if (function_exists('nammu_atomic_write_file')) {
+        $saved = nammu_atomic_write_file($file, $json);
+    } else {
+        $dir = dirname($file);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        $saved = @file_put_contents($file, $json, LOCK_EX) !== false;
+        if ($saved) {
+            @chmod($file, 0664);
+        }
+    }
+    if (!$saved) {
+        error_log('Nammu Actualidad: no se pudo guardar JSON ' . $file);
+    }
+    return $saved;
+}
+
 function nammu_actuality_load_cache(): array
 {
     $file = nammu_actuality_cache_file();
@@ -61,13 +86,7 @@ function nammu_actuality_load_cache(): array
 
 function nammu_actuality_save_cache(array $cache): void
 {
-    $file = nammu_actuality_cache_file();
-    $dir = dirname($file);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
-    }
-    @file_put_contents($file, json_encode($cache, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-    @chmod($file, 0664);
+    nammu_actuality_write_json_file(nammu_actuality_cache_file(), $cache);
 }
 
 function nammu_actuality_load_items_snapshot(): array
@@ -91,17 +110,11 @@ function nammu_actuality_load_items_snapshot(): array
 
 function nammu_actuality_save_items_snapshot(array $items): void
 {
-    $file = nammu_actuality_items_file();
-    $dir = dirname($file);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
-    }
     $payload = [
         'updated_at' => time(),
         'items' => array_values($items),
     ];
-    @file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-    @chmod($file, 0664);
+    nammu_actuality_write_json_file(nammu_actuality_items_file(), $payload);
 }
 
 function nammu_actuality_feed_is_stale(string $feedPath): bool
@@ -148,17 +161,11 @@ function nammu_actuality_load_manual_items(): array
 
 function nammu_actuality_save_manual_items(array $items): void
 {
-    $file = nammu_actuality_manual_items_file();
-    $dir = dirname($file);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
-    }
     $payload = [
         'updated_at' => time(),
         'items' => array_values($items),
     ];
-    @file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-    @chmod($file, 0664);
+    nammu_actuality_write_json_file(nammu_actuality_manual_items_file(), $payload);
 }
 
 function nammu_actuality_load_news_overrides(): array
@@ -181,17 +188,11 @@ function nammu_actuality_load_news_overrides(): array
 
 function nammu_actuality_save_news_overrides(array $items): void
 {
-    $file = nammu_actuality_news_overrides_file();
-    $dir = dirname($file);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
-    }
     $payload = [
         'updated_at' => time(),
         'items' => array_values($items),
     ];
-    @file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-    @chmod($file, 0664);
+    nammu_actuality_write_json_file(nammu_actuality_news_overrides_file(), $payload);
 }
 
 function nammu_actuality_load_news_store(): array
@@ -214,17 +215,11 @@ function nammu_actuality_load_news_store(): array
 
 function nammu_actuality_save_news_store(array $items): void
 {
-    $file = nammu_actuality_news_store_file();
-    $dir = dirname($file);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
-    }
     $payload = [
         'updated_at' => time(),
         'items' => array_values($items),
     ];
-    @file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-    @chmod($file, 0664);
+    nammu_actuality_write_json_file(nammu_actuality_news_store_file(), $payload);
 }
 
 function nammu_actuality_load_social_rss_state(): array
@@ -473,8 +468,12 @@ function nammu_actuality_replace_news_item_in_snapshots(string $id, string $base
     $feed = nammu_generate_actuality_feed($baseUrl, $config, $siteTitle, $siteDescription, $siteLang, $items);
     if ($baseUrl !== '') {
         $feedFile = dirname(__DIR__) . '/noticias.xml';
-        @file_put_contents($feedFile, $feed);
-        @chmod($feedFile, 0664);
+        if (function_exists('nammu_atomic_write_file')) {
+            nammu_atomic_write_file($feedFile, $feed);
+        } else {
+            @file_put_contents($feedFile, $feed, LOCK_EX);
+            @chmod($feedFile, 0664);
+        }
     }
 
     return true;
@@ -2557,7 +2556,13 @@ function nammu_actuality_rebuild_snapshot(string $baseUrl, array $config, string
     nammu_actuality_save_items_snapshot($items);
     $feed = nammu_generate_actuality_feed($baseUrl, $config, $siteTitle, $siteDescription, $siteLang, $items);
     if ($baseUrl !== '') {
-        @file_put_contents(dirname(__DIR__) . '/noticias.xml', $feed);
+        $feedFile = dirname(__DIR__) . '/noticias.xml';
+        if (function_exists('nammu_atomic_write_file')) {
+            nammu_atomic_write_file($feedFile, $feed);
+        } else {
+            @file_put_contents($feedFile, $feed, LOCK_EX);
+            @chmod($feedFile, 0664);
+        }
     }
     nammu_actuality_trace([
         'event' => 'rebuild_snapshot',

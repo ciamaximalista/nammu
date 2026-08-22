@@ -1,5 +1,7 @@
 <?php
 
+umask(0002);
+
 $serverTimezone = getenv('TZ');
 if (!is_string($serverTimezone) || $serverTimezone === '') {
     $tzFile = @file_get_contents('/etc/timezone');

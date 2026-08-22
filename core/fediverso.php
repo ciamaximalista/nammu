@@ -517,17 +517,27 @@ function nammu_fediverse_load_json_store(string $file, array $default = []): arr
     return is_array($cache[$file]) ? $cache[$file] : $default;
 }
 
-function nammu_fediverse_save_json_store(string $file, array $payload): void
+function nammu_fediverse_save_json_store(string $file, array $payload): bool
 {
     $dir = dirname($file);
     if (!is_dir($dir)) {
         nammu_ensure_directory($dir);
     }
-    file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (!is_string($json)) {
+        error_log('Nammu Fediverso: no se pudo codificar el almacén JSON ' . $file);
+        return false;
+    }
+    $written = @file_put_contents($file, $json);
+    if ($written === false) {
+        error_log('Nammu Fediverso: no se pudo guardar el almacén JSON ' . $file);
+        return false;
+    }
     if (!isset($GLOBALS['nammu_fediverse_json_store_cache']) || !is_array($GLOBALS['nammu_fediverse_json_store_cache'])) {
         $GLOBALS['nammu_fediverse_json_store_cache'] = [];
     }
     $GLOBALS['nammu_fediverse_json_store_cache'][$file] = $payload;
+    return true;
 }
 
 function nammu_fediverse_link_cards_store(): array
@@ -1858,9 +1868,19 @@ function nammu_fediverse_deliveries_store(): array
     return ['followers' => $followers];
 }
 
-function nammu_fediverse_save_deliveries_store(array $followers): void
+function nammu_fediverse_save_deliveries_store(array $followers): bool
 {
-    nammu_fediverse_save_json_store(nammu_fediverse_deliveries_file(), ['followers' => $followers]);
+    return nammu_fediverse_save_json_store(nammu_fediverse_deliveries_file(), ['followers' => $followers]);
+}
+
+function nammu_fediverse_deliveries_store_is_writable(): bool
+{
+    $file = nammu_fediverse_deliveries_file();
+    if (is_file($file)) {
+        return is_writable($file);
+    }
+    $dir = dirname($file);
+    return is_dir($dir) && is_writable($dir);
 }
 
 function nammu_fediverse_mark_item_delivered_to_followers(string $itemId, array $config): int
@@ -10029,6 +10049,14 @@ function nammu_fediverse_deliver_local_items(array $config): array
     if (empty($followers)) {
         return ['followers' => 0, 'delivered' => 0];
     }
+    if (!nammu_fediverse_deliveries_store_is_writable()) {
+        error_log('Nammu Fediverso: no se puede entregar a seguidores porque fediverso-deliveries.json no es escribible.');
+        return [
+            'followers' => count($followers),
+            'delivered' => 0,
+            'error' => 'deliveries_store_not_writable',
+        ];
+    }
     $items = nammu_fediverse_local_content_items($config, true);
     $deliveryStore = nammu_fediverse_deliveries_store();
     $deliveryFollowers = is_array($deliveryStore['followers'] ?? null) ? $deliveryStore['followers'] : [];
@@ -10057,8 +10085,12 @@ function nammu_fediverse_deliver_local_items(array $config): array
         $state['sent_ids'] = array_slice(array_values(array_unique(array_map('strval', is_array($state['sent_ids'] ?? null) ? $state['sent_ids'] : []))), -300);
         $deliveryFollowers[$followerId] = $state;
     }
-    nammu_fediverse_save_deliveries_store($deliveryFollowers);
-    return ['followers' => count($followers), 'delivered' => $delivered];
+    $saved = nammu_fediverse_save_deliveries_store($deliveryFollowers);
+    return [
+        'followers' => count($followers),
+        'delivered' => $delivered,
+        'save_failed' => !$saved,
+    ];
 }
 
 function nammu_fediverse_resend_local_item_to_followers(array $matchedItem, array $config, string $resendKey = ''): array
@@ -10070,6 +10102,10 @@ function nammu_fediverse_resend_local_item_to_followers(array $matchedItem, arra
     $followers = nammu_fediverse_followers_store()['followers'];
     if (empty($followers)) {
         return ['ok' => false, 'message' => 'No hay seguidores en el Fediverso a los que enviar este contenido.'];
+    }
+    if (!nammu_fediverse_deliveries_store_is_writable()) {
+        error_log('Nammu Fediverso: no se puede reenviar a seguidores porque fediverso-deliveries.json no es escribible.');
+        return ['ok' => false, 'message' => 'No se puede registrar la entrega federada. Revisa permisos de config/fediverso-deliveries.json antes de reenviar.'];
     }
 
     $deletedIds = array_values(array_filter(nammu_fediverse_deleted_store()['ids'], static function (string $deletedId) use ($itemId): bool {
@@ -10105,7 +10141,9 @@ function nammu_fediverse_resend_local_item_to_followers(array $matchedItem, arra
         $state['sent_ids'] = array_slice(array_values(array_unique(array_map('strval', is_array($state['sent_ids'] ?? null) ? $state['sent_ids'] : []))), -300);
         $deliveryFollowers[$followerId] = $state;
     }
-    nammu_fediverse_save_deliveries_store($deliveryFollowers);
+    if (!nammu_fediverse_save_deliveries_store($deliveryFollowers)) {
+        return ['ok' => false, 'message' => 'Se intentó enviar, pero no se pudo guardar el estado de entregas. Revisa permisos de config/fediverso-deliveries.json.'];
+    }
     nammu_fediverse_record_action('resend', '', (string) ($matchedItem['url'] ?? ''), [
         'resend_object_id' => $itemId,
         'activity_id' => (string) ($activity['id'] ?? ''),

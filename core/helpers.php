@@ -3294,6 +3294,7 @@ function nammu_process_scheduled_notifications_queue(): array
             return ['processed' => 0, 'remaining' => 0];
         }
         $remaining = [];
+        $mailingRetryQueue = [];
         $processed = 0;
         $mailingBatchProcessed = 0;
         foreach ($queue as $payload) {
@@ -3313,7 +3314,8 @@ function nammu_process_scheduled_notifications_queue(): array
                     $payload['attempts'] = (int) (($payload['attempts'] ?? 0)) + 1;
                     $payload['last_error'] = (string) ($result['error'] ?? ('Mailing batch retry #' . $payload['attempts']));
                     $payload['last_attempt_at'] = gmdate(DATE_ATOM);
-                    $remaining[] = $payload;
+                    // Do not let one transient recipient failure block later batches from the same campaign.
+                    $mailingRetryQueue[] = $payload;
                 }
                 continue;
             }
@@ -3322,6 +3324,9 @@ function nammu_process_scheduled_notifications_queue(): array
                 continue;
             }
             $remaining[] = $payload;
+        }
+        if (!empty($mailingRetryQueue)) {
+            array_push($remaining, ...$mailingRetryQueue);
         }
         nammu_save_scheduled_notifications($remaining);
         return ['processed' => $processed, 'remaining' => count($remaining)];

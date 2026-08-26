@@ -473,7 +473,6 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
 .fediverse-public-reply__text { font-size: 1rem; line-height: 1.6; }
 .fediverse-public-reply__header-metrics { display: inline-flex; align-items: center; gap: .55rem; margin-left: auto; }
 .fediverse-public-reply__header-metric { display: inline-flex; align-items: center; gap: .22rem; color: rgba(0,0,0,.62); font-size: .9rem; line-height: 1; white-space: nowrap; }
-.fediverse-public-reply__header-metric svg { width: 1rem; height: 1rem; display: block; }
 .fediverse-public-status--note-own,
 .fediverse-public-status--note-own .fediverse-public-status__text,
 .fediverse-public-status--note-own .fediverse-public-status__text p,
@@ -768,14 +767,12 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                                         <span class="fediverse-public-reply__header-metrics">
                                             <?php if ((int) ($replySummary['likes'] ?? 0) > 0): ?>
                                                 <span class="fediverse-public-reply__header-metric" title="<?= (int) ($replySummary['likes'] ?? 0) ?> favorito<?= ((int) ($replySummary['likes'] ?? 0) === 1) ? '' : 's' ?>">
-                                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="m12 21-1.45-1.32C5.4 15.02 2 11.93 2 8.14 2 5.05 4.42 3 7.2 3c1.57 0 3.08.74 4.05 1.91A5.26 5.26 0 0 1 15.3 3C18.08 3 20.5 5.05 20.5 8.14c0 3.79-3.4 6.88-8.55 11.54Z"/></svg>
-                                                    <span><?= (int) ($replySummary['likes'] ?? 0) ?></span>
+                                                    <span aria-hidden="true">♥</span><span><?= (int) ($replySummary['likes'] ?? 0) ?></span>
                                                 </span>
                                             <?php endif; ?>
                                             <?php if ((int) ($replySummary['shares'] ?? 0) > 0): ?>
                                                 <span class="fediverse-public-reply__header-metric" title="<?= (int) ($replySummary['shares'] ?? 0) ?> impulso<?= ((int) ($replySummary['shares'] ?? 0) === 1) ? '' : 's' ?>">
-                                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17 8V5l5 5-5 5v-3h-4a7 7 0 0 0-7 7v1H4v-1a9 9 0 0 1 9-9h4Z"/><path fill="currentColor" d="M7 4h6v2H7a3 3 0 0 0-3 3v4H2V9a5 5 0 0 1 5-5Z"/></svg>
-                                                    <span><?= (int) ($replySummary['shares'] ?? 0) ?></span>
+                                                    <span aria-hidden="true">↗</span><span><?= (int) ($replySummary['shares'] ?? 0) ?></span>
                                                 </span>
                                             <?php endif; ?>
                                         </span>

@@ -313,11 +313,11 @@ unset($_SESSION['newsletter_custom_recipients']);
                             $formattedDate = $ts > 0 ? date('d/m/Y H:i', $ts) : '—';
                             ?>
                             <tr>
-                                <td><?= htmlspecialchars((string) ($news['title'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
-                                <td style="min-width: 24rem;"><?= htmlspecialchars($excerpt, ENT_QUOTES, 'UTF-8') ?></td>
-                                <td><?= htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') ?></td>
-                                <td><?= htmlspecialchars((string) ($news['source'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
-                                <td class="text-center"><?= $renderActualitySocialForms($news, 'news') ?></td>
+                                <td class="actuality-edit-title-cell"><?= htmlspecialchars((string) ($news['title'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
+                                <td class="actuality-edit-text-cell"><?= htmlspecialchars($excerpt, ENT_QUOTES, 'UTF-8') ?></td>
+                                <td class="actuality-edit-date-cell"><?= htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') ?></td>
+                                <td class="actuality-edit-source-cell"><?= htmlspecialchars((string) ($news['source'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
+                                <td class="text-center actuality-edit-social-cell"><?= $renderActualitySocialForms($news, 'news') ?></td>
                                 <td class="text-right actuality-edit-actions-column">
                                     <div class="d-flex flex-column align-items-end">
                                         <a href="?page=edit-news&id=<?= urlencode((string) ($news['id'] ?? '')) ?>" class="btn btn-sm btn-primary mb-2">Editar</a>
@@ -533,16 +533,33 @@ unset($_SESSION['newsletter_custom_recipients']);
 
         <style>
             .actuality-edit-table {
-                table-layout: auto;
-                min-width: 980px;
+                table-layout: fixed;
+                width: 100%;
+                min-width: 0;
             }
 
-            .actuality-edit-table--news td:nth-child(1) {
-                max-width: 16rem;
+            .actuality-edit-table--news th:nth-child(1) {
+                width: 20%;
             }
 
-            .actuality-edit-table--news td:nth-child(2) {
-                max-width: 24rem;
+            .actuality-edit-table--news th:nth-child(2) {
+                width: 34%;
+            }
+
+            .actuality-edit-table--news th:nth-child(3) {
+                width: 10%;
+            }
+
+            .actuality-edit-table--news th:nth-child(4) {
+                width: 11%;
+            }
+
+            .actuality-edit-table--news th:nth-child(5) {
+                width: 15%;
+            }
+
+            .actuality-edit-table--news th:nth-child(6) {
+                width: 10%;
             }
 
             .actuality-edit-table--notes td:nth-child(1) {
@@ -558,10 +575,69 @@ unset($_SESSION['newsletter_custom_recipients']);
                 overflow-wrap: anywhere;
             }
 
+            .actuality-edit-title-cell,
+            .actuality-edit-text-cell,
+            .actuality-edit-source-cell {
+                word-break: break-word;
+                overflow-wrap: anywhere;
+            }
+
+            .actuality-edit-date-cell {
+                font-size: 0.82rem;
+                white-space: normal;
+            }
+
+            .actuality-edit-social-cell form {
+                display: block !important;
+                margin: 0 0 0.25rem 0 !important;
+            }
+
+            .actuality-edit-social-cell .btn,
+            .actuality-edit-actions-column .btn {
+                width: 100%;
+                padding-left: 0.35rem;
+                padding-right: 0.35rem;
+                white-space: normal;
+            }
+
             .actuality-edit-actions-column {
-                width: 6.5rem;
-                min-width: 6.5rem;
-                white-space: nowrap;
+                width: 5.75rem;
+                white-space: normal;
+            }
+
+            @media (max-width: 900px) {
+                .actuality-edit-table--news {
+                    font-size: 0.84rem;
+                }
+
+                .actuality-edit-table--news th:nth-child(1) {
+                    width: 18%;
+                }
+
+                .actuality-edit-table--news th:nth-child(2) {
+                    width: 30%;
+                }
+
+                .actuality-edit-table--news th:nth-child(3) {
+                    width: 11%;
+                }
+
+                .actuality-edit-table--news th:nth-child(4) {
+                    width: 10%;
+                }
+
+                .actuality-edit-table--news th:nth-child(5) {
+                    width: 17%;
+                }
+
+                .actuality-edit-table--news th:nth-child(6) {
+                    width: 14%;
+                }
+
+                .actuality-edit-social-cell .btn,
+                .actuality-edit-actions-column .btn {
+                    font-size: 0.78rem;
+                }
             }
 
             .draft-schedule-badge {

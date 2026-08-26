@@ -1693,10 +1693,15 @@ function nammu_actuality_cache_social_image(string $pageUrl, string $imageUrl, s
     }
     $filename = sha1($pageUrl) . '.' . $ext;
     $path = $dir . '/' . $filename;
-    if (@file_put_contents($path, $body) === false) {
+    $saved = function_exists('nammu_atomic_write_file')
+        ? nammu_atomic_write_file($path, $body)
+        : (@file_put_contents($path, $body, LOCK_EX) !== false);
+    if (!$saved) {
         return '';
     }
-    @chmod($path, 0664);
+    if (!function_exists('nammu_atomic_write_file')) {
+        @chmod($path, 0664);
+    }
     $base = rtrim($publicBaseUrl, '/');
     return ($base !== '' ? $base : '') . '/assets/actualidad-cache/' . $filename;
 }
@@ -1716,7 +1721,8 @@ function nammu_actuality_cache_remote_avatar(string $avatarUrl, string $actorUrl
         return ($localImagePath !== '' && is_file($localImagePath)) ? $avatarUrl : '';
     }
     $cacheKeyUrl = trim($actorUrl) !== '' ? trim($actorUrl) . '#avatar' : $avatarUrl . '#avatar';
-    $response = nammu_actuality_fetch_url($avatarUrl, 'image/*', 10, $config);
+    $timeout = is_array($config) ? max(1, (int) ($config['__avatar_fetch_timeout'] ?? 10)) : 10;
+    $response = nammu_actuality_fetch_url($avatarUrl, 'image/*', $timeout, $config);
     $body = $response['body'] ?? '';
     if (!is_string($body) || $body === '') {
         return '';
@@ -1732,10 +1738,15 @@ function nammu_actuality_cache_remote_avatar(string $avatarUrl, string $actorUrl
     }
     $filename = sha1($cacheKeyUrl) . '.' . nammu_actuality_extension_from_headers($avatarUrl, $headers);
     $path = $dir . '/' . $filename;
-    if (@file_put_contents($path, $body) === false) {
+    $saved = function_exists('nammu_atomic_write_file')
+        ? nammu_atomic_write_file($path, $body)
+        : (@file_put_contents($path, $body, LOCK_EX) !== false);
+    if (!$saved) {
         return '';
     }
-    @chmod($path, 0664);
+    if (!function_exists('nammu_atomic_write_file')) {
+        @chmod($path, 0664);
+    }
     $base = rtrim($publicBaseUrl, '/');
     return ($base !== '' ? $base : '') . '/assets/actualidad-cache/' . $filename;
 }

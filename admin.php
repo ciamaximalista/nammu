@@ -252,6 +252,7 @@ function admin_run_scheduled_maintenance_tasks(): array {
         : ['scanned' => 0, 'suppressed' => 0];
     $rssStats = ['sent' => 0, 'checked' => 0];
     $linkCardRefreshStats = ['processed' => 0, 'updated' => 0, 'failed' => 0, 'remaining' => 0];
+    $avatarCacheQueueStats = ['processed' => 0, 'updated' => 0, 'failed' => 0, 'remaining' => 0];
     $socialRssBroadcastQueueStats = ['queued' => 0, 'remaining' => 0];
     $socialBroadcastQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $pushQueueStats = ['sent' => 0, 'failed' => 0, 'skipped' => true];
@@ -289,6 +290,11 @@ function admin_run_scheduled_maintenance_tasks(): array {
     if (function_exists('nammu_fediverse_refresh_link_card_queue')) {
         $linkCardRefreshStats = $traceStep('fediverse_link_card_refresh', static function () use ($config) {
             return nammu_fediverse_refresh_link_card_queue($config, 8, 259200);
+        });
+    }
+    if (function_exists('nammu_fediverse_process_avatar_cache_queue')) {
+        $avatarCacheQueueStats = $traceStep('fediverse_avatar_cache_queue', static function () use ($config) {
+            return nammu_fediverse_process_avatar_cache_queue($config, 3);
         });
     }
     $pendingSocialRssLinkCards = 0;
@@ -428,6 +434,10 @@ function admin_run_scheduled_maintenance_tasks(): array {
         'fediverse_delivered' => (int) ($deliveryStats['delivered'] ?? 0),
         'fediverse_delivery_error' => (string) ($deliveryStats['error'] ?? ''),
         'fediverse_delivery_save_failed' => !empty($deliveryStats['save_failed']),
+        'fediverse_avatar_cache_processed' => (int) ($avatarCacheQueueStats['processed'] ?? 0),
+        'fediverse_avatar_cache_updated' => (int) ($avatarCacheQueueStats['updated'] ?? 0),
+        'fediverse_avatar_cache_failed' => (int) ($avatarCacheQueueStats['failed'] ?? 0),
+        'fediverse_avatar_cache_remaining' => (int) ($avatarCacheQueueStats['remaining'] ?? 0),
         'fediverse_recent_threads_warmed' => 0,
         'fediverse_follow_accepts_checked' => (int) ($acceptStats['checked'] ?? 0),
         'fediverse_follow_accepts_sent' => (int) ($acceptStats['accepted'] ?? 0),
@@ -13215,10 +13225,9 @@ if ($isLoggedIn && $page === 'fediverso') {
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['recache_fediverse_actor_avatar'])) {
         $actorId = trim((string) ($_POST['fediverse_actor_id'] ?? ''));
         $config = load_config_file();
-        $recacheResult = nammu_fediverse_recache_actor_avatar($actorId, $config);
-        if (!empty($recacheResult['ok'])) {
-            $refreshFediverseAvatarSnapshots($config);
-        }
+        $recacheResult = function_exists('nammu_fediverse_enqueue_actor_avatar_recache')
+            ? nammu_fediverse_enqueue_actor_avatar_recache($actorId, $config, true)
+            : nammu_fediverse_recache_actor_avatar($actorId, $config);
         $fediverseFeedback = [
             'type' => !empty($recacheResult['ok']) ? 'success' : 'danger',
             'message' => (string) ($recacheResult['message'] ?? ''),
@@ -13226,10 +13235,9 @@ if ($isLoggedIn && $page === 'fediverso') {
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['recache_all_fediverse_actor_avatars'])) {
         $config = load_config_file();
-        $recacheResult = nammu_fediverse_recache_all_actor_avatars($config);
-        if (!empty($recacheResult['ok'])) {
-            $refreshFediverseAvatarSnapshots($config);
-        }
+        $recacheResult = function_exists('nammu_fediverse_enqueue_all_actor_avatar_recaches')
+            ? nammu_fediverse_enqueue_all_actor_avatar_recaches($config)
+            : nammu_fediverse_recache_all_actor_avatars($config);
         $fediverseFeedback = [
             'type' => !empty($recacheResult['ok']) ? 'success' : 'danger',
             'message' => (string) ($recacheResult['message'] ?? ''),

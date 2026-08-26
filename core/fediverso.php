@@ -160,6 +160,11 @@ function nammu_fediverse_link_card_queue_file(): string
     return dirname(__DIR__) . '/config/fediverso-link-card-queue.json';
 }
 
+function nammu_fediverse_avatar_cache_queue_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-avatar-cache-queue.json';
+}
+
 function nammu_fediverse_actuality_item_link_targets(array $item): array
 {
     return array_values(array_filter(array_map(
@@ -934,7 +939,7 @@ function nammu_fediverse_signed_fetch(string $url, array $config, string $method
     return $result;
 }
 
-function nammu_fediverse_signed_fetch_json(string $url, array $config, string $method = 'GET', string $body = ''): ?array
+function nammu_fediverse_signed_fetch_json(string $url, array $config, string $method = 'GET', string $body = '', ?int $timeoutOverride = null): ?array
 {
     $url = trim($url);
     if (
@@ -948,10 +953,10 @@ function nammu_fediverse_signed_fetch_json(string $url, array $config, string $m
             return $payload;
         }
     }
-    $response = nammu_fediverse_signed_fetch($url, $config, $method, $body);
+    $response = nammu_fediverse_signed_fetch($url, $config, $method, $body, $timeoutOverride);
     if (($response['status'] ?? 0) < 200 || ($response['status'] ?? 0) >= 400) {
         if (strtoupper($method) === 'GET' && $body === '') {
-            return nammu_fediverse_fetch_json($url);
+            return nammu_fediverse_fetch_json($url, 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9', $timeoutOverride ?? 12);
         }
         return null;
     }
@@ -970,13 +975,13 @@ function nammu_fediverse_signed_fetch_json(string $url, array $config, string $m
     return is_array($decoded) ? $decoded : null;
 }
 
-function nammu_fediverse_fetch(string $url, string $accept = 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9'): array
+function nammu_fediverse_fetch(string $url, string $accept = 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9', int $timeout = 12): array
 {
     $headers = [];
     $context = stream_context_create([
         'http' => [
             'method' => 'GET',
-            'timeout' => 12,
+            'timeout' => max(1, $timeout),
             'ignore_errors' => true,
             'header' => "User-Agent: Nammu Fediverso\r\nAccept: {$accept}\r\n",
         ],
@@ -1001,10 +1006,10 @@ function nammu_fediverse_fetch(string $url, string $accept = 'application/activi
     ];
 }
 
-function nammu_fediverse_fetch_json(string $url, string $accept = 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9'): ?array
+function nammu_fediverse_fetch_json(string $url, string $accept = 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9', int $timeout = 12): ?array
 {
     $url = trim($url);
-    $response = nammu_fediverse_fetch($url, $accept);
+    $response = nammu_fediverse_fetch($url, $accept, $timeout);
     if (($response['status'] ?? 0) < 200 || ($response['status'] ?? 0) >= 400) {
         return null;
     }
@@ -1329,6 +1334,7 @@ function nammu_fediverse_resolve_actor(string $input, ?array $config = null): ?a
         return null;
     }
     $forceRefresh = is_array($config) && !empty($config['__force_actor_refresh']);
+    $fetchTimeout = is_array($config) ? max(1, (int) ($config['__fediverse_fetch_timeout'] ?? 12)) : 12;
     if (!$forceRefresh) {
         $knownActor = nammu_fediverse_known_actor_from_input($trimmed);
         if (is_array($knownActor)) {
@@ -1337,8 +1343,8 @@ function nammu_fediverse_resolve_actor(string $input, ?array $config = null): ?a
     }
     if (preg_match('#^https?://#i', $trimmed)) {
         $actor = is_array($config)
-            ? nammu_fediverse_signed_fetch_json($trimmed, $config)
-            : nammu_fediverse_fetch_json($trimmed);
+            ? nammu_fediverse_signed_fetch_json($trimmed, $config, 'GET', '', $fetchTimeout)
+            : nammu_fediverse_fetch_json($trimmed, 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9', $fetchTimeout);
         if (is_array($actor)) {
             return nammu_fediverse_normalize_actor_entry($actor, $trimmed);
         }
@@ -1382,7 +1388,8 @@ function nammu_fediverse_resolve_actor(string $input, ?array $config = null): ?a
     if (!is_array($webfinger)) {
         $webfinger = nammu_fediverse_fetch_json(
             $webfingerUrl,
-            'application/jrd+json, application/json;q=0.9'
+            'application/jrd+json, application/json;q=0.9',
+            $fetchTimeout
         );
         if (is_array($config) && is_array($webfinger) && nammu_fediverse_should_shared_cache_remote_url($webfingerUrl, $config)) {
             nammu_fediverse_shared_cache_write($config, 'webfinger', $webfingerUrl, [
@@ -1729,8 +1736,12 @@ function nammu_fediverse_recache_actor_avatar(string $actorId, array $config): a
     }
 
     $refreshConfig = $config;
-    $refreshConfig['__force_actor_refresh'] = true;
-    $resolvedActor = nammu_fediverse_resolve_actor($actorId, $refreshConfig);
+    $refreshConfig['__force_actor_refresh'] = array_key_exists('__force_actor_refresh', $config)
+        ? !empty($config['__force_actor_refresh'])
+        : true;
+    $resolvedActor = !empty($refreshConfig['__force_actor_refresh'])
+        ? nammu_fediverse_resolve_actor($actorId, $refreshConfig)
+        : [];
     $resolvedActor = is_array($resolvedActor) ? $resolvedActor : [];
     $resolvedIcon = trim((string) ($resolvedActor['icon'] ?? ''));
     $updated = 0;
@@ -1855,6 +1866,189 @@ function nammu_fediverse_recache_all_actor_avatars(array $config): array
         'total' => $total,
         'updated' => $updated,
         'failed' => $failed,
+    ];
+}
+
+function nammu_fediverse_avatar_cache_queue_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_avatar_cache_queue_file(), ['items' => []]);
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    return ['items' => array_values(array_filter($items, 'is_array'))];
+}
+
+function nammu_fediverse_save_avatar_cache_queue_store(array $items): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_avatar_cache_queue_file(), ['items' => array_values($items)]);
+}
+
+function nammu_fediverse_actor_host(string $actorId): string
+{
+    $host = parse_url(trim($actorId), PHP_URL_HOST);
+    return is_string($host) ? strtolower(trim($host)) : '';
+}
+
+function nammu_fediverse_enqueue_actor_avatar_recache(string $actorId, array $config = [], bool $forceRefresh = true): array
+{
+    $actorId = trim($actorId);
+    if ($actorId === '') {
+        return ['ok' => false, 'message' => 'No se recibió el actor.', 'queued' => 0];
+    }
+    $store = nammu_fediverse_avatar_cache_queue_store();
+    $items = $store['items'];
+    foreach ($items as &$item) {
+        if (trim((string) ($item['actor_id'] ?? '')) !== $actorId) {
+            continue;
+        }
+        $item['force_refresh'] = !empty($item['force_refresh']) || $forceRefresh;
+        $item['next_attempt_at'] = 0;
+        $item['updated_at'] = time();
+        nammu_fediverse_save_avatar_cache_queue_store($items);
+        return ['ok' => true, 'message' => 'Recaché de avatar ya estaba en cola; se ha actualizado su prioridad.', 'queued' => 0];
+    }
+    unset($item);
+    $items[] = [
+        'actor_id' => $actorId,
+        'host' => nammu_fediverse_actor_host($actorId),
+        'force_refresh' => $forceRefresh,
+        'attempts' => 0,
+        'next_attempt_at' => 0,
+        'last_error' => '',
+        'created_at' => time(),
+        'updated_at' => time(),
+    ];
+    nammu_fediverse_save_avatar_cache_queue_store($items);
+    return ['ok' => true, 'message' => 'Recaché de avatar encolado. Se procesará en maintenance.', 'queued' => 1];
+}
+
+function nammu_fediverse_enqueue_all_actor_avatar_recaches(array $config): array
+{
+    $actorIds = [];
+    foreach (nammu_fediverse_following_store()['actors'] as $actor) {
+        $actorId = trim((string) ($actor['id'] ?? ''));
+        if ($actorId !== '') {
+            $actorIds[$actorId] = true;
+        }
+    }
+    foreach (nammu_fediverse_followers_store()['followers'] as $follower) {
+        $actorId = trim((string) ($follower['id'] ?? ''));
+        if ($actorId !== '') {
+            $actorIds[$actorId] = true;
+        }
+    }
+    $queued = 0;
+    $existing = 0;
+    $store = nammu_fediverse_avatar_cache_queue_store();
+    $items = $store['items'];
+    $queuedByActor = [];
+    foreach ($items as $index => $item) {
+        $queuedActorId = trim((string) ($item['actor_id'] ?? ''));
+        if ($queuedActorId !== '') {
+            $queuedByActor[$queuedActorId] = $index;
+        }
+    }
+    foreach (array_keys($actorIds) as $actorId) {
+        if (isset($queuedByActor[$actorId])) {
+            $index = $queuedByActor[$actorId];
+            $items[$index]['force_refresh'] = true;
+            $items[$index]['next_attempt_at'] = 0;
+            $items[$index]['updated_at'] = time();
+            $existing++;
+            continue;
+        }
+        $items[] = [
+            'actor_id' => $actorId,
+            'host' => nammu_fediverse_actor_host($actorId),
+            'force_refresh' => true,
+            'attempts' => 0,
+            'next_attempt_at' => 0,
+            'last_error' => '',
+            'created_at' => time(),
+            'updated_at' => time(),
+        ];
+        $queued++;
+    }
+    nammu_fediverse_save_avatar_cache_queue_store($items);
+    $total = count($actorIds);
+    return [
+        'ok' => $total > 0,
+        'message' => $total > 0
+            ? 'Recaché de avatares encolado. Actores: ' . $total . '. Nuevos en cola: ' . $queued . '. Ya estaban en cola: ' . $existing . '.'
+            : 'No hay seguidos ni seguidores con avatar que recachear.',
+        'total' => $total,
+        'queued' => $queued,
+        'existing' => $existing,
+    ];
+}
+
+function nammu_fediverse_process_avatar_cache_queue(array $config, int $limit = 3): array
+{
+    $store = nammu_fediverse_avatar_cache_queue_store();
+    $items = $store['items'];
+    if (empty($items)) {
+        return ['processed' => 0, 'updated' => 0, 'failed' => 0, 'remaining' => 0];
+    }
+    $now = time();
+    $remaining = [];
+    $processed = 0;
+    $updated = 0;
+    $failed = 0;
+    $hostBackoff = [];
+    foreach ($items as $item) {
+        $item = is_array($item) ? $item : [];
+        $actorId = trim((string) ($item['actor_id'] ?? ''));
+        if ($actorId === '') {
+            continue;
+        }
+        $host = trim((string) (($item['host'] ?? '') ?: nammu_fediverse_actor_host($actorId)));
+        $nextAttemptAt = (int) ($item['next_attempt_at'] ?? 0);
+        if ($nextAttemptAt > $now || (isset($hostBackoff[$host]) && $hostBackoff[$host] > $now) || $processed >= max(1, $limit)) {
+            $item['host'] = $host;
+            if (isset($hostBackoff[$host]) && $hostBackoff[$host] > $now) {
+                $item['next_attempt_at'] = max($nextAttemptAt, (int) $hostBackoff[$host]);
+                $item['last_error'] = trim((string) (($item['last_error'] ?? '') ?: 'Host en backoff temporal.'));
+                $item['updated_at'] = $now;
+            }
+            $remaining[] = $item;
+            continue;
+        }
+        $refreshConfig = $config;
+        $refreshConfig['__force_actor_refresh'] = !empty($item['force_refresh']);
+        $refreshConfig['__fediverse_fetch_timeout'] = 4;
+        $refreshConfig['__avatar_fetch_timeout'] = 3;
+        $result = nammu_fediverse_recache_actor_avatar($actorId, $refreshConfig);
+        $processed++;
+        if (!empty($result['ok']) && trim((string) ($result['icon'] ?? '')) !== '') {
+            $updated++;
+            continue;
+        }
+        $attempts = (int) ($item['attempts'] ?? 0) + 1;
+        $delay = min(3600, 300 * max(1, $attempts));
+        $item['host'] = $host;
+        $item['attempts'] = $attempts;
+        $item['last_error'] = trim((string) ($result['message'] ?? 'No se pudo recachear el avatar.'));
+        $item['last_attempt_at'] = $now;
+        $item['next_attempt_at'] = $now + $delay;
+        $item['updated_at'] = $now;
+        $remaining[] = $item;
+        $failed++;
+        if ($host !== '') {
+            $hostBackoff[$host] = $now + $delay;
+        }
+    }
+    nammu_fediverse_save_avatar_cache_queue_store($remaining);
+    if ($updated > 0) {
+        if (function_exists('nammu_fediverse_rebuild_light_snapshots')) {
+            nammu_fediverse_rebuild_light_snapshots($config);
+        }
+        if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
+            nammu_fediverse_save_fragments_cache_store([]);
+        }
+    }
+    return [
+        'processed' => $processed,
+        'updated' => $updated,
+        'failed' => $failed,
+        'remaining' => count($remaining),
     ];
 }
 

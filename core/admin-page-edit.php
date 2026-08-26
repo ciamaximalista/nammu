@@ -1299,7 +1299,7 @@ unset($_SESSION['newsletter_custom_recipients']);
                 <div class="form-group">
                     <label for="news_images">Imágenes</label>
                     <div class="input-group">
-                        <textarea name="news_images" id="news_images" class="form-control" rows="4" readonly><?= htmlspecialchars($newsImagesValue, ENT_QUOTES, 'UTF-8') ?></textarea>
+                        <textarea name="news_images" id="news_images" class="form-control" rows="4" placeholder="https://example.com/imagen.jpg"><?= htmlspecialchars($newsImagesValue, ENT_QUOTES, 'UTF-8') ?></textarea>
                         <div class="input-group-append">
                             <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#imageModal" data-target-type="field" data-target-input="news_images" data-target-prefix="" data-target-multi="1" data-target-max-items="4">Añadir imagen</button>
                         </div>

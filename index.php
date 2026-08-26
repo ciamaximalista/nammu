@@ -310,8 +310,43 @@ if ($isBlogIndexRoute || $isBlogPaginationRoute) {
         return $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . $target : $target;
     });
 }
+$renderHomeHeader = static function () use ($renderer): string {
+    return $renderer->render('home', [
+        'posts' => [],
+        'bioHtml' => '',
+        'pagination' => null,
+        'letterGroups' => [],
+        'isAlphabetical' => false,
+        'letterGroupUrls' => [],
+        'dictionaryIntroHtml' => '',
+        'headerOnly' => true,
+    ]);
+};
 if ($isHomeRoute && $homeContentMode === 'fediverse') {
-    require __DIR__ . '/actualidad.php';
+    $nammuActualityEmbedOnly = true;
+    $actualityHomePage = require __DIR__ . '/actualidad.php';
+    $actualityHomeContent = is_array($actualityHomePage) ? (string) ($actualityHomePage['content'] ?? '') : '';
+    $content = $renderHomeHeader() . $actualityHomeContent;
+    $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/' : '/';
+    if (function_exists('nammu_record_pageview')) {
+        nammu_record_pageview('pages', 'index', 'Portada');
+    }
+    echo $renderer->render('layout', [
+        'pageTitle' => '',
+        'metaDescription' => $homeDescription,
+        'content' => $content,
+        'socialMeta' => nammu_build_social_meta([
+            'type' => 'website',
+            'title' => $displaySiteTitle,
+            'description' => $homeDescription,
+            'url' => $canon,
+            'image' => $homeImage,
+            'site_name' => $siteNameForMeta,
+        ], $socialConfig),
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
+        'showLogo' => false,
+    ]);
     exit;
 }
 $fediverseProfileAliasPath = function_exists('nammu_fediverse_profile_alias_path')
@@ -1542,7 +1577,11 @@ if (preg_match('#^/podcast/?$#i', $routePath) || ($isHomeRoute && $homeContentMo
         'episodes' => $episodes,
         'count' => $count,
         'hasItineraries' => !empty($itineraryListing),
+        'suppressArchiveHeader' => $isHomeRoute && $homeContentMode === 'podcast',
     ]);
+    if ($isHomeRoute && $homeContentMode === 'podcast') {
+        $content = $renderHomeHeader() . $content;
+    }
     $canon = ($isHomeRoute && $homeContentMode === 'podcast')
         ? ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/' : '/')
         : ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/podcast' : '/podcast');
@@ -1559,7 +1598,7 @@ if (preg_match('#^/podcast/?$#i', $routePath) || ($isHomeRoute && $homeContentMo
         'site_name' => $siteNameForMeta,
     ], $socialConfig);
     echo $renderer->render('layout', [
-        'pageTitle' => ($isHomeRoute && $homeContentMode === 'podcast') ? $displaySiteTitle : 'Podcast',
+        'pageTitle' => ($isHomeRoute && $homeContentMode === 'podcast') ? '' : 'Podcast',
         'metaDescription' => $description,
         'content' => $content,
         'socialMeta' => $podcastMeta,
@@ -2534,7 +2573,11 @@ if (preg_match('#^/itinerarios/?$#i', $routePath) || ($isHomeRoute && $homeConte
         'itineraries' => $itineraries,
         'heroImage' => $itineraryHeroImage,
         'itineraryFediverseMetaBySlug' => $itineraryFediverseMetaBySlug,
+        'suppressArchiveHeader' => $isHomeRoute && $homeContentMode === 'itineraries',
     ]);
+    if ($isHomeRoute && $homeContentMode === 'itineraries') {
+        $content = $renderHomeHeader() . $content;
+    }
     $canon = ($isHomeRoute && $homeContentMode === 'itineraries')
         ? ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/' : '/')
         : ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios');
@@ -2554,7 +2597,7 @@ if (preg_match('#^/itinerarios/?$#i', $routePath) || ($isHomeRoute && $homeConte
         ['name' => ($isHomeRoute && $homeContentMode === 'itineraries') ? 'Portada' : 'Itinerarios', 'url' => $canon],
     ]);
     echo $renderer->render('layout', [
-        'pageTitle' => ($isHomeRoute && $homeContentMode === 'itineraries') ? $displaySiteTitle : 'Itinerarios',
+        'pageTitle' => ($isHomeRoute && $homeContentMode === 'itineraries') ? '' : 'Itinerarios',
         'metaDescription' => $description,
         'content' => $content,
         'socialMeta' => $itineraryIndexMeta,
@@ -3293,7 +3336,7 @@ $content = $renderer->render('home', [
 ]);
 
 echo $renderer->render('layout', [
-    'pageTitle' => $homePageTitle,
+    'pageTitle' => $isHomeRoute ? '' : $homePageTitle,
     'metaDescription' => $siteDescription,
     'content' => $content,
     'socialMeta' => $homeSocialMeta,

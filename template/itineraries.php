@@ -6,6 +6,7 @@
  * @var array $theme
  * @var string|null $heroImage
  * @var array<string, array> $itineraryFediverseMetaBySlug
+ * @var bool $suppressArchiveHeader
  */
 $colors = $theme['colors'] ?? [];
 $highlight = htmlspecialchars($colors['highlight'] ?? '#f3f6f9', ENT_QUOTES, 'UTF-8');
@@ -105,15 +106,18 @@ $heroStyle = $heroImageUrl
     : '';
 $heroTextColor = $heroImageUrl ? '#ffffff' : $brandColor;
 $heroLabelColor = $heroImageUrl ? 'rgba(255,255,255,0.92)' : $accentColor;
+$suppressArchiveHeader = !empty($suppressArchiveHeader);
 ?>
 
-<section class="itinerary-archive-hero<?= $heroImageUrl ? ' has-hero-image' : '' ?>"<?= $heroStyle ?>>
-    <div>
-        <p class="itinerary-archive-label"><?= $blogOwner ?></p>
-        <h1>Itinerarios</h1>
-        <?= $headerButtonsHtml ?>
-    </div>
-</section>
+<?php if (!$suppressArchiveHeader): ?>
+    <section class="itinerary-archive-hero<?= $heroImageUrl ? ' has-hero-image' : '' ?>"<?= $heroStyle ?>>
+        <div>
+            <p class="itinerary-archive-label"><?= $blogOwner ?></p>
+            <h1>Itinerarios</h1>
+            <?= $headerButtonsHtml ?>
+        </div>
+    </section>
+<?php endif; ?>
 
 <?php if (empty($itineraries)): ?>
     <p>No hay itinerarios publicados todavía.</p>

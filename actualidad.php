@@ -199,6 +199,24 @@ $socialMeta = nammu_build_social_meta([
     'site_name' => $siteNameForMeta,
 ], $socialConfig);
 
+if (!empty($nammuActualityEmbedOnly)) {
+    return [
+        'content' => $content,
+        'pageTitle' => $pageTitle,
+        'pageDescription' => $pageDescription,
+        'canonical' => $canonical,
+        'socialMeta' => $socialMeta,
+        'jsonLd' => [[
+            '@context' => 'https://schema.org',
+            '@type' => 'CollectionPage',
+            'name' => $pageTitle,
+            'url' => $canonical,
+            'description' => $pageDescription,
+            'inLanguage' => $siteLang,
+        ]],
+    ];
+}
+
 if (function_exists('nammu_record_pageview')) {
     nammu_record_pageview('pages', 'actualidad', 'Actualidad');
 }

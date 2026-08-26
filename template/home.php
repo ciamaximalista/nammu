@@ -10,6 +10,7 @@
  * @var array<string, string> $letterGroupUrls
  * @var bool $isAlphabetical
  * @var string $dictionaryIntroHtml
+ * @var bool $headerOnly
  */
 $colors = $theme['colors'] ?? [];
 $highlight = htmlspecialchars($colors['highlight'] ?? '#f3f6f9', ENT_QUOTES, 'UTF-8');
@@ -141,6 +142,7 @@ $hasCategories = !empty($hasCategories);
 $showLetterButton = !empty($showLetterIndexButton) && !empty($letterIndexUrlValue);
 $isAlphabetical = !empty($isAlphabetical);
 $dictionaryIntroHtml = (string) ($dictionaryIntroHtml ?? '');
+$headerOnly = !empty($headerOnly);
 $letterGroups = $letterGroups ?? [];
 $letterGroupUrls = $letterGroupUrls ?? [];
 $currentUrl = ($baseHref ?? '') . ($_SERVER['REQUEST_URI'] ?? '/');
@@ -512,6 +514,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     <?= $headerButtonsHtml ?>
 <?php endif; ?>
 
+<?php if (!$headerOnly): ?>
 <?php if ($homeSubscriptionTop): ?>
     <section class="site-search-block placement-top site-subscription-block">
         <?= $renderSubscriptionBox('variant-inline minimal') ?>
@@ -693,6 +696,7 @@ $buildPageUrl = (isset($paginationUrl) && is_callable($paginationUrl))
     <section class="site-search-block placement-bottom">
         <?= $renderSearchBox('variant-panel') ?>
     </section>
+<?php endif; ?>
 <?php endif; ?>
 
 <style>

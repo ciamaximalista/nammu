@@ -2,6 +2,7 @@
 /**
  * @var array<int, array{title:string,description:string,date:string,image:?string,audio:string,duration:string,fediverse?:array}> $episodes
  * @var int $count
+ * @var bool $suppressArchiveHeader
  */
 $colors = $theme['colors'] ?? [];
 $highlight = htmlspecialchars($colors['highlight'] ?? '#f3f6f9', ENT_QUOTES, 'UTF-8');
@@ -85,6 +86,7 @@ $podcastHeroStyle = '';
 if ($podcastHeroImage !== '') {
     $podcastHeroStyle = ' style="background-image: linear-gradient(rgba(0,0,0,0.36), rgba(0,0,0,0.36)), url(\'' . htmlspecialchars($podcastHeroImage, ENT_QUOTES, 'UTF-8') . '\');"';
 }
+$suppressArchiveHeader = !empty($suppressArchiveHeader);
 $subscriptionSuccess = isset($_GET['subscribed']) && $_GET['subscribed'] === '1';
 $subscriptionSent = isset($_GET['sub_sent']) && $_GET['sub_sent'] === '1';
 $subscriptionError = isset($_GET['sub_error']) && $_GET['sub_error'] === '1';
@@ -251,14 +253,16 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
 };
 ?>
 
-<section class="category-detail-hero<?= $podcastHeroImage !== '' ? ' has-hero-image' : '' ?>"<?= $podcastHeroStyle ?>>
-    <div>
-        <p class="category-label"><?= htmlspecialchars((string) ($theme['author'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
-        <h1><?= htmlspecialchars((string) ($theme['blog'] ?? $siteTitle ?? 'Nammu Blog'), ENT_QUOTES, 'UTF-8') ?> · Podcast</h1>
-        <p class="category-count"><?= htmlspecialchars((string) $count, ENT_QUOTES, 'UTF-8') ?> <?= $count === 1 ? 'episodio publicado' : 'episodios publicados' ?></p>
-        <?= $headerButtonsHtml ?>
-    </div>
-</section>
+<?php if (!$suppressArchiveHeader): ?>
+    <section class="category-detail-hero<?= $podcastHeroImage !== '' ? ' has-hero-image' : '' ?>"<?= $podcastHeroStyle ?>>
+        <div>
+            <p class="category-label"><?= htmlspecialchars((string) ($theme['author'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
+            <h1><?= htmlspecialchars((string) ($theme['blog'] ?? $siteTitle ?? 'Nammu Blog'), ENT_QUOTES, 'UTF-8') ?> · Podcast</h1>
+            <p class="category-count"><?= htmlspecialchars((string) $count, ENT_QUOTES, 'UTF-8') ?> <?= $count === 1 ? 'episodio publicado' : 'episodios publicados' ?></p>
+            <?= $headerButtonsHtml ?>
+        </div>
+    </section>
+<?php endif; ?>
 
 <?php if ($subscriptionTop): ?>
     <section class="site-search-block placement-top site-subscription-block">

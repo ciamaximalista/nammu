@@ -582,12 +582,12 @@ if ($isPageTemplate && $formattedDate !== '') {
                             <?php endif; ?>
                         </a>
                     </div>
-                    <div class="fediverse-inline-metrics">
+                    <div class="fediverse-public-status__metrics fediverse-public-status__metrics--single">
                         <?php if ($fediverseRepliesCount > 0): ?>
-                            <div class="fediverse-inline-metric-group">
-                                <a class="fediverse-inline-metric-label" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>"><?= $fediverseRepliesCount ?> respuesta<?= ($fediverseRepliesCount === 1) ? '' : 's' ?></a>
+                            <div class="fediverse-public-status__metric-group">
+                                <a class="fediverse-public-status__metric-label" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>"><?= $fediverseRepliesCount ?> respuesta<?= ($fediverseRepliesCount === 1) ? '' : 's' ?></a>
                                 <?php if (!empty($fediverseThreadDetails['replies'])): ?>
-                                    <span class="fediverse-inline-actor-icons">
+                                    <span class="fediverse-public-status__actor-icons">
                                         <?php foreach ((array) $fediverseThreadDetails['replies'] as $replyActor): ?>
                                             <?php
                                             $replyActorUrl = trim((string) (($replyActor['url'] ?? '') ?: $fediverseThreadUrl));
@@ -606,10 +606,10 @@ if ($isPageTemplate && $formattedDate !== '') {
                             </div>
                         <?php endif; ?>
                         <?php if ($fediverseLikesCount > 0): ?>
-                            <div class="fediverse-inline-metric-group">
-                                <a class="fediverse-inline-metric-label" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>"><?= $fediverseLikesCount ?> favorito<?= ($fediverseLikesCount === 1) ? '' : 's' ?></a>
+                            <div class="fediverse-public-status__metric-group">
+                                <a class="fediverse-public-status__metric-label" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>"><?= $fediverseLikesCount ?> favorito<?= ($fediverseLikesCount === 1) ? '' : 's' ?></a>
                                 <?php if (!empty($fediverseThreadDetails['likes'])): ?>
-                                    <span class="fediverse-inline-actor-icons">
+                                    <span class="fediverse-public-status__actor-icons">
                                         <?php foreach ((array) $fediverseThreadDetails['likes'] as $likeActor): ?>
                                             <?php
                                             $likeActorUrl = trim((string) (($likeActor['url'] ?? '') ?: $fediverseThreadUrl));
@@ -628,10 +628,10 @@ if ($isPageTemplate && $formattedDate !== '') {
                             </div>
                         <?php endif; ?>
                         <?php if ($fediverseSharesCount > 0): ?>
-                            <div class="fediverse-inline-metric-group">
-                                <a class="fediverse-inline-metric-label" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>"><?= $fediverseSharesCount ?> impulso<?= ($fediverseSharesCount === 1) ? '' : 's' ?></a>
+                            <div class="fediverse-public-status__metric-group">
+                                <a class="fediverse-public-status__metric-label" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>"><?= $fediverseSharesCount ?> impulso<?= ($fediverseSharesCount === 1) ? '' : 's' ?></a>
                                 <?php if (!empty($fediverseThreadDetails['shares'])): ?>
-                                    <span class="fediverse-inline-actor-icons">
+                                    <span class="fediverse-public-status__actor-icons">
                                         <?php foreach ((array) $fediverseThreadDetails['shares'] as $shareActor): ?>
                                             <?php
                                             $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: $fediverseThreadUrl));
@@ -825,11 +825,65 @@ if ($isPageTemplate && $formattedDate !== '') {
         color: <?= $accentColor ?>;
         text-decoration: underline;
     }
-    .fediverse-inline-metrics {
+    .fediverse-public-status__metrics {
         display: flex;
         flex-wrap: wrap;
         justify-content: flex-start;
         gap: .65rem;
+    }
+    .fediverse-public-status__metrics--single {
+        margin-top: .25rem;
+    }
+    .fediverse-public-status__metric-group {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        background: #fff;
+        border: 1px solid rgba(0,0,0,.08);
+        border-radius: 999px;
+        padding: .3rem .45rem .3rem .7rem;
+        font-size: .92rem;
+        line-height: 1.2;
+    }
+    .fediverse-public-status__metric-group > span,
+    .fediverse-public-status__metric-label {
+        background: transparent;
+        border: 0;
+        padding: 0;
+    }
+    .fediverse-public-status__metric-label {
+        color: <?= $fediverseMetricLinkColorEsc ?>;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .fediverse-public-status__metric-label:hover {
+        text-decoration: underline;
+    }
+    .fediverse-public-status__actor-icons {
+        display: inline-flex;
+        align-items: center;
+        gap: .25rem;
+    }
+    .fediverse-public-status__actor-icons a {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        overflow: hidden;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #dfe7ef;
+        text-decoration: none;
+        color: inherit;
+        border: 1px solid rgba(0,0,0,.08);
+        font-size: .8rem;
+        font-weight: 700;
+    }
+    .fediverse-public-status__actor-icons img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
     }
     .fediverse-inline-metric-group {
         display: inline-flex;

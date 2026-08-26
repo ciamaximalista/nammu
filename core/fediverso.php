@@ -4894,6 +4894,8 @@ function nammu_fediverse_thread_page_payload(array $item, array $config): array
             trim((string) ($reply['id'] ?? '')),
             trim((string) ($reply['url'] ?? '')),
             trim((string) ($reply['note_id'] ?? '')),
+            trim((string) ($reply['object_id'] ?? '')),
+            trim((string) ($reply['target_url'] ?? '')),
         ])));
         $replyKey = 'reply:' . $replyIndex;
         foreach ($replyIdentifiers as $replyIdentifier) {
@@ -4932,6 +4934,52 @@ function nammu_fediverse_thread_page_payload(array $item, array $config): array
     ]);
 }
 
+function nammu_fediverse_reaction_target_identifier_variants(string $identifier, int $depth = 0): array
+{
+    $identifier = trim($identifier);
+    if ($identifier === '') {
+        return [];
+    }
+    $variants = [$identifier];
+    $decoded = rawurldecode(html_entity_decode($identifier, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    if ($decoded !== '' && $decoded !== $identifier) {
+        $variants[] = $decoded;
+    }
+    $parts = parse_url($identifier);
+    if (is_array($parts)) {
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        $path = (string) ($parts['path'] ?? '');
+        $query = (string) ($parts['query'] ?? '');
+        if ($scheme !== '' && $host !== '') {
+            $base = $scheme . '://' . $host . $path;
+            $variants[] = $base;
+            $trimmedBase = rtrim($base, '/');
+            if ($trimmedBase !== '') {
+                $variants[] = $trimmedBase;
+            }
+            if ($query !== '' && $depth < 2) {
+                parse_str($query, $queryParams);
+                foreach (['id', 'url', 'uri'] as $queryKey) {
+                    $queryValue = $queryParams[$queryKey] ?? null;
+                    if (!is_scalar($queryValue)) {
+                        continue;
+                    }
+                    $queryIdentifier = trim((string) $queryValue);
+                    if ($queryIdentifier === '') {
+                        continue;
+                    }
+                    $variants[] = $queryIdentifier;
+                    $variants = array_merge($variants, nammu_fediverse_reaction_target_identifier_variants($queryIdentifier, $depth + 1));
+                }
+            }
+        }
+    }
+    return array_values(array_unique(array_filter($variants, static function ($variant): bool {
+        return is_string($variant) && trim($variant) !== '';
+    })));
+}
+
 function nammu_fediverse_reaction_snapshot_for_targets(array $targetMap, array $config): array
 {
     $normalizedTargetMap = [];
@@ -4941,7 +4989,9 @@ function nammu_fediverse_reaction_snapshot_for_targets(array $targetMap, array $
         if ($identifier === '' || $targetKey === '') {
             continue;
         }
-        $normalizedTargetMap[$identifier] = $targetKey;
+        foreach (nammu_fediverse_reaction_target_identifier_variants($identifier) as $identifierVariant) {
+            $normalizedTargetMap[$identifierVariant] = $targetKey;
+        }
     }
     $targetMap = $normalizedTargetMap;
     if ($targetMap === []) {
@@ -4968,6 +5018,16 @@ function nammu_fediverse_reaction_snapshot_for_targets(array $targetMap, array $
         $result[$targetKey]['summary'][$bucket]++;
         $result[$targetKey]['details'][$bucket][] = $actorEntry;
     };
+    $findTargetKey = static function (array $candidates) use ($targetMap): string {
+        foreach (array_values(array_unique(array_filter($candidates))) as $targetCandidate) {
+            foreach (nammu_fediverse_reaction_target_identifier_variants((string) $targetCandidate) as $targetVariant) {
+                if (isset($targetMap[$targetVariant])) {
+                    return $targetMap[$targetVariant];
+                }
+            }
+        }
+        return '';
+    };
 
     $inboxStore = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
     foreach ((array) ($inboxStore['activities'] ?? []) as $entry) {
@@ -4988,13 +5048,7 @@ function nammu_fediverse_reaction_snapshot_for_targets(array $targetMap, array $
                 }
             }
         }
-        $targetKey = '';
-        foreach (array_values(array_unique(array_filter($targetCandidates))) as $targetCandidate) {
-            if (isset($targetMap[$targetCandidate])) {
-                $targetKey = $targetMap[$targetCandidate];
-                break;
-            }
-        }
+        $targetKey = $findTargetKey($targetCandidates);
         if ($targetKey === '') {
             continue;
         }
@@ -5023,7 +5077,7 @@ function nammu_fediverse_reaction_snapshot_for_targets(array $targetMap, array $
             continue;
         }
         $target = trim((string) ($action['object_url'] ?? ''));
-        $targetKey = $targetMap[$target] ?? '';
+        $targetKey = $findTargetKey([$target]);
         if ($targetKey === '') {
             continue;
         }
@@ -5043,8 +5097,10 @@ function nammu_fediverse_reaction_snapshot_for_targets(array $targetMap, array $
         $targetKey = '';
         foreach (['object_id', 'target_url'] as $field) {
             $value = trim((string) ($timelineItem[$field] ?? ''));
-            if ($value !== '' && isset($targetMap[$value])) {
-                $targetKey = $targetMap[$value];
+            if ($value !== '') {
+                $targetKey = $findTargetKey([$value]);
+            }
+            if ($targetKey !== '') {
                 break;
             }
         }

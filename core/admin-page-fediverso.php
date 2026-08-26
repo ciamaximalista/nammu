@@ -380,13 +380,65 @@
             $fediverseLocalLinks[$fediverseLocalUrl] = 'admin.php?page=fediverso&tab=home#' . $fediverseLocalAnchor;
         }
     }
+    $fediverseThreadLatestReplyActivity = [];
+    $rememberFediverseThreadReplyActivity = static function (string $targetIdentifier, string $published) use (&$fediverseThreadLatestReplyActivity, $fediverseEquivalentIdentifiers): void {
+        $targetIdentifier = trim($targetIdentifier);
+        $published = trim($published);
+        if ($targetIdentifier === '' || $published === '') {
+            return;
+        }
+        foreach ($fediverseEquivalentIdentifiers($targetIdentifier) as $targetVariant) {
+            if (!isset($fediverseThreadLatestReplyActivity[$targetVariant]) || strcmp($published, (string) $fediverseThreadLatestReplyActivity[$targetVariant]) > 0) {
+                $fediverseThreadLatestReplyActivity[$targetVariant] = $published;
+            }
+        }
+    };
+    foreach ($fediverseIncomingReplies as $fediverseIncomingLocalId => $fediverseIncomingReplyGroup) {
+        foreach ((array) $fediverseIncomingReplyGroup as $fediverseIncomingReply) {
+            if (!is_array($fediverseIncomingReply)) {
+                continue;
+            }
+            $rememberFediverseThreadReplyActivity((string) $fediverseIncomingLocalId, (string) ($fediverseIncomingReply['published'] ?? ''));
+        }
+    }
+    foreach ($fediverseRemoteRepliesByTarget as $fediverseRemoteReplyTarget => $fediverseRemoteReplyGroup) {
+        foreach ((array) $fediverseRemoteReplyGroup as $fediverseRemoteReply) {
+            if (!is_array($fediverseRemoteReply)) {
+                continue;
+            }
+            $rememberFediverseThreadReplyActivity((string) $fediverseRemoteReplyTarget, (string) ($fediverseRemoteReply['published'] ?? ''));
+        }
+    }
+    if (is_array($fediverseHomeSnapshot['thread_payloads'] ?? null)) {
+        foreach ((array) $fediverseHomeSnapshot['thread_payloads'] as $fediverseThreadPayloadItemId => $fediverseThreadPayload) {
+            if (!is_array($fediverseThreadPayload)) {
+                continue;
+            }
+            foreach ((array) ($fediverseThreadPayload['replies'] ?? []) as $fediverseThreadPayloadReply) {
+                if (!is_array($fediverseThreadPayloadReply)) {
+                    continue;
+                }
+                $rememberFediverseThreadReplyActivity((string) $fediverseThreadPayloadItemId, (string) ($fediverseThreadPayloadReply['published'] ?? ''));
+            }
+        }
+    }
     $fediverseTimelineEntries = [];
     foreach ($fediverseLocalItems as $fediverseLocalItem) {
         $fediverseLocalId = trim((string) ($fediverseLocalItem['id'] ?? ''));
+        $fediverseLocalSortKey = (string) ($fediverseLocalItem['published'] ?? '');
+        foreach (['id', 'object_id', 'url'] as $fediverseLocalSortField) {
+            $fediverseLocalSortIdentifier = trim((string) ($fediverseLocalItem[$fediverseLocalSortField] ?? ''));
+            foreach ($fediverseEquivalentIdentifiers($fediverseLocalSortIdentifier) as $fediverseLocalSortVariant) {
+                $fediverseLocalReplyActivity = (string) ($fediverseThreadLatestReplyActivity[$fediverseLocalSortVariant] ?? '');
+                if ($fediverseLocalReplyActivity !== '' && strcmp($fediverseLocalReplyActivity, $fediverseLocalSortKey) > 0) {
+                    $fediverseLocalSortKey = $fediverseLocalReplyActivity;
+                }
+            }
+        }
         $fediverseTimelineEntries[] = [
             'kind' => 'local',
             'published' => (string) ($fediverseLocalItem['published'] ?? ''),
-            'sort_key' => (string) ($fediverseLocalItem['published'] ?? ''),
+            'sort_key' => $fediverseLocalSortKey,
             'item' => $fediverseLocalItem,
         ];
     }

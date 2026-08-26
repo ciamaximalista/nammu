@@ -182,6 +182,7 @@ $content = $renderer->render('actuality', [
     'totalPages' => $actualityTotalPages,
     'prevPageUrl' => $actualityPrevPageUrl,
     'nextPageUrl' => $actualityNextPageUrl,
+    'suppressArchiveHeader' => !empty($nammuActualityEmbedOnly),
 ]);
 
 $pageTitle = 'Fediverso';

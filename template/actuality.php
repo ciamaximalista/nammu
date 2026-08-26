@@ -560,6 +560,7 @@ $currentPage = max(1, (int) ($currentPage ?? 1));
 $totalPages = max(1, (int) ($totalPages ?? 1));
 $prevPageUrl = trim((string) ($prevPageUrl ?? ''));
 $nextPageUrl = trim((string) ($nextPageUrl ?? ''));
+$suppressArchiveHeader = !empty($suppressArchiveHeader);
 $fediverseUsername = trim((string) ($fediverseUsername ?? ''));
 if ($fediverseUsername === '') {
     $fediverseUsername = trim((string) (explode('.', strtolower((string) parse_url((string) ($baseUrl ?? ''), PHP_URL_HOST)))[0] ?? 'blog'));
@@ -659,6 +660,7 @@ $manualDisplayText = static function (array $item): string {
     return trim((string) ($item['title'] ?? ''));
 };
 ?>
+<?php if (!$suppressArchiveHeader): ?>
 <?php if ($headerType === 'graphic' && $headerImageUrl): ?>
     <section class="home-hero home-hero-graphic mode-<?= htmlspecialchars($headerMode, ENT_QUOTES, 'UTF-8') ?>">
         <img src="<?= htmlspecialchars($headerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cabecera del sitio" decoding="async" fetchpriority="high">
@@ -721,6 +723,7 @@ $manualDisplayText = static function (array $item): string {
 
 <?php if ($showHeaderButtons): ?>
     <?= $headerButtonsHtml ?>
+<?php endif; ?>
 <?php endif; ?>
 
 <?php if (empty($items)): ?>

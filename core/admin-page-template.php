@@ -24,6 +24,10 @@
                             }
                             $footerNammuEnabled = ($templateSettings['footer_nammu'] ?? ($defaults['footer_nammu'] ?? 'on')) === 'on';
                             $templateHome = $templateSettings['home'] ?? [];
+                            $homeContent = $templateHome['content'] ?? ($defaults['home']['content'] ?? 'blog');
+                            if (!in_array($homeContent, ['blog', 'podcast', 'fediverse'], true)) {
+                                $homeContent = $defaults['home']['content'] ?? 'blog';
+                            }
                             $colorLabels = [
                                 'h1' => 'Color H1',
                                 'h2' => 'Color H2',
@@ -142,6 +146,60 @@
                                 <?php endif; ?>
 
                                 <form method="post" id="template-settings" data-google-fonts-key="<?= htmlspecialchars($settings['google_fonts_api'] ?? '') ?>">
+                                    <h3 class="mt-4">Contenido de la home</h3>
+                                    <p class="text-muted">Elige qué se muestra al entrar en la portada. La vista clásica de entradas queda siempre disponible en <code>/blog</code>.</p>
+                                    <div class="form-group">
+                                        <div class="home-card-style-options">
+                                            <?php
+                                            $homeContentOptions = [
+                                                'blog' => [
+                                                    'label' => 'Blog / diccionario',
+                                                    'caption' => 'Muestra las entradas como hasta ahora',
+                                                    'figure' => 'home-content-blog',
+                                                ],
+                                                'podcast' => [
+                                                    'label' => 'Podcast',
+                                                    'caption' => 'Muestra el índice de episodios',
+                                                    'figure' => 'home-content-podcast',
+                                                ],
+                                                'fediverse' => [
+                                                    'label' => 'Fediverso',
+                                                    'caption' => 'Muestra la página de perfil federado',
+                                                    'figure' => 'home-content-fediverse',
+                                                ],
+                                            ];
+                                            ?>
+                                            <?php foreach ($homeContentOptions as $optionKey => $info): ?>
+                                                <?php $optionActive = ($homeContent === $optionKey); ?>
+                                                <label class="home-card-style-option <?= $optionActive ? 'active' : '' ?>" data-home-content-option="1">
+                                                    <input type="radio"
+                                                        name="home_content"
+                                                        value="<?= htmlspecialchars($optionKey, ENT_QUOTES, 'UTF-8') ?>"
+                                                        <?= $optionActive ? 'checked' : '' ?>>
+                                                    <span class="home-header-figure <?= htmlspecialchars($info['figure'], ENT_QUOTES, 'UTF-8') ?>">
+                                                        <?php if ($optionKey === 'podcast'): ?>
+                                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                                                <rect x="9" y="3" width="6" height="10" rx="3" stroke="currentColor" stroke-width="2"/>
+                                                                <path d="M5 11C5 15 8 18 12 18C16 18 19 15 19 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                                            </svg>
+                                                        <?php elseif ($optionKey === 'fediverse'): ?>
+                                                            <?= function_exists('nammu_fediverse_glyph_svg') ? nammu_fediverse_glyph_svg(22) : '<span style="font-weight:700;">@</span>' ?>
+                                                        <?php else: ?>
+                                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                                                <rect x="5" y="4" width="14" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+                                                                <path d="M8 9H16M8 13H16M8 17H13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                                            </svg>
+                                                        <?php endif; ?>
+                                                    </span>
+                                                    <span class="card-style-text">
+                                                        <strong><?= htmlspecialchars($info['label'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                                        <small><?= htmlspecialchars($info['caption'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                    </span>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+
                                     <h4 class="mt-3">Fuentes</h4>
                                     <div class="form-row">
                                         <div class="form-group col-md-6">

@@ -1223,6 +1223,11 @@ function nammu_template_settings(): array
 
     $homeConfig = $template['home'] ?? [];
     $home = array_merge($defaults['home'], $homeConfig);
+    $homeContent = $home['content'] ?? $defaults['home']['content'];
+    if (!in_array($homeContent, ['blog', 'podcast', 'fediverse'], true)) {
+        $homeContent = $defaults['home']['content'];
+    }
+    $home['content'] = $homeContent;
     $home['dictionary_intro'] = (string) ($home['dictionary_intro'] ?? '');
     $homeBlocks = $home['blocks'] ?? $defaults['home']['blocks'];
     if (!in_array($homeBlocks, ['boxed', 'flat'], true)) {
@@ -1416,6 +1421,7 @@ function nammu_default_template_settings(): array
             'corners' => 'rounded',
         ],
         'home' => [
+            'content' => 'blog',
             'columns' => 2,
             'per_page' => 'all',
             'card_style' => 'full',
@@ -3552,6 +3558,7 @@ function nammu_render_header_buttons(array $options): string
     $categoriesUrl = (string) ($options['categories_url'] ?? '/categorias');
     $itinerariesUrl = (string) ($options['itineraries_url'] ?? '/itinerarios');
     $podcastUrl = (string) ($options['podcast_url'] ?? '/podcast');
+    $blogUrl = (string) ($options['blog_url'] ?? (($homeUrl !== '' ? rtrim($homeUrl, '/') : '') . '/blog'));
     $lettersUrl = (string) ($options['letters_url'] ?? ($GLOBALS['lettersIndexUrl'] ?? '/letras'));
     $newslettersUrl = (string) ($options['newsletters_url'] ?? ($GLOBALS['newslettersIndexUrl'] ?? '/newsletters'));
     $actualityUrl = (string) ($options['actuality_url'] ?? (($homeUrl !== '' ? rtrim($homeUrl, '/') : '') . nammu_fediverse_profile_alias_path($config, $homeUrl)));
@@ -3586,6 +3593,11 @@ function nammu_render_header_buttons(array $options): string
         'label' => 'Portada',
         'href' => $homeUrl,
         'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 11.5L12 4L21 11.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5Z" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>',
+    ];
+    $items[] = [
+        'label' => 'Blog',
+        'href' => $blogUrl,
+        'svg' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="4" width="14" height="16" rx="2" stroke="#fff" stroke-width="2"/><path d="M8 9H16M8 13H16M8 17H13" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
     ];
     if ($showLetters) {
         $items[] = [

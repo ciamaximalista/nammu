@@ -297,6 +297,23 @@ $renderer->setGlobal('isAlphabeticalOrder', $isAlphabeticalOrder);
 $renderer->setGlobal('isAdminLogged', $isAdminLogged);
 
 $routePath = nammu_route_path();
+$homeContentMode = (string) (($theme['home']['content'] ?? 'blog') ?: 'blog');
+if (!in_array($homeContentMode, ['blog', 'podcast', 'fediverse'], true)) {
+    $homeContentMode = 'blog';
+}
+$isHomeRoute = ($routePath === '/' || $routePath === '/index.php');
+$isBlogIndexRoute = (bool) preg_match('#^/blog/?$#i', $routePath);
+$isBlogPaginationRoute = (bool) preg_match('#^/blog/(?:pagina|page)/[1-9][0-9]*$#i', $routePath);
+if ($isBlogIndexRoute || $isBlogPaginationRoute) {
+    $renderer->setGlobal('paginationUrl', function (int $page) use ($publicBaseUrl): string {
+        $target = $page <= 1 ? '/blog' : '/blog/pagina/' . $page;
+        return $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . $target : $target;
+    });
+}
+if ($isHomeRoute && $homeContentMode === 'fediverse') {
+    require __DIR__ . '/actualidad.php';
+    exit;
+}
 $fediverseProfileAliasPath = function_exists('nammu_fediverse_profile_alias_path')
     ? nammu_fediverse_profile_alias_path($configData, $publicBaseUrl)
     : '/actualidad.php';
@@ -773,8 +790,8 @@ if (!$isCategoriesIndex && preg_match('#^/categoria/([^/]+)/?$#i', $routePath, $
 }
 $currentPage = 1;
 $isPaginationRoute = false;
-if ($routePath !== '/' && $routePath !== '/index.php') {
-    if (preg_match('#^/(?:pagina|page)/([1-9][0-9]*)$#i', $routePath, $matches)) {
+if (!$isHomeRoute && !$isBlogIndexRoute) {
+    if (preg_match('#^/(?:pagina|page|blog/pagina|blog/page)/([1-9][0-9]*)$#i', $routePath, $matches)) {
         $currentPage = (int) $matches[1];
         if ($currentPage < 1) {
             $currentPage = 1;
@@ -1495,7 +1512,7 @@ if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
     exit;
 }
 
-if (preg_match('#^/podcast/?$#i', $routePath)) {
+if (preg_match('#^/podcast/?$#i', $routePath) || ($isHomeRoute && $homeContentMode === 'podcast')) {
     $rawEpisodes = nammu_collect_podcast_items(__DIR__ . '/content', $publicBaseUrl);
     $episodes = [];
     foreach ($rawEpisodes as $episode) {
@@ -1526,10 +1543,12 @@ if (preg_match('#^/podcast/?$#i', $routePath)) {
         'count' => $count,
         'hasItineraries' => !empty($itineraryListing),
     ]);
-    $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/podcast' : '/podcast';
+    $canon = ($isHomeRoute && $homeContentMode === 'podcast')
+        ? ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/' : '/')
+        : ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/podcast' : '/podcast');
     $description = 'Episodios de nuestro podcast.';
     if (function_exists('nammu_record_pageview')) {
-        nammu_record_pageview('pages', 'podcast', 'Podcast');
+        nammu_record_pageview('pages', ($isHomeRoute && $homeContentMode === 'podcast') ? 'index' : 'podcast', ($isHomeRoute && $homeContentMode === 'podcast') ? 'Portada' : 'Podcast');
     }
     $podcastMeta = nammu_build_social_meta([
         'type' => 'website',
@@ -1540,13 +1559,13 @@ if (preg_match('#^/podcast/?$#i', $routePath)) {
         'site_name' => $siteNameForMeta,
     ], $socialConfig);
     echo $renderer->render('layout', [
-        'pageTitle' => 'Podcast',
+        'pageTitle' => ($isHomeRoute && $homeContentMode === 'podcast') ? $displaySiteTitle : 'Podcast',
         'metaDescription' => $description,
         'content' => $content,
         'socialMeta' => $podcastMeta,
         'jsonLd' => [$siteJsonLd, $orgJsonLd],
         'pageLang' => $siteLang,
-        'showLogo' => true,
+        'showLogo' => !($isHomeRoute && $homeContentMode === 'podcast'),
     ]);
     exit;
 }
@@ -2884,7 +2903,7 @@ if (isset($_GET['post'])) {
         $slug = $candidateSlug;
     }
 }
-if ($slug === null && !$isPaginationRoute && $routePath !== '/' && $routePath !== '/index.php') {
+if ($slug === null && !$isPaginationRoute && !$isHomeRoute && !$isBlogIndexRoute) {
     $candidate = trim($routePath, '/');
     if ($candidate !== '') {
         $slug = $candidate;
@@ -3203,6 +3222,9 @@ if ($isAlphabeticalOrder && trim($dictionaryIntroRaw) !== '') {
 }
 
 $homeCanonicalPath = ($perPage !== null && $currentPage > 1) ? '/pagina/' . $currentPage : '/';
+if ($isBlogIndexRoute || $isBlogPaginationRoute) {
+    $homeCanonicalPath = ($perPage !== null && $currentPage > 1) ? '/blog/pagina/' . $currentPage : '/blog';
+}
 if ($publicBaseUrl !== '') {
     $baseForCanonical = rtrim($publicBaseUrl, '/');
     $homeCanonical = $homeCanonicalPath === '/' ? $baseForCanonical . '/' : $baseForCanonical . $homeCanonicalPath;
@@ -3230,6 +3252,10 @@ if ($perPage !== null && $currentPage > 1) {
 if (function_exists('nammu_record_pageview')) {
     $pageSlug = $currentPage > 1 ? 'pagina/' . $currentPage : 'index';
     $pageLabel = $currentPage > 1 ? ('Página ' . $currentPage) : 'Portada';
+    if ($isBlogIndexRoute || $isBlogPaginationRoute) {
+        $pageSlug = $currentPage > 1 ? 'blog/pagina/' . $currentPage : 'blog';
+        $pageLabel = $currentPage > 1 ? ('Blog - Página ' . $currentPage) : 'Blog';
+    }
     nammu_record_pageview('pages', $pageSlug, $pageLabel);
 }
 
@@ -3250,5 +3276,5 @@ echo $renderer->render('layout', [
     'socialMeta' => $homeSocialMeta,
     'jsonLd' => [$siteJsonLd, $orgJsonLd],
     'pageLang' => $siteLang,
-    'showLogo' => ($routePath !== '/' && $routePath !== '/index.php'),
+    'showLogo' => !$isHomeRoute,
 ]);

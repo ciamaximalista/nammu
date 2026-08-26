@@ -2863,6 +2863,11 @@ function get_settings() {
     }
     $homeConfig = $templateConfig['home'] ?? [];
     $home = array_merge($defaults['home'], $homeConfig);
+    $homeContent = $home['content'] ?? $defaults['home']['content'];
+    if (!in_array($homeContent, ['blog', 'podcast', 'fediverse'], true)) {
+        $homeContent = $defaults['home']['content'];
+    }
+    $home['content'] = $homeContent;
     $homeBlocks = $home['blocks'] ?? $defaults['home']['blocks'];
     if (!in_array($homeBlocks, ['boxed', 'flat'], true)) {
         $homeBlocks = $defaults['home']['blocks'];
@@ -6510,6 +6515,7 @@ function get_default_template_settings(): array {
             'corners' => 'rounded',
         ],
         'home' => [
+            'content' => 'blog',
             'columns' => 2,
             'first_row_enabled' => 'off',
             'first_row_columns' => 2,
@@ -12827,6 +12833,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $logoImage = trim($_POST['logo_image'] ?? '');
         $images = ['logo' => $logoImage];
+        $homeContentPosted = $_POST['home_content'] ?? ($defaults['home']['content'] ?? 'blog');
+        if (!in_array($homeContentPosted, ['blog', 'podcast', 'fediverse'], true)) {
+            $homeContentPosted = $defaults['home']['content'] ?? 'blog';
+        }
         $homeColumnsPosted = isset($_POST['home_columns']) ? (int) $_POST['home_columns'] : $defaults['home']['columns'];
         if (!in_array($homeColumnsPosted, [1, 2, 3], true)) {
             $homeColumnsPosted = $defaults['home']['columns'];
@@ -12972,6 +12982,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'corners' => $cornerStylePosted,
             ],
             'home' => [
+                'content' => $homeContentPosted,
                 'columns' => $homeColumnsPosted,
                 'first_row_enabled' => $homeFirstRowEnabled ? 'on' : 'off',
                 'first_row_columns' => $homeFirstRowColumns,
@@ -16429,6 +16440,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             refreshLayoutSelection();
 
             var cardStyleOptions = form.querySelectorAll('.home-card-style-option[data-card-style-option]');
+            var homeContentOptions = form.querySelectorAll('.home-card-style-option[data-home-content-option]');
             var fullImageOptionsContainer = form.querySelector('[data-full-image-options]');
             var fullImageModeOptions = form.querySelectorAll('.home-card-style-option[data-full-image-mode]');
             var searchModeOptions = form.querySelectorAll('.home-card-style-option[data-search-mode-option]');
@@ -16462,6 +16474,20 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                 }
             });
             refreshCardStyleSelection();
+            function refreshHomeContentSelection() {
+                homeContentOptions.forEach(function(option) {
+                    var radio = option.querySelector('input[type="radio"]');
+                    option.classList.toggle('active', radio && radio.checked);
+                });
+            }
+            homeContentOptions.forEach(function(option) {
+                var radio = option.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.addEventListener('change', refreshHomeContentSelection);
+                }
+            });
+            refreshHomeContentSelection();
+
             function refreshFullImageModeSelection() {
                 fullImageModeOptions.forEach(function(option) {
                     var radio = option.querySelector('input[type="radio"]');

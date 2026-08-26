@@ -225,7 +225,7 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $accent
     <?php
     return (string) ob_get_clean();
 };
-$renderSubscriptionBox = static function (string $variant) use ($subscriptionAction, $accentColor, $highlight, $textColor, $subscriptionMessage, $currentUrl, $postalEnabled, $postalUrl, $postalLogoSvg): string {
+$renderSubscriptionBox = static function (string $variant) use ($subscriptionAction, $accentColor, $highlight, $textColor, $subscriptionMessage, $currentUrl, $postalEnabled, $postalUrl, $postalLogoSvg, $subscriptionMenuLabel): string {
     $avisosUrl = $subscriptionAction !== '' ? str_replace('/subscribe.php', '/avisos', $subscriptionAction) : '/avisos';
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?> site-subscription-box">

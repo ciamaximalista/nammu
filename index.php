@@ -298,7 +298,7 @@ $renderer->setGlobal('isAdminLogged', $isAdminLogged);
 
 $routePath = nammu_route_path();
 $homeContentMode = (string) (($theme['home']['content'] ?? 'blog') ?: 'blog');
-if (!in_array($homeContentMode, ['blog', 'podcast', 'fediverse'], true)) {
+if (!in_array($homeContentMode, ['blog', 'podcast', 'fediverse', 'itineraries'], true)) {
     $homeContentMode = 'blog';
 }
 $isHomeRoute = ($routePath === '/' || $routePath === '/index.php');
@@ -2493,7 +2493,7 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
     exit;
 }
 
-if (preg_match('#^/itinerarios/?$#i', $routePath)) {
+if (preg_match('#^/itinerarios/?$#i', $routePath) || ($isHomeRoute && $homeContentMode === 'itineraries')) {
     $itineraries = $itineraryListing;
     $itineraryFediverseMetaBySlug = [];
     if (function_exists('nammu_fediverse_public_thread_meta_for_named_local_item')) {
@@ -2535,30 +2535,32 @@ if (preg_match('#^/itinerarios/?$#i', $routePath)) {
         'heroImage' => $itineraryHeroImage,
         'itineraryFediverseMetaBySlug' => $itineraryFediverseMetaBySlug,
     ]);
-    $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios';
+    $canon = ($isHomeRoute && $homeContentMode === 'itineraries')
+        ? ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/' : '/')
+        : ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/itinerarios' : '/itinerarios');
     $description = 'Selección de itinerarios temáticos para seguir paso a paso.';
     if (function_exists('nammu_record_pageview')) {
-        nammu_record_pageview('pages', 'itinerarios', 'Itinerarios');
+        nammu_record_pageview('pages', ($isHomeRoute && $homeContentMode === 'itineraries') ? 'index' : 'itinerarios', ($isHomeRoute && $homeContentMode === 'itineraries') ? 'Portada' : 'Itinerarios');
     }
     $itineraryIndexMeta = nammu_build_social_meta([
         'type' => 'website',
-        'title' => 'Itinerarios — ' . $siteNameForMeta,
+        'title' => ($isHomeRoute && $homeContentMode === 'itineraries') ? $displaySiteTitle : 'Itinerarios — ' . $siteNameForMeta,
         'description' => $description,
         'url' => $canon,
         'image' => $homeImage,
         'site_name' => $siteNameForMeta,
     ], $socialConfig);
     $breadcrumbJsonLd = $buildBreadcrumbJsonLd([
-        ['name' => 'Itinerarios', 'url' => $canon],
+        ['name' => ($isHomeRoute && $homeContentMode === 'itineraries') ? 'Portada' : 'Itinerarios', 'url' => $canon],
     ]);
     echo $renderer->render('layout', [
-        'pageTitle' => 'Itinerarios',
+        'pageTitle' => ($isHomeRoute && $homeContentMode === 'itineraries') ? $displaySiteTitle : 'Itinerarios',
         'metaDescription' => $description,
         'content' => $content,
         'socialMeta' => $itineraryIndexMeta,
         'jsonLd' => [$siteJsonLd, $orgJsonLd, $breadcrumbJsonLd],
         'pageLang' => $siteLang,
-        'showLogo' => true,
+        'showLogo' => !($isHomeRoute && $homeContentMode === 'itineraries'),
     ]);
     exit;
 }
@@ -3050,6 +3052,26 @@ if ($slug !== null && $slug !== '') {
     $postFediverseThreadMeta = function_exists('nammu_fediverse_public_thread_meta_for_named_local_item')
         ? nammu_fediverse_public_thread_meta_for_named_local_item($post->getSlug(), 'post', $config)
         : ['thread_url' => '', 'summary' => ['likes' => 0, 'shares' => 0, 'replies' => 0], 'details' => ['likes' => [], 'shares' => [], 'replies' => []]];
+    $postFediverseThreadReplies = [];
+    if (function_exists('nammu_fediverse_find_named_local_item') && function_exists('nammu_fediverse_best_thread_page_payload')) {
+        $postFediverseLocalItem = nammu_fediverse_find_named_local_item($post->getSlug(), 'post', $config);
+        if (is_array($postFediverseLocalItem)) {
+            $postFediversePayload = nammu_fediverse_best_thread_page_payload($postFediverseLocalItem, $config);
+            $postFediverseThreadReplies = is_array($postFediversePayload['replies'] ?? null) ? $postFediversePayload['replies'] : [];
+            foreach ($postFediverseThreadReplies as &$postFediverseThreadReply) {
+                if (!is_array($postFediverseThreadReply)) {
+                    continue;
+                }
+                if (function_exists('nammu_fediverse_reply_link_card')) {
+                    $replyLinkCard = nammu_fediverse_reply_link_card($postFediverseThreadReply, $config);
+                    if (is_array($replyLinkCard)) {
+                        $postFediverseThreadReply['link_card'] = $replyLinkCard;
+                    }
+                }
+            }
+            unset($postFediverseThreadReply);
+        }
+    }
     $content = $renderer->render('single', [
         'pageTitle' => $post->getTitle(),
         'post' => $post,
@@ -3059,6 +3081,7 @@ if ($slug !== null && $slug !== '') {
         'relatedPosts' => $relatedPosts,
         'fediverseThreadUrl' => (string) ($postFediverseThreadMeta['thread_url'] ?? ''),
         'fediverseThreadMeta' => $postFediverseThreadMeta,
+        'fediverseThreadReplies' => $postFediverseThreadReplies,
         'editButtonHref' => $isAdminLogged
             ? (($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/admin.php?page=edit-post&file=' . rawurlencode($post->getSlug() . '.md'))
             : '',

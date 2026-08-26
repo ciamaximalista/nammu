@@ -41,6 +41,7 @@ $fediverseThreadUrl = trim((string) ($fediverseThreadUrl ?? ''));
 $fediverseThreadMeta = is_array($fediverseThreadMeta ?? null) ? $fediverseThreadMeta : [];
 $fediverseThreadSummary = is_array($fediverseThreadMeta['summary'] ?? null) ? $fediverseThreadMeta['summary'] : ['likes' => 0, 'shares' => 0, 'replies' => 0];
 $fediverseThreadDetails = is_array($fediverseThreadMeta['details'] ?? null) ? $fediverseThreadMeta['details'] : ['likes' => [], 'shares' => [], 'replies' => []];
+$fediverseThreadReplies = is_array($fediverseThreadReplies ?? null) ? $fediverseThreadReplies : [];
 $fediverseIcon = function_exists('nammu_footer_icon_svgs') ? (string) (nammu_footer_icon_svgs()['fediverse'] ?? '') : '';
 $singleFediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
 $singleFediverseConfig = is_array($singleFediverseConfig) ? $singleFediverseConfig : [];
@@ -67,6 +68,62 @@ $singleUserAgent = (string) ($_SERVER['HTTP_USER_AGENT'] ?? '');
 $singleBotName = function_exists('nammu_detect_bot_name') ? nammu_detect_bot_name($singleUserAgent) : '';
 $singleReaderAgentNames = ['Instapaper', 'Kobo', 'Pocket', 'Wallabag', 'Readability'];
 $isReaderFetcherSingle = in_array($singleBotName, $singleReaderAgentNames, true);
+$formatSingleFediverseDateTime = static function (string $value): string {
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+    try {
+        $date = new DateTimeImmutable($value);
+        return $date->format('d/m/Y H:i');
+    } catch (Throwable $exception) {
+        return $value;
+    }
+};
+$renderSingleFediverseText = static function (string $text): string {
+    $text = trim($text);
+    if ($text === '') {
+        return '';
+    }
+    $escaped = htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $escaped = preg_replace_callback('#https?://[^\s<]+#iu', static function (array $matches): string {
+        $url = rtrim((string) ($matches[0] ?? ''), '.,;:)');
+        $suffix = substr((string) ($matches[0] ?? ''), strlen($url));
+        return '<a href="' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" target="_blank" rel="noopener">' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</a>' . htmlspecialchars($suffix, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }, $escaped) ?? $escaped;
+    $paragraphs = preg_split('/\n{2,}/u', $escaped) ?: [$escaped];
+    $html = '';
+    foreach ($paragraphs as $paragraph) {
+        $paragraph = trim((string) $paragraph);
+        if ($paragraph === '') {
+            continue;
+        }
+        $html .= '<p>' . nl2br($paragraph) . '</p>';
+    }
+    return $html;
+};
+$renderSingleFediverseAttachments = static function (array $attachments): string {
+    $html = '';
+    foreach ($attachments as $attachment) {
+        if (!is_array($attachment)) {
+            continue;
+        }
+        $url = trim((string) (($attachment['url'] ?? '') ?: ($attachment['href'] ?? '')));
+        if ($url === '' || preg_match('#^https?://#i', $url) !== 1) {
+            continue;
+        }
+        $mime = strtolower(trim((string) (($attachment['mediaType'] ?? '') ?: ($attachment['type'] ?? ''))));
+        $name = trim((string) (($attachment['name'] ?? '') ?: 'Adjunto'));
+        if (str_starts_with($mime, 'video/')) {
+            $html .= '<div class="fediverse-public-reply__media"><video controls preload="metadata"><source src="' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" type="' . htmlspecialchars($mime, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"></video></div>';
+        } elseif (str_starts_with($mime, 'audio/')) {
+            $html .= '<div class="fediverse-public-reply__media"><audio controls preload="none"><source src="' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" type="' . htmlspecialchars($mime, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"></audio></div>';
+        } elseif (str_starts_with($mime, 'image/') || preg_match('#\.(?:jpe?g|png|gif|webp|avif)(?:\?|$)#i', $url) === 1) {
+            $html .= '<div class="fediverse-public-reply__media"><img src="' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" alt="' . htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" loading="lazy"></div>';
+        }
+    }
+    return $html;
+};
 $searchSettings = $theme['search'] ?? [];
 $searchMode = in_array($searchSettings['mode'] ?? 'none', ['none', 'home', 'single', 'both'], true) ? $searchSettings['mode'] : 'none';
 $searchPositionSetting = in_array($searchSettings['position'] ?? 'title', ['title', 'footer'], true) ? $searchSettings['position'] : 'title';
@@ -212,7 +269,7 @@ $renderSearchBox = static function (string $variant) use ($searchAction, $colorH
     <?php
     return (string) ob_get_clean();
 };
-$renderSubscriptionBox = static function (string $variant) use ($subscriptionAction, $colorAccent, $colorHighlight, $colorText, $subscriptionMessage, $currentUrl, $postalEnabled, $postalUrl, $postalLogoSvg): string {
+$renderSubscriptionBox = static function (string $variant) use ($subscriptionAction, $colorAccent, $colorHighlight, $colorText, $subscriptionMessage, $currentUrl, $postalEnabled, $postalUrl, $postalLogoSvg, $subscriptionMenuLabel): string {
     $avisosUrl = $subscriptionAction !== '' ? str_replace('/subscribe.php', '/avisos', $subscriptionAction) : '/avisos';
     ob_start(); ?>
     <div class="site-search-box <?= htmlspecialchars($variant, ENT_QUOTES, 'UTF-8') ?> site-subscription-box">
@@ -446,6 +503,60 @@ if ($isPageTemplate && $formattedDate !== '') {
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
+        <?php if (!empty($webmentionMentions)): ?>
+            <div class="fediverse-object-cta instapaper_ignore" aria-label="Menciones en otros blogs">
+                <div class="post-related-heading fediverse-object-heading">
+                    <span class="fediverse-object-cta-label">Menciones en otros blogs</span>
+                </div>
+                <div class="fediverse-inline-metrics">
+                    <?php foreach ($webmentionMentions as $mention): ?>
+                        <?php
+                        $mentionBlogName = trim((string) (($mention['blog_name'] ?? '') ?: ((string) (parse_url((string) ($mention['source'] ?? ''), PHP_URL_HOST) ?? ''))));
+                        $mentionBlogIcon = trim((string) ($mention['blog_icon'] ?? ''));
+                        $mentionSourceUrl = trim((string) ($mention['source'] ?? ''));
+                        if ($mentionSourceUrl === '') {
+                            continue;
+                        }
+                        ?>
+                        <div class="fediverse-inline-metric-group fediverse-inline-metric-group--mention">
+                            <a class="fediverse-inline-metric-label fediverse-inline-metric-label--mention" href="<?= htmlspecialchars($mentionSourceUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                <?php if ($mentionBlogIcon !== ''): ?>
+                                    <span class="fediverse-inline-mention-icon"><img src="<?= htmlspecialchars($mentionBlogIcon, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($mentionBlogName, ENT_QUOTES, 'UTF-8') ?>" loading="lazy"></span>
+                                <?php else: ?>
+                                    <span class="fediverse-inline-mention-fallback"><?= htmlspecialchars(mb_substr($mentionBlogName !== '' ? $mentionBlogName : 'B', 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></span>
+                                <?php endif; ?>
+                                <span><?= htmlspecialchars($mentionBlogName !== '' ? $mentionBlogName : 'Blog externo', ENT_QUOTES, 'UTF-8') ?></span>
+                            </a>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
+        <?php if (!empty($relatedPosts)): ?>
+            <section class="post-related" aria-label="Entradas o itinerarios relacionados">
+                <div class="post-related-heading">Descubre ahora</div>
+                <div class="post-related-grid">
+                    <?php foreach ($relatedPosts as $relatedPost): ?>
+                        <?php
+                        $relatedTitle = trim((string) ($relatedPost['title'] ?? ''));
+                        $relatedUrl = trim((string) ($relatedPost['url'] ?? ''));
+                        $relatedImage = trim((string) ($relatedPost['image'] ?? ''));
+                        if ($relatedTitle === '' || $relatedUrl === '') {
+                            continue;
+                        }
+                        ?>
+                        <a class="post-related-card" href="<?= htmlspecialchars($relatedUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?>">
+                            <?php if ($relatedImage !== ''): ?>
+                                <img src="<?= htmlspecialchars($relatedImage, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
+                            <?php else: ?>
+                                <span class="post-related-fallback" aria-hidden="true"></span>
+                            <?php endif; ?>
+                            <span class="post-related-title"><?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?></span>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+        <?php endif; ?>
         <?php if ($fediverseThreadUrl !== ''): ?>
             <?php
             $fediverseRepliesCount = max(0, (int) ($fediverseThreadSummary['replies'] ?? 0));
@@ -455,16 +566,14 @@ if ($isPageTemplate && $formattedDate !== '') {
             $fediverseEmptyLabel = $isItineraryTemplate
                 ? 'Este itinerario en el Fediverso'
                 : ($isPodcastTemplate ? 'Este episodio en el Fediverso' : 'Esta entrada en el Fediverso');
+            $fediverseButtonLabel = $isItineraryTemplate
+                ? 'Comentarios y reacciones a este itinerario en el Fediverso'
+                : ($isPodcastTemplate
+                    ? 'Comentarios y reacciones a este episodio en el Fediverso'
+                    : 'Comentarios y reacciones a esta entrada en el Fediverso');
             ?>
             <div class="fediverse-object-cta instapaper_ignore" aria-label="Resumen en el Fediverso">
                 <?php if ($hasFediverseMetrics): ?>
-                    <?php
-                    $fediverseButtonLabel = $isItineraryTemplate
-                        ? 'Comentarios y reacciones a este itinerario en el Fediverso'
-                        : ($isPodcastTemplate
-                            ? 'Comentarios y reacciones a este episodio en el Fediverso'
-                            : 'Comentarios y reacciones a esta entrada en el Fediverso');
-                    ?>
                     <div class="post-related-heading fediverse-object-heading">
                         <a class="fediverse-object-heading-link" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($fediverseButtonLabel, ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($fediverseButtonLabel, ENT_QUOTES, 'UTF-8') ?>">
                             <span class="fediverse-object-cta-label"><?= htmlspecialchars($fediverseButtonLabel, ENT_QUOTES, 'UTF-8') ?></span>
@@ -540,10 +649,99 @@ if ($isPageTemplate && $formattedDate !== '') {
                                 <?php endif; ?>
                             </div>
                         <?php endif; ?>
-                        <div class="fediverse-inline-metric-group">
-                            <a class="fediverse-inline-metric-label fediverse-inline-metric-label--cta" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>">Ver</a>
-                        </div>
                     </div>
+                    <?php if (!empty($fediverseThreadReplies)): ?>
+                        <section class="fediverse-public-section fediverse-public-section--single-replies" aria-label="Respuestas en el Fediverso">
+                            <h2>Respuestas</h2>
+                            <div class="fediverse-public-thread">
+                                <?php foreach ($fediverseThreadReplies as $reply): ?>
+                                    <?php
+                                    if (!is_array($reply)) {
+                                        continue;
+                                    }
+                                    $replyActorId = trim((string) ($reply['actor_id'] ?? ''));
+                                    $replyActorUsername = trim((string) ($reply['actor_username'] ?? ''));
+                                    $replyName = trim((string) ($reply['actor_name'] ?? ''));
+                                    if ($replyName === '') {
+                                        $replyName = $replyActorUsername !== '' ? $replyActorUsername : ($replyActorId !== '' ? $replyActorId : 'Autor');
+                                    }
+                                    $replyHandle = trim((string) ($reply['actor_handle'] ?? ''));
+                                    if ($replyHandle === '') {
+                                        $actorHost = trim((string) (parse_url($replyActorId, PHP_URL_HOST) ?? ''));
+                                        if ($replyActorUsername !== '') {
+                                            $replyHandle = '@' . ltrim($replyActorUsername, '@') . ($actorHost !== '' ? '@' . $actorHost : '');
+                                        } elseif ($replyActorId !== '') {
+                                            $replyHandle = $replyActorId;
+                                        }
+                                    }
+                                    $replyAvatar = $singleValidFediverseAvatarUrl(trim((string) ($reply['actor_icon'] ?? '')), $replyActorId !== '' ? $replyActorId : trim((string) ($reply['url'] ?? '')));
+                                    $replySummary = is_array($reply['summary'] ?? null) ? $reply['summary'] : ['likes' => 0, 'shares' => 0];
+                                    $replyText = trim((string) ($reply['reply_text'] ?? ''));
+                                    $replyCard = is_array($reply['link_card'] ?? null) ? $reply['link_card'] : null;
+                                    ?>
+                                    <article class="fediverse-public-reply">
+                                        <div class="fediverse-public-reply__top">
+                                            <div class="fediverse-public-reply__avatar">
+                                                <?php if ($replyAvatar !== ''): ?>
+                                                    <img src="<?= htmlspecialchars($replyAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="" loading="lazy">
+                                                <?php else: ?>
+                                                    <?= htmlspecialchars(mb_substr($replyName !== '' ? $replyName : 'A', 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="fediverse-public-reply__main">
+                                                <div class="fediverse-public-reply__header">
+                                                    <strong><?= htmlspecialchars($replyName, ENT_QUOTES, 'UTF-8') ?></strong>
+                                                    <?php if ($replyHandle !== ''): ?>
+                                                        <span class="fediverse-public-reply__meta"><?= htmlspecialchars($replyHandle, ENT_QUOTES, 'UTF-8') ?></span>
+                                                    <?php endif; ?>
+                                                    <?php $replyPublishedLabel = $formatSingleFediverseDateTime((string) ($reply['published'] ?? '')); ?>
+                                                    <?php if ($replyPublishedLabel !== ''): ?>
+                                                        <span class="fediverse-public-reply__meta"><?= htmlspecialchars($replyPublishedLabel, ENT_QUOTES, 'UTF-8') ?></span>
+                                                    <?php endif; ?>
+                                                    <?php if ((int) ($replySummary['likes'] ?? 0) > 0 || (int) ($replySummary['shares'] ?? 0) > 0): ?>
+                                                        <span class="fediverse-public-reply__header-metrics">
+                                                            <?php if ((int) ($replySummary['likes'] ?? 0) > 0): ?>
+                                                                <span class="fediverse-public-reply__header-metric" title="<?= (int) ($replySummary['likes'] ?? 0) ?> favorito<?= ((int) ($replySummary['likes'] ?? 0) === 1) ? '' : 's' ?>">
+                                                                    <span aria-hidden="true">♥</span><span><?= (int) ($replySummary['likes'] ?? 0) ?></span>
+                                                                </span>
+                                                            <?php endif; ?>
+                                                            <?php if ((int) ($replySummary['shares'] ?? 0) > 0): ?>
+                                                                <span class="fediverse-public-reply__header-metric" title="<?= (int) ($replySummary['shares'] ?? 0) ?> impulso<?= ((int) ($replySummary['shares'] ?? 0) === 1) ? '' : 's' ?>">
+                                                                    <span aria-hidden="true">↗</span><span><?= (int) ($replySummary['shares'] ?? 0) ?></span>
+                                                                </span>
+                                                            <?php endif; ?>
+                                                        </span>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <?php if ($replyText !== ''): ?>
+                                                    <div class="fediverse-public-reply__text"><?= $renderSingleFediverseText($replyText) ?></div>
+                                                <?php endif; ?>
+                                                <?php if (is_array($replyCard) && trim((string) ($replyCard['url'] ?? '')) !== ''): ?>
+                                                    <a class="fediverse-public-reply__card" href="<?= htmlspecialchars((string) $replyCard['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                                                        <?php if (!empty($replyCard['image'])): ?>
+                                                            <img src="<?= htmlspecialchars((string) $replyCard['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) (($replyCard['title'] ?? '') ?: 'Vista previa del enlace'), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                                        <?php endif; ?>
+                                                        <div class="fediverse-public-reply__card-body">
+                                                            <span class="fediverse-public-reply__card-title"><?= htmlspecialchars((string) (($replyCard['title'] ?? '') ?: ($replyCard['url'] ?? '')), ENT_QUOTES, 'UTF-8') ?></span>
+                                                            <?php if (!empty($replyCard['description'])): ?>
+                                                                <div class="fediverse-public-reply__card-description"><?= $renderSingleFediverseText((string) $replyCard['description']) ?></div>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </a>
+                                                <?php endif; ?>
+                                                <?php if (!empty($reply['image'])): ?>
+                                                    <div class="fediverse-public-reply__media">
+                                                        <img src="<?= htmlspecialchars((string) $reply['image'], ENT_QUOTES, 'UTF-8') ?>" alt="Imagen adjunta" loading="lazy">
+                                                    </div>
+                                                <?php endif; ?>
+                                                <?= $renderSingleFediverseAttachments((array) ($reply['attachments'] ?? [])) ?>
+                                            </div>
+                                        </div>
+                                    </article>
+                                <?php endforeach; ?>
+                            </div>
+                        </section>
+                    <?php endif; ?>
                 <?php else: ?>
                     <a class="fediverse-object-empty-btn" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($fediverseEmptyLabel, ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($fediverseEmptyLabel, ENT_QUOTES, 'UTF-8') ?>">
                         <span><?= htmlspecialchars($fediverseEmptyLabel, ENT_QUOTES, 'UTF-8') ?></span>
@@ -553,60 +751,6 @@ if ($isPageTemplate && $formattedDate !== '') {
                     </a>
                 <?php endif; ?>
             </div>
-        <?php endif; ?>
-        <?php if (!empty($webmentionMentions)): ?>
-            <div class="fediverse-object-cta instapaper_ignore" aria-label="Menciones en otros blogs">
-                <div class="post-related-heading fediverse-object-heading">
-                    <span class="fediverse-object-cta-label">Menciones en otros blogs</span>
-                </div>
-                <div class="fediverse-inline-metrics">
-                    <?php foreach ($webmentionMentions as $mention): ?>
-                        <?php
-                        $mentionBlogName = trim((string) (($mention['blog_name'] ?? '') ?: ((string) (parse_url((string) ($mention['source'] ?? ''), PHP_URL_HOST) ?? ''))));
-                        $mentionBlogIcon = trim((string) ($mention['blog_icon'] ?? ''));
-                        $mentionSourceUrl = trim((string) ($mention['source'] ?? ''));
-                        if ($mentionSourceUrl === '') {
-                            continue;
-                        }
-                        ?>
-                        <div class="fediverse-inline-metric-group fediverse-inline-metric-group--mention">
-                            <a class="fediverse-inline-metric-label fediverse-inline-metric-label--mention" href="<?= htmlspecialchars($mentionSourceUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                <?php if ($mentionBlogIcon !== ''): ?>
-                                    <span class="fediverse-inline-mention-icon"><img src="<?= htmlspecialchars($mentionBlogIcon, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($mentionBlogName, ENT_QUOTES, 'UTF-8') ?>" loading="lazy"></span>
-                                <?php else: ?>
-                                    <span class="fediverse-inline-mention-fallback"><?= htmlspecialchars(mb_substr($mentionBlogName !== '' ? $mentionBlogName : 'B', 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></span>
-                                <?php endif; ?>
-                                <span><?= htmlspecialchars($mentionBlogName !== '' ? $mentionBlogName : 'Blog externo', ENT_QUOTES, 'UTF-8') ?></span>
-                            </a>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        <?php endif; ?>
-        <?php if (!empty($relatedPosts)): ?>
-            <section class="post-related" aria-label="Entradas o itinerarios relacionados">
-                <div class="post-related-heading">Descubre ahora</div>
-                <div class="post-related-grid">
-                    <?php foreach ($relatedPosts as $relatedPost): ?>
-                        <?php
-                        $relatedTitle = trim((string) ($relatedPost['title'] ?? ''));
-                        $relatedUrl = trim((string) ($relatedPost['url'] ?? ''));
-                        $relatedImage = trim((string) ($relatedPost['image'] ?? ''));
-                        if ($relatedTitle === '' || $relatedUrl === '') {
-                            continue;
-                        }
-                        ?>
-                        <a class="post-related-card" href="<?= htmlspecialchars($relatedUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?>">
-                            <?php if ($relatedImage !== ''): ?>
-                                <img src="<?= htmlspecialchars($relatedImage, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
-                            <?php else: ?>
-                                <span class="post-related-fallback" aria-hidden="true"></span>
-                            <?php endif; ?>
-                            <span class="post-related-title"><?= htmlspecialchars($relatedTitle, ENT_QUOTES, 'UTF-8') ?></span>
-                        </a>
-                    <?php endforeach; ?>
-                </div>
-            </section>
         <?php endif; ?>
         <?php if ($isPodcastTemplate && $podcastEpisodesIndexUrl !== ''): ?>
             <div class="podcast-index-cta">
@@ -715,22 +859,6 @@ if ($isPageTemplate && $formattedDate !== '') {
         align-items: center;
         gap: .5rem;
     }
-    .fediverse-inline-metric-label--cta {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: .28rem .78rem;
-        border-radius: 999px;
-        background: <?= $fediverseButtonTextColor ?>;
-        color: #fff;
-        text-decoration: none;
-        box-shadow: 0 8px 18px rgba(0,0,0,.12);
-    }
-    .fediverse-inline-metric-label--cta:hover {
-        color: #fff;
-        text-decoration: none;
-        filter: brightness(.96);
-    }
     .fediverse-object-empty-btn {
         display: inline-flex;
         align-items: center;
@@ -794,6 +922,148 @@ if ($isPageTemplate && $formattedDate !== '') {
         height: 100%;
         object-fit: cover;
         display: block;
+    }
+    .fediverse-public-section--single-replies {
+        background: #fff;
+        border: 1px solid rgba(0,0,0,.08);
+        border-radius: 18px;
+        padding: 1.25rem;
+        margin: 1rem 0 0;
+        box-shadow: 0 16px 36px rgba(0,0,0,.06);
+    }
+    .fediverse-public-section--single-replies h2 {
+        margin: 0 0 1rem;
+        font-size: 1.15rem;
+    }
+    .fediverse-public-thread {
+        display: grid;
+        gap: .9rem;
+    }
+    .fediverse-public-reply {
+        background: #fff;
+        border: 1px solid rgba(0,0,0,.08);
+        border-radius: 16px;
+        padding: 1rem;
+    }
+    .fediverse-public-reply__top {
+        display: flex;
+        gap: .9rem;
+        align-items: flex-start;
+    }
+    .fediverse-public-reply__avatar {
+        width: 52px;
+        height: 52px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #dfe7ef;
+        flex: 0 0 52px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+    }
+    .fediverse-public-reply__avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    .fediverse-public-reply__main {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .fediverse-public-reply__header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem .75rem;
+        align-items: baseline;
+        margin-bottom: .75rem;
+    }
+    .fediverse-public-reply__header strong {
+        font-size: 1rem;
+    }
+    .fediverse-public-reply__meta {
+        color: rgba(0,0,0,.6);
+        font-size: .92rem;
+    }
+    .fediverse-public-reply__text {
+        font-size: 1rem;
+        line-height: 1.6;
+    }
+    .fediverse-public-reply__text p {
+        margin: 0 0 .7rem;
+    }
+    .fediverse-public-reply__text p:last-child {
+        margin-bottom: 0;
+    }
+    .fediverse-public-reply__header-metrics {
+        display: inline-flex;
+        align-items: center;
+        gap: .55rem;
+        margin-left: auto;
+    }
+    .fediverse-public-reply__header-metric {
+        display: inline-flex;
+        align-items: center;
+        gap: .22rem;
+        color: rgba(0,0,0,.62);
+        font-size: .9rem;
+        line-height: 1;
+        white-space: nowrap;
+    }
+    .fediverse-public-reply__media {
+        margin-top: .9rem;
+    }
+    .fediverse-public-reply__media img {
+        width: 100%;
+        max-height: 720px;
+        object-fit: cover;
+        display: block;
+        border-radius: 16px;
+        background: #fff;
+        border: 1px solid rgba(0,0,0,.08);
+    }
+    .fediverse-public-reply__media video,
+    .fediverse-public-reply__media audio {
+        width: 100%;
+        display: block;
+        border-radius: 16px;
+    }
+    .fediverse-public-reply__media video {
+        background: #000;
+        max-height: 720px;
+    }
+    .fediverse-public-reply__media audio {
+        background: #f4f4f4;
+    }
+    .fediverse-public-reply__card {
+        display: block;
+        margin-top: .9rem;
+        border-radius: 16px;
+        overflow: hidden;
+        background: #f7f7f7;
+        border: 1px solid rgba(0,0,0,.08);
+        color: inherit;
+        text-decoration: none;
+    }
+    .fediverse-public-reply__card img {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        object-fit: cover;
+        display: block;
+    }
+    .fediverse-public-reply__card-body {
+        padding: .9rem 1rem;
+    }
+    .fediverse-public-reply__card-title {
+        display: block;
+        font-weight: 700;
+        margin-bottom: .35rem;
+    }
+    .fediverse-public-reply__card-description {
+        display: block;
+        color: rgba(0,0,0,.7);
+        line-height: 1.5;
     }
     .post-body .podcast-video-single {
         width: min(960px, 100%);

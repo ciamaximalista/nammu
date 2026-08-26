@@ -25,7 +25,7 @@
                             $footerNammuEnabled = ($templateSettings['footer_nammu'] ?? ($defaults['footer_nammu'] ?? 'on')) === 'on';
                             $templateHome = $templateSettings['home'] ?? [];
                             $homeContent = $templateHome['content'] ?? ($defaults['home']['content'] ?? 'blog');
-                            if (!in_array($homeContent, ['blog', 'podcast', 'fediverse'], true)) {
+                            if (!in_array($homeContent, ['blog', 'podcast', 'fediverse', 'itineraries'], true)) {
                                 $homeContent = $defaults['home']['content'] ?? 'blog';
                             }
                             $colorLabels = [
@@ -167,6 +167,11 @@
                                                     'caption' => 'Muestra la página de perfil federado',
                                                     'figure' => 'home-content-fediverse',
                                                 ],
+                                                'itineraries' => [
+                                                    'label' => 'Itinerarios',
+                                                    'caption' => 'Muestra el índice de itinerarios',
+                                                    'figure' => 'home-content-itineraries',
+                                                ],
                                             ];
                                             ?>
                                             <?php foreach ($homeContentOptions as $optionKey => $info): ?>
@@ -184,6 +189,12 @@
                                                             </svg>
                                                         <?php elseif ($optionKey === 'fediverse'): ?>
                                                             <?= function_exists('nammu_fediverse_glyph_svg') ? nammu_fediverse_glyph_svg(22) : '<span style="font-weight:700;">@</span>' ?>
+                                                        <?php elseif ($optionKey === 'itineraries'): ?>
+                                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                                                                <path d="M4 5H10C11.1046 5 12 5.89543 12 7V19H4C2.89543 19 2 18.1046 2 17V7C2 5.89543 2.89543 5 4 5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                                                <path d="M20 5H14C12.8954 5 12 5.89543 12 7V19H20C21.1046 19 22 18.1046 22 17V7C22 5.89543 21.1046 5 20 5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                                                <line x1="12" y1="7" x2="12" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                                            </svg>
                                                         <?php else: ?>
                                                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
                                                                 <rect x="5" y="4" width="14" height="16" rx="2" stroke="currentColor" stroke-width="2"/>

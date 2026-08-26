@@ -2864,7 +2864,7 @@ function get_settings() {
     $homeConfig = $templateConfig['home'] ?? [];
     $home = array_merge($defaults['home'], $homeConfig);
     $homeContent = $home['content'] ?? $defaults['home']['content'];
-    if (!in_array($homeContent, ['blog', 'podcast', 'fediverse'], true)) {
+    if (!in_array($homeContent, ['blog', 'podcast', 'fediverse', 'itineraries'], true)) {
         $homeContent = $defaults['home']['content'];
     }
     $home['content'] = $homeContent;
@@ -12834,7 +12834,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $logoImage = trim($_POST['logo_image'] ?? '');
         $images = ['logo' => $logoImage];
         $homeContentPosted = $_POST['home_content'] ?? ($defaults['home']['content'] ?? 'blog');
-        if (!in_array($homeContentPosted, ['blog', 'podcast', 'fediverse'], true)) {
+        if (!in_array($homeContentPosted, ['blog', 'podcast', 'fediverse', 'itineraries'], true)) {
             $homeContentPosted = $defaults['home']['content'] ?? 'blog';
         }
         $homeColumnsPosted = isset($_POST['home_columns']) ? (int) $_POST['home_columns'] : $defaults['home']['columns'];

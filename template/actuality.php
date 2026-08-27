@@ -170,9 +170,9 @@ $actualityFediverseMeta = static function (array $item) use ($fediverseConfig): 
 };
 $actualityMetricIcon = static function (string $type): string {
     return match ($type) {
-        'reply' => '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M20 4H4a2 2 0 0 0-2 2v14l4-4h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Z"/></svg>',
-        'like' => '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="m12 21-1.45-1.32C5.4 15.02 2 11.93 2 8.14 2 5.05 4.42 3 7.2 3c1.57 0 3.08.74 4.05 1.91A5.26 5.26 0 0 1 15.3 3C18.08 3 20.5 5.05 20.5 8.14c0 3.79-3.4 6.88-8.55 11.54Z"/></svg>',
-        'share' => '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17 8V5l5 5-5 5v-3h-4a7 7 0 0 0-7 7v1H4v-1a9 9 0 0 1 9-9h4Z"/><path fill="currentColor" d="M7 4h6v2H7a3 3 0 0 0-3 3v4H2V9a5 5 0 0 1 5-5Z"/></svg>',
+        'reply' => '↩',
+        'like' => '♥',
+        'share' => '↗',
         default => '',
     };
 };
@@ -1318,14 +1318,19 @@ $manualDisplayText = static function (array $item): string {
     }
     .actuality-fediverse-inline-icon {
         display: inline-flex;
+        align-items: center;
+        justify-content: center;
         width: 0.95rem;
         height: 0.95rem;
     }
     .actuality-fediverse-inline-icon--metric {
-        width: 0.9rem;
-        height: 0.9rem;
+        width: auto;
+        height: auto;
+        font-size: .92rem;
+        font-weight: 700;
+        line-height: 1;
     }
-    .actuality-fediverse-inline svg {
+    .actuality-fediverse-inline-icon:not(.actuality-fediverse-inline-icon--metric) svg {
         width: 100%;
         height: 100%;
         display: block;

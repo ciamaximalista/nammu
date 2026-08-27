@@ -111,19 +111,19 @@ $renderFediverseInlineMeta = static function (array $meta) use ($fediverseInline
     if ($threadUrl === '' || ($replies + $likes + $shares) === 0 || $fediverseInlineIcon === '') {
         return '';
     }
-    $replyIcon = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M20 4H4a2 2 0 0 0-2 2v14l4-4h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Z"/></svg>';
-    $likeIcon = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="m12 21-1.45-1.32C5.4 15.02 2 11.93 2 8.14 2 5.05 4.42 3 7.2 3c1.57 0 3.08.74 4.05 1.91A5.26 5.26 0 0 1 15.3 3C18.08 3 20.5 5.05 20.5 8.14c0 3.79-3.4 6.88-8.55 11.54Z"/></svg>';
-    $shareIcon = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17 8V5l5 5-5 5v-3h-4a7 7 0 0 0-7 7v1H4v-1a9 9 0 0 1 9-9h4Z"/><path fill="currentColor" d="M7 4h6v2H7a3 3 0 0 0-3 3v4H2V9a5 5 0 0 1 5-5Z"/></svg>';
+    $replyIcon = '↩';
+    $likeIcon = '♥';
+    $shareIcon = '↗';
     $html = ' <a class="fediverse-inline-meta" href="' . htmlspecialchars($threadUrl, ENT_QUOTES, 'UTF-8') . '" title="En el Fediverso" aria-label="En el Fediverso">';
     $html .= '<span class="fediverse-inline-meta__icon">' . $fediverseInlineIcon . '</span>';
     if ($replies > 0) {
-        $html .= '<span class="fediverse-inline-meta__count">' . $replies . '</span><span class="fediverse-inline-meta__icon">' . $replyIcon . '</span>';
+        $html .= '<span class="fediverse-inline-meta__count">' . $replies . '</span><span class="fediverse-inline-meta__icon fediverse-inline-meta__icon--metric">' . $replyIcon . '</span>';
     }
     if ($likes > 0) {
-        $html .= '<span class="fediverse-inline-meta__count">' . $likes . '</span><span class="fediverse-inline-meta__icon">' . $likeIcon . '</span>';
+        $html .= '<span class="fediverse-inline-meta__count">' . $likes . '</span><span class="fediverse-inline-meta__icon fediverse-inline-meta__icon--metric">' . $likeIcon . '</span>';
     }
     if ($shares > 0) {
-        $html .= '<span class="fediverse-inline-meta__count">' . $shares . '</span><span class="fediverse-inline-meta__icon">' . $shareIcon . '</span>';
+        $html .= '<span class="fediverse-inline-meta__count">' . $shares . '</span><span class="fediverse-inline-meta__icon fediverse-inline-meta__icon--metric">' . $shareIcon . '</span>';
     }
     $html .= '</a>';
     return $html;
@@ -731,10 +731,19 @@ $renderPostalBox = static function (string $variant) use ($postalEnabled, $posta
     }
     .fediverse-inline-meta__icon {
         display: inline-flex;
+        align-items: center;
+        justify-content: center;
         width: .95rem;
         height: .95rem;
     }
-    .fediverse-inline-meta__icon svg {
+    .fediverse-inline-meta__icon--metric {
+        width: auto;
+        height: auto;
+        font-size: .92rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .fediverse-inline-meta__icon:not(.fediverse-inline-meta__icon--metric) svg {
         width: 100%;
         height: 100%;
         display: block;

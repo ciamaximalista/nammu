@@ -170,9 +170,9 @@ $actualityFediverseMeta = static function (array $item) use ($fediverseConfig): 
 };
 $actualityMetricIcon = static function (string $type): string {
     return match ($type) {
-        'reply' => '↩',
+        'reply' => '💬',
         'like' => '♥',
-        'share' => '↗',
+        'share' => '📣',
         default => '',
     };
 };

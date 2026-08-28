@@ -772,7 +772,7 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                                             <?php endif; ?>
                                             <?php if ((int) ($replySummary['shares'] ?? 0) > 0): ?>
                                                 <span class="fediverse-public-reply__header-metric" title="<?= (int) ($replySummary['shares'] ?? 0) ?> impulso<?= ((int) ($replySummary['shares'] ?? 0) === 1) ? '' : 's' ?>">
-                                                    <span aria-hidden="true">↗</span><span><?= (int) ($replySummary['shares'] ?? 0) ?></span>
+                                                    <span aria-hidden="true">📣</span><span><?= (int) ($replySummary['shares'] ?? 0) ?></span>
                                                 </span>
                                             <?php endif; ?>
                                         </span>

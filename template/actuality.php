@@ -344,17 +344,25 @@ $renderBoostHeader = static function (array $item) use ($actualityValidAvatarUrl
     if ($originalUrl === '') {
         return '';
     }
-    $actorName = trim((string) ($item['boost_actor_name'] ?? ''));
-    $actorIcon = $actualityValidAvatarUrl(trim((string) ($item['boost_actor_icon'] ?? '')));
     $actorUrl = trim((string) ($item['boost_actor_url'] ?? ''));
+    $actorName = trim((string) ($item['boost_actor_name'] ?? ''));
+    $actorIcon = '';
+    if ($actorUrl !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
+        $actorIcon = $actualityValidAvatarUrl(nammu_fediverse_cached_actor_avatar_for_reference($actorUrl, $fediverseConfig));
+    }
+    if ($actorIcon === '') {
+        $actorIcon = $actualityValidAvatarUrl(trim((string) ($item['boost_actor_icon'] ?? '')));
+    }
     if ($actorIcon === '' && function_exists('nammu_actuality_enrich_manual_boost_item_images')) {
         $item = nammu_actuality_enrich_manual_boost_item_images($item, $fediverseConfig, (string) ($baseUrl ?? ''));
         $actorName = trim((string) ($item['boost_actor_name'] ?? $actorName));
-        $actorIcon = $actualityValidAvatarUrl(trim((string) ($item['boost_actor_icon'] ?? '')));
         $actorUrl = trim((string) ($item['boost_actor_url'] ?? $actorUrl));
-    }
-    if ($actorIcon === '' && $actorUrl !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
-        $actorIcon = $actualityValidAvatarUrl(nammu_fediverse_cached_actor_avatar_for_reference($actorUrl, $fediverseConfig));
+        if ($actorUrl !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
+            $actorIcon = $actualityValidAvatarUrl(nammu_fediverse_cached_actor_avatar_for_reference($actorUrl, $fediverseConfig));
+        }
+        if ($actorIcon === '') {
+            $actorIcon = $actualityValidAvatarUrl(trim((string) ($item['boost_actor_icon'] ?? '')));
+        }
     }
     $fallback = mb_substr($actorName !== '' ? $actorName : 'F', 0, 1, 'UTF-8');
     $avatarHtml = $actorIcon !== ''
@@ -466,7 +474,7 @@ $renderLinks = static function (array $links, array $item = []) use ($fediverseI
     }
     return implode(', ', $bits);
 };
-$renderImages = static function (array $item, bool $isSiteContent = false) use ($actualityVisibleLinkCardImage, $actualityIsProbableImageUrl): string {
+$renderImages = static function (array $item, bool $isSiteContent = false) use ($actualityVisibleLinkCardImage, $actualityIsProbableImageUrl, $fediverseConfig): string {
     $itemLinkForImages = trim((string) ($item['link'] ?? ''));
     $allImages = array_values(array_unique(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []), static function (string $imageUrl) use ($actualityIsProbableImageUrl, $itemLinkForImages): bool {
         return $actualityIsProbableImageUrl($imageUrl, $itemLinkForImages);
@@ -488,17 +496,31 @@ $renderImages = static function (array $item, bool $isSiteContent = false) use (
         $primaryImage = $actualityVisibleLinkCardImage($item);
     }
     if ($isBoost) {
+        $boostActorIconCandidates = [];
         $boostActorIcon = trim((string) ($item['boost_actor_icon'] ?? ''));
-        $sourceImage = trim((string) ($item['source_image'] ?? ''));
         if ($boostActorIcon !== '') {
-            $normalizedBoostActorIcon = strtolower($boostActorIcon);
-            $allImages = array_values(array_filter($allImages, static function ($imageUrl) use ($normalizedBoostActorIcon): bool {
-                return strtolower(trim((string) $imageUrl)) !== $normalizedBoostActorIcon;
+            $boostActorIconCandidates[] = $boostActorIcon;
+        }
+        $boostActorUrl = trim((string) ($item['boost_actor_url'] ?? ''));
+        if ($boostActorUrl !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
+            $cachedBoostActorIcon = trim((string) nammu_fediverse_cached_actor_avatar_for_reference($boostActorUrl, $fediverseConfig));
+            if ($cachedBoostActorIcon !== '') {
+                $boostActorIconCandidates[] = $cachedBoostActorIcon;
+            }
+        }
+        $sourceImage = trim((string) ($item['source_image'] ?? ''));
+        if (!empty($boostActorIconCandidates)) {
+            $normalizedBoostActorIcons = array_fill_keys(array_map(static function (string $imageUrl): string {
+                return strtolower(trim($imageUrl));
+            }, $boostActorIconCandidates), true);
+            unset($normalizedBoostActorIcons['']);
+            $allImages = array_values(array_filter($allImages, static function ($imageUrl) use ($normalizedBoostActorIcons): bool {
+                return !isset($normalizedBoostActorIcons[strtolower(trim((string) $imageUrl))]);
             }));
-            if (strtolower($primaryImage) === $normalizedBoostActorIcon) {
+            if (isset($normalizedBoostActorIcons[strtolower($primaryImage)])) {
                 $primaryImage = '';
             }
-            if ($sourceImage !== '' && strtolower($sourceImage) === $normalizedBoostActorIcon && $primaryImage !== '') {
+            if ($sourceImage !== '' && isset($normalizedBoostActorIcons[strtolower($sourceImage)]) && $primaryImage !== '') {
                 $primaryImage = '';
             }
         }

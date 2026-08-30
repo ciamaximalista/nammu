@@ -330,7 +330,7 @@ $actualityValidAvatarUrl = static function (string $avatarUrl) use ($baseUrl): s
     }
     return $avatarUrl;
 };
-$renderBoostHeader = static function (array $item) use ($actualityValidAvatarUrl, $fediverseConfig, $baseUrl): string {
+$boostOriginalUrlFor = static function (array $item): string {
     if (strtolower(trim((string) ($item['via'] ?? ''))) !== 'boost') {
         return '';
     }
@@ -341,10 +341,20 @@ $renderBoostHeader = static function (array $item) use ($actualityValidAvatarUrl
             $originalUrl = trim((string) end($boostLinks));
         }
     }
+    return $originalUrl;
+};
+$boostActorProfileUrlFor = static function (array $item): string {
+    if (strtolower(trim((string) ($item['via'] ?? ''))) !== 'boost') {
+        return '';
+    }
+    return trim((string) ($item['boost_actor_url'] ?? ''));
+};
+$renderBoostHeader = static function (array $item) use ($actualityValidAvatarUrl, $fediverseConfig, $baseUrl, $boostOriginalUrlFor, $boostActorProfileUrlFor): string {
+    $originalUrl = $boostOriginalUrlFor($item);
     if ($originalUrl === '') {
         return '';
     }
-    $actorUrl = trim((string) ($item['boost_actor_url'] ?? ''));
+    $actorUrl = $boostActorProfileUrlFor($item);
     $actorName = trim((string) ($item['boost_actor_name'] ?? ''));
     $actorIcon = '';
     if ($actorUrl !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
@@ -368,7 +378,9 @@ $renderBoostHeader = static function (array $item) use ($actualityValidAvatarUrl
     $avatarHtml = $actorIcon !== ''
         ? '<img class="actuality-boost-origin__avatar" src="' . htmlspecialchars($actorIcon, ENT_QUOTES, 'UTF-8') . '" alt="' . htmlspecialchars($actorName !== '' ? $actorName : 'Autor original', ENT_QUOTES, 'UTF-8') . '" loading="lazy">'
         : '<span class="actuality-boost-origin__avatar actuality-boost-origin__avatar--fallback">' . htmlspecialchars($fallback, ENT_QUOTES, 'UTF-8') . '</span>';
-    return '<div class="actuality-boost-origin"><a class="actuality-boost-origin__link" href="' . htmlspecialchars($originalUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" title="' . htmlspecialchars($actorName !== '' ? $actorName : 'Publicación original', ENT_QUOTES, 'UTF-8') . '" aria-label="' . htmlspecialchars($actorName !== '' ? ('Publicación original de ' . $actorName) : 'Publicación original', ENT_QUOTES, 'UTF-8') . '">' . $avatarHtml . '</a></div>';
+    $actorLabel = $actorName !== '' ? $actorName : 'Autor original';
+    $profileUrl = $actorUrl !== '' ? $actorUrl : $originalUrl;
+    return '<div class="actuality-boost-origin"><a class="actuality-boost-origin__link" href="' . htmlspecialchars($profileUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" title="' . htmlspecialchars($actorLabel, ENT_QUOTES, 'UTF-8') . '" aria-label="' . htmlspecialchars('Perfil de ' . $actorLabel, ENT_QUOTES, 'UTF-8') . '">' . $avatarHtml . '<span class="actuality-boost-origin__name">' . htmlspecialchars($actorLabel, ENT_QUOTES, 'UTF-8') . '</span></a></div>';
 };
 $formatDate = static function (int $timestamp): string {
     if ($timestamp <= 0) {
@@ -419,6 +431,35 @@ $actualitySourceLabel = static function (array $item): string {
         }
     }
     return trim((string) preg_replace('/^www\./i', '', (string) ($item['source'] ?? '')));
+};
+$renderActualityMeta = static function (array $item, bool $isSiteContent = false) use ($formatDate, $actualitySourceLabel, $boostOriginalUrlFor, $boostActorProfileUrlFor): string {
+    $timestamp = (int) ($item['timestamp'] ?? 0);
+    $sourceLabel = $actualitySourceLabel($item);
+    if ($timestamp <= 0 && $sourceLabel === '') {
+        return '';
+    }
+    $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
+    $originalUrl = $isBoost ? $boostOriginalUrlFor($item) : '';
+    $actorUrl = $isBoost ? $boostActorProfileUrlFor($item) : '';
+    $html = '<p class="actuality-meta' . ($isSiteContent ? ' actuality-meta--site' : '') . '">';
+    if ($timestamp > 0) {
+        $dateLabel = htmlspecialchars($formatDate($timestamp), ENT_QUOTES, 'UTF-8');
+        $html .= '<span>';
+        $html .= $originalUrl !== ''
+            ? '<a href="' . htmlspecialchars($originalUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">' . $dateLabel . '</a>'
+            : $dateLabel;
+        $html .= '</span>';
+    }
+    if ($sourceLabel !== '') {
+        $sourceEsc = htmlspecialchars($sourceLabel, ENT_QUOTES, 'UTF-8');
+        $html .= '<span>';
+        $html .= $actorUrl !== ''
+            ? '<a href="' . htmlspecialchars($actorUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">' . $sourceEsc . '</a>'
+            : $sourceEsc;
+        $html .= '</span>';
+    }
+    $html .= '</p>';
+    return $html;
 };
 $groupedItems = [];
 foreach ($items as $item) {
@@ -474,7 +515,7 @@ $renderLinks = static function (array $links, array $item = []) use ($fediverseI
     }
     return implode(', ', $bits);
 };
-$renderImages = static function (array $item, bool $isSiteContent = false) use ($actualityVisibleLinkCardImage, $actualityIsProbableImageUrl, $fediverseConfig): string {
+$renderImages = static function (array $item, bool $isSiteContent = false) use ($actualityVisibleLinkCardImage, $actualityIsProbableImageUrl, $fediverseConfig, $boostOriginalUrlFor): string {
     $itemLinkForImages = trim((string) ($item['link'] ?? ''));
     $allImages = array_values(array_unique(array_filter(array_map('strval', is_array($item['images'] ?? null) ? $item['images'] : []), static function (string $imageUrl) use ($actualityIsProbableImageUrl, $itemLinkForImages): bool {
         return $actualityIsProbableImageUrl($imageUrl, $itemLinkForImages);
@@ -531,7 +572,11 @@ $renderImages = static function (array $item, bool $isSiteContent = false) use (
     if (empty($allImages)) {
         return '';
     }
-    $target = htmlspecialchars((string) ($item['link'] ?? '#'), ENT_QUOTES, 'UTF-8');
+    $targetUrl = $isBoost ? $boostOriginalUrlFor($item) : '';
+    if ($targetUrl === '') {
+        $targetUrl = (string) ($item['link'] ?? '#');
+    }
+    $target = htmlspecialchars($targetUrl, ENT_QUOTES, 'UTF-8');
     $attrs = $isSiteContent ? '' : ' target="_blank" rel="noopener"';
     if (count($allImages) === 1) {
         return '<a class="actuality-image-link" href="' . $target . '"' . $attrs . '><img src="' . htmlspecialchars($allImages[0], ENT_QUOTES, 'UTF-8') . '" alt="' . htmlspecialchars((string) ($item['title'] ?? 'Imagen'), ENT_QUOTES, 'UTF-8') . '" loading="lazy"></a>';
@@ -785,17 +830,7 @@ $manualDisplayText = static function (array $item): string {
                             <?php if (!$isManual): ?>
                                 <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
                             <?php endif; ?>
-                            <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
-                                <p class="actuality-meta<?= $isSiteContent ? ' actuality-meta--site' : '' ?>">
-                                    <?php if ($item['timestamp'] > 0): ?>
-                                        <span><?= htmlspecialchars($formatDate($item['timestamp']), ENT_QUOTES, 'UTF-8') ?></span>
-                                    <?php endif; ?>
-                                    <?php $sourceLabel = $actualitySourceLabel($item); ?>
-                                    <?php if ($sourceLabel !== ''): ?>
-                                        <span><?= htmlspecialchars($sourceLabel, ENT_QUOTES, 'UTF-8') ?></span>
-                                    <?php endif; ?>
-                                </p>
-                            <?php endif; ?>
+                            <?= $renderActualityMeta($item, $isSiteContent) ?>
                             <?php if (!$isSiteContent && $imagesHtml !== ''): ?>
                                 <?= $imagesHtml ?>
                             <?php endif; ?>
@@ -834,17 +869,7 @@ $manualDisplayText = static function (array $item): string {
                                 <?php if (!$isManual): ?>
                                     <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
                                 <?php endif; ?>
-                                <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
-                                    <p class="actuality-meta<?= $isSiteContent ? ' actuality-meta--site' : '' ?>">
-                                        <?php if ($item['timestamp'] > 0): ?>
-                                            <span><?= htmlspecialchars($formatDate($item['timestamp']), ENT_QUOTES, 'UTF-8') ?></span>
-                                        <?php endif; ?>
-                                        <?php $sourceLabel = $actualitySourceLabel($item); ?>
-                                        <?php if ($sourceLabel !== ''): ?>
-                                            <span><?= htmlspecialchars($sourceLabel, ENT_QUOTES, 'UTF-8') ?></span>
-                                        <?php endif; ?>
-                                    </p>
-                                <?php endif; ?>
+                                <?= $renderActualityMeta($item, $isSiteContent) ?>
                                 <?php if (!$isSiteContent && $imagesHtml !== ''): ?>
                                     <?= $imagesHtml ?>
                                 <?php endif; ?>
@@ -885,17 +910,7 @@ $manualDisplayText = static function (array $item): string {
                                 <?php if (!$isManual): ?>
                                     <h3><a href="<?= htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8') ?>"<?= $isSiteContent ? '' : ' target="_blank" rel="noopener"' ?>><?= htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') ?></a></h3>
                                 <?php endif; ?>
-                                <?php if ($item['timestamp'] > 0 || $item['source'] !== ''): ?>
-                                    <p class="actuality-meta<?= $isSiteContent ? ' actuality-meta--site' : '' ?>">
-                                        <?php if ($item['timestamp'] > 0): ?>
-                                            <span><?= htmlspecialchars($formatDate($item['timestamp']), ENT_QUOTES, 'UTF-8') ?></span>
-                                        <?php endif; ?>
-                                        <?php $sourceLabel = $actualitySourceLabel($item); ?>
-                                        <?php if ($sourceLabel !== ''): ?>
-                                            <span><?= htmlspecialchars($sourceLabel, ENT_QUOTES, 'UTF-8') ?></span>
-                                        <?php endif; ?>
-                                    </p>
-                                <?php endif; ?>
+                                <?= $renderActualityMeta($item, $isSiteContent) ?>
                                 <?php if (!$isSiteContent && $imagesHtml !== ''): ?>
                                     <?= $imagesHtml ?>
                                 <?php endif; ?>
@@ -1190,6 +1205,7 @@ $manualDisplayText = static function (array $item): string {
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        gap: 0.55rem;
         text-decoration: none;
     }
     .actuality-boost-origin__avatar {
@@ -1210,6 +1226,15 @@ $manualDisplayText = static function (array $item): string {
         font-size: 1.15rem;
         font-weight: 700;
         justify-content: center;
+    }
+    .actuality-boost-origin__name {
+        color: #3f6f1f;
+        font-family: "<?= $noteFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 0.98rem;
+        font-weight: 700;
+    }
+    .actuality-boost-origin__link:hover .actuality-boost-origin__name {
+        text-decoration: underline;
     }
     .actuality-image-link {
         display: block;

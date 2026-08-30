@@ -2167,6 +2167,149 @@ function nammu_generate_identity_txt(array $config = [], array $options = []): s
     return implode("\n", $lines) . "\n";
 }
 
+function nammu_home_content_mode(array $theme, bool $hasItineraries = true, bool $hasPodcast = true): string
+{
+    $mode = strtolower(trim((string) (($theme['home']['content'] ?? '') ?: 'blog')));
+    if (!in_array($mode, ['blog', 'podcast', 'fediverse', 'itineraries'], true)) {
+        return 'blog';
+    }
+    if ($mode === 'podcast' && !$hasPodcast) {
+        return 'blog';
+    }
+    if ($mode === 'itineraries' && !$hasItineraries) {
+        return 'blog';
+    }
+    return $mode;
+}
+
+function nammu_site_rss_links(array $config, array $theme, string $baseUrl = '', bool $hasItineraries = false, bool $hasPodcast = false): array
+{
+    $baseRoot = rtrim($baseUrl, '/');
+    $siteTitle = trim((string) (($theme['blog'] ?? '') ?: ($config['site_name'] ?? 'Nammu Blog')));
+    if ($siteTitle === '') {
+        $siteTitle = 'Nammu';
+    }
+    $homeMode = nammu_home_content_mode($theme, $hasItineraries, $hasPodcast);
+    $labels = [
+        'blog' => 'RSS blog',
+        'itineraries' => 'RSS Itinerarios',
+        'podcast' => 'RSS Podcast',
+        'news' => 'RSS Noticias',
+        'fediverse' => 'RSS Fediverso',
+    ];
+    $links = [[
+        'key' => 'site',
+        'source' => $homeMode,
+        'label' => 'RSS del sitio',
+        'title' => $siteTitle . ' — RSS del sitio',
+        'href' => $baseRoot . '/rss.xml',
+    ]];
+    $specific = [[
+        'key' => 'blog',
+        'href' => $baseRoot . '/blog.xml',
+    ]];
+    if ($hasItineraries) {
+        $specific[] = ['key' => 'itineraries', 'href' => $baseRoot . '/itinerarios.xml'];
+    }
+    if ($hasPodcast) {
+        $specific[] = ['key' => 'podcast', 'href' => $baseRoot . '/podcast.xml'];
+    }
+    if (function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($config) : false) {
+        $specific[] = ['key' => 'news', 'href' => $baseRoot . '/noticias.xml'];
+    }
+    $specific[] = ['key' => 'fediverse', 'href' => $baseRoot . '/fediverso.xml'];
+    foreach ($specific as $item) {
+        $key = (string) ($item['key'] ?? '');
+        $label = $labels[$key] ?? 'RSS';
+        $links[] = [
+            'key' => $key,
+            'source' => $key,
+            'label' => $label,
+            'title' => $siteTitle . ' — ' . $label,
+            'href' => (string) ($item['href'] ?? ''),
+        ];
+    }
+    return $links;
+}
+
+function nammu_generate_blog_rss_feed(string $baseUrl, string $siteTitle, string $siteDescription, string $siteLang = 'es', string $selfPath = '/blog.xml', string $channelPath = '/blog'): string
+{
+    $baseUrl = rtrim($baseUrl, '/');
+    $channelLink = $baseUrl !== '' ? $baseUrl . '/' . ltrim($channelPath, '/') : '/' . ltrim($channelPath, '/');
+    $selfLink = $baseUrl !== '' ? $baseUrl . '/' . ltrim($selfPath, '/') : '/' . ltrim($selfPath, '/');
+    $repository = new \Nammu\Core\ContentRepository(dirname(__DIR__) . '/content');
+    $posts = $repository->all();
+    $markdown = new \Nammu\Core\MarkdownConverter();
+    $rssGenerator = new \Nammu\Core\RssGenerator($baseUrl, $siteTitle, $siteDescription, $channelLink, $selfLink, $siteLang);
+    return $rssGenerator->generate(
+        $posts,
+        static fn(\Nammu\Core\Post $post): string => '/' . rawurlencode($post->getSlug()),
+        $markdown
+    );
+}
+
+function nammu_generate_itineraries_rss_feed(string $baseUrl, array $itineraries, string $siteTitle, string $siteDescription, string $siteLang = 'es', string $selfPath = '/itinerarios.xml', string $channelPath = '/itinerarios'): string
+{
+    $baseUrl = rtrim($baseUrl, '/');
+    $channelLink = $baseUrl !== '' ? $baseUrl . '/' . ltrim($channelPath, '/') : '/' . ltrim($channelPath, '/');
+    $selfLink = $baseUrl !== '' ? $baseUrl . '/' . ltrim($selfPath, '/') : '/' . ltrim($selfPath, '/');
+    $markdown = new \Nammu\Core\MarkdownConverter();
+    $feedPosts = [];
+    $postUrls = [];
+    foreach ($itineraries as $itinerary) {
+        if (!$itinerary instanceof \Nammu\Core\Itinerary) {
+            continue;
+        }
+        if (method_exists($itinerary, 'isDraft') && $itinerary->isDraft()) {
+            continue;
+        }
+        $metadata = $itinerary->getMetadata();
+        $description = $itinerary->getDescription();
+        if ($description === '') {
+            $convertedDocument = $markdown->convertDocument($itinerary->getContent());
+            $description = nammu_excerpt_text($convertedDocument['html'], 220);
+        }
+        $dateString = $metadata['Date'] ?? ($metadata['Updated'] ?? '');
+        if (trim((string) $dateString) === '') {
+            $indexPath = $itinerary->getDirectory() . '/index.md';
+            $mtime = is_file($indexPath) ? @filemtime($indexPath) : false;
+            $dateString = $mtime !== false ? gmdate('Y-m-d', $mtime) : gmdate('Y-m-d');
+        }
+        $virtualSlug = 'itinerary-feed-' . $itinerary->getSlug();
+        $feedPosts[] = new \Nammu\Core\Post($virtualSlug, [
+            'Title' => $itinerary->getTitle(),
+            'Description' => $description,
+            'Image' => $itinerary->getImage() ?? '',
+            'Date' => $dateString,
+        ], $itinerary->getContent(), 'published');
+        $postUrls[$virtualSlug] = ($baseUrl !== '' ? $baseUrl : '') . '/itinerarios/' . rawurlencode($itinerary->getSlug());
+    }
+    usort($feedPosts, static function (\Nammu\Core\Post $a, \Nammu\Core\Post $b): int {
+        $dateA = $a->getDate();
+        $dateB = $b->getDate();
+        if ($dateA && $dateB) {
+            return $dateB <=> $dateA;
+        }
+        if ($dateA) {
+            return -1;
+        }
+        if ($dateB) {
+            return 1;
+        }
+        return strcmp($a->getSlug(), $b->getSlug());
+    });
+    $title = trim($siteTitle) !== '' ? $siteTitle . ' — Itinerarios' : 'Itinerarios';
+    $description = trim($siteDescription) !== '' ? $siteDescription : 'Itinerarios recientes';
+    return (new \Nammu\Core\RssGenerator($baseUrl, $title, $description, $channelLink, $selfLink, $siteLang))->generate(
+        $feedPosts,
+        static function (\Nammu\Core\Post $post) use ($postUrls): string {
+            return $postUrls[$post->getSlug()] ?? '/';
+        },
+        $markdown,
+        false
+    );
+}
+
 function nammu_build_footer_links(array $config, array $theme, string $baseUrl, string $postalUrl, bool $hasItineraries = false, bool $hasPodcast = false): array
 {
     $icons = nammu_footer_icon_svgs();
@@ -2305,37 +2448,13 @@ function nammu_build_footer_links(array $config, array $theme, string $baseUrl, 
         ];
     }
 
-    $links[] = [
-        'label' => 'RSS blog',
-        'href' => $baseRoot . '/rss.xml',
-        'svg' => $icons['rss'],
-    ];
-    if ($hasItineraries) {
+    foreach (nammu_site_rss_links($config, $theme, $baseRoot, $hasItineraries, $hasPodcast) as $rssLink) {
         $links[] = [
-            'label' => 'RSS Itinerarios',
-            'href' => $baseRoot . '/itinerarios.xml',
+            'label' => (string) ($rssLink['label'] ?? 'RSS'),
+            'href' => (string) ($rssLink['href'] ?? ''),
             'svg' => $icons['rss'],
         ];
     }
-    if ($hasPodcast) {
-        $links[] = [
-            'label' => 'RSS Podcast',
-            'href' => $baseRoot . '/podcast.xml',
-            'svg' => $icons['rss'],
-        ];
-    }
-    if (function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content($config) : false) {
-        $links[] = [
-            'label' => 'RSS Noticias',
-            'href' => $baseRoot . '/noticias.xml',
-            'svg' => $icons['rss'],
-        ];
-    }
-    $links[] = [
-        'label' => 'RSS Fediverso',
-        'href' => $baseRoot . '/fediverso.xml',
-        'svg' => $icons['rss'],
-    ];
 
     $podcastServices = $config['podcast_services'] ?? [];
     if ($hasPodcast) {
@@ -2746,7 +2865,7 @@ function nammu_prepare_podcast_feed_artwork(string $imageUrl, string $baseUrl): 
     return ($base !== '' ? $base : '') . '/assets/podcast/' . rawurlencode($fileName);
 }
 
-function nammu_generate_podcast_feed(string $baseUrl, array $config): string
+function nammu_generate_podcast_feed(string $baseUrl, array $config, string $selfPath = '/podcast.xml'): string
 {
     $baseUrl = rtrim($baseUrl, '/');
     $siteTitle = trim((string) ($config['site_name'] ?? 'Nammu Blog'));
@@ -2813,14 +2932,16 @@ XML;
     $itemsBlock = implode("\n", $itemsXml);
     $itunesImageTag = $podcastHomeImageFeed !== '' ? "\n    <itunes:image href=\"" . htmlspecialchars((string) $podcastHomeImageFeed, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "\" />" : '';
     $ownerEmailTag = $ownerEmailEsc !== '' ? "<itunes:email>{$ownerEmailEsc}</itunes:email>" : "<itunes:email></itunes:email>";
+    $selfUrl = htmlspecialchars($baseUrl !== '' ? $baseUrl . '/' . ltrim($selfPath, '/') : '/' . ltrim($selfPath, '/'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
     return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>{$titleEsc}</title>
     <description>{$descEsc}</description>
     <link>{$channelLink}</link>
+    <atom:link href="{$selfUrl}" rel="self" type="application/rss+xml" />
     <language>{$langEsc}</language>
     <lastBuildDate>{$lastBuild}</lastBuildDate>
     <itunes:author>{$authorEsc}</itunes:author>{$itunesImageTag}

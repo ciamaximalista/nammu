@@ -211,17 +211,19 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
     <?php if ($metaRobots !== ''): ?>
         <meta name="robots" content="<?= htmlspecialchars($metaRobots, ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
-    <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — RSS blog" href="<?= htmlspecialchars($rssUrl, ENT_QUOTES, 'UTF-8') ?>">
-    <?php if (!empty($hasItineraries)): ?>
-        <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Itinerarios" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/itinerarios.xml' : $searchBaseNormalized . '/itinerarios.xml', ENT_QUOTES, 'UTF-8') ?>">
-    <?php endif; ?>
-    <?php if (!empty($hasPodcast)): ?>
-        <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Podcast" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/podcast.xml' : $searchBaseNormalized . '/podcast.xml', ENT_QUOTES, 'UTF-8') ?>">
-    <?php endif; ?>
-    <?php if (function_exists('nammu_actuality_has_content') ? nammu_actuality_has_content(nammu_load_config()) : false): ?>
-        <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Noticias" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/noticias.xml' : $searchBaseNormalized . '/noticias.xml', ENT_QUOTES, 'UTF-8') ?>">
-    <?php endif; ?>
-    <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — Fediverso" href="<?= htmlspecialchars($searchBaseNormalized === '' ? '/fediverso.xml' : $searchBaseNormalized . '/fediverso.xml', ENT_QUOTES, 'UTF-8') ?>">
+    <?php $headRssLinks = is_array($rssLinks ?? null) ? $rssLinks : [[
+        'title' => $siteTitle . ' — RSS del sitio',
+        'href' => $rssUrl,
+    ]]; ?>
+    <?php foreach ($headRssLinks as $headRssLink): ?>
+        <?php
+            $headRssHref = trim((string) ($headRssLink['href'] ?? ''));
+            $headRssTitle = trim((string) (($headRssLink['title'] ?? '') ?: (($headRssLink['label'] ?? '') ?: 'RSS')));
+        ?>
+        <?php if ($headRssHref !== ''): ?>
+            <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($headRssTitle, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($headRssHref, ENT_QUOTES, 'UTF-8') ?>">
+        <?php endif; ?>
+    <?php endforeach; ?>
     <?php if ($webmentionEndpoint !== ''): ?>
         <link rel="webmention" href="<?= htmlspecialchars($webmentionEndpoint, ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>

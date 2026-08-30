@@ -12,6 +12,7 @@
 
     # Friendly URLs and machine-readable files delegated to the front controller.
     RewriteRule ^rss\.xml$ index.php [L]
+    RewriteRule ^blog\.xml$ index.php [L]
     RewriteRule ^sitemap\.xml$ index.php [L]
     RewriteRule ^podcast\.xml$ index.php [L]
     RewriteRule ^llms\.txt$ index.php [L]

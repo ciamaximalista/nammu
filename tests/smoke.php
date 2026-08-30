@@ -68,6 +68,18 @@ try {
     smoke_assert(is_file($root . '/itinerarios/ruta-prueba/index.md'), 'No se creo index.md del itinerario.');
     smoke_assert(is_file($root . '/itinerarios/ruta-prueba/index.quiz.json'), 'No se creo la autoevaluacion del itinerario.');
 
+    $rssLinks = nammu_site_rss_links(
+        ['site_name' => 'Sitio de prueba'],
+        ['home' => ['content' => 'fediverse'], 'blog' => 'Sitio de prueba'],
+        'https://example.test',
+        true,
+        true
+    );
+    smoke_assert(($rssLinks[0]['label'] ?? '') === 'RSS del sitio', 'La RSS del sitio no aparece primero.');
+    smoke_assert(($rssLinks[0]['href'] ?? '') === 'https://example.test/rss.xml', 'La RSS del sitio no usa /rss.xml.');
+    smoke_assert(($rssLinks[1]['href'] ?? '') === 'https://example.test/blog.xml', 'La RSS especifica del blog no usa /blog.xml.');
+    smoke_assert(nammu_home_content_mode(['home' => ['content' => 'podcast']], true, false) === 'blog', 'El modo podcast sin episodios no cae a blog.');
+
     echo "Smoke OK\n";
 } finally {
     smoke_remove_tree($root);

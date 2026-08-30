@@ -2100,7 +2100,7 @@ function admin_itinerary_repository(): ItineraryRepository {
     static $repository = null;
     if ($repository === null) {
         if (!is_dir(ITINERARIES_DIR)) {
-            @mkdir(ITINERARIES_DIR, 0755, true);
+            nammu_ensure_directory(ITINERARIES_DIR);
         }
         $repository = new ItineraryRepository(ITINERARIES_DIR);
     }
@@ -2112,7 +2112,6 @@ function admin_regenerate_itinerary_feed(): void {
         $repository = admin_itinerary_repository();
         $itineraries = $repository->all();
         $baseUrl = nammu_base_url();
-
         $config = load_config_file();
         $siteTitle = trim((string) ($config['site_name'] ?? 'Nammu Blog'));
         $siteDescription = trim((string) ($config['social']['default_description'] ?? ''));
@@ -2120,75 +2119,7 @@ function admin_regenerate_itinerary_feed(): void {
         if (!is_string($siteLang) || $siteLang === '') {
             $siteLang = 'es';
         }
-
-        $markdown = new MarkdownConverter();
-        $posts = [];
-        $urls = [];
-
-        foreach ($itineraries as $itinerary) {
-            if (!$itinerary instanceof Itinerary) {
-                continue;
-            }
-            if (method_exists($itinerary, 'isDraft') && $itinerary->isDraft()) {
-                continue;
-            }
-            $metadata = $itinerary->getMetadata();
-            $description = $itinerary->getDescription();
-            if ($description === '') {
-                $convertedDocument = $markdown->convertDocument($itinerary->getContent());
-                $description = nammu_excerpt_text($convertedDocument['html'], 220);
-            }
-            $dateString = $metadata['Date'] ?? ($metadata['Updated'] ?? '');
-            if (trim((string) $dateString) === '') {
-                $indexPath = $itinerary->getDirectory() . '/index.md';
-                $mtime = is_file($indexPath) ? @filemtime($indexPath) : false;
-                $dateString = $mtime !== false ? gmdate('Y-m-d', $mtime) : gmdate('Y-m-d');
-            }
-            $virtualMeta = [
-                'Title' => $itinerary->getTitle(),
-                'Description' => $description,
-                'Image' => $itinerary->getImage() ?? '',
-                'Date' => $dateString,
-            ];
-            $virtualSlug = 'itinerary-feed-' . $itinerary->getSlug();
-            $posts[] = new Post($virtualSlug, $virtualMeta, $itinerary->getContent());
-            $path = '/itinerarios/' . rawurlencode($itinerary->getSlug());
-            $urls[$virtualSlug] = $baseUrl !== '' ? $baseUrl . $path : $path;
-        }
-
-        usort($posts, static function (Post $a, Post $b): int {
-            $dateA = $a->getDate();
-            $dateB = $b->getDate();
-            if ($dateA && $dateB) {
-                return $dateB <=> $dateA;
-            }
-            if ($dateA) {
-                return -1;
-            }
-            if ($dateB) {
-                return 1;
-            }
-            return strcmp($a->getSlug(), $b->getSlug());
-        });
-
-        $itinerariesIndexUrl = ($baseUrl !== '' ? rtrim($baseUrl, '/') : '') . '/itinerarios';
-        $itinerariesFeedUrl = ($baseUrl !== '' ? rtrim($baseUrl, '/') : '') . '/itinerarios.xml';
-        $feedContent = (new RssGenerator(
-            $baseUrl,
-            $siteTitle . ' — Itinerarios',
-            'Itinerarios recientes',
-            $itinerariesIndexUrl,
-            $itinerariesFeedUrl,
-            $siteLang
-        ))->generate(
-            $posts,
-            static function (Post $post) use ($urls): string {
-                return $urls[$post->getSlug()] ?? '/';
-            },
-            $markdown,
-            false
-        );
-
+        $feedContent = nammu_generate_itineraries_rss_feed($baseUrl, $itineraries, $siteTitle, $siteDescription, $siteLang);
         admin_write_public_artifact(__DIR__ . '/itinerarios.xml', $feedContent);
     } catch (Throwable $e) {
         error_log('No se pudo regenerar itinerarios.xml: ' . $e->getMessage());
@@ -2512,18 +2443,21 @@ function admin_regenerate_rss_feed(): void {
         if (!is_string($siteLang) || $siteLang === '') {
             $siteLang = 'es';
         }
-        $homeUrl = rtrim($baseUrl, '/') . '/';
-        $rssUrl = rtrim($baseUrl, '/') . '/rss.xml';
-        $repository = new \Nammu\Core\ContentRepository(CONTENT_DIR);
-        $posts = $repository->all();
-        $markdown = new MarkdownConverter();
-        $rssGenerator = new RssGenerator($baseUrl, $siteTitle, $siteDescription, $homeUrl, $rssUrl, $siteLang);
-        $rss = $rssGenerator->generate(
-            $posts,
-            static fn (Post $post): string => '/' . rawurlencode($post->getSlug()),
-            $markdown
-        );
+        $theme = nammu_template_settings();
+        $itineraries = admin_itinerary_repository()->all();
+        $podcastItems = nammu_collect_podcast_items(__DIR__ . '/content', $baseUrl);
+        $homeMode = nammu_home_content_mode($theme, !empty($itineraries), !empty($podcastItems));
+        if ($homeMode === 'podcast') {
+            $rss = nammu_generate_podcast_feed($baseUrl, $config, '/rss.xml');
+        } elseif ($homeMode === 'fediverse' && function_exists('nammu_generate_fediverse_threads_feed')) {
+            $rss = nammu_generate_fediverse_threads_feed($baseUrl, $config, $siteTitle, $siteDescription, $siteLang, '/rss.xml');
+        } elseif ($homeMode === 'itineraries') {
+            $rss = nammu_generate_itineraries_rss_feed($baseUrl, $itineraries, $siteTitle, $siteDescription, $siteLang, '/rss.xml', '/itinerarios');
+        } else {
+            $rss = nammu_generate_blog_rss_feed($baseUrl, $siteTitle, $siteDescription, $siteLang, '/rss.xml', '/');
+        }
         admin_write_public_artifact(__DIR__ . '/rss.xml', $rss);
+        admin_write_public_artifact(__DIR__ . '/blog.xml', nammu_generate_blog_rss_feed($baseUrl, $siteTitle, $siteDescription, $siteLang));
     } catch (Throwable $e) {
         error_log('No se pudo regenerar rss.xml: ' . $e->getMessage());
     }

@@ -146,6 +146,7 @@ $lettersIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '
 $postalEnabled = ($configData['postal']['enabled'] ?? 'off') === 'on';
 $postalUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/correos';
 $postalLogoSvg = nammu_postal_icon_svg();
+$rssLinks = nammu_site_rss_links($configData, $theme, $publicBaseUrl, !empty($itineraryListing), $hasPodcast);
 $footerLinks = nammu_build_footer_links($configData, $theme, $homeUrl, $postalUrl, !empty($itineraryListing), $hasPodcast);
 $logoForJsonLd = $theme['logo_url'] ?? '';
 $orgJsonLd = [
@@ -196,6 +197,7 @@ $renderer->setGlobal('postalEnabled', $postalEnabled);
 $renderer->setGlobal('postalUrl', $postalUrl);
 $renderer->setGlobal('postalLogoSvg', $postalLogoSvg);
 $renderer->setGlobal('footerLinks', $footerLinks);
+$renderer->setGlobal('rssLinks', $rssLinks);
 $renderer->setGlobal('hasCategories', $hasCategories);
 $renderer->setGlobal('hasPodcast', $hasPodcast);
 $renderer->setGlobal('podcastIndexUrl', $podcastIndexUrl);
@@ -829,21 +831,33 @@ if (!$isHomeRoute && !$isBlogIndexRoute) {
     }
 }
 
-if ($routePath === '/rss.xml') {
-    $posts = $contentRepository->all();
-    $rssGenerator = new RssGenerator($publicBaseUrl, $siteTitle, $siteDescription, $homeUrl, $rssUrl, $siteLang);
-    $rss = $rssGenerator->generate(
-        $posts,
-        static fn (Post $post): string => '/' . rawurlencode($post->getSlug()),
-        $markdown
-    );
+if ($routePath === '/rss.xml' || $routePath === '/blog.xml') {
+    $feedMode = $routePath === '/blog.xml' ? 'blog' : nammu_home_content_mode($theme, !empty($itineraryListing), $hasPodcast);
+    if ($feedMode === 'podcast' && !$hasPodcast) {
+        $feedMode = 'blog';
+    }
+    if ($feedMode === 'itineraries' && empty($itineraryListing)) {
+        $feedMode = 'blog';
+    }
+    $selfPath = $routePath === '/blog.xml' ? '/blog.xml' : '/rss.xml';
+    if ($feedMode === 'podcast') {
+        $rss = nammu_generate_podcast_feed($publicBaseUrl, $config, $selfPath);
+    } elseif ($feedMode === 'fediverse') {
+        $rss = function_exists('nammu_generate_fediverse_threads_feed')
+            ? nammu_generate_fediverse_threads_feed($publicBaseUrl, $config, $siteTitle, $siteDescription, $siteLang, $selfPath)
+            : '';
+    } elseif ($feedMode === 'itineraries') {
+        $rss = nammu_generate_itineraries_rss_feed($publicBaseUrl, $itineraryListing, $siteTitle, $siteDescription, $siteLang, $selfPath, '/itinerarios');
+    } else {
+        $channelPath = $routePath === '/blog.xml' ? '/blog' : '/';
+        $rss = nammu_generate_blog_rss_feed($publicBaseUrl, $siteTitle, $siteDescription, $siteLang, $selfPath, $channelPath);
+    }
 
     header('Content-Type: application/rss+xml; charset=UTF-8');
     echo $rss;
 
-    // Store a fresh copy for direct access as static file
     if ($publicBaseUrl !== '') {
-        nammu_atomic_write_file(__DIR__ . '/rss.xml', $rss);
+        nammu_atomic_write_file(__DIR__ . $routePath, $rss);
     }
     exit;
 }
@@ -1311,71 +1325,7 @@ if ($routePath === '/sitemap.xml') {
 }
 
 if ($routePath === '/itinerarios.xml') {
-    $itinerariesIndexUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/itinerarios';
-    $itinerariesFeedUrl = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/itinerarios.xml';
-    $itineraryFeedPosts = [];
-    $itineraryPostUrls = [];
-    foreach ($itineraryListing as $itineraryItem) {
-        if (method_exists($itineraryItem, 'isDraft') && $itineraryItem->isDraft()) {
-            continue;
-        }
-        $itineraryMetadata = $itineraryItem->getMetadata();
-        $itineraryDescription = $itineraryItem->getDescription();
-        if ($itineraryDescription === '') {
-            $convertedDocument = $markdown->convertDocument($itineraryItem->getContent());
-            $itineraryDescription = nammu_excerpt_text($convertedDocument['html'], 220);
-        }
-        $dateString = $itineraryMetadata['Date'] ?? ($itineraryMetadata['Updated'] ?? '');
-        if (trim((string) $dateString) === '') {
-            $indexPath = $itineraryItem->getDirectory() . '/index.md';
-            $mtime = is_file($indexPath) ? @filemtime($indexPath) : false;
-            if ($mtime !== false) {
-                $dateString = gmdate('Y-m-d', $mtime);
-            } else {
-                $dateString = gmdate('Y-m-d');
-            }
-        }
-        $virtualMeta = [
-            'Title' => $itineraryItem->getTitle(),
-            'Description' => $itineraryDescription,
-            'Image' => $itineraryItem->getImage() ?? '',
-            'Date' => $dateString,
-        ];
-        $virtualSlug = 'itinerary-feed-' . $itineraryItem->getSlug();
-        $status = method_exists($itineraryItem, 'isDraft') && $itineraryItem->isDraft() ? 'draft' : 'published';
-        $virtualPost = new Post($virtualSlug, $virtualMeta, $itineraryItem->getContent(), $status);
-        $itineraryFeedPosts[] = $virtualPost;
-        $itineraryPostUrls[$virtualSlug] = $buildItineraryUrl($itineraryItem);
-    }
-    usort($itineraryFeedPosts, static function (Post $a, Post $b): int {
-        $dateA = $a->getDate();
-        $dateB = $b->getDate();
-        if ($dateA && $dateB) {
-            return $dateB <=> $dateA;
-        }
-        if ($dateA) {
-            return -1;
-        }
-        if ($dateB) {
-            return 1;
-        }
-        return strcmp($a->getSlug(), $b->getSlug());
-    });
-    $itineraryFeedContent = (new RssGenerator(
-        $publicBaseUrl,
-        $siteTitle . ' — Itinerarios',
-        'Itinerarios recientes',
-        $itinerariesIndexUrl,
-        $itinerariesFeedUrl,
-        $siteLang
-    ))->generate(
-        $itineraryFeedPosts,
-        static function (Post $post) use ($itineraryPostUrls): string {
-            return $itineraryPostUrls[$post->getSlug()] ?? '/';
-        },
-        $markdown,
-        false
-    );
+    $itineraryFeedContent = nammu_generate_itineraries_rss_feed($publicBaseUrl, $itineraryListing, $siteTitle, $siteDescription, $siteLang);
     header('Content-Type: application/rss+xml; charset=UTF-8');
     echo $itineraryFeedContent;
     nammu_atomic_write_file(__DIR__ . '/itinerarios.xml', $itineraryFeedContent);

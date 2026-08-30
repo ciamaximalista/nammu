@@ -2464,7 +2464,7 @@ XML;
 XML;
 }
 
-function nammu_generate_fediverse_threads_feed(string $baseUrl, array $config, string $siteTitle, string $siteDescription, string $siteLang = 'es'): string
+function nammu_generate_fediverse_threads_feed(string $baseUrl, array $config, string $siteTitle, string $siteDescription, string $siteLang = 'es', string $selfPath = '/fediverso.xml'): string
 {
     $items = nammu_actuality_page_items($config, dirname(__DIR__) . '/content', dirname(__DIR__) . '/itinerarios', $baseUrl, $siteTitle, $siteDescription, $siteLang);
     $feedItems = [];
@@ -2495,7 +2495,7 @@ function nammu_generate_fediverse_threads_feed(string $baseUrl, array $config, s
     $feedTitle = htmlspecialchars(trim($siteTitle) !== '' ? ($siteTitle . ' — Fediverso') : 'Fediverso', ENT_XML1 | ENT_COMPAT, 'UTF-8');
     $feedDescription = htmlspecialchars(trim($siteDescription) !== '' ? $siteDescription : 'Páginas públicas de hilo Fediverso asociadas al perfil del blog.', ENT_XML1 | ENT_COMPAT, 'UTF-8');
     $feedLink = htmlspecialchars(rtrim($baseUrl, '/') . (function_exists('nammu_fediverse_profile_alias_path') ? nammu_fediverse_profile_alias_path($config, $baseUrl) : '/actualidad.php'), ENT_XML1 | ENT_COMPAT, 'UTF-8');
-    $selfUrl = htmlspecialchars(rtrim($baseUrl, '/') . '/fediverso.xml', ENT_XML1 | ENT_COMPAT, 'UTF-8');
+    $selfUrl = htmlspecialchars(rtrim($baseUrl, '/') . '/' . ltrim($selfPath, '/'), ENT_XML1 | ENT_COMPAT, 'UTF-8');
 
     $itemsXml = [];
     foreach ($feedItems as $item) {

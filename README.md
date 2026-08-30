@@ -643,7 +643,8 @@ Nammu no se limita a generar RSS: también convierte cada blog en una cuenta pro
 
 - `noticias.xml` publica la selección agregada de noticias y notas.
 - `fediverso.xml` publica las páginas públicas de hilo Fediverso asociadas a los contenidos visibles en la página de perfil.
-- `rss.xml`, `podcast.xml` e `itinerarios.xml` siguen coexistiendo como feeds específicos del resto del sitio.
+- `rss.xml` es la RSS principal del sitio y refleja el contenido elegido como portada.
+- `blog.xml`, `podcast.xml` e `itinerarios.xml` siguen coexistiendo como feeds específicos del resto del sitio.
 
 #### Automatización y rendimiento
 
@@ -803,7 +804,8 @@ Ejemplo rápido:
 
 ## SEO, feeds y archivos auxiliares
 
-- `rss.xml`: feed RSS 2.0 con títulos, descripciones higienizadas, enlaces absolutos e imágenes destacadas.
+- `rss.xml`: feed RSS principal del sitio; publica la RSS asociada al contenido elegido como portada.
+- `blog.xml`: feed RSS 2.0 específico de entradas del blog, con títulos, descripciones higienizadas, enlaces absolutos e imágenes destacadas.
 - `sitemap.xml`: inventario de entradas, páginas e itinerarios para buscadores.
 - `itinerarios.xml`: feed específico de cursos/libros para reutilizar el contenido en otras plataformas.
 - `podcast.xml`: feed RSS de podcast con metadatos iTunes, duración y archivo mp3.

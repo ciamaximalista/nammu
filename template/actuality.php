@@ -380,7 +380,7 @@ $renderBoostHeader = static function (array $item) use ($actualityValidAvatarUrl
         : '<span class="actuality-boost-origin__avatar actuality-boost-origin__avatar--fallback">' . htmlspecialchars($fallback, ENT_QUOTES, 'UTF-8') . '</span>';
     $actorLabel = $actorName !== '' ? $actorName : 'Autor original';
     $profileUrl = $actorUrl !== '' ? $actorUrl : $originalUrl;
-    return '<div class="actuality-boost-origin"><a class="actuality-boost-origin__link" href="' . htmlspecialchars($profileUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" title="' . htmlspecialchars($actorLabel, ENT_QUOTES, 'UTF-8') . '" aria-label="' . htmlspecialchars('Perfil de ' . $actorLabel, ENT_QUOTES, 'UTF-8') . '">' . $avatarHtml . '<span class="actuality-boost-origin__name">' . htmlspecialchars($actorLabel, ENT_QUOTES, 'UTF-8') . '</span></a></div>';
+    return '<div class="actuality-boost-origin"><a class="actuality-boost-origin__link" href="' . htmlspecialchars($profileUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" title="' . htmlspecialchars($actorLabel, ENT_QUOTES, 'UTF-8') . '" aria-label="' . htmlspecialchars('Perfil de ' . $actorLabel, ENT_QUOTES, 'UTF-8') . '">' . $avatarHtml . '</a></div>';
 };
 $formatDate = static function (int $timestamp): string {
     if ($timestamp <= 0) {
@@ -1205,7 +1205,6 @@ $manualDisplayText = static function (array $item): string {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 0.55rem;
         text-decoration: none;
     }
     .actuality-boost-origin__avatar {
@@ -1226,15 +1225,6 @@ $manualDisplayText = static function (array $item): string {
         font-size: 1.15rem;
         font-weight: 700;
         justify-content: center;
-    }
-    .actuality-boost-origin__name {
-        color: #3f6f1f;
-        font-family: "<?= $noteFont ?>", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        font-size: 0.98rem;
-        font-weight: 700;
-    }
-    .actuality-boost-origin__link:hover .actuality-boost-origin__name {
-        text-decoration: underline;
     }
     .actuality-image-link {
         display: block;

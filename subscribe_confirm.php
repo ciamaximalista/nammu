@@ -101,15 +101,13 @@ function subscription_load(array $fileDef): array {
 
 function subscription_save(string $file, array $data): void {
     $dir = dirname($file);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
+    nammu_ensure_directory($dir);
     $payload = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if ($payload === false) {
         throw new RuntimeException('No se pudo serializar los datos');
     }
-    file_put_contents($file, $payload, LOCK_EX);
-    @chmod($file, 0664);
+    nammu_atomic_write_file($file, $payload);
+    nammu_apply_shared_permissions($file, 0664, $dir);
 }
 
 $email = subscription_normalize_email($_GET['email'] ?? '');

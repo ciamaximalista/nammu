@@ -212,15 +212,13 @@ function mailing_load_rate_limit_state(): array
 function mailing_save_rate_limit_state(array $state): void
 {
     $dir = dirname(MAILING_RATE_LIMIT_FILE);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
+    nammu_ensure_directory($dir);
     $payload = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if ($payload === false) {
         return;
     }
-    file_put_contents(MAILING_RATE_LIMIT_FILE, $payload, LOCK_EX);
-    @chmod(MAILING_RATE_LIMIT_FILE, 0664);
+    nammu_atomic_write_file(MAILING_RATE_LIMIT_FILE, $payload);
+    nammu_apply_shared_permissions(MAILING_RATE_LIMIT_FILE, 0664, $dir);
 }
 
 function mailing_rate_limit_register(array &$state, string $key, int $now, int $window, int $max): bool
@@ -276,15 +274,13 @@ function mailing_rate_limited(string $email = ''): bool
 function mailing_save_pending(array $pending): void
 {
     $dir = dirname(MAILING_PENDING_FILE);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
+    nammu_ensure_directory($dir);
     $payload = json_encode(array_values($pending), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if ($payload === false) {
         throw new RuntimeException('No se pudo preparar la lista de pendientes.');
     }
-    file_put_contents(MAILING_PENDING_FILE, $payload, LOCK_EX);
-    @chmod(MAILING_PENDING_FILE, 0664);
+    nammu_atomic_write_file(MAILING_PENDING_FILE, $payload);
+    nammu_apply_shared_permissions(MAILING_PENDING_FILE, 0664, $dir);
 }
 
 function mailing_has_recent_pending(array $pending, string $email, int $window = MAILING_PENDING_RESEND_WINDOW): bool
@@ -330,26 +326,25 @@ function mailing_save_tokens(array $tokens): void
     if ($payload === false) {
         return;
     }
-    file_put_contents(MAILING_TOKENS_FILE, $payload, LOCK_EX);
-    @chmod(MAILING_TOKENS_FILE, 0660);
+    nammu_atomic_write_file(MAILING_TOKENS_FILE, $payload);
+    nammu_apply_shared_permissions(MAILING_TOKENS_FILE, 0660, $dir);
 }
 
 function mailing_secret(): string
 {
     if (!is_file(MAILING_SECRET_FILE)) {
         $dir = dirname(MAILING_SECRET_FILE);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0775, true);
-        }
+        nammu_ensure_directory($dir);
         $secret = bin2hex(random_bytes(32));
-        file_put_contents(MAILING_SECRET_FILE, $secret);
-        @chmod(MAILING_SECRET_FILE, 0640);
+        nammu_atomic_write_file(MAILING_SECRET_FILE, $secret);
+        nammu_apply_shared_permissions(MAILING_SECRET_FILE, 0640, $dir);
         return $secret;
     }
     $content = trim((string) file_get_contents(MAILING_SECRET_FILE));
     if ($content === '') {
         $content = bin2hex(random_bytes(32));
-        file_put_contents(MAILING_SECRET_FILE, $content);
+        nammu_atomic_write_file(MAILING_SECRET_FILE, $content);
+        nammu_apply_shared_permissions(MAILING_SECRET_FILE, 0640, dirname(MAILING_SECRET_FILE));
     }
     return $content;
 }

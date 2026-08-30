@@ -72,6 +72,11 @@ function nammu_fediverse_announce_queue_file(): string
     return dirname(__DIR__) . '/config/fediverso-announce-queue.json';
 }
 
+function nammu_fediverse_update_queue_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-update-queue.json';
+}
+
 function nammu_fediverse_shared_queue_dir(array $config): string
 {
     $multi = nammu_fediverse_multi_instance_config($config);
@@ -545,6 +550,30 @@ function nammu_fediverse_save_json_store(string $file, array $payload): bool
     }
     $GLOBALS['nammu_fediverse_json_store_cache'][$file] = $payload;
     return true;
+}
+
+function nammu_fediverse_with_json_store_lock(string $file, callable $callback)
+{
+    $dir = dirname($file);
+    nammu_ensure_directory($dir);
+    $lockFile = $file . '.lock';
+    $handle = @fopen($lockFile, 'c+');
+    if (!is_resource($handle)) {
+        return $callback(false);
+    }
+    try {
+        if (!@flock($handle, LOCK_EX)) {
+            return $callback(false);
+        }
+        nammu_apply_shared_permissions($lockFile, 0664, $dir);
+        if (isset($GLOBALS['nammu_fediverse_json_store_cache']) && is_array($GLOBALS['nammu_fediverse_json_store_cache'])) {
+            unset($GLOBALS['nammu_fediverse_json_store_cache'][$file]);
+        }
+        return $callback(true);
+    } finally {
+        @flock($handle, LOCK_UN);
+        @fclose($handle);
+    }
 }
 
 function nammu_fediverse_link_cards_store(): array
@@ -2268,6 +2297,38 @@ function nammu_fediverse_announce_queue_store(?array $config = null): array
     return ['items' => $normalized];
 }
 
+function nammu_fediverse_update_queue_store(?array $config = null): array
+{
+    $resolvedConfig = nammu_fediverse_effective_config($config);
+    $file = nammu_fediverse_queue_file_for($resolvedConfig, 'fediverso-update-queue', nammu_fediverse_update_queue_file());
+    $store = nammu_fediverse_load_json_store($file, ['items' => []]);
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    $normalized = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $activity = is_array($item['activity'] ?? null) ? $item['activity'] : null;
+        $activityId = trim((string) (($item['activity_id'] ?? '') ?: ($activity['id'] ?? '')));
+        $inboxUrl = trim((string) ($item['inbox_url'] ?? ''));
+        if ($activityId === '' || $inboxUrl === '' || !is_array($activity)) {
+            continue;
+        }
+        $normalized[] = [
+            'activity_id' => $activityId,
+            'object_id' => trim((string) ($item['object_id'] ?? '')),
+            'follower_id' => trim((string) ($item['follower_id'] ?? '')),
+            'inbox_url' => $inboxUrl,
+            'activity' => $activity,
+            'created_at' => trim((string) ($item['created_at'] ?? '')) ?: gmdate(DATE_ATOM),
+            'last_attempt_at' => trim((string) ($item['last_attempt_at'] ?? '')),
+            'last_error' => trim((string) ($item['last_error'] ?? '')),
+            'attempts' => (int) ($item['attempts'] ?? 0),
+        ];
+    }
+    return ['items' => $normalized];
+}
+
 function nammu_fediverse_threads_cache_store(): array
 {
     $store = nammu_fediverse_load_json_store(nammu_fediverse_threads_cache_file(), ['items' => []]);
@@ -2502,6 +2563,13 @@ function nammu_fediverse_save_announce_queue_store(array $items, ?array $config 
 {
     $resolvedConfig = nammu_fediverse_effective_config($config);
     $file = nammu_fediverse_queue_file_for($resolvedConfig, 'fediverso-announce-queue', nammu_fediverse_announce_queue_file());
+    nammu_fediverse_save_json_store($file, ['items' => array_values($items)]);
+}
+
+function nammu_fediverse_save_update_queue_store(array $items, ?array $config = null): void
+{
+    $resolvedConfig = nammu_fediverse_effective_config($config);
+    $file = nammu_fediverse_queue_file_for($resolvedConfig, 'fediverso-update-queue', nammu_fediverse_update_queue_file());
     nammu_fediverse_save_json_store($file, ['items' => array_values($items)]);
 }
 
@@ -4092,6 +4160,7 @@ function nammu_fediverse_store_files_for_tab(string $tab): array
             nammu_fediverse_deleted_file(),
             nammu_fediverse_hidden_replies_file(),
             nammu_fediverse_followers_file(),
+            nammu_fediverse_update_queue_file(),
         ],
         'notifications' => [
             nammu_fediverse_notifications_snapshot_file(),
@@ -4121,6 +4190,7 @@ function nammu_fediverse_store_files_for_tab(string $tab): array
             nammu_fediverse_followers_file(),
             nammu_fediverse_keys_file(),
             nammu_fediverse_actions_file(),
+            nammu_fediverse_update_queue_file(),
         ],
         default => [
             nammu_fediverse_timeline_file(),
@@ -4133,6 +4203,7 @@ function nammu_fediverse_store_files_for_tab(string $tab): array
             nammu_fediverse_threads_cache_file(),
             nammu_fediverse_hidden_replies_file(),
             nammu_fediverse_blocked_file(),
+            nammu_fediverse_update_queue_file(),
         ],
     };
     return array_values(array_unique($files));
@@ -8228,6 +8299,75 @@ function nammu_fediverse_reply_note_document(string $routePath, array $config): 
     return null;
 }
 
+function nammu_fediverse_update_queue_delivery_key(string $activityId, string $inboxUrl): string
+{
+    return sha1(trim($activityId) . '|' . trim($inboxUrl));
+}
+
+function nammu_fediverse_enqueue_update_deliveries(array $deliveries, array $config): void
+{
+    if ($deliveries === []) {
+        return;
+    }
+    $resolvedConfig = nammu_fediverse_effective_config($config);
+    $queueFile = nammu_fediverse_queue_file_for($resolvedConfig, 'fediverso-update-queue', nammu_fediverse_update_queue_file());
+    $recordsByKey = [];
+    $now = gmdate(DATE_ATOM);
+    foreach ($deliveries as $delivery) {
+        if (!is_array($delivery)) {
+            continue;
+        }
+        $activity = is_array($delivery['activity'] ?? null) ? $delivery['activity'] : [];
+        $activityId = trim((string) ($activity['id'] ?? ''));
+        $inboxUrl = trim((string) ($delivery['inbox_url'] ?? ''));
+        if ($activityId === '' || $inboxUrl === '') {
+            continue;
+        }
+        $object = is_array($activity['object'] ?? null) ? $activity['object'] : [];
+        $recordsByKey[nammu_fediverse_update_queue_delivery_key($activityId, $inboxUrl)] = [
+            'activity_id' => $activityId,
+            'object_id' => trim((string) ($object['id'] ?? '')),
+            'follower_id' => trim((string) ($delivery['follower_id'] ?? '')),
+            'inbox_url' => $inboxUrl,
+            'activity' => $activity,
+            'created_at' => $now,
+            'last_attempt_at' => $now,
+            'last_error' => mb_substr(trim((string) ($delivery['last_error'] ?? 'Entrega fallida.')), 0, 500, 'UTF-8'),
+            'attempts' => 1,
+        ];
+    }
+    if ($recordsByKey === []) {
+        return;
+    }
+    nammu_fediverse_with_json_store_lock($queueFile, static function (bool $_locked) use ($config, $recordsByKey): void {
+        $queue = nammu_fediverse_update_queue_store($config);
+        $items = is_array($queue['items'] ?? null) ? array_values($queue['items']) : [];
+        $pendingRecords = $recordsByKey;
+        $merged = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $itemActivityId = trim((string) ($item['activity_id'] ?? ''));
+            $itemInboxUrl = trim((string) ($item['inbox_url'] ?? ''));
+            $key = ($itemActivityId !== '' && $itemInboxUrl !== '') ? nammu_fediverse_update_queue_delivery_key($itemActivityId, $itemInboxUrl) : '';
+            if ($key !== '' && isset($pendingRecords[$key])) {
+                $record = $pendingRecords[$key];
+                $record['created_at'] = trim((string) ($item['created_at'] ?? '')) ?: $record['created_at'];
+                $record['attempts'] = max(1, (int) ($item['attempts'] ?? 0));
+                $merged[] = $record;
+                unset($pendingRecords[$key]);
+                continue;
+            }
+            $merged[] = $item;
+        }
+        foreach ($pendingRecords as $record) {
+            $merged[] = $record;
+        }
+        nammu_fediverse_save_update_queue_store($merged, $config);
+    });
+}
+
 function nammu_fediverse_notify_followers_of_object_update(array $item, array $config): int
 {
     $itemId = trim((string) ($item['id'] ?? ''));
@@ -8261,6 +8401,7 @@ function nammu_fediverse_notify_followers_of_object_update(array $item, array $c
         'object' => $object,
     ];
     $delivered = 0;
+    $failedDeliveries = [];
     foreach ($followers as $follower) {
         $followerId = trim((string) ($follower['id'] ?? ''));
         if ($followerId !== '' && nammu_fediverse_is_blocked_actor($followerId)) {
@@ -8270,10 +8411,19 @@ function nammu_fediverse_notify_followers_of_object_update(array $item, array $c
         if ($inboxUrl === '') {
             continue;
         }
-        if (nammu_fediverse_post_activity($inboxUrl, $updateActivity, $config)) {
+        $delivery = nammu_fediverse_post_activity_response($inboxUrl, $updateActivity, $config);
+        if (!empty($delivery['ok'])) {
             $delivered++;
+            continue;
         }
+        $failedDeliveries[] = [
+            'activity' => $updateActivity,
+            'inbox_url' => $inboxUrl,
+            'follower_id' => $followerId,
+            'last_error' => (string) ($delivery['message'] ?? 'Entrega fallida.'),
+        ];
     }
+    nammu_fediverse_enqueue_update_deliveries($failedDeliveries, $config);
     return $delivered;
 }
 
@@ -9703,6 +9853,59 @@ function nammu_fediverse_process_announce_queue(array $config, int $maxJobs = 2)
         'failed' => $failed,
         'remaining' => count($remaining),
     ];
+}
+
+function nammu_fediverse_process_update_queue(array $config, int $maxJobs = 3): array
+{
+    if ($maxJobs < 1) {
+        $maxJobs = 1;
+    }
+    $resolvedConfig = nammu_fediverse_effective_config($config);
+    $queueFile = nammu_fediverse_queue_file_for($resolvedConfig, 'fediverso-update-queue', nammu_fediverse_update_queue_file());
+    return nammu_fediverse_with_json_store_lock($queueFile, static function (bool $_locked) use ($config, $maxJobs): array {
+        $queue = nammu_fediverse_update_queue_store($config);
+        $items = is_array($queue['items'] ?? null) ? array_values($queue['items']) : [];
+        $processed = 0;
+        $sent = 0;
+        $failed = 0;
+        $remaining = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            if ($processed >= $maxJobs) {
+                $remaining[] = $item;
+                continue;
+            }
+            $activity = is_array($item['activity'] ?? null) ? $item['activity'] : null;
+            $inboxUrl = trim((string) ($item['inbox_url'] ?? ''));
+            $activityId = trim((string) (($item['activity_id'] ?? '') ?: ($activity['id'] ?? '')));
+            if (!is_array($activity) || $inboxUrl === '' || $activityId === '') {
+                continue;
+            }
+            $processed++;
+            $delivery = nammu_fediverse_post_activity_response($inboxUrl, $activity, $config);
+            if (!empty($delivery['ok'])) {
+                $sent++;
+                continue;
+            }
+            $item['activity_id'] = $activityId;
+            $item['attempts'] = (int) ($item['attempts'] ?? 0) + 1;
+            $item['last_attempt_at'] = gmdate(DATE_ATOM);
+            $item['last_error'] = mb_substr(trim((string) ($delivery['message'] ?? 'Entrega fallida.')), 0, 500, 'UTF-8');
+            $failed++;
+            if ((int) $item['attempts'] < 5) {
+                $remaining[] = $item;
+            }
+        }
+        nammu_fediverse_save_update_queue_store($remaining, $config);
+        return [
+            'processed' => $processed,
+            'sent' => $sent,
+            'failed' => $failed,
+            'remaining' => count($remaining),
+        ];
+    });
 }
 
 function nammu_fediverse_send_undo_like_for_item(array $item, array $config): array

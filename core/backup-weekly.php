@@ -9,6 +9,8 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $root = dirname(__DIR__);
+require_once $root . '/core/helpers.php';
+
 $defaultBackupDir = $root . '/backups';
 $defaultRetentionWeeks = 8;
 $lockFile = $root . '/config/backup-full.lock';
@@ -96,7 +98,7 @@ if (empty($includePaths)) {
 
 $fileListPath = rtrim($backupDir, '/') . '/.backup-full-filelist.txt';
 $fileListPayload = implode(PHP_EOL, $includePaths) . PHP_EOL;
-if (@file_put_contents($fileListPath, $fileListPayload) === false) {
+if (@file_put_contents($fileListPath, $fileListPayload, LOCK_EX) === false) {
     fwrite(STDERR, "No se pudo crear la lista de rutas para backup completo.\n");
     flock($lockHandle, LOCK_UN);
     fclose($lockHandle);
@@ -134,7 +136,7 @@ if (!@rename($tempPath, $archivePath)) {
 
 $hash = @hash_file('sha256', $archivePath) ?: '';
 if ($hash !== '') {
-    @file_put_contents($archivePath . '.sha256', $hash . '  ' . basename($archivePath) . PHP_EOL);
+    nammu_atomic_write_file($archivePath . '.sha256', $hash . '  ' . basename($archivePath) . PHP_EOL);
 }
 
 $deleted = $cleanupOldBackups($backupDir, $timestamp, $retentionDays);
@@ -147,7 +149,10 @@ $summary = [
     'retention_weeks' => $retentionWeeks,
     'paths' => $includePaths,
 ];
-@file_put_contents(rtrim($backupDir, '/') . '/latest-full-backup.json', json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+$summaryJson = json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+if (is_string($summaryJson)) {
+    nammu_atomic_write_file(rtrim($backupDir, '/') . '/latest-full-backup.json', $summaryJson);
+}
 
 fwrite(STDOUT, "Backup completo creado: {$archivePath}\n");
 if ($hash !== '') {

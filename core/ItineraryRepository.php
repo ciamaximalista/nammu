@@ -231,10 +231,10 @@ class ItineraryRepository
         $lines[] = "---";
         $body = ltrim($content);
         $payload = implode("\n", $lines) . "\n\n" . $body . "\n";
-        if (file_put_contents($file, $payload) === false) {
+        if (!\nammu_atomic_write_file($file, $payload)) {
             throw new RuntimeException("No se pudo escribir el archivo {$file}");
         }
-        @chmod($file, 0664);
+        \nammu_apply_shared_permissions($file, 0664, dirname($file));
     }
 
     private function itineraryQuizFile(string $directory): string
@@ -292,10 +292,10 @@ class ItineraryRepository
         if ($payload === false) {
             throw new RuntimeException("No se pudo serializar la autoevaluación para {$file}");
         }
-        if (file_put_contents($file, $payload) === false) {
+        if (!\nammu_atomic_write_file($file, $payload)) {
             throw new RuntimeException("No se pudo escribir la autoevaluación {$file}");
         }
-        @chmod($file, 0664);
+        \nammu_apply_shared_permissions($file, 0664, dirname($file));
     }
 
     public function getItineraryStats(string $slug): array
@@ -414,10 +414,10 @@ class ItineraryRepository
         if ($payload === false) {
             throw new RuntimeException("No se pudieron serializar las estadísticas para {$file}");
         }
-        if (file_put_contents($file, $payload) === false) {
+        if (!\nammu_atomic_write_file($file, $payload)) {
             throw new RuntimeException("No se pudieron escribir las estadísticas {$file}");
         }
-        @chmod($file, 0664);
+        \nammu_apply_shared_permissions($file, 0664, dirname($file));
     }
 
     private function sanitizeQuizData(?array $quiz): array

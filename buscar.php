@@ -12,7 +12,6 @@ use Nammu\Core\Itinerary;
 use Nammu\Core\ItineraryRepository;
 use Nammu\Core\MarkdownConverter;
 use Nammu\Core\TemplateRenderer;
-use Throwable;
 
 if (function_exists('nammu_publish_scheduled_posts')) {
     nammu_publish_scheduled_posts(__DIR__ . '/content');

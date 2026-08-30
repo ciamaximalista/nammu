@@ -39,6 +39,22 @@ function nammu_apply_shared_permissions(string $path, int $permissions = 0664, ?
     @chmod($path, $permissions);
 }
 
+function nammu_set_cookie(string $name, string $value, int $expires, bool $httpOnly = true, string $sameSite = 'Lax'): void
+{
+    $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    if (PHP_VERSION_ID >= 70300) {
+        setcookie($name, $value, [
+            'expires' => $expires,
+            'path' => '/',
+            'secure' => $secure,
+            'httponly' => $httpOnly,
+            'samesite' => $sameSite,
+        ]);
+        return;
+    }
+    setcookie($name, $value, $expires, '/', '', $secure, $httpOnly);
+}
+
 function nammu_base_url(): string
 {
     $explicit = getenv('NAMMU_BASE_URL');
@@ -192,7 +208,10 @@ function nammu_multi_instance_remote_host_with_lock(array $config, callable $cal
         }
         $state['hosts'] = is_array($state['hosts'] ?? null) ? $state['hosts'] : [];
         $result = $callback($state);
-        @file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $payload = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (is_string($payload)) {
+            nammu_atomic_write_file($stateFile, $payload);
+        }
         return $result;
     } finally {
         @flock($handle, LOCK_UN);
@@ -304,7 +323,7 @@ function nammu_stats_uid(): ?string
     } catch (Throwable $e) {
         $uid = bin2hex(pack('N', time())) . bin2hex(pack('N', mt_rand(1, PHP_INT_MAX)));
     }
-    setcookie($cookieName, $uid, time() + 31536000, '/', '', false, false);
+    nammu_set_cookie($cookieName, $uid, time() + 31536000);
     $_COOKIE[$cookieName] = $uid;
     return $uid;
 }
@@ -930,7 +949,7 @@ function nammu_record_visit(): void
                 $referrer = $decodedRef;
             }
         }
-        setcookie('nammu_stats_referrer', '', time() - 3600, '/');
+        nammu_set_cookie('nammu_stats_referrer', '', time() - 3600);
         unset($_COOKIE['nammu_stats_referrer']);
     }
     $utmSource = strtolower(trim((string) ($_GET['utm_source'] ?? '')));
@@ -1912,7 +1931,7 @@ function nammu_dispatch_push_queue(): array
     }
     if (empty($summary['skipped'])) {
         $file = nammu_push_queue_file();
-        @file_put_contents($file, json_encode([], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        nammu_atomic_write_file($file, json_encode([], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
     }
     return $summary;
 }
@@ -3537,7 +3556,7 @@ function nammu_set_itinerary_progress(string $slug, array $progress): void
         return;
     }
     $cookieName = nammu_itinerary_progress_cookie_name($slug);
-    setcookie($cookieName, $payload, time() + 31536000, '/', '', false, false);
+    nammu_set_cookie($cookieName, $payload, time() + 31536000);
     $_COOKIE[$cookieName] = $payload;
 }
 
@@ -3984,18 +4003,7 @@ function nammu_newsletter_set_access_cookie(string $email, string $token, int $e
         return;
     }
     $encoded = base64_encode($payload);
-    $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
-    if (PHP_VERSION_ID >= 70300) {
-        setcookie(nammu_newsletter_access_cookie_name(), $encoded, [
-            'expires' => $expires,
-            'path' => '/',
-            'secure' => $secure,
-            'httponly' => true,
-            'samesite' => 'Lax',
-        ]);
-    } else {
-        setcookie(nammu_newsletter_access_cookie_name(), $encoded, $expires, '/', '', $secure, true);
-    }
+    nammu_set_cookie(nammu_newsletter_access_cookie_name(), $encoded, $expires);
     $_COOKIE[nammu_newsletter_access_cookie_name()] = $encoded;
 }
 
@@ -4020,7 +4028,7 @@ function nammu_newsletter_get_access_cookie(): ?array
         return null;
     }
     if ($expiresAt === 0 || $expiresAt <= time()) {
-        setcookie(nammu_newsletter_access_cookie_name(), '', time() - 3600, '/', '', false, true);
+        nammu_set_cookie(nammu_newsletter_access_cookie_name(), '', time() - 3600);
         unset($_COOKIE[nammu_newsletter_access_cookie_name()]);
         return null;
     }
@@ -4286,14 +4294,15 @@ function nammu_mailing_secret(): string
     if (!is_file($file)) {
         nammu_ensure_directory(dirname($file));
         $secret = bin2hex(random_bytes(32));
-        file_put_contents($file, $secret);
-        @chmod($file, 0640);
+        nammu_atomic_write_file($file, $secret);
+        nammu_apply_shared_permissions($file, 0640, dirname($file));
         return $secret;
     }
     $secret = trim((string) file_get_contents($file));
     if ($secret === '') {
         $secret = bin2hex(random_bytes(32));
-        file_put_contents($file, $secret);
+        nammu_atomic_write_file($file, $secret);
+        nammu_apply_shared_permissions($file, 0640, dirname($file));
     }
     return $secret;
 }

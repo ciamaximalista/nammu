@@ -8,6 +8,16 @@ $__nammuRunFediverseLinkCardRefreshOnly = PHP_SAPI === 'cli' && in_array('--run-
 $__nammuReplayFediverseDeletesOnly = PHP_SAPI === 'cli' && in_array('--replay-fediverse-deletes', $__nammuCliArgs, true);
 $__nammuCliDebugEnabled = PHP_SAPI === 'cli' && in_array('--debug', $__nammuCliArgs, true);
 if (!$__nammuRunScheduledOnly && !$__nammuRunScheduledMaintenanceOnly && !$__nammuRunScheduledHeavyOnly && !$__nammuRunClusterScheduledOnly && !$__nammuRunFediverseLinkCardRefreshOnly && !$__nammuReplayFediverseDeletesOnly) {
+    $secureSession = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    if (PHP_VERSION_ID >= 70300) {
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => '/',
+            'secure' => $secureSession,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    }
     session_start();
 }
 
@@ -18,6 +28,10 @@ require_once __DIR__ . '/core/admin-nisaba.php';
 require_once __DIR__ . '/core/admin-telex.php';
 require_once __DIR__ . '/core/admin-ideas.php';
 require_once __DIR__ . '/core/webmention.php';
+
+if (!$__nammuRunScheduledOnly && !$__nammuRunScheduledMaintenanceOnly && !$__nammuRunScheduledHeavyOnly && !$__nammuRunClusterScheduledOnly && !$__nammuRunFediverseLinkCardRefreshOnly && !$__nammuReplayFediverseDeletesOnly) {
+    admin_start_csrf_form_injection();
+}
 
 // Load dependencies (optional)
 $autoload = __DIR__ . '/vendor/autoload.php';
@@ -92,6 +106,55 @@ function admin_cli_timing_log(string $scope, string $step, float $startedAt, arr
         'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
     ], $extra);
     fwrite(STDERR, '[nammu-timing] ' . json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . PHP_EOL);
+}
+
+function admin_csrf_token(): string
+{
+    if (empty($_SESSION['nammu_csrf_token']) || !is_string($_SESSION['nammu_csrf_token'])) {
+        $_SESSION['nammu_csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['nammu_csrf_token'];
+}
+
+function admin_csrf_input(): string
+{
+    return '<input type="hidden" name="_nammu_csrf" value="' . htmlspecialchars(admin_csrf_token(), ENT_QUOTES, 'UTF-8') . '">';
+}
+
+function admin_csrf_is_valid($token): bool
+{
+    $token = is_string($token) ? $token : '';
+    return $token !== '' && hash_equals(admin_csrf_token(), $token);
+}
+
+function admin_start_csrf_form_injection(): void
+{
+    if (PHP_SAPI === 'cli') {
+        return;
+    }
+    admin_csrf_token();
+    ob_start(static function (string $html): string {
+        if ($html === '' || stripos($html, '<form') === false) {
+            return $html;
+        }
+        $input = admin_csrf_input();
+        $html = preg_replace_callback('/<form\b[^>]*>/i', static function (array $matches) use ($input): string {
+            $tag = $matches[0];
+            if (!preg_match('/\bmethod\s*=\s*([\'"]?)post\1/i', $tag)) {
+                return $tag;
+            }
+            if (stripos($tag, '_nammu_csrf') !== false) {
+                return $tag;
+            }
+            return $tag . "\n" . $input;
+        }, $html) ?? $html;
+        $tokenJson = json_encode(admin_csrf_token(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+        if (is_string($tokenJson) && stripos($html, '</body>') !== false && stripos($html, 'window.NAMMU_CSRF_TOKEN') === false) {
+            $script = '<script>window.NAMMU_CSRF_TOKEN=' . $tokenJson . ';document.addEventListener("submit",function(e){var f=e.target;if(!f||String(f.method||"").toLowerCase()!=="post"||f.querySelector("input[name=\'_nammu_csrf\']"))return;var i=document.createElement("input");i.type="hidden";i.name="_nammu_csrf";i.value=window.NAMMU_CSRF_TOKEN;f.appendChild(i);},true);</script>';
+            $html = str_ireplace('</body>', $script . '</body>', $html);
+        }
+        return $html;
+    });
 }
 
 function admin_run_scheduled_tasks(): array {
@@ -263,6 +326,7 @@ function admin_run_scheduled_maintenance_tasks(): array {
     $fediverseDeleteQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $fediverseUndoAnnounceQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $fediverseAnnounceQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
+    $fediverseUpdateQueueStats = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'remaining' => 0];
     $deliveryStats = ['followers' => 0, 'delivered' => 0];
     $acceptStats = ['checked' => 0, 'accepted' => 0, 'failed' => 0];
     $actualityChanged = false;
@@ -368,6 +432,11 @@ function admin_run_scheduled_maintenance_tasks(): array {
             return nammu_fediverse_process_undo_announce_queue($config, 2);
         });
     }
+    if (function_exists('nammu_fediverse_process_update_queue')) {
+        $fediverseUpdateQueueStats = $traceStep('fediverse_update_queue', static function () use ($config) {
+            return nammu_fediverse_process_update_queue($config, 3);
+        });
+    }
     if (function_exists('nammu_fediverse_retry_pending_follower_accepts')) {
         $acceptStats = $traceStep('fediverse_retry_pending_follower_accepts', static function () use ($config) {
             return nammu_fediverse_retry_pending_follower_accepts($config);
@@ -442,10 +511,14 @@ function admin_run_scheduled_maintenance_tasks(): array {
         'fediverse_follow_accepts_checked' => (int) ($acceptStats['checked'] ?? 0),
         'fediverse_follow_accepts_sent' => (int) ($acceptStats['accepted'] ?? 0),
         'fediverse_follow_accepts_failed' => (int) ($acceptStats['failed'] ?? 0),
-        'fediverse_delete_queue_processed' => (int) ($fediverseDeleteQueueStats['processed'] ?? 0) + (int) ($fediverseUndoAnnounceQueueStats['processed'] ?? 0) + (int) ($fediverseAnnounceQueueStats['processed'] ?? 0),
-        'fediverse_delete_queue_sent' => (int) ($fediverseDeleteQueueStats['sent'] ?? 0) + (int) ($fediverseUndoAnnounceQueueStats['sent'] ?? 0) + (int) ($fediverseAnnounceQueueStats['sent'] ?? 0),
-        'fediverse_delete_queue_failed' => (int) ($fediverseDeleteQueueStats['failed'] ?? 0) + (int) ($fediverseUndoAnnounceQueueStats['failed'] ?? 0) + (int) ($fediverseAnnounceQueueStats['failed'] ?? 0),
-        'fediverse_delete_queue_remaining' => (int) ($fediverseDeleteQueueStats['remaining'] ?? 0) + (int) ($fediverseUndoAnnounceQueueStats['remaining'] ?? 0) + (int) ($fediverseAnnounceQueueStats['remaining'] ?? 0),
+        'fediverse_update_queue_processed' => (int) ($fediverseUpdateQueueStats['processed'] ?? 0),
+        'fediverse_update_queue_sent' => (int) ($fediverseUpdateQueueStats['sent'] ?? 0),
+        'fediverse_update_queue_failed' => (int) ($fediverseUpdateQueueStats['failed'] ?? 0),
+        'fediverse_update_queue_remaining' => (int) ($fediverseUpdateQueueStats['remaining'] ?? 0),
+        'fediverse_delete_queue_processed' => (int) ($fediverseDeleteQueueStats['processed'] ?? 0) + (int) ($fediverseUndoAnnounceQueueStats['processed'] ?? 0) + (int) ($fediverseAnnounceQueueStats['processed'] ?? 0) + (int) ($fediverseUpdateQueueStats['processed'] ?? 0),
+        'fediverse_delete_queue_sent' => (int) ($fediverseDeleteQueueStats['sent'] ?? 0) + (int) ($fediverseUndoAnnounceQueueStats['sent'] ?? 0) + (int) ($fediverseAnnounceQueueStats['sent'] ?? 0) + (int) ($fediverseUpdateQueueStats['sent'] ?? 0),
+        'fediverse_delete_queue_failed' => (int) ($fediverseDeleteQueueStats['failed'] ?? 0) + (int) ($fediverseUndoAnnounceQueueStats['failed'] ?? 0) + (int) ($fediverseAnnounceQueueStats['failed'] ?? 0) + (int) ($fediverseUpdateQueueStats['failed'] ?? 0),
+        'fediverse_delete_queue_remaining' => (int) ($fediverseDeleteQueueStats['remaining'] ?? 0) + (int) ($fediverseUndoAnnounceQueueStats['remaining'] ?? 0) + (int) ($fediverseAnnounceQueueStats['remaining'] ?? 0) + (int) ($fediverseUpdateQueueStats['remaining'] ?? 0),
     ];
 }
 
@@ -765,7 +838,7 @@ function admin_multi_instance_trace(array $config, array $entry): void
     }
     $file = admin_multi_instance_trace_file($config);
     $entry['at'] = date(DATE_ATOM);
-    @file_put_contents($file, json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+    @file_put_contents($file, json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND | LOCK_EX);
 }
 
 function admin_multi_instance_scheduler_state_load(array $config): array
@@ -790,10 +863,11 @@ function admin_multi_instance_scheduler_state_save(array $config, array $state):
         return;
     }
     $dir = dirname($file);
-    if (!is_dir($dir)) {
-        nammu_ensure_directory($dir);
+    nammu_ensure_directory($dir);
+    $payload = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (is_string($payload)) {
+        nammu_atomic_write_file($file, $payload);
     }
-    @file_put_contents($file, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 }
 
 function admin_multi_instance_site_last_local_activity_at(string $siteDir): int
@@ -1347,7 +1421,7 @@ function admin_maintenance_trace(array $entry): void
     }
     $entry['at'] = date(DATE_ATOM);
     $entry['site'] = basename(__DIR__);
-    @file_put_contents($backupDir . '/maintenance-trace.log', json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+    @file_put_contents($backupDir . '/maintenance-trace.log', json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND | LOCK_EX);
 }
 
 function admin_heavy_trace(array $entry): void
@@ -1361,7 +1435,7 @@ function admin_heavy_trace(array $entry): void
     }
     $entry['at'] = date(DATE_ATOM);
     $entry['site'] = basename(__DIR__);
-    @file_put_contents($backupDir . '/heavy-trace.log', json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+    @file_put_contents($backupDir . '/heavy-trace.log', json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND | LOCK_EX);
 }
 
 /**
@@ -1714,7 +1788,6 @@ function nammu_generate_webp_variant_for_asset(string $absolutePath): ?string {
     $target = $absolutePath . '.webp';
     $tmp = $target . '.tmp-' . getmypid();
     $ok = @imagewebp($src, $tmp, 82);
-    @imagedestroy($src);
     if (!$ok || !is_file($tmp) || filesize($tmp) <= 0) {
         @unlink($tmp);
         return null;
@@ -1877,7 +1950,7 @@ function save_media_tags(array $tags): void {
     if (function_exists('nammu_atomic_write_file')) {
         nammu_atomic_write_file(MEDIA_TAGS_FILE, $json);
     } else {
-        @file_put_contents(MEDIA_TAGS_FILE, $json);
+        @file_put_contents(MEDIA_TAGS_FILE, $json, LOCK_EX);
         @chmod(MEDIA_TAGS_FILE, 0664);
     }
     load_media_tags(true);
@@ -2498,9 +2571,7 @@ function admin_save_public_artifacts_refresh_queue(array $queue): void
 {
     $file = admin_public_artifacts_refresh_queue_file();
     $dir = dirname($file);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
-    }
+    nammu_ensure_directory($dir);
     $payload = [
         'pending' => !empty($queue['pending']),
         'updated_at' => time(),
@@ -2512,6 +2583,7 @@ function admin_save_public_artifacts_refresh_queue(array $queue): void
     if (is_string($json)) {
         if (function_exists('nammu_atomic_write_file')) {
             nammu_atomic_write_file($file, $json);
+            nammu_apply_shared_permissions($file, 0664, $dir);
         } else {
             @file_put_contents($file, $json, LOCK_EX);
             @chmod($file, 0664);
@@ -3155,16 +3227,18 @@ function get_user_data() {
 
 function write_user_file(string $username, string $passwordHash): void {
     $dir = dirname(USER_FILE);
-    if (!is_dir($dir)) {
-        if (!mkdir($dir, 0755, true) && !is_dir($dir)) {
-            throw new RuntimeException('No se pudo crear el directorio de configuración');
-        }
+    if (!nammu_ensure_directory($dir)) {
+        throw new RuntimeException('No se pudo crear el directorio de configuración');
     }
 
     $content = "<?php return ['username' => '" . addslashes($username) . "', 'password' => '" . $passwordHash . "'];";
-    if (file_put_contents(USER_FILE, $content) === false) {
+    $saved = function_exists('nammu_atomic_write_file')
+        ? nammu_atomic_write_file(USER_FILE, $content)
+        : file_put_contents(USER_FILE, $content, LOCK_EX) !== false;
+    if (!$saved) {
         throw new RuntimeException('No se pudo escribir el archivo de usuario');
     }
+    nammu_apply_shared_permissions(USER_FILE, 0664, $dir);
 }
 
 function register_user($username, $password) {
@@ -3899,7 +3973,10 @@ function admin_indexnow_refresh_searchengines_cache_if_needed(): array {
             'updated_at' => time(),
             'endpoints' => $fetched,
         ];
-        @file_put_contents(admin_indexnow_searchengines_cache_path(), json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $cacheJson = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if (is_string($cacheJson)) {
+            nammu_atomic_write_file(admin_indexnow_searchengines_cache_path(), $cacheJson);
+        }
         return $fetched;
     }
     return $endpoints;
@@ -3984,7 +4061,7 @@ function admin_indexnow_save_log(array $payload): void {
     if ($json === false) {
         return;
     }
-    file_put_contents($path, $json);
+    nammu_atomic_write_file($path, $json);
 }
 
 function admin_indexnow_prepare_config(array &$config): array {
@@ -4022,7 +4099,8 @@ function admin_indexnow_prepare_config(array &$config): array {
         $current = is_file($keyPath) ? trim((string) file_get_contents($keyPath)) : '';
         if ($current === $key) {
             $fileOk = true;
-        } elseif (@file_put_contents($keyPath, $key) !== false) {
+        } elseif (@file_put_contents($keyPath, $key, LOCK_EX) !== false) {
+            nammu_apply_shared_permissions($keyPath, 0664, dirname($keyPath));
             $fileOk = true;
         }
     }
@@ -4087,9 +4165,7 @@ function admin_save_indexnow_queue(array $urls): void
 {
     $file = admin_indexnow_queue_file();
     $dir = dirname($file);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
-    }
+    nammu_ensure_directory($dir);
     $payload = [
         'updated_at' => time(),
         'urls' => array_values(array_unique(array_filter(array_map('strval', $urls)))),
@@ -4098,6 +4174,7 @@ function admin_save_indexnow_queue(array $urls): void
     if (is_string($json)) {
         if (function_exists('nammu_atomic_write_file')) {
             nammu_atomic_write_file($file, $json);
+            nammu_apply_shared_permissions($file, 0664, $dir);
         } else {
             @file_put_contents($file, $json, LOCK_EX);
             @chmod($file, 0664);
@@ -5097,7 +5174,7 @@ function admin_twitter_upload_media(string $imageRef, string $imageUrl, array $s
             };
         }
         $tmpPath = tempnam(sys_get_temp_dir(), 'nammu_x_');
-        if ($tmpPath === false || @file_put_contents($tmpPath, $binary) === false) {
+        if ($tmpPath === false || @file_put_contents($tmpPath, $binary, LOCK_EX) === false) {
             $error = 'X: no se pudo preparar temporalmente la imagen.';
             return null;
         }
@@ -5576,7 +5653,6 @@ function admin_bluesky_prepare_blob_binary(string $binary, int $maxBytes = 90000
                 $targetH = max(1, (int) floor($height * $ratio));
                 $resized = imagecreatetruecolor($targetW, $targetH);
                 imagecopyresampled($resized, $resource, 0, 0, 0, 0, $targetW, $targetH, $width, $height);
-                imagedestroy($resource);
                 $resource = $resized;
             }
             $quality = 82;
@@ -5588,7 +5664,6 @@ function admin_bluesky_prepare_blob_binary(string $binary, int $maxBytes = 90000
                 if ($candidate !== '') {
                     $best = $candidate;
                     if (strlen($candidate) <= $maxBytes) {
-                        imagedestroy($resource);
                         return $candidate;
                     }
                 }
@@ -5597,7 +5672,6 @@ function admin_bluesky_prepare_blob_binary(string $binary, int $maxBytes = 90000
                     break;
                 }
             }
-            imagedestroy($resource);
             if ($best !== '' && strlen($best) < strlen($binary)) {
                 return $best;
             }
@@ -5722,14 +5796,12 @@ function admin_prepare_instagram_image_url(string $imageTrim, string $baseUrl, ?
     $width = (int) imagesx($src);
     $height = (int) imagesy($src);
     if ($width < 10 || $height < 10) {
-        imagedestroy($src);
         $error = 'La imagen destacada no tiene dimensiones válidas para Instagram.';
         return '';
     }
     $originalRatio = $height > 0 ? ($width / $height) : 0.0;
     $originalRatioAllowed = $originalRatio >= $minAllowedRatio && $originalRatio <= $maxAllowedRatio;
     if (!function_exists('imagecreatetruecolor')) {
-        imagedestroy($src);
         if (!$originalRatioAllowed) {
             $error = 'La imagen destacada tiene una proporcion no admitida por Instagram y el servidor no puede generar una variante valida (GD no disponible).';
             return '';
@@ -5753,7 +5825,6 @@ function admin_prepare_instagram_image_url(string $imageTrim, string $baseUrl, ?
 
     $dst = imagecreatetruecolor($targetSide, $targetSide);
     if (!$dst) {
-        imagedestroy($src);
         return $imageUrl;
     }
     imagecopyresampled($dst, $src, 0, 0, $srcX, $srcY, $targetSide, $targetSide, $squareSide, $squareSide);
@@ -5766,8 +5837,6 @@ function admin_prepare_instagram_image_url(string $imageTrim, string $baseUrl, ?
     $variantName = 'instagram_' . substr(sha1($hashBase . '|q:' . $jpegQuality . '|t:' . $targetSide), 0, 20) . '.jpg';
     $variantAbsolute = $socialDir . '/' . $variantName;
     $saved = @imagejpeg($dst, $variantAbsolute, $jpegQuality);
-    imagedestroy($dst);
-    imagedestroy($src);
     if (!$saved) {
         if (!$originalRatioAllowed) {
             $error = 'No se pudo generar la imagen ajustada para Instagram.';
@@ -5846,13 +5915,11 @@ function admin_prepare_podcast_artwork_image(string $imageValue, string $siteUrl
     $width = (int) imagesx($src);
     $height = (int) imagesy($src);
     if ($width < 10 || $height < 10) {
-        imagedestroy($src);
         $error = 'La imagen de podcast no tiene dimensiones válidas.';
         return $imageValue;
     }
 
     if ($width === 3000 && $height === 3000) {
-        imagedestroy($src);
         return $imageValue;
     }
 
@@ -5864,15 +5931,12 @@ function admin_prepare_podcast_artwork_image(string $imageValue, string $siteUrl
 
     $tmp = imagecreatetruecolor($scaledW, $scaledH);
     if (!$tmp) {
-        imagedestroy($src);
         return $imageValue;
     }
     imagecopyresampled($tmp, $src, 0, 0, 0, 0, $scaledW, $scaledH, $width, $height);
 
     $dst = imagecreatetruecolor($target, $target);
     if (!$dst) {
-        imagedestroy($tmp);
-        imagedestroy($src);
         return $imageValue;
     }
     $srcX = (int) floor(($scaledW - $target) / 2);
@@ -5887,9 +5951,6 @@ function admin_prepare_podcast_artwork_image(string $imageValue, string $siteUrl
     $variantAbsolute = $podcastDir . '/' . $variantName;
     $saved = @imagejpeg($dst, $variantAbsolute, 90);
 
-    imagedestroy($dst);
-    imagedestroy($tmp);
-    imagedestroy($src);
 
     if (!$saved) {
         $error = 'No se pudo guardar la imagen normalizada de podcast.';
@@ -6672,10 +6733,8 @@ function load_config_file(): array {
 function save_config_file(array $config): void {
     $configFile = __DIR__ . '/config/config.yml';
     $dir = dirname($configFile);
-    if (!is_dir($dir)) {
-        if (!mkdir($dir, 0755, true) && !is_dir($dir)) {
-            throw new RuntimeException('No se pudo crear el directorio de configuración');
-        }
+    if (!nammu_ensure_directory($dir)) {
+        throw new RuntimeException('No se pudo crear el directorio de configuración');
     }
 
     if (class_exists(Yaml::class)) {
@@ -6687,9 +6746,13 @@ function save_config_file(array $config): void {
         }
     }
 
-    if (file_put_contents($configFile, $yaml) === false) {
+    $saved = function_exists('nammu_atomic_write_file')
+        ? nammu_atomic_write_file($configFile, $yaml)
+        : file_put_contents($configFile, $yaml, LOCK_EX) !== false;
+    if (!$saved) {
         throw new RuntimeException('No se pudo escribir el archivo de configuración');
     }
+    nammu_apply_shared_permissions($configFile, 0664, $dir);
 }
 
 function admin_normalize_email(string $email): string {
@@ -6910,10 +6973,13 @@ function admin_save_mailing_suppressed_entries(array $entries): void {
     if ($payload === false) {
         throw new RuntimeException('No se pudo serializar la lista de supresión');
     }
-    if (file_put_contents($file, $payload, LOCK_EX) === false) {
+    $saved = function_exists('nammu_atomic_write_file')
+        ? nammu_atomic_write_file($file, $payload)
+        : file_put_contents($file, $payload, LOCK_EX) !== false;
+    if (!$saved) {
         throw new RuntimeException('No se pudo escribir el archivo de supresión');
     }
-    @chmod($file, 0664);
+    nammu_apply_shared_permissions($file, 0664, $dir);
 }
 
 function admin_load_mailing_bounces_state(): array {
@@ -6959,10 +7025,13 @@ function admin_save_mailing_bounces_state(array $state): void {
     if ($json === false) {
         throw new RuntimeException('No se pudo serializar el estado de rebotes');
     }
-    if (file_put_contents($file, $json, LOCK_EX) === false) {
+    $saved = function_exists('nammu_atomic_write_file')
+        ? nammu_atomic_write_file($file, $json)
+        : file_put_contents($file, $json, LOCK_EX) !== false;
+    if (!$saved) {
         throw new RuntimeException('No se pudo guardar el estado de rebotes');
     }
-    @chmod($file, 0664);
+    nammu_apply_shared_permissions($file, 0664, $dir);
 }
 
 function admin_mailing_suppressed_map(): array {
@@ -7280,10 +7349,13 @@ function admin_save_mailing_subscriber_entries(array $entries): void {
     if ($payload === false) {
         throw new RuntimeException('No se pudo serializar la lista de suscriptores');
     }
-    if (file_put_contents($file, $payload, LOCK_EX) === false) {
+    $saved = function_exists('nammu_atomic_write_file')
+        ? nammu_atomic_write_file($file, $payload)
+        : file_put_contents($file, $payload, LOCK_EX) !== false;
+    if (!$saved) {
         throw new RuntimeException('No se pudo escribir el archivo de suscriptores');
     }
-    @chmod($file, 0664);
+    nammu_apply_shared_permissions($file, 0664, $dir);
 }
 
 function admin_load_mailing_subscribers(): array {
@@ -7369,10 +7441,13 @@ function admin_save_mailing_tokens(array $tokens): void {
     if ($payload === false) {
         throw new RuntimeException('No se pudo serializar los tokens de correo');
     }
-    if (file_put_contents($file, $payload, LOCK_EX) === false) {
+    $saved = function_exists('nammu_atomic_write_file')
+        ? nammu_atomic_write_file($file, $payload)
+        : file_put_contents($file, $payload, LOCK_EX) !== false;
+    if (!$saved) {
         throw new RuntimeException('No se pudo escribir el archivo de tokens de correo');
     }
-    @chmod($file, 0660);
+    nammu_apply_shared_permissions($file, 0660, $dir);
 }
 
 function admin_delete_mailing_tokens(): void {
@@ -7388,14 +7463,15 @@ function admin_mailing_secret(): string {
         $dir = dirname($file);
         nammu_ensure_directory($dir);
         $secret = bin2hex(random_bytes(32));
-        file_put_contents($file, $secret);
-        @chmod($file, 0640);
+        nammu_atomic_write_file($file, $secret);
+        nammu_apply_shared_permissions($file, 0640, $dir);
         return $secret;
     }
     $secret = trim((string) file_get_contents($file));
     if ($secret === '') {
         $secret = bin2hex(random_bytes(32));
-        file_put_contents($file, $secret);
+        nammu_atomic_write_file($file, $secret);
+        nammu_apply_shared_permissions($file, 0640, dirname($file));
     }
     return $secret;
 }
@@ -7656,7 +7732,7 @@ function admin_save_mailing_deliveries(array $data): void
         if (function_exists('nammu_atomic_write_file')) {
             nammu_atomic_write_file(admin_mailing_deliveries_file(), $json);
         } else {
-            file_put_contents(admin_mailing_deliveries_file(), $json);
+            file_put_contents(admin_mailing_deliveries_file(), $json, LOCK_EX);
             @chmod(admin_mailing_deliveries_file(), 0664);
         }
     }
@@ -8918,7 +8994,7 @@ function admin_autosave_from_payload($jsonPayload): array {
         $result['message'] = 'No se pudo crear el archivo temporal para el borrador.';
         return $result;
     }
-    if (file_put_contents($tempPath, $file_content) === false) {
+    if (file_put_contents($tempPath, $file_content, LOCK_EX) === false) {
         @unlink($tempPath);
         $result['message'] = 'No se pudieron guardar los cambios antes de recargar la página.';
         return $result;
@@ -8930,7 +9006,7 @@ function admin_autosave_from_payload($jsonPayload): array {
         $writeSucceeded = true;
     } else {
         @unlink($tempPath);
-        if (file_put_contents($finalPath, $file_content) !== false) {
+        if (file_put_contents($finalPath, $file_content, LOCK_EX) !== false) {
             $writeSucceeded = true;
         }
     }
@@ -9200,7 +9276,10 @@ if (isset($_GET['bing_oauth'])) {
 
 // Handle POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['register'])) {
+    $csrfRequired = !isset($_POST['register']) && !isset($_POST['login']);
+    if ($csrfRequired && !admin_csrf_is_valid($_POST['_nammu_csrf'] ?? '')) {
+        $error = 'La sesión del formulario ha caducado. Vuelve a intentarlo.';
+    } elseif (isset($_POST['register'])) {
         if (!$user_exists) {
             try {
                 register_user($_POST['username'], $_POST['password']);
@@ -9318,7 +9397,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 ";
                 $file_content .= $content;
-                if (file_put_contents($filepath, $file_content) === false) {
+                if (file_put_contents($filepath, $file_content, LOCK_EX) === false) {
                     $error = 'No se pudo guardar la newsletter. Revisa los permisos de la carpeta content/.';
                 } else {
                     admin_chmod_content_file($filepath);
@@ -9544,7 +9623,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ";
                 $file_content .= $content;
 
-                if (file_put_contents($filepath, $file_content) === false) {
+                if (file_put_contents($filepath, $file_content, LOCK_EX) === false) {
                     $error = 'No se pudo guardar el contenido. Revisa los permisos de la carpeta content/.';
                 } else {
                     admin_chmod_content_file($filepath);
@@ -9878,7 +9957,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 ";
             $fileContent .= $content;
-            if (@file_put_contents($filepath, $fileContent) !== false) {
+            if (@file_put_contents($filepath, $fileContent, LOCK_EX) !== false) {
                 admin_chmod_content_file($filepath);
             }
         }
@@ -10161,7 +10240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $tempPath = tempnam(CONTENT_DIR, 'upd_');
             if ($tempPath === false) {
                 $error = 'No se pudo crear un archivo temporal para actualizar el contenido.';
-            } elseif (file_put_contents($tempPath, $file_content) === false) {
+            } elseif (file_put_contents($tempPath, $file_content, LOCK_EX) === false) {
                 @unlink($tempPath);
                 $error = 'No se pudo guardar el contenido actualizado. Revisa los permisos de la carpeta content/.';
             } else {
@@ -10171,7 +10250,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $writeSucceeded = true;
                 } else {
                     @unlink($tempPath);
-                    if (file_put_contents($finalPath, $file_content) !== false) {
+                    if (file_put_contents($finalPath, $file_content, LOCK_EX) !== false) {
                         $writeSucceeded = true;
                     }
                 }
@@ -10585,7 +10664,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } else {
                 if (!is_dir($targetDir)) {
-                    @mkdir($targetDir, 0755, true);
+                    nammu_ensure_directory($targetDir);
                 }
             }
         }
@@ -11371,8 +11450,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (function_exists('nammu_atomic_write_file')) {
                 nammu_atomic_write_file($target_path, $image_data);
+                nammu_apply_shared_permissions($target_path, 0664, dirname($target_path));
             } else {
-                file_put_contents($target_path, $image_data);
+                file_put_contents($target_path, $image_data, LOCK_EX);
                 @chmod($target_path, 0664);
             }
             nammu_generate_webp_variant_for_asset($target_path);
@@ -11603,7 +11683,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $file_content .= $post_data['content'];
 
                 $sortedPath = CONTENT_DIR . '/' . $sorted_post['filename'];
-                if (file_put_contents($sortedPath, $file_content) !== false) {
+                if (file_put_contents($sortedPath, $file_content, LOCK_EX) !== false) {
                     admin_chmod_content_file($sortedPath);
                 }
                 $ordo++;
@@ -19681,6 +19761,10 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                     var form = $('<form action="admin.php?page=resources" method="post"></form>');
 
+                    if (window.NAMMU_CSRF_TOKEN) {
+                        form.append($('<input type="hidden" name="_nammu_csrf">').val(window.NAMMU_CSRF_TOKEN));
+                    }
+
         
 
                     form.append('<input type="hidden" name="save_edited_image" value="1">');
@@ -19752,6 +19836,10 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
         
 
                     var form = $('<form action="admin.php?page=resources" method="post"></form>');
+
+                    if (window.NAMMU_CSRF_TOKEN) {
+                        form.append($('<input type="hidden" name="_nammu_csrf">').val(window.NAMMU_CSRF_TOKEN));
+                    }
 
         
 

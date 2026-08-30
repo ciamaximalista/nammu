@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+if (!function_exists('nammu_atomic_write_file')) {
+    require_once __DIR__ . '/helpers.php';
+}
+
 function nammu_webmention_store_file(): string
 {
     return dirname(__DIR__) . '/config/webmentions.json';
@@ -72,10 +76,11 @@ function nammu_webmention_load_store(string $file, array $default): array
 function nammu_webmention_save_store(string $file, array $data): void
 {
     $directory = dirname($file);
-    if (!is_dir($directory)) {
-        @mkdir($directory, 0775, true);
+    nammu_ensure_directory($directory);
+    $payload = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (is_string($payload)) {
+        nammu_atomic_write_file($file, $payload);
     }
-    @file_put_contents($file, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 }
 
 function nammu_webmention_store(): array

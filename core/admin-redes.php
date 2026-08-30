@@ -166,9 +166,7 @@ function admin_social_broadcast_open_queue_lock(bool $blocking = false)
 {
     $file = admin_social_broadcast_queue_lock_file();
     $dir = dirname($file);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
-    }
+    nammu_ensure_directory($dir);
     $handle = @fopen($file, 'c+');
     if (!is_resource($handle)) {
         return null;
@@ -181,7 +179,7 @@ function admin_social_broadcast_open_queue_lock(bool $blocking = false)
         @fclose($handle);
         return null;
     }
-    @chmod($file, 0664);
+    nammu_apply_shared_permissions($file, 0664, $dir);
     return $handle;
 }
 
@@ -303,6 +301,7 @@ function admin_save_social_rss_state(array $state): void
     }
     if (function_exists('nammu_atomic_write_file')) {
         nammu_atomic_write_file($file, $encoded);
+        nammu_apply_shared_permissions($file, 0664, dirname($file));
     } else {
         $dir = dirname($file);
         if (!is_dir($dir)) {
@@ -372,6 +371,7 @@ function admin_save_social_broadcast_queue(array $queue): void
     }
     if (function_exists('nammu_atomic_write_file')) {
         nammu_atomic_write_file($file, $encoded);
+        nammu_apply_shared_permissions($file, 0664, dirname($file));
     } else {
         $dir = dirname($file);
         if (!is_dir($dir)) {
@@ -2024,7 +2024,7 @@ function admin_telegram_prepare_upload(string $photoUrl, ?string &$tempPath = nu
         };
     }
     $tmpPath = tempnam(sys_get_temp_dir(), 'nammu_tg_');
-    if ($tmpPath === false || @file_put_contents($tmpPath, $binary) === false) {
+    if ($tmpPath === false || @file_put_contents($tmpPath, $binary, LOCK_EX) === false) {
         return null;
     }
     $finalTmpPath = $tmpPath . '.' . $extension;

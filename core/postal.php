@@ -30,8 +30,8 @@ function postal_save_entries(array $entries): void
     if ($payload === false) {
         throw new RuntimeException('No se pudo serializar la libreta postal.');
     }
-    file_put_contents($file, $payload, LOCK_EX);
-    @chmod($file, 0664);
+    nammu_atomic_write_file($file, $payload);
+    nammu_apply_shared_permissions($file, 0664, $dir);
 }
 
 function postal_normalize_email(string $email): string
@@ -165,8 +165,8 @@ function postal_save_reset_tokens(array $tokens): void
     if ($payload === false) {
         throw new RuntimeException('No se pudo serializar los tokens de reset.');
     }
-    file_put_contents($file, $payload, LOCK_EX);
-    @chmod($file, 0664);
+    nammu_atomic_write_file($file, $payload);
+    nammu_apply_shared_permissions($file, 0664, $dir);
 }
 
 function postal_prune_reset_tokens(array $tokens): array

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/core/helpers.php';
+
 define('MAILING_SUBSCRIBERS_FILE', __DIR__ . '/config/mailing-subscribers.json');
 define('MAILING_SECRET_FILE', __DIR__ . '/config/mailing-secret.key');
 define('CONFIG_FILE', __DIR__ . '/config/config.yml');
@@ -13,18 +15,17 @@ function mailing_normalize_email(string $email): string {
 function mailing_secret(): string {
     if (!is_file(MAILING_SECRET_FILE)) {
         $dir = dirname(MAILING_SECRET_FILE);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0775, true);
-        }
+        nammu_ensure_directory($dir);
         $secret = bin2hex(random_bytes(32));
-        file_put_contents(MAILING_SECRET_FILE, $secret);
-        @chmod(MAILING_SECRET_FILE, 0640);
+        nammu_atomic_write_file(MAILING_SECRET_FILE, $secret);
+        nammu_apply_shared_permissions(MAILING_SECRET_FILE, 0640, $dir);
         return $secret;
     }
     $content = trim((string) file_get_contents(MAILING_SECRET_FILE));
     if ($content === '') {
         $content = bin2hex(random_bytes(32));
-        file_put_contents(MAILING_SECRET_FILE, $content);
+        nammu_atomic_write_file(MAILING_SECRET_FILE, $content);
+        nammu_apply_shared_permissions(MAILING_SECRET_FILE, 0640, dirname(MAILING_SECRET_FILE));
     }
     return $content;
 }
@@ -103,11 +104,9 @@ function mailing_save_entries(array $subscribers): void {
         throw new RuntimeException('No se pudo serializar la lista.');
     }
     $dir = dirname(MAILING_SUBSCRIBERS_FILE);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
-    }
-    file_put_contents(MAILING_SUBSCRIBERS_FILE, $payload, LOCK_EX);
-    @chmod(MAILING_SUBSCRIBERS_FILE, 0664);
+    nammu_ensure_directory($dir);
+    nammu_atomic_write_file(MAILING_SUBSCRIBERS_FILE, $payload);
+    nammu_apply_shared_permissions(MAILING_SUBSCRIBERS_FILE, 0664, $dir);
 }
 
 function mailing_site_name(): string {

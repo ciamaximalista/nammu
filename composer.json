@@ -1,4 +1,14 @@
 {
+    "license": "EUPL-1.2",
+    "scripts": {
+        "lint": "find . -path ./.git -prune -o -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l",
+        "smoke": "php tests/smoke.php",
+        "check": [
+            "@lint",
+            "@smoke",
+            "composer validate --no-check-publish"
+        ]
+    },
     "require": {
         "minishlink/web-push": "^9.0"
     }

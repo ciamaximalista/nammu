@@ -169,9 +169,10 @@ touch .git/test-write config/test-write assets/test-write backups/test-write
 rm .git/test-write config/test-write assets/test-write backups/test-write
 git config --get core.sharedRepository
 git config --get core.fileMode
+composer run check
 ```
 
-Los directorios deben verse como `drwxrwsr-x` o compatible, con el grupo compartido. `core.sharedRepository` debe devolver `group` y `core.fileMode` debe devolver `false`. Si ves archivos creados por otro propietario, sin escritura de grupo, o Git falla con `index.lock`, `FETCH_HEAD` o `dubious ownership`, corrige permisos antes de activar cron o publicar.
+Los directorios deben verse como `drwxrwsr-x` o compatible, con el grupo compartido. `core.sharedRepository` debe devolver `group`, `core.fileMode` debe devolver `false` y `composer run check` debe terminar con `Smoke OK`. Si ves archivos creados por otro propietario, sin escritura de grupo, errores de sintaxis, o Git falla con `index.lock`, `FETCH_HEAD` o `dubious ownership`, corrige permisos antes de activar cron o publicar.
 
 Diagnóstico rápido de permisos en Fediverso y colas:
 
@@ -724,6 +725,7 @@ sudo find config content assets itinerarios backups .git -type f -exec chmod 664
 git config core.sharedRepository group
 git config core.fileMode false
 git config --global --add safe.directory "$SITE"
+composer run check
 ```
 
 Si mantienes dependencias con Composer dentro del sitio, incluye también `vendor` en los tres comandos de permisos. Si algún directorio opcional aún no existe, créalo antes con `mkdir -p`.

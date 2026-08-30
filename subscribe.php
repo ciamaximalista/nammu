@@ -74,15 +74,13 @@ function subscription_load_subscribers(): array {
 
 function subscription_save_subscribers(array $list): void {
     $dir = dirname(MAILING_SUBSCRIBERS_FILE);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
+    nammu_ensure_directory($dir);
     $payload = json_encode(array_values($list), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if ($payload === false) {
         throw new RuntimeException('No se pudo preparar la lista de suscriptores.');
     }
-    file_put_contents(MAILING_SUBSCRIBERS_FILE, $payload, LOCK_EX);
-    @chmod(MAILING_SUBSCRIBERS_FILE, 0664);
+    nammu_atomic_write_file(MAILING_SUBSCRIBERS_FILE, $payload);
+    nammu_apply_shared_permissions(MAILING_SUBSCRIBERS_FILE, 0664, $dir);
 }
 
 function subscription_load_tokens(): array {
@@ -104,8 +102,8 @@ function subscription_save_tokens(array $tokens): void {
     if ($payload === false) {
         throw new RuntimeException('No se pudo guardar tokens de mailing.');
     }
-    file_put_contents(MAILING_TOKENS_FILE, $payload, LOCK_EX);
-    @chmod(MAILING_TOKENS_FILE, 0660);
+    nammu_atomic_write_file(MAILING_TOKENS_FILE, $payload);
+    nammu_apply_shared_permissions(MAILING_TOKENS_FILE, 0660, $dir);
 }
 
 function subscription_load_pending(): array {
@@ -196,15 +194,13 @@ function subscription_load_rate_limit_state(): array {
 
 function subscription_save_rate_limit_state(array $state): void {
     $dir = dirname(MAILING_RATE_LIMIT_FILE);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
+    nammu_ensure_directory($dir);
     $payload = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if ($payload === false) {
         return;
     }
-    file_put_contents(MAILING_RATE_LIMIT_FILE, $payload, LOCK_EX);
-    @chmod(MAILING_RATE_LIMIT_FILE, 0664);
+    nammu_atomic_write_file(MAILING_RATE_LIMIT_FILE, $payload);
+    nammu_apply_shared_permissions(MAILING_RATE_LIMIT_FILE, 0664, $dir);
 }
 
 function subscription_rate_limit_register(array &$state, string $key, int $now, int $window, int $max): bool {
@@ -257,15 +253,13 @@ function subscription_rate_limited(string $email = ''): bool {
 
 function subscription_save_pending(array $pending): void {
     $dir = dirname(MAILING_PENDING_FILE);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
+    nammu_ensure_directory($dir);
     $payload = json_encode(array_values($pending), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if ($payload === false) {
         throw new RuntimeException('No se pudo preparar la lista de pendientes.');
     }
-    file_put_contents(MAILING_PENDING_FILE, $payload, LOCK_EX);
-    @chmod(MAILING_PENDING_FILE, 0664);
+    nammu_atomic_write_file(MAILING_PENDING_FILE, $payload);
+    nammu_apply_shared_permissions(MAILING_PENDING_FILE, 0664, $dir);
 }
 
 function subscription_has_recent_pending(array $pending, string $email, int $window = MAILING_PENDING_RESEND_WINDOW): bool {

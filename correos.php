@@ -43,15 +43,13 @@ function postal_load_mailing_subscribers(): array
 function postal_save_mailing_subscribers(array $list): void
 {
     $dir = dirname(MAILING_SUBSCRIBERS_FILE);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
+    nammu_ensure_directory($dir);
     $payload = json_encode(array_values($list), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if ($payload === false) {
         return;
     }
-    file_put_contents(MAILING_SUBSCRIBERS_FILE, $payload, LOCK_EX);
-    @chmod(MAILING_SUBSCRIBERS_FILE, 0664);
+    nammu_atomic_write_file(MAILING_SUBSCRIBERS_FILE, $payload);
+    nammu_apply_shared_permissions(MAILING_SUBSCRIBERS_FILE, 0664, $dir);
 }
 
 function postal_sync_mailing_subscriber(string $email): void
@@ -86,15 +84,13 @@ function postal_load_mailing_pending(): array
 function postal_save_mailing_pending(array $pending): void
 {
     $dir = dirname(MAILING_PENDING_FILE);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
+    nammu_ensure_directory($dir);
     $payload = json_encode(array_values($pending), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if ($payload === false) {
         throw new RuntimeException('No se pudo guardar la lista de pendientes.');
     }
-    file_put_contents(MAILING_PENDING_FILE, $payload, LOCK_EX);
-    @chmod(MAILING_PENDING_FILE, 0664);
+    nammu_atomic_write_file(MAILING_PENDING_FILE, $payload);
+    nammu_apply_shared_permissions(MAILING_PENDING_FILE, 0664, $dir);
 }
 
 function postal_load_mailing_tokens(): array
@@ -118,8 +114,8 @@ function postal_save_mailing_tokens(array $tokens): void
     if ($payload === false) {
         throw new RuntimeException('No se pudo guardar tokens de mailing.');
     }
-    file_put_contents(MAILING_TOKENS_FILE, $payload, LOCK_EX);
-    @chmod(MAILING_TOKENS_FILE, 0660);
+    nammu_atomic_write_file(MAILING_TOKENS_FILE, $payload);
+    nammu_apply_shared_permissions(MAILING_TOKENS_FILE, 0660, $dir);
 }
 
 function postal_google_refresh_access_token(string $clientId, string $clientSecret, string $refreshToken): array

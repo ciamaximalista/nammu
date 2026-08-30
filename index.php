@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-ini_set('display_errors', '1');
-ini_set('display_startup_errors', '1');
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
 error_reporting(E_ALL);
 @ini_set('pcre.jit', '0');
 
@@ -799,13 +799,7 @@ if (!$isAdminLogged && !empty($rejectedOriginDomains) && $isLikelyHumanVisitor()
         $refererHost = trim((string) (parse_url((string) ($_SERVER['HTTP_REFERER'] ?? ''), PHP_URL_HOST) ?? ''));
         $isRejectedVisitor = $hostMatchesRejectedOrigin($refererHost, $rejectedOriginDomains);
         if ($isRejectedVisitor) {
-            setcookie($rejectedCookieName, '1', [
-                'expires' => time() + 31536000,
-                'path' => '/',
-                'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
-                'httponly' => true,
-                'samesite' => 'Lax',
-            ]);
+            nammu_set_cookie($rejectedCookieName, '1', time() + 31536000);
             $_COOKIE[$rejectedCookieName] = '1';
         }
     }
@@ -849,7 +843,7 @@ if ($routePath === '/rss.xml') {
 
     // Store a fresh copy for direct access as static file
     if ($publicBaseUrl !== '') {
-        @file_put_contents(__DIR__ . '/rss.xml', $rss);
+        nammu_atomic_write_file(__DIR__ . '/rss.xml', $rss);
     }
     exit;
 }
@@ -1061,7 +1055,7 @@ if ($routePath === '/podcast.xml') {
     header('Content-Type: application/rss+xml; charset=UTF-8');
     echo $podcastFeed;
     if ($publicBaseUrl !== '') {
-        @file_put_contents(__DIR__ . '/podcast.xml', $podcastFeed);
+        nammu_atomic_write_file(__DIR__ . '/podcast.xml', $podcastFeed);
     }
     exit;
 }
@@ -1207,7 +1201,7 @@ if ($routePath === '/llms.txt') {
     }
     header('Content-Type: text/plain; charset=UTF-8');
     echo $llmsText;
-    @file_put_contents(__DIR__ . '/llms.txt', $llmsText);
+    nammu_atomic_write_file(__DIR__ . '/llms.txt', $llmsText);
     exit;
 }
 
@@ -1235,7 +1229,7 @@ if ($routePath === '/identity.txt') {
     }
     header('Content-Type: text/plain; charset=UTF-8');
     echo $identityText;
-    @file_put_contents(__DIR__ . '/identity.txt', $identityText);
+    nammu_atomic_write_file(__DIR__ . '/identity.txt', $identityText);
     exit;
 }
 
@@ -1300,7 +1294,7 @@ if ($routePath === '/robots.txt') {
     header('Content-Type: text/plain; charset=UTF-8');
     echo $robotsText;
     if ($base !== '') {
-        @file_put_contents(__DIR__ . '/robots.txt', $robotsText);
+        nammu_atomic_write_file(__DIR__ . '/robots.txt', $robotsText);
     }
     exit;
 }
@@ -1312,7 +1306,7 @@ if ($routePath === '/sitemap.xml') {
     $sitemapXml = $sitemapGenerator->generate($entries);
     header('Content-Type: application/xml; charset=UTF-8');
     echo $sitemapXml;
-    @file_put_contents(__DIR__ . '/sitemap.xml', $sitemapXml);
+    nammu_atomic_write_file(__DIR__ . '/sitemap.xml', $sitemapXml);
     exit;
 }
 
@@ -1384,7 +1378,7 @@ if ($routePath === '/itinerarios.xml') {
     );
     header('Content-Type: application/rss+xml; charset=UTF-8');
     echo $itineraryFeedContent;
-    @file_put_contents(__DIR__ . '/itinerarios.xml', $itineraryFeedContent);
+    nammu_atomic_write_file(__DIR__ . '/itinerarios.xml', $itineraryFeedContent);
     exit;
 }
 

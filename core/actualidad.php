@@ -2467,6 +2467,44 @@ XML;
 function nammu_generate_fediverse_threads_feed(string $baseUrl, array $config, string $siteTitle, string $siteDescription, string $siteLang = 'es', string $selfPath = '/fediverso.xml'): string
 {
     $items = nammu_actuality_page_items($config, dirname(__DIR__) . '/content', dirname(__DIR__) . '/itinerarios', $baseUrl, $siteTitle, $siteDescription, $siteLang);
+    $guessImageMimeType = static function (string $url): string {
+        $extension = strtolower(pathinfo((string) (parse_url($url, PHP_URL_PATH) ?? ''), PATHINFO_EXTENSION));
+        return match ($extension) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'svg' => 'image/svg+xml',
+            default => 'image/jpeg',
+        };
+    };
+    $resolveFeedImage = static function (array $item): string {
+        $candidates = [];
+        $primaryImage = trim((string) ($item['image'] ?? ''));
+        if ($primaryImage !== '') {
+            $candidates[] = $primaryImage;
+        }
+        foreach ((array) ($item['images'] ?? []) as $image) {
+            $image = trim((string) $image);
+            if ($image !== '') {
+                $candidates[] = $image;
+            }
+        }
+        if (function_exists('nammu_actuality_images_from_fediverse_attachments')) {
+            foreach (nammu_actuality_images_from_fediverse_attachments((array) ($item['attachments'] ?? [])) as $image) {
+                $image = trim((string) $image);
+                if ($image !== '') {
+                    $candidates[] = $image;
+                }
+            }
+        }
+        foreach (array_values(array_unique($candidates)) as $candidate) {
+            if (preg_match('#^https?://#i', $candidate) === 1) {
+                return $candidate;
+            }
+        }
+        return '';
+    };
     $feedItems = [];
     foreach ($items as $item) {
         if (!is_array($item) || !function_exists('nammu_fediverse_public_thread_url_for_actuality_item')) {
@@ -2476,12 +2514,18 @@ function nammu_generate_fediverse_threads_feed(string $baseUrl, array $config, s
         if ($threadUrl === '') {
             continue;
         }
+        $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
+        $boostOriginalUrl = trim((string) ($item['boost_original_url'] ?? ''));
+        $itemLink = ($isBoost && $boostOriginalUrl !== '') ? $boostOriginalUrl : $threadUrl;
         $title = trim((string) ($item['title'] ?? ''));
         $description = trim((string) (($item['raw_text'] ?? '') ?: ($item['description'] ?? '')));
         $timestamp = (int) ($item['timestamp'] ?? 0);
+        $image = $resolveFeedImage($item);
         $feedItems[] = [
             'title' => $title !== '' ? $title : nammu_excerpt_text($description, 120),
-            'link' => $threadUrl,
+            'link' => $itemLink,
+            'local_thread_url' => $threadUrl,
+            'image' => $image,
             'description' => $description,
             'timestamp' => $timestamp > 0 ? $timestamp : time(),
         ];
@@ -2503,13 +2547,23 @@ function nammu_generate_fediverse_threads_feed(string $baseUrl, array $config, s
         $link = htmlspecialchars((string) ($item['link'] ?? ''), ENT_XML1 | ENT_COMPAT, 'UTF-8');
         $guid = $link;
         $descriptionHtml = nammu_actuality_text_to_html((string) ($item['description'] ?? ''));
+        $image = trim((string) ($item['image'] ?? ''));
+        if ($image !== '') {
+            $imageEsc = htmlspecialchars($image, ENT_XML1 | ENT_COMPAT, 'UTF-8');
+            $descriptionHtml .= '<p><img src="' . htmlspecialchars($image, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" alt="' . htmlspecialchars((string) ($item['title'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" /></p>';
+        }
         $descriptionEscaped = htmlspecialchars($descriptionHtml, ENT_XML1 | ENT_COMPAT, 'UTF-8');
         $pubDate = gmdate(DATE_RSS, (int) ($item['timestamp'] ?? time()));
+        $enclosureXml = '';
+        if ($image !== '') {
+            $mimeType = htmlspecialchars($guessImageMimeType($image), ENT_XML1 | ENT_COMPAT, 'UTF-8');
+            $enclosureXml = "\n  <enclosure url=\"{$imageEsc}\" type=\"{$mimeType}\" />";
+        }
         $itemsXml[] = <<<XML
 <item>
   <title>{$title}</title>
   <link>{$link}</link>
-  <guid isPermaLink="true">{$guid}</guid>
+  <guid isPermaLink="true">{$guid}</guid>{$enclosureXml}
   <pubDate>{$pubDate}</pubDate>
   <description>{$descriptionEscaped}</description>
 </item>

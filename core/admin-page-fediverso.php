@@ -2737,6 +2737,75 @@
             border-left-width: 3px !important;
             box-shadow: inset 0 0 0 1px rgba(27, 142, 237, 0.08);
         }
+        :root[data-admin-theme="dark"] .fediverse-home-card,
+        :root[data-admin-theme="dark"] .fediverse-home-card .card-body {
+            background: #1f2937;
+            color: #e5e7eb;
+        }
+        :root[data-admin-theme="dark"] .fediverse-status {
+            background: #1f2937;
+            border-top-color: #374151;
+            color: #e5e7eb;
+        }
+        :root[data-admin-theme="dark"] .fediverse-status--local {
+            background: #172033;
+            border-top-color: #3b536f;
+        }
+        :root[data-admin-theme="dark"] .fediverse-status__content,
+        :root[data-admin-theme="dark"] .fediverse-thread__content,
+        :root[data-admin-theme="dark"] .fediverse-status__title,
+        :root[data-admin-theme="dark"] .fediverse-status__identity strong {
+            color: #f3f4f6;
+        }
+        :root[data-admin-theme="dark"] .fediverse-status__handle,
+        :root[data-admin-theme="dark"] .fediverse-status__meta,
+        :root[data-admin-theme="dark"] .fediverse-status__file-meta,
+        :root[data-admin-theme="dark"] .fediverse-status__history,
+        :root[data-admin-theme="dark"] .fediverse-thread__header,
+        :root[data-admin-theme="dark"] .fediverse-pagination__status,
+        :root[data-admin-theme="dark"] .fediverse-inline-check {
+            color: #aab7c7;
+        }
+        :root[data-admin-theme="dark"] .fediverse-status__avatar-fallback,
+        :root[data-admin-theme="dark"] .fediverse-thread__avatar-fallback,
+        :root[data-admin-theme="dark"] .fediverse-notification__avatar-fallback,
+        :root[data-admin-theme="dark"] .fediverse-message__avatar-fallback {
+            background: #334155;
+            color: #dbeafe;
+        }
+        :root[data-admin-theme="dark"] .fediverse-status__media,
+        :root[data-admin-theme="dark"] .fediverse-status__file,
+        :root[data-admin-theme="dark"] .fediverse-inline-form[open] {
+            background: #111827;
+            border: 1px solid #374151;
+            color: #e5e7eb;
+        }
+        :root[data-admin-theme="dark"] .fediverse-status__file-cover {
+            background: #0f172a;
+        }
+        :root[data-admin-theme="dark"] .fediverse-status__history span,
+        :root[data-admin-theme="dark"] .fediverse-status__actor-icons a {
+            background: #263244;
+            color: #dbeafe;
+        }
+        :root[data-admin-theme="dark"] .fediverse-inline-form summary {
+            color: #bfdbfe;
+        }
+        :root[data-admin-theme="dark"] .fediverse-inline-form__summary-button {
+            background: #111827;
+            border-color: #6b7280;
+            color: #d1d5db;
+        }
+        :root[data-admin-theme="dark"] .fediverse-inline-form__summary-button:hover {
+            background: #374151;
+            color: #ffffff;
+        }
+        :root[data-admin-theme="dark"] .fediverse-thread {
+            border-left-color: #3b536f;
+        }
+        :root[data-admin-theme="dark"] .fediverse-conversation__reply {
+            box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.12);
+        }
         @media (max-width: 640px) {
             .fediverse-status {
                 grid-template-columns: 44px minmax(0, 1fr);
@@ -2770,6 +2839,7 @@
 
         var panel = root.querySelector('[data-fediverse-tab-panel]');
         var pollTimer = null;
+        var timelineScrollStorageKey = 'nammuFediverseTimelineScroll';
 
         function currentTab() {
             return root.getAttribute('data-active-tab') || 'home';
@@ -2810,13 +2880,74 @@
             return url.toString();
         }
 
-        function loadTab(tab, pushState, extraParams, knownVersion) {
+        function restoreTimelineScrollAfterAction() {
+            var stored = null;
+            try {
+                stored = sessionStorage.getItem(timelineScrollStorageKey);
+                if (stored !== null) {
+                    sessionStorage.removeItem(timelineScrollStorageKey);
+                }
+            } catch (error) {
+                stored = null;
+            }
+            if (!stored) {
+                return;
+            }
+            try {
+                var payload = JSON.parse(stored);
+                var currentUrl = window.location.pathname + window.location.search;
+                if (!payload || payload.url !== currentUrl) {
+                    return;
+                }
+                var y = Math.max(0, parseInt(payload.scrollY, 10) || 0);
+                window.requestAnimationFrame(function () {
+                    window.scrollTo(0, y);
+                });
+            } catch (error) {
+            }
+        }
+
+        function rememberTimelineScrollForAction(form) {
+            if (!form || !form.closest('.fediverse-timeline')) {
+                return;
+            }
+            var actionNames = [
+                'fediverse_like_item',
+                'fediverse_unlike_item',
+                'fediverse_boost_item',
+                'fediverse_unboost_item',
+                'fediverse_reply_item',
+                'fediverse_delete_reply_item',
+                'fediverse_hide_incoming_reply'
+            ];
+            var hasTimelineAction = actionNames.some(function (name) {
+                return !!form.querySelector('[name="' + name + '"]');
+            });
+            if (!hasTimelineAction) {
+                return;
+            }
+            try {
+                sessionStorage.setItem(timelineScrollStorageKey, JSON.stringify({
+                    url: window.location.pathname + window.location.search,
+                    scrollY: window.scrollY || window.pageYOffset || 0
+                }));
+            } catch (error) {
+            }
+        }
+
+        function scrollToPageTop() {
+            window.requestAnimationFrame(function () {
+                window.scrollTo(0, 0);
+            });
+        }
+
+        function loadTab(tab, pushState, extraParams, knownVersion, scrollMode) {
             if (!panel) {
                 return;
             }
             panel.setAttribute('aria-busy', 'true');
             var params = Object.assign({fediverse_fragment: '1'}, extraParams || {});
-            fetch(buildUrl(tab, params), {
+            return fetch(buildUrl(tab, params), {
                 headers: {'X-Requested-With': 'XMLHttpRequest'},
                 credentials: 'same-origin'
             }).then(function (response) {
@@ -2838,6 +2969,9 @@
                         nextUrl.searchParams.delete('timeline_page');
                     }
                     window.history.pushState({fediverseTab: tab, fediverseParams: extraParams || {}}, '', nextUrl.toString());
+                }
+                if (scrollMode === 'top') {
+                    scrollToPageTop();
                 }
             }).catch(function () {
                 panel.setAttribute('aria-busy', 'false');
@@ -2876,7 +3010,7 @@
             var tabLink = event.target.closest('[data-fediverse-tab-link]');
             if (tabLink) {
                 event.preventDefault();
-                loadTab(tabLink.getAttribute('data-fediverse-tab-link') || 'home', true, {});
+                loadTab(tabLink.getAttribute('data-fediverse-tab-link') || 'home', true, {}, null, 'top');
                 return;
             }
             var paginationLink = event.target.closest('.fediverse-pagination a');
@@ -2884,8 +3018,15 @@
                 event.preventDefault();
                 var pageUrl = new URL(paginationLink.href, window.location.origin);
                 var timelinePage = pageUrl.searchParams.get('timeline_page') || '1';
-                loadTab('home', true, {timeline_page: timelinePage});
+                loadTab('home', true, {timeline_page: timelinePage}, null, 'top');
             }
+        });
+
+        root.addEventListener('submit', function (event) {
+            if (event.defaultPrevented) {
+                return;
+            }
+            rememberTimelineScrollForAction(event.target);
         });
 
         window.addEventListener('popstate', function () {
@@ -2901,6 +3042,7 @@
             loadTab(tab, false, extraParams);
         });
 
+        restoreTimelineScrollAfterAction();
         pollState();
     })();
     </script>

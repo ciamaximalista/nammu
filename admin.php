@@ -14040,6 +14040,17 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nammu</title>
     <link rel="icon" href="nammu.png" type="image/png">
+    <script>
+        (function() {
+            try {
+                if (localStorage.getItem('nammuAdminTheme') === 'dark') {
+                    document.documentElement.setAttribute('data-admin-theme', 'dark');
+                }
+            } catch (error) {
+                // Si el navegador bloquea localStorage, el admin permanece en modo claro.
+            }
+        })();
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Gabarito:wght@700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -15473,6 +15484,182 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                 }
 
+                :root[data-admin-theme="dark"] {
+
+                    color-scheme: dark;
+
+                }
+
+                :root[data-admin-theme="dark"] body {
+
+                    background-color: #111827;
+
+                    color: #e5e7eb;
+
+                }
+
+                :root[data-admin-theme="dark"] .auth-container,
+                :root[data-admin-theme="dark"] .admin-container,
+                :root[data-admin-theme="dark"] .card,
+                :root[data-admin-theme="dark"] .modal-content,
+                :root[data-admin-theme="dark"] .dropdown-menu,
+                :root[data-admin-theme="dark"] .list-group-item,
+                :root[data-admin-theme="dark"] .topic-quiz-modal__dialog {
+
+                    background-color: #1f2937;
+
+                    color: #e5e7eb;
+
+                    border-color: #374151;
+
+                }
+
+                :root[data-admin-theme="dark"] .navbar,
+                :root[data-admin-theme="dark"] .table,
+                :root[data-admin-theme="dark"] .table-responsive,
+                :root[data-admin-theme="dark"] .bg-light,
+                :root[data-admin-theme="dark"] .topic-quiz-question,
+                :root[data-admin-theme="dark"] .home-layout-option,
+                :root[data-admin-theme="dark"] .home-header-option {
+
+                    background-color: #111827 !important;
+
+                    color: #e5e7eb;
+
+                    border-color: #374151;
+
+                }
+
+                :root[data-admin-theme="dark"] .form-control,
+                :root[data-admin-theme="dark"] .form-control-plaintext,
+                :root[data-admin-theme="dark"] .custom-select,
+                :root[data-admin-theme="dark"] .input-group-text,
+                :root[data-admin-theme="dark"] textarea,
+                :root[data-admin-theme="dark"] select,
+                :root[data-admin-theme="dark"] input {
+
+                    background-color: #0f172a;
+
+                    color: #f9fafb;
+
+                    border-color: #4b5563;
+
+                }
+
+                :root[data-admin-theme="dark"] .form-control:focus,
+                :root[data-admin-theme="dark"] .custom-select:focus {
+
+                    background-color: #111827;
+
+                    color: #ffffff;
+
+                    border-color: #60a5fa;
+
+                    box-shadow: 0 0 0 0.2rem rgba(96, 165, 250, 0.2);
+
+                }
+
+                :root[data-admin-theme="dark"] .table th,
+                :root[data-admin-theme="dark"] .table td,
+                :root[data-admin-theme="dark"] .modal-header,
+                :root[data-admin-theme="dark"] .modal-footer,
+                :root[data-admin-theme="dark"] .topic-quiz-modal__header,
+                :root[data-admin-theme="dark"] .topic-quiz-modal__footer {
+
+                    border-color: #374151;
+
+                }
+
+                :root[data-admin-theme="dark"] .table-striped tbody tr:nth-of-type(odd) {
+
+                    background-color: rgba(255, 255, 255, 0.035);
+
+                }
+
+                :root[data-admin-theme="dark"] .table-hover tbody tr:hover {
+
+                    background-color: rgba(96, 165, 250, 0.12);
+
+                    color: #f9fafb;
+
+                }
+
+                :root[data-admin-theme="dark"] .text-muted,
+                :root[data-admin-theme="dark"] .topic-quiz-answers small {
+
+                    color: #9ca3af !important;
+
+                }
+
+                :root[data-admin-theme="dark"] a,
+                :root[data-admin-theme="dark"] .btn-link,
+                :root[data-admin-theme="dark"] .navbar-brand,
+                :root[data-admin-theme="dark"] .nav-link h1 {
+
+                    color: #93c5fd !important;
+
+                }
+
+                :root[data-admin-theme="dark"] h2 {
+
+                    color: #f87171;
+
+                }
+
+                :root[data-admin-theme="dark"] .nav-tabs,
+                :root[data-admin-theme="dark"] .nav-tabs .nav-link,
+                :root[data-admin-theme="dark"] .admin-container hr {
+
+                    border-color: #374151;
+
+                }
+
+                :root[data-admin-theme="dark"] .nav-tabs .nav-link.active,
+                :root[data-admin-theme="dark"] .home-layout-option.active,
+                :root[data-admin-theme="dark"] .home-header-option.active {
+
+                    background-color: #1f2937;
+
+                    color: #f9fafb !important;
+
+                    border-color: #60a5fa;
+
+                }
+
+                :root[data-admin-theme="dark"] .btn-outline-secondary {
+
+                    color: #d1d5db;
+
+                    border-color: #6b7280;
+
+                }
+
+                :root[data-admin-theme="dark"] .btn-outline-secondary:hover,
+                :root[data-admin-theme="dark"] .btn-outline-secondary:focus {
+
+                    background-color: #374151;
+
+                    color: #ffffff;
+
+                    border-color: #9ca3af;
+
+                }
+
+                :root[data-admin-theme="dark"] .admin-floating-logo {
+
+                    background: #111827;
+
+                    box-shadow: 0 12px 25px rgba(0,0,0,0.45);
+
+                }
+
+                :root[data-admin-theme="dark"] .itinerary-form-card .sticky-save,
+                :root[data-admin-theme="dark"] .itinerary-topics-card .sticky-save {
+
+                    background: linear-gradient(180deg, rgba(31,41,55,0) 0%, #1f2937 40%);
+
+                }
+
             </style>
 
         </head>
@@ -15676,8 +15863,9 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                             <form method="post" class="form-inline my-2 my-lg-0 ml-lg-3">
                                 <div class="d-flex flex-column align-items-stretch">
-                                    <button type="submit" name="logout" class="btn btn-outline-danger my-2 my-sm-0">Cerrar sesión</button>
-                                    <a href="index.php" class="btn btn-outline-secondary btn-sm mt-2">Ir al blog</a>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm mb-2" id="adminThemeToggle" aria-pressed="false">Modo oscuro</button>
+                                    <button type="submit" name="logout" class="btn btn-outline-danger my-2 my-sm-0">Cerrar</button>
+                                    <a href="index.php" class="btn btn-outline-secondary btn-sm mt-2">Portada</a>
                                 </div>
                             </form>
 
@@ -20306,6 +20494,41 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     toggleModal(true);
                 });
                 updateSummary(targetInput, summaryEl, trigger);
+            });
+        });
+        </script>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var toggle = document.getElementById('adminThemeToggle');
+            if (!toggle) {
+                return;
+            }
+
+            var storageKey = 'nammuAdminTheme';
+            var root = document.documentElement;
+
+            function applyAdminTheme(theme) {
+                var isDark = theme === 'dark';
+                if (isDark) {
+                    root.setAttribute('data-admin-theme', 'dark');
+                } else {
+                    root.removeAttribute('data-admin-theme');
+                }
+                toggle.textContent = isDark ? 'Modo claro' : 'Modo oscuro';
+                toggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+            }
+
+            var currentTheme = root.getAttribute('data-admin-theme') === 'dark' ? 'dark' : 'light';
+            applyAdminTheme(currentTheme);
+
+            toggle.addEventListener('click', function() {
+                var nextTheme = root.getAttribute('data-admin-theme') === 'dark' ? 'light' : 'dark';
+                applyAdminTheme(nextTheme);
+                try {
+                    localStorage.setItem(storageKey, nextTheme);
+                } catch (error) {
+                    // La preferencia no es crítica si localStorage no está disponible.
+                }
             });
         });
         </script>

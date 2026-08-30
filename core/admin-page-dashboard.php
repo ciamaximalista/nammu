@@ -2918,6 +2918,39 @@
                 stroke: none !important;
                 paint-order: normal !important;
             }
+            :root[data-admin-theme="dark"] .dashboard-status-panel {
+                background: #1f2937 !important;
+                border-color: #374151 !important;
+                color: #e5e7eb;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-panel--email {
+                background: #17271f !important;
+                border-color: #31543f !important;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-panel--social {
+                background: #172033 !important;
+                border-color: #355174 !important;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-panel--indexnow-ok {
+                background: #172033 !important;
+                border-color: #355174 !important;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-panel--indexnow-error {
+                background: #321b1b !important;
+                border-color: #7f1d1d !important;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-item {
+                background: #111827 !important;
+                border-color: #374151 !important;
+                color: #e5e7eb;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-item strong {
+                color: #f9fafb;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-panel .text-muted,
+            :root[data-admin-theme="dark"] .dashboard-status-item .text-muted {
+                color: #aab7c7 !important;
+            }
         </style>
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-2">
             <div>
@@ -2927,7 +2960,7 @@
         </div>
         <div class="row mb-4">
             <div class="col-lg-6 mb-3 mb-lg-0">
-                <div style="border:1px solid #d8eadf;background:#f6fbf8;border-radius:12px;padding:16px;height:100%;">
+                <div class="dashboard-status-panel dashboard-status-panel--email" style="border:1px solid #d8eadf;background:#f6fbf8;border-radius:12px;padding:16px;height:100%;">
                     <h3 class="h6 text-uppercase mb-3" style="color:#167a3a;">Envíos por email</h3>
                     <?php if (empty($mailingDashboardItems)): ?>
                         <p class="text-muted mb-0">Sin campañas recientes.</p>
@@ -2939,7 +2972,7 @@
                             $mailingQueuedAt = (int) ($mailingRow['queued_at'] ?? 0);
                             $mailingError = trim((string) ($mailingRow['last_error'] ?? ''));
                             ?>
-                            <div style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:12px;margin-bottom:12px;">
+                            <div class="dashboard-status-item" style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:12px;margin-bottom:12px;">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
                                     <strong><?= htmlspecialchars((string) ($mailingRow['label'] ?? 'Correo'), ENT_QUOTES, 'UTF-8') ?></strong>
                                     <span style="font-size:.8rem;color:<?= htmlspecialchars($mailingStatusColor($mailingRow), ENT_QUOTES, 'UTF-8') ?>;font-weight:700;"><?= htmlspecialchars($mailingStatusLabel($mailingRow), ENT_QUOTES, 'UTF-8') ?></span>
@@ -2969,12 +3002,12 @@
                 </div>
             </div>
             <div class="col-lg-6">
-                <div style="border:1px solid #cce2ff;background:#f5f9ff;border-radius:12px;padding:16px;height:100%;">
+                <div class="dashboard-status-panel dashboard-status-panel--social" style="border:1px solid #cce2ff;background:#f5f9ff;border-radius:12px;padding:16px;height:100%;">
                     <div class="d-flex justify-content-between align-items-start mb-3">
                         <h3 class="h6 text-uppercase mb-0" style="color:#1b8eed;">Envíos Fediverso y RRSS</h3>
                         <span style="font-size:.8rem;color:<?= htmlspecialchars($socialFediverseColor, ENT_QUOTES, 'UTF-8') ?>;font-weight:700;"><?= htmlspecialchars($socialFediverseLabel, ENT_QUOTES, 'UTF-8') ?></span>
                     </div>
-                    <div style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:12px;margin-bottom:12px;">
+                    <div class="dashboard-status-item" style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:12px;margin-bottom:12px;">
                         <strong>RRSS</strong>
                         <p class="mb-2 text-muted">Última actividad: <?= htmlspecialchars($mailingDateLabel((int) ($socialFediverseStatus['social_last_at'] ?? 0)), ENT_QUOTES, 'UTF-8') ?></p>
                         <p class="mb-0">
@@ -3012,7 +3045,7 @@
                             </ul>
                         <?php endif; ?>
                     </div>
-                    <div style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:12px;">
+                    <div class="dashboard-status-item" style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:12px;">
                         <strong>Fediverso</strong>
                         <p class="mb-2 text-muted">Última actividad: <?= htmlspecialchars($mailingDateLabel((int) ($socialFediverseStatus['fediverse_last_at'] ?? 0)), ENT_QUOTES, 'UTF-8') ?></p>
                         <p class="mb-0"><strong>Acciones pendientes:</strong> <?= (int) ($socialFediverseStatus['fediverse_pending'] ?? 0) ?></p>
@@ -3021,7 +3054,7 @@
             </div>
         </div>
         <?php if ($indexnowHasErrors): ?>
-            <div class="mb-4" style="border:1px solid #ea2f28;background:#fff5f5;border-radius:12px;padding:16px;">
+            <div class="mb-4 dashboard-status-panel dashboard-status-panel--indexnow-error" style="border:1px solid #ea2f28;background:#fff5f5;border-radius:12px;padding:16px;">
                 <h3 class="h6 text-uppercase mb-2" style="color:#ea2f28;">Errores al enviar IndexNow</h3>
                 <?php if ($indexnowTimestamp > 0): ?>
                     <p class="text-muted mb-2">Último intento: <?= htmlspecialchars(date('d/m/y H:i', $indexnowTimestamp), ENT_QUOTES, 'UTF-8') ?></p>
@@ -3046,7 +3079,7 @@
                 </ul>
             </div>
         <?php elseif ($indexnowHasLog): ?>
-            <div class="mb-4" style="border:1px solid #cce2ff;background:#f5f9ff;border-radius:12px;padding:16px;">
+            <div class="mb-4 dashboard-status-panel dashboard-status-panel--indexnow-ok" style="border:1px solid #cce2ff;background:#f5f9ff;border-radius:12px;padding:16px;">
                 <h3 class="h6 text-uppercase mb-2" style="color:#1b8eed;">IndexNow enviado correctamente</h3>
                 <p class="text-muted mb-2">Último envío: <?= htmlspecialchars(date('d/m/y H:i', $indexnowTimestamp), ENT_QUOTES, 'UTF-8') ?></p>
                 <?php if (!empty($indexnowUrls)): ?>

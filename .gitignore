@@ -53,3 +53,5 @@ vendor/
 backups/*
 !backups/.gitkeep
 !backups/.htaccess
+
+blog.xml

@@ -380,6 +380,22 @@
             $fediverseLocalLinks[$fediverseLocalUrl] = 'admin.php?page=fediverso&tab=home#' . $fediverseLocalAnchor;
         }
     }
+    $fediverseLocalRootByIdentifier = [];
+    foreach ($fediverseLocalItems as $fediverseLocalItem) {
+        if (!is_array($fediverseLocalItem)) {
+            continue;
+        }
+        $fediverseLocalRootId = trim((string) ($fediverseLocalItem['id'] ?? ''));
+        if ($fediverseLocalRootId === '') {
+            continue;
+        }
+        foreach (['id', 'object_id', 'url'] as $fediverseLocalRootField) {
+            $fediverseLocalRootIdentifier = trim((string) ($fediverseLocalItem[$fediverseLocalRootField] ?? ''));
+            foreach ($fediverseEquivalentIdentifiers($fediverseLocalRootIdentifier) as $fediverseLocalRootVariant) {
+                $fediverseLocalRootByIdentifier[$fediverseLocalRootVariant] = $fediverseLocalRootId;
+            }
+        }
+    }
     $fediverseThreadLatestReplyActivity = [];
     $rememberFediverseThreadReplyActivity = static function (string $targetIdentifier, string $published) use (&$fediverseThreadLatestReplyActivity, $fediverseEquivalentIdentifiers): void {
         $targetIdentifier = trim($targetIdentifier);
@@ -393,6 +409,73 @@
             }
         }
     };
+    $fediverseOutgoingReplyRootByIdentifier = [];
+    $rememberFediverseOutgoingReplyRoot = static function (string $replyIdentifier, string $rootIdentifier) use (&$fediverseOutgoingReplyRootByIdentifier, $fediverseEquivalentIdentifiers): void {
+        $replyIdentifier = trim($replyIdentifier);
+        $rootIdentifier = trim($rootIdentifier);
+        if ($replyIdentifier === '' || $rootIdentifier === '') {
+            return;
+        }
+        foreach ($fediverseEquivalentIdentifiers($replyIdentifier) as $replyVariant) {
+            $fediverseOutgoingReplyRootByIdentifier[$replyVariant] = $rootIdentifier;
+        }
+    };
+    foreach (nammu_fediverse_actions_store()['items'] as $fediverseActionItem) {
+        if (!is_array($fediverseActionItem) || strtolower(trim((string) ($fediverseActionItem['type'] ?? ''))) !== 'reply') {
+            continue;
+        }
+        $fediverseReplyRootIdentifier = trim((string) ($fediverseActionItem['object_url'] ?? ''));
+        if ($fediverseReplyRootIdentifier === '') {
+            continue;
+        }
+        $rememberFediverseOutgoingReplyRoot((string) ($fediverseActionItem['note_id'] ?? ''), $fediverseReplyRootIdentifier);
+        $rememberFediverseOutgoingReplyRoot((string) ($fediverseActionItem['activity_id'] ?? ''), $fediverseReplyRootIdentifier);
+    }
+    $fediverseInboxStoreForReplies = function_exists('nammu_fediverse_load_json_store') && function_exists('nammu_fediverse_inbox_file')
+        ? nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []])
+        : ['activities' => []];
+    $fediverseReplyRootByIdentifier = $fediverseLocalRootByIdentifier;
+    $fediverseInboxActivityEntriesForReplies = array_values((array) ($fediverseInboxStoreForReplies['activities'] ?? []));
+    usort($fediverseInboxActivityEntriesForReplies, static function (array $a, array $b): int {
+        $payloadA = is_array($a['payload'] ?? null) ? $a['payload'] : [];
+        $payloadB = is_array($b['payload'] ?? null) ? $b['payload'] : [];
+        $objectA = is_array($payloadA['object'] ?? null) ? $payloadA['object'] : [];
+        $objectB = is_array($payloadB['object'] ?? null) ? $payloadB['object'] : [];
+        $publishedA = (string) (($objectA['published'] ?? '') ?: ($payloadA['published'] ?? '') ?: ($a['received_at'] ?? ''));
+        $publishedB = (string) (($objectB['published'] ?? '') ?: ($payloadB['published'] ?? '') ?: ($b['received_at'] ?? ''));
+        return strcmp($publishedA, $publishedB);
+    });
+    foreach ($fediverseInboxActivityEntriesForReplies as $fediverseInboxActivityEntry) {
+        if (!is_array($fediverseInboxActivityEntry)) {
+            continue;
+        }
+        $fediverseInboxPayload = is_array($fediverseInboxActivityEntry['payload'] ?? null) ? $fediverseInboxActivityEntry['payload'] : [];
+        if (strtolower(trim((string) ($fediverseInboxPayload['type'] ?? ''))) !== 'create') {
+            continue;
+        }
+        $fediverseInboxObject = is_array($fediverseInboxPayload['object'] ?? null) ? $fediverseInboxPayload['object'] : [];
+        if (strtolower(trim((string) ($fediverseInboxObject['type'] ?? ''))) !== 'note') {
+            continue;
+        }
+        $fediverseInboxReplyTarget = trim((string) ($fediverseInboxObject['inReplyTo'] ?? ''));
+        if ($fediverseInboxReplyTarget === '') {
+            continue;
+        }
+        foreach ($fediverseEquivalentIdentifiers($fediverseInboxReplyTarget) as $fediverseInboxReplyTargetVariant) {
+            $fediverseReplyRootIdentifier = (string) (($fediverseReplyRootByIdentifier[$fediverseInboxReplyTargetVariant] ?? '') ?: ($fediverseOutgoingReplyRootByIdentifier[$fediverseInboxReplyTargetVariant] ?? ''));
+            if ($fediverseReplyRootIdentifier === '') {
+                continue;
+            }
+            $fediverseReplyPublished = trim((string) (($fediverseInboxObject['published'] ?? '') ?: ($fediverseInboxPayload['published'] ?? '') ?: ($fediverseInboxActivityEntry['received_at'] ?? '')));
+            $rememberFediverseThreadReplyActivity($fediverseReplyRootIdentifier, $fediverseReplyPublished);
+            foreach (['id', 'url'] as $fediverseInboxReplyIdentifierField) {
+                $fediverseInboxReplyIdentifier = trim((string) ($fediverseInboxObject[$fediverseInboxReplyIdentifierField] ?? ''));
+                foreach ($fediverseEquivalentIdentifiers($fediverseInboxReplyIdentifier) as $fediverseInboxReplyIdentifierVariant) {
+                    $fediverseReplyRootByIdentifier[$fediverseInboxReplyIdentifierVariant] = $fediverseReplyRootIdentifier;
+                }
+            }
+        }
+    }
     foreach ($fediverseIncomingReplies as $fediverseIncomingLocalId => $fediverseIncomingReplyGroup) {
         foreach ((array) $fediverseIncomingReplyGroup as $fediverseIncomingReply) {
             if (!is_array($fediverseIncomingReply)) {
@@ -766,10 +849,20 @@
             ]];
         }
         $fediverseTimelineDisplay[] = $fediverseTimelineItem;
+        $fediverseRemoteSortKey = (string) ($fediverseTimelineItem['published'] ?? '');
+        foreach (['id', 'object_id', 'url'] as $fediverseRemoteSortField) {
+            $fediverseRemoteSortIdentifier = trim((string) ($fediverseTimelineItem[$fediverseRemoteSortField] ?? ''));
+            foreach ($fediverseEquivalentIdentifiers($fediverseRemoteSortIdentifier) as $fediverseRemoteSortVariant) {
+                $fediverseRemoteReplyActivity = (string) ($fediverseThreadLatestReplyActivity[$fediverseRemoteSortVariant] ?? '');
+                if ($fediverseRemoteReplyActivity !== '' && strcmp($fediverseRemoteReplyActivity, $fediverseRemoteSortKey) > 0) {
+                    $fediverseRemoteSortKey = $fediverseRemoteReplyActivity;
+                }
+            }
+        }
         $fediverseTimelineEntries[] = [
             'kind' => 'remote',
             'published' => (string) ($fediverseTimelineItem['published'] ?? ''),
-            'sort_key' => (string) ($fediverseTimelineItem['published'] ?? ''),
+            'sort_key' => $fediverseRemoteSortKey,
             'item' => $fediverseTimelineItem,
         ];
         if ($fediverseTimelineType === 'announce' && !empty($fediverseAnnounceGroupKey)) {

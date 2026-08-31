@@ -8652,6 +8652,9 @@ function nammu_fediverse_store_inbox_activity(array $payload, array $meta = [], 
     ];
     $store['activities'] = array_slice($activities, -1000);
     nammu_fediverse_save_json_store(nammu_fediverse_inbox_file(), $store);
+    if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
+        nammu_fediverse_save_fragments_cache_store([]);
+    }
     if (is_array($config)) {
         nammu_fediverse_record_legacy_actuality_payload($payload, $config);
     }

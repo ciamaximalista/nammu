@@ -934,6 +934,52 @@ if (preg_match('#^/ap/replies/[a-f0-9]{24}$#', $routePath) === 1) {
     exit;
 }
 
+if (preg_match('#^/fediverso-thread-fragment/(post|podcast|itinerary)/([^/]+)/?$#', $routePath, $fediverseFragmentMatch) === 1) {
+    $fragmentTemplate = (string) ($fediverseFragmentMatch[1] ?? 'post');
+    $fragmentSlug = rawurldecode((string) ($fediverseFragmentMatch[2] ?? ''));
+    $fragmentMeta = function_exists('nammu_fediverse_public_thread_meta_for_named_local_item')
+        ? nammu_fediverse_public_thread_meta_for_named_local_item($fragmentSlug, $fragmentTemplate, $configData)
+        : ['thread_url' => '', 'summary' => ['likes' => 0, 'shares' => 0, 'replies' => 0], 'details' => ['likes' => [], 'shares' => [], 'replies' => []]];
+    $fragmentReplies = [];
+    if (function_exists('nammu_fediverse_find_named_local_item') && function_exists('nammu_fediverse_best_thread_page_payload')) {
+        $fragmentItem = nammu_fediverse_find_named_local_item($fragmentSlug, $fragmentTemplate, $configData);
+        if (is_array($fragmentItem)) {
+            $fragmentPayload = nammu_fediverse_best_thread_page_payload($fragmentItem, $configData);
+            if (is_array($fragmentPayload['summary'] ?? null) || is_array($fragmentPayload['details'] ?? null)) {
+                $fragmentMeta = [
+                    'thread_url' => trim((string) (($fragmentPayload['thread_url'] ?? '') ?: ($fragmentMeta['thread_url'] ?? ''))),
+                    'summary' => is_array($fragmentPayload['summary'] ?? null) ? $fragmentPayload['summary'] : ($fragmentMeta['summary'] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0]),
+                    'details' => is_array($fragmentPayload['details'] ?? null) ? $fragmentPayload['details'] : ($fragmentMeta['details'] ?? ['likes' => [], 'shares' => [], 'replies' => []]),
+                ];
+            }
+            $fragmentReplies = is_array($fragmentPayload['replies'] ?? null) ? $fragmentPayload['replies'] : [];
+            foreach ($fragmentReplies as &$fragmentReply) {
+                if (!is_array($fragmentReply)) {
+                    continue;
+                }
+                if (function_exists('nammu_fediverse_reply_link_card')) {
+                    $fragmentReplyLinkCard = nammu_fediverse_reply_link_card($fragmentReply, $configData);
+                    if (is_array($fragmentReplyLinkCard)) {
+                        $fragmentReply['link_card'] = $fragmentReplyLinkCard;
+                    }
+                }
+            }
+            unset($fragmentReply);
+        }
+    }
+    header('Content-Type: text/html; charset=UTF-8');
+    header('Cache-Control: no-store, max-age=0');
+    echo $renderer->render('fediverse-thread-summary', [
+        'theme' => $theme,
+        'fediverseThreadUrl' => (string) ($fragmentMeta['thread_url'] ?? ''),
+        'fediverseThreadMeta' => $fragmentMeta,
+        'fediverseThreadReplies' => $fragmentReplies,
+        'isItineraryTemplate' => $fragmentTemplate === 'itinerary',
+        'isPodcastTemplate' => $fragmentTemplate === 'podcast',
+    ]);
+    exit;
+}
+
 if (preg_match('#^/fediverso/([a-f0-9]{24})/?$#', $routePath, $fediverseThreadMatch) === 1) {
     $threadHash = trim((string) ($fediverseThreadMatch[1] ?? ''));
     $threadItem = nammu_fediverse_find_local_item_for_thread_hash($threadHash, $configData);
@@ -3040,25 +3086,6 @@ if ($slug !== null && $slug !== '') {
         ? nammu_fediverse_public_thread_meta_for_named_local_item($post->getSlug(), 'post', $config)
         : ['thread_url' => '', 'summary' => ['likes' => 0, 'shares' => 0, 'replies' => 0], 'details' => ['likes' => [], 'shares' => [], 'replies' => []]];
     $postFediverseThreadReplies = [];
-    if (function_exists('nammu_fediverse_find_named_local_item') && function_exists('nammu_fediverse_best_thread_page_payload')) {
-        $postFediverseLocalItem = nammu_fediverse_find_named_local_item($post->getSlug(), 'post', $config);
-        if (is_array($postFediverseLocalItem)) {
-            $postFediversePayload = nammu_fediverse_best_thread_page_payload($postFediverseLocalItem, $config);
-            $postFediverseThreadReplies = is_array($postFediversePayload['replies'] ?? null) ? $postFediversePayload['replies'] : [];
-            foreach ($postFediverseThreadReplies as &$postFediverseThreadReply) {
-                if (!is_array($postFediverseThreadReply)) {
-                    continue;
-                }
-                if (function_exists('nammu_fediverse_reply_link_card')) {
-                    $replyLinkCard = nammu_fediverse_reply_link_card($postFediverseThreadReply, $config);
-                    if (is_array($replyLinkCard)) {
-                        $postFediverseThreadReply['link_card'] = $replyLinkCard;
-                    }
-                }
-            }
-            unset($postFediverseThreadReply);
-        }
-    }
     $content = $renderer->render('single', [
         'pageTitle' => $post->getTitle(),
         'post' => $post,

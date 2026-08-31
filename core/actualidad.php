@@ -2466,6 +2466,10 @@ XML;
 
 function nammu_generate_fediverse_threads_feed(string $baseUrl, array $config, string $siteTitle, string $siteDescription, string $siteLang = 'es', string $selfPath = '/fediverso.xml'): string
 {
+    $resolvedBaseUrl = rtrim($baseUrl, '/');
+    if ($resolvedBaseUrl === '' && function_exists('nammu_fediverse_base_url')) {
+        $resolvedBaseUrl = rtrim(nammu_fediverse_base_url($config), '/');
+    }
     $items = nammu_actuality_page_items($config, dirname(__DIR__) . '/content', dirname(__DIR__) . '/itinerarios', $baseUrl, $siteTitle, $siteDescription, $siteLang);
     $guessImageMimeType = static function (string $url): string {
         $extension = strtolower(pathinfo((string) (parse_url($url, PHP_URL_PATH) ?? ''), PATHINFO_EXTENSION));
@@ -2505,6 +2509,21 @@ function nammu_generate_fediverse_threads_feed(string $baseUrl, array $config, s
         }
         return '';
     };
+    $resolveFeedLink = static function (array $item, string $threadUrl) use ($resolvedBaseUrl): string {
+        $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
+        $boostOriginalUrl = trim((string) ($item['boost_original_url'] ?? ''));
+        if ($isBoost && $boostOriginalUrl !== '') {
+            return $boostOriginalUrl;
+        }
+        $publicContentUrl = trim((string) ($item['link'] ?? ''));
+        if ($publicContentUrl !== '' && str_starts_with($publicContentUrl, '/') && $resolvedBaseUrl !== '') {
+            $publicContentUrl = $resolvedBaseUrl . '/' . ltrim($publicContentUrl, '/');
+        }
+        if (!empty($item['is_site_content']) && $publicContentUrl !== '' && preg_match('#^https?://#i', $publicContentUrl) === 1) {
+            return $publicContentUrl;
+        }
+        return $threadUrl;
+    };
     $feedItems = [];
     foreach ($items as $item) {
         if (!is_array($item) || !function_exists('nammu_fediverse_public_thread_url_for_actuality_item')) {
@@ -2514,9 +2533,7 @@ function nammu_generate_fediverse_threads_feed(string $baseUrl, array $config, s
         if ($threadUrl === '') {
             continue;
         }
-        $isBoost = strtolower(trim((string) ($item['via'] ?? ''))) === 'boost';
-        $boostOriginalUrl = trim((string) ($item['boost_original_url'] ?? ''));
-        $itemLink = ($isBoost && $boostOriginalUrl !== '') ? $boostOriginalUrl : $threadUrl;
+        $itemLink = $resolveFeedLink($item, $threadUrl);
         $title = trim((string) ($item['title'] ?? ''));
         $description = trim((string) (($item['raw_text'] ?? '') ?: ($item['description'] ?? '')));
         $timestamp = (int) ($item['timestamp'] ?? 0);

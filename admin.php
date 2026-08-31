@@ -20117,6 +20117,356 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
         <script>
         document.addEventListener('DOMContentLoaded', function() {
+            window.setTimeout(function() {
+                if (window.nammuMediaModalFallbackInitialized) {
+                    return;
+                }
+                var modal = document.getElementById('imageModal');
+                var gallery = modal ? modal.querySelector('.image-gallery') : null;
+                var pagination = document.getElementById('image-pagination');
+                var count = document.getElementById('image-modal-count');
+                var search = document.getElementById('modal-image-search');
+                var insertActions = document.getElementById('image-insert-actions');
+                if (!modal || !gallery || !pagination || !search || !insertActions) {
+                    return;
+                }
+                var allItems = Array.prototype.slice.call(gallery.querySelectorAll('.gallery-item'));
+                if (!allItems.length) {
+                    return;
+                }
+                if ((pagination.children.length > 0 || allItems.length <= 8) && count && count.textContent.trim() !== '') {
+                    return;
+                }
+                window.nammuMediaModalFallbackInitialized = true;
+
+                var empty = document.getElementById('image-modal-empty');
+                var selectedHelp = document.getElementById('image-modal-selected-help');
+                var perPage = 8;
+                var currentPage = 1;
+                var filteredItems = allItems.slice();
+                var targetMode = '';
+                var targetInput = '';
+                var targetEditor = '';
+                var targetPrefix = '';
+                var targetAccept = '';
+                var targetMulti = '';
+                var targetMaxItems = 0;
+                var targetSelection = null;
+                var pendingInsert = null;
+
+                function normalize(value) {
+                    var normalized = (value || '').toString().toLowerCase().trim();
+                    if (typeof normalized.normalize === 'function') {
+                        normalized = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    }
+                    return normalized;
+                }
+
+                function closestMedia(node) {
+                    while (node && node !== gallery) {
+                        if (node.getAttribute && node.getAttribute('data-media-name') !== null) {
+                            return node;
+                        }
+                        node = node.parentNode;
+                    }
+                    return null;
+                }
+
+                function mediaAttr(media, name) {
+                    return media ? (media.getAttribute(name) || '') : '';
+                }
+
+                function targetTextarea() {
+                    if (targetEditor) {
+                        try {
+                            var explicit = document.querySelector(targetEditor);
+                            if (explicit && explicit.tagName === 'TEXTAREA') {
+                                return explicit;
+                            }
+                        } catch (err) {
+                            // Ignore invalid selectors coming from old buttons.
+                        }
+                    }
+                    if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
+                        return document.activeElement;
+                    }
+                    return document.querySelector('[data-markdown-editor]') || document.querySelector('textarea');
+                }
+
+                function hideModal() {
+                    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.modal) {
+                        window.jQuery(modal).modal('hide');
+                        return;
+                    }
+                    modal.classList.remove('show');
+                    modal.style.display = 'none';
+                    document.body.classList.remove('modal-open');
+                }
+
+                function clearSelected() {
+                    allItems.forEach(function(item) {
+                        item.classList.remove('is-selected');
+                        var media = item.querySelector('[data-media-name]');
+                        if (media) {
+                            media.classList.remove('is-selected');
+                            media.setAttribute('aria-pressed', 'false');
+                        }
+                    });
+                    if (selectedHelp) {
+                        selectedHelp.classList.add('d-none');
+                    }
+                }
+
+                function render() {
+                    var total = filteredItems.length;
+                    var totalPages = Math.max(1, Math.ceil(Math.max(total, 1) / perPage));
+                    currentPage = Math.max(1, Math.min(currentPage, totalPages));
+                    allItems.forEach(function(item) {
+                        item.style.display = 'none';
+                    });
+                    if (!total) {
+                        if (empty) {
+                            empty.classList.remove('d-none');
+                        }
+                        if (count) {
+                            count.textContent = '0 recursos';
+                        }
+                        pagination.innerHTML = '';
+                        return;
+                    }
+                    if (empty) {
+                        empty.classList.add('d-none');
+                    }
+                    var start = (currentPage - 1) * perPage;
+                    var end = Math.min(start + perPage, total);
+                    filteredItems.slice(start, end).forEach(function(item) {
+                        item.style.display = '';
+                    });
+                    if (count) {
+                        count.textContent = (start + 1) + '-' + end + ' de ' + total + ' recursos';
+                    }
+                    pagination.innerHTML = '';
+                    if (totalPages <= 1) {
+                        return;
+                    }
+                    for (var i = 1; i <= totalPages; i++) {
+                        var li = document.createElement('li');
+                        li.className = 'page-item' + (i === currentPage ? ' active' : '');
+                        var link = document.createElement('a');
+                        link.className = 'page-link';
+                        link.href = '#';
+                        link.textContent = String(i);
+                        link.setAttribute('data-page', String(i));
+                        li.appendChild(link);
+                        pagination.appendChild(li);
+                    }
+                }
+
+                function applyFilter() {
+                    var term = normalize(search.value || '');
+                    filteredItems = allItems.filter(function(item) {
+                        return !term || normalize(item.getAttribute('data-media-search') || '').indexOf(term) !== -1;
+                    });
+                    currentPage = 1;
+                    render();
+                }
+
+                function captureTarget(button) {
+                    targetMode = button.getAttribute('data-target-type') || '';
+                    targetInput = button.getAttribute('data-target-input') || '';
+                    targetEditor = button.getAttribute('data-target-editor') || '';
+                    targetPrefix = button.getAttribute('data-target-prefix') || '';
+                    targetAccept = button.getAttribute('data-target-accept') || '';
+                    targetMulti = button.getAttribute('data-target-multi') || '';
+                    targetMaxItems = parseInt(button.getAttribute('data-target-max-items') || '0', 10) || 0;
+                    var textarea = targetTextarea();
+                    if (textarea && typeof textarea.selectionStart === 'number') {
+                        targetSelection = {
+                            textarea: textarea,
+                            start: textarea.selectionStart,
+                            end: typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : textarea.selectionStart,
+                            scrollTop: textarea.scrollTop
+                        };
+                    } else {
+                        targetSelection = null;
+                    }
+                    clearSelected();
+                    insertActions.classList.add('d-none');
+                    applyFilter();
+                }
+
+                function setFieldValue(media) {
+                    var input = targetInput ? document.getElementById(targetInput) : null;
+                    if (!input) {
+                        return;
+                    }
+                    var nextValue = targetPrefix + mediaAttr(media, 'data-media-name');
+                    if (targetMulti) {
+                        var values = (input.value || '').split(/\r?\n/).map(function(value) {
+                            return value.trim();
+                        }).filter(Boolean);
+                        if (values.indexOf(nextValue) === -1) {
+                            if (targetMaxItems > 0 && values.length >= targetMaxItems) {
+                                alert('Solo puedes añadir hasta ' + targetMaxItems + ' adjuntos.');
+                                return;
+                            }
+                            values.push(nextValue);
+                        }
+                        input.value = values.join("\n");
+                    } else {
+                        input.value = nextValue;
+                    }
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                    hideModal();
+                }
+
+                function escapeAttr(value) {
+                    return (value || '').toString()
+                        .replace(/&/g, '&amp;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;');
+                }
+
+                function insertText(textarea, text) {
+                    if (!textarea) {
+                        return;
+                    }
+                    var start = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : textarea.value.length;
+                    var end = typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : start;
+                    if (targetSelection && targetSelection.textarea === textarea) {
+                        start = targetSelection.start;
+                        end = targetSelection.end;
+                    }
+                    textarea.value = textarea.value.slice(0, start) + text + textarea.value.slice(end);
+                    var cursor = start + text.length;
+                    textarea.focus();
+                    if (typeof textarea.setSelectionRange === 'function') {
+                        textarea.setSelectionRange(cursor, cursor);
+                    }
+                    if (targetSelection && typeof targetSelection.scrollTop === 'number') {
+                        textarea.scrollTop = targetSelection.scrollTop;
+                    }
+                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+
+                function insertMedia(mode) {
+                    if (!pendingInsert) {
+                        return;
+                    }
+                    var textarea = targetTextarea();
+                    if (!textarea) {
+                        return;
+                    }
+                    var type = pendingInsert.type;
+                    var source = pendingInsert.src;
+                    var mime = pendingInsert.mime;
+                    var snippet = '';
+                    if (type === 'video') {
+                        if (mode === 'link') {
+                            snippet = '[' + (source.split('/').pop() || 'Video') + '](' + source + ')';
+                        } else {
+                            snippet = '\n\n<div class="embedded-video">\n    <video controls preload="metadata">\n        <source src="' + source + '"' + (mime ? ' type="' + mime + '"' : '') + '>\n    </video>\n</div>\n\n';
+                        }
+                    } else if (type === 'pdf') {
+                        if (mode === 'link') {
+                            snippet = '[' + (source.split('/').pop() || 'Documento') + '](' + source + ')';
+                        } else {
+                            snippet = '\n\n<div class="embedded-pdf">\n    <iframe src="' + source + '#page=1&zoom=page-fit&spread=0&toolbar=0&navpanes=0&scrollbar=0&statusbar=0&pagemode=none" title="Documento PDF" loading="lazy" allowfullscreen></iframe>\n    <div class="embedded-pdf__actions" aria-label="Acciones del PDF">\n        <a class="embedded-pdf__action" href="' + source + '" download>Descargar PDF</a>\n        <a class="embedded-pdf__action" href="' + source + '" target="_blank" rel="noopener">Ver a pantalla completa</a>\n    </div>\n</div>\n\n';
+                        }
+                    } else if (type === 'audio') {
+                        snippet = '\n\n<audio class="embedded-audio" controls preload="metadata">\n        <source src="' + source + '"' + (mime ? ' type="' + mime + '"' : '') + '>\n</audio>\n\n';
+                    } else if (type === 'document') {
+                        snippet = '[' + (source.split('/').pop() || 'Documento') + '](' + source + ')';
+                    } else {
+                        var label = escapeAttr(pendingInsert.tags || pendingInsert.name || '');
+                        var classAttr = mode === 'vignette' ? ' class="nammu-image-vignette"' : '';
+                        snippet = '\n\n<img src="' + source + '" alt="' + label + '"' + (label ? ' title="' + label + '"' : '') + classAttr + ' />\n\n';
+                    }
+                    insertText(textarea, snippet);
+                    pendingInsert = null;
+                    targetSelection = null;
+                    hideModal();
+                }
+
+                document.addEventListener('click', function(event) {
+                    var trigger = event.target.closest ? event.target.closest('[data-toggle="modal"][data-target="#imageModal"]') : null;
+                    if (trigger) {
+                        captureTarget(trigger);
+                    }
+                }, true);
+
+                gallery.addEventListener('click', function(event) {
+                    var media = closestMedia(event.target);
+                    if (!media) {
+                        return;
+                    }
+                    if (!targetMode && targetTextarea()) {
+                        targetMode = 'editor';
+                    }
+                    var type = mediaAttr(media, 'data-media-type') || 'image';
+                    if (targetMode === 'field') {
+                        var allowed = (targetAccept || 'image').split(',').map(function(value) {
+                            return value.trim().toLowerCase();
+                        }).filter(Boolean);
+                        if (allowed.indexOf(type.toLowerCase()) === -1) {
+                            alert('Solo puedes seleccionar archivos de tipo ' + allowed.join(', ') + ' para este campo.');
+                            return;
+                        }
+                        setFieldValue(media);
+                        return;
+                    }
+                    clearSelected();
+                    media.classList.add('is-selected');
+                    media.setAttribute('aria-pressed', 'true');
+                    var item = media.closest ? media.closest('.gallery-item') : null;
+                    if (item) {
+                        item.classList.add('is-selected');
+                    }
+                    pendingInsert = {
+                        name: mediaAttr(media, 'data-media-name'),
+                        type: type,
+                        src: mediaAttr(media, 'data-media-src'),
+                        mime: mediaAttr(media, 'data-media-mime'),
+                        tags: mediaAttr(media, 'data-media-tags')
+                    };
+                    Array.prototype.forEach.call(insertActions.querySelectorAll('[data-insert-group]'), function(group) {
+                        var groupName = group.getAttribute('data-insert-group') || '';
+                        var wanted = type === 'pdf' ? 'pdf' : (type === 'video' ? 'video' : 'image');
+                        group.classList.toggle('d-none', groupName !== wanted);
+                    });
+                    insertActions.classList.remove('d-none');
+                    if (selectedHelp) {
+                        selectedHelp.classList.remove('d-none');
+                    }
+                });
+
+                insertActions.addEventListener('click', function(event) {
+                    var button = event.target.closest ? event.target.closest('[data-insert-mode]') : null;
+                    if (!button) {
+                        return;
+                    }
+                    event.preventDefault();
+                    insertMedia(button.getAttribute('data-insert-mode') || 'full');
+                });
+
+                search.addEventListener('input', applyFilter);
+                pagination.addEventListener('click', function(event) {
+                    var link = event.target.closest ? event.target.closest('[data-page]') : null;
+                    if (!link) {
+                        return;
+                    }
+                    event.preventDefault();
+                    currentPage = parseInt(link.getAttribute('data-page') || '1', 10) || 1;
+                    render();
+                });
+                applyFilter();
+            }, 100);
+        });
+        </script>
+
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
             var classSelect = document.querySelector('[data-itinerary-class-select]');
             var customWrapper = document.querySelector('[data-itinerary-class-custom-wrapper]');
             var customInput = document.getElementById('itinerary_class_custom');

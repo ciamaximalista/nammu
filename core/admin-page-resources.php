@@ -74,11 +74,11 @@
             <div class="d-flex flex-wrap align-items-center gap-2">
                 <form class="form-inline mb-0" method="get">
                     <input type="hidden" name="page" value="resources">
-                    <label for="resource-search" class="sr-only">Buscar</label>
+                    <label for="resource-search-input" class="sr-only">Buscar</label>
                     <input
                         type="search"
                         class="form-control form-control-sm mr-2"
-                        id="resource-search"
+                        id="resource-search-input"
                         name="search"
                         placeholder="Buscar por nombre o etiqueta"
                         value="<?= htmlspecialchars($resourceSearchTerm ?? '', ENT_QUOTES, 'UTF-8') ?>"
@@ -102,7 +102,7 @@
 
         <?php else: ?>
 
-            <div class="row">
+            <div class="row" id="resource-gallery" data-resources-page="<?= (int) $current_page ?>" data-resources-search="<?= htmlspecialchars($resourceSearchTerm, ENT_QUOTES, 'UTF-8') ?>">
                 <?php foreach ($media_data['items'] as $resource): ?>
                     <?php
                     $ext = strtolower(pathinfo($resource['name'], PATHINFO_EXTENSION));
@@ -110,9 +110,10 @@
                     $relativePath = $resource['relative'] ?? $resource['name'];
                     $resourceUrl = 'assets/' . rawurlencode($relativePath);
                     $resourceTags = $media_tags_map[$relativePath] ?? [];
+                    $resourceSearchValue = trim($resource['name'] . ' ' . $relativePath . ' ' . implode(' ', $resourceTags));
                     ?>
                     <div class="col-sm-6 col-md-4 col-lg-3 mb-4">
-                        <div class="card h-100 resource-card" data-resource-name="<?= htmlspecialchars($resource['name'], ENT_QUOTES, 'UTF-8') ?>">
+                        <div class="card h-100 resource-card" data-resource-name="<?= htmlspecialchars($resource['name'], ENT_QUOTES, 'UTF-8') ?>" data-resource-search-value="<?= htmlspecialchars($resourceSearchValue, ENT_QUOTES, 'UTF-8') ?>">
                             <?php if ($isImage): ?>
                                 <img src="assets/<?= htmlspecialchars($relativePath, ENT_QUOTES, 'UTF-8') ?>" class="card-img-top" style="height: 150px; object-fit: cover;" alt="<?= htmlspecialchars($resource['name'], ENT_QUOTES, 'UTF-8') ?>">
                             <?php else: ?>

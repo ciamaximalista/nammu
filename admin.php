@@ -15310,6 +15310,17 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                 }
 
+                .image-gallery .gallery-item [data-media-name] {
+                    transition: box-shadow .15s ease, border-color .15s ease, transform .15s ease;
+                }
+
+                .image-gallery .gallery-item.is-selected [data-media-name],
+                .image-gallery .gallery-item [data-media-name].is-selected {
+                    border-color: #1b8eed !important;
+                    box-shadow: 0 0 0 .2rem rgba(27, 142, 237, .25);
+                    transform: translateY(-1px);
+                }
+
                 .card-style-full .card-thumb {
 
                     grid-column: 1 / -1;
@@ -16231,7 +16242,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                     <div class="modal-header">
 
-                        <h5 class="modal-title" id="imageModalLabel">Seleccionar Imagen</h5>
+                        <h5 class="modal-title" id="imageModalLabel">Seleccionar recurso</h5>
 
                         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
 
@@ -16277,7 +16288,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                             <?php
 
-                            $media_data = get_media_items(1, 1000); // Load all media for now
+                            $media_data = get_media_items(1, 0); // Load all media for modal filtering and pagination
                             $modal_media_tags = load_media_tags();
 
                             foreach ($media_data['items'] as $media):
@@ -17971,12 +17982,12 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                 if (!$media || !$media.length) {
                     return;
                 }
-                var mediaType = ($media.data('mediaType') || '').toString().toLowerCase();
+                var mediaType = mediaData($media, 'mediaType', 'data-media-type', '').toString().toLowerCase();
                 if (mediaType !== 'image') {
                     alert('La galería solo admite imágenes guardadas en Recursos.');
                     return;
                 }
-                var mediaSrc = ($media.data('mediaSrc') || '').toString();
+                var mediaSrc = mediaData($media, 'mediaSrc', 'data-media-src', '').toString();
                 if (!mediaSrc) {
                     return;
                 }
@@ -17992,8 +18003,8 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                 } else {
                     pendingGalleryItems.push({
                         src: mediaSrc,
-                        name: ($media.data('mediaName') || '').toString(),
-                        tags: ($media.data('mediaTags') || '').toString()
+                        name: mediaData($media, 'mediaName', 'data-media-name', '').toString(),
+                        tags: mediaData($media, 'mediaTags', 'data-media-tags', '').toString()
                     });
                     $media.addClass('border-primary shadow').attr('aria-pressed', 'true');
                 }
@@ -18264,6 +18275,8 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     imageTargetMaxItems = parseInt(button.data('target-max-items') || '0', 10) || 0;
                 }
                 resetGallerySelection();
+                clearSelectedMedia();
+                refreshGalleryItems();
                 if (!skipImageModalSelectionCapture) {
                     imageTargetTextarea = resolveImageTargetTextarea();
                     if (imageTargetTextarea && typeof imageTargetTextarea.selectionStart === 'number') {
@@ -18307,6 +18320,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             $('#imageModal').on('hidden.bs.modal', function () {
                 imageTargetSelection = null;
                 imageTargetTextarea = null;
+                clearSelectedMedia();
                 resetGallerySelection();
             });
 
@@ -18316,17 +18330,42 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
             var itemsPerPage = 8;
 
-            var galleryItems = $('.image-gallery .gallery-item');
+            var galleryItems = $();
 
-            var filteredGalleryItems = galleryItems;
+            var filteredGalleryItems = $();
 
-            var totalItems = filteredGalleryItems.length;
+            var totalItems = 0;
 
-            var totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+            var totalPages = 1;
+
+            function refreshGalleryItems() {
+                galleryItems = $('.image-gallery .gallery-item');
+                filteredGalleryItems = galleryItems;
+                totalItems = filteredGalleryItems.length;
+                totalPages = Math.max(1, Math.ceil(Math.max(totalItems, 1) / itemsPerPage));
+            }
+
+            function clearSelectedMedia() {
+                $('.image-gallery .gallery-item').removeClass('is-selected');
+                $('.image-gallery [data-media-name]').removeClass('is-selected').attr('aria-pressed', 'false');
+            }
+
+            function mediaData($media, camelName, attrName, fallback) {
+                var value = $media.data(camelName);
+                if (value === undefined || value === null || value === '') {
+                    value = $media.attr(attrName);
+                }
+                if (value === undefined || value === null || value === '') {
+                    return fallback || '';
+                }
+                return value;
+            }
 
         
 
             function showPage(page) {
+                page = parseInt(page, 10) || 1;
+                page = Math.max(1, Math.min(page, totalPages));
 
                 galleryItems.hide();
 
@@ -18351,7 +18390,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                 var groupSize = 16;
 
-                if (!filteredGalleryItems.length) {
+                if (!filteredGalleryItems.length || totalPages <= 1) {
                     return;
                 }
 
@@ -18390,6 +18429,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             }
 
             function applyModalFilter(term) {
+                refreshGalleryItems();
 
                 var normalized = (term || '').toString().toLowerCase().trim();
 
@@ -18429,6 +18469,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
             }
 
+            refreshGalleryItems();
             applyModalFilter('');
 
             var resourceSearchInput = $('#resource-search-input');
@@ -18449,7 +18490,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                         var matches = !normalized.length || haystack.indexOf(normalized) !== -1;
 
-                        $(this).toggle(matches);
+                        $(this).closest('[class*="col-"]').toggle(matches);
 
                     });
 
@@ -18598,11 +18639,12 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             $('.image-gallery').on('click', '[data-media-name]', function() {
 
                 var $media = $(this);
-                var mediaName = $media.data('mediaName');
-                var mediaType = $media.data('mediaType') || 'image';
-                var mediaSrc = $media.data('mediaSrc') || '';
-                var mediaMime = $media.data('mediaMime') || '';
-                var mediaTags = $media.data('mediaTags') || '';
+                var $galleryItem = $media.closest('.gallery-item');
+                var mediaName = mediaData($media, 'mediaName', 'data-media-name', '');
+                var mediaType = mediaData($media, 'mediaType', 'data-media-type', 'image');
+                var mediaSrc = mediaData($media, 'mediaSrc', 'data-media-src', '');
+                var mediaMime = mediaData($media, 'mediaMime', 'data-media-mime', '');
+                var mediaTags = mediaData($media, 'mediaTags', 'data-media-tags', '');
 
                 if (!mediaName) {
                     return;
@@ -18612,6 +18654,10 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     toggleGalleryItemSelection($media);
                     return;
                 }
+
+                clearSelectedMedia();
+                $media.addClass('is-selected').attr('aria-pressed', 'true');
+                $galleryItem.addClass('is-selected');
 
                 if (imageTargetMode === 'field') {
                     var acceptList = (imageTargetAccept || 'image').toString().split(',').map(function(value) {
@@ -18652,6 +18698,9 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                     if (mediaType === 'image' || mediaType === 'pdf' || mediaType === 'video') {
                         showInsertActions(mediaName, mediaType, mediaSrc, mediaMime, mediaTags);
+                        if (insertActions.length && insertActions[0].scrollIntoView) {
+                            insertActions[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
                         return;
                     }
 

@@ -492,6 +492,35 @@
             $rememberFediverseThreadReplyActivity((string) $fediverseRemoteReplyTarget, (string) ($fediverseRemoteReply['published'] ?? ''));
         }
     }
+    $fediverseTimelineRootByIdentifier = $fediverseLocalRootByIdentifier;
+    $fediverseTimelineReplyItemsForActivity = array_values(array_filter($fediverseTimeline, static function ($item): bool {
+        return is_array($item)
+            && strtolower(trim((string) ($item['type'] ?? ''))) !== 'announce'
+            && trim((string) ($item['target_url'] ?? '')) !== '';
+    }));
+    usort($fediverseTimelineReplyItemsForActivity, static function (array $a, array $b): int {
+        return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
+    });
+    foreach ($fediverseTimelineReplyItemsForActivity as $fediverseTimelineReplyItemForActivity) {
+        $fediverseTimelineReplyTarget = trim((string) ($fediverseTimelineReplyItemForActivity['target_url'] ?? ''));
+        $fediverseTimelineReplyRootIdentifier = '';
+        foreach ($fediverseEquivalentIdentifiers($fediverseTimelineReplyTarget) as $fediverseTimelineReplyTargetVariant) {
+            $fediverseTimelineReplyRootIdentifier = (string) ($fediverseTimelineRootByIdentifier[$fediverseTimelineReplyTargetVariant] ?? '');
+            if ($fediverseTimelineReplyRootIdentifier !== '') {
+                break;
+            }
+        }
+        if ($fediverseTimelineReplyRootIdentifier === '') {
+            continue;
+        }
+        $rememberFediverseThreadReplyActivity($fediverseTimelineReplyRootIdentifier, (string) ($fediverseTimelineReplyItemForActivity['published'] ?? ''));
+        foreach (['id', 'activity_id', 'object_id', 'url'] as $fediverseTimelineReplyIdentifierField) {
+            $fediverseTimelineReplyIdentifier = trim((string) ($fediverseTimelineReplyItemForActivity[$fediverseTimelineReplyIdentifierField] ?? ''));
+            foreach ($fediverseEquivalentIdentifiers($fediverseTimelineReplyIdentifier) as $fediverseTimelineReplyIdentifierVariant) {
+                $fediverseTimelineRootByIdentifier[$fediverseTimelineReplyIdentifierVariant] = $fediverseTimelineReplyRootIdentifier;
+            }
+        }
+    }
     if (is_array($fediverseHomeSnapshot['thread_payloads'] ?? null)) {
         foreach ((array) $fediverseHomeSnapshot['thread_payloads'] as $fediverseThreadPayloadItemId => $fediverseThreadPayload) {
             if (!is_array($fediverseThreadPayload)) {

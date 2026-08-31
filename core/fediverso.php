@@ -3080,8 +3080,42 @@ function nammu_fediverse_apply_remote_object_update(array $payload, array $actor
 function nammu_fediverse_timeline_entries_targeting_local_items(array $config): array
 {
     $index = nammu_fediverse_local_items_index($config);
+    $identifierVariants = static function (string $identifier): array {
+        $identifier = trim($identifier);
+        if ($identifier === '') {
+            return [];
+        }
+        if (function_exists('nammu_fediverse_reaction_target_identifier_variants')) {
+            return nammu_fediverse_reaction_target_identifier_variants($identifier);
+        }
+        $variants = [$identifier];
+        $path = trim((string) (parse_url($identifier, PHP_URL_PATH) ?? ''));
+        if ($path !== '') {
+            if (str_ends_with($path, '/activity')) {
+                $variants[] = preg_replace('#/activity$#', '', $identifier) ?? $identifier;
+            } elseif (preg_match('#^/ap/(objects|notes|replies)/[^/]+$#', $path) === 1) {
+                $variants[] = rtrim($identifier, '/') . '/activity';
+            }
+        }
+        return array_values(array_unique(array_filter(array_map('strval', $variants))));
+    };
+    $rootByIdentifier = [];
+    foreach ($index as $identifier => $localItem) {
+        $canonicalItem = nammu_fediverse_canonical_local_item($localItem, $config);
+        $localId = trim((string) ($canonicalItem['id'] ?? ''));
+        if ($localId !== '') {
+            foreach ($identifierVariants((string) $identifier) as $identifierVariant) {
+                $rootByIdentifier[$identifierVariant] = $localId;
+            }
+        }
+    }
+    $timelineItems = nammu_fediverse_timeline_store()['items'];
+    usort($timelineItems, static function (array $a, array $b): int {
+        return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
+    });
     $entries = [];
-    foreach (nammu_fediverse_timeline_store()['items'] as $item) {
+    $seen = [];
+    foreach ($timelineItems as $item) {
         if (!is_array($item)) {
             continue;
         }
@@ -3098,14 +3132,39 @@ function nammu_fediverse_timeline_entries_targeting_local_items(array $config): 
         } else {
             $target = trim((string) ($item['target_url'] ?? ''));
         }
-        if ($target === '' || !isset($index[$target])) {
+        $localId = '';
+        foreach ($identifierVariants($target) as $targetVariant) {
+            $localId = (string) ($rootByIdentifier[$targetVariant] ?? '');
+            if ($localId !== '') {
+                break;
+            }
+        }
+        if ($localId === '') {
             continue;
         }
+        $localItem = $index[$localId] ?? $index[$target] ?? null;
+        if (!is_array($localItem)) {
+            continue;
+        }
+        $itemKey = trim((string) (($item['id'] ?? '') ?: ($item['object_id'] ?? '') ?: ($item['url'] ?? '')));
+        $seenKey = $localId . '|' . ($itemKey !== '' ? $itemKey : sha1(json_encode($item, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)));
+        if (isset($seen[$seenKey])) {
+            continue;
+        }
+        $seen[$seenKey] = true;
         $entries[] = [
             'target' => $target,
             'item' => $item,
-            'canonical_item' => nammu_fediverse_canonical_local_item($index[$target], $config),
+            'canonical_item' => nammu_fediverse_canonical_local_item($localItem, $config),
         ];
+        if ($type !== 'announce') {
+            foreach (['id', 'activity_id', 'object_id', 'url'] as $replyField) {
+                $replyIdentifier = trim((string) ($item[$replyField] ?? ''));
+                foreach ($identifierVariants($replyIdentifier) as $replyIdentifierVariant) {
+                    $rootByIdentifier[$replyIdentifierVariant] = $localId;
+                }
+            }
+        }
     }
     return $entries;
 }

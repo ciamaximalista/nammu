@@ -6085,6 +6085,8 @@ function nammu_fediverse_normalize_remote_item(array $activity, array $actor, ar
         'object_id' => $objectId !== '' ? $objectId : $id,
         'url' => $url !== '' ? $url : $id,
         'target_url' => trim((string) ($object['inReplyTo'] ?? '')),
+        'context' => trim((string) ($object['context'] ?? '')),
+        'conversation' => trim((string) ($object['conversation'] ?? '')),
         'title' => $name,
         'content' => $content,
         'content_html' => $contentHtml,

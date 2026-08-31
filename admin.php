@@ -16284,6 +16284,12 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                             <small class="form-text text-muted">La galería mostrará solo los elementos que coincidan con tu búsqueda.</small>
                         </div>
 
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <small class="text-muted" id="image-modal-count"></small>
+                            <small class="text-muted d-none" id="image-modal-selected-help">Recurso seleccionado. Elige abajo cómo insertarlo.</small>
+                        </div>
+                        <div class="alert alert-light border d-none" id="image-modal-empty" role="status">No hay recursos que coincidan con la búsqueda.</div>
+
                         <div class="row image-gallery">
 
                             <?php
@@ -17885,6 +17891,9 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             var tagsModalRedirect = $('#tagsModalRedirect');
             var insertActions = $('#image-insert-actions');
             var insertActionGroups = insertActions.find('[data-insert-group]');
+            var modalEmpty = $('#image-modal-empty');
+            var modalCount = $('#image-modal-count');
+            var modalSelectedHelp = $('#image-modal-selected-help');
             var galleryActions = $('#image-gallery-actions');
             var galleryCount = $('#image-gallery-count');
             var galleryInsertBtn = $('#image-gallery-insert');
@@ -18348,6 +18357,9 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             function clearSelectedMedia() {
                 $('.image-gallery .gallery-item').removeClass('is-selected');
                 $('.image-gallery [data-media-name]').removeClass('is-selected').attr('aria-pressed', 'false');
+                if (modalSelectedHelp.length) {
+                    modalSelectedHelp.addClass('d-none');
+                }
             }
 
             function mediaData($media, camelName, attrName, fallback) {
@@ -18371,12 +18383,28 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                 if (!filteredGalleryItems.length) {
                     currentPage = 1;
+                    if (modalEmpty.length) {
+                        modalEmpty.removeClass('d-none');
+                    }
+                    if (modalCount.length) {
+                        modalCount.text('0 recursos');
+                    }
                     return;
+                }
+
+                if (modalEmpty.length) {
+                    modalEmpty.addClass('d-none');
                 }
 
                 filteredGalleryItems.slice((page - 1) * itemsPerPage, page * itemsPerPage).show();
 
                 currentPage = page;
+
+                if (modalCount.length) {
+                    var first = ((currentPage - 1) * itemsPerPage) + 1;
+                    var last = Math.min(currentPage * itemsPerPage, totalItems);
+                    modalCount.text(first + '-' + last + ' de ' + totalItems + ' recursos');
+                }
 
             }
 
@@ -18428,10 +18456,18 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
             }
 
+            function normalizeModalSearch(value) {
+                var normalized = (value || '').toString().toLowerCase().trim();
+                if (typeof normalized.normalize === 'function') {
+                    normalized = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                }
+                return normalized;
+            }
+
             function applyModalFilter(term) {
                 refreshGalleryItems();
 
-                var normalized = (term || '').toString().toLowerCase().trim();
+                var normalized = normalizeModalSearch(term);
 
                 if (!normalized.length) {
 
@@ -18441,7 +18477,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                     filteredGalleryItems = galleryItems.filter(function() {
 
-                        var haystack = ($(this).data('media-search') || '').toString().toLowerCase();
+                        var haystack = normalizeModalSearch($(this).attr('data-media-search') || '');
 
                         return haystack.indexOf(normalized) !== -1;
 
@@ -18571,6 +18607,9 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     insertActionGroups.filter('[data-insert-group="' + groupKey + '"]').removeClass('d-none');
                 }
                 insertActions.removeClass('d-none');
+                if (modalSelectedHelp.length) {
+                    modalSelectedHelp.removeClass('d-none');
+                }
             }
 
             $('.edit-tags-btn').on('click', function() {
@@ -18658,6 +18697,10 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                 clearSelectedMedia();
                 $media.addClass('is-selected').attr('aria-pressed', 'true');
                 $galleryItem.addClass('is-selected');
+
+                if (!imageTargetMode && resolveImageTargetTextarea()) {
+                    imageTargetMode = 'editor';
+                }
 
                 if (imageTargetMode === 'field') {
                     var acceptList = (imageTargetAccept || 'image').toString().split(',').map(function(value) {

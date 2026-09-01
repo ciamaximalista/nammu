@@ -753,7 +753,8 @@
             }
         }
         $fediverseTimelineAttachments = is_array($fediverseTimelineItem['attachments'] ?? null) ? $fediverseTimelineItem['attachments'] : [];
-        $fediversePrimaryLinkAttachment = null;
+        $fediverseTimelineHadLinkCard = false;
+        $fediverseTimelineRenderableAttachments = [];
         foreach ($fediverseTimelineAttachments as $fediverseTimelineAttachmentIndex => $fediverseTimelineAttachment) {
             if (!is_array($fediverseTimelineAttachment)) {
                 continue;
@@ -761,13 +762,12 @@
             $fediverseTimelineAttachmentType = strtolower(trim((string) ($fediverseTimelineAttachment['type'] ?? '')));
             $fediverseTimelineAttachmentMediaType = strtolower(trim((string) ($fediverseTimelineAttachment['media_type'] ?? '')));
             if ($fediverseTimelineAttachmentType === 'link' || $fediverseTimelineAttachmentMediaType === 'text/html' || str_starts_with($fediverseTimelineAttachmentMediaType, 'text/html')) {
-                $fediversePrimaryLinkAttachment = [
-                    'index' => $fediverseTimelineAttachmentIndex,
-                    'item' => $fediverseTimelineAttachment,
-                ];
-                break;
+                $fediverseTimelineHadLinkCard = true;
+                continue;
             }
+            $fediverseTimelineRenderableAttachments[] = $fediverseTimelineAttachment;
         }
+        $fediverseTimelineAttachments = $fediverseTimelineRenderableAttachments;
         if (empty($fediverseTimelineAttachments) && function_exists('nammu_fediverse_extract_html_image_urls')) {
             foreach (nammu_fediverse_extract_html_image_urls((string) ($fediverseTimelineItem['content_html'] ?? '')) as $fediverseTimelineImageUrl) {
                 $fediverseTimelineAttachments[] = [
@@ -778,7 +778,7 @@
                 ];
             }
         }
-        if (empty($fediverseTimelineAttachments) && trim((string) ($fediverseTimelineItem['image'] ?? '')) !== '') {
+        if (empty($fediverseTimelineAttachments) && !$fediverseTimelineHadLinkCard && trim((string) ($fediverseTimelineItem['image'] ?? '')) !== '') {
             $fediverseTimelineAttachments[] = [
                 'type' => 'image',
                 'url' => trim((string) $fediverseTimelineItem['image']),
@@ -801,14 +801,6 @@
                 }
             }
             if ($fediverseBoostTargetUrl !== '') {
-                $fediverseTimelineAttachments[] = [
-                    'type' => 'link',
-                    'url' => $fediverseBoostTargetUrl,
-                    'name' => 'Publicación impulsada',
-                    'media_type' => 'text/html',
-                    'summary' => '',
-                    'image' => '',
-                ];
                 $fediverseTimelineItem['content'] = 'Ha impulsado una publicación';
             }
         }
@@ -1116,8 +1108,7 @@
                                 });
                                 $shareModalId = 'fediverse-share-modal-' . preg_replace('/[^a-z0-9_-]+/i', '-', $localAnchor);
                                 $localIsNote = strcasecmp((string) ($localItem['type'] ?? ''), 'Note') === 0;
-                                $localCardDescription = trim((string) (($localItem['summary'] ?? '') ?: ($localItem['content'] ?? '')));
-                                $localCardDescription = str_replace(["\r\n", "\r"], "\n", strip_tags($localCardDescription));
+                                $localContent = trim((string) (($localItem['content'] ?? '') ?: ($localItem['summary'] ?? '')));
                                 $localImages = array_values(array_filter(array_map('strval', is_array($localItem['images'] ?? null) ? $localItem['images'] : [])));
                                 if (empty($localImages) && !empty($localItem['image'])) {
                                     $localImages[] = (string) $localItem['image'];
@@ -1144,22 +1135,10 @@
                                         <?php if (!empty($localItem['title']) && !$localIsNote): ?>
                                             <div class="fediverse-status__title"><?= htmlspecialchars((string) ($localItem['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
                                         <?php endif; ?>
-                                        <?php if ($localIsNote && !empty($localItem['content'])): ?>
-                                            <div class="fediverse-status__content"><?= nl2br(htmlspecialchars((string) ($localItem['content'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></div>
+                                        <?php if ($localContent !== ''): ?>
+                                            <div class="fediverse-status__content"><?= nl2br(htmlspecialchars($localContent, ENT_QUOTES, 'UTF-8')) ?></div>
                                         <?php endif; ?>
-                                        <?php if (!$localIsNote && !empty($localItem['url'])): ?>
-                                            <div class="fediverse-status__attachments">
-                                                <a class="fediverse-status__file fediverse-status__file--linkcard" href="<?= htmlspecialchars((string) $localItem['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                                    <?php if (!empty($localItem['image'])): ?>
-                                                        <img class="fediverse-status__file-cover" src="<?= htmlspecialchars((string) $localItem['image'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($localItem['title'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                                                    <?php endif; ?>
-                                                    <span class="fediverse-status__file-name"><?= htmlspecialchars((string) (($localItem['title'] ?? '') ?: ($localItem['url'] ?? '')), ENT_QUOTES, 'UTF-8') ?></span>
-                                                    <?php if ($localCardDescription !== ''): ?>
-                                                        <div class="fediverse-status__file-meta fediverse-status__file-meta--description"><?= $fediverseRenderCardDescription($localCardDescription) ?></div>
-                                                    <?php endif; ?>
-                                                </a>
-                                            </div>
-                                        <?php elseif (!empty($localImages)): ?>
+                                        <?php if (!empty($localImages)): ?>
                                             <div class="fediverse-status__attachments">
                                                 <?php foreach ($localImages as $localImage): ?>
                                                     <a class="fediverse-status__media" href="<?= htmlspecialchars($localImage, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
@@ -1555,26 +1534,6 @@
                                             <div class="fediverse-status__content"><?= nl2br(htmlspecialchars(strip_tags($statusText), ENT_QUOTES, 'UTF-8')) ?></div>
                                         <?php endif; ?>
                                         <?php $attachments = is_array($item['attachments'] ?? null) ? $item['attachments'] : []; ?>
-                                        <?php
-                                        $primaryLinkCardImageUrl = '';
-                                        foreach ($attachments as $attachmentProbe) {
-                                            if (!is_array($attachmentProbe)) {
-                                                continue;
-                                            }
-                                            $attachmentProbeType = strtolower(trim((string) ($attachmentProbe['type'] ?? '')));
-                                            $attachmentProbeMediaType = strtolower(trim((string) ($attachmentProbe['media_type'] ?? '')));
-                                            $isProbeLinkCard = $attachmentProbeType === 'link'
-                                                || $attachmentProbeMediaType === 'text/html'
-                                                || str_starts_with($attachmentProbeMediaType, 'text/html');
-                                            if (!$isProbeLinkCard) {
-                                                continue;
-                                            }
-                                            $primaryLinkCardImageUrl = trim((string) (($attachmentProbe['image'] ?? '') ?: ($item['image'] ?? '')));
-                                            if ($primaryLinkCardImageUrl !== '') {
-                                                break;
-                                            }
-                                        }
-                                        ?>
                                         <?php if (!empty($attachments)): ?>
                                             <div class="fediverse-status__attachments">
                                                 <?php foreach ($attachments as $attachment): ?>
@@ -1587,16 +1546,10 @@
                                                     $isVideo = $attachmentType === 'video' || str_starts_with($attachmentMediaType, 'video/');
                                                     $isAudio = $attachmentType === 'audio' || str_starts_with($attachmentMediaType, 'audio/');
                                                     $isLinkCard = $attachmentType === 'link' || $attachmentMediaType === 'text/html' || str_starts_with($attachmentMediaType, 'text/html');
-                                                    $linkCardTitle = trim((string) (($attachment['name'] ?? '') ?: ($item['title'] ?? '') ?: 'Abrir enlace'));
-                                                    $linkCardImage = trim((string) (($attachment['image'] ?? '') ?: ($item['image'] ?? '')));
-                                                    $linkCardDescription = trim((string) (($attachment['summary'] ?? '') ?: ($item['summary'] ?? '') ?: ($item['content'] ?? '')));
-                                                    $linkCardDescription = preg_replace('#^\s*https?://\S+\s*#iu', '', $linkCardDescription) ?? $linkCardDescription;
-                                                    $linkCardDescription = str_replace(["\r\n", "\r"], "\n", strip_tags($linkCardDescription));
                                                     ?>
-                                                    <?php if ($isImage): ?>
-                                                        <?php if ($primaryLinkCardImageUrl !== '' && trim($attachmentUrl) === $primaryLinkCardImageUrl): ?>
-                                                            <?php continue; ?>
-                                                        <?php endif; ?>
+                                                    <?php if ($isLinkCard): ?>
+                                                        <?php continue; ?>
+                                                    <?php elseif ($isImage): ?>
                                                         <a class="fediverse-status__media" href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
                                                             <img src="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($attachment['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
                                                         </a>
@@ -1613,16 +1566,6 @@
                                                                 <source src="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"<?= $attachmentMediaType !== '' ? ' type="' . htmlspecialchars($attachmentMediaType, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                                                             </audio>
                                                         </div>
-                                                    <?php elseif ($isLinkCard): ?>
-                                                        <a class="fediverse-status__file fediverse-status__file--linkcard" href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                                                            <?php if ($linkCardImage !== ''): ?>
-                                                                <img class="fediverse-status__file-cover" src="<?= htmlspecialchars($linkCardImage, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($linkCardTitle, ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                                                            <?php endif; ?>
-                                                            <span class="fediverse-status__file-name"><?= htmlspecialchars($linkCardTitle, ENT_QUOTES, 'UTF-8') ?></span>
-                                                            <?php if ($linkCardDescription !== ''): ?>
-                                                                <div class="fediverse-status__file-meta fediverse-status__file-meta--description"><?= $fediverseRenderCardDescription($linkCardDescription) ?></div>
-                                                            <?php endif; ?>
-                                                        </a>
                                                     <?php else: ?>
                                                         <a class="fediverse-status__file" href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
                                                             <span class="fediverse-status__file-name"><?= htmlspecialchars((string) (($attachment['name'] ?? '') ?: 'Abrir adjunto'), ENT_QUOTES, 'UTF-8') ?></span>

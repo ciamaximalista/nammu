@@ -17221,6 +17221,9 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                 return;
             }
             var lastFocusedTextarea = null;
+            var calloutTarget = null;
+            var nisabaTarget = null;
+            var telexTarget = null;
             document.addEventListener('focusin', function(event) {
                 if (event.target && event.target.tagName === 'TEXTAREA' && event.target.id !== 'calloutBody') {
                     lastFocusedTextarea = event.target;
@@ -17273,6 +17276,12 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     event.preventDefault();
                     var action = button.getAttribute('data-md-action');
                     if (action) {
+                        if (['callout', 'nisaba', 'telex', 'ideas'].indexOf(action) !== -1) {
+                            event.stopPropagation();
+                            if (typeof event.stopImmediatePropagation === 'function') {
+                                event.stopImmediatePropagation();
+                            }
+                        }
                         applyMarkdownAction(textarea, action);
                     }
                 });
@@ -17339,7 +17348,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                         insertTable(textarea);
                         break;
                     case 'callout':
-                        // Lo gestiona el handler delegado posterior para evitar doble apertura.
+                        openCalloutModal(textarea);
                         break;
                     case 'nisaba':
                         openNisabaModal(textarea);
@@ -17502,8 +17511,46 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                 replaceSelection(textarea, tableMarkdown, tableMarkdown.length, tableMarkdown.length);
             }
 
+            function fallbackTextarea() {
+                if (lastFocusedTextarea && lastFocusedTextarea.tagName === 'TEXTAREA' && lastFocusedTextarea.id !== 'calloutBody') {
+                    return lastFocusedTextarea;
+                }
+                var active = document.activeElement;
+                if (active && active.tagName === 'TEXTAREA' && active.id !== 'calloutBody') {
+                    return active;
+                }
+                return document.querySelector('[data-markdown-editor]') || document.querySelector('#content_edit, #content_publish, #itinerary_content, #topic_content') || document.querySelector('textarea');
+            }
+
+            function showBootstrapModal(modal) {
+                if (!modal) {
+                    return;
+                }
+                if (window.jQuery && window.jQuery.fn && typeof window.jQuery.fn.modal === 'function') {
+                    window.jQuery(modal).modal('show');
+                    return;
+                }
+                modal.classList.add('show');
+                modal.style.display = 'block';
+                modal.removeAttribute('aria-hidden');
+                document.body.classList.add('modal-open');
+            }
+
+            function hideBootstrapModal(modal) {
+                if (!modal) {
+                    return;
+                }
+                if (window.jQuery && window.jQuery.fn && typeof window.jQuery.fn.modal === 'function') {
+                    window.jQuery(modal).modal('hide');
+                    return;
+                }
+                modal.classList.remove('show');
+                modal.style.display = 'none';
+                modal.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('modal-open');
+            }
+
             function openCalloutModal(textarea) {
-                ensureCalloutModal();
                 var target = textarea;
                 if (!target || target.tagName !== 'TEXTAREA') {
                     if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
@@ -17518,21 +17565,17 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     target = null;
                 }
                 calloutTarget = target || fallbackTextarea();
-                if (calloutTitleInput.length) {
-                    calloutTitleInput.val(calloutTitleInput.val() || 'Aviso');
-                }
-                if (calloutBodyInput.length) {
-                    calloutBodyInput.val(calloutBodyInput.val() || '');
-                }
-                var showModal = function() {
-                    if (calloutModal.length && typeof calloutModal.modal === 'function') {
-                        calloutModal.modal('show');
-                    } else if (calloutModal.length) {
-                        calloutModal.addClass('show').css('display', 'block').attr('aria-hidden', 'false');
+                var modal = document.getElementById('calloutModal');
+                var titleInput = document.getElementById('calloutTitle');
+                var bodyInput = document.getElementById('calloutBody');
+                if (modal) {
+                    if (titleInput && titleInput.value.trim() === '') {
+                        titleInput.value = 'Aviso';
                     }
-                };
-                if (calloutModal.length) {
-                    showModal();
+                    if (bodyInput) {
+                        bodyInput.value = '';
+                    }
+                    showBootstrapModal(modal);
                 } else {
                     // Fallback a prompts si el modal no está disponible
                     var title = window.prompt('Título del aviso/caja', 'Aviso') || 'Aviso';
@@ -17545,11 +17588,9 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                     var callout = '\n\n<div class="callout-box">\n  <h4>' + title + '</h4>\n' + bodyHtml + '\n</div>\n\n';
                     replaceSelection(calloutTarget, callout, callout.length, callout.length);
                     calloutTarget = null;
-                    calloutTargetSelector = '';
                 }
             }
 
-            var nisabaTarget = null;
             function openNisabaModal(textarea) {
                 var modal = document.getElementById('nisabaModal');
                 if (!modal) {
@@ -17578,7 +17619,6 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                 }
             }
 
-            var telexTarget = null;
             function openTelexModal(textarea) {
                 var modal = document.getElementById('telexModal');
                 if (!modal) {
@@ -17731,6 +17771,45 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                         default: return char;
                     }
                 });
+            }
+
+            var calloutInsertButton = document.getElementById('calloutInsert');
+            if (calloutInsertButton) {
+                calloutInsertButton.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (typeof event.stopImmediatePropagation === 'function') {
+                        event.stopImmediatePropagation();
+                    }
+                    var modal = document.getElementById('calloutModal');
+                    var titleInput = document.getElementById('calloutTitle');
+                    var bodyInput = document.getElementById('calloutBody');
+                    var target = calloutTarget || fallbackTextarea();
+                    if (!target || target.id === 'calloutBody') {
+                        target = document.querySelector('[data-markdown-editor]') || document.querySelector('#content_edit, #content_publish, #itinerary_content, #topic_content');
+                    }
+                    if (!target || target.tagName !== 'TEXTAREA') {
+                        hideBootstrapModal(modal);
+                        return;
+                    }
+                    var title = titleInput && titleInput.value.trim() !== '' ? titleInput.value.trim() : 'Aviso';
+                    var bodyRaw = bodyInput ? bodyInput.value : '';
+                    var lines = bodyRaw.split(/\n+/).map(function(line) {
+                        return line.trim();
+                    }).filter(function(line) {
+                        return line !== '';
+                    });
+                    if (!lines.length) {
+                        lines = ['Contenido del aviso.'];
+                    }
+                    var bodyHtml = lines.map(function(line) {
+                        return '  <p>' + line + '</p>';
+                    }).join('\n');
+                    var callout = '\n\n<div class="callout-box">\n  <h4>' + title + '</h4>\n' + bodyHtml + '\n</div>\n\n';
+                    replaceSelection(target, callout, callout.length, callout.length);
+                    calloutTarget = null;
+                    hideBootstrapModal(modal);
+                }, true);
             }
 
             var nisabaInsertButton = document.getElementById('nisabaInsert');

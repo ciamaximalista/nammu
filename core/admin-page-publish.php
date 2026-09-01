@@ -215,7 +215,7 @@
                     <button type="button" class="btn btn-outline-secondary" data-md-action="code-block" title="Bloque de código" aria-label="Bloque de código">{ }</button>
                     <button type="button" class="btn btn-outline-secondary" data-md-action="hr" title="Separador" aria-label="Separador">—</button>
                     <button type="button" class="btn btn-outline-secondary" data-md-action="table" title="Tabla" aria-label="Tabla">Tbl</button>
-                    <button type="button" class="btn btn-outline-secondary" data-md-action="callout" data-toggle="modal" data-target="#calloutModal" title="Caja destacada" aria-label="Caja destacada">Aviso</button>
+                    <button type="button" class="btn btn-outline-secondary" data-md-action="callout" title="Caja destacada" aria-label="Caja destacada">Aviso</button>
                     <?php if (!empty($nisabaEnabled)): ?>
                         <button type="button" class="btn btn-outline-secondary" data-md-action="nisaba" title="Nisaba" aria-label="Nisaba">
                             <img src="nisaba.png" alt="" class="nisaba-icon">

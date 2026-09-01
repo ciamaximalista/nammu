@@ -90,7 +90,7 @@
                                     <button type="button" class="btn btn-outline-secondary" data-md-action="code-block">{ }</button>
                                     <button type="button" class="btn btn-outline-secondary" data-md-action="hr">—</button>
                                     <button type="button" class="btn btn-outline-secondary" data-md-action="table">Tbl</button>
-                                    <button type="button" class="btn btn-outline-secondary" data-md-action="callout" data-toggle="modal" data-target="#calloutModal">Aviso</button>
+                                    <button type="button" class="btn btn-outline-secondary" data-md-action="callout">Aviso</button>
                                         <?php if (!empty($nisabaEnabled)): ?>
                                             <button type="button" class="btn btn-outline-secondary" data-md-action="nisaba" title="Nisaba" aria-label="Nisaba">
                                                 <img src="nisaba.png" alt="" class="nisaba-icon">

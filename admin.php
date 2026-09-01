@@ -17220,6 +17220,12 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             if (!toolbars.length) {
                 return;
             }
+            var lastFocusedTextarea = null;
+            document.addEventListener('focusin', function(event) {
+                if (event.target && event.target.tagName === 'TEXTAREA' && event.target.id !== 'calloutBody') {
+                    lastFocusedTextarea = event.target;
+                }
+            });
 
             toolbars.forEach(function(toolbar) {
                 var targetSelector = toolbar.getAttribute('data-target');
@@ -17333,7 +17339,7 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                         insertTable(textarea);
                         break;
                     case 'callout':
-                        openCalloutModal(textarea);
+                        // Lo gestiona el handler delegado posterior para evitar doble apertura.
                         break;
                     case 'nisaba':
                         openNisabaModal(textarea);
@@ -18266,7 +18272,11 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             }
 
             $(document).on('click', '[data-md-action="callout"]', function(evt) {
-                // Garantiza que el modal se abra aunque falle el toolbar handler
+                evt.preventDefault();
+                evt.stopPropagation();
+                if (typeof evt.stopImmediatePropagation === 'function') {
+                    evt.stopImmediatePropagation();
+                }
                 var toolbar = this.closest('[data-markdown-toolbar]');
                 var target = null;
                 if (toolbar) {
@@ -18285,7 +18295,25 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                         }
                     }
                 }
-                openCalloutModal(target);
+                if (!target || target.tagName !== 'TEXTAREA' || target.id === 'calloutBody') {
+                    target = fallbackTextarea();
+                }
+                if (target && target.id === 'calloutBody') {
+                    target = document.querySelector('[data-markdown-editor]') || document.querySelector('#content_edit, #content_publish, #itinerary_content, #topic_content');
+                }
+                calloutTarget = target && target.tagName === 'TEXTAREA' ? target : null;
+                ensureCalloutModal();
+                if (calloutTitleInput.length && !calloutTitleInput.val()) {
+                    calloutTitleInput.val('Aviso');
+                }
+                if (calloutBodyInput.length) {
+                    calloutBodyInput.val('');
+                }
+                if (calloutModal.length && typeof calloutModal.modal === 'function') {
+                    calloutModal.modal('show');
+                } else if (calloutModal.length) {
+                    calloutModal.addClass('show').css('display', 'block').attr('aria-hidden', 'false');
+                }
             });
             function ensureCalloutModal() {
                 calloutModal = $('#calloutModal');
@@ -19134,6 +19162,12 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
             function resolveCalloutTarget() {
                 if (calloutTarget && calloutTarget.tagName === 'TEXTAREA' && calloutTarget.id !== 'calloutBody') {
                     return calloutTarget;
+                }
+                var candidates = document.querySelectorAll('[data-markdown-editor], #content_edit, #content_publish, #itinerary_content, #topic_content, textarea');
+                for (var i = 0; i < candidates.length; i++) {
+                    if (candidates[i] && candidates[i].tagName === 'TEXTAREA' && candidates[i].id !== 'calloutBody') {
+                        return candidates[i];
+                    }
                 }
                 var fb = fallbackTextarea();
                 if (fb && fb.id === 'calloutBody') {

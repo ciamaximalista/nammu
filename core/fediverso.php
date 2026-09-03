@@ -3963,6 +3963,20 @@ function nammu_fediverse_stable_reply_list(array ...$replyGroups): array
 
 function nammu_fediverse_collect_recursive_replies(array $replyIndex, array $rootTargets): array
 {
+    $normalizedReplyIndex = [];
+    foreach ($replyIndex as $replyTarget => $replyGroup) {
+        foreach (nammu_fediverse_reaction_target_identifier_variants((string) $replyTarget) as $replyTargetVariant) {
+            if (!isset($normalizedReplyIndex[$replyTargetVariant])) {
+                $normalizedReplyIndex[$replyTargetVariant] = [];
+            }
+            foreach ((array) $replyGroup as $reply) {
+                if (is_array($reply)) {
+                    $normalizedReplyIndex[$replyTargetVariant][] = $reply;
+                }
+            }
+        }
+    }
+    $replyIndex = $normalizedReplyIndex;
     $queue = array_values(array_filter(array_map(static fn($target): string => trim((string) $target), $rootTargets)));
     $visitedTargets = [];
     $collected = [];
@@ -3974,7 +3988,19 @@ function nammu_fediverse_collect_recursive_replies(array $replyIndex, array $roo
             continue;
         }
         $visitedTargets[$target] = true;
-        foreach ((array) ($replyIndex[$target] ?? []) as $reply) {
+        $targetReplies = [];
+        foreach (nammu_fediverse_reaction_target_identifier_variants($target) as $targetVariant) {
+            if (isset($visitedTargets[$targetVariant]) && $targetVariant !== $target) {
+                continue;
+            }
+            $visitedTargets[$targetVariant] = true;
+            foreach ((array) ($replyIndex[$targetVariant] ?? []) as $reply) {
+                if (is_array($reply)) {
+                    $targetReplies[] = $reply;
+                }
+            }
+        }
+        foreach ($targetReplies as $reply) {
             if (!is_array($reply)) {
                 continue;
             }
@@ -4003,8 +4029,10 @@ function nammu_fediverse_collect_recursive_replies(array $replyIndex, array $roo
                 $collected[] = $reply;
                 foreach (['id', 'url', 'note_id'] as $field) {
                     $identifier = trim((string) ($reply[$field] ?? ''));
-                    if ($identifier !== '' && !isset($visitedTargets[$identifier])) {
-                        $queue[] = $identifier;
+                    foreach (nammu_fediverse_reaction_target_identifier_variants($identifier) as $identifierVariant) {
+                        if ($identifierVariant !== '' && !isset($visitedTargets[$identifierVariant])) {
+                            $queue[] = $identifierVariant;
+                        }
                     }
                 }
             }
@@ -7645,7 +7673,9 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
         $canonicalItem = nammu_fediverse_canonical_local_item($localItem, $config);
         $localId = trim((string) ($canonicalItem['id'] ?? ''));
         if ($localId !== '') {
-            $localTargetMap[(string) $identifier] = $localId;
+            foreach (nammu_fediverse_reaction_target_identifier_variants((string) $identifier) as $identifierVariant) {
+                $localTargetMap[$identifierVariant] = $localId;
+            }
         }
     }
     $replyRootMap = [];
@@ -7722,7 +7752,13 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
         $resolvedThisPass = 0;
         foreach ($pendingReplies as $pendingIndex => $pendingReply) {
             $target = (string) ($pendingReply['target'] ?? '');
-            $localId = $localTargetMap[$target] ?? $replyRootMap[$target] ?? null;
+            $localId = null;
+            foreach (nammu_fediverse_reaction_target_identifier_variants($target) as $targetVariant) {
+                $localId = $localTargetMap[$targetVariant] ?? $replyRootMap[$targetVariant] ?? null;
+                if (is_string($localId) && $localId !== '') {
+                    break;
+                }
+            }
             if (!is_string($localId) || $localId === '') {
                 continue;
             }
@@ -7759,8 +7795,10 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
             }
             foreach (['reply_id', 'reply_url'] as $replyField) {
                 $replyIdentifier = trim((string) ($pendingReply[$replyField] ?? ''));
-                if ($replyIdentifier !== '') {
-                    $replyRootMap[$replyIdentifier] = $localId;
+                foreach (nammu_fediverse_reaction_target_identifier_variants($replyIdentifier) as $replyIdentifierVariant) {
+                    if ($replyIdentifierVariant !== '') {
+                        $replyRootMap[$replyIdentifierVariant] = $localId;
+                    }
                 }
             }
             unset($pendingReplies[$pendingIndex]);

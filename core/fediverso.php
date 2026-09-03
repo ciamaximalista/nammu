@@ -3831,9 +3831,85 @@ function nammu_fediverse_thread_reply_actor_details(array $replies): array
     return array_values($replyActors);
 }
 
+function nammu_fediverse_annotate_reply_reply_counts(array $replies): array
+{
+    $replies = array_values($replies);
+    $replyKeys = [];
+    foreach ($replies as $index => $reply) {
+        if (!is_array($reply)) {
+            continue;
+        }
+        foreach (['id', 'url', 'note_id', 'object_id'] as $field) {
+            $identifier = trim((string) ($reply[$field] ?? ''));
+            if ($identifier === '') {
+                continue;
+            }
+            foreach (nammu_fediverse_reaction_target_identifier_variants($identifier) as $variant) {
+                $replyKeys[$variant] = $index;
+            }
+        }
+    }
+
+    $children = [];
+    $seenChildren = [];
+    foreach ($replies as $childIndex => $reply) {
+        if (!is_array($reply)) {
+            continue;
+        }
+        $target = trim((string) ($reply['target_url'] ?? ''));
+        if ($target === '') {
+            continue;
+        }
+        $parentIndex = null;
+        foreach (nammu_fediverse_reaction_target_identifier_variants($target) as $variant) {
+            if (isset($replyKeys[$variant])) {
+                $parentIndex = $replyKeys[$variant];
+                break;
+            }
+        }
+        if (!is_int($parentIndex) || $parentIndex === $childIndex) {
+            continue;
+        }
+        $childKey = trim((string) ($reply['id'] ?? ''));
+        if ($childKey === '') {
+            $childKey = trim((string) ($reply['url'] ?? ''));
+        }
+        if ($childKey === '') {
+            $childKey = trim((string) ($reply['note_id'] ?? ''));
+        }
+        if ($childKey === '') {
+            $childKey = strtolower(trim((string) ($reply['actor_id'] ?? ''))) . '|' .
+                trim((string) ($reply['published'] ?? '')) . '|' .
+                trim((string) ($reply['reply_text'] ?? ''));
+        }
+        if ($childKey === '' || isset($seenChildren[$parentIndex][$childKey])) {
+            continue;
+        }
+        $seenChildren[$parentIndex][$childKey] = true;
+        $children[$parentIndex][] = $reply;
+    }
+
+    foreach ($replies as $index => &$reply) {
+        if (!is_array($reply)) {
+            continue;
+        }
+        $directChildren = array_values($children[$index] ?? []);
+        $summary = is_array($reply['summary'] ?? null) ? $reply['summary'] : [];
+        $details = is_array($reply['details'] ?? null) ? $reply['details'] : [];
+        $summary['replies'] = count($directChildren);
+        $details['replies'] = nammu_fediverse_thread_reply_actor_details($directChildren);
+        $reply['summary'] = $summary;
+        $reply['details'] = $details;
+    }
+    unset($reply);
+
+    return $replies;
+}
+
 function nammu_fediverse_normalize_thread_payload(array $payload): array
 {
     $payload['replies'] = nammu_fediverse_filter_visible_replies((array) ($payload['replies'] ?? []));
+    $payload['replies'] = nammu_fediverse_annotate_reply_reply_counts((array) $payload['replies']);
     $summary = is_array($payload['summary'] ?? null) ? $payload['summary'] : ['likes' => 0, 'shares' => 0, 'replies' => 0];
     $details = is_array($payload['details'] ?? null) ? $payload['details'] : ['likes' => [], 'shares' => [], 'replies' => []];
     $summary['replies'] = count((array) $payload['replies']);
@@ -4069,6 +4145,7 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
             (array) ($threadPayloads[$localId]['replies'] ?? [])
         );
         $threadPayloads[$localId]['replies'] = nammu_fediverse_filter_visible_replies((array) ($threadPayloads[$localId]['replies'] ?? []));
+        $threadPayloads[$localId]['replies'] = nammu_fediverse_annotate_reply_reply_counts((array) $threadPayloads[$localId]['replies']);
         $threadPayloads[$localId]['summary']['replies'] = count((array) $threadPayloads[$localId]['replies']);
         $threadPayloads[$localId]['details']['replies'] = nammu_fediverse_thread_reply_actor_details((array) $threadPayloads[$localId]['replies']);
     }

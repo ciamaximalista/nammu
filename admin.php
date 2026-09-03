@@ -21168,8 +21168,11 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
                 var uploadForm = modal.querySelector('form[enctype="multipart/form-data"]');
                 if (uploadForm) {
                     uploadForm.addEventListener('submit', function(event) {
-                        event.preventDefault();
                         updateUploadHiddenFields();
+                        if ((currentQueryParam('page') || '') === 'resources') {
+                            return;
+                        }
+                        event.preventDefault();
                         var submitButton = uploadForm.querySelector('[type="submit"]');
                         if (submitButton) {
                             submitButton.disabled = true;

@@ -3596,6 +3596,7 @@ function nammu_fediverse_remote_replies_for_item(array $item, array $config): ar
                     'id' => $replyId,
                     'note_id' => trim((string) (($replyObject['id'] ?? '') ?: '')),
                     'url' => $replyUrl,
+                    'target_url' => trim((string) ($replyObject['inReplyTo'] ?? '')),
                     'published' => trim((string) ($replyObject['published'] ?? '')),
                     'reply_text' => $replyText,
                     'actor_id' => $actorId,
@@ -7682,6 +7683,63 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
     $pendingReplies = [];
     $grouped = [];
     $seenReplies = [];
+    $fetchedParentTargets = [];
+    $appendFetchedParentReply = static function (string $target) use (&$pendingReplies, &$fetchedParentTargets, &$knownActorsById, $config): bool {
+        $target = trim($target);
+        if ($target === '' || isset($fetchedParentTargets[$target])) {
+            return false;
+        }
+        $fetchedParentTargets[$target] = true;
+        $parentObject = nammu_fediverse_signed_fetch_json($target, $config);
+        if (!is_array($parentObject)) {
+            $parentObject = nammu_fediverse_fetch_json($target);
+        }
+        if (!is_array($parentObject) || strtolower(trim((string) ($parentObject['type'] ?? ''))) !== 'note') {
+            return false;
+        }
+        $parentTarget = trim((string) ($parentObject['inReplyTo'] ?? ''));
+        if ($parentTarget === '') {
+            return false;
+        }
+        $contentHtml = trim((string) ($parentObject['content'] ?? ''));
+        $contentText = trim((string) (function_exists('nammu_fediverse_html_to_text') ? nammu_fediverse_html_to_text($contentHtml) : strip_tags($contentHtml)));
+        if ($contentText === '') {
+            return false;
+        }
+        $actorId = trim((string) ($parentObject['attributedTo'] ?? ''));
+        $actor = $actorId !== '' && isset($knownActorsById[$actorId]) ? $knownActorsById[$actorId] : [];
+        if ($actorId !== '' && empty($actor)) {
+            $resolvedActor = nammu_fediverse_resolve_actor($actorId, $config);
+            $actor = is_array($resolvedActor) ? $resolvedActor : [];
+        }
+        $replyId = trim((string) (($parentObject['id'] ?? '') ?: $target));
+        $replyUrl = nammu_fediverse_extract_url($parentObject['url'] ?? '');
+        $pendingReplies[] = [
+            'target' => $parentTarget,
+            'root_targets' => array_values(array_filter([
+                trim((string) ($parentObject['context'] ?? '')),
+                trim((string) ($parentObject['conversation'] ?? '')),
+            ])),
+            'reply_id' => $replyId,
+            'reply_url' => $replyUrl,
+            'entry' => [
+                'id' => $replyId,
+                'url' => $replyUrl !== '' ? $replyUrl : $replyId,
+                'target_url' => $parentTarget,
+                'published' => trim((string) ($parentObject['published'] ?? '')),
+                'reply_text' => $contentText,
+                'actor_id' => $actorId,
+                'actor_name' => trim((string) (($actor['name'] ?? '') ?: ($actor['preferredUsername'] ?? '') ?: $actorId)),
+                'actor_username' => trim((string) ($actor['preferredUsername'] ?? '')),
+                'actor_icon' => trim((string) ($actor['icon'] ?? '')),
+                'attachments' => [],
+                'link_card' => null,
+                'verified' => true,
+                'source' => 'incoming-remote',
+            ],
+        ];
+        return true;
+    };
     foreach ($activities as $entry) {
         $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
         if (strtolower(trim((string) ($payload['type'] ?? ''))) !== 'create') {
@@ -7728,6 +7786,10 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
         $replyUrl = trim((string) (($object['url'] ?? '') ?: ''));
         $pendingReplies[] = [
             'target' => $target,
+            'root_targets' => array_values(array_filter([
+                trim((string) ($object['context'] ?? '')),
+                trim((string) ($object['conversation'] ?? '')),
+            ])),
             'reply_id' => $replyId,
             'reply_url' => $replyUrl,
             'entry' => [
@@ -7757,6 +7819,17 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
                 $localId = $localTargetMap[$targetVariant] ?? $replyRootMap[$targetVariant] ?? null;
                 if (is_string($localId) && $localId !== '') {
                     break;
+                }
+            }
+            if (!is_string($localId) || $localId === '') {
+                $appendFetchedParentReply($target);
+                foreach ((array) ($pendingReply['root_targets'] ?? []) as $rootTarget) {
+                    foreach (nammu_fediverse_reaction_target_identifier_variants((string) $rootTarget) as $rootTargetVariant) {
+                        $localId = $localTargetMap[$rootTargetVariant] ?? null;
+                        if (is_string($localId) && $localId !== '') {
+                            break 2;
+                        }
+                    }
                 }
             }
             if (!is_string($localId) || $localId === '') {

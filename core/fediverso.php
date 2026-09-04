@@ -10272,6 +10272,9 @@ function nammu_fediverse_notification_entries(array $config): array
     $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
     $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
     $filtered = array_values(array_filter($activities, static function (array $entry) use ($config): bool {
+        if (empty($entry['verified'])) {
+            return false;
+        }
         $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
         $type = strtolower(trim((string) ($payload['type'] ?? '')));
         if ($type === 'delete') {
@@ -11381,15 +11384,15 @@ function nammu_fediverse_accept_follow(array $payload, array $config): bool
 function nammu_fediverse_handle_inbox_payload(array $payload, array $config, array $headers = [], string $rawBody = ''): array
 {
     $verification = nammu_fediverse_verify_inbox_request($payload, $headers, $rawBody, $config);
-    nammu_fediverse_store_inbox_activity($payload, [
-        'verified' => !empty($verification['verified']),
-        'verification_error' => (string) ($verification['error'] ?? ''),
-        'signature_key_id' => (string) ($verification['key_id'] ?? ''),
-        'signed_headers' => (string) ($verification['signed_headers'] ?? ''),
-    ], $config);
     if (empty($verification['verified'])) {
         return ['accepted' => false, 'type' => 'unauthorized', 'verified' => false, 'error' => (string) ($verification['error'] ?? '')];
     }
+    nammu_fediverse_store_inbox_activity($payload, [
+        'verified' => true,
+        'verification_error' => '',
+        'signature_key_id' => (string) ($verification['key_id'] ?? ''),
+        'signed_headers' => (string) ($verification['signed_headers'] ?? ''),
+    ], $config);
     $type = strtolower((string) ($payload['type'] ?? ''));
     $actorId = trim((string) ($payload['actor'] ?? ''));
     $accepted = false;

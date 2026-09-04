@@ -130,6 +130,9 @@
     $fediverseNotifications = $isFediverseNotificationsTab && $fediverseNeedsLivePanel
         ? (is_array($fediverseNotificationsSnapshot['notifications'] ?? null) ? $fediverseNotificationsSnapshot['notifications'] : [])
         : [];
+    $fediverseNotifications = array_values(array_filter($fediverseNotifications, static function ($entry): bool {
+        return is_array($entry) && !empty($entry['verified']);
+    }));
     $fediverseWebmentions = ($isFediverseMentionsTab && $fediverseNeedsLivePanel && function_exists('nammu_webmention_list'))
         ? nammu_webmention_list()
         : [];
@@ -313,6 +316,32 @@
         }
         return array_values(array_unique(array_filter(array_map('strval', $variants))));
     };
+    $fediverseReplyActorAvatar = static function (array $reply, string $fallback = '') use ($fediverseActorsById, $fediverseConfig, $fediverseValidAvatarUrl): string {
+        $actorId = trim((string) ($reply['actor_id'] ?? ''));
+        $avatarCandidates = [
+            trim((string) ($reply['actor_icon'] ?? '')),
+        ];
+        if ($actorId !== '' && is_array($fediverseActorsById[$actorId] ?? null)) {
+            $actor = $fediverseActorsById[$actorId];
+            $avatarCandidates[] = trim((string) (($actor['avatar_remote_url'] ?? '') ?: ''));
+            $avatarCandidates[] = trim((string) (($actor['icon'] ?? '') ?: ''));
+        }
+        if ($actorId !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
+            $avatarCandidates[] = trim((string) nammu_fediverse_cached_actor_avatar_for_reference($actorId, $fediverseConfig));
+        }
+        $replyReference = trim((string) (($reply['url'] ?? '') ?: ($reply['id'] ?? '')));
+        if ($replyReference !== '' && function_exists('nammu_fediverse_cached_actor_avatar_for_reference')) {
+            $avatarCandidates[] = trim((string) nammu_fediverse_cached_actor_avatar_for_reference($replyReference, $fediverseConfig));
+        }
+        $avatarCandidates[] = trim($fallback);
+        foreach ($avatarCandidates as $avatarCandidate) {
+            $avatarUrl = $fediverseValidAvatarUrl((string) $avatarCandidate);
+            if ($avatarUrl !== '') {
+                return $avatarUrl;
+            }
+        }
+        return '';
+    };
     $fediverseIncomingReplyIds = [];
     $fediverseIncomingReplyRoots = [];
     $fediverseRemoteRepliesByTarget = [];
@@ -348,15 +377,21 @@
             if ($fediverseTimelineReplyText === '') {
                 continue;
             }
+            $fediverseTimelineReplyActorId = trim((string) ($fediverseTimelineReplyCandidate['actor_id'] ?? ''));
             $fediverseRemoteReplyPayload = [
                 'id' => trim((string) ($fediverseTimelineReplyCandidate['id'] ?? '')),
                 'note_id' => trim((string) (($fediverseTimelineReplyCandidate['object_id'] ?? '') ?: ($fediverseTimelineReplyCandidate['id'] ?? ''))),
                 'url' => trim((string) ($fediverseTimelineReplyCandidate['url'] ?? '')),
                 'published' => trim((string) ($fediverseTimelineReplyCandidate['published'] ?? '')),
                 'reply_text' => $fediverseTimelineReplyText,
-                'actor_id' => trim((string) ($fediverseTimelineReplyCandidate['actor_id'] ?? '')),
+                'actor_id' => $fediverseTimelineReplyActorId,
                 'actor_name' => trim((string) ($fediverseTimelineReplyCandidate['actor_name'] ?? '')),
-                'actor_icon' => trim((string) ($fediverseTimelineReplyCandidate['actor_icon'] ?? '')),
+                'actor_icon' => $fediverseReplyActorAvatar([
+                    'actor_id' => $fediverseTimelineReplyActorId,
+                    'actor_icon' => trim((string) ($fediverseTimelineReplyCandidate['actor_icon'] ?? '')),
+                    'url' => trim((string) ($fediverseTimelineReplyCandidate['url'] ?? '')),
+                    'id' => trim((string) (($fediverseTimelineReplyCandidate['object_id'] ?? '') ?: ($fediverseTimelineReplyCandidate['id'] ?? ''))),
+                ]),
                 'source' => 'incoming-remote',
             ];
             foreach ($fediverseEquivalentIdentifiers($fediverseTimelineReplyTarget) as $fediverseTimelineReplyTargetIdentifier) {
@@ -393,6 +428,13 @@
             $fediverseLocalRootIdentifier = trim((string) ($fediverseLocalItem[$fediverseLocalRootField] ?? ''));
             foreach ($fediverseEquivalentIdentifiers($fediverseLocalRootIdentifier) as $fediverseLocalRootVariant) {
                 $fediverseLocalRootByIdentifier[$fediverseLocalRootVariant] = $fediverseLocalRootId;
+            }
+        }
+        if (function_exists('nammu_fediverse_item_identifiers_with_canonical')) {
+            foreach (nammu_fediverse_item_identifiers_with_canonical($fediverseLocalItem, $fediverseConfig) as $fediverseLocalRootIdentifier) {
+                foreach ($fediverseEquivalentIdentifiers((string) $fediverseLocalRootIdentifier) as $fediverseLocalRootVariant) {
+                    $fediverseLocalRootByIdentifier[$fediverseLocalRootVariant] = $fediverseLocalRootId;
+                }
             }
         }
     }
@@ -461,6 +503,20 @@
         if ($fediverseInboxReplyTarget === '') {
             continue;
         }
+        $fediverseCanonicalInboxReplyRoot = function_exists('nammu_fediverse_canonical_local_id_for_identifier')
+            ? trim((string) nammu_fediverse_canonical_local_id_for_identifier($fediverseInboxReplyTarget, $fediverseConfig))
+            : '';
+        if ($fediverseCanonicalInboxReplyRoot !== '') {
+            $fediverseReplyPublished = trim((string) (($fediverseInboxObject['published'] ?? '') ?: ($fediverseInboxPayload['published'] ?? '') ?: ($fediverseInboxActivityEntry['received_at'] ?? '')));
+            $rememberFediverseThreadReplyActivity($fediverseCanonicalInboxReplyRoot, $fediverseReplyPublished);
+            foreach (['id', 'url'] as $fediverseInboxReplyIdentifierField) {
+                $fediverseInboxReplyIdentifier = trim((string) ($fediverseInboxObject[$fediverseInboxReplyIdentifierField] ?? ''));
+                foreach ($fediverseEquivalentIdentifiers($fediverseInboxReplyIdentifier) as $fediverseInboxReplyIdentifierVariant) {
+                    $fediverseReplyRootByIdentifier[$fediverseInboxReplyIdentifierVariant] = $fediverseCanonicalInboxReplyRoot;
+                }
+            }
+            continue;
+        }
         foreach ($fediverseEquivalentIdentifiers($fediverseInboxReplyTarget) as $fediverseInboxReplyTargetVariant) {
             $fediverseReplyRootIdentifier = (string) (($fediverseReplyRootByIdentifier[$fediverseInboxReplyTargetVariant] ?? '') ?: ($fediverseOutgoingReplyRootByIdentifier[$fediverseInboxReplyTargetVariant] ?? ''));
             if ($fediverseReplyRootIdentifier === '') {
@@ -503,8 +559,13 @@
     });
     foreach ($fediverseTimelineReplyItemsForActivity as $fediverseTimelineReplyItemForActivity) {
         $fediverseTimelineReplyTarget = trim((string) ($fediverseTimelineReplyItemForActivity['target_url'] ?? ''));
-        $fediverseTimelineReplyRootIdentifier = '';
+        $fediverseTimelineReplyRootIdentifier = function_exists('nammu_fediverse_canonical_local_id_for_identifier')
+            ? trim((string) nammu_fediverse_canonical_local_id_for_identifier($fediverseTimelineReplyTarget, $fediverseConfig))
+            : '';
         foreach ($fediverseEquivalentIdentifiers($fediverseTimelineReplyTarget) as $fediverseTimelineReplyTargetVariant) {
+            if ($fediverseTimelineReplyRootIdentifier !== '') {
+                break;
+            }
             $fediverseTimelineReplyRootIdentifier = (string) ($fediverseTimelineRootByIdentifier[$fediverseTimelineReplyTargetVariant] ?? '');
             if ($fediverseTimelineReplyRootIdentifier !== '') {
                 break;
@@ -538,8 +599,16 @@
     foreach ($fediverseLocalItems as $fediverseLocalItem) {
         $fediverseLocalId = trim((string) ($fediverseLocalItem['id'] ?? ''));
         $fediverseLocalSortKey = (string) ($fediverseLocalItem['published'] ?? '');
+        $fediverseLocalSortIdentifiers = [];
         foreach (['id', 'object_id', 'url'] as $fediverseLocalSortField) {
-            $fediverseLocalSortIdentifier = trim((string) ($fediverseLocalItem[$fediverseLocalSortField] ?? ''));
+            $fediverseLocalSortIdentifiers[] = trim((string) ($fediverseLocalItem[$fediverseLocalSortField] ?? ''));
+        }
+        if (function_exists('nammu_fediverse_item_identifiers_with_canonical')) {
+            foreach (nammu_fediverse_item_identifiers_with_canonical($fediverseLocalItem, $fediverseConfig) as $fediverseLocalSortIdentifier) {
+                $fediverseLocalSortIdentifiers[] = (string) $fediverseLocalSortIdentifier;
+            }
+        }
+        foreach (array_unique(array_filter($fediverseLocalSortIdentifiers)) as $fediverseLocalSortIdentifier) {
             foreach ($fediverseEquivalentIdentifiers($fediverseLocalSortIdentifier) as $fediverseLocalSortVariant) {
                 $fediverseLocalReplyActivity = (string) ($fediverseThreadLatestReplyActivity[$fediverseLocalSortVariant] ?? '');
                 if ($fediverseLocalReplyActivity !== '' && strcmp($fediverseLocalReplyActivity, $fediverseLocalSortKey) > 0) {
@@ -949,7 +1018,12 @@
         $type = strtolower(trim((string) ($payload['type'] ?? '')));
         $object = $payload['object'] ?? null;
         $targetUrl = '';
-        if (in_array($type, ['like', 'announce'], true) && is_string($object)) {
+        $isUndoFollow = $type === 'undo'
+            && is_array($object)
+            && strtolower(trim((string) ($object['type'] ?? ''))) === 'follow';
+        if ($type === 'follow' || $isUndoFollow) {
+            $targetUrl = '';
+        } elseif (in_array($type, ['like', 'announce'], true) && is_string($object)) {
             $targetUrl = trim($object);
         } elseif ($type === 'create' && is_array($object)) {
             $targetUrl = trim((string) (($object['inReplyTo'] ?? '') ?: ($object['url'] ?? '') ?: ($object['id'] ?? '')));
@@ -1099,7 +1173,7 @@
                                         'actor_id' => $replyActorId,
                                         'actor_name' => (string) (($reply['actor_name'] ?? '') ?: ($replySource === 'local' ? $fediverseLocalName : 'Actor remoto')),
                                         'actor_handle' => $replyActorHandle,
-                                        'actor_icon' => $fediverseValidAvatarUrl((string) (($reply['actor_icon'] ?? '') ?: ($replySource === 'local' ? $fediverseLocalAvatar : ''))),
+                                        'actor_icon' => $fediverseReplyActorAvatar($reply, $replySource === 'local' ? $fediverseLocalAvatar : ''),
                                         'source' => $replySource,
                                     ];
                                 }
@@ -1229,7 +1303,7 @@
                                                     $replyPublicUrl = trim((string) ($reply['url'] ?? ''));
                                                     $replyActorId = trim((string) ($reply['actor_id'] ?? ''));
                                                     $replyActorName = trim((string) ($reply['actor_name'] ?? ''));
-                                                    $replyActorIcon = $fediverseValidAvatarUrl(trim((string) ($reply['actor_icon'] ?? '')));
+                                                    $replyActorIcon = $fediverseReplyActorAvatar($reply);
                                                     $replyBoostImages = [];
                                                     $replyActionState = function_exists('nammu_fediverse_action_state_for_item')
                                                         ? nammu_fediverse_action_state_for_item($reply)
@@ -1736,7 +1810,7 @@
                                                     $replyPublicUrl = trim((string) ($reply['url'] ?? ''));
                                                     $replyActorId = trim((string) ($reply['actor_id'] ?? ''));
                                                     $replyActorName = trim((string) ($reply['actor_name'] ?? ''));
-                                                    $replyActorIcon = $fediverseValidAvatarUrl(trim((string) ($reply['actor_icon'] ?? '')));
+                                                    $replyActorIcon = $fediverseReplyActorAvatar($reply, (($reply['source'] ?? '') === 'incoming-remote') ? '' : $fediverseLocalAvatar);
                                                     $replyBoostImages = [];
                                                     $replyActionState = function_exists('nammu_fediverse_action_state_for_item')
                                                         ? nammu_fediverse_action_state_for_item($reply)

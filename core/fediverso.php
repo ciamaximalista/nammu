@@ -4599,7 +4599,9 @@ function nammu_fediverse_reply_list_score(array $replies): int
 
 function nammu_fediverse_stable_reply_list(array ...$replyGroups): array
 {
-    $replyGroups = array_map(static fn(array $group): array => nammu_fediverse_filter_visible_replies($group), $replyGroups);
+    $replyGroups = array_map(static function (array $group): array {
+        return nammu_fediverse_merge_thread_replies(nammu_fediverse_filter_visible_replies($group));
+    }, $replyGroups);
     $merged = nammu_fediverse_merge_thread_replies(...$replyGroups);
     $bestReplies = $merged;
     $bestScore = nammu_fediverse_reply_list_score($merged);

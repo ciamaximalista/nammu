@@ -6,6 +6,8 @@ $threadItem = is_array($threadItem ?? null) ? $threadItem : [];
 $themeFonts = is_array($theme['fonts'] ?? null) ? $theme['fonts'] : [];
 $noteFont = htmlspecialchars((string) ($themeFonts['note'] ?? ($themeFonts['body'] ?? 'Roboto')), ENT_QUOTES, 'UTF-8');
 $threadPayload = is_array($threadPayload ?? null) ? $threadPayload : [];
+$deferThreadInteractions = !empty($deferThreadInteractions);
+$threadInteractionsFragmentUrl = trim((string) ($threadInteractionsFragmentUrl ?? ''));
 $threadSummary = is_array($threadPayload['summary'] ?? null) ? $threadPayload['summary'] : ['likes' => 0, 'shares' => 0, 'replies' => 0];
 $threadDetails = is_array($threadPayload['details'] ?? null) ? $threadPayload['details'] : ['likes' => [], 'shares' => [], 'replies' => []];
 $threadReplies = is_array($threadPayload['replies'] ?? null) ? $threadPayload['replies'] : [];
@@ -640,70 +642,78 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
                     <?php endif; ?>
                 </div>
 
-                <div class="fediverse-public-status__metrics"<?= $threadOwnNoteFontStyle ?>>
-                    <div class="fediverse-public-status__metric-group">
-                        <span><?= (int) ($threadSummary['replies'] ?? 0) ?> respuesta<?= ((int) ($threadSummary['replies'] ?? 0) === 1) ? '' : 's' ?></span>
-                        <?php if (!empty($threadReplyActors)): ?>
-                            <span class="fediverse-public-status__actor-icons">
-                                <?php foreach ($threadReplyActors as $replyActor): ?>
-                                    <?php $replyActorUrl = trim((string) (($replyActor['url'] ?? '') ?: '#')); ?>
-                                    <a href="<?= htmlspecialchars($replyActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                        <?php if (!empty($replyActor['icon'])): ?>
-                                            <img src="<?= htmlspecialchars((string) $replyActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                                        <?php else: ?>
-                                            <?= htmlspecialchars(mb_substr((string) (($replyActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
-                                        <?php endif; ?>
-                                    </a>
-                                <?php endforeach; ?>
-                            </span>
-                        <?php endif; ?>
+                <?php if (!$deferThreadInteractions): ?>
+                    <div class="fediverse-public-status__metrics"<?= $threadOwnNoteFontStyle ?>>
+                        <div class="fediverse-public-status__metric-group">
+                            <span><?= (int) ($threadSummary['replies'] ?? 0) ?> respuesta<?= ((int) ($threadSummary['replies'] ?? 0) === 1) ? '' : 's' ?></span>
+                            <?php if (!empty($threadReplyActors)): ?>
+                                <span class="fediverse-public-status__actor-icons">
+                                    <?php foreach ($threadReplyActors as $replyActor): ?>
+                                        <?php $replyActorUrl = trim((string) (($replyActor['url'] ?? '') ?: '#')); ?>
+                                        <a href="<?= htmlspecialchars($replyActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                            <?php if (!empty($replyActor['icon'])): ?>
+                                                <img src="<?= htmlspecialchars((string) $replyActor['icon'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($replyActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                            <?php else: ?>
+                                                <?= htmlspecialchars(mb_substr((string) (($replyActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                            <?php endif; ?>
+                                        </a>
+                                    <?php endforeach; ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="fediverse-public-status__metric-group">
+                            <span><?= (int) ($threadSummary['likes'] ?? 0) ?> favorito<?= ((int) ($threadSummary['likes'] ?? 0) === 1) ? '' : 's' ?></span>
+                            <?php if (!empty($threadDetails['likes'])): ?>
+                                <span class="fediverse-public-status__actor-icons">
+                                    <?php foreach ($threadDetails['likes'] as $likeActor): ?>
+                                        <?php
+                                        $likeActorUrl = trim((string) (($likeActor['url'] ?? '') ?: '#'));
+                                        $likeActorIcon = $threadValidAvatarUrl(trim((string) ($likeActor['icon'] ?? '')), trim((string) (($likeActor['id'] ?? '') ?: $likeActorUrl)));
+                                        ?>
+                                        <a href="<?= htmlspecialchars($likeActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                            <?php if ($likeActorIcon !== ''): ?>
+                                                <img src="<?= htmlspecialchars($likeActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                            <?php else: ?>
+                                                <?= htmlspecialchars(mb_substr((string) (($likeActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                            <?php endif; ?>
+                                        </a>
+                                    <?php endforeach; ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="fediverse-public-status__metric-group">
+                            <span><?= (int) ($threadSummary['shares'] ?? 0) ?> impulso<?= ((int) ($threadSummary['shares'] ?? 0) === 1) ? '' : 's' ?></span>
+                            <?php if (!empty($threadDetails['shares'])): ?>
+                                <span class="fediverse-public-status__actor-icons">
+                                    <?php foreach ($threadDetails['shares'] as $shareActor): ?>
+                                        <?php
+                                        $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: '#'));
+                                        $shareActorIcon = $threadValidAvatarUrl(trim((string) ($shareActor['icon'] ?? '')), trim((string) (($shareActor['id'] ?? '') ?: $shareActorUrl)));
+                                        ?>
+                                        <a href="<?= htmlspecialchars($shareActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                            <?php if ($shareActorIcon !== ''): ?>
+                                                <img src="<?= htmlspecialchars($shareActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+                                            <?php else: ?>
+                                                <?= htmlspecialchars(mb_substr((string) (($shareActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
+                                            <?php endif; ?>
+                                        </a>
+                                    <?php endforeach; ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
                     </div>
-                    <div class="fediverse-public-status__metric-group">
-                        <span><?= (int) ($threadSummary['likes'] ?? 0) ?> favorito<?= ((int) ($threadSummary['likes'] ?? 0) === 1) ? '' : 's' ?></span>
-                        <?php if (!empty($threadDetails['likes'])): ?>
-                            <span class="fediverse-public-status__actor-icons">
-                                <?php foreach ($threadDetails['likes'] as $likeActor): ?>
-                                    <?php
-                                    $likeActorUrl = trim((string) (($likeActor['url'] ?? '') ?: '#'));
-                                    $likeActorIcon = $threadValidAvatarUrl(trim((string) ($likeActor['icon'] ?? '')), trim((string) (($likeActor['id'] ?? '') ?: $likeActorUrl)));
-                                    ?>
-                                    <a href="<?= htmlspecialchars($likeActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                        <?php if ($likeActorIcon !== ''): ?>
-                                            <img src="<?= htmlspecialchars($likeActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($likeActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                                        <?php else: ?>
-                                            <?= htmlspecialchars(mb_substr((string) (($likeActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
-                                        <?php endif; ?>
-                                    </a>
-                                <?php endforeach; ?>
-                            </span>
-                        <?php endif; ?>
-                    </div>
-                    <div class="fediverse-public-status__metric-group">
-                        <span><?= (int) ($threadSummary['shares'] ?? 0) ?> impulso<?= ((int) ($threadSummary['shares'] ?? 0) === 1) ? '' : 's' ?></span>
-                        <?php if (!empty($threadDetails['shares'])): ?>
-                            <span class="fediverse-public-status__actor-icons">
-                                <?php foreach ($threadDetails['shares'] as $shareActor): ?>
-                                    <?php
-                                    $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: '#'));
-                                    $shareActorIcon = $threadValidAvatarUrl(trim((string) ($shareActor['icon'] ?? '')), trim((string) (($shareActor['id'] ?? '') ?: $shareActorUrl)));
-                                    ?>
-                                    <a href="<?= htmlspecialchars($shareActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                        <?php if ($shareActorIcon !== ''): ?>
-                                            <img src="<?= htmlspecialchars($shareActorIcon, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string) ($shareActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                                        <?php else: ?>
-                                            <?= htmlspecialchars(mb_substr((string) (($shareActor['name'] ?? '') ?: 'A'), 0, 1, 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>
-                                        <?php endif; ?>
-                                    </a>
-                                <?php endforeach; ?>
-                            </span>
-                        <?php endif; ?>
-                    </div>
-                </div>
+                <?php endif; ?>
             </div>
         </div>
     </article>
 
-    <?php if (!empty($threadReplies)): ?>
+    <?php if ($deferThreadInteractions && $threadInteractionsFragmentUrl !== ''): ?>
+        <div class="fediverse-object-cta fediverse-object-cta--async" data-fediverse-fragment-url="<?= htmlspecialchars($threadInteractionsFragmentUrl, ENT_QUOTES, 'UTF-8') ?>" aria-live="polite">
+            <a class="fediverse-object-empty-btn fediverse-object-empty-btn--loading" href="<?= htmlspecialchars($threadUrl !== '' ? $threadUrl : '#', ENT_QUOTES, 'UTF-8') ?>">
+                <span>Cargando comentarios y reacciones...</span>
+            </a>
+        </div>
+    <?php elseif (!empty($threadReplies)): ?>
         <section class="fediverse-public-section">
             <h2>Respuestas</h2>
             <div class="fediverse-public-thread">
@@ -807,3 +817,37 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
     <?php endif; ?>
 
 </div>
+
+<?php if ($deferThreadInteractions && $threadInteractionsFragmentUrl !== ''): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-fediverse-fragment-url]').forEach(function (container) {
+        var url = container.getAttribute('data-fediverse-fragment-url') || '';
+        if (!url || container.getAttribute('data-fediverse-fragment-loaded') === '1') {
+            return;
+        }
+        container.setAttribute('data-fediverse-fragment-loaded', '1');
+        fetch(url, {
+            credentials: 'same-origin',
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        }).then(function (response) {
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+            return response.text();
+        }).then(function (html) {
+            html = html.trim();
+            if (html !== '') {
+                container.innerHTML = html;
+            }
+        }).catch(function () {
+            container.classList.add('fediverse-object-cta--async-error');
+            var loadingLabel = container.querySelector('.fediverse-object-empty-btn--loading span:first-child');
+            if (loadingLabel) {
+                loadingLabel.textContent = 'Ver comentarios y reacciones en el Fediverso';
+            }
+        });
+    });
+});
+</script>
+<?php endif; ?>

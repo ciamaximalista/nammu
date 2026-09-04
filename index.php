@@ -980,6 +980,50 @@ if (preg_match('#^/fediverso-thread-fragment/(post|podcast|itinerary)/([^/]+)/?$
     exit;
 }
 
+if (preg_match('#^/fediverso-thread-fragment/object/([a-f0-9]{24})/?$#', $routePath, $fediverseObjectFragmentMatch) === 1) {
+    $fragmentHash = trim((string) ($fediverseObjectFragmentMatch[1] ?? ''));
+    $fragmentItem = function_exists('nammu_fediverse_find_local_item_for_thread_hash')
+        ? nammu_fediverse_find_local_item_for_thread_hash($fragmentHash, $configData)
+        : null;
+    if (!is_array($fragmentItem)) {
+        http_response_code(404);
+        header('Content-Type: text/html; charset=UTF-8');
+        echo '';
+        exit;
+    }
+    $fragmentPayload = function_exists('nammu_fediverse_best_thread_page_payload')
+        ? nammu_fediverse_best_thread_page_payload($fragmentItem, $configData)
+        : (function_exists('nammu_fediverse_thread_page_payload') ? nammu_fediverse_thread_page_payload($fragmentItem, $configData) : []);
+    $fragmentReplies = is_array($fragmentPayload['replies'] ?? null) ? $fragmentPayload['replies'] : [];
+    foreach ($fragmentReplies as &$fragmentReply) {
+        if (!is_array($fragmentReply)) {
+            continue;
+        }
+        if (function_exists('nammu_fediverse_reply_link_card')) {
+            $fragmentReplyLinkCard = nammu_fediverse_reply_link_card($fragmentReply, $configData);
+            if (is_array($fragmentReplyLinkCard)) {
+                $fragmentReply['link_card'] = $fragmentReplyLinkCard;
+            }
+        }
+    }
+    unset($fragmentReply);
+    header('Content-Type: text/html; charset=UTF-8');
+    header('Cache-Control: no-store, max-age=0');
+    echo $renderer->render('fediverse-thread-summary', [
+        'theme' => $theme,
+        'fediverseThreadUrl' => (string) ($fragmentPayload['thread_url'] ?? ''),
+        'fediverseThreadMeta' => [
+            'thread_url' => (string) ($fragmentPayload['thread_url'] ?? ''),
+            'summary' => is_array($fragmentPayload['summary'] ?? null) ? $fragmentPayload['summary'] : ['likes' => 0, 'shares' => 0, 'replies' => 0],
+            'details' => is_array($fragmentPayload['details'] ?? null) ? $fragmentPayload['details'] : ['likes' => [], 'shares' => [], 'replies' => []],
+        ],
+        'fediverseThreadReplies' => $fragmentReplies,
+        'isItineraryTemplate' => false,
+        'isPodcastTemplate' => false,
+    ]);
+    exit;
+}
+
 if (preg_match('#^/fediverso/([a-f0-9]{24})/?$#', $routePath, $fediverseThreadMatch) === 1) {
     $threadHash = trim((string) ($fediverseThreadMatch[1] ?? ''));
     $threadItem = nammu_fediverse_find_local_item_for_thread_hash($threadHash, $configData);
@@ -988,12 +1032,17 @@ if (preg_match('#^/fediverso/([a-f0-9]{24})/?$#', $routePath, $fediverseThreadMa
     }
     $threadPayload = nammu_fediverse_thread_page_snapshot_payload($threadItem, $configData);
     $threadItemId = trim((string) ($threadItem['id'] ?? ''));
-    if (function_exists('nammu_fediverse_best_thread_page_payload') && $threadItemId !== '') {
-        $threadPayload = nammu_fediverse_best_thread_page_payload($threadItem, $configData);
-    } elseif (!is_array($threadPayload)) {
-        $threadPayload = function_exists('nammu_fediverse_best_thread_page_payload')
-            ? nammu_fediverse_best_thread_page_payload($threadItem, $configData)
-            : nammu_fediverse_thread_page_payload($threadItem, $configData);
+    if (!is_array($threadPayload)) {
+        $threadPayload = [
+            'item' => $threadItem,
+            'thread_url' => function_exists('nammu_fediverse_thread_page_url') && $threadItemId !== ''
+                ? nammu_fediverse_thread_page_url($threadItemId, $configData)
+                : '',
+            'original_url' => trim((string) ($threadItem['url'] ?? '')),
+            'summary' => ['likes' => 0, 'shares' => 0, 'replies' => 0],
+            'details' => ['likes' => [], 'shares' => [], 'replies' => []],
+            'replies' => [],
+        ];
     }
     $threadPageTitle = trim((string) (($threadItem['title'] ?? '') ?: ($siteTitle . ' — Fediverso')));
     $threadDescription = trim((string) (($threadItem['summary'] ?? '') ?: ($threadItem['content'] ?? '')));
@@ -1049,6 +1098,8 @@ if (preg_match('#^/fediverso/([a-f0-9]{24})/?$#', $routePath, $fediverseThreadMa
     $content = $renderer->render('fediverse-thread-public', [
         'threadItem' => $threadItem,
         'threadPayload' => $threadPayload,
+        'deferThreadInteractions' => true,
+        'threadInteractionsFragmentUrl' => rtrim($publicBaseUrl, '/') . '/fediverso-thread-fragment/object/' . rawurlencode($threadHash),
         'fediverseLocalHandle' => '@' . substr(nammu_fediverse_acct_uri($configData), 5),
         'fediverseLocalName' => trim((string) (($configData['site_name'] ?? '') ?: $siteTitle)),
         'fediverseLocalAvatar' => nammu_fediverse_avatar_url($configData),

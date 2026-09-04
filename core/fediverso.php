@@ -3926,6 +3926,48 @@ function nammu_fediverse_cached_remote_replies_snapshot_for_item(array $item): a
     return is_array($cached['replies'] ?? null) ? $cached['replies'] : [];
 }
 
+function nammu_fediverse_remote_descendant_replies_for_known_replies(array $knownReplies, array $config, int $limit = 25): array
+{
+    static $cache = [];
+    $knownReplies = nammu_fediverse_filter_visible_replies($knownReplies);
+    if (empty($knownReplies)) {
+        return [];
+    }
+    $collected = [];
+    $queue = array_values($knownReplies);
+    $seenObjects = [];
+    while (!empty($queue) && count($seenObjects) < max(1, $limit)) {
+        $reply = array_shift($queue);
+        if (!is_array($reply)) {
+            continue;
+        }
+        $objectId = trim((string) (($reply['object_id'] ?? '') ?: ($reply['note_id'] ?? '') ?: ($reply['id'] ?? '')));
+        $objectUrl = trim((string) ($reply['url'] ?? ''));
+        $objectKey = $objectId !== '' ? $objectId : $objectUrl;
+        if ($objectKey === '' || isset($seenObjects[$objectKey])) {
+            continue;
+        }
+        $seenObjects[$objectKey] = true;
+        $cacheKey = sha1($objectKey);
+        if (!array_key_exists($cacheKey, $cache)) {
+            $cache[$cacheKey] = nammu_fediverse_cached_remote_replies_for_item([
+                'id' => $objectId !== '' ? $objectId : $objectUrl,
+                'object_id' => $objectId !== '' ? $objectId : $objectUrl,
+                'url' => $objectUrl !== '' ? $objectUrl : $objectId,
+            ], $config, 300);
+        }
+        $children = is_array($cache[$cacheKey]) ? $cache[$cacheKey] : [];
+        foreach ($children as $child) {
+            if (!is_array($child)) {
+                continue;
+            }
+            $collected[] = $child;
+            $queue[] = $child;
+        }
+    }
+    return nammu_fediverse_stable_reply_list($collected);
+}
+
 function nammu_fediverse_warm_threads_cache(array $config, int $limit = 20): int
 {
     $timelineItems = nammu_fediverse_timeline_store()['items'];
@@ -4412,6 +4454,10 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
             nammu_fediverse_collect_recursive_replies($incomingReplies, $targetIdentifiers),
             $remoteReplies,
             $existingReplies
+        );
+        $mergedReplies = nammu_fediverse_stable_reply_list(
+            $mergedReplies,
+            nammu_fediverse_remote_descendant_replies_for_known_replies($mergedReplies, $config)
         );
         $summary = $reactionSummary[$localId] ?? ['likes' => 0, 'shares' => 0, 'replies' => 0];
         $summary['replies'] = count($mergedReplies);
@@ -5427,6 +5473,10 @@ function nammu_fediverse_thread_page_payload(array $item, array $config): array
         $localReplies,
         nammu_fediverse_collect_recursive_replies($incomingReplies, $targetIdentifiers),
         nammu_fediverse_cached_remote_replies_snapshot_for_item($canonicalItem)
+    );
+    $mergedReplies = nammu_fediverse_stable_reply_list(
+        $mergedReplies,
+        nammu_fediverse_remote_descendant_replies_for_known_replies($mergedReplies, $config)
     );
     $replyReactionTargetMap = [];
     $replyReactionKeyMap = [];
@@ -8002,10 +8052,20 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
     };
     foreach ($activities as $entry) {
         $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
-        if (strtolower(trim((string) ($payload['type'] ?? ''))) !== 'create') {
-            continue;
+        $payloadType = strtolower(trim((string) ($payload['type'] ?? '')));
+        $object = [];
+        if ($payloadType === 'create') {
+            $object = is_array($payload['object'] ?? null) ? $payload['object'] : [];
+        } elseif ($payloadType === 'announce' && is_string($payload['object'] ?? null)) {
+            $announcedObjectUrl = trim((string) $payload['object']);
+            if ($announcedObjectUrl !== '') {
+                $announcedObject = nammu_fediverse_signed_fetch_json($announcedObjectUrl, $config);
+                if (!is_array($announcedObject)) {
+                    $announcedObject = nammu_fediverse_fetch_json($announcedObjectUrl);
+                }
+                $object = is_array($announcedObject) ? $announcedObject : [];
+            }
         }
-        $object = is_array($payload['object'] ?? null) ? $payload['object'] : [];
         if (strtolower(trim((string) ($object['type'] ?? ''))) !== 'note') {
             continue;
         }
@@ -8013,7 +8073,7 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
         if ($target === '') {
             continue;
         }
-        $actorId = trim((string) ($payload['actor'] ?? ''));
+        $actorId = trim((string) (($object['attributedTo'] ?? '') ?: ($payload['actor'] ?? '')));
         $actor = $actorId !== '' && isset($knownActorsById[$actorId]) ? $knownActorsById[$actorId] : [];
         $contentHtml = trim((string) ($object['content'] ?? ''));
         $contentText = trim((string) (function_exists('nammu_fediverse_html_to_text') ? nammu_fediverse_html_to_text($contentHtml) : strip_tags($contentHtml)));

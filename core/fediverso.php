@@ -4163,6 +4163,8 @@ function nammu_fediverse_cached_remote_replies_for_item(array $item, array $conf
         $cachedReplies,
         nammu_fediverse_remote_replies_for_item($item, $config)
     );
+    $replies = nammu_fediverse_apply_reply_reaction_metrics($replies, $config);
+    $replies = nammu_fediverse_annotate_reply_reply_counts($replies);
     $cacheItems[$objectId] = [
         'fetched_at' => $now,
         'replies' => $replies,
@@ -4743,6 +4745,7 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
             (array) ($threadPayloads[$localId]['replies'] ?? [])
         );
         $threadPayloads[$localId]['replies'] = nammu_fediverse_filter_visible_replies((array) ($threadPayloads[$localId]['replies'] ?? []));
+        $threadPayloads[$localId]['replies'] = nammu_fediverse_apply_reply_reaction_metrics((array) $threadPayloads[$localId]['replies'], $config);
         $threadPayloads[$localId]['replies'] = nammu_fediverse_annotate_reply_reply_counts((array) $threadPayloads[$localId]['replies']);
         $threadPayloads[$localId]['summary']['replies'] = count((array) $threadPayloads[$localId]['replies']);
         $threadPayloads[$localId]['details']['replies'] = nammu_fediverse_thread_reply_actor_details((array) $threadPayloads[$localId]['replies']);
@@ -5741,39 +5744,7 @@ function nammu_fediverse_thread_page_payload(array $item, array $config): array
         $mergedReplies,
         nammu_fediverse_remote_descendant_replies_for_known_replies($mergedReplies, $config)
     );
-    $replyReactionTargetMap = [];
-    $replyReactionKeyMap = [];
-    foreach ($mergedReplies as $replyIndex => $reply) {
-        if (!is_array($reply)) {
-            continue;
-        }
-        $replyIdentifiers = array_values(array_unique(array_filter([
-            trim((string) ($reply['id'] ?? '')),
-            trim((string) ($reply['url'] ?? '')),
-            trim((string) ($reply['note_id'] ?? '')),
-            trim((string) ($reply['object_id'] ?? '')),
-            trim((string) ($reply['target_url'] ?? '')),
-        ])));
-        $replyKey = 'reply:' . $replyIndex;
-        foreach ($replyIdentifiers as $replyIdentifier) {
-            $replyReactionTargetMap[$replyIdentifier] = $replyKey;
-        }
-        $replyReactionKeyMap[$replyKey] = $replyIdentifiers;
-    }
-    $replyReactionMap = nammu_fediverse_reaction_snapshot_for_targets($replyReactionTargetMap, $config);
-    foreach ($mergedReplies as $replyIndex => &$reply) {
-        if (!is_array($reply)) {
-            continue;
-        }
-        $replyKey = 'reply:' . $replyIndex;
-        $replyReaction = is_array($replyReactionMap[$replyKey] ?? null) ? $replyReactionMap[$replyKey] : [
-            'summary' => ['likes' => 0, 'shares' => 0],
-            'details' => ['likes' => [], 'shares' => []],
-        ];
-        $reply['summary'] = is_array($replyReaction['summary'] ?? null) ? $replyReaction['summary'] : ['likes' => 0, 'shares' => 0];
-        $reply['details'] = is_array($replyReaction['details'] ?? null) ? $replyReaction['details'] : ['likes' => [], 'shares' => []];
-    }
-    unset($reply);
+    $mergedReplies = nammu_fediverse_apply_reply_reaction_metrics($mergedReplies, $config);
     usort($mergedReplies, static function (array $a, array $b): int {
         return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
     });
@@ -5974,6 +5945,61 @@ function nammu_fediverse_reaction_snapshot_for_targets(array $targetMap, array $
     }
 
     return $result;
+}
+
+function nammu_fediverse_reply_reaction_identifiers(array $reply): array
+{
+    $identifiers = [];
+    foreach (['id', 'url', 'note_id', 'object_id'] as $field) {
+        $identifier = trim((string) ($reply[$field] ?? ''));
+        if ($identifier !== '') {
+            $identifiers[$identifier] = true;
+        }
+    }
+    return array_keys($identifiers);
+}
+
+function nammu_fediverse_apply_reply_reaction_metrics(array $replies, array $config): array
+{
+    $replyReactionTargetMap = [];
+    foreach ($replies as $replyIndex => $reply) {
+        if (!is_array($reply)) {
+            continue;
+        }
+        $replyKey = 'reply:' . $replyIndex;
+        foreach (nammu_fediverse_reply_reaction_identifiers($reply) as $replyIdentifier) {
+            $replyReactionTargetMap[$replyIdentifier] = $replyKey;
+        }
+    }
+    $replyReactionMap = nammu_fediverse_reaction_snapshot_for_targets($replyReactionTargetMap, $config);
+    foreach ($replies as $replyIndex => &$reply) {
+        if (!is_array($reply)) {
+            continue;
+        }
+        $replyKey = 'reply:' . $replyIndex;
+        $replyReaction = is_array($replyReactionMap[$replyKey] ?? null) ? $replyReactionMap[$replyKey] : [
+            'summary' => ['likes' => 0, 'shares' => 0],
+            'details' => ['likes' => [], 'shares' => []],
+        ];
+        $summary = is_array($replyReaction['summary'] ?? null) ? $replyReaction['summary'] : [];
+        $details = is_array($replyReaction['details'] ?? null) ? $replyReaction['details'] : [];
+        $existingSummary = is_array($reply['summary'] ?? null) ? $reply['summary'] : [];
+        $existingDetails = is_array($reply['details'] ?? null) ? $reply['details'] : [];
+        $summary['replies'] = max(0, (int) ($existingSummary['replies'] ?? 0));
+        $details['replies'] = is_array($existingDetails['replies'] ?? null) ? $existingDetails['replies'] : [];
+        $reply['summary'] = [
+            'likes' => max(0, (int) ($summary['likes'] ?? 0)),
+            'shares' => max(0, (int) ($summary['shares'] ?? 0)),
+            'replies' => max(0, (int) ($summary['replies'] ?? 0)),
+        ];
+        $reply['details'] = [
+            'likes' => is_array($details['likes'] ?? null) ? $details['likes'] : [],
+            'shares' => is_array($details['shares'] ?? null) ? $details['shares'] : [],
+            'replies' => is_array($details['replies'] ?? null) ? $details['replies'] : [],
+        ];
+    }
+    unset($reply);
+    return $replies;
 }
 
 function nammu_fediverse_thread_page_snapshot_payload(array $item, array $config): ?array

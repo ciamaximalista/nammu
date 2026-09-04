@@ -197,13 +197,8 @@ $fediverseButtonLabel = $isItineraryTemplate
                                         <?php if ($replyPublishedLabel !== ''): ?>
                                             <span class="fediverse-public-reply__meta"><?= htmlspecialchars($replyPublishedLabel, ENT_QUOTES, 'UTF-8') ?></span>
                                         <?php endif; ?>
-                                        <?php if ((int) ($replySummary['replies'] ?? 0) > 0 || (int) ($replySummary['likes'] ?? 0) > 0 || (int) ($replySummary['shares'] ?? 0) > 0): ?>
+                                        <?php if ((int) ($replySummary['likes'] ?? 0) > 0 || (int) ($replySummary['shares'] ?? 0) > 0): ?>
                                             <span class="fediverse-public-reply__header-metrics">
-                                                <?php if ((int) ($replySummary['replies'] ?? 0) > 0): ?>
-                                                    <span class="fediverse-public-reply__header-metric" title="<?= (int) ($replySummary['replies'] ?? 0) ?> respuesta<?= ((int) ($replySummary['replies'] ?? 0) === 1) ? '' : 's' ?>">
-                                                        <span aria-hidden="true">💬</span><span><?= (int) ($replySummary['replies'] ?? 0) ?></span>
-                                                    </span>
-                                                <?php endif; ?>
                                                 <?php if ((int) ($replySummary['likes'] ?? 0) > 0): ?>
                                                     <span class="fediverse-public-reply__header-metric" title="<?= (int) ($replySummary['likes'] ?? 0) ?> favorito<?= ((int) ($replySummary['likes'] ?? 0) === 1) ? '' : 's' ?>">
                                                         <span aria-hidden="true">♥</span><span><?= (int) ($replySummary['likes'] ?? 0) ?></span>

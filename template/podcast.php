@@ -112,8 +112,8 @@ $renderFediverseInlineMeta = static function (array $meta) use ($fediverseInline
         return '';
     }
     $replyIcon = '💬';
-    $likeIcon = '♥';
-    $shareIcon = '📣';
+    $likeIcon = '❤️';
+    $shareIcon = '📢';
     $html = ' <a class="fediverse-inline-meta" href="' . htmlspecialchars($threadUrl, ENT_QUOTES, 'UTF-8') . '" title="En el Fediverso" aria-label="En el Fediverso">';
     $html .= '<span class="fediverse-inline-meta__icon">' . $fediverseInlineIcon . '</span>';
     if ($replies > 0) {

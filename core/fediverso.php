@@ -170,6 +170,11 @@ function nammu_fediverse_avatar_cache_queue_file(): string
     return dirname(__DIR__) . '/config/fediverso-avatar-cache-queue.json';
 }
 
+function nammu_fediverse_fetch_cache_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-fetch-cache.json';
+}
+
 function nammu_fediverse_actuality_item_link_targets(array $item): array
 {
     return array_values(array_filter(array_map(
@@ -506,6 +511,179 @@ function nammu_fediverse_should_shared_cache_remote_url(string $url, ?array $con
         return nammu_fediverse_shared_cache_dir($config) !== '';
     }
     return true;
+}
+
+function nammu_fediverse_fetch_cache_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_fetch_cache_file(), ['items' => []]);
+    $store['items'] = is_array($store['items'] ?? null) ? $store['items'] : [];
+    return $store;
+}
+
+function nammu_fediverse_fetch_cache_key(string $url): string
+{
+    return sha1(trim($url));
+}
+
+function nammu_fediverse_retry_after_seconds(array $headers): int
+{
+    $value = trim((string) ($headers['retry-after'] ?? ''));
+    if ($value === '') {
+        return 0;
+    }
+    if (ctype_digit($value)) {
+        return max(0, (int) $value);
+    }
+    $timestamp = strtotime($value);
+    return $timestamp !== false ? max(0, $timestamp - time()) : 0;
+}
+
+function nammu_fediverse_cache_control_max_age(array $headers): int
+{
+    $value = strtolower(trim((string) ($headers['cache-control'] ?? '')));
+    if ($value === '') {
+        return 0;
+    }
+    if (preg_match('/(?:^|,)\s*max-age\s*=\s*(\d+)/', $value, $matches) === 1) {
+        return max(0, (int) ($matches[1] ?? 0));
+    }
+    return 0;
+}
+
+function nammu_fediverse_fetch_cache_ttl_for_response(int $status, array $headers, string $body = ''): int
+{
+    $retryAfter = nammu_fediverse_retry_after_seconds($headers);
+    if ($retryAfter > 0) {
+        return $retryAfter;
+    }
+    $maxAge = nammu_fediverse_cache_control_max_age($headers);
+    if ($maxAge > 0) {
+        return $maxAge;
+    }
+    if ($status >= 200 && $status < 300 && trim($body) !== '') {
+        return 300;
+    }
+    if ($status === 410) {
+        return 86400;
+    }
+    if ($status === 404) {
+        return 21600;
+    }
+    if ($status === 429) {
+        return 300;
+    }
+    if ($status >= 500 || $status === 0) {
+        return 120;
+    }
+    return 0;
+}
+
+function nammu_fediverse_fetch_cache_read(string $url): ?array
+{
+    $url = trim($url);
+    if ($url === '' || !preg_match('#^https?://#i', $url)) {
+        return null;
+    }
+    $store = nammu_fediverse_fetch_cache_store();
+    $entry = $store['items'][nammu_fediverse_fetch_cache_key($url)] ?? null;
+    if (!is_array($entry)) {
+        return null;
+    }
+    $expiresAt = (int) ($entry['expires_at'] ?? 0);
+    if ($expiresAt <= time()) {
+        return null;
+    }
+    return $entry;
+}
+
+function nammu_fediverse_fetch_cache_peek(string $url): ?array
+{
+    $url = trim($url);
+    if ($url === '' || !preg_match('#^https?://#i', $url)) {
+        return null;
+    }
+    $store = nammu_fediverse_fetch_cache_store();
+    $entry = $store['items'][nammu_fediverse_fetch_cache_key($url)] ?? null;
+    return is_array($entry) ? $entry : null;
+}
+
+function nammu_fediverse_fetch_cache_conditional_headers(?array $entry): array
+{
+    if (!is_array($entry) || (int) ($entry['status'] ?? 0) < 200 || (int) ($entry['status'] ?? 0) >= 300) {
+        return [];
+    }
+    $headers = is_array($entry['headers'] ?? null) ? $entry['headers'] : [];
+    $result = [];
+    $etag = trim((string) ($headers['etag'] ?? ''));
+    if ($etag !== '') {
+        $result['If-None-Match'] = $etag;
+    }
+    $lastModified = trim((string) ($headers['last-modified'] ?? ''));
+    if ($lastModified !== '') {
+        $result['If-Modified-Since'] = $lastModified;
+    }
+    return $result;
+}
+
+function nammu_fediverse_fetch_cache_refresh_not_modified(string $url, array $responseHeaders = []): ?array
+{
+    $entry = nammu_fediverse_fetch_cache_peek($url);
+    if (!is_array($entry) || (int) ($entry['status'] ?? 0) < 200 || (int) ($entry['status'] ?? 0) >= 300) {
+        return null;
+    }
+    $headers = array_merge(is_array($entry['headers'] ?? null) ? $entry['headers'] : [], $responseHeaders);
+    $ttl = nammu_fediverse_fetch_cache_ttl_for_response((int) ($entry['status'] ?? 200), $headers, (string) ($entry['body'] ?? ''));
+    if ($ttl <= 0) {
+        $ttl = 300;
+    }
+    $store = nammu_fediverse_fetch_cache_store();
+    $key = nammu_fediverse_fetch_cache_key($url);
+    $entry['headers'] = array_intersect_key($headers, array_flip(['cache-control', 'etag', 'last-modified', 'retry-after', 'content-type']));
+    $entry['fetched_at'] = time();
+    $entry['expires_at'] = time() + $ttl;
+    $entry['failure_count'] = 0;
+    $store['items'][$key] = $entry;
+    nammu_fediverse_save_json_store(nammu_fediverse_fetch_cache_file(), ['items' => $store['items']]);
+    return $entry;
+}
+
+function nammu_fediverse_fetch_cache_write(string $url, array $response): void
+{
+    $url = trim($url);
+    if ($url === '' || !preg_match('#^https?://#i', $url)) {
+        return;
+    }
+    $status = (int) ($response['status'] ?? 0);
+    $headers = is_array($response['headers'] ?? null) ? $response['headers'] : [];
+    $body = (string) ($response['body'] ?? '');
+    $ttl = nammu_fediverse_fetch_cache_ttl_for_response($status, $headers, $body);
+    if ($ttl <= 0) {
+        return;
+    }
+    $store = nammu_fediverse_fetch_cache_store();
+    $key = nammu_fediverse_fetch_cache_key($url);
+    $previous = is_array($store['items'][$key] ?? null) ? $store['items'][$key] : [];
+    $failureCount = ($status >= 200 && $status < 300) ? 0 : ((int) ($previous['failure_count'] ?? 0) + 1);
+    if (($status >= 500 || $status === 0) && $failureCount > 1) {
+        $ttl = min(3600, max($ttl, (int) (120 * (2 ** min(4, $failureCount - 1))) + random_int(0, 60)));
+    }
+    $entry = [
+        'url' => $url,
+        'status' => $status,
+        'headers' => array_intersect_key($headers, array_flip(['cache-control', 'etag', 'last-modified', 'retry-after', 'content-type'])),
+        'body' => ($status >= 200 && $status < 300) ? $body : '',
+        'fetched_at' => time(),
+        'expires_at' => time() + $ttl,
+        'failure_count' => $failureCount,
+    ];
+    $store['items'][$key] = $entry;
+    if (count($store['items']) > 1000) {
+        uasort($store['items'], static function (array $a, array $b): int {
+            return ((int) ($b['expires_at'] ?? 0)) <=> ((int) ($a['expires_at'] ?? 0));
+        });
+        $store['items'] = array_slice($store['items'], 0, 1000, true);
+    }
+    nammu_fediverse_save_json_store(nammu_fediverse_fetch_cache_file(), ['items' => $store['items']]);
 }
 
 function nammu_fediverse_load_json_store(string $file, array $default = []): array
@@ -923,16 +1101,24 @@ function nammu_fediverse_signature_header(string $method, string $url, array $co
     return $result;
 }
 
-function nammu_fediverse_signed_fetch(string $url, array $config, string $method = 'GET', string $body = '', ?int $timeoutOverride = null): array
+function nammu_fediverse_signed_fetch(string $url, array $config, string $method = 'GET', string $body = '', ?int $timeoutOverride = null, array $extraHeaders = []): array
 {
     $method = strtoupper($method);
     if (function_exists('nammu_multi_instance_remote_host_before_request')) {
         nammu_multi_instance_remote_host_before_request($url, $config);
     }
-    $headers = nammu_fediverse_signature_header($method, $url, $config, $body) ?? [
+    $headers = nammu_fediverse_signature_header($method, $url, $config, $body, $extraHeaders) ?? [
         'User-Agent: Nammu Fediverso',
         'Accept: application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9',
     ];
+    if (!empty($extraHeaders)) {
+        foreach ($extraHeaders as $name => $value) {
+            $headerLine = trim((string) $name) . ': ' . trim((string) $value);
+            if (!in_array($headerLine, $headers, true)) {
+                $headers[] = $headerLine;
+            }
+        }
+    }
     $timeout = $timeoutOverride ?? ($method === 'POST' ? 6 : 15);
     $context = stream_context_create([
         'http' => [
@@ -970,21 +1156,56 @@ function nammu_fediverse_signed_fetch(string $url, array $config, string $method
 
 function nammu_fediverse_signed_fetch_json(string $url, array $config, string $method = 'GET', string $body = '', ?int $timeoutOverride = null): ?array
 {
+    static $requestCache = [];
     $url = trim($url);
+    $method = strtoupper($method);
+    $cacheKey = $method . '|' . $url;
+    if ($method === 'GET' && $body === '' && array_key_exists($cacheKey, $requestCache)) {
+        return is_array($requestCache[$cacheKey]) ? $requestCache[$cacheKey] : null;
+    }
+    if ($method === 'GET' && $body === '') {
+        $cachedFetch = nammu_fediverse_fetch_cache_read($url);
+        if (is_array($cachedFetch)) {
+            $cachedStatus = (int) ($cachedFetch['status'] ?? 0);
+            if ($cachedStatus >= 200 && $cachedStatus < 300) {
+                $decoded = json_decode((string) ($cachedFetch['body'] ?? ''), true);
+                $requestCache[$cacheKey] = is_array($decoded) ? $decoded : null;
+                return is_array($decoded) ? $decoded : null;
+            }
+            $requestCache[$cacheKey] = null;
+            return null;
+        }
+    }
+    $staleFetch = ($method === 'GET' && $body === '') ? nammu_fediverse_fetch_cache_peek($url) : null;
+    $conditionalHeaders = nammu_fediverse_fetch_cache_conditional_headers($staleFetch);
     if (
-        strtoupper($method) === 'GET'
+        $method === 'GET'
         && $body === ''
         && nammu_fediverse_should_shared_cache_remote_url($url, $config)
     ) {
         $cached = nammu_fediverse_shared_cache_read($config, 'activitypub-json', $url, 300);
         $payload = is_array($cached['payload'] ?? null) ? $cached['payload'] : null;
         if (is_array($payload)) {
+            $requestCache[$cacheKey] = $payload;
             return $payload;
         }
     }
-    $response = nammu_fediverse_signed_fetch($url, $config, $method, $body, $timeoutOverride);
+    $response = nammu_fediverse_signed_fetch($url, $config, $method, $body, $timeoutOverride, $conditionalHeaders);
+    if ($method === 'GET' && $body === '' && (int) ($response['status'] ?? 0) === 304) {
+        $refreshed = nammu_fediverse_fetch_cache_refresh_not_modified($url, is_array($response['headers'] ?? null) ? $response['headers'] : []);
+        if (is_array($refreshed)) {
+            $decoded = json_decode((string) ($refreshed['body'] ?? ''), true);
+            $requestCache[$cacheKey] = is_array($decoded) ? $decoded : null;
+            return is_array($decoded) ? $decoded : null;
+        }
+    }
     if (($response['status'] ?? 0) < 200 || ($response['status'] ?? 0) >= 400) {
-        if (strtoupper($method) === 'GET' && $body === '') {
+        if ($method === 'GET' && $body === '') {
+            nammu_fediverse_fetch_cache_write($url, $response);
+            if (in_array((int) ($response['status'] ?? 0), [0, 404, 410, 429], true) || (int) ($response['status'] ?? 0) >= 500) {
+                $requestCache[$cacheKey] = null;
+                return null;
+            }
             return nammu_fediverse_fetch_json($url, 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9', $timeoutOverride ?? 12);
         }
         return null;
@@ -1001,18 +1222,29 @@ function nammu_fediverse_signed_fetch_json(string $url, array $config, string $m
             'payload' => $decoded,
         ]);
     }
+    if (strtoupper($method) === 'GET' && $body === '') {
+        nammu_fediverse_fetch_cache_write($url, $response);
+        $requestCache[$cacheKey] = is_array($decoded) ? $decoded : null;
+    }
     return is_array($decoded) ? $decoded : null;
 }
 
-function nammu_fediverse_fetch(string $url, string $accept = 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9', int $timeout = 12): array
+function nammu_fediverse_fetch(string $url, string $accept = 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9', int $timeout = 12, array $extraHeaders = []): array
 {
     $headers = [];
+    $headerLines = [
+        'User-Agent: Nammu Fediverso',
+        'Accept: ' . $accept,
+    ];
+    foreach ($extraHeaders as $name => $value) {
+        $headerLines[] = trim((string) $name) . ': ' . trim((string) $value);
+    }
     $context = stream_context_create([
         'http' => [
             'method' => 'GET',
             'timeout' => max(1, $timeout),
             'ignore_errors' => true,
-            'header' => "User-Agent: Nammu Fediverso\r\nAccept: {$accept}\r\n",
+            'header' => implode("\r\n", $headerLines) . "\r\n",
         ],
     ]);
     $body = @file_get_contents($url, false, $context);
@@ -1037,12 +1269,40 @@ function nammu_fediverse_fetch(string $url, string $accept = 'application/activi
 
 function nammu_fediverse_fetch_json(string $url, string $accept = 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", application/json;q=0.9', int $timeout = 12): ?array
 {
+    static $requestCache = [];
     $url = trim($url);
-    $response = nammu_fediverse_fetch($url, $accept, $timeout);
+    $cacheKey = $url . '|' . $accept;
+    if (array_key_exists($cacheKey, $requestCache)) {
+        return is_array($requestCache[$cacheKey]) ? $requestCache[$cacheKey] : null;
+    }
+    $cachedFetch = nammu_fediverse_fetch_cache_read($url);
+    if (is_array($cachedFetch)) {
+        $cachedStatus = (int) ($cachedFetch['status'] ?? 0);
+        if ($cachedStatus >= 200 && $cachedStatus < 300) {
+            $decoded = json_decode((string) ($cachedFetch['body'] ?? ''), true);
+            $requestCache[$cacheKey] = is_array($decoded) ? $decoded : null;
+            return is_array($decoded) ? $decoded : null;
+        }
+        $requestCache[$cacheKey] = null;
+        return null;
+    }
+    $staleFetch = nammu_fediverse_fetch_cache_peek($url);
+    $response = nammu_fediverse_fetch($url, $accept, $timeout, nammu_fediverse_fetch_cache_conditional_headers($staleFetch));
+    if ((int) ($response['status'] ?? 0) === 304) {
+        $refreshed = nammu_fediverse_fetch_cache_refresh_not_modified($url, is_array($response['headers'] ?? null) ? $response['headers'] : []);
+        if (is_array($refreshed)) {
+            $decoded = json_decode((string) ($refreshed['body'] ?? ''), true);
+            $requestCache[$cacheKey] = is_array($decoded) ? $decoded : null;
+            return is_array($decoded) ? $decoded : null;
+        }
+    }
+    nammu_fediverse_fetch_cache_write($url, $response);
     if (($response['status'] ?? 0) < 200 || ($response['status'] ?? 0) >= 400) {
+        $requestCache[$cacheKey] = null;
         return null;
     }
     $decoded = json_decode((string) ($response['body'] ?? ''), true);
+    $requestCache[$cacheKey] = is_array($decoded) ? $decoded : null;
     return is_array($decoded) ? $decoded : null;
 }
 

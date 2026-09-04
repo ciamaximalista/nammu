@@ -11,6 +11,11 @@ $threadInteractionsFragmentUrl = trim((string) ($threadInteractionsFragmentUrl ?
 $threadSummary = is_array($threadPayload['summary'] ?? null) ? $threadPayload['summary'] : ['likes' => 0, 'shares' => 0, 'replies' => 0];
 $threadDetails = is_array($threadPayload['details'] ?? null) ? $threadPayload['details'] : ['likes' => [], 'shares' => [], 'replies' => []];
 $threadReplies = is_array($threadPayload['replies'] ?? null) ? $threadPayload['replies'] : [];
+if ($deferThreadInteractions) {
+    $threadSummary = ['likes' => 0, 'shares' => 0, 'replies' => 0];
+    $threadDetails = ['likes' => [], 'shares' => [], 'replies' => []];
+    $threadReplies = [];
+}
 $threadFediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
 $threadFediverseConfig = is_array($threadFediverseConfig) ? $threadFediverseConfig : [];
 $threadRootActorId = trim((string) ($threadItem['actor_id'] ?? ''));
@@ -530,6 +535,10 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
 .fediverse-public-status__actor-icons { display: inline-flex; align-items: center; gap: .25rem; }
 .fediverse-public-status__actor-icons a { width: 28px; height: 28px; border-radius: 999px; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; background: #dfe7ef; text-decoration: none; color: inherit; border: 1px solid rgba(0,0,0,.08); }
 .fediverse-public-status__actor-icons img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fediverse-object-cta--async { margin: 1rem 0; }
+.fediverse-object-empty-btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; width: 100%; box-sizing: border-box; border-radius: 999px; border: 1px solid rgba(0,0,0,.1); background: #fff; color: inherit; text-decoration: none; padding: .8rem 1rem; font-weight: 700; }
+.fediverse-object-empty-btn--loading { opacity: .75; cursor: wait; }
+.fediverse-object-cta--async-error .fediverse-object-empty-btn--loading { cursor: pointer; opacity: 1; }
 .fediverse-public-section h2 { margin: 0 0 1rem; font-size: 1.15rem; }
 .fediverse-public-thread { display: grid; gap: .9rem; }
 .fediverse-public-reply { background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 16px; padding: 1rem; }

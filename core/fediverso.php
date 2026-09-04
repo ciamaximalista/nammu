@@ -3237,7 +3237,7 @@ function nammu_fediverse_find_manual_boost_item(array $boostAction): ?array
 function nammu_fediverse_hidden_reply_keys(array $reply): array
 {
     $keys = [];
-    foreach (['id', 'url', 'note_id'] as $field) {
+    foreach (['id', 'url', 'note_id', 'object_id', 'activity_id'] as $field) {
         $value = trim((string) ($reply[$field] ?? ''));
         if ($value !== '') {
             $keys[] = 'id:' . $value;
@@ -3250,6 +3250,47 @@ function nammu_fediverse_hidden_reply_keys(array $reply): array
         $keys[] = 'fallback:' . $fallback;
     }
     return array_values(array_unique(array_filter($keys)));
+}
+
+function nammu_fediverse_hide_deleted_remote_reply(array $identifiers): void
+{
+    $keys = [];
+    foreach ($identifiers as $identifier) {
+        $identifier = trim((string) $identifier);
+        if ($identifier === '') {
+            continue;
+        }
+        foreach (nammu_fediverse_reaction_target_identifier_variants($identifier) as $variant) {
+            $variant = trim((string) $variant);
+            if ($variant !== '') {
+                $keys[] = 'id:' . $variant;
+            }
+        }
+    }
+    $keys = array_values(array_unique($keys));
+    if (empty($keys)) {
+        return;
+    }
+    $items = nammu_fediverse_hidden_replies_store()['items'];
+    foreach ($items as $existing) {
+        $existingKeys = array_values(array_filter(array_map('strval', (array) ($existing['keys'] ?? []))));
+        if (!array_diff($keys, $existingKeys)) {
+            nammu_fediverse_clear_threads_cache();
+            return;
+        }
+    }
+    $items[] = [
+        'id' => substr(sha1('deleted|' . implode('|', $keys)), 0, 24),
+        'keys' => $keys,
+        'target_url' => '',
+        'actor_id' => '',
+        'reply_text' => '',
+        'published' => '',
+        'hidden_at' => gmdate(DATE_ATOM),
+        'reason' => 'remote-delete',
+    ];
+    nammu_fediverse_save_hidden_replies_store($items);
+    nammu_fediverse_clear_threads_cache();
 }
 
 function nammu_fediverse_hidden_reply_lookup(): array
@@ -4052,7 +4093,15 @@ function nammu_fediverse_remote_replies_for_item(array $item, array $config): ar
         foreach ($extractOrderedItems($collection, $config, $firstPage) as $rawReply) {
             $replyObject = null;
             if (is_string($rawReply)) {
-                $replyObject = $fetchObject(trim($rawReply), $config);
+                $rawReplyUrl = trim($rawReply);
+                $replyObject = $fetchObject($rawReplyUrl, $config);
+                if (!is_array($replyObject) && $rawReplyUrl !== '') {
+                    $cachedReplyFetch = nammu_fediverse_fetch_cache_peek($rawReplyUrl);
+                    $cachedReplyStatus = (int) ($cachedReplyFetch['status'] ?? 0);
+                    if (in_array($cachedReplyStatus, [404, 410], true)) {
+                        nammu_fediverse_hide_deleted_remote_reply([$rawReplyUrl]);
+                    }
+                }
             } elseif (is_array($rawReply)) {
                 $replyObject = $rawReply;
                 $replyObjectId = trim((string) ($replyObject['id'] ?? ''));
@@ -4066,7 +4115,16 @@ function nammu_fediverse_remote_replies_for_item(array $item, array $config): ar
             if (!is_array($replyObject)) {
                 continue;
             }
-            if (strtolower(trim((string) ($replyObject['type'] ?? ''))) !== 'note') {
+            $replyObjectType = strtolower(trim((string) ($replyObject['type'] ?? '')));
+            if (in_array($replyObjectType, ['delete', 'tombstone'], true)) {
+                nammu_fediverse_hide_deleted_remote_reply(array_filter([
+                    is_string($rawReply) ? trim($rawReply) : '',
+                    trim((string) ($replyObject['id'] ?? '')),
+                    trim((string) ($replyObject['url'] ?? '')),
+                ]));
+                continue;
+            }
+            if ($replyObjectType !== 'note') {
                 continue;
             }
             $replyHtml = trim((string) ($replyObject['content'] ?? ''));
@@ -11359,6 +11417,7 @@ function nammu_fediverse_handle_inbox_payload(array $payload, array $config, arr
             }
         }
         $affectedLocalTargets = nammu_fediverse_local_targets_for_deleted_reply($targets, $config);
+        nammu_fediverse_hide_deleted_remote_reply($targets);
         nammu_fediverse_remove_timeline_items($targets);
         nammu_fediverse_remove_inbox_activities($targets);
         foreach ($affectedLocalTargets as $affectedLocalTarget) {

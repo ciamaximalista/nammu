@@ -1146,7 +1146,11 @@ if ($routePath === '/ap/inbox') {
         exit;
     }
     $result = nammu_fediverse_handle_inbox_payload($payload, $configData, nammu_fediverse_request_headers(), $rawInboxBody);
-    http_response_code(!empty($result['accepted']) ? 202 : 401);
+    $inboxStatus = !empty($result['accepted']) ? 202 : (int) ($result['http_status'] ?? 401);
+    http_response_code($inboxStatus);
+    if ($inboxStatus === 503 && (int) ($result['retry_after'] ?? 0) > 0) {
+        header('Retry-After: ' . (int) $result['retry_after']);
+    }
     header('Content-Type: application/activity+json; charset=UTF-8');
     echo json_encode(['status' => 'accepted', 'result' => $result], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;

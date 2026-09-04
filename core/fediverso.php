@@ -722,6 +722,32 @@ function nammu_fediverse_fetch_cache_read(string $url): ?array
     return $entry;
 }
 
+function nammu_fediverse_fetch_retry_after_for_url(string $url): int
+{
+    $url = trim($url);
+    if ($url === '' || !preg_match('#^https?://#i', $url)) {
+        return 0;
+    }
+    $retryAfter = 0;
+    $entry = nammu_fediverse_fetch_cache_peek($url);
+    if (is_array($entry)) {
+        $expiresAt = (int) ($entry['expires_at'] ?? 0);
+        $status = (int) ($entry['status'] ?? 0);
+        if ($expiresAt > time() && ($status === 429 || $status >= 500 || $status === 0)) {
+            $retryAfter = max($retryAfter, $expiresAt - time());
+            $headerRetryAfter = nammu_fediverse_retry_after_seconds(is_array($entry['headers'] ?? null) ? $entry['headers'] : []);
+            if ($headerRetryAfter > 0) {
+                $retryAfter = max($retryAfter, $headerRetryAfter);
+            }
+        }
+    }
+    $pauseUntil = nammu_fediverse_fetch_host_pause_until($url);
+    if ($pauseUntil > time()) {
+        $retryAfter = max($retryAfter, $pauseUntil - time());
+    }
+    return $retryAfter;
+}
+
 function nammu_fediverse_fetch_cache_peek(string $url): ?array
 {
     $url = trim($url);
@@ -10577,6 +10603,21 @@ function nammu_fediverse_verify_inbox_request(array $payload, array $headers, st
         }
     }
     if ($publicKeyPem === '') {
+        $retryAfter = nammu_fediverse_fetch_retry_after_for_url($actorId);
+        if ($retryAfter <= 0 && $keyId !== '' && preg_match('#^https?://#i', $keyId)) {
+            $retryAfter = nammu_fediverse_fetch_retry_after_for_url($keyId);
+        }
+        if ($retryAfter > 0) {
+            return [
+                'verified' => false,
+                'temporary' => true,
+                'http_status' => 503,
+                'retry_after' => $retryAfter,
+                'error' => 'La clave pública del actor remoto no está disponible temporalmente.',
+                'key_id' => $keyId,
+                'signed_headers' => $signedHeaders,
+            ];
+        }
         return ['verified' => false, 'error' => 'No se pudo obtener la clave pública del actor remoto.', 'key_id' => $keyId, 'signed_headers' => $signedHeaders];
     }
     $publicKey = openssl_pkey_get_public($publicKeyPem);
@@ -11385,7 +11426,14 @@ function nammu_fediverse_handle_inbox_payload(array $payload, array $config, arr
 {
     $verification = nammu_fediverse_verify_inbox_request($payload, $headers, $rawBody, $config);
     if (empty($verification['verified'])) {
-        return ['accepted' => false, 'type' => 'unauthorized', 'verified' => false, 'error' => (string) ($verification['error'] ?? '')];
+        return [
+            'accepted' => false,
+            'type' => !empty($verification['temporary']) ? 'temporary_unavailable' : 'unauthorized',
+            'verified' => false,
+            'error' => (string) ($verification['error'] ?? ''),
+            'http_status' => (int) ($verification['http_status'] ?? (!empty($verification['temporary']) ? 503 : 401)),
+            'retry_after' => (int) ($verification['retry_after'] ?? 0),
+        ];
     }
     nammu_fediverse_store_inbox_activity($payload, [
         'verified' => true,

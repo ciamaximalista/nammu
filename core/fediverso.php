@@ -7731,6 +7731,21 @@ function nammu_fediverse_local_content_items(array $config, bool $refresh = fals
 
 function nammu_fediverse_local_items_index(array $config): array
 {
+    static $cache = [];
+    $baseUrl = rtrim(nammu_fediverse_base_url($config), '/');
+    $signatureParts = [
+        $baseUrl,
+        (string) @filemtime(dirname(__DIR__) . '/config/actualidad-items.json'),
+        (string) @filemtime(nammu_fediverse_legacy_actuality_file()),
+        (string) @filemtime(nammu_fediverse_legacy_actuality_aliases_file()),
+        (string) @filemtime(nammu_fediverse_home_snapshot_file()),
+        (string) @filemtime(nammu_fediverse_thread_state_file()),
+        (string) @filemtime(nammu_fediverse_actions_file()),
+    ];
+    $cacheKey = sha1(implode('|', $signatureParts));
+    if (isset($cache[$cacheKey])) {
+        return $cache[$cacheKey];
+    }
     $byIdentifier = [];
     $registerItem = static function (array $item, bool $overwrite = false) use (&$byIdentifier, $config): void {
         $identifiers = [];
@@ -7773,6 +7788,10 @@ function nammu_fediverse_local_items_index(array $config): array
         if (is_array($resendItem)) {
             $registerItem($resendItem, false);
         }
+    }
+    $cache[$cacheKey] = $byIdentifier;
+    if (count($cache) > 4) {
+        array_shift($cache);
     }
     return $byIdentifier;
 }

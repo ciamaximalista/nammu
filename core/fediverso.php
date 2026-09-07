@@ -8932,7 +8932,8 @@ function nammu_fediverse_activity_for_local_item(array $item, array $config): ar
         $itemId = trim((string) ($item['id'] ?? ''));
         $isActualityItem = $itemId !== '' && preg_match('#/ap/objects/actualidad-[^/]+$#', $itemId) === 1;
         $title = trim((string) ($item['title'] ?? ''));
-        if ($isActualityItem && $title !== '') {
+        $hasVisibleObjectTitle = in_array(strtolower($objectType), ['article', 'page'], true);
+        if ($isActualityItem && $title !== '' && !$hasVisibleObjectTitle) {
             $contentParts[] = '<p><strong>' . htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</strong></p>';
         }
         if ($originalObjectUrl !== '') {

@@ -579,6 +579,7 @@ if ($isPageTemplate && $formattedDate !== '') {
             <div class="fediverse-object-cta instapaper_ignore fediverse-object-cta--async" data-fediverse-fragment-url="<?= htmlspecialchars($fediverseFragmentUrl, ENT_QUOTES, 'UTF-8') ?>" aria-label="Resumen en el Fediverso">
                 <a class="fediverse-object-empty-btn fediverse-object-empty-btn--loading" href="<?= htmlspecialchars($fediverseThreadUrl, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars($fediverseButtonLabel, ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($fediverseButtonLabel, ENT_QUOTES, 'UTF-8') ?>">
                     <span>Cargando comentarios y reacciones...</span>
+                    <span class="fediverse-object-loading-indicator" aria-hidden="true"></span>
                     <?php if ($fediverseIcon !== ''): ?>
                         <span class="fediverse-object-cta-icon" aria-hidden="true"><?= $fediverseIcon ?></span>
                     <?php endif; ?>
@@ -666,6 +667,25 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     .fediverse-object-empty-btn--loading {
         opacity: .72;
+    }
+    .fediverse-object-loading-indicator {
+        width: 1rem;
+        height: 1rem;
+        flex: 0 0 auto;
+        border: 2px solid rgba(0, 0, 0, .16);
+        border-top-color: var(--color-link, currentColor);
+        border-radius: 999px;
+        animation: nammu-fediverse-loading-spin .85s linear infinite;
+    }
+    @keyframes nammu-fediverse-loading-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .fediverse-object-loading-indicator {
+            animation: none;
+        }
     }
     .fediverse-object-cta-icon {
         display: inline-flex;

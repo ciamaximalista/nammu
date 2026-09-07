@@ -538,6 +538,9 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
 .fediverse-object-cta--async { margin: 1rem 0; }
 .fediverse-object-empty-btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; width: 100%; box-sizing: border-box; border-radius: 999px; border: 1px solid rgba(0,0,0,.1); background: #fff; color: inherit; text-decoration: none; padding: .8rem 1rem; font-weight: 700; }
 .fediverse-object-empty-btn--loading { opacity: .75; cursor: wait; }
+.fediverse-object-loading-indicator { width: 1rem; height: 1rem; flex: 0 0 auto; border: 2px solid rgba(0,0,0,.16); border-top-color: currentColor; border-radius: 999px; animation: nammu-fediverse-loading-spin .85s linear infinite; }
+@keyframes nammu-fediverse-loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .fediverse-object-loading-indicator { animation: none; } }
 .fediverse-object-cta--async-error .fediverse-object-empty-btn--loading { cursor: pointer; opacity: 1; }
 .fediverse-public-section h2 { margin: 0 0 1rem; font-size: 1.15rem; }
 .fediverse-public-thread { display: grid; gap: .9rem; }
@@ -720,6 +723,7 @@ $threadMediaAttachmentsHtml = $renderFediversePublicMediaAttachments($threadAtta
         <div class="fediverse-object-cta fediverse-object-cta--async" data-fediverse-fragment-url="<?= htmlspecialchars($threadInteractionsFragmentUrl, ENT_QUOTES, 'UTF-8') ?>" aria-live="polite">
             <a class="fediverse-object-empty-btn fediverse-object-empty-btn--loading" href="<?= htmlspecialchars($threadUrl !== '' ? $threadUrl : '#', ENT_QUOTES, 'UTF-8') ?>">
                 <span>Cargando comentarios y reacciones...</span>
+                <span class="fediverse-object-loading-indicator" aria-hidden="true"></span>
             </a>
         </div>
     <?php elseif (!empty($threadReplies)): ?>

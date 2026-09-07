@@ -53,5 +53,5 @@ vendor/
 backups/*
 !backups/.gitkeep
 !backups/.htaccess
-
+.codewhale/
 blog.xml

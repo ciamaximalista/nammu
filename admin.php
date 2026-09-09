@@ -824,7 +824,7 @@ function admin_multi_instance_scheduler_lock_file(array $config): string
 
 function admin_multi_instance_trace_file(array $config): string
 {
-    $backupDir = __DIR__ . '/backups';
+    $backupDir = nammu_backup_dir($config, __DIR__);
     if (!is_dir($backupDir)) {
         nammu_ensure_directory($backupDir);
     }
@@ -1407,7 +1407,98 @@ function parse_yaml_front_matter($content) {
 }
 
 function admin_stats_backup_dir(): string {
-    return __DIR__ . '/backups';
+    $config = function_exists('nammu_load_config') ? nammu_load_config() : load_config_file();
+    return nammu_backup_dir($config, __DIR__);
+}
+
+function admin_copy_backup_directory(string $source, string $destination, ?string &$error = null): bool
+{
+    if (!is_dir($source)) {
+        return true;
+    }
+    if (!nammu_ensure_directory($destination)) {
+        $error = 'No se pudo crear el nuevo directorio de backups.';
+        return false;
+    }
+    $items = @scandir($source);
+    if (!is_array($items)) {
+        $error = 'No se pudo leer el directorio actual de backups.';
+        return false;
+    }
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+        $from = rtrim($source, '/') . '/' . $item;
+        $to = rtrim($destination, '/') . '/' . $item;
+        if (is_dir($from) && !is_link($from)) {
+            if (!admin_copy_backup_directory($from, $to, $error)) {
+                return false;
+            }
+            continue;
+        }
+        if (!@copy($from, $to)) {
+            $error = 'No se pudo copiar el backup ' . $item . ' al nuevo directorio.';
+            return false;
+        }
+        nammu_apply_shared_permissions($to, 0664, dirname($to));
+    }
+    return true;
+}
+
+function admin_backup_directory_is_safe(string $directory): bool
+{
+    $directory = rtrim($directory, '/');
+    if ($directory === '' || $directory === '/') {
+        return false;
+    }
+    $blocked = [
+        __DIR__,
+        dirname(__DIR__),
+        dirname(dirname(__DIR__)),
+        '/var',
+        '/var/www',
+        '/var/www/html',
+        '/tmp',
+    ];
+    return !in_array($directory, array_map(static fn(string $path): string => rtrim($path, '/'), $blocked), true);
+}
+
+function admin_update_backup_directory(string $newDirectory, ?string &$error = null): bool
+{
+    $config = load_config_file();
+    $currentDirectory = admin_stats_backup_dir();
+    $targetDirectory = nammu_normalize_backup_dir($newDirectory, __DIR__);
+    if (!admin_backup_directory_is_safe($targetDirectory)) {
+        $error = 'La ruta del directorio de backups no es válida.';
+        return false;
+    }
+    if (!nammu_ensure_directory($targetDirectory)) {
+        $error = 'No se pudo crear el directorio de backups indicado.';
+        return false;
+    }
+    if (!is_writable($targetDirectory)) {
+        $error = 'El directorio de backups indicado no es escribible.';
+        return false;
+    }
+    $directoryChanged = $currentDirectory !== $targetDirectory;
+    if ($directoryChanged) {
+        if (str_starts_with(rtrim($targetDirectory, '/') . '/', rtrim($currentDirectory, '/') . '/')) {
+            $error = 'El nuevo directorio de backups no puede estar dentro del directorio antiguo.';
+            return false;
+        }
+        if (!admin_copy_backup_directory($currentDirectory, $targetDirectory, $error)) {
+            return false;
+        }
+    }
+    $config['backups'] = is_array($config['backups'] ?? null) ? $config['backups'] : [];
+    $config['backups']['directory'] = $targetDirectory;
+    save_config_file($config);
+    if ($directoryChanged && is_dir($currentDirectory) && admin_backup_directory_is_safe($currentDirectory) && !admin_recursive_delete_path($currentDirectory)) {
+        $error = 'Los backups se copiaron y la configuración se guardó, pero no se pudo borrar el directorio antiguo.';
+        return false;
+    }
+    return true;
 }
 
 function admin_maintenance_trace(array $entry): void
@@ -1415,7 +1506,7 @@ function admin_maintenance_trace(array $entry): void
     if (PHP_SAPI !== 'cli' || !admin_cli_debug_enabled()) {
         return;
     }
-    $backupDir = __DIR__ . '/backups';
+    $backupDir = admin_stats_backup_dir();
     if (!is_dir($backupDir)) {
         nammu_ensure_directory($backupDir);
     }
@@ -1429,7 +1520,7 @@ function admin_heavy_trace(array $entry): void
     if (PHP_SAPI !== 'cli' || !admin_cli_debug_enabled()) {
         return;
     }
-    $backupDir = __DIR__ . '/backups';
+    $backupDir = admin_stats_backup_dir();
     if (!is_dir($backupDir)) {
         nammu_ensure_directory($backupDir);
     }
@@ -9121,6 +9212,12 @@ if (!is_array($statsBackupFeedback) || !isset($statsBackupFeedback['message'], $
 } else {
     unset($_SESSION['stats_backup_feedback']);
 }
+$backupFeedback = $_SESSION['backup_feedback'] ?? null;
+if (!is_array($backupFeedback) || !isset($backupFeedback['message'], $backupFeedback['type'])) {
+    $backupFeedback = null;
+} else {
+    unset($_SESSION['backup_feedback']);
+}
 $fullBackupFeedback = $_SESSION['full_backup_feedback'] ?? null;
 if (!is_array($fullBackupFeedback) || !isset($fullBackupFeedback['message'], $fullBackupFeedback['type'])) {
     $fullBackupFeedback = null;
@@ -11837,6 +11934,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         $_SESSION['bing_webmaster_feedback'] = $feedback;
+        header('Location: admin.php?page=configuracion');
+        exit;
+    } elseif (isset($_POST['save_backup_settings'])) {
+        $backupDirectory = trim((string) ($_POST['backup_directory'] ?? ''));
+        $backupError = null;
+        if (admin_update_backup_directory($backupDirectory, $backupError)) {
+            $_SESSION['backup_feedback'] = [
+                'type' => 'success',
+                'message' => 'Directorio de backups actualizado correctamente.',
+            ];
+        } else {
+            $_SESSION['backup_feedback'] = [
+                'type' => 'danger',
+                'message' => $backupError ?: 'No se pudo actualizar el directorio de backups.',
+            ];
+        }
         header('Location: admin.php?page=configuracion');
         exit;
     } elseif (isset($_POST['restore_stats_backup'])) {

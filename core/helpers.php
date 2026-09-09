@@ -39,6 +39,32 @@ function nammu_apply_shared_permissions(string $path, int $permissions = 0664, ?
     @chmod($path, $permissions);
 }
 
+function nammu_default_backup_dir(?string $root = null): string
+{
+    $root = $root !== null && trim($root) !== '' ? rtrim(trim($root), '/') : dirname(__DIR__);
+    return $root . '/backups';
+}
+
+function nammu_normalize_backup_dir(string $path, ?string $root = null): string
+{
+    $path = trim(str_replace("\0", '', $path));
+    $root = $root !== null && trim($root) !== '' ? rtrim(trim($root), '/') : dirname(__DIR__);
+    if ($path === '') {
+        return nammu_default_backup_dir($root);
+    }
+    if ($path[0] !== '/') {
+        $path = $root . '/' . $path;
+    }
+    return rtrim((string) preg_replace('#/+#', '/', $path), '/');
+}
+
+function nammu_backup_dir(array $config = [], ?string $root = null): string
+{
+    $settings = is_array($config['backups'] ?? null) ? $config['backups'] : [];
+    $path = trim((string) ($settings['directory'] ?? ''));
+    return nammu_normalize_backup_dir($path, $root);
+}
+
 function nammu_set_cookie(string $name, string $value, int $expires, bool $httpOnly = true, string $sameSite = 'Lax'): void
 {
     $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';

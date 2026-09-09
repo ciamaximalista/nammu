@@ -34,6 +34,11 @@
                 <?= htmlspecialchars($statsBackupFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
             </div>
         <?php endif; ?>
+        <?php if (isset($backupFeedback) && $backupFeedback !== null): ?>
+            <div class="alert alert-<?= $backupFeedback['type'] === 'success' ? 'success' : 'danger' ?>">
+                <?= htmlspecialchars($backupFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
         <?php if (isset($fullBackupFeedback) && $fullBackupFeedback !== null): ?>
             <div class="alert alert-<?= $fullBackupFeedback['type'] === 'success' ? 'success' : 'danger' ?>">
                 <?= htmlspecialchars($fullBackupFeedback['message'], ENT_QUOTES, 'UTF-8') ?>
@@ -114,6 +119,12 @@
         }
         $statsBackups = function_exists('admin_list_stats_backups') ? admin_list_stats_backups(7) : [];
         $fullBackups = function_exists('admin_list_full_backups') ? admin_list_full_backups(8) : [];
+        $backupDirectory = function_exists('nammu_backup_dir')
+            ? nammu_backup_dir($settings, dirname(__DIR__))
+            : (dirname(__DIR__) . '/backups');
+        $defaultBackupDirectory = function_exists('nammu_default_backup_dir')
+            ? nammu_default_backup_dir(dirname(__DIR__))
+            : (dirname(__DIR__) . '/backups');
         $siteBaseForMachineFiles = trim((string) ($settings['site_url'] ?? ''));
         if ($siteBaseForMachineFiles === '' && function_exists('nammu_base_url')) {
             $siteBaseForMachineFiles = nammu_base_url();
@@ -519,27 +530,75 @@
         </div>
 
         <hr class="my-5">
-        <h3>Backups de estadísticas</h3>
-        <p class="text-muted">Restaura estadísticas desde backups de los últimos 7 días.</p>
-        <form method="post" class="mb-4">
-            <div class="form-group">
-                <label for="stats_backup_file">Backup disponible</label>
-                <select name="stats_backup_file" id="stats_backup_file" class="form-control" <?= $statsBackups ? '' : 'disabled' ?>>
-                    <?php if (!$statsBackups): ?>
-                        <option value="">No hay backups disponibles</option>
-                    <?php else: ?>
-                        <?php foreach ($statsBackups as $backup): ?>
-                            <option value="<?= htmlspecialchars($backup['file'], ENT_QUOTES, 'UTF-8') ?>">
-                                <?= htmlspecialchars($backup['label'] ?? $backup['file'], ENT_QUOTES, 'UTF-8') ?>
-                            </option>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </select>
+        <div class="card border-0 bg-light">
+            <div class="card-body">
+                <h3>Backups</h3>
+                <p class="text-muted">Configura el directorio común para backups de estadísticas, backups completos, trazas y logs generados por Nammu.</p>
+                <form method="post" class="mb-4">
+                    <div class="form-group">
+                        <label for="backup_directory">Directorio de backups</label>
+                        <input type="text" name="backup_directory" id="backup_directory" class="form-control" value="<?= htmlspecialchars($backupDirectory, ENT_QUOTES, 'UTF-8') ?>" placeholder="<?= htmlspecialchars($defaultBackupDirectory, ENT_QUOTES, 'UTF-8') ?>">
+                        <small class="form-text text-muted">Puede ser una ruta absoluta o relativa a la raíz del sitio. Si cambia, Nammu copiará el contenido del directorio actual al nuevo y después borrará el antiguo.</small>
+                    </div>
+                    <div class="text-right">
+                        <button type="submit" name="save_backup_settings" class="btn btn-outline-primary">Guardar directorio de backups</button>
+                    </div>
+                </form>
+
+                <h4>Backups de estadísticas</h4>
+                <p class="text-muted">Restaura estadísticas desde backups de los últimos 7 días.</p>
+                <form method="post" class="mb-4">
+                    <div class="form-group">
+                        <label for="stats_backup_file">Backup disponible</label>
+                        <select name="stats_backup_file" id="stats_backup_file" class="form-control" <?= $statsBackups ? '' : 'disabled' ?>>
+                            <?php if (!$statsBackups): ?>
+                                <option value="">No hay backups disponibles</option>
+                            <?php else: ?>
+                                <?php foreach ($statsBackups as $backup): ?>
+                                    <option value="<?= htmlspecialchars($backup['file'], ENT_QUOTES, 'UTF-8') ?>">
+                                        <?= htmlspecialchars($backup['label'] ?? $backup['file'], ENT_QUOTES, 'UTF-8') ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                    </div>
+                    <div class="text-right">
+                        <button type="submit" name="restore_stats_backup" class="btn btn-outline-primary" <?= $statsBackups ? '' : 'disabled' ?>>Recuperar estadísticas desde backup</button>
+                    </div>
+                </form>
+
+                <h4>Backup completo semanal</h4>
+                <p class="text-muted">Incluye <code>content/</code>, <code>assets/</code>, <code>config/</code> y estadísticas. Se conservan las últimas 8 semanas.</p>
+                <?php if (empty($fullBackups)): ?>
+                    <p class="text-muted mb-0">Todavía no hay backups completos disponibles.</p>
+                <?php else: ?>
+                    <div class="table-responsive mb-0">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Archivo</th>
+                                    <th>Fecha</th>
+                                    <th>Tamaño</th>
+                                    <th class="text-right">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($fullBackups as $backup): ?>
+                                    <tr>
+                                        <td><code><?= htmlspecialchars($backup['file'], ENT_QUOTES, 'UTF-8') ?></code></td>
+                                        <td><?= htmlspecialchars(date('d/m/Y H:i:s', (int) ($backup['mtime'] ?? 0)), ENT_QUOTES, 'UTF-8') ?></td>
+                                        <td><?= htmlspecialchars(number_format(((int) ($backup['size'] ?? 0)) / 1024 / 1024, 2, ',', '.') . ' MiB', ENT_QUOTES, 'UTF-8') ?></td>
+                                        <td class="text-right">
+                                            <a class="btn btn-sm btn-outline-primary" href="<?= htmlspecialchars($backup['download_url'], ENT_QUOTES, 'UTF-8') ?>">Descargar</a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
             </div>
-            <div class="text-right mb-4">
-                <button type="submit" name="restore_stats_backup" class="btn btn-outline-primary" <?= $statsBackups ? '' : 'disabled' ?>>Recuperar estadísticas desde backup</button>
-            </div>
-        </form>
+        </div>
 
             <hr class="my-5">
             <h3>Cuenta de acceso</h3>
@@ -567,38 +626,6 @@
                 </div>
                 <button type="submit" name="update_account" class="btn btn-outline-primary">Actualizar cuenta</button>
             </form>
-
-            <hr class="my-5">
-            <h3>Backup completo semanal</h3>
-            <p class="text-muted">Incluye <code>content/</code>, <code>assets/</code>, <code>config/</code> y estadísticas. Se conservan las últimas 8 semanas.</p>
-            <?php if (empty($fullBackups)): ?>
-                <p class="text-muted mb-4">Todavía no hay backups completos disponibles.</p>
-            <?php else: ?>
-                <div class="table-responsive mb-4">
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Archivo</th>
-                                <th>Fecha</th>
-                                <th>Tamaño</th>
-                                <th class="text-right">Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($fullBackups as $backup): ?>
-                                <tr>
-                                    <td><code><?= htmlspecialchars($backup['file'], ENT_QUOTES, 'UTF-8') ?></code></td>
-                                    <td><?= htmlspecialchars(date('d/m/Y H:i:s', (int) ($backup['mtime'] ?? 0)), ENT_QUOTES, 'UTF-8') ?></td>
-                                    <td><?= htmlspecialchars(number_format(((int) ($backup['size'] ?? 0)) / 1024 / 1024, 2, ',', '.') . ' MiB', ENT_QUOTES, 'UTF-8') ?></td>
-                                    <td class="text-right">
-                                        <a class="btn btn-sm btn-outline-primary" href="<?= htmlspecialchars($backup['download_url'], ENT_QUOTES, 'UTF-8') ?>">Descargar</a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php endif; ?>
 
             <hr class="my-5">
             <div class="card border-0 bg-light">

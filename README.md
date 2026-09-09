@@ -305,19 +305,21 @@ Las tres deben ejecutarse con el usuario del servidor web, escalonando las disti
 
 ### Bloque de cron recomendado
 
+En `admin.php?page=configuracion`, Nammu permite definir un directorio común de backups. Si no configuras nada, se usa `/var/www/html/<carpeta-publica>/backups`. Si eliges otra ruta, los scripts `core/backup-daily.php` y `core/backup-weekly.php` la leen de `config/config.yml` sin necesitar `--dest`; ajusta también las redirecciones `>>` del cron para que los logs vayan al mismo sitio.
+
 ```bash
-*/5 * * * * umask 0002; flock -n /tmp/<carpeta-publica>-run-scheduled.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
-12,27,42,57 * * * * umask 0002; flock -n /tmp/<carpeta-publica>-run-scheduled-maintenance.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-maintenance >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
-7 * * * * umask 0002; flock -n /tmp/<carpeta-publica>-run-scheduled-heavy.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-heavy >> /var/www/html/<carpeta-publica>/backups/cron.log 2>&1
-15 3 * * * umask 0002; flock -n /tmp/<carpeta-publica>-backup-daily.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
-30 3 * * 0 umask 0002; flock -n /tmp/<carpeta-publica>-backup-cleanup.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> /var/www/html/<carpeta-publica>/backups/backup.log 2>&1
-45 3 * * 0 umask 0002; flock -n /tmp/<carpeta-publica>-backup-weekly.lock php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> /var/www/html/<carpeta-publica>/backups/backup-full.log 2>&1
+*/5 * * * * umask 0002; flock -n /tmp/<carpeta-publica>-run-scheduled.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> <directorio-backups>/cron.log 2>&1
+12,27,42,57 * * * * umask 0002; flock -n /tmp/<carpeta-publica>-run-scheduled-maintenance.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-maintenance >> <directorio-backups>/cron.log 2>&1
+7 * * * * umask 0002; flock -n /tmp/<carpeta-publica>-run-scheduled-heavy.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled-heavy >> <directorio-backups>/cron.log 2>&1
+15 3 * * * umask 0002; flock -n /tmp/<carpeta-publica>-backup-daily.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --retention=7 >> <directorio-backups>/backup.log 2>&1
+30 3 * * 0 umask 0002; flock -n /tmp/<carpeta-publica>-backup-cleanup.lock php /var/www/html/<carpeta-publica>/core/backup-daily.php --cleanup-only --retention=7 >> <directorio-backups>/backup.log 2>&1
+45 3 * * 0 umask 0002; flock -n /tmp/<carpeta-publica>-backup-weekly.lock php /var/www/html/<carpeta-publica>/core/backup-weekly.php --retention-weeks=8 >> <directorio-backups>/backup-full.log 2>&1
 ```
 
 Si usas el planificador central multiinstancia, la forma más robusta es ejecutarlo con rutas absolutas y `timeout`:
 
 ```bash
-* * * * * umask 0002; /usr/bin/timeout -k 10s 50s /usr/bin/flock -n /tmp/<cluster>-run-cluster.lock /usr/bin/php /var/www/html/<carpeta-publica>/admin.php --run-cluster-scheduled >> /var/www/html/<carpeta-publica>/backups/cluster-cron.log 2>&1
+* * * * * umask 0002; /usr/bin/timeout -k 10s 50s /usr/bin/flock -n /tmp/<cluster>-run-cluster.lock /usr/bin/php /var/www/html/<carpeta-publica>/admin.php --run-cluster-scheduled >> <directorio-backups>/cluster-cron.log 2>&1
 ```
 
 Así evitas que un proceso colgado retenga el lock indefinidamente.

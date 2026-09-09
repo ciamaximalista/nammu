@@ -11,7 +11,8 @@ if (PHP_SAPI !== 'cli') {
 $root = dirname(__DIR__);
 require_once $root . '/core/helpers.php';
 
-$defaultBackupDir = $root . '/backups';
+$config = function_exists('nammu_load_config') ? nammu_load_config() : [];
+$defaultBackupDir = nammu_backup_dir($config, $root);
 $defaultRetentionWeeks = 8;
 $lockFile = $root . '/config/backup-full.lock';
 

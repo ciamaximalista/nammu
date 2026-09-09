@@ -60,9 +60,18 @@ function nammu_normalize_backup_dir(string $path, ?string $root = null): string
 
 function nammu_backup_dir(array $config = [], ?string $root = null): string
 {
+    $root = $root !== null && trim($root) !== '' ? rtrim(trim($root), '/') : dirname(__DIR__);
     $settings = is_array($config['backups'] ?? null) ? $config['backups'] : [];
     $path = trim((string) ($settings['directory'] ?? ''));
-    return nammu_normalize_backup_dir($path, $root);
+    $directory = nammu_normalize_backup_dir($path, $root);
+    if ($path === '' || $directory === nammu_default_backup_dir($root)) {
+        return $directory;
+    }
+    $siteDirectory = trim(basename($root));
+    if ($siteDirectory === '' || basename($directory) === $siteDirectory) {
+        return $directory;
+    }
+    return $directory . '/' . $siteDirectory;
 }
 
 function nammu_set_cookie(string $name, string $value, int $expires, bool $httpOnly = true, string $sameSite = 'Lax'): void

@@ -119,6 +119,11 @@
         }
         $statsBackups = function_exists('admin_list_stats_backups') ? admin_list_stats_backups(7) : [];
         $fullBackups = function_exists('admin_list_full_backups') ? admin_list_full_backups(8) : [];
+        $backupSettings = is_array($settings['backups'] ?? null) ? $settings['backups'] : [];
+        $configuredBackupDirectory = trim((string) ($backupSettings['directory'] ?? ''));
+        $configuredBackupDirectory = $configuredBackupDirectory !== ''
+            ? $configuredBackupDirectory
+            : (function_exists('nammu_default_backup_dir') ? nammu_default_backup_dir(dirname(__DIR__)) : (dirname(__DIR__) . '/backups'));
         $backupDirectory = function_exists('nammu_backup_dir')
             ? nammu_backup_dir($settings, dirname(__DIR__))
             : (dirname(__DIR__) . '/backups');
@@ -537,8 +542,9 @@
                 <form method="post" class="mb-4">
                     <div class="form-group">
                         <label for="backup_directory">Directorio de backups</label>
-                        <input type="text" name="backup_directory" id="backup_directory" class="form-control" value="<?= htmlspecialchars($backupDirectory, ENT_QUOTES, 'UTF-8') ?>" placeholder="<?= htmlspecialchars($defaultBackupDirectory, ENT_QUOTES, 'UTF-8') ?>">
-                        <small class="form-text text-muted">Puede ser una ruta absoluta o relativa a la raíz del sitio. Si cambia, Nammu copiará el contenido del directorio actual al nuevo y después borrará el antiguo.</small>
+                        <input type="text" name="backup_directory" id="backup_directory" class="form-control" value="<?= htmlspecialchars($configuredBackupDirectory, ENT_QUOTES, 'UTF-8') ?>" placeholder="<?= htmlspecialchars($defaultBackupDirectory, ENT_QUOTES, 'UTF-8') ?>">
+                        <small class="form-text text-muted">Puede ser una ruta absoluta o relativa a la raíz del sitio. Si apunta a una carpeta compartida, Nammu usará una subcarpeta con el nombre del blog para no mezclar backups de varias instalaciones.</small>
+                        <small class="form-text text-muted">Ruta efectiva actual: <code><?= htmlspecialchars($backupDirectory, ENT_QUOTES, 'UTF-8') ?></code></small>
                     </div>
                     <div class="text-right">
                         <button type="submit" name="save_backup_settings" class="btn btn-outline-primary">Guardar directorio de backups</button>

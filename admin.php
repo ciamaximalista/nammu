@@ -1468,8 +1468,9 @@ function admin_update_backup_directory(string $newDirectory, ?string &$error = n
 {
     $config = load_config_file();
     $currentDirectory = admin_stats_backup_dir();
-    $targetDirectory = nammu_normalize_backup_dir($newDirectory, __DIR__);
-    if (!admin_backup_directory_is_safe($targetDirectory)) {
+    $configuredDirectory = nammu_normalize_backup_dir($newDirectory, __DIR__);
+    $targetDirectory = nammu_backup_dir(['backups' => ['directory' => $configuredDirectory]], __DIR__);
+    if (!admin_backup_directory_is_safe($configuredDirectory) || !admin_backup_directory_is_safe($targetDirectory)) {
         $error = 'La ruta del directorio de backups no es válida.';
         return false;
     }
@@ -1492,7 +1493,7 @@ function admin_update_backup_directory(string $newDirectory, ?string &$error = n
         }
     }
     $config['backups'] = is_array($config['backups'] ?? null) ? $config['backups'] : [];
-    $config['backups']['directory'] = $targetDirectory;
+    $config['backups']['directory'] = $configuredDirectory;
     save_config_file($config);
     if ($directoryChanged && is_dir($currentDirectory) && admin_backup_directory_is_safe($currentDirectory) && !admin_recursive_delete_path($currentDirectory)) {
         $error = 'Los backups se copiaron y la configuración se guardó, pero no se pudo borrar el directorio antiguo.';

@@ -305,7 +305,7 @@ Las tres deben ejecutarse con el usuario del servidor web, escalonando las disti
 
 ### Bloque de cron recomendado
 
-En `admin.php?page=configuracion`, Nammu permite definir un directorio común de backups. Si no configuras nada, se usa `/var/www/html/<carpeta-publica>/backups`. Si eliges otra ruta, los scripts `core/backup-daily.php` y `core/backup-weekly.php` la leen de `config/config.yml` sin necesitar `--dest`; ajusta también las redirecciones `>>` del cron para que los logs vayan al mismo sitio.
+En `admin.php?page=configuracion`, Nammu permite definir un directorio común de backups. Si no configuras nada, se usa `/var/www/html/<carpeta-publica>/backups`. Si eliges una ruta compartida como `/media/backups`, Nammu usará automáticamente una subcarpeta por blog, por ejemplo `/media/backups/<carpeta-publica>`, para no mezclar backups de varias instalaciones. Los scripts `core/backup-daily.php` y `core/backup-weekly.php` leen esa configuración sin necesitar `--dest`; ajusta también las redirecciones `>>` del cron para que los logs vayan al mismo sitio.
 
 ```bash
 */5 * * * * umask 0002; flock -n /tmp/<carpeta-publica>-run-scheduled.lock php /var/www/html/<carpeta-publica>/admin.php --run-scheduled >> <directorio-backups>/cron.log 2>&1

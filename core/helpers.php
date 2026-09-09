@@ -11,6 +11,7 @@ function nammu_ensure_directory(string $directory, int $permissions = 02775): bo
         return false;
     }
     $permissions |= 02000;
+    $fallbackPermissions = $permissions & ~02000;
 
     clearstatcache(true, $directory);
     if (is_dir($directory)) {
@@ -18,7 +19,11 @@ function nammu_ensure_directory(string $directory, int $permissions = 02775): bo
         return true;
     }
 
-    if (@mkdir($directory, $permissions, true) || is_dir($directory)) {
+    if (
+        @mkdir($directory, $permissions, true)
+        || @mkdir($directory, $fallbackPermissions, true)
+        || is_dir($directory)
+    ) {
         @chmod($directory, $permissions);
         return true;
     }

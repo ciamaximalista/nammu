@@ -361,7 +361,7 @@ function admin_run_scheduled_maintenance_tasks(): array {
             return nammu_fediverse_process_avatar_cache_queue($config, 3);
         });
     }
-    $pendingSocialRssLinkCards = 0;
+    $pendingSocialRssLinkCardsAwaitingAttempt = 0;
     if (function_exists('nammu_fediverse_link_card_queue_store')) {
         $linkCardQueueStore = nammu_fediverse_link_card_queue_store();
         foreach ((array) ($linkCardQueueStore['items'] ?? []) as $queueEntry) {
@@ -369,12 +369,13 @@ function admin_run_scheduled_maintenance_tasks(): array {
                 continue;
             }
             $reason = trim((string) ($queueEntry['reason'] ?? ''));
-            if ($reason === 'social-rss-news') {
-                $pendingSocialRssLinkCards++;
+            if ($reason === 'social-rss-news' && (int) ($queueEntry['attempts'] ?? 0) <= 0) {
+                $pendingSocialRssLinkCardsAwaitingAttempt++;
             }
         }
     }
-    $shouldDeferActualityPublish = (int) ($rssStats['discovered'] ?? 0) > 0 || $pendingSocialRssLinkCards > 0;
+    $shouldDeferActualityPublish = (int) ($rssStats['discovered'] ?? 0) > 0
+        || $pendingSocialRssLinkCardsAwaitingAttempt > 0;
     if (!$shouldDeferActualityPublish && function_exists('nammu_actuality_rebuild_snapshot')) {
         $rebuiltActuality = $traceStep('actuality_rebuild_snapshot', static function () use ($baseUrl, $config, $siteName, $siteDescription, $siteLang) {
             return nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteName, $siteDescription, $siteLang);

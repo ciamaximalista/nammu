@@ -6413,6 +6413,11 @@ function nammu_fediverse_refresh_link_card_queue(array $config, int $limit = 8, 
         return ['processed' => 0, 'updated' => 0, 'failed' => 0, 'remaining' => 0];
     }
     uasort($queueItems, static function (array $a, array $b): int {
+        $priorityA = trim((string) ($a['reason'] ?? '')) === 'social-rss-news' ? 1 : 0;
+        $priorityB = trim((string) ($b['reason'] ?? '')) === 'social-rss-news' ? 1 : 0;
+        if ($priorityA !== $priorityB) {
+            return $priorityB <=> $priorityA;
+        }
         $requestedA = (int) (($a['last_requested_at'] ?? 0) ?: ($a['queued_at'] ?? 0));
         $requestedB = (int) (($b['last_requested_at'] ?? 0) ?: ($b['queued_at'] ?? 0));
         return $requestedB <=> $requestedA;

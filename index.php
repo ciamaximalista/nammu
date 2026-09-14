@@ -944,6 +944,9 @@ if (preg_match('#^/fediverso-thread-fragment/(post|podcast|itinerary)/([^/]+)/?$
     if (function_exists('nammu_fediverse_find_named_local_item') && function_exists('nammu_fediverse_best_thread_page_payload')) {
         $fragmentItem = nammu_fediverse_find_named_local_item($fragmentSlug, $fragmentTemplate, $configData);
         if (is_array($fragmentItem)) {
+            if (function_exists('nammu_fediverse_enqueue_thread_refresh_for_item')) {
+                nammu_fediverse_enqueue_thread_refresh_for_item($fragmentItem, $configData, 'public-fragment');
+            }
             $fragmentPayload = nammu_fediverse_best_thread_page_payload($fragmentItem, $configData);
             if (is_array($fragmentPayload['summary'] ?? null) || is_array($fragmentPayload['details'] ?? null)) {
                 $fragmentMeta = [
@@ -991,6 +994,9 @@ if (preg_match('#^/fediverso-thread-fragment/object/([a-f0-9]{24})/?$#', $routeP
         echo '';
         exit;
     }
+    if (function_exists('nammu_fediverse_enqueue_thread_refresh_for_item')) {
+        nammu_fediverse_enqueue_thread_refresh_for_item($fragmentItem, $configData, 'public-object-fragment');
+    }
     $fragmentPayload = function_exists('nammu_fediverse_best_thread_page_payload')
         ? nammu_fediverse_best_thread_page_payload($fragmentItem, $configData)
         : (function_exists('nammu_fediverse_thread_page_payload') ? nammu_fediverse_thread_page_payload($fragmentItem, $configData) : []);
@@ -1029,6 +1035,9 @@ if (preg_match('#^/fediverso/([a-f0-9]{24})/?$#', $routePath, $fediverseThreadMa
     $threadItem = nammu_fediverse_find_local_item_for_thread_hash($threadHash, $configData);
     if (!is_array($threadItem)) {
         $renderNotFound('Hilo federado no encontrado', 'La publicación federada solicitada no está disponible.', $routePath);
+    }
+    if (function_exists('nammu_fediverse_enqueue_thread_refresh_for_item')) {
+        nammu_fediverse_enqueue_thread_refresh_for_item($threadItem, $configData, 'public-thread-page');
     }
     $threadPayload = nammu_fediverse_thread_page_snapshot_payload($threadItem, $configData);
     $threadItemId = trim((string) ($threadItem['id'] ?? ''));

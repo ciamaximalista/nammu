@@ -694,6 +694,8 @@ unset($_SESSION['newsletter_custom_recipients']);
         $post_data = $safeEditFilename !== '' ? get_post_content($safeEditFilename) : null;
 
         if ($post_data):
+            $editFilePath = CONTENT_DIR . '/' . $safeEditFilename;
+            $editFileMtime = is_file($editFilePath) ? (int) filemtime($editFilePath) : 0;
             $currentTemplateValue = strtolower($post_data['metadata']['Template'] ?? 'post');
             $currentStatusValue = strtolower($post_data['metadata']['Status'] ?? 'published');
             if (!in_array($currentStatusValue, ['draft', 'published', 'newsletter'], true)) {
@@ -770,6 +772,7 @@ unset($_SESSION['newsletter_custom_recipients']);
             <form method="post">
 
             <input type="hidden" name="filename" value="<?= htmlspecialchars($safeEditFilename, ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="server_mtime" value="<?= $editFileMtime ?>">
             <input type="hidden" name="status" value="<?= htmlspecialchars($currentStatusValue, ENT_QUOTES, 'UTF-8') ?>">
 
             <div class="form-group">

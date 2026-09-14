@@ -135,6 +135,11 @@ function nammu_fediverse_fragments_cache_file(): string
     return dirname(__DIR__) . '/config/fediverso-fragments-cache.json';
 }
 
+function nammu_fediverse_thread_refresh_queue_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-thread-refresh-queue.json';
+}
+
 function nammu_fediverse_home_snapshot_file(): string
 {
     return dirname(__DIR__) . '/config/fediverso-home.json';
@@ -977,6 +982,18 @@ function nammu_fediverse_fragments_cache_store(): array
 function nammu_fediverse_save_fragments_cache_store(array $items): void
 {
     nammu_fediverse_save_json_store(nammu_fediverse_fragments_cache_file(), ['items' => $items]);
+}
+
+function nammu_fediverse_thread_refresh_queue_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_thread_refresh_queue_file(), ['items' => []]);
+    $store['items'] = is_array($store['items'] ?? null) ? $store['items'] : [];
+    return $store;
+}
+
+function nammu_fediverse_save_thread_refresh_queue_store(array $items): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_thread_refresh_queue_file(), ['items' => array_values($items)]);
 }
 
 function nammu_fediverse_home_snapshot_store(): array
@@ -5032,6 +5049,7 @@ function nammu_fediverse_store_files_for_tab(string $tab): array
             nammu_fediverse_hidden_replies_file(),
             nammu_fediverse_followers_file(),
             nammu_fediverse_update_queue_file(),
+            nammu_fediverse_thread_refresh_queue_file(),
         ],
         'notifications' => [
             nammu_fediverse_notifications_snapshot_file(),
@@ -5048,6 +5066,7 @@ function nammu_fediverse_store_files_for_tab(string $tab): array
             nammu_fediverse_following_file(),
             nammu_fediverse_followers_file(),
             nammu_fediverse_hidden_replies_file(),
+            nammu_fediverse_thread_refresh_queue_file(),
         ],
         'mentions' => [
             dirname(__DIR__) . '/config/webmentions.json',
@@ -5075,6 +5094,7 @@ function nammu_fediverse_store_files_for_tab(string $tab): array
             nammu_fediverse_hidden_replies_file(),
             nammu_fediverse_blocked_file(),
             nammu_fediverse_update_queue_file(),
+            nammu_fediverse_thread_refresh_queue_file(),
         ],
     };
     return array_values(array_unique($files));
@@ -5848,6 +5868,20 @@ function nammu_fediverse_thread_page_payload(array $item, array $config): array
     ]);
 }
 
+function nammu_fediverse_empty_thread_page_payload(array $item, array $config): array
+{
+    $canonicalItem = nammu_fediverse_canonical_local_item($item, $config);
+    $itemId = trim((string) ($canonicalItem['id'] ?? ($item['id'] ?? '')));
+    return nammu_fediverse_normalize_thread_payload([
+        'item' => $canonicalItem,
+        'thread_url' => $itemId !== '' ? nammu_fediverse_thread_page_url($itemId, $config) : '',
+        'original_url' => trim((string) ($canonicalItem['url'] ?? ($item['url'] ?? ''))),
+        'summary' => ['likes' => 0, 'shares' => 0, 'replies' => 0],
+        'details' => ['likes' => [], 'shares' => [], 'replies' => []],
+        'replies' => [],
+    ]);
+}
+
 function nammu_fediverse_reaction_target_identifier_variants(string $identifier, int $depth = 0): array
 {
     $identifier = trim($identifier);
@@ -6125,32 +6159,132 @@ function nammu_fediverse_persist_thread_page_payload(array $payload, array $conf
     nammu_fediverse_save_home_snapshot_store($data);
 }
 
+function nammu_fediverse_enqueue_thread_refresh_for_item(array $item, array $config, string $reason = ''): bool
+{
+    $canonicalItem = nammu_fediverse_canonical_local_item($item, $config);
+    $itemId = trim((string) ($canonicalItem['id'] ?? ($item['id'] ?? '')));
+    if ($itemId === '') {
+        return false;
+    }
+    $file = nammu_fediverse_thread_refresh_queue_file();
+    return (bool) nammu_fediverse_with_json_store_lock($file, static function () use ($file, $itemId, $reason): bool {
+        $store = nammu_fediverse_load_json_store($file, ['items' => []]);
+        $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+        $queuedById = [];
+        foreach ($items as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $entryId = trim((string) ($entry['item_id'] ?? ''));
+            if ($entryId !== '') {
+                $queuedById[$entryId] = $entry;
+            }
+        }
+        $existing = is_array($queuedById[$itemId] ?? null) ? $queuedById[$itemId] : [];
+        $lastRequestedAt = (int) ($existing['last_requested_at'] ?? 0);
+        if ($lastRequestedAt > 0 && (time() - $lastRequestedAt) < 300) {
+            return true;
+        }
+        $queuedById[$itemId] = [
+            'item_id' => $itemId,
+            'reason' => $reason !== '' ? $reason : (string) ($existing['reason'] ?? ''),
+            'queued_at' => (int) ($existing['queued_at'] ?? time()),
+            'last_requested_at' => time(),
+            'last_attempt_at' => (int) ($existing['last_attempt_at'] ?? 0),
+            'attempts' => (int) ($existing['attempts'] ?? 0),
+            'last_error' => (string) ($existing['last_error'] ?? ''),
+        ];
+        uasort($queuedById, static function (array $a, array $b): int {
+            return ((int) ($a['last_attempt_at'] ?? 0)) <=> ((int) ($b['last_attempt_at'] ?? 0));
+        });
+        if (count($queuedById) > 300) {
+            $queuedById = array_slice($queuedById, -300, null, true);
+        }
+        return nammu_fediverse_save_json_store($file, ['items' => array_values($queuedById)]);
+    });
+}
+
+function nammu_fediverse_refresh_thread_page_payload(array $item, array $config): array
+{
+    $livePayload = nammu_fediverse_thread_page_payload($item, $config);
+    $snapshotPayload = nammu_fediverse_thread_page_snapshot_payload($item, $config);
+    $payload = is_array($snapshotPayload)
+        ? nammu_fediverse_best_persisted_thread_payload($snapshotPayload, $livePayload)
+        : $livePayload;
+    $payload = is_array($payload) ? $payload : $livePayload;
+    nammu_fediverse_persist_thread_page_payload($payload, $config);
+    return $payload;
+}
+
 function nammu_fediverse_best_thread_page_payload(array $item, array $config): array
 {
     $snapshotPayload = nammu_fediverse_thread_page_snapshot_payload($item, $config);
-    $livePayload = nammu_fediverse_thread_page_payload($item, $config);
-    if (!is_array($snapshotPayload)) {
-        $livePayload = nammu_fediverse_merge_thread_payload_metrics($livePayload, null);
-        nammu_fediverse_persist_thread_page_payload($livePayload, $config);
-        return $livePayload;
+    if (is_array($snapshotPayload)) {
+        return nammu_fediverse_merge_thread_payload_metrics($snapshotPayload, null);
     }
-    $liveScore = nammu_fediverse_thread_payload_score($livePayload);
-    $snapshotScore = nammu_fediverse_thread_payload_score($snapshotPayload);
-    $liveNormalized = nammu_fediverse_normalize_thread_payload($livePayload);
-    $snapshotNormalized = nammu_fediverse_normalize_thread_payload($snapshotPayload);
-    $liveReplyCount = count((array) ($liveNormalized['replies'] ?? []));
-    $snapshotReplyCount = count((array) ($snapshotNormalized['replies'] ?? []));
-    if (
-        $liveReplyCount > $snapshotReplyCount
-        || $liveScore > $snapshotScore
-        || ($liveScore === $snapshotScore
-            && json_encode($liveNormalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !== json_encode($snapshotNormalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE))
-    ) {
-        $livePayload = nammu_fediverse_merge_thread_payload_metrics($livePayload, $snapshotPayload);
-        nammu_fediverse_persist_thread_page_payload($livePayload, $config);
-        return $livePayload;
-    }
-    return nammu_fediverse_merge_thread_payload_metrics($snapshotPayload, $livePayload);
+    return nammu_fediverse_empty_thread_page_payload($item, $config);
+}
+
+function nammu_fediverse_process_thread_refresh_queue(array $config, int $limit = 3): array
+{
+    $file = nammu_fediverse_thread_refresh_queue_file();
+    return (array) nammu_fediverse_with_json_store_lock($file, static function () use ($file, $config, $limit): array {
+        $store = nammu_fediverse_load_json_store($file, ['items' => []]);
+        $queueItems = is_array($store['items'] ?? null) ? $store['items'] : [];
+        if (empty($queueItems)) {
+            return ['processed' => 0, 'updated' => 0, 'failed' => 0, 'remaining' => 0];
+        }
+        usort($queueItems, static function (array $a, array $b): int {
+            return ((int) ($a['last_attempt_at'] ?? 0)) <=> ((int) ($b['last_attempt_at'] ?? 0));
+        });
+        $processed = 0;
+        $updated = 0;
+        $failed = 0;
+        $remaining = [];
+        foreach ($queueItems as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            if ($processed >= max(1, $limit)) {
+                $remaining[] = $entry;
+                continue;
+            }
+            $itemId = trim((string) ($entry['item_id'] ?? ''));
+            if ($itemId === '') {
+                $failed++;
+                continue;
+            }
+            $processed++;
+            $entry['last_attempt_at'] = time();
+            $entry['attempts'] = (int) ($entry['attempts'] ?? 0) + 1;
+            $item = nammu_fediverse_find_local_item_for_identifier($itemId, $config);
+            if (!is_array($item)) {
+                $entry['last_error'] = 'local_item_not_found';
+                $failed++;
+                if ((int) $entry['attempts'] < 5) {
+                    $remaining[] = $entry;
+                }
+                continue;
+            }
+            try {
+                nammu_fediverse_refresh_thread_page_payload($item, $config);
+                $updated++;
+            } catch (Throwable $exception) {
+                $entry['last_error'] = $exception->getMessage();
+                $failed++;
+                if ((int) $entry['attempts'] < 5) {
+                    $remaining[] = $entry;
+                }
+            }
+        }
+        nammu_fediverse_save_json_store($file, ['items' => array_values($remaining)]);
+        return [
+            'processed' => $processed,
+            'updated' => $updated,
+            'failed' => $failed,
+            'remaining' => count($remaining),
+        ];
+    });
 }
 
 function nammu_fediverse_extract_first_url_from_text(string $text): string

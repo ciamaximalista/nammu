@@ -177,12 +177,13 @@ function admin_bing_api_get(string $method, array $params): array {
                 $respText = is_string($resp) ? trim($resp) : '';
                 $status = '';
                 $location = '';
-                if (!empty($http_response_header) && is_array($http_response_header)) {
-                    $statusLine = $http_response_header[0] ?? '';
+                $responseHeaders = nammu_last_response_headers($http_response_header ?? null);
+                if ($responseHeaders !== []) {
+                    $statusLine = $responseHeaders[0] ?? '';
                     if (is_string($statusLine) && preg_match('/\\s(\\d{3})\\s/', $statusLine, $match)) {
                         $status = $match[1];
                     }
-                    foreach ($http_response_header as $headerLine) {
+                    foreach ($responseHeaders as $headerLine) {
                         if (stripos((string) $headerLine, 'Location:') === 0) {
                             $location = trim(substr((string) $headerLine, strlen('Location:')));
                             break;
@@ -436,8 +437,9 @@ function admin_bing_fetch_token(array $payload): array {
             ];
             $resp = @file_get_contents($url, false, stream_context_create($opts));
             $response = is_string($resp) ? $resp : '';
-            if (!empty($http_response_header) && is_array($http_response_header)) {
-                $statusLine = $http_response_header[0] ?? '';
+            $responseHeaders = nammu_last_response_headers($http_response_header ?? null);
+            if ($responseHeaders !== []) {
+                $statusLine = $responseHeaders[0] ?? '';
                 if (is_string($statusLine) && preg_match('/\\s(\\d{3})\\s/', $statusLine, $match)) {
                     $status = (int) $match[1];
                 }

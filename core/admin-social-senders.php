@@ -1263,8 +1263,9 @@ function admin_http_post_body_response(string $url, string $body, array $headers
             ],
         ]);
         $responseBody = @file_get_contents($url, false, $context);
-        if (isset($http_response_header) && is_array($http_response_header)) {
-            foreach ($http_response_header as $headerLine) {
+        $responseHeaders = nammu_last_response_headers($http_response_header ?? null);
+        if ($responseHeaders !== []) {
+            foreach ($responseHeaders as $headerLine) {
                 if (preg_match('#HTTP/\d\.\d\s+(\d+)#', $headerLine, $matches)) {
                     $httpCode = (int) $matches[1];
                     break;
@@ -1302,8 +1303,9 @@ function admin_http_get_json(string $url, array $headers = []): ?array {
             ],
         ]);
         $responseBody = @file_get_contents($url, false, $context);
-        if (isset($http_response_header) && is_array($http_response_header)) {
-            foreach ($http_response_header as $headerLine) {
+        $responseHeaders = nammu_last_response_headers($http_response_header ?? null);
+        if ($responseHeaders !== []) {
+            foreach ($responseHeaders as $headerLine) {
                 if (preg_match('#HTTP/\d\.\d\s+(\d+)#', $headerLine, $matches)) {
                     $httpCode = (int) $matches[1];
                     break;
@@ -1357,8 +1359,9 @@ function admin_send_telegram_message(string $token, string $chatId, string $text
             ],
         ]);
         $responseBody = @file_get_contents($endpoint, false, $context);
-        if (isset($http_response_header) && is_array($http_response_header)) {
-            foreach ($http_response_header as $headerLine) {
+        $responseHeaders = nammu_last_response_headers($http_response_header ?? null);
+        if ($responseHeaders !== []) {
+            foreach ($responseHeaders as $headerLine) {
                 if (preg_match('#HTTP/\d\.\d\s+(\d+)#', $headerLine, $matches)) {
                     $httpCode = (int) $matches[1];
                     break;

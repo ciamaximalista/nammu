@@ -409,6 +409,27 @@ function nammu_decode_analytics_payload(string $raw): ?array
     return $decoded;
 }
 
+/**
+ * Cabeceras de la última respuesta HTTP obtenida con file_get_contents() y un stream wrapper http(s).
+ *
+ * PHP 8.4 añadió http_get_last_response_headers() y PHP 8.5 declaró obsoleta la variable local
+ * $http_response_header. Para seguir funcionando de 8.0 en adelante, quien llama pasa
+ * `$http_response_header ?? null` (la forma `??` no dispara la deprecación) y aquí se prefiere la
+ * función nativa cuando existe.
+ *
+ * @return string[]
+ */
+function nammu_last_response_headers(?array $fallback = null): array
+{
+    if (function_exists('http_get_last_response_headers')) {
+        $headers = http_get_last_response_headers();
+        if (is_array($headers)) {
+            return $headers;
+        }
+    }
+    return is_array($fallback) ? $fallback : [];
+}
+
 function nammu_atomic_write_file(string $file, string $payload): bool
 {
     $dir = dirname($file);

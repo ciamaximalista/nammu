@@ -4,6 +4,9 @@
             ? load_config_file()
             : (function_exists('nammu_load_config') ? nammu_load_config() : ($settings ?? []));
         $settings = is_array($settings) ? $settings : [];
+        // Usuario actual para el formulario "Cuenta de acceso" (se perdió al trocear el admin en includes).
+        $currentUserData = function_exists('get_user_data') ? get_user_data() : null;
+        $currentUsername = is_array($currentUserData) ? (string) ($currentUserData['username'] ?? '') : '';
     ?>
 
     <div class="tab-pane active">

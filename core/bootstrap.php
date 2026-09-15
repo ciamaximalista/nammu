@@ -2,6 +2,12 @@
 
 umask(0002);
 
+// Raíz de la instalación (directorio público del sitio). Permite que las piezas
+// del admin que viven en core/ construyan rutas sin depender de __DIR__.
+if (!defined('NAMMU_ROOT')) {
+    define('NAMMU_ROOT', dirname(__DIR__));
+}
+
 $serverTimezone = getenv('TZ');
 if (!is_string($serverTimezone) || $serverTimezone === '') {
     $tzFile = @file_get_contents('/etc/timezone');

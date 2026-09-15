@@ -22,19 +22,19 @@ if (!$__nammuRunScheduledOnly && !$__nammuRunScheduledMaintenanceOnly && !$__nam
 }
 
 require_once __DIR__ . '/core/bootstrap.php';
-require_once __DIR__ . '/core/helpers.php';
-require_once __DIR__ . '/core/postal.php';
-require_once __DIR__ . '/core/admin-nisaba.php';
-require_once __DIR__ . '/core/admin-telex.php';
-require_once __DIR__ . '/core/admin-ideas.php';
-require_once __DIR__ . '/core/webmention.php';
+require_once NAMMU_ROOT . '/core/helpers.php';
+require_once NAMMU_ROOT . '/core/postal.php';
+require_once NAMMU_ROOT . '/core/admin-nisaba.php';
+require_once NAMMU_ROOT . '/core/admin-telex.php';
+require_once NAMMU_ROOT . '/core/admin-ideas.php';
+require_once NAMMU_ROOT . '/core/webmention.php';
 
 if (!$__nammuRunScheduledOnly && !$__nammuRunScheduledMaintenanceOnly && !$__nammuRunScheduledHeavyOnly && !$__nammuRunClusterScheduledOnly && !$__nammuRunFediverseLinkCardRefreshOnly && !$__nammuReplayFediverseDeletesOnly) {
     admin_start_csrf_form_injection();
 }
 
 // Load dependencies (optional)
-$autoload = __DIR__ . '/vendor/autoload.php';
+$autoload = NAMMU_ROOT . '/vendor/autoload.php';
 if (is_file($autoload)) {
     require_once $autoload;
 }
@@ -48,15 +48,15 @@ use Nammu\Core\SitemapGenerator;
 use Symfony\Component\Yaml\Yaml;
 
 // --- User Configuration ---
-define('USER_FILE', __DIR__ . '/config/user.php');
-define('CONTENT_DIR', __DIR__ . '/content');
-define('ASSETS_DIR', __DIR__ . '/assets');
-define('ITINERARIES_DIR', __DIR__ . '/itinerarios');
-define('MEDIA_TAGS_FILE', __DIR__ . '/config/media-tags.json');
-define('MAILING_SUBSCRIBERS_FILE', __DIR__ . '/config/mailing-subscribers.json');
-define('MAILING_SUPPRESSED_FILE', __DIR__ . '/config/mailing-suppressed.json');
-define('MAILING_BOUNCES_STATE_FILE', __DIR__ . '/config/mailing-bounces-state.json');
-define('MAILING_SECRET_FILE', __DIR__ . '/config/mailing-secret.key');
+define('USER_FILE', NAMMU_ROOT . '/config/user.php');
+define('CONTENT_DIR', NAMMU_ROOT . '/content');
+define('ASSETS_DIR', NAMMU_ROOT . '/assets');
+define('ITINERARIES_DIR', NAMMU_ROOT . '/itinerarios');
+define('MEDIA_TAGS_FILE', NAMMU_ROOT . '/config/media-tags.json');
+define('MAILING_SUBSCRIBERS_FILE', NAMMU_ROOT . '/config/mailing-subscribers.json');
+define('MAILING_SUPPRESSED_FILE', NAMMU_ROOT . '/config/mailing-suppressed.json');
+define('MAILING_BOUNCES_STATE_FILE', NAMMU_ROOT . '/config/mailing-bounces-state.json');
+define('MAILING_SECRET_FILE', NAMMU_ROOT . '/config/mailing-secret.key');
 nammu_ensure_directory(ITINERARIES_DIR);
 $runScheduledOnly = $__nammuRunScheduledOnly;
 $runScheduledMaintenanceOnly = $__nammuRunScheduledMaintenanceOnly;
@@ -159,11 +159,11 @@ function admin_start_csrf_form_injection(): void
 
 function admin_run_scheduled_tasks(): array {
     $config = nammu_load_config();
-    if (!function_exists('admin_process_social_rss_feeds') && is_file(__DIR__ . '/core/admin-redes.php')) {
-        require_once __DIR__ . '/core/admin-redes.php';
+    if (!function_exists('admin_process_social_rss_feeds') && is_file(NAMMU_ROOT . '/core/admin-redes.php')) {
+        require_once NAMMU_ROOT . '/core/admin-redes.php';
     }
-    if (!function_exists('nammu_fediverse_refresh_following') && is_file(__DIR__ . '/core/fediverso.php')) {
-        require_once __DIR__ . '/core/fediverso.php';
+    if (!function_exists('nammu_fediverse_refresh_following') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+        require_once NAMMU_ROOT . '/core/fediverso.php';
     }
     $fediverseStats = ['checked' => 0, 'new' => 0, 'followers_checked' => 0, 'followers_removed' => 0];
     $fediverseInboxSyncStats = ['scanned' => 0, 'new' => 0];
@@ -277,22 +277,22 @@ function admin_run_scheduled_maintenance_tasks(): array {
         'scope' => 'maintenance',
         'event' => 'after_load_config',
     ]);
-    if (!function_exists('admin_process_social_rss_feeds') && is_file(__DIR__ . '/core/admin-redes.php')) {
-        require_once __DIR__ . '/core/admin-redes.php';
+    if (!function_exists('admin_process_social_rss_feeds') && is_file(NAMMU_ROOT . '/core/admin-redes.php')) {
+        require_once NAMMU_ROOT . '/core/admin-redes.php';
         admin_maintenance_trace([
             'scope' => 'maintenance',
             'event' => 'after_require_admin_redes',
         ]);
     }
-    if (!function_exists('nammu_actuality_rebuild_snapshot') && is_file(__DIR__ . '/core/actualidad.php')) {
-        require_once __DIR__ . '/core/actualidad.php';
+    if (!function_exists('nammu_actuality_rebuild_snapshot') && is_file(NAMMU_ROOT . '/core/actualidad.php')) {
+        require_once NAMMU_ROOT . '/core/actualidad.php';
         admin_maintenance_trace([
             'scope' => 'maintenance',
             'event' => 'after_require_actualidad',
         ]);
     }
-    if (!function_exists('nammu_fediverse_rebuild_light_snapshots') && is_file(__DIR__ . '/core/fediverso.php')) {
-        require_once __DIR__ . '/core/fediverso.php';
+    if (!function_exists('nammu_fediverse_rebuild_light_snapshots') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+        require_once NAMMU_ROOT . '/core/fediverso.php';
         admin_maintenance_trace([
             'scope' => 'maintenance',
             'event' => 'after_require_fediverso',
@@ -559,15 +559,15 @@ function admin_run_scheduled_heavy_tasks(): array {
         'scope' => 'heavy',
         'event' => 'after_load_config',
     ]);
-    if (!function_exists('nammu_actuality_rebuild_snapshot') && is_file(__DIR__ . '/core/actualidad.php')) {
-        require_once __DIR__ . '/core/actualidad.php';
+    if (!function_exists('nammu_actuality_rebuild_snapshot') && is_file(NAMMU_ROOT . '/core/actualidad.php')) {
+        require_once NAMMU_ROOT . '/core/actualidad.php';
         admin_heavy_trace([
             'scope' => 'heavy',
             'event' => 'after_require_actualidad',
         ]);
     }
-    if (!function_exists('nammu_fediverse_warm_threads_cache') && is_file(__DIR__ . '/core/fediverso.php')) {
-        require_once __DIR__ . '/core/fediverso.php';
+    if (!function_exists('nammu_fediverse_warm_threads_cache') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+        require_once NAMMU_ROOT . '/core/fediverso.php';
         admin_heavy_trace([
             'scope' => 'heavy',
             'event' => 'after_require_fediverso',
@@ -624,8 +624,8 @@ function admin_run_scheduled_heavy_tasks(): array {
 function admin_run_fediverse_link_card_refresh_tasks(): array
 {
     $config = nammu_load_config();
-    if (!function_exists('nammu_fediverse_refresh_link_card_queue') && is_file(__DIR__ . '/core/fediverso.php')) {
-        require_once __DIR__ . '/core/fediverso.php';
+    if (!function_exists('nammu_fediverse_refresh_link_card_queue') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+        require_once NAMMU_ROOT . '/core/fediverso.php';
     }
     if (!function_exists('nammu_fediverse_refresh_link_card_queue')) {
         return ['processed' => 0, 'updated' => 0, 'failed' => 0, 'remaining' => 0, 'skipped' => 1];
@@ -637,11 +637,11 @@ function admin_run_fediverse_link_card_refresh_tasks(): array
 
 function admin_refresh_fediverse_threads(array $config, int $limit = 20): array
 {
-    if (!function_exists('admin_process_social_broadcast_queue') && is_file(__DIR__ . '/core/admin-redes.php')) {
-        require_once __DIR__ . '/core/admin-redes.php';
+    if (!function_exists('admin_process_social_broadcast_queue') && is_file(NAMMU_ROOT . '/core/admin-redes.php')) {
+        require_once NAMMU_ROOT . '/core/admin-redes.php';
     }
-    if (!function_exists('nammu_fediverse_warm_threads_cache') && is_file(__DIR__ . '/core/fediverso.php')) {
-        require_once __DIR__ . '/core/fediverso.php';
+    if (!function_exists('nammu_fediverse_warm_threads_cache') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+        require_once NAMMU_ROOT . '/core/fediverso.php';
     }
     $stats = [
         'threads_warmed' => 0,
@@ -678,8 +678,8 @@ function admin_refresh_fediverse_threads(array $config, int $limit = 20): array
 
 function admin_rebuild_fediverse_timeline(array $config): array
 {
-    if (!function_exists('nammu_fediverse_rebuild_timeline') && is_file(__DIR__ . '/core/fediverso.php')) {
-        require_once __DIR__ . '/core/fediverso.php';
+    if (!function_exists('nammu_fediverse_rebuild_timeline') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+        require_once NAMMU_ROOT . '/core/fediverso.php';
     }
     $stats = function_exists('nammu_fediverse_rebuild_timeline')
         ? nammu_fediverse_rebuild_timeline()
@@ -724,7 +724,7 @@ function admin_multi_instance_instances_root_dir(array $config): string
     if ($configured !== '') {
         return rtrim($configured, '/');
     }
-    return rtrim(dirname(__DIR__), '/');
+    return rtrim(dirname(NAMMU_ROOT), '/');
 }
 
 function admin_multi_instance_shared_queue_dir(array $config): string
@@ -835,7 +835,7 @@ function admin_multi_instance_scheduler_lock_file(array $config): string
 
 function admin_multi_instance_trace_file(array $config): string
 {
-    $backupDir = nammu_backup_dir($config, __DIR__);
+    $backupDir = nammu_backup_dir($config, NAMMU_ROOT);
     if (!is_dir($backupDir)) {
         nammu_ensure_directory($backupDir);
     }
@@ -1174,9 +1174,9 @@ function admin_run_cluster_scheduled_tasks(): array
         $strategy = trim((string) ($settings['scheduler_strategy'] ?? 'fixed'));
         $now = time();
         $state['last_runner'] = [
-            'site_dir' => __DIR__,
-            'slug' => basename(__DIR__),
-            'site_name' => trim((string) ($config['site_name'] ?? basename(__DIR__))),
+            'site_dir' => NAMMU_ROOT,
+            'slug' => basename(NAMMU_ROOT),
+            'site_name' => trim((string) ($config['site_name'] ?? basename(NAMMU_ROOT))),
             'site_url' => trim((string) ($config['site_url'] ?? '')),
             'ran_at' => gmdate(DATE_ATOM, $now),
             'timestamp' => $now,
@@ -1367,7 +1367,7 @@ function admin_run_cluster_scheduled_tasks(): array
 
 function admin_scheduled_lock_file(): string
 {
-    return __DIR__ . '/config/.scheduled-run.lock';
+    return NAMMU_ROOT . '/config/.scheduled-run.lock';
 }
 
 function admin_run_with_scheduled_lock(callable $callback): array
@@ -1429,7 +1429,7 @@ function parse_yaml_front_matter($content) {
 
 function admin_stats_backup_dir(): string {
     $config = function_exists('nammu_load_config') ? nammu_load_config() : load_config_file();
-    return nammu_backup_dir($config, __DIR__);
+    return nammu_backup_dir($config, NAMMU_ROOT);
 }
 
 function admin_copy_backup_directory(string $source, string $destination, ?string &$error = null): bool
@@ -1474,9 +1474,9 @@ function admin_backup_directory_is_safe(string $directory): bool
         return false;
     }
     $blocked = [
-        __DIR__,
-        dirname(__DIR__),
-        dirname(dirname(__DIR__)),
+        NAMMU_ROOT,
+        dirname(NAMMU_ROOT),
+        dirname(dirname(NAMMU_ROOT)),
         '/var',
         '/var/www',
         '/var/www/html',
@@ -1489,8 +1489,8 @@ function admin_update_backup_directory(string $newDirectory, ?string &$error = n
 {
     $config = load_config_file();
     $currentDirectory = admin_stats_backup_dir();
-    $configuredDirectory = nammu_normalize_backup_dir($newDirectory, __DIR__);
-    $targetDirectory = nammu_backup_dir(['backups' => ['directory' => $configuredDirectory]], __DIR__);
+    $configuredDirectory = nammu_normalize_backup_dir($newDirectory, NAMMU_ROOT);
+    $targetDirectory = nammu_backup_dir(['backups' => ['directory' => $configuredDirectory]], NAMMU_ROOT);
     if (!admin_backup_directory_is_safe($configuredDirectory) || !admin_backup_directory_is_safe($targetDirectory)) {
         $error = 'La ruta del directorio de backups no es válida.';
         return false;
@@ -1533,7 +1533,7 @@ function admin_maintenance_trace(array $entry): void
         nammu_ensure_directory($backupDir);
     }
     $entry['at'] = date(DATE_ATOM);
-    $entry['site'] = basename(__DIR__);
+    $entry['site'] = basename(NAMMU_ROOT);
     @file_put_contents($backupDir . '/maintenance-trace.log', json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND | LOCK_EX);
 }
 
@@ -1547,7 +1547,7 @@ function admin_heavy_trace(array $entry): void
         nammu_ensure_directory($backupDir);
     }
     $entry['at'] = date(DATE_ATOM);
-    $entry['site'] = basename(__DIR__);
+    $entry['site'] = basename(NAMMU_ROOT);
     @file_put_contents($backupDir . '/heavy-trace.log', json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND | LOCK_EX);
 }
 
@@ -1626,7 +1626,7 @@ function admin_restore_stats_backup(string $archiveFile, ?string &$error = null)
         $error = 'El archivo de backup no existe.';
         return false;
     }
-    $tmpBase = __DIR__ . '/config/.stats-restore-' . bin2hex(random_bytes(6));
+    $tmpBase = NAMMU_ROOT . '/config/.stats-restore-' . bin2hex(random_bytes(6));
     if (!@mkdir($tmpBase, 0775, true) && !is_dir($tmpBase)) {
         $error = 'No se pudo crear el directorio temporal de restauración.';
         return false;
@@ -1639,7 +1639,7 @@ function admin_restore_stats_backup(string $archiveFile, ?string &$error = null)
         return false;
     }
 
-    $root = __DIR__;
+    $root = NAMMU_ROOT;
     $restored = 0;
     $safeFiles = [
         'config/analytics.json',
@@ -2284,7 +2284,7 @@ function admin_regenerate_itinerary_feed(): void {
             $siteLang = 'es';
         }
         $feedContent = nammu_generate_itineraries_rss_feed($baseUrl, $itineraries, $siteTitle, $siteDescription, $siteLang);
-        admin_write_public_artifact(__DIR__ . '/itinerarios.xml', $feedContent);
+        admin_write_public_artifact(NAMMU_ROOT . '/itinerarios.xml', $feedContent);
     } catch (Throwable $e) {
         error_log('No se pudo regenerar itinerarios.xml: ' . $e->getMessage());
     }
@@ -2315,7 +2315,7 @@ function admin_build_sitemap_entries(array $posts, array $theme, string $publicB
     $settings = get_settings();
     $sortOrder = strtolower(trim((string) ($settings['sort_order'] ?? 'date')));
     $isAlphabeticalOrder = $sortOrder === 'alphabetical';
-    $podcastItems = nammu_collect_podcast_items(__DIR__ . '/content', $publicBaseUrl);
+    $podcastItems = nammu_collect_podcast_items(NAMMU_ROOT . '/content', $publicBaseUrl);
     $hasPodcast = !empty($podcastItems);
 
     $entries = [];
@@ -2581,14 +2581,14 @@ function admin_build_sitemap_entries(array $posts, array $theme, string $publicB
 function admin_regenerate_podcast_feed(): void {
     try {
         $baseUrl = nammu_base_url();
-        $podcastItems = nammu_collect_podcast_items(__DIR__ . '/content', $baseUrl);
+        $podcastItems = nammu_collect_podcast_items(NAMMU_ROOT . '/content', $baseUrl);
         if (empty($podcastItems)) {
-            @unlink(__DIR__ . '/podcast.xml');
+            @unlink(NAMMU_ROOT . '/podcast.xml');
             return;
         }
         $config = load_config_file();
         $feed = nammu_generate_podcast_feed($baseUrl, $config);
-        admin_write_public_artifact(__DIR__ . '/podcast.xml', $feed);
+        admin_write_public_artifact(NAMMU_ROOT . '/podcast.xml', $feed);
     } catch (Throwable $e) {
         error_log('No se pudo regenerar podcast.xml: ' . $e->getMessage());
     }
@@ -2609,7 +2609,7 @@ function admin_regenerate_rss_feed(): void {
         }
         $theme = nammu_template_settings();
         $itineraries = admin_itinerary_repository()->all();
-        $podcastItems = nammu_collect_podcast_items(__DIR__ . '/content', $baseUrl);
+        $podcastItems = nammu_collect_podcast_items(NAMMU_ROOT . '/content', $baseUrl);
         $homeMode = nammu_home_content_mode($theme, !empty($itineraries), !empty($podcastItems));
         if ($homeMode === 'podcast') {
             $rss = nammu_generate_podcast_feed($baseUrl, $config, '/rss.xml');
@@ -2620,8 +2620,8 @@ function admin_regenerate_rss_feed(): void {
         } else {
             $rss = nammu_generate_blog_rss_feed($baseUrl, $siteTitle, $siteDescription, $siteLang, '/rss.xml', '/');
         }
-        admin_write_public_artifact(__DIR__ . '/rss.xml', $rss);
-        admin_write_public_artifact(__DIR__ . '/blog.xml', nammu_generate_blog_rss_feed($baseUrl, $siteTitle, $siteDescription, $siteLang));
+        admin_write_public_artifact(NAMMU_ROOT . '/rss.xml', $rss);
+        admin_write_public_artifact(NAMMU_ROOT . '/blog.xml', nammu_generate_blog_rss_feed($baseUrl, $siteTitle, $siteDescription, $siteLang));
     } catch (Throwable $e) {
         error_log('No se pudo regenerar rss.xml: ' . $e->getMessage());
     }
@@ -2637,7 +2637,7 @@ function admin_regenerate_sitemap(): void {
         $entries = admin_build_sitemap_entries($posts, $theme, $baseUrl);
         $generator = new SitemapGenerator($baseUrl);
         $sitemapXml = $generator->generate($entries);
-        admin_write_public_artifact(__DIR__ . '/sitemap.xml', $sitemapXml);
+        admin_write_public_artifact(NAMMU_ROOT . '/sitemap.xml', $sitemapXml);
     } catch (Throwable $e) {
         error_log('No se pudo regenerar sitemap.xml: ' . $e->getMessage());
     }
@@ -2645,7 +2645,7 @@ function admin_regenerate_sitemap(): void {
 
 function admin_public_artifacts_refresh_queue_file(): string
 {
-    return __DIR__ . '/config/public-artifacts-refresh.json';
+    return NAMMU_ROOT . '/config/public-artifacts-refresh.json';
 }
 
 function admin_load_public_artifacts_refresh_queue(): array
@@ -2704,7 +2704,7 @@ function admin_enqueue_public_artifacts_refresh(string $reason = ''): void
 }
 
 function admin_regenerate_public_artifacts_now(): void {
-    $lockPath = __DIR__ . '/config/public-artifacts-refresh.lock';
+    $lockPath = NAMMU_ROOT . '/config/public-artifacts-refresh.lock';
     $fp = @fopen($lockPath, 'c');
     if ($fp === false) {
         return;
@@ -4009,7 +4009,7 @@ function admin_public_itinerary_url(string $slug): string {
 }
 
 function admin_indexnow_searchengines_cache_path(): string {
-    return __DIR__ . '/config/indexnow-searchengines.json';
+    return NAMMU_ROOT . '/config/indexnow-searchengines.json';
 }
 
 function admin_indexnow_fetch_searchengines(): array {
@@ -4104,7 +4104,7 @@ function admin_indexnow_key_filename(string $key): string {
 
 function admin_indexnow_key_path(string $key, string $filename = ''): string {
     $filename = $filename !== '' ? $filename : admin_indexnow_key_filename($key);
-    return __DIR__ . '/' . $filename;
+    return NAMMU_ROOT . '/' . $filename;
 }
 
 function admin_indexnow_normalize_site_base(string $base): string {
@@ -4136,7 +4136,7 @@ function admin_indexnow_key_url(string $filename, string $baseOverride = ''): st
 }
 
 function admin_indexnow_log_path(): string {
-    return __DIR__ . '/config/indexnow-log.json';
+    return NAMMU_ROOT . '/config/indexnow-log.json';
 }
 
 function admin_indexnow_load_log(): array {
@@ -4242,7 +4242,7 @@ function admin_indexnow_status(): array {
 
 function admin_indexnow_queue_file(): string
 {
-    return __DIR__ . '/config/indexnow-queue.json';
+    return NAMMU_ROOT . '/config/indexnow-queue.json';
 }
 
 function admin_load_indexnow_queue(): array
@@ -4826,8 +4826,8 @@ function admin_send_post_to_telegram(string $slug, string $title, string $descri
 
 function admin_social_fediverse_thread_url(string $slug, string $template = 'post'): string
 {
-    if (!function_exists('nammu_fediverse_public_thread_url_for_named_local_item') && is_file(__DIR__ . '/core/fediverso.php')) {
-        require_once __DIR__ . '/core/fediverso.php';
+    if (!function_exists('nammu_fediverse_public_thread_url_for_named_local_item') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+        require_once NAMMU_ROOT . '/core/fediverso.php';
     }
     if (!function_exists('nammu_fediverse_public_thread_url_for_named_local_item')) {
         return '';
@@ -5494,8 +5494,8 @@ function admin_send_linkedin_post(string $slug, string $title, string $descripti
 }
 
 function admin_send_bluesky_post(string $slug, string $title, string $description, array $settings, string $urlOverride = '', string $imageUrl = '', ?string &$error = null): bool {
-    if (!function_exists('admin_bluesky_build_link_facets') && is_file(__DIR__ . '/core/admin-redes.php')) {
-        require_once __DIR__ . '/core/admin-redes.php';
+    if (!function_exists('admin_bluesky_build_link_facets') && is_file(NAMMU_ROOT . '/core/admin-redes.php')) {
+        require_once NAMMU_ROOT . '/core/admin-redes.php';
     }
     $service = trim((string) ($settings['service'] ?? ''));
     if ($service === '') {
@@ -5846,7 +5846,7 @@ function admin_prepare_instagram_image_url(string $imageTrim, string $baseUrl, ?
     }
     $minAllowedRatio = 0.8;
     $maxAllowedRatio = 1.91;
-    $projectRoot = __DIR__;
+    $projectRoot = NAMMU_ROOT;
     $imageTrimNorm = str_replace('\\', '/', $imageTrim);
     $relativePath = ltrim($imageTrimNorm, '/');
     if (preg_match('#^https?://#i', $imageTrimNorm)) {
@@ -5963,7 +5963,7 @@ function admin_prepare_podcast_artwork_image(string $imageValue, string $siteUrl
         return $imageValue;
     }
 
-    $projectRoot = __DIR__;
+    $projectRoot = NAMMU_ROOT;
     $siteHost = '';
     if ($siteUrl !== '') {
         $siteHost = strtolower((string) (@parse_url($siteUrl, PHP_URL_HOST) ?: ''));
@@ -6594,8 +6594,8 @@ function admin_maybe_auto_post_to_social_networks(string $filename, string $titl
     if (empty($networks)) {
         return;
     }
-    if (!function_exists('admin_enqueue_social_broadcast') && is_file(__DIR__ . '/core/admin-redes.php')) {
-        require_once __DIR__ . '/core/admin-redes.php';
+    if (!function_exists('admin_enqueue_social_broadcast') && is_file(NAMMU_ROOT . '/core/admin-redes.php')) {
+        require_once NAMMU_ROOT . '/core/admin-redes.php';
     }
     if (!function_exists('admin_enqueue_social_broadcast')) {
         return;
@@ -6808,7 +6808,7 @@ function simple_yaml_dump(array $data, int $level = 0): string {
 }
 
 function load_config_file(): array {
-    $configFile = __DIR__ . '/config/config.yml';
+    $configFile = NAMMU_ROOT . '/config/config.yml';
     if (!is_file($configFile)) {
         return [];
     }
@@ -6829,7 +6829,7 @@ function load_config_file(): array {
 }
 
 function save_config_file(array $config): void {
-    $configFile = __DIR__ . '/config/config.yml';
+    $configFile = NAMMU_ROOT . '/config/config.yml';
     $dir = dirname($configFile);
     if (!nammu_ensure_directory($dir)) {
         throw new RuntimeException('No se pudo crear el directorio de configuración');
@@ -7517,7 +7517,7 @@ function admin_mailing_type_for_template(string $template): string {
 }
 
 function admin_load_mailing_tokens(): array {
-    $file = __DIR__ . '/config/mailing-tokens.json';
+    $file = NAMMU_ROOT . '/config/mailing-tokens.json';
     if (!is_file($file)) {
         return [];
     }
@@ -7530,7 +7530,7 @@ function admin_load_mailing_tokens(): array {
 }
 
 function admin_save_mailing_tokens(array $tokens): void {
-    $file = __DIR__ . '/config/mailing-tokens.json';
+    $file = NAMMU_ROOT . '/config/mailing-tokens.json';
     $dir = dirname($file);
     if (!nammu_ensure_directory($dir)) {
         throw new RuntimeException('No se pudo crear el directorio de configuración para tokens de correo');
@@ -7549,7 +7549,7 @@ function admin_save_mailing_tokens(array $tokens): void {
 }
 
 function admin_delete_mailing_tokens(): void {
-    $file = __DIR__ . '/config/mailing-tokens.json';
+    $file = NAMMU_ROOT . '/config/mailing-tokens.json';
     if (is_file($file)) {
         @unlink($file);
     }
@@ -7788,7 +7788,7 @@ function admin_mailing_batch_size(): int
 
 function admin_mailing_deliveries_file(): string
 {
-    return __DIR__ . '/config/mailing-deliveries.json';
+    return NAMMU_ROOT . '/config/mailing-deliveries.json';
 }
 
 function admin_load_mailing_deliveries(): array
@@ -8473,8 +8473,8 @@ function admin_prepare_mailing_payload(string $template, array $settings, string
                 $candidates[] = 'assets/' . $normalizedImage;
             }
             foreach ($candidates as $cand) {
-                $local = __DIR__ . '/' . $cand;
-                if (is_file($local) || is_file(__DIR__ . '/' . ltrim($cand, '/'))) {
+                $local = NAMMU_ROOT . '/' . $cand;
+                if (is_file($local) || is_file(NAMMU_ROOT . '/' . ltrim($cand, '/'))) {
                     $imageUrl = $baseForAssets . '/' . $cand;
                     break;
                 }
@@ -8637,8 +8637,8 @@ function admin_prepare_newsletter_payload(array $settings, string $title, string
                 $candidates[] = 'assets/' . $normalizedImage;
             }
             foreach ($candidates as $cand) {
-                $local = __DIR__ . '/' . $cand;
-                if (is_file($local) || is_file(__DIR__ . '/' . ltrim($cand, '/'))) {
+                $local = NAMMU_ROOT . '/' . $cand;
+                if (is_file($local) || is_file(NAMMU_ROOT . '/' . ltrim($cand, '/'))) {
                     $imageUrl = $baseForAssets . '/' . $cand;
                     break;
                 }
@@ -9161,8 +9161,8 @@ if ($runFediverseLinkCardRefreshOnly) {
 if ($runReplayFediverseDeletesOnly) {
     $result = admin_run_with_scheduled_lock(static function (): array {
         $config = nammu_load_config();
-        if (!function_exists('nammu_fediverse_replay_all_deletes') && is_file(__DIR__ . '/core/fediverso.php')) {
-            require_once __DIR__ . '/core/fediverso.php';
+        if (!function_exists('nammu_fediverse_replay_all_deletes') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+            require_once NAMMU_ROOT . '/core/fediverso.php';
         }
         return function_exists('nammu_fediverse_replay_all_deletes')
             ? nammu_fediverse_replay_all_deletes($config)
@@ -9557,7 +9557,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $type = 'Entrada';
         }
         if ($type === 'Nota') {
-            require_once __DIR__ . '/core/admin-redes.php';
+            require_once NAMMU_ROOT . '/core/admin-redes.php';
             $messageText = trim((string) ($_POST['content'] ?? ''));
             $messageImages = trim((string) ($_POST['social_broadcast_image'] ?? ''));
             $socialBroadcastState = admin_handle_social_broadcast_submission(get_settings(), $messageText, $messageImages);
@@ -10380,8 +10380,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         && !$shouldAutoSharePodcast
                         && in_array($template, ['post', 'podcast', 'page'], true)
                     ) {
-                        if (!function_exists('nammu_fediverse_mark_item_delivered_to_followers') && is_file(__DIR__ . '/core/fediverso.php')) {
-                            require_once __DIR__ . '/core/fediverso.php';
+                        if (!function_exists('nammu_fediverse_mark_item_delivered_to_followers') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+                            require_once NAMMU_ROOT . '/core/fediverso.php';
                         }
                         if (function_exists('nammu_fediverse_mark_item_delivered_to_followers')) {
                             $fediverseConfig = load_config_file();
@@ -10548,8 +10548,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $imageUrl = admin_public_asset_url((string) $image);
                     $customUrl = '';
                     if ($networkKey === 'fediverse') {
-                        if (!function_exists('nammu_fediverse_deliver_named_local_item') && is_file(__DIR__ . '/core/fediverso.php')) {
-                            require_once __DIR__ . '/core/fediverso.php';
+                        if (!function_exists('nammu_fediverse_deliver_named_local_item') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+                            require_once NAMMU_ROOT . '/core/fediverso.php';
                         }
                         if (!function_exists('nammu_fediverse_deliver_named_local_item')) {
                             $feedback['message'] = 'La integración con Fediverso no está disponible en esta instalación.';
@@ -10605,8 +10605,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!isset($networkLabels[$networkKey])) {
             $feedback['message'] = 'Red social no válida.';
         } elseif ($actualityId !== '') {
-            if (!function_exists('nammu_actuality_get_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
-                require_once __DIR__ . '/core/actualidad.php';
+            if (!function_exists('nammu_actuality_get_manual_item') && is_file(NAMMU_ROOT . '/core/actualidad.php')) {
+                require_once NAMMU_ROOT . '/core/actualidad.php';
             }
             $item = null;
             if ($actualityType === 'news' && function_exists('nammu_actuality_get_news_item')) {
@@ -10616,8 +10616,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if (is_array($item)) {
                 if ($networkKey === 'fediverse') {
-                    if (!function_exists('nammu_fediverse_deliver_actuality_item') && is_file(__DIR__ . '/core/fediverso.php')) {
-                        require_once __DIR__ . '/core/fediverso.php';
+                    if (!function_exists('nammu_fediverse_deliver_actuality_item') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+                        require_once NAMMU_ROOT . '/core/fediverso.php';
                     }
                     if (!function_exists('nammu_fediverse_deliver_actuality_item')) {
                         $feedback['message'] = 'La integración con Fediverso no está disponible en esta instalación.';
@@ -10629,8 +10629,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ];
                     }
                 } else {
-                    if (!function_exists('admin_social_broadcast_fediverse_url_for_actuality_item') && is_file(__DIR__ . '/core/admin-redes.php')) {
-                        require_once __DIR__ . '/core/admin-redes.php';
+                    if (!function_exists('admin_social_broadcast_fediverse_url_for_actuality_item') && is_file(NAMMU_ROOT . '/core/admin-redes.php')) {
+                        require_once NAMMU_ROOT . '/core/admin-redes.php';
                     }
                     $title = trim((string) ($item['title'] ?? ''));
                     $description = trim((string) (($item['raw_text'] ?? '') ?: ($item['description'] ?? '')));
@@ -11060,8 +11060,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: ' . $redirectBase);
         exit;
     } elseif (isset($_POST['update_actuality_note'])) {
-        if (!function_exists('nammu_actuality_update_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
-            require_once __DIR__ . '/core/actualidad.php';
+        if (!function_exists('nammu_actuality_update_manual_item') && is_file(NAMMU_ROOT . '/core/actualidad.php')) {
+            require_once NAMMU_ROOT . '/core/actualidad.php';
         }
         $noteId = preg_replace('/[^a-f0-9]/i', '', (string) ($_POST['note_id'] ?? '')) ?? '';
         $noteText = trim((string) ($_POST['note_text'] ?? ''));
@@ -11099,8 +11099,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             nammu_fediverse_save_fragments_cache_store([]);
         }
         $fediverseUpdateDelivered = null;
-        if (!function_exists('nammu_fediverse_notify_followers_of_object_update') && is_file(__DIR__ . '/core/fediverso.php')) {
-            require_once __DIR__ . '/core/fediverso.php';
+        if (!function_exists('nammu_fediverse_notify_followers_of_object_update') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+            require_once NAMMU_ROOT . '/core/fediverso.php';
         }
         if (function_exists('nammu_fediverse_notify_followers_of_object_update') && function_exists('nammu_fediverse_local_content_items')) {
             $fediverseItemId = rtrim($baseUrl, '/') . '/ap/objects/actualidad-' . rawurlencode($noteId);
@@ -11120,8 +11120,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: admin.php?page=edit&template=notes');
         exit;
     } elseif (isset($_POST['update_actuality_news'])) {
-        if (!function_exists('nammu_actuality_update_news_item') && is_file(__DIR__ . '/core/actualidad.php')) {
-            require_once __DIR__ . '/core/actualidad.php';
+        if (!function_exists('nammu_actuality_update_news_item') && is_file(NAMMU_ROOT . '/core/actualidad.php')) {
+            require_once NAMMU_ROOT . '/core/actualidad.php';
         }
         $newsId = preg_replace('/[^a-f0-9]/i', '', (string) ($_POST['news_id'] ?? '')) ?? '';
         $newsTitle = trim((string) ($_POST['news_title'] ?? ''));
@@ -11158,8 +11158,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
         }
         $fediverseUpdateDelivered = null;
-        if (!function_exists('nammu_fediverse_notify_followers_of_object_update') && is_file(__DIR__ . '/core/fediverso.php')) {
-            require_once __DIR__ . '/core/fediverso.php';
+        if (!function_exists('nammu_fediverse_notify_followers_of_object_update') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+            require_once NAMMU_ROOT . '/core/fediverso.php';
         }
         if (function_exists('nammu_fediverse_notify_followers_of_object_update') && function_exists('nammu_fediverse_local_content_items')) {
             $fediverseItemId = rtrim($baseUrl, '/') . '/ap/objects/actualidad-' . rawurlencode($newsId);
@@ -11179,11 +11179,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: admin.php?page=edit&template=news');
         exit;
     } elseif (isset($_POST['delete_actuality_note'])) {
-        if (!function_exists('nammu_actuality_delete_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
-            require_once __DIR__ . '/core/actualidad.php';
+        if (!function_exists('nammu_actuality_delete_manual_item') && is_file(NAMMU_ROOT . '/core/actualidad.php')) {
+            require_once NAMMU_ROOT . '/core/actualidad.php';
         }
-        if (!function_exists('nammu_fediverse_enqueue_delete_local_item') && is_file(__DIR__ . '/core/fediverso.php')) {
-            require_once __DIR__ . '/core/fediverso.php';
+        if (!function_exists('nammu_fediverse_enqueue_delete_local_item') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+            require_once NAMMU_ROOT . '/core/fediverso.php';
         }
         $noteId = preg_replace('/[^a-f0-9]/i', '', (string) ($_POST['delete_note_id'] ?? '')) ?? '';
         if ($noteId === '') {
@@ -11223,11 +11223,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: admin.php?page=edit&template=notes');
         exit;
     } elseif (isset($_POST['delete_actuality_news'])) {
-        if (!function_exists('nammu_actuality_delete_news_item') && is_file(__DIR__ . '/core/actualidad.php')) {
-            require_once __DIR__ . '/core/actualidad.php';
+        if (!function_exists('nammu_actuality_delete_news_item') && is_file(NAMMU_ROOT . '/core/actualidad.php')) {
+            require_once NAMMU_ROOT . '/core/actualidad.php';
         }
-        if (!function_exists('nammu_fediverse_enqueue_delete_local_item') && is_file(__DIR__ . '/core/fediverso.php')) {
-            require_once __DIR__ . '/core/fediverso.php';
+        if (!function_exists('nammu_fediverse_enqueue_delete_local_item') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+            require_once NAMMU_ROOT . '/core/fediverso.php';
         }
         $newsId = preg_replace('/[^a-f0-9]/i', '', (string) ($_POST['delete_news_id'] ?? '')) ?? '';
         if ($newsId === '') {
@@ -13393,7 +13393,7 @@ if (!empty($_SESSION['fediverse_state']) && is_array($_SESSION['fediverse_state'
     $fediverseMessageText = (string) ($fediverseRedirectState['message_text'] ?? $fediverseMessageText);
 }
 if ($isLoggedIn && $page === 'publish') {
-    require_once __DIR__ . '/core/admin-redes.php';
+    require_once NAMMU_ROOT . '/core/admin-redes.php';
     if (!empty($_SESSION['social_broadcast_feedback'])) {
         $socialBroadcastFeedback = is_array($_SESSION['social_broadcast_feedback']) ? $_SESSION['social_broadcast_feedback'] : null;
         unset($_SESSION['social_broadcast_feedback']);
@@ -13408,10 +13408,10 @@ if ($isLoggedIn && $page === 'publish') {
     }
 }
 if ($isLoggedIn && $page === 'fediverso') {
-    require_once __DIR__ . '/core/fediverso.php';
+    require_once NAMMU_ROOT . '/core/fediverso.php';
     $refreshFediverseAvatarSnapshots = static function (array $config): void {
-        if (!function_exists('nammu_actuality_rebuild_snapshot') && is_file(__DIR__ . '/core/actualidad.php')) {
-            require_once __DIR__ . '/core/actualidad.php';
+        if (!function_exists('nammu_actuality_rebuild_snapshot') && is_file(NAMMU_ROOT . '/core/actualidad.php')) {
+            require_once NAMMU_ROOT . '/core/actualidad.php';
         }
         $baseUrl = trim((string) (($config['site_url'] ?? '') ?: nammu_base_url()));
         $siteTitle = trim((string) (($config['site_name'] ?? '') ?: 'Nammu Blog'));
@@ -13624,8 +13624,8 @@ if ($isLoggedIn && $page === 'fediverso') {
         }
         $resolvedObjectType = '';
         $config = load_config_file();
-        if (!function_exists('nammu_fediverse_signed_fetch_json') && is_file(__DIR__ . '/core/fediverso.php')) {
-            require_once __DIR__ . '/core/fediverso.php';
+        if (!function_exists('nammu_fediverse_signed_fetch_json') && is_file(NAMMU_ROOT . '/core/fediverso.php')) {
+            require_once NAMMU_ROOT . '/core/fediverso.php';
         }
         if (function_exists('nammu_fediverse_signed_fetch_json') && function_exists('nammu_fediverse_resolve_actor')) {
             $resolvedObject = nammu_fediverse_signed_fetch_json($objectUrl, $config);
@@ -13659,11 +13659,11 @@ if ($isLoggedIn && $page === 'fediverso') {
         }
         $result = nammu_fediverse_send_announce($recipientId, $objectUrl, $config);
         if (!empty($result['ok'])) {
-            if (!function_exists('admin_send_social_broadcast_to_configured_networks') && is_file(__DIR__ . '/core/admin-redes.php')) {
-                require_once __DIR__ . '/core/admin-redes.php';
+            if (!function_exists('admin_send_social_broadcast_to_configured_networks') && is_file(NAMMU_ROOT . '/core/admin-redes.php')) {
+                require_once NAMMU_ROOT . '/core/admin-redes.php';
             }
-            if (!function_exists('nammu_actuality_add_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
-                require_once __DIR__ . '/core/actualidad.php';
+            if (!function_exists('nammu_actuality_add_manual_item') && is_file(NAMMU_ROOT . '/core/actualidad.php')) {
+                require_once NAMMU_ROOT . '/core/actualidad.php';
             }
             $baseUrl = rtrim((string) (($config['site_url'] ?? '') ?: nammu_base_url()), '/');
             $siteTitle = trim((string) (($config['site_name'] ?? '') ?: ''));
@@ -13791,8 +13791,8 @@ if ($isLoggedIn && $page === 'fediverso') {
             $result = nammu_fediverse_send_reply($recipientId, $objectUrl, $replyText, $config);
         }
         if (!empty($result['ok']) && $replyAlsoAsNote) {
-            if (!function_exists('nammu_actuality_add_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
-                require_once __DIR__ . '/core/actualidad.php';
+            if (!function_exists('nammu_actuality_add_manual_item') && is_file(NAMMU_ROOT . '/core/actualidad.php')) {
+                require_once NAMMU_ROOT . '/core/actualidad.php';
             }
             $baseUrl = rtrim((string) (($config['site_url'] ?? '') ?: nammu_base_url()), '/');
             $siteTitle = trim((string) (($config['site_name'] ?? '') ?: ''));
@@ -13814,8 +13814,8 @@ if ($isLoggedIn && $page === 'fediverso') {
                 if (function_exists('nammu_actuality_rebuild_snapshot')) {
                     nammu_actuality_rebuild_snapshot($baseUrl, $config, $siteTitle, $siteDescription, $siteLang);
                 }
-                if (!function_exists('admin_enqueue_social_broadcast') && is_file(__DIR__ . '/core/admin-redes.php')) {
-                    require_once __DIR__ . '/core/admin-redes.php';
+                if (!function_exists('admin_enqueue_social_broadcast') && is_file(NAMMU_ROOT . '/core/admin-redes.php')) {
+                    require_once NAMMU_ROOT . '/core/admin-redes.php';
                 }
                 if (is_array($manualItem) && function_exists('admin_enqueue_social_broadcast') && function_exists('admin_social_broadcast_available_networks')) {
                     $allConfiguredNetworks = array_keys(admin_social_broadcast_available_networks(get_settings()));
@@ -13881,8 +13881,8 @@ if ($isLoggedIn && $page === 'fediverso') {
         ];
         $fediverseRedirect = true;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fediverse_share_note'])) {
-        if (!function_exists('nammu_actuality_add_manual_item') && is_file(__DIR__ . '/core/actualidad.php')) {
-            require_once __DIR__ . '/core/actualidad.php';
+        if (!function_exists('nammu_actuality_add_manual_item') && is_file(NAMMU_ROOT . '/core/actualidad.php')) {
+            require_once NAMMU_ROOT . '/core/actualidad.php';
         }
         $objectUrl = trim((string) ($_POST['fediverse_object_url'] ?? ''));
         $shareText = trim((string) ($_POST['fediverse_share_text'] ?? ''));
@@ -13937,8 +13937,8 @@ if ($isLoggedIn && $page === 'fediverso') {
             if (function_exists('nammu_fediverse_record_action')) {
                 nammu_fediverse_record_action('share', '', $objectUrl, ['share_text' => $shareText, 'title' => $shareTitle]);
             }
-            if (!function_exists('admin_enqueue_social_broadcast') && is_file(__DIR__ . '/core/admin-redes.php')) {
-                require_once __DIR__ . '/core/admin-redes.php';
+            if (!function_exists('admin_enqueue_social_broadcast') && is_file(NAMMU_ROOT . '/core/admin-redes.php')) {
+                require_once NAMMU_ROOT . '/core/admin-redes.php';
             }
             if (is_array($manualItem) && function_exists('admin_enqueue_social_broadcast') && function_exists('admin_social_broadcast_available_networks')) {
                 $allConfiguredNetworks = array_keys(admin_social_broadcast_available_networks(get_settings()));
@@ -14007,7 +14007,7 @@ if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET'
         exit;
     }
     ob_start();
-    include __DIR__ . '/core/admin-page-fediverso.php';
+    include NAMMU_ROOT . '/core/admin-page-fediverso.php';
     $fediverseHtml = (string) ob_get_clean();
     $fediverseHtml = $normalizeFediversePanelFragment($fediverseHtml);
     nammu_fediverse_store_cached_fragment($fediverseFragmentTab, $fediverseFragmentVersion, $fediverseFragmentContext, $fediverseHtml);
@@ -14020,7 +14020,7 @@ if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET'
 }
 
 if ($isLoggedIn && $page === 'fediverso' && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fediverse_state'])) {
-    require_once __DIR__ . '/core/fediverso.php';
+    require_once NAMMU_ROOT . '/core/fediverso.php';
     header('Content-Type: application/json; charset=UTF-8');
     header('Cache-Control: no-store, no-cache, must-revalidate');
     header('Pragma: no-cache');
@@ -16092,56 +16092,56 @@ $adminLogoLink = $adminLogoLink !== '' ? $adminLogoLink : 'index.php';
 
                         <?php if ($page === 'dashboard'): ?>
 
-                            <?php include __DIR__ . '/core/admin-page-dashboard.php'; ?>
+                            <?php include NAMMU_ROOT . '/core/admin-page-dashboard.php'; ?>
 
 <?php elseif ($page === 'publish'): ?>
 
-                            <?php include __DIR__ . '/core/admin-page-publish.php'; ?>
+                            <?php include NAMMU_ROOT . '/core/admin-page-publish.php'; ?>
 
 <?php elseif ($page === 'edit' || $page === 'edit-post' || $page === 'edit-note' || $page === 'edit-news'): ?>
 
-    <?php include __DIR__ . '/core/admin-page-edit.php'; ?>
+    <?php include NAMMU_ROOT . '/core/admin-page-edit.php'; ?>
 
 <?php elseif ($page === 'resources'): ?>
 
-    <?php include __DIR__ . '/core/admin-page-resources.php'; ?>
+    <?php include NAMMU_ROOT . '/core/admin-page-resources.php'; ?>
     
 <?php elseif ($page === 'template'): ?>
 
-    <?php include __DIR__ . '/core/admin-page-template.php'; ?>
+    <?php include NAMMU_ROOT . '/core/admin-page-template.php'; ?>
 
 <?php elseif ($page === 'itinerarios'): ?>
 
-    <?php include __DIR__ . '/core/admin-page-itinerarios.php'; ?>
+    <?php include NAMMU_ROOT . '/core/admin-page-itinerarios.php'; ?>
 
 
 <?php elseif ($page === 'itinerario'): ?>
 
-    <?php include __DIR__ . '/core/admin-page-itinerario.php'; ?>
+    <?php include NAMMU_ROOT . '/core/admin-page-itinerario.php'; ?>
 
 <?php elseif ($page === 'itinerario-tema'): ?>
 
-    <?php include __DIR__ . '/core/admin-page-itinerario-tema.php'; ?>
+    <?php include NAMMU_ROOT . '/core/admin-page-itinerario-tema.php'; ?>
 
 <?php elseif ($page === 'lista-correo'): ?>
 
-    <?php include __DIR__ . '/core/admin-page-lista-correo.php'; ?>
+    <?php include NAMMU_ROOT . '/core/admin-page-lista-correo.php'; ?>
 
 <?php elseif ($page === 'correo-postal'): ?>
 
-    <?php include __DIR__ . '/core/admin-page-correo-postal.php'; ?>
+    <?php include NAMMU_ROOT . '/core/admin-page-correo-postal.php'; ?>
 
 <?php elseif ($page === 'anuncios'): ?>
 
-    <?php include __DIR__ . '/core/admin-page-anuncios.php'; ?>
+    <?php include NAMMU_ROOT . '/core/admin-page-anuncios.php'; ?>
 
 <?php elseif ($page === 'fediverso'): ?>
 
-    <?php include __DIR__ . '/core/admin-page-fediverso.php'; ?>
+    <?php include NAMMU_ROOT . '/core/admin-page-fediverso.php'; ?>
 
 <?php elseif ($page === 'configuracion'): ?>
 
-    <?php include __DIR__ . '/core/admin-page-configuracion.php'; ?>
+    <?php include NAMMU_ROOT . '/core/admin-page-configuracion.php'; ?>
 
 <?php endif; ?>
 

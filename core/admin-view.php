@@ -14,3 +14,17 @@ function admin_inline_asset(string $relativePath): void
         readfile($path);
     }
 }
+
+/**
+ * Recupera y borra un mensaje de una sola lectura dejado en sesión (patrón flash).
+ * Devuelve null si no existe o no tiene la forma esperada; en ese caso no se toca la sesión.
+ */
+function admin_take_flash(string $key, bool $requireMessage = true): ?array
+{
+    $value = $_SESSION[$key] ?? null;
+    if (!is_array($value) || ($requireMessage && !isset($value['message'], $value['type']))) {
+        return null;
+    }
+    unset($_SESSION[$key]);
+    return $value;
+}

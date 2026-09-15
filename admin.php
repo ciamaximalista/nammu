@@ -1089,6 +1089,16 @@ function admin_multi_instance_run_completed(array $run): bool
     return true;
 }
 
+function admin_multi_instance_run_consumed_slot(array $run): bool
+{
+    if (admin_multi_instance_run_completed($run)) {
+        return true;
+    }
+    $result = is_array($run['result'] ?? null) ? $run['result'] : null;
+    $reason = is_array($result) ? trim((string) ($result['reason'] ?? '')) : '';
+    return $reason === 'already_running';
+}
+
 function admin_multi_instance_run_site_phase(string $adminFile, string $phase): array
 {
     $map = [
@@ -1257,7 +1267,7 @@ function admin_run_cluster_scheduled_tasks(): array
                     'exit_code' => (int) ($run['exit_code'] ?? 1),
                     'result' => $run['result'] ?? null,
                 ];
-                if (admin_multi_instance_run_completed($run)) {
+                if (admin_multi_instance_run_consumed_slot($run)) {
                     admin_multi_instance_mark_phase_run($state, $siteKey, $phase, $now);
                     admin_multi_instance_scheduler_state_save($config, $state);
                 }
@@ -1328,7 +1338,7 @@ function admin_run_cluster_scheduled_tasks(): array
                         'exit_code' => (int) ($run['exit_code'] ?? 1),
                         'result' => $run['result'] ?? null,
                     ];
-                    if (admin_multi_instance_run_completed($run)) {
+                    if (admin_multi_instance_run_consumed_slot($run)) {
                         admin_multi_instance_mark_phase_run($state, $siteKey, $phase, $now);
                         admin_multi_instance_scheduler_state_save($config, $state);
                     }

@@ -26,10 +26,8 @@ function admin_google_refresh_access_token(string $clientId, string $clientSecre
     $context = stream_context_create($opts);
     $raw = @file_get_contents('https://oauth2.googleapis.com/token', false, $context);
     if ($raw === false) {
-        $status = '';
-        if (isset($http_response_header[0])) {
-            $status = ' (' . $http_response_header[0] . ')';
-        }
+        $statusLine = nammu_last_response_headers($http_response_header ?? null)[0] ?? '';
+        $status = $statusLine !== '' ? ' (' . $statusLine . ')' : '';
         throw new RuntimeException('No se pudo refrescar el token con Google' . $status);
     }
     $decoded = json_decode($raw, true);
@@ -94,7 +92,7 @@ function admin_gmail_send_message(string $from, string $to, string $subject, str
     $context = stream_context_create($opts);
     $response = @file_get_contents('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', false, $context);
     if ($response === false) {
-        $status = isset($http_response_header[0]) ? $http_response_header[0] : 'sin respuesta';
+        $status = nammu_last_response_headers($http_response_header ?? null)[0] ?? 'sin respuesta';
         return [false, 'HTTP ' . $status];
     }
     $decoded = json_decode($response, true);
@@ -1273,7 +1271,8 @@ function admin_gmail_update_display_name(string $sendAsEmail, string $displayNam
         ];
         $context = stream_context_create($opts);
         $result = @file_get_contents($url, false, $context);
-        if ($result !== false && isset($http_response_header[0]) && str_contains($http_response_header[0], '200')) {
+        $statusLine = nammu_last_response_headers($http_response_header ?? null)[0] ?? '';
+        if ($result !== false && str_contains($statusLine, '200')) {
             break;
         }
     }

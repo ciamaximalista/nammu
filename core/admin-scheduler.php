@@ -210,7 +210,10 @@ function admin_run_scheduled_maintenance_tasks(): array {
     }
     if (function_exists('nammu_fediverse_refresh_link_card_queue')) {
         $linkCardRefreshStats = $traceStep('fediverse_link_card_refresh', static function () use ($config) {
-            return nammu_fediverse_refresh_link_card_queue($config, 8, 259200);
+            // Si el cron de link cards está procesando la cola, este paso se salta en vez de esperar.
+            return admin_run_with_scheduled_lock(static function () use ($config): array {
+                return nammu_fediverse_refresh_link_card_queue($config, 8, 259200);
+            }, admin_fediverse_link_card_lock_file());
         });
     }
     if (function_exists('nammu_fediverse_process_avatar_cache_queue')) {
@@ -1226,9 +1229,19 @@ function admin_scheduled_lock_file(): string
     return NAMMU_ROOT . '/config/.scheduled-run.lock';
 }
 
-function admin_run_with_scheduled_lock(callable $callback): array
+/**
+ * Lock propio del refresco de link cards: lo comparten el cron --run-fediverse-link-card-refresh
+ * y el paso equivalente de maintenance, de modo que la cola nunca se procese dos veces a la vez
+ * sin que ese trabajo (lento, de red) bloquee las fases light/maintenance/heavy.
+ */
+function admin_fediverse_link_card_lock_file(): string
 {
-    $lockFile = admin_scheduled_lock_file();
+    return NAMMU_ROOT . '/config/.fediverse-link-cards.lock';
+}
+
+function admin_run_with_scheduled_lock(callable $callback, string $lockFile = ''): array
+{
+    $lockFile = $lockFile !== '' ? $lockFile : admin_scheduled_lock_file();
     $handle = @fopen($lockFile, 'c+');
     if (!is_resource($handle)) {
         return ['ok' => false, 'skipped' => 1, 'reason' => 'lock_unavailable'];

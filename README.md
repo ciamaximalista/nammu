@@ -319,13 +319,14 @@ En `admin.php?page=configuracion`, Nammu permite definir un directorio común de
 Si usas el planificador central multiinstancia, la forma más robusta es ejecutarlo con rutas absolutas y `timeout`:
 
 ```bash
-* * * * * umask 0002; /usr/bin/timeout -k 10s 50s /usr/bin/flock -n /tmp/<cluster>-run-cluster.lock /usr/bin/php /var/www/html/<carpeta-publica>/admin.php --run-cluster-scheduled >> <directorio-backups>/cluster-cron.log 2>&1
+* * * * * umask 0002; /usr/bin/timeout -k 10s 120s /usr/bin/flock -n /tmp/<cluster>-run-cluster.lock /usr/bin/php /var/www/html/<carpeta-publica>/admin.php --run-cluster-scheduled >> <directorio-backups>/cluster-cron.log 2>&1
 ```
 
-Así evitas que un proceso colgado retenga el lock indefinidamente.
+Así evitas que un proceso colgado retenga el lock indefinidamente. El `timeout` debe superar con holgura lo que tarda una fase (una fase `light` con actores lentos puede pasar de 45 s); si se queda corto, `timeout` mata al runner antes de que escriba su línea en el log y la fase se repite en el minuto siguiente.
 
 Si además quieres refrescar en segundo plano las `link cards` del Fediverso para recuperar `og:image` sin cargar la petición web ni las fases `light`, `maintenance` o `heavy`, añade un cron separado y escalonado por blog. Ese proceso:
 
+- usa un lock propio (`config/.fediverse-link-cards.lock`), compartido con el paso equivalente de `maintenance`, así que no bloquea a `light`, `maintenance` ni `heavy` aunque coincidan en el mismo minuto,
 - solo descarga el HTML de la URL remota, no la imagen binaria,
 - resuelve `og:title`, `og:description` y `og:image`,
 - guarda el resultado en caché,

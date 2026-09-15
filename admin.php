@@ -114,7 +114,7 @@ if ($runClusterScheduledOnly) {
 }
 
 if ($runFediverseLinkCardRefreshOnly) {
-    $result = admin_run_with_scheduled_lock('admin_run_fediverse_link_card_refresh_tasks');
+    $result = admin_run_with_scheduled_lock('admin_run_fediverse_link_card_refresh_tasks', admin_fediverse_link_card_lock_file());
     $result['mode'] = 'fediverse_link_cards';
     fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
     exit(0);

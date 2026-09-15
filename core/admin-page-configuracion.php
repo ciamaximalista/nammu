@@ -1,4 +1,10 @@
 <?php if ($page === 'configuracion'): ?>
+    <?php
+        $settings = function_exists('load_config_file')
+            ? load_config_file()
+            : (function_exists('nammu_load_config') ? nammu_load_config() : ($settings ?? []));
+        $settings = is_array($settings) ? $settings : [];
+    ?>
 
     <div class="tab-pane active">
 

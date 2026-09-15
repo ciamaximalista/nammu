@@ -80,6 +80,31 @@ try {
     smoke_assert(($rssLinks[1]['href'] ?? '') === 'https://example.test/blog.xml', 'La RSS especifica del blog no usa /blog.xml.');
     smoke_assert(nammu_home_content_mode(['home' => ['content' => 'podcast']], true, false) === 'blog', 'El modo podcast sin episodios no cae a blog.');
 
+    // Piezas del panel troceadas en core/admin-*.php: deben cargar sin errores fatales y el
+    // despachador de acciones POST debe resolver claves a ficheros existentes.
+    require_once __DIR__ . '/../core/bootstrap.php';
+    foreach ([
+        'admin-cli', 'admin-csrf', 'admin-scheduler', 'admin-content', 'admin-backups', 'admin-media',
+        'admin-itineraries', 'admin-artifacts', 'admin-settings', 'admin-search-console', 'admin-urls',
+        'admin-indexnow', 'admin-social', 'admin-social-senders', 'admin-mailing', 'admin-mailing-campaigns',
+        'admin-view', 'admin-actions',
+    ] as $piece) {
+        require_once __DIR__ . '/../core/' . $piece . '.php';
+    }
+    smoke_assert(function_exists('admin_run_scheduled_tasks') && function_exists('get_settings'), 'Las funciones del panel no se cargaron.');
+    foreach (admin_action_files() as $key => $file) {
+        smoke_assert(is_file(__DIR__ . '/../core/' . $file), "El despachador apunta a un fichero inexistente para {$key}: {$file}.");
+    }
+    smoke_assert(admin_action_file_for_request(['delete_post' => '1']) === 'admin-actions-content.php', 'El despachador no resuelve delete_post.');
+    smoke_assert(admin_action_file_for_request(['fediverse_like_item' => '1']) === '', 'El despachador no debe atender acciones del Fediverso.');
+    foreach (['admin-request-state', 'admin-endpoints', 'admin-view-itineraries', 'admin-view-data', 'admin-layout-head',
+        'admin-layout-auth', 'admin-layout-nav', 'admin-layout-modals', 'admin-layout-scripts', 'admin-actions-fediverso', 'admin-actions-oauth'] as $piece) {
+        smoke_assert(is_file(__DIR__ . '/../core/' . $piece . '.php'), "Falta core/{$piece}.php.");
+    }
+    foreach (['admin.css', 'markdown-toolbar.js', 'media-modal.js', 'autosave.js'] as $asset) {
+        smoke_assert(is_file(__DIR__ . '/../core/admin-assets/' . $asset), "Falta core/admin-assets/{$asset}.");
+    }
+
     echo "Smoke OK\n";
 } finally {
     smoke_remove_tree($root);

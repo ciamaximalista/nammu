@@ -705,6 +705,26 @@ Nammu no se limita a generar RSS: también convierte cada blog en una cuenta pro
 - Parser propio robusto y uso opcional de Symfony Yaml si está disponible.
 - Integración con Nisaba y sugerencias editoriales desde el botón **Ideas**.
 
+## Estructura del código
+
+Nammu no usa framework: son funciones PHP con prefijo `nammu_*` (núcleo compartido por la web pública y el panel) y `admin_*` (panel). Las piezas principales:
+
+- `index.php` y `template/*.php`: web pública (portada, entradas, categorías, podcast, itinerarios, perfil Fediverso, buscador).
+- `core/helpers.php`: núcleo compartido (configuración, analítica, feeds, push, mailing público).
+- `core/fediverso.php`, `core/actualidad.php`, `core/webmention.php`, `core/admin-redes.php`, `core/postal.php`: módulos que el panel y el cron cargan bajo demanda.
+- `core/Itinerary*.php`, `core/MarkdownConverter.php`, `core/RssGenerator.php`, `core/SitemapGenerator.php`: clases del espacio de nombres `Nammu\Core`.
+
+`admin.php` es la entrada del panel y del cron (`--run-scheduled`, `--run-scheduled-maintenance`, `--run-scheduled-heavy`, `--run-cluster-scheduled`, `--run-fediverse-link-card-refresh`, `--replay-fediverse-deletes`). Es un fichero corto que solo arranca, despacha y monta la página; todo lo demás vive en `core/` con estos prefijos:
+
+- `core/admin-<dominio>.php`: funciones del panel por dominio (`admin-scheduler`, `admin-content`, `admin-media`, `admin-itineraries`, `admin-artifacts`, `admin-settings`, `admin-search-console`, `admin-urls`, `admin-indexnow`, `admin-social`, `admin-social-senders`, `admin-mailing`, `admin-mailing-campaigns`, `admin-backups`, `admin-csrf`, `admin-cli`, `admin-view`). Solo definen funciones.
+- `core/admin-actions.php` y `core/admin-actions-<grupo>.php`: acciones POST. El despachador elige el fichero por la primera clave de formulario presente y el fichero contiene la cadena `if/elseif` de su grupo (`auth`, `content`, `social`, `itineraries`, `actuality`, `media`, `settings`, `mailing`, `postal`). Las acciones del Fediverso están en `admin-actions-fediverso.php` y los retornos OAuth en `admin-actions-oauth.php`. Todas se ejecutan tras validar el token CSRF.
+- `core/admin-request-state.php`, `core/admin-endpoints.php`, `core/admin-view-*.php`: estado recuperado de la sesión, respuestas AJAX/descargas que terminan la petición y datos que necesitan las vistas.
+- `core/admin-layout-*.php`: esqueleto HTML (`head`, `auth`, `nav`, `modals`, `scripts`).
+- `core/admin-page-<pestaña>.php`: plantilla de cada pestaña del panel.
+- `core/admin-assets/`: CSS y JS del panel. `core/` no se sirve por HTTP, así que `admin_inline_asset()` los vuelca inline en la página.
+
+Todas esas piezas se incluyen en el ámbito global de `admin.php`, por lo que comparten variables como `$page`, `$settings` o `$error`. `NAMMU_ROOT` (definida en `core/bootstrap.php`) es la raíz pública de la instalación y sustituye a `__DIR__` en el código del panel.
+
 ## Actualización
 
 ### Desde Git

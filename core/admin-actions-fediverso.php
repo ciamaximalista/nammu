@@ -231,27 +231,37 @@
             if (!is_array($resolvedObject)) {
                 $resolvedObject = nammu_fediverse_fetch_json($objectUrl);
             }
+            $resolvedActorId = '';
             if (is_array($resolvedObject)) {
                 $resolvedObjectType = strtolower(trim((string) ($resolvedObject['type'] ?? '')));
                 $resolvedActorId = trim((string) (($resolvedObject['attributedTo'] ?? '') ?: ($resolvedObject['actor'] ?? '')));
-                if ($resolvedActorId !== '') {
-                    $resolvedActor = nammu_fediverse_resolve_actor($resolvedActorId, $config);
-                    if (is_array($resolvedActor)) {
-                        $resolvedActorName = trim((string) (($resolvedActor['name'] ?? '') ?: ($resolvedActor['preferredUsername'] ?? '') ?: ''));
-                        $resolvedActorIcon = trim((string) ($resolvedActor['icon'] ?? ''));
-                        $resolvedActorUrl = trim((string) (($resolvedActor['url'] ?? '') ?: ($resolvedActor['id'] ?? '')));
-                        if ($resolvedActorName !== '') {
-                            $objectActorName = $resolvedActorName;
-                        }
-                        if ($resolvedActorIcon !== '') {
-                            $objectActorIcon = $resolvedActorIcon;
-                        }
-                        if ($resolvedActorUrl !== '') {
-                            $objectActorUrl = $resolvedActorUrl;
-                        }
+            }
+            // Si no se ha podido leer el objeto, el autor es el actor al que se dirige el Announce.
+            if ($resolvedActorId === '') {
+                $resolvedActorId = $recipientId;
+            }
+            if ($resolvedActorId !== '') {
+                $resolvedActor = nammu_fediverse_resolve_actor($resolvedActorId, $config);
+                if (is_array($resolvedActor)) {
+                    $resolvedActorName = trim((string) (($resolvedActor['name'] ?? '') ?: ($resolvedActor['preferredUsername'] ?? '') ?: ''));
+                    $resolvedActorIcon = trim((string) ($resolvedActor['icon'] ?? ''));
+                    $resolvedActorUrl = trim((string) (($resolvedActor['url'] ?? '') ?: ($resolvedActor['id'] ?? '')));
+                    if ($resolvedActorName !== '') {
+                        $objectActorName = $resolvedActorName;
+                    }
+                    if ($resolvedActorIcon !== '') {
+                        $objectActorIcon = $resolvedActorIcon;
+                    }
+                    if ($resolvedActorUrl !== '') {
+                        $objectActorUrl = $resolvedActorUrl;
                     }
                 }
             }
+        }
+        // La URL del autor nunca puede ser la de la propia publicación: sin ella no se encuentra su avatar.
+        $publicationUrls = array_filter([rtrim($objectUrl, '/'), rtrim($publicUrl, '/')]);
+        if ($objectActorUrl === '' || in_array(rtrim($objectActorUrl, '/'), $publicationUrls, true)) {
+            $objectActorUrl = $recipientId;
         }
         if ($resolvedObjectType === 'note') {
             $objectTitle = '';

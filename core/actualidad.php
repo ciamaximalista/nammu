@@ -1286,6 +1286,23 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item, array $con
         [(string) ($item['link'] ?? '')],
         is_array($item['links'] ?? null) ? $item['links'] : []
     ))));
+    // Algunos impulsos antiguos guardaron la URL de la publicación como perfil del autor;
+    // se descarta para que el autor se recupere de la bandeja de entrada o de la lista de actores.
+    $isPublicationUrl = static function (string $url) use ($boostOriginalUrl, $candidateIdentifiers): bool {
+        $url = rtrim($url, '/');
+        if ($url === '') {
+            return false;
+        }
+        foreach (array_merge([$boostOriginalUrl], $candidateIdentifiers) as $publicationUrl) {
+            if (rtrim((string) $publicationUrl, '/') === $url) {
+                return true;
+            }
+        }
+        return false;
+    };
+    if ($isPublicationUrl($boostActorUrl)) {
+        $boostActorUrl = '';
+    }
     foreach ((array) (nammu_fediverse_actions_store()['items'] ?? []) as $action) {
         if (!is_array($action)) {
             continue;
@@ -1313,7 +1330,7 @@ function nammu_actuality_enrich_manual_boost_item_images(array $item, array $con
             if ($boostActorIcon === '') {
                 $boostActorIcon = trim((string) ($action['boost_actor_icon'] ?? ''));
             }
-            if ($boostActorUrl === '') {
+            if ($boostActorUrl === '' && !$isPublicationUrl(trim((string) ($action['boost_actor_url'] ?? '')))) {
                 $boostActorUrl = trim((string) ($action['boost_actor_url'] ?? ''));
             }
             foreach (array_filter([

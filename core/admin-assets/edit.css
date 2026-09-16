@@ -1,0 +1,120 @@
+/* Nammu — estilos de la pestaña Editar del panel (se incrusta inline desde core/admin-page-edit.php). */
+            .actuality-edit-table {
+                table-layout: fixed;
+                width: 100%;
+                min-width: 0;
+            }
+
+            .actuality-edit-table--news th:nth-child(1) {
+                width: 20%;
+            }
+
+            .actuality-edit-table--news th:nth-child(2) {
+                width: 34%;
+            }
+
+            .actuality-edit-table--news th:nth-child(3) {
+                width: 10%;
+            }
+
+            .actuality-edit-table--news th:nth-child(4) {
+                width: 11%;
+            }
+
+            .actuality-edit-table--news th:nth-child(5) {
+                width: 15%;
+            }
+
+            .actuality-edit-table--news th:nth-child(6) {
+                width: 10%;
+            }
+
+            .actuality-edit-table--notes td:nth-child(1) {
+                max-width: 34rem;
+            }
+
+            .actuality-edit-table td {
+                vertical-align: top;
+            }
+
+            .actuality-edit-table td:nth-child(1),
+            .actuality-edit-table td:nth-child(2) {
+                overflow-wrap: anywhere;
+            }
+
+            .actuality-edit-title-cell,
+            .actuality-edit-text-cell,
+            .actuality-edit-source-cell {
+                word-break: break-word;
+                overflow-wrap: anywhere;
+            }
+
+            .actuality-edit-date-cell {
+                font-size: 0.82rem;
+                white-space: normal;
+            }
+
+            .actuality-edit-social-cell form {
+                display: block !important;
+                margin: 0 0 0.25rem 0 !important;
+            }
+
+            .actuality-edit-social-cell .btn,
+            .actuality-edit-actions-column .btn {
+                width: 100%;
+                padding-left: 0.35rem;
+                padding-right: 0.35rem;
+                white-space: normal;
+            }
+
+            .actuality-edit-actions-column {
+                width: 5.75rem;
+                white-space: normal;
+            }
+
+            @media (max-width: 900px) {
+                .actuality-edit-table--news {
+                    font-size: 0.84rem;
+                }
+
+                .actuality-edit-table--news th:nth-child(1) {
+                    width: 18%;
+                }
+
+                .actuality-edit-table--news th:nth-child(2) {
+                    width: 30%;
+                }
+
+                .actuality-edit-table--news th:nth-child(3) {
+                    width: 11%;
+                }
+
+                .actuality-edit-table--news th:nth-child(4) {
+                    width: 10%;
+                }
+
+                .actuality-edit-table--news th:nth-child(5) {
+                    width: 17%;
+                }
+
+                .actuality-edit-table--news th:nth-child(6) {
+                    width: 14%;
+                }
+
+                .actuality-edit-social-cell .btn,
+                .actuality-edit-actions-column .btn {
+                    font-size: 0.78rem;
+                }
+            }
+
+            .draft-schedule-badge {
+                display: inline-block;
+                margin-top: 0.4rem;
+                padding: 0.25rem 0.5rem;
+                border-radius: 6px;
+                background: #ea2f28;
+                color: #ffffff;
+                font-size: 0.78rem;
+                font-weight: 600;
+                letter-spacing: 0.01em;
+            }

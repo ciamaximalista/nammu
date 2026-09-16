@@ -1,0 +1,14 @@
+/* Nammu — estilos de la pestaña Publicar del panel (se incrusta inline desde core/admin-page-publish.php). */
+                .social-fediverse-inline-icon {
+                    width: 0.95rem;
+                    height: 0.95rem;
+                    line-height: 1;
+                    vertical-align: -0.1em;
+                    --nammu-fediverse-bg: #0d6efd;
+                    --nammu-fediverse-fg: #ffffff;
+                }
+                .social-fediverse-inline-icon svg {
+                    display: block;
+                    width: 100%;
+                    height: 100%;
+                }

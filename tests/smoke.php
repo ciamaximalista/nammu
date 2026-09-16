@@ -97,11 +97,14 @@ try {
     }
     smoke_assert(admin_action_file_for_request(['delete_post' => '1']) === 'admin-actions-content.php', 'El despachador no resuelve delete_post.');
     smoke_assert(admin_action_file_for_request(['fediverse_like_item' => '1']) === '', 'El despachador no debe atender acciones del Fediverso.');
-    foreach (['admin-request-state', 'admin-endpoints', 'admin-view-itineraries', 'admin-view-data', 'admin-layout-head',
-        'admin-layout-auth', 'admin-layout-nav', 'admin-layout-modals', 'admin-layout-scripts', 'admin-actions-fediverso', 'admin-actions-oauth'] as $piece) {
+    foreach (['admin-request-state', 'admin-endpoints', 'admin-view-itineraries', 'admin-view-data', 'admin-view-dashboard',
+        'admin-view-dashboard-queues', 'admin-view-dashboard-search', 'admin-view-dashboard-analytics', 'admin-view-dashboard-top',
+        'admin-view-dashboard-counts', 'admin-layout-head', 'admin-layout-auth', 'admin-layout-nav', 'admin-layout-modals',
+        'admin-layout-scripts', 'admin-actions-fediverso', 'admin-actions-oauth'] as $piece) {
         smoke_assert(is_file(__DIR__ . '/../core/' . $piece . '.php'), "Falta core/{$piece}.php.");
     }
-    foreach (['admin.css', 'markdown-toolbar.js', 'media-modal.js', 'autosave.js'] as $asset) {
+    foreach (['admin.css', 'markdown-toolbar.js', 'media-modal.js', 'autosave.js', 'dashboard.css', 'dashboard.js', 'fediverso.css',
+        'fediverso.js', 'edit.css', 'edit.js', 'publish.css', 'publish.js'] as $asset) {
         smoke_assert(is_file(__DIR__ . '/../core/admin-assets/' . $asset), "Falta core/admin-assets/{$asset}.");
     }
 

@@ -1,0 +1,126 @@
+/* Nammu — estilos del Escritorio del panel (se incrusta inline desde core/admin-page-dashboard.php). */
+            .dashboard-card-title {
+                color: #1b8eed !important;
+            }
+            .dashboard-section-title {
+                color: #ea2f28 !important;
+            }
+            .dashboard-links a {
+                color: #7fa7d9 !important;
+            }
+            .dashboard-links a:hover {
+                color: #7fa7d9 !important;
+            }
+            .dashboard-links li:first-child {
+                background: #1b8eed;
+                border-radius: 8px;
+                padding: 0.2rem 0.4rem;
+            }
+            .dashboard-links li:first-child a,
+            .dashboard-links li:first-child span {
+                color: #ffffff !important;
+            }
+            .dashboard-toggle .btn {
+                color: #1b8eed;
+                border-color: #1b8eed;
+            }
+            .dashboard-toggle .btn.active,
+            .gsc-toggle .btn.active {
+                background: #1b8eed;
+                color: #ffffff;
+                border-color: #1b8eed;
+            }
+            .gsc-period-input {
+                position: absolute;
+                opacity: 0;
+                pointer-events: none;
+            }
+            #gsc-period-28:checked ~ .gsc-buttons label[for="gsc-period-28"],
+            #gsc-period-7:checked ~ .gsc-buttons label[for="gsc-period-7"] {
+                background: #1b8eed;
+                color: #ffffff;
+                border-color: #1b8eed;
+            }
+            .gsc-period-7 {
+                display: none;
+            }
+            #gsc-period-7:checked ~ .gsc-content .gsc-period-7 {
+                display: block;
+            }
+            #gsc-period-7:checked ~ .gsc-content .gsc-period-28 {
+                display: none;
+            }
+            #gsc-period-28:checked ~ .gsc-content .gsc-period-28 {
+                display: block;
+            }
+            #gsc-period-28:checked ~ .gsc-content .gsc-period-7 {
+                display: none;
+            }
+            .dashboard-line-chart {
+                display: block !important;
+                width: 100% !important;
+                height: 170px !important;
+                max-width: 100% !important;
+                overflow: visible !important;
+                background: transparent !important;
+            }
+            .dashboard-line-chart__axis {
+                fill: none !important;
+                stroke: #ccd6e0 !important;
+                stroke-width: 1 !important;
+                vector-effect: non-scaling-stroke;
+            }
+            .dashboard-line-chart__line {
+                fill: none !important;
+                stroke-width: 2 !important;
+                stroke-linecap: round !important;
+                stroke-linejoin: round !important;
+                vector-effect: non-scaling-stroke;
+            }
+            .dashboard-line-chart__point {
+                stroke: #ffffff !important;
+                stroke-width: 1 !important;
+                vector-effect: non-scaling-stroke;
+            }
+            .dashboard-line-chart__label {
+                font-family: sans-serif !important;
+                font-size: 10px !important;
+                font-weight: 400 !important;
+                line-height: 1 !important;
+                fill: #6c757d !important;
+                stroke: none !important;
+                paint-order: normal !important;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-panel {
+                background: #1f2937 !important;
+                border-color: #374151 !important;
+                color: #e5e7eb;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-panel--email {
+                background: #17271f !important;
+                border-color: #31543f !important;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-panel--social {
+                background: #172033 !important;
+                border-color: #355174 !important;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-panel--indexnow-ok {
+                background: #172033 !important;
+                border-color: #355174 !important;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-panel--indexnow-error {
+                background: #321b1b !important;
+                border-color: #7f1d1d !important;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-item {
+                background: #111827 !important;
+                border-color: #374151 !important;
+                color: #e5e7eb;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-item strong {
+                color: #f9fafb;
+            }
+            :root[data-admin-theme="dark"] .dashboard-status-panel .text-muted,
+            :root[data-admin-theme="dark"] .dashboard-status-item .text-muted {
+                color: #aab7c7 !important;
+            }

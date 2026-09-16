@@ -560,10 +560,10 @@ Nammu no usa framework: son funciones PHP con prefijo `nammu_*` (núcleo compart
 
 - `core/admin-<dominio>.php`: funciones del panel por dominio (`admin-scheduler`, `admin-content`, `admin-media`, `admin-itineraries`, `admin-artifacts`, `admin-settings`, `admin-search-console`, `admin-urls`, `admin-indexnow`, `admin-social`, `admin-social-senders`, `admin-mailing`, `admin-mailing-campaigns`, `admin-backups`, `admin-csrf`, `admin-cli`, `admin-view`). Solo definen funciones.
 - `core/admin-actions.php` y `core/admin-actions-<grupo>.php`: acciones POST. El despachador elige el fichero por la primera clave de formulario presente y cada fichero contiene la cadena `if/elseif` de su grupo (`auth`, `content`, `social`, `itineraries`, `actuality`, `media`, `settings`, `mailing`, `postal`). Las acciones del Fediverso están en `admin-actions-fediverso.php` y los retornos OAuth en `admin-actions-oauth.php`. Todas se ejecutan tras validar el token CSRF.
-- `core/admin-request-state.php`, `core/admin-endpoints.php`, `core/admin-view-*.php`: estado recuperado de la sesión, respuestas AJAX/descargas que terminan la petición y datos que necesitan las vistas.
+- `core/admin-request-state.php`, `core/admin-endpoints.php`, `core/admin-view-*.php`: estado recuperado de la sesión, respuestas AJAX/descargas que terminan la petición y datos que necesitan las vistas. Los del Escritorio (`admin-view-dashboard.php`) se reparten en `admin-view-dashboard-{queues,search,analytics,top,counts}.php`, que se cargan en ese orden y comparten variables.
 - `core/admin-layout-*.php`: esqueleto HTML (`head`, `auth`, `nav`, `modals`, `scripts`).
 - `core/admin-page-<pestaña>.php`: plantilla de cada pestaña.
-- `core/admin-assets/`: CSS y JS del panel. `core/` no se sirve por HTTP, así que `admin_inline_asset()` los vuelca inline.
+- `core/admin-assets/`: CSS y JS del panel (`admin.css` común y un `<pestaña>.css`/`<pestaña>.js` por pestaña con estilos o scripts propios). `core/` no se sirve por HTTP, así que `admin_inline_asset()` los vuelca inline.
 
 Todas esas piezas se incluyen en el ámbito global de `admin.php` y comparten variables como `$page`, `$settings` o `$error`. `NAMMU_ROOT` (definida en `core/bootstrap.php`) es la raíz pública de la instalación y sustituye a `__DIR__` en el código del panel.
 

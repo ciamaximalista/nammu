@@ -38,6 +38,54 @@ function smoke_remove_tree(string $path): void
     @rmdir($path);
 }
 
+/**
+ * Renderiza una pestaña de admin.php en un subproceso PHP (ver tests/admin-render-prepend.php) y devuelve
+ * ['exit' => int, 'stdout' => string, 'stderr' => string]. Aborta el proceso si tarda más de $timeoutSeconds.
+ */
+function smoke_render_admin_page(string $adminRoot, string $sessionDir, string $page, bool $loggedIn, int $timeoutSeconds = 180): array
+{
+    $command = [
+        PHP_BINARY,
+        '-d', 'auto_prepend_file=' . $adminRoot . '/tests/admin-render-prepend.php',
+        '-d', 'session.save_path=' . $sessionDir,
+        '-d', 'log_errors=0',
+        $adminRoot . '/admin.php',
+    ];
+    $env = array_merge(getenv(), [
+        'NAMMU_RENDER_PAGE' => $page,
+        'NAMMU_RENDER_LOGGED_OUT' => $loggedIn ? '0' : '1',
+    ]);
+    $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $adminRoot, $env);
+    smoke_assert(is_resource($process), "No se pudo lanzar PHP para renderizar admin.php?page={$page}.");
+    stream_set_blocking($pipes[1], false);
+    stream_set_blocking($pipes[2], false);
+    $stdout = '';
+    $stderr = '';
+    $startedAt = microtime(true);
+    $exitCode = -1;
+    while (true) {
+        $stdout .= (string) stream_get_contents($pipes[1]);
+        $stderr .= (string) stream_get_contents($pipes[2]);
+        $status = proc_get_status($process);
+        if (!$status['running']) {
+            $exitCode = (int) $status['exitcode'];
+            break;
+        }
+        if (microtime(true) - $startedAt > $timeoutSeconds) {
+            proc_terminate($process, 9);
+            $stderr .= "\nTiempo agotado tras {$timeoutSeconds}s.";
+            break;
+        }
+        usleep(20000);
+    }
+    $stdout .= (string) stream_get_contents($pipes[1]);
+    $stderr .= (string) stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    proc_close($process);
+    return ['exit' => $exitCode, 'stdout' => $stdout, 'stderr' => trim($stderr)];
+}
+
 $root = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'nammu-smoke-' . bin2hex(random_bytes(6));
 
 try {
@@ -107,6 +155,32 @@ try {
         'fediverso.js', 'edit.css', 'edit.js', 'publish.css', 'publish.js'] as $asset) {
         smoke_assert(is_file(__DIR__ . '/../core/admin-assets/' . $asset), "Falta core/admin-assets/{$asset}.");
     }
+
+    // Render real de cada pestaña como usuario con sesión (y de la pantalla de acceso sin ella): debe terminar sin
+    // avisos de PHP y con el panel completo. Es lo que detecta variables perdidas al mover código entre piezas.
+    $adminRoot = dirname(__DIR__);
+    $sessionDir = $root . '/sessions';
+    smoke_assert(nammu_ensure_directory($sessionDir), 'No se pudo crear el directorio de sesiones de prueba.');
+    foreach ([
+        'dashboard', 'publish', 'edit', 'edit-post', 'edit-note', 'edit-news', 'resources', 'template', 'itinerarios',
+        'itinerario', 'itinerario-tema', 'lista-correo', 'correo-postal', 'anuncios', 'fediverso', 'configuracion',
+    ] as $adminPage) {
+        $render = smoke_render_admin_page($adminRoot, $sessionDir, $adminPage, true);
+        smoke_assert($render['exit'] === 0, "admin.php?page={$adminPage} terminó con código {$render['exit']}.\n{$render['stderr']}");
+        smoke_assert($render['stderr'] === '', "admin.php?page={$adminPage} emitió avisos de PHP:\n{$render['stderr']}");
+        smoke_assert(str_contains($render['stdout'], '</html>'), "admin.php?page={$adminPage} no completó el HTML.");
+        smoke_assert(
+            str_contains($render['stdout'], 'class="admin-container"') && str_contains($render['stdout'], 'tab-pane'),
+            "admin.php?page={$adminPage} no pintó la pestaña con la sesión iniciada."
+        );
+    }
+    $render = smoke_render_admin_page($adminRoot, $sessionDir, 'dashboard', false);
+    smoke_assert($render['exit'] === 0 && $render['stderr'] === '', "La pantalla de acceso terminó con código {$render['exit']}.\n{$render['stderr']}");
+    smoke_assert(
+        str_contains($render['stdout'], '</html>') && !str_contains($render['stdout'], 'class="admin-container"')
+            && (str_contains($render['stdout'], 'name="login"') || str_contains($render['stdout'], 'name="register"')),
+        'Sin sesión, admin.php no mostró la pantalla de acceso o registro.'
+    );
 
     echo "Smoke OK\n";
 } finally {

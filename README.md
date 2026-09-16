@@ -567,7 +567,7 @@ Nammu no usa framework: son funciones PHP con prefijo `nammu_*` (núcleo compart
 
 Todas esas piezas se incluyen en el ámbito global de `admin.php` y comparten variables como `$page`, `$settings` o `$error`. `NAMMU_ROOT` (definida en `core/bootstrap.php`) es la raíz pública de la instalación y sustituye a `__DIR__` en el código del panel.
 
-Antes de enviar cambios, `composer run check` pasa `php -l` sobre todos los ficheros, ejecuta `tests/smoke.php` y valida `composer.json`.
+Antes de enviar cambios, `composer run check` pasa `php -l` sobre todos los ficheros, ejecuta `tests/smoke.php` y valida `composer.json`. El smoke test, además de las comprobaciones unitarias, renderiza cada pestaña del panel desde la CLI como usuario con sesión iniciada (`php -d auto_prepend_file=tests/admin-render-prepend.php admin.php`, con la pestaña en `NAMMU_RENDER_PAGE`) y falla ante cualquier aviso de PHP, así que detecta variables perdidas al mover código entre piezas.
 
 ## Licencia y soporte
 

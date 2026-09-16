@@ -6092,6 +6092,21 @@ function nammu_fediverse_apply_reply_reaction_metrics(array $replies, array $con
         }
     }
     $replyReactionMap = nammu_fediverse_reaction_snapshot_for_targets($replyReactionTargetMap, $config);
+    // La bandeja de entrada rota (se conservan ~1000 actividades), así que la
+    // instantánea recién calculada sólo ve las reacciones recientes. Igual que
+    // hace nammu_fediverse_merge_thread_payload_metrics() con los posts, se
+    // fusiona con lo que la respuesta ya traía en lugar de sobrescribirlo. La
+    // única excepción son nuestras propias reacciones: la tienda de acciones
+    // es la fuente de verdad y, si ya no están ahí, es que se retiraron.
+    $localActorId = trim((string) nammu_fediverse_actor_url($config));
+    $dropLocalActor = static function (array $entries) use ($localActorId): array {
+        return array_values(array_filter($entries, static function ($entry) use ($localActorId): bool {
+            if (!is_array($entry)) {
+                return false;
+            }
+            return $localActorId === '' || trim((string) ($entry['id'] ?? '')) !== $localActorId;
+        }));
+    };
     foreach ($replies as $replyIndex => &$reply) {
         if (!is_array($reply)) {
             continue;
@@ -6105,6 +6120,19 @@ function nammu_fediverse_apply_reply_reaction_metrics(array $replies, array $con
         $details = is_array($replyReaction['details'] ?? null) ? $replyReaction['details'] : [];
         $existingSummary = is_array($reply['summary'] ?? null) ? $reply['summary'] : [];
         $existingDetails = is_array($reply['details'] ?? null) ? $reply['details'] : [];
+        foreach (['likes', 'shares'] as $bucket) {
+            $freshEntries = is_array($details[$bucket] ?? null) ? $details[$bucket] : [];
+            $previousEntries = is_array($existingDetails[$bucket] ?? null) ? $existingDetails[$bucket] : [];
+            $previousCount = $previousEntries !== []
+                ? count($dropLocalActor($previousEntries))
+                : max(0, (int) ($existingSummary[$bucket] ?? 0));
+            $details[$bucket] = nammu_fediverse_merge_actor_detail_lists($freshEntries, $dropLocalActor($previousEntries));
+            $summary[$bucket] = max(
+                (int) ($summary[$bucket] ?? 0),
+                $previousCount,
+                count($details[$bucket])
+            );
+        }
         $summary['replies'] = max(0, (int) ($existingSummary['replies'] ?? 0));
         $details['replies'] = is_array($existingDetails['replies'] ?? null) ? $existingDetails['replies'] : [];
         $reply['summary'] = [

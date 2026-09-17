@@ -42,7 +42,7 @@ function smoke_remove_tree(string $path): void
  * Renderiza una pestaña de admin.php en un subproceso PHP (ver tests/admin-render-prepend.php) y devuelve
  * ['exit' => int, 'stdout' => string, 'stderr' => string]. Aborta el proceso si tarda más de $timeoutSeconds.
  */
-function smoke_render_admin_page(string $adminRoot, string $sessionDir, string $page, bool $loggedIn, int $timeoutSeconds = 180): array
+function smoke_render_admin_page(string $adminRoot, string $sessionDir, string $page, bool $loggedIn, array $query = [], int $timeoutSeconds = 180): array
 {
     $command = [
         PHP_BINARY,
@@ -54,6 +54,7 @@ function smoke_render_admin_page(string $adminRoot, string $sessionDir, string $
     $env = array_merge(getenv(), [
         'NAMMU_RENDER_PAGE' => $page,
         'NAMMU_RENDER_LOGGED_OUT' => $loggedIn ? '0' : '1',
+        'NAMMU_RENDER_QUERY' => http_build_query($query),
     ]);
     $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $adminRoot, $env);
     smoke_assert(is_resource($process), "No se pudo lanzar PHP para renderizar admin.php?page={$page}.");
@@ -161,17 +162,24 @@ try {
     $adminRoot = dirname(__DIR__);
     $sessionDir = $root . '/sessions';
     smoke_assert(nammu_ensure_directory($sessionDir), 'No se pudo crear el directorio de sesiones de prueba.');
+    $adminPages = [];
     foreach ([
         'dashboard', 'publish', 'edit', 'edit-post', 'edit-note', 'edit-news', 'resources', 'template', 'itinerarios',
-        'itinerario', 'itinerario-tema', 'lista-correo', 'correo-postal', 'anuncios', 'fediverso', 'configuracion',
+        'itinerario', 'itinerario-tema', 'lista-correo', 'correo-postal', 'anuncios', 'configuracion',
     ] as $adminPage) {
-        $render = smoke_render_admin_page($adminRoot, $sessionDir, $adminPage, true);
-        smoke_assert($render['exit'] === 0, "admin.php?page={$adminPage} terminó con código {$render['exit']}.\n{$render['stderr']}");
-        smoke_assert($render['stderr'] === '', "admin.php?page={$adminPage} emitió avisos de PHP:\n{$render['stderr']}");
-        smoke_assert(str_contains($render['stdout'], '</html>'), "admin.php?page={$adminPage} no completó el HTML.");
+        $adminPages[$adminPage] = [$adminPage, []];
+    }
+    foreach (['home', 'notifications', 'messages', 'mentions', 'network', 'settings'] as $fediverseTab) {
+        $adminPages["fediverso&tab={$fediverseTab}"] = ['fediverso', ['tab' => $fediverseTab]];
+    }
+    foreach ($adminPages as $adminLabel => [$adminPage, $adminQuery]) {
+        $render = smoke_render_admin_page($adminRoot, $sessionDir, $adminPage, true, $adminQuery);
+        smoke_assert($render['exit'] === 0, "admin.php?page={$adminLabel} terminó con código {$render['exit']}.\n{$render['stderr']}");
+        smoke_assert($render['stderr'] === '', "admin.php?page={$adminLabel} emitió avisos de PHP:\n{$render['stderr']}");
+        smoke_assert(str_contains($render['stdout'], '</html>'), "admin.php?page={$adminLabel} no completó el HTML.");
         smoke_assert(
             str_contains($render['stdout'], 'class="admin-container"') && str_contains($render['stdout'], 'tab-pane'),
-            "admin.php?page={$adminPage} no pintó la pestaña con la sesión iniciada."
+            "admin.php?page={$adminLabel} no pintó la pestaña con la sesión iniciada."
         );
     }
     $render = smoke_render_admin_page($adminRoot, $sessionDir, 'dashboard', false);

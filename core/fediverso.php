@@ -5108,7 +5108,11 @@ function nammu_fediverse_tab_version(string $tab): string
         $size = is_file($file) ? (string) ((int) @filesize($file)) : '0';
         $parts[] = basename($file) . ':' . $mtime . ':' . $size;
     }
-    foreach ([__FILE__, dirname(__DIR__) . '/core/admin-page-fediverso.php', dirname(__DIR__) . '/admin.php'] as $codeFile) {
+    $codeFiles = array_merge(
+        [__FILE__, dirname(__DIR__) . '/core/admin-page-fediverso.php', dirname(__DIR__) . '/admin.php'],
+        glob(dirname(__DIR__) . '/core/admin-view-fediverso-*.php') ?: []
+    );
+    foreach ($codeFiles as $codeFile) {
         $mtime = is_file($codeFile) ? (string) ((int) @filemtime($codeFile)) : '0';
         $size = is_file($codeFile) ? (string) ((int) @filesize($codeFile)) : '0';
         $parts[] = basename($codeFile) . ':' . $mtime . ':' . $size;

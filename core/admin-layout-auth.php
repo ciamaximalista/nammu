@@ -47,6 +47,12 @@
 
                         <?php endif; ?>
 
+                        <?php if (admin_pending_submission_pending()): ?>
+
+                            <div class="alert alert-info">El texto que estabas escribiendo no se ha perdido: en cuanto inicies sesión se guardará como borrador y se abrirá en el editor.</div>
+
+                        <?php endif; ?>
+
                         <form method="post">
 
                             <div class="form-group">

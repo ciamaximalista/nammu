@@ -19,6 +19,14 @@ if (!$__nammuRunScheduledOnly && !$__nammuRunScheduledMaintenanceOnly && !$__nam
         ]);
     }
     session_start();
+    // Latido del editor (core/admin-assets/autosave.js): mantiene viva la sesión mientras el autor escribe y le dice
+    // al navegador si sigue iniciada. Termina aquí, antes de cargar el panel.
+    if (isset($_GET['session_ping'])) {
+        header('Content-Type: application/json; charset=UTF-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        echo json_encode(['loggedin' => isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true]);
+        exit;
+    }
 }
 
 require_once __DIR__ . '/core/bootstrap.php';
@@ -33,6 +41,7 @@ require_once NAMMU_ROOT . '/core/admin-cli.php';
 require_once NAMMU_ROOT . '/core/admin-csrf.php';
 require_once NAMMU_ROOT . '/core/admin-scheduler.php';
 require_once NAMMU_ROOT . '/core/admin-content.php';
+require_once NAMMU_ROOT . '/core/admin-pending-submission.php';
 require_once NAMMU_ROOT . '/core/admin-backups.php';
 require_once NAMMU_ROOT . '/core/admin-media.php';
 require_once NAMMU_ROOT . '/core/admin-itineraries.php';
@@ -175,6 +184,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($adminActionFile !== '') {
             include NAMMU_ROOT . '/core/' . $adminActionFile;
         }
+    }
+    // El envío del editor llegó con la sesión caducada (token inválido o sin login): se conserva en la sesión nueva y
+    // se escribe como borrador en cuanto el autor vuelva a entrar (core/admin-pending-submission.php).
+    if (!is_logged_in()) {
+        admin_pending_submission_stash($_POST);
     }
 }
 

@@ -47,6 +47,16 @@
 
 
 
+<?php
+// Un POST del editor que acabó en la pantalla de acceso sin poder conservarse, o un borrador pendiente que no se pudo
+// escribir tras el login: autosave.js desmarca la copia local "enviada" para volver a ofrecerla.
+$adminSubmissionLost = admin_take_flash('nammu_submission_lost', false) !== null
+    || ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isLoggedIn && !isset($_POST['login']) && !isset($_POST['register'])
+        && !admin_pending_submission_pending());
+?>
+<?php if ($adminSubmissionLost): ?>
+        <div hidden data-nammu-submission-lost="1"></div>
+<?php endif; ?>
         <script>
 <?php admin_inline_asset('autosave.js'); ?>
         </script>

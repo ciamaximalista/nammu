@@ -21,6 +21,26 @@ if (isset($_POST['register'])) {
 } elseif (isset($_POST['login'])) {
         if (verify_user($_POST['username'], $_POST['password'])) {
             $_SESSION['loggedin'] = true;
+            $pendingSubmission = admin_pending_submission_take();
+            if ($pendingSubmission !== null) {
+                // El texto que el autor intentó guardar con la sesión caducada se escribe ahora como borrador.
+                $recovered = admin_pending_submission_restore($pendingSubmission);
+                if ($recovered['saved'] && $recovered['filename'] !== '') {
+                    $_SESSION['edit_feedback'] = ['type' => 'success', 'message' => $recovered['message']];
+                    header('Location: admin.php?page=edit-post&file=' . urlencode($recovered['filename']));
+                    exit;
+                }
+                // No se pudo escribir: se vuelve al editor y autosave.js vuelve a ofrecer la copia local del navegador.
+                $_SESSION['nammu_submission_lost'] = ['at' => time()];
+                if (($pendingSubmission['context'] ?? '') === 'edit') {
+                    $_SESSION['edit_feedback'] = ['type' => 'warning', 'message' => $recovered['message']];
+                    header('Location: admin.php?page=edit-post&file=' . urlencode(nammu_normalize_filename((string) ($pendingSubmission['fields']['filename'] ?? ''))));
+                    exit;
+                }
+                $_SESSION['social_broadcast_feedback'] = ['type' => 'warning', 'message' => $recovered['message']];
+                header('Location: admin.php?page=publish');
+                exit;
+            }
             header('Location: admin.php?page=dashboard');
             exit;
         } else {

@@ -1,5 +1,25 @@
 // Nammu admin — autoguardado local del editor (localStorage) y restauración de borradores.
         document.addEventListener('DOMContentLoaded', function() {
+            var prefix = 'nammuEditorAutosave:';
+
+            // El envío del editor no llegó a guardarse (sesión caducada): las copias locales marcadas como enviadas
+            // vuelven a ser recuperables. Se ejecuta tanto en la pantalla de acceso como al volver al editor.
+            if (document.querySelector('[data-nammu-submission-lost]')) {
+                try {
+                    Object.keys(localStorage).forEach(function(key) {
+                        if (key.indexOf(prefix) !== 0) {
+                            return;
+                        }
+                        var payload = JSON.parse(localStorage.getItem(key) || '{}');
+                        if (payload && payload.submitted_at) {
+                            delete payload.submitted_at;
+                            localStorage.setItem(key, JSON.stringify(payload));
+                        }
+                    });
+                } catch (error) {
+                }
+            }
+
             var form = null;
             var context = '';
             if (document.getElementById('content_edit')) {
@@ -13,7 +33,15 @@
                 return;
             }
 
-            var prefix = 'nammuEditorAutosave:';
+            // Latido: mantiene viva la sesión de PHP mientras el editor está abierto, para que un texto largo no se
+            // encuentre con la pantalla de acceso al pulsar Guardar.
+            window.setInterval(function() {
+                try {
+                    fetch('admin.php?session_ping=1', { credentials: 'same-origin', cache: 'no-store' }).catch(function() {});
+                } catch (error) {
+                }
+            }, 5 * 60 * 1000);
+
             var maxAge = 14 * 24 * 60 * 60 * 1000;
             var fieldNames = [
                 'title',

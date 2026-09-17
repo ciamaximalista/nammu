@@ -133,7 +133,7 @@ try {
     // despachador de acciones POST debe resolver claves a ficheros existentes.
     require_once __DIR__ . '/../core/bootstrap.php';
     foreach ([
-        'admin-cli', 'admin-csrf', 'admin-scheduler', 'admin-content', 'admin-backups', 'admin-media',
+        'admin-cli', 'admin-csrf', 'admin-scheduler', 'admin-content', 'admin-pending-submission', 'admin-backups', 'admin-media',
         'admin-itineraries', 'admin-artifacts', 'admin-settings', 'admin-search-console', 'admin-urls',
         'admin-indexnow', 'admin-social', 'admin-social-senders', 'admin-mailing', 'admin-mailing-campaigns',
         'admin-view', 'admin-actions',
@@ -146,6 +146,19 @@ try {
     }
     smoke_assert(admin_action_file_for_request(['delete_post' => '1']) === 'admin-actions-content.php', 'El despachador no resuelve delete_post.');
     smoke_assert(admin_action_file_for_request(['fediverse_like_item' => '1']) === '', 'El despachador no debe atender acciones del Fediverso.');
+
+    // Envío del editor con la sesión caducada: se conserva en la sesión (sin el token CSRF) hasta el siguiente login.
+    $_SESSION = [];
+    smoke_assert(!admin_pending_submission_stash(['login' => '1', 'username' => 'x']), 'Un login no debe conservarse como envío pendiente.');
+    smoke_assert(!admin_pending_submission_stash(['save_draft' => '1', 'title' => '', 'content' => '  ']), 'Un editor vacío no debe conservarse.');
+    smoke_assert(!admin_pending_submission_pending(), 'No debería haber envío pendiente todavía.');
+    smoke_assert(admin_pending_submission_stash(['publish' => '1', 'title' => 'Prueba', 'content' => 'Texto', '_nammu_csrf' => 'x']), 'El envío de Publicar no se conservó.');
+    smoke_assert(admin_pending_submission_pending(), 'El envío pendiente no quedó en la sesión.');
+    $pendingSmoke = admin_pending_submission_take();
+    smoke_assert(($pendingSmoke['context'] ?? '') === 'publish' && ($pendingSmoke['fields']['content'] ?? '') === 'Texto' && !isset($pendingSmoke['fields']['_nammu_csrf']), 'El envío pendiente no conserva los campos esperados.');
+    smoke_assert(!admin_pending_submission_pending() && admin_pending_submission_take() === null, 'El envío pendiente debe consumirse al recogerlo.');
+    smoke_assert(admin_pending_submission_stash(['update' => '1', 'filename' => 'entrada.md', 'title' => 'Prueba', 'content' => 'Texto']) && (admin_pending_submission_take()['context'] ?? '') === 'edit', 'El envío de Actualizar debe conservarse con contexto edit.');
+    $_SESSION = [];
     foreach (['admin-request-state', 'admin-endpoints', 'admin-view-itineraries', 'admin-view-data', 'admin-view-dashboard',
         'admin-view-dashboard-queues', 'admin-view-dashboard-search', 'admin-view-dashboard-analytics', 'admin-view-dashboard-top',
         'admin-view-dashboard-counts', 'admin-layout-head', 'admin-layout-auth', 'admin-layout-nav', 'admin-layout-modals',

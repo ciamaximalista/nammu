@@ -4437,13 +4437,14 @@ function nammu_fediverse_merge_thread_replies(array ...$replyGroups): array
             if ($alreadySeen) {
                 if (is_int($existingIndex) && isset($merged[$existingIndex])) {
                     foreach ($reply as $field => $value) {
-                        if (is_array($value)) {
-                            if (empty($merged[$existingIndex][$field]) && !empty($value)) {
+                        $current = $merged[$existingIndex][$field] ?? null;
+                        if (is_array($value) || is_array($current)) {
+                            if (empty($current) && !empty($value)) {
                                 $merged[$existingIndex][$field] = $value;
                             }
                             continue;
                         }
-                        if (trim((string) ($merged[$existingIndex][$field] ?? '')) === '' && trim((string) $value) !== '') {
+                        if (trim((string) $current) === '' && trim((string) $value) !== '') {
                             $merged[$existingIndex][$field] = $value;
                         }
                     }

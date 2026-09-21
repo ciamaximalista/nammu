@@ -123,12 +123,6 @@ $fediverseRecipients = ($isFediverseMessagesTab || $isFediverseNetworkTab)
         ? $fediverseMessagesSnapshot['recipients']
         : [])
     : [];
-$fediverseMessages = [];
-$fediversePublicReplyMessages = [];
-$fediverseOutgoingPublicReplyMessages = [];
-$fediverseRemotePublicReplyMessages = [];
-$fediversePublicThreadRootMessages = [];
-$fediverseRemoteThreadRootMessages = [];
 $fediverseNotifications = $isFediverseNotificationsTab && $fediverseNeedsLivePanel
     ? (is_array($fediverseNotificationsSnapshot['notifications'] ?? null) ? $fediverseNotificationsSnapshot['notifications'] : [])
     : [];
@@ -187,23 +181,6 @@ $fediverseFormatDate = static function (?string $value): string {
     }
     return $value;
 };
-$fediverseRenderCardDescription = static function (?string $value): string {
-    $value = trim((string) $value);
-    if ($value === '') {
-        return '';
-    }
-    $value = str_replace(["\r\n", "\r"], "\n", strip_tags($value));
-    $paragraphs = preg_split("/\n{2,}/", $value) ?: [];
-    $html = [];
-    foreach ($paragraphs as $paragraph) {
-        $paragraph = trim((string) $paragraph);
-        if ($paragraph === '') {
-            continue;
-        }
-        $html[] = '<p>' . nl2br(htmlspecialchars($paragraph, ENT_QUOTES, 'UTF-8')) . '</p>';
-    }
-    return implode('', $html);
-};
 $fediverseKnownActors = [];
 if (($isFediverseHomeTab || $isFediverseNotificationsTab || $isFediverseMessagesTab) && $fediverseNeedsLivePanel) {
     if ($isFediverseHomeTab && is_array($fediverseHomeSnapshot['actors_by_id'] ?? null)) {
@@ -219,43 +196,6 @@ foreach ($fediverseKnownActors as $fediverseKnownActor) {
     if ($fediverseKnownActorId !== '') {
         $fediverseActorsById[$fediverseKnownActorId] = $fediverseKnownActor;
     }
-}
-foreach ($fediverseMessages as &$fediverseMessageGroup) {
-    usort($fediverseMessageGroup, static function (array $a, array $b): int {
-        return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
-    });
-}
-unset($fediverseMessageGroup);
-$fediverseFlatMessages = [];
-$fediverseFlatMessageKeys = [];
-foreach ($fediverseMessages as $fediverseMessageGroupItems) {
-    foreach ((array) $fediverseMessageGroupItems as $fediverseMessageItem) {
-        $fediverseMessageId = trim((string) ($fediverseMessageItem['id'] ?? ''));
-        $fediverseMessageKey = $fediverseMessageId !== '' ? 'id:' . $fediverseMessageId : 'hash:' . sha1(json_encode($fediverseMessageItem, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-        if (isset($fediverseFlatMessageKeys[$fediverseMessageKey])) {
-            continue;
-        }
-        $fediverseFlatMessageKeys[$fediverseMessageKey] = true;
-        $fediverseFlatMessages[] = $fediverseMessageItem;
-    }
-}
-foreach (array_merge(
-    $fediversePublicReplyMessages,
-    $fediverseOutgoingPublicReplyMessages,
-    $fediverseRemotePublicReplyMessages,
-    $fediversePublicThreadRootMessages,
-    $fediverseRemoteThreadRootMessages
-) as $publicConversationMessage) {
-    if (!is_array($publicConversationMessage)) {
-        continue;
-    }
-    $fediverseMessageId = trim((string) ($publicConversationMessage['id'] ?? ''));
-    $fediverseMessageKey = $fediverseMessageId !== '' ? 'id:' . $fediverseMessageId : 'hash:' . sha1(json_encode($publicConversationMessage, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-    if (isset($fediverseFlatMessageKeys[$fediverseMessageKey])) {
-        continue;
-    }
-    $fediverseFlatMessageKeys[$fediverseMessageKey] = true;
-    $fediverseFlatMessages[] = $publicConversationMessage;
 }
 $fediverseMessageThreads = $isFediverseMessagesTab && $fediverseNeedsLivePanel
     ? (is_array($fediverseMessagesSnapshot['message_threads'] ?? null)

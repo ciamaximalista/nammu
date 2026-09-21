@@ -75,7 +75,6 @@ $fediverseReplyActorAvatar = static function (array $reply, string $fallback = '
     return '';
 };
 $fediverseIncomingReplyIds = [];
-$fediverseIncomingReplyRoots = [];
 $fediverseRemoteRepliesByTarget = [];
 foreach ($fediverseIncomingReplies as $fediverseIncomingLocalId => $fediverseIncomingReplyGroup) {
     foreach ((array) $fediverseIncomingReplyGroup as $fediverseIncomingReply) {
@@ -85,7 +84,6 @@ foreach ($fediverseIncomingReplies as $fediverseIncomingLocalId => $fediverseInc
                 continue;
             }
             $fediverseIncomingReplyIds[$fediverseIncomingReplyValue] = true;
-            $fediverseIncomingReplyRoots[$fediverseIncomingReplyValue] = (string) $fediverseIncomingLocalId;
         }
     }
 }
@@ -435,7 +433,6 @@ if (function_exists('nammu_fediverse_cluster_actuality_item_for_object_id')) {
 if (!empty($fediverseSyntheticRemoteItems)) {
     $fediverseTimeline = array_merge(array_values($fediverseSyntheticRemoteItems), $fediverseTimeline);
 }
-$fediverseTimelineDisplay = [];
 $fediverseAnnounceEntryIndexes = [];
 $fediverseRemoteCanonicalItems = [];
 foreach ($fediverseTimeline as $fediverseTimelineCandidate) {
@@ -668,7 +665,6 @@ foreach ($fediverseTimeline as $fediverseTimelineItem) {
             'published' => trim((string) ($fediverseTimelineItem['published'] ?? '')),
         ]];
     }
-    $fediverseTimelineDisplay[] = $fediverseTimelineItem;
     $fediverseRemoteSortKey = (string) ($fediverseTimelineItem['published'] ?? '');
     foreach (['id', 'object_id', 'url'] as $fediverseRemoteSortField) {
         $fediverseRemoteSortIdentifier = trim((string) ($fediverseTimelineItem[$fediverseRemoteSortField] ?? ''));

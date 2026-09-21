@@ -1,5 +1,5 @@
 <?php if ($page === 'fediverso'): ?>
-    <?php include __DIR__ . '/admin-view-fediverso-data.php'; ?>
+    <?php include __DIR__ . '/admin-view-fediverso-data.php'; if ($isFediverseHomeTab && $fediverseNeedsLivePanel) { include __DIR__ . '/admin-view-fediverso-home-data.php'; } ?>
     <?php $fediverseInitialVersion = function_exists('nammu_fediverse_tab_version') ? nammu_fediverse_tab_version($fediverseTab) : ''; ?>
     <div class="tab-pane active" id="fediverse-admin-root" data-fediverse-admin data-active-tab="<?= htmlspecialchars($fediverseTab, ENT_QUOTES, 'UTF-8') ?>" data-active-version="<?= htmlspecialchars($fediverseInitialVersion, ENT_QUOTES, 'UTF-8') ?>">
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">

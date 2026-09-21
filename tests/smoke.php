@@ -231,7 +231,8 @@ try {
     foreach (['admin-request-state', 'admin-endpoints', 'admin-view-itineraries', 'admin-view-data', 'admin-view-dashboard',
         'admin-view-dashboard-queues', 'admin-view-dashboard-search', 'admin-view-dashboard-analytics', 'admin-view-dashboard-top',
         'admin-view-dashboard-counts', 'admin-layout-head', 'admin-layout-auth', 'admin-layout-nav', 'admin-layout-modals',
-        'admin-layout-scripts', 'admin-actions-fediverso', 'admin-actions-oauth'] as $piece) {
+        'admin-layout-scripts', 'admin-actions-fediverso', 'admin-actions-oauth', 'admin-view-fediverso-data',
+        'admin-view-fediverso-home-data'] as $piece) {
         smoke_assert(is_file(__DIR__ . '/../core/' . $piece . '.php'), "Falta core/{$piece}.php.");
     }
     foreach (['admin.css', 'markdown-toolbar.js', 'media-modal.js', 'autosave.js', 'dashboard.css', 'dashboard.js', 'fediverso.css',

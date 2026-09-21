@@ -87,6 +87,61 @@ function smoke_render_admin_page(string $adminRoot, string $sessionDir, string $
     return ['exit' => $exitCode, 'stdout' => $stdout, 'stderr' => trim($stderr)];
 }
 
+/**
+ * Nombres de clase usados en $file (new X, X::, instanceof X, tipos) que pertenecen a $knownClasses y que el fichero
+ * no importa con `use`. Un `use` es por fichero: al mover código de admin.php a core/admin-*.php se pierde y PHP
+ * sólo lo detecta al ejecutar esa rama ("Class \"MarkdownConverter\" not found").
+ */
+function smoke_unimported_classes(string $file, array $knownClasses): array
+{
+    $tokens = token_get_all((string) file_get_contents($file));
+    $imported = [];
+    $used = [];
+    $count = count($tokens);
+    for ($i = 0; $i < $count; $i++) {
+        $token = $tokens[$i];
+        if (!is_array($token)) {
+            continue;
+        }
+        if ($token[0] === T_USE) {
+            for ($j = $i + 1; $j < $count && $tokens[$j] !== ';'; $j++) {
+                if (is_array($tokens[$j]) && in_array($tokens[$j][0], [T_STRING, T_NAME_QUALIFIED], true)) {
+                    $parts = explode('\\', $tokens[$j][1]);
+                    $imported[end($parts)] = true;
+                }
+            }
+            $i = $j;
+            continue;
+        }
+        if ($token[0] !== T_STRING || !isset($knownClasses[$token[1]])) {
+            continue;
+        }
+        $previous = null;
+        for ($j = $i - 1; $j >= 0; $j--) {
+            if (!is_array($tokens[$j]) || !in_array($tokens[$j][0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+                $previous = $tokens[$j];
+                break;
+            }
+        }
+        $next = null;
+        for ($j = $i + 1; $j < $count; $j++) {
+            if (!is_array($tokens[$j]) || !in_array($tokens[$j][0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+                $next = $tokens[$j];
+                break;
+            }
+        }
+        $previousType = is_array($previous) ? $previous[0] : $previous;
+        if (in_array($previousType, [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR, T_DOUBLE_COLON, T_FUNCTION, T_CONST, T_NS_SEPARATOR], true)) {
+            continue; // método, propiedad, constante o nombre de función.
+        }
+        if ($next === '(' && $previousType !== T_NEW) {
+            continue; // llamada a función homónima.
+        }
+        $used[$token[1]] = true;
+    }
+    return array_keys(array_diff_key($used, $imported));
+}
+
 $root = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'nammu-smoke-' . bin2hex(random_bytes(6));
 
 try {
@@ -147,6 +202,20 @@ try {
     smoke_assert(admin_action_file_for_request(['delete_post' => '1']) === 'admin-actions-content.php', 'El despachador no resuelve delete_post.');
     smoke_assert(admin_action_file_for_request(['fediverse_like_item' => '1']) === '', 'El despachador no debe atender acciones del Fediverso.');
 
+    // Cada pieza core/admin-*.php necesita sus propios `use` (Nammu\Core\*, Yaml): sin ellos la rama falla con error 500
+    // sólo cuando se ejecuta (p. ej. al enviar una newsletter).
+    $coreClasses = ['Yaml' => true];
+    foreach (glob(__DIR__ . '/../core/*.php') ?: [] as $coreFile) {
+        if (preg_match('/^namespace\s+Nammu\\\\Core;/m', (string) file_get_contents($coreFile))) {
+            $coreClasses[basename($coreFile, '.php')] = true;
+        }
+    }
+    smoke_assert(isset($coreClasses['MarkdownConverter']), 'No se detectaron las clases de core/.');
+    foreach (array_merge([__DIR__ . '/../admin.php'], glob(__DIR__ . '/../core/admin-*.php') ?: []) as $adminFile) {
+        $missing = smoke_unimported_classes($adminFile, $coreClasses);
+        smoke_assert($missing === [], basename($adminFile) . ' usa clases sin `use`: ' . implode(', ', $missing) . '.');
+    }
+
     // Envío del editor con la sesión caducada: se conserva en la sesión (sin el token CSRF) hasta el siguiente login.
     $_SESSION = [];
     smoke_assert(!admin_pending_submission_stash(['login' => '1', 'username' => 'x']), 'Un login no debe conservarse como envío pendiente.');
@@ -182,6 +251,8 @@ try {
     ] as $adminPage) {
         $adminPages[$adminPage] = [$adminPage, []];
     }
+    $adminPages['itinerario&itinerary=x'] = ['itinerario', ['itinerary' => 'smoke-inexistente']];
+    $adminPages['itinerario-tema&itinerary=x&topic=y'] = ['itinerario-tema', ['itinerary' => 'smoke-inexistente', 'topic' => 'smoke-tema']];
     foreach (['home', 'notifications', 'messages', 'mentions', 'network', 'settings'] as $fediverseTab) {
         $adminPages["fediverso&tab={$fediverseTab}"] = ['fediverso', ['tab' => $fediverseTab]];
     }

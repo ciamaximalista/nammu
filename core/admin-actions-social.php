@@ -6,6 +6,8 @@
  * cuando la petición trae alguna de las claves de formulario de este grupo.
  */
 
+use Nammu\Core\ItineraryRepository;
+
 if (isset($_POST['send_social_post'])) {
         $networkKey = $_POST['social_network'] ?? '';
         $filename = $_POST['social_filename'] ?? '';

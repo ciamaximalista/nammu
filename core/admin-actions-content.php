@@ -6,6 +6,8 @@
  * cuando la petición trae alguna de las claves de formulario de este grupo.
  */
 
+use Nammu\Core\MarkdownConverter;
+
 if (isset($_POST['send_newsletter'])) {
         $title = trim($_POST['title'] ?? '');
         $category = trim($_POST['category'] ?? '');

@@ -3,6 +3,8 @@
  * Nammu — panel de administración. Datos de formulario para las pestañas de itinerarios (listado, itinerario y tema
  * seleccionados, cuestionarios). Se incluye desde admin.php (ámbito global).
  */
+use Nammu\Core\ItineraryRepository;
+
 $itinerariesList = [];
 $selectedItinerary = null;
 $selectedTopic = null;

@@ -6,6 +6,8 @@
  * cuando la petición trae alguna de las claves de formulario de este grupo.
  */
 
+use Nammu\Core\ItineraryRepository;
+
 if (isset($_POST['save_itinerary']) || isset($_POST['save_itinerary_view']) || isset($_POST['publish_itinerary'])) {
         $viewItineraryAfterSave = isset($_POST['save_itinerary_view']);
         $publishItineraryNow = isset($_POST['publish_itinerary']);

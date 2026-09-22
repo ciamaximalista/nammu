@@ -1753,7 +1753,10 @@ function nammu_actuality_cache_remote_avatar(string $avatarUrl, string $actorUrl
     if (!is_dir($dir)) {
         @mkdir($dir, 0775, true);
     }
-    $filename = sha1($cacheKeyUrl) . '.' . nammu_actuality_extension_from_headers($avatarUrl, $headers);
+    // Prefijo "avatar-": los avatares comparten carpeta con las imágenes de Actualidad, pero no están en su
+    // índice; sin el prefijo, nammu_actuality_prune_cache() los borraba en cada refresco y los actores se
+    // quedaban con un icono que apuntaba a un fichero inexistente (avatar en blanco en favoritos e impulsos).
+    $filename = 'avatar-' . sha1($cacheKeyUrl) . '.' . nammu_actuality_extension_from_headers($avatarUrl, $headers);
     $path = $dir . '/' . $filename;
     $saved = function_exists('nammu_atomic_write_file')
         ? nammu_atomic_write_file($path, $body)
@@ -1845,6 +1848,9 @@ function nammu_actuality_prune_cache(array &$cache, array $activeKeys): void
             }
         }
         foreach ($files as $file) {
+            if (str_starts_with(basename((string) $file), 'avatar-')) {
+                continue;
+            }
             if (!in_array($file, $usedPaths, true)) {
                 @unlink($file);
             }

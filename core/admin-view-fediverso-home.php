@@ -153,7 +153,7 @@
                                                     <?php foreach ($localReactionDetails['shares'] as $shareActor): ?>
                                                         <?php
                                                         $shareActorUrl = trim((string) (($shareActor['url'] ?? '') ?: '#'));
-                                                        $shareActorIcon = $fediverseValidAvatarUrl(trim((string) ($shareActor['icon'] ?? '')));
+                                                        $shareActorIcon = $fediverseReplyActorAvatar(['actor_id' => trim((string) ($shareActor['id'] ?? '')), 'actor_icon' => trim((string) ($shareActor['icon'] ?? ''))]);
                                                         ?>
                                                         <a class="list-group-item list-group-item-action d-flex align-items-center" href="<?= htmlspecialchars($shareActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
                                                             <?php if ($shareActorIcon !== ''): ?>
@@ -608,7 +608,7 @@
                                                 <?php foreach ($historyBoostActors as $remoteBoostActor): ?>
                                                     <?php
                                                     $remoteBoostActorUrl = trim((string) (($remoteBoostActor['url'] ?? '') ?: '#'));
-                                                    $remoteBoostActorIcon = $fediverseValidAvatarUrl(trim((string) ($remoteBoostActor['icon'] ?? '')));
+                                                    $remoteBoostActorIcon = $fediverseReplyActorAvatar(['actor_id' => trim((string) ($remoteBoostActor['id'] ?? '')), 'actor_icon' => trim((string) ($remoteBoostActor['icon'] ?? ''))]);
                                                     ?>
                                                     <a href="<?= htmlspecialchars($remoteBoostActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($remoteBoostActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                         <?php if ($remoteBoostActorIcon !== ''): ?>
@@ -628,7 +628,7 @@
                                                 <?php foreach ($historyFavoriteActors as $historyFavoriteActor): ?>
                                                     <?php
                                                     $historyFavoriteActorUrl = trim((string) (($historyFavoriteActor['url'] ?? '') ?: '#'));
-                                                    $historyFavoriteActorIcon = $fediverseValidAvatarUrl(trim((string) ($historyFavoriteActor['icon'] ?? '')));
+                                                    $historyFavoriteActorIcon = $fediverseReplyActorAvatar(['actor_id' => trim((string) ($historyFavoriteActor['id'] ?? '')), 'actor_icon' => trim((string) ($historyFavoriteActor['icon'] ?? ''))]);
                                                     ?>
                                                     <a href="<?= htmlspecialchars($historyFavoriteActorUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="<?= htmlspecialchars((string) ($historyFavoriteActor['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                                         <?php if ($historyFavoriteActorIcon !== ''): ?>

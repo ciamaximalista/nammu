@@ -835,6 +835,12 @@ function nammu_fediverse_fetch_cache_write(string $url, array $response): void
     if ($url === '' || !preg_match('#^https?://#i', $url)) {
         return;
     }
+    // Un 429 sintético (host en pausa) o una respuesta rescatada de la caché no son respuestas
+    // del servidor remoto: guardarlas volvía a contar el fallo y alargaba la pausa del host en
+    // cada intento, con lo que la pausa no terminaba nunca mientras hubiera tráfico.
+    if (!empty($response['__synthetic']) || !empty($response['__replayed'])) {
+        return;
+    }
     $status = (int) ($response['status'] ?? 0);
     $headers = is_array($response['headers'] ?? null) ? $response['headers'] : [];
     $body = (string) ($response['body'] ?? '');
@@ -1404,7 +1410,7 @@ function nammu_fediverse_signed_fetch_json(string $url, array $config, string $m
                 return ['__cached_payload' => $cachedPayload];
             }
             if (is_array($cachedFetch)) {
-                return ['status' => (int) ($cachedFetch['status'] ?? 0), 'headers' => is_array($cachedFetch['headers'] ?? null) ? $cachedFetch['headers'] : [], 'body' => ''];
+                return ['status' => (int) ($cachedFetch['status'] ?? 0), 'headers' => is_array($cachedFetch['headers'] ?? null) ? $cachedFetch['headers'] : [], 'body' => '', '__replayed' => true];
             }
             $pauseUntil = nammu_fediverse_fetch_host_pause_until($url);
             if ($pauseUntil > time()) {
@@ -1412,7 +1418,7 @@ function nammu_fediverse_signed_fetch_json(string $url, array $config, string $m
                 if (is_array($stalePayload)) {
                     return ['__cached_payload' => $stalePayload];
                 }
-                return ['status' => 429, 'headers' => ['retry-after' => (string) max(1, $pauseUntil - time())], 'body' => ''];
+                return ['status' => 429, 'headers' => ['retry-after' => (string) max(1, $pauseUntil - time())], 'body' => '', '__synthetic' => true];
             }
         }
         if (!$urlLocked) {
@@ -1422,7 +1428,7 @@ function nammu_fediverse_signed_fetch_json(string $url, array $config, string $m
                 return ['__cached_payload' => $cachedPayload];
             }
             if (is_array($cachedFetch)) {
-                return ['status' => (int) ($cachedFetch['status'] ?? 0), 'headers' => is_array($cachedFetch['headers'] ?? null) ? $cachedFetch['headers'] : [], 'body' => ''];
+                return ['status' => (int) ($cachedFetch['status'] ?? 0), 'headers' => is_array($cachedFetch['headers'] ?? null) ? $cachedFetch['headers'] : [], 'body' => '', '__replayed' => true];
             }
             return ['__locked_elsewhere' => true];
         }
@@ -1545,7 +1551,7 @@ function nammu_fediverse_fetch_json(string $url, string $accept = 'application/a
             return ['__cached_payload' => $cachedPayload];
         }
         if (is_array($cachedFetch)) {
-            return ['status' => (int) ($cachedFetch['status'] ?? 0), 'headers' => is_array($cachedFetch['headers'] ?? null) ? $cachedFetch['headers'] : [], 'body' => ''];
+            return ['status' => (int) ($cachedFetch['status'] ?? 0), 'headers' => is_array($cachedFetch['headers'] ?? null) ? $cachedFetch['headers'] : [], 'body' => '', '__replayed' => true];
         }
         $pauseUntil = nammu_fediverse_fetch_host_pause_until($url);
         if ($pauseUntil > time()) {
@@ -1553,7 +1559,7 @@ function nammu_fediverse_fetch_json(string $url, string $accept = 'application/a
             if (is_array($stalePayload)) {
                 return ['__cached_payload' => $stalePayload];
             }
-            return ['status' => 429, 'headers' => ['retry-after' => (string) max(1, $pauseUntil - time())], 'body' => ''];
+            return ['status' => 429, 'headers' => ['retry-after' => (string) max(1, $pauseUntil - time())], 'body' => '', '__synthetic' => true];
         }
         if (!$urlLocked) {
             $cachedFetch = nammu_fediverse_fetch_cache_read($url);
@@ -1562,7 +1568,7 @@ function nammu_fediverse_fetch_json(string $url, string $accept = 'application/a
                 return ['__cached_payload' => $cachedPayload];
             }
             if (is_array($cachedFetch)) {
-                return ['status' => (int) ($cachedFetch['status'] ?? 0), 'headers' => is_array($cachedFetch['headers'] ?? null) ? $cachedFetch['headers'] : [], 'body' => ''];
+                return ['status' => (int) ($cachedFetch['status'] ?? 0), 'headers' => is_array($cachedFetch['headers'] ?? null) ? $cachedFetch['headers'] : [], 'body' => '', '__replayed' => true];
             }
             return ['__locked_elsewhere' => true];
         }
@@ -7329,6 +7335,16 @@ function nammu_fediverse_refresh_following(array $options = []): array
     ];
 }
 
+function nammu_fediverse_timeline_item_known_id_fields(array $item): array
+{
+    // Un impulso (Announce) apunta a la publicación de otra persona: su object_id y su url no
+    // deben marcar como "ya conocida" la publicación original cuando llegue el Create de su autor.
+    if (strtolower(trim((string) ($item['type'] ?? ''))) === 'announce') {
+        return ['id', 'activity_id'];
+    }
+    return ['id', 'activity_id', 'object_id', 'url'];
+}
+
 function nammu_fediverse_sync_recent_followed_inbox_items(array $config, int $limit = 6, int $scanLimit = 60): array
 {
     $limit = max(1, $limit);
@@ -7350,7 +7366,7 @@ function nammu_fediverse_sync_recent_followed_inbox_items(array $config, int $li
     $timelineById = [];
     $knownTimelineIds = [];
     foreach ($timelineItems as $item) {
-        foreach (['id', 'activity_id', 'object_id', 'url'] as $field) {
+        foreach (nammu_fediverse_timeline_item_known_id_fields($item) as $field) {
             $itemId = trim((string) ($item[$field] ?? ''));
             if ($itemId !== '') {
                 $knownTimelineIds[$itemId] = true;
@@ -7365,7 +7381,7 @@ function nammu_fediverse_sync_recent_followed_inbox_items(array $config, int $li
         $timelineById = [];
         $knownTimelineIds = [];
         foreach (nammu_fediverse_timeline_store()['items'] as $item) {
-            foreach (['id', 'activity_id', 'object_id', 'url'] as $field) {
+            foreach (nammu_fediverse_timeline_item_known_id_fields($item) as $field) {
                 $itemId = trim((string) ($item[$field] ?? ''));
                 if ($itemId !== '') {
                     $knownTimelineIds[$itemId] = true;
@@ -7456,7 +7472,7 @@ function nammu_fediverse_sync_recent_followed_inbox_items(array $config, int $li
             continue;
         }
         $timelineById[$normalizedId] = $normalized;
-        foreach (['id', 'activity_id', 'object_id', 'url'] as $field) {
+        foreach (nammu_fediverse_timeline_item_known_id_fields($normalized) as $field) {
             $normalizedKey = trim((string) ($normalized[$field] ?? ''));
             if ($normalizedKey !== '') {
                 $knownTimelineIds[$normalizedKey] = true;
@@ -7470,6 +7486,89 @@ function nammu_fediverse_sync_recent_followed_inbox_items(array $config, int $li
     }
 
     return ['scanned' => $scanned, 'new' => $newItems, 'updated' => $updatedItems];
+}
+
+function nammu_fediverse_repair_unresolved_announces(array $config, int $limit = 5): array
+{
+    // Un Announce cuyo objeto no se pudo leer al normalizarlo (host en pausa, caída puntual...) se guarda
+    // con object_id = su propio id, sin contenido y con el autor sustituido por quien impulsa: en el timeline
+    // sale "Impulsó una publicación." con el avatar equivocado. Aquí se vuelve a normalizar desde el payload
+    // del inbox cuando el objeto ya es alcanzable; el resto de elementos no se toca.
+    $limit = max(1, $limit);
+    $store = nammu_fediverse_timeline_store();
+    $items = is_array($store['items'] ?? null) ? $store['items'] : [];
+    $actorsById = [];
+    foreach (nammu_fediverse_following_store()['actors'] as $actor) {
+        $actorId = trim((string) ($actor['id'] ?? ''));
+        if ($actorId !== '') {
+            $actorsById[$actorId] = $actor;
+        }
+    }
+    $order = array_keys($items);
+    usort($order, static function ($a, $b) use ($items): int {
+        return strcmp((string) ($items[$b]['published'] ?? ''), (string) ($items[$a]['published'] ?? ''));
+    });
+    $inboxById = null;
+    $checked = 0;
+    $repaired = 0;
+    foreach ($order as $index) {
+        if ($checked >= $limit) {
+            break;
+        }
+        $item = is_array($items[$index] ?? null) ? $items[$index] : [];
+        if (strtolower(trim((string) ($item['type'] ?? ''))) !== 'announce') {
+            continue;
+        }
+        $itemId = trim((string) ($item['id'] ?? ''));
+        if ($itemId === '' || trim((string) ($item['object_id'] ?? '')) !== $itemId) {
+            continue;
+        }
+        $actorId = trim((string) ($item['actor_id'] ?? ''));
+        $actor = $actorsById[$actorId] ?? null;
+        if (!is_array($actor)) {
+            continue;
+        }
+        if ($inboxById === null) {
+            $inboxById = [];
+            foreach ((array) (nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []])['activities'] ?? []) as $entry) {
+                $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+                $payloadId = trim((string) ($payload['id'] ?? ''));
+                if ($payloadId !== '') {
+                    $inboxById[$payloadId] = $payload;
+                }
+            }
+        }
+        $payload = $inboxById[$itemId] ?? null;
+        $announcedId = is_array($payload)
+            ? (is_string($payload['object'] ?? null) ? trim((string) $payload['object']) : trim((string) ($payload['object']['id'] ?? '')))
+            : trim((string) ($item['url'] ?? ''));
+        if ($announcedId === '' || $announcedId === $itemId) {
+            continue;
+        }
+        if (nammu_fediverse_fetch_retry_after_for_url($announcedId) > 0) {
+            continue;
+        }
+        $checked++;
+        if (!is_array($payload)) {
+            $payload = [
+                'id' => $itemId,
+                'type' => 'Announce',
+                'actor' => $actorId,
+                'object' => $announcedId,
+                'published' => (string) ($item['published'] ?? ''),
+            ];
+        }
+        $normalized = nammu_fediverse_normalize_remote_item($payload, $actor, $config);
+        if (!is_array($normalized) || trim((string) ($normalized['object_id'] ?? '')) === $itemId) {
+            continue;
+        }
+        $items[$index] = $normalized;
+        $repaired++;
+    }
+    if ($repaired > 0) {
+        nammu_fediverse_save_timeline_store(array_values($items));
+    }
+    return ['checked' => $checked, 'repaired' => $repaired];
 }
 
 function nammu_fediverse_refresh_followers(array $config): array

@@ -52,6 +52,14 @@ function admin_run_scheduled_tasks(): array {
                 'new' => (int) ($fediverseInboxSyncStats['new'] ?? 0),
             ]);
         }
+        if (function_exists('nammu_fediverse_repair_unresolved_announces')) {
+            $stepStartedAt = microtime(true);
+            $fediverseAnnounceRepairStats = nammu_fediverse_repair_unresolved_announces($config, 5);
+            admin_cli_timing_log('scheduled', 'repair_unresolved_announces', $stepStartedAt, [
+                'checked' => (int) ($fediverseAnnounceRepairStats['checked'] ?? 0),
+                'repaired' => (int) ($fediverseAnnounceRepairStats['repaired'] ?? 0),
+            ]);
+        }
         if (function_exists('nammu_fediverse_warm_recent_threads_cache')) {
             $stepStartedAt = microtime(true);
             $fediverseRecentThreadsWarmed = (int) nammu_fediverse_warm_recent_threads_cache($config, 8);
@@ -547,6 +555,10 @@ function admin_rebuild_fediverse_timeline(array $config): array
         $inboxStats = nammu_fediverse_sync_recent_followed_inbox_items($config, 8, 400);
         $stats['fediverse_inbox_sync_scanned'] = (int) ($inboxStats['scanned'] ?? 0);
         $stats['fediverse_inbox_sync_new'] = (int) ($inboxStats['new'] ?? 0);
+    }
+    if (function_exists('nammu_fediverse_repair_unresolved_announces')) {
+        $repairStats = nammu_fediverse_repair_unresolved_announces($config, 20);
+        $stats['fediverse_announces_repaired'] = (int) ($repairStats['repaired'] ?? 0);
     }
     $threadStats = admin_refresh_fediverse_threads($config, 20);
     $stats['threads_warmed'] = (int) ($threadStats['threads_warmed'] ?? 0);

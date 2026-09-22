@@ -299,7 +299,17 @@
                         && trim((string) ($item['content'] ?? '')) !== ''
                         && $itemObjectIdForPage !== ''
                         && $itemTargetForPage !== $itemObjectIdForPage;
-                    if ($itemIsReplyForPage && isset($fediverseTimelineRootIdentifiers[$itemTargetForPage])) { continue; }
+                    $itemAttachedToRootForPage = false;
+                    if ($itemIsReplyForPage) {
+                        // Se oculta la copia suelta si cuelga (directamente o vía context/conversation) de un hilo del timeline.
+                        foreach (array_unique(array_filter([$itemTargetForPage, trim((string) ($item['context'] ?? '')), trim((string) ($item['conversation'] ?? ''))])) as $itemThreadKeyForPage) {
+                            if (isset($fediverseTimelineRootIdentifiers[$itemThreadKeyForPage])) {
+                                $itemAttachedToRootForPage = true;
+                                break;
+                            }
+                        }
+                    }
+                    if ($itemAttachedToRootForPage) { continue; }
                     ?>
                     <?php $itemObjectId = (string) (($item['object_id'] ?? '') ?: (($item['url'] ?? '') ?: ($item['id'] ?? ''))); ?>
                     <?php $itemTargetActorId = (string) (($item['target_actor_id'] ?? '') ?: ($item['actor_id'] ?? '')); ?>
@@ -441,6 +451,25 @@
                                     }
                                 }
                             }
+                        }
+                    }
+                    if ($isRemoteAnnounce && $displayActorId === trim((string) ($item['actor_id'] ?? '')) && function_exists('nammu_fediverse_timeline_item_for_identifier')) {
+                        // Impulso cuyo objeto no se pudo leer: si la publicación impulsada está en el timeline, se toma su autor
+                        // para el nombre y el avatar en vez de mostrar a quien impulsa como si fuera el autor.
+                        foreach (array_unique(array_filter([trim((string) ($item['url'] ?? '')), trim((string) ($item['object_id'] ?? ''))])) as $announcedIdentifier) {
+                            if ($announcedIdentifier === trim((string) ($item['id'] ?? ''))) {
+                                continue;
+                            }
+                            $announcedTimelineItem = nammu_fediverse_timeline_item_for_identifier($announcedIdentifier);
+                            $announcedActorId = is_array($announcedTimelineItem) ? trim((string) ($announcedTimelineItem['actor_id'] ?? '')) : '';
+                            if ($announcedActorId === '' || $announcedActorId === $displayActorId) {
+                                continue;
+                            }
+                            $displayActorId = $announcedActorId;
+                            $displayActorName = trim((string) (($announcedTimelineItem['actor_name'] ?? '') ?: $displayActorName));
+                            $displayActorIcon = trim((string) ($announcedTimelineItem['actor_icon'] ?? ''));
+                            $displayActorUsername = trim((string) ($announcedTimelineItem['actor_username'] ?? ''));
+                            break;
                         }
                     }
                     if ($displayActorIcon === '' && $displayActorId !== '' && isset($fediverseActorsById[$displayActorId])) {

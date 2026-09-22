@@ -76,6 +76,19 @@ $fediverseReplyActorAvatar = static function (array $reply, string $fallback = '
 };
 $fediverseIncomingReplyIds = [];
 $fediverseRemoteRepliesByTarget = [];
+// Claves de hilo de una respuesta remota: su destino directo (inReplyTo) y, además, la raíz de la
+// conversación (context/conversation). Así una respuesta a alguien a quien no seguimos sigue colgando
+// del hilo de una publicación que sí tenemos en el timeline, en vez de salir suelta.
+$fediverseTimelineReplyThreadKeys = static function (array $item): array {
+    $keys = [];
+    foreach (['target_url', 'context', 'conversation'] as $field) {
+        $value = trim((string) ($item[$field] ?? ''));
+        if ($value !== '' && !in_array($value, $keys, true)) {
+            $keys[] = $value;
+        }
+    }
+    return $keys;
+};
 foreach ($fediverseIncomingReplies as $fediverseIncomingLocalId => $fediverseIncomingReplyGroup) {
     foreach ((array) $fediverseIncomingReplyGroup as $fediverseIncomingReply) {
         foreach (['id', 'url'] as $fediverseIncomingReplyField) {
@@ -123,11 +136,13 @@ foreach ($fediverseTimeline as $fediverseTimelineReplyCandidate) {
         ]),
         'source' => 'incoming-remote',
     ];
-    foreach ($fediverseEquivalentIdentifiers($fediverseTimelineReplyTarget) as $fediverseTimelineReplyTargetIdentifier) {
-        if (!isset($fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTargetIdentifier])) {
-            $fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTargetIdentifier] = [];
+    foreach ($fediverseTimelineReplyThreadKeys($fediverseTimelineReplyCandidate) as $fediverseTimelineReplyThreadKey) {
+        foreach ($fediverseEquivalentIdentifiers($fediverseTimelineReplyThreadKey) as $fediverseTimelineReplyTargetIdentifier) {
+            if (!isset($fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTargetIdentifier])) {
+                $fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTargetIdentifier] = [];
+            }
+            $fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTargetIdentifier][] = $fediverseRemoteReplyPayload;
         }
-        $fediverseRemoteRepliesByTarget[$fediverseTimelineReplyTargetIdentifier][] = $fediverseRemoteReplyPayload;
     }
 }
 $fediverseLocalLinks = [];
@@ -286,15 +301,17 @@ usort($fediverseTimelineReplyItemsForActivity, static function (array $a, array 
     return strcmp((string) ($a['published'] ?? ''), (string) ($b['published'] ?? ''));
 });
 foreach ($fediverseTimelineReplyItemsForActivity as $fediverseTimelineReplyItemForActivity) {
-    $fediverseTimelineReplyTarget = trim((string) ($fediverseTimelineReplyItemForActivity['target_url'] ?? ''));
-    $fediverseTimelineReplyRootIdentifier = function_exists('nammu_fediverse_canonical_local_id_for_identifier')
-        ? trim((string) nammu_fediverse_canonical_local_id_for_identifier($fediverseTimelineReplyTarget, $fediverseConfig))
-        : '';
-    foreach ($fediverseEquivalentIdentifiers($fediverseTimelineReplyTarget) as $fediverseTimelineReplyTargetVariant) {
-        if ($fediverseTimelineReplyRootIdentifier !== '') {
-            break;
+    $fediverseTimelineReplyRootIdentifier = '';
+    foreach ($fediverseTimelineReplyThreadKeys($fediverseTimelineReplyItemForActivity) as $fediverseTimelineReplyTarget) {
+        if (function_exists('nammu_fediverse_canonical_local_id_for_identifier')) {
+            $fediverseTimelineReplyRootIdentifier = trim((string) nammu_fediverse_canonical_local_id_for_identifier($fediverseTimelineReplyTarget, $fediverseConfig));
         }
-        $fediverseTimelineReplyRootIdentifier = (string) ($fediverseTimelineRootByIdentifier[$fediverseTimelineReplyTargetVariant] ?? '');
+        foreach ($fediverseEquivalentIdentifiers($fediverseTimelineReplyTarget) as $fediverseTimelineReplyTargetVariant) {
+            if ($fediverseTimelineReplyRootIdentifier !== '') {
+                break;
+            }
+            $fediverseTimelineReplyRootIdentifier = (string) ($fediverseTimelineRootByIdentifier[$fediverseTimelineReplyTargetVariant] ?? '');
+        }
         if ($fediverseTimelineReplyRootIdentifier !== '') {
             break;
         }

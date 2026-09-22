@@ -17,6 +17,11 @@ function nammu_fediverse_inbox_file(): string
     return dirname(__DIR__) . '/config/fediverso-inbox.json';
 }
 
+function nammu_fediverse_inbox_queue_file(): string
+{
+    return dirname(__DIR__) . '/config/fediverso-inbox-queue.json';
+}
+
 function nammu_fediverse_followers_file(): string
 {
     return dirname(__DIR__) . '/config/fediverso-followers.json';
@@ -9958,25 +9963,196 @@ function nammu_fediverse_inspect_object(string $objectUrl, array $config): array
     ];
 }
 
-function nammu_fediverse_store_inbox_activity(array $payload, array $meta = [], ?array $config = null): void
+function nammu_fediverse_inbox_payload_hash(array $payload): string
 {
-    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
-    $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
-    $activities[] = [
-        'received_at' => gmdate(DATE_ATOM),
-        'payload' => $payload,
-        'verified' => !empty($meta['verified']),
-        'verification_error' => trim((string) ($meta['verification_error'] ?? '')),
-        'signature_key_id' => trim((string) ($meta['signature_key_id'] ?? '')),
-        'signed_headers' => trim((string) ($meta['signed_headers'] ?? '')),
-    ];
-    $store['activities'] = array_slice($activities, -1000);
-    nammu_fediverse_save_json_store(nammu_fediverse_inbox_file(), $store);
+    return sha1((string) json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+}
+
+/**
+ * Una actividad es un reenvío si ya hay guardada otra con el mismo id y el mismo contenido. Los emisores
+ * reintentan cuando no reciben el 202 a tiempo; sin esto cada reintento volvía a disparar relays y
+ * notificaciones a seguidores y ocupaba sitio en el tope de 1000 del inbox.
+ */
+function nammu_fediverse_inbox_activity_is_duplicate(array $activities, array $payload): bool
+{
+    $payloadId = trim((string) ($payload['id'] ?? ''));
+    if ($payloadId === '') {
+        return false;
+    }
+    $hash = nammu_fediverse_inbox_payload_hash($payload);
+    foreach ($activities as $entry) {
+        $storedPayload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+        if (trim((string) ($storedPayload['id'] ?? '')) !== $payloadId) {
+            continue;
+        }
+        if (nammu_fediverse_inbox_payload_hash($storedPayload) === $hash) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function nammu_fediverse_store_inbox_activity(array $payload, array $meta = [], ?array $config = null): bool
+{
+    $stored = nammu_fediverse_with_json_store_lock(nammu_fediverse_inbox_file(), static function () use ($payload, $meta): bool {
+        $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
+        $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
+        if (nammu_fediverse_inbox_activity_is_duplicate($activities, $payload)) {
+            return false;
+        }
+        $activities[] = [
+            'received_at' => gmdate(DATE_ATOM),
+            'payload' => $payload,
+            'verified' => !empty($meta['verified']),
+            'verification_error' => trim((string) ($meta['verification_error'] ?? '')),
+            'signature_key_id' => trim((string) ($meta['signature_key_id'] ?? '')),
+            'signed_headers' => trim((string) ($meta['signed_headers'] ?? '')),
+        ];
+        $store['activities'] = array_slice($activities, -1000);
+        nammu_fediverse_save_json_store(nammu_fediverse_inbox_file(), $store);
+        return true;
+    });
+    if (!$stored) {
+        return false;
+    }
     if (function_exists('nammu_fediverse_save_fragments_cache_store')) {
         nammu_fediverse_save_fragments_cache_store([]);
     }
     if (is_array($config)) {
         nammu_fediverse_record_legacy_actuality_payload($payload, $config);
+    }
+    return true;
+}
+
+function nammu_fediverse_inbox_queue_store(): array
+{
+    $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_queue_file(), ['items' => []]);
+    return ['items' => array_values(is_array($store['items'] ?? null) ? $store['items'] : [])];
+}
+
+function nammu_fediverse_save_inbox_queue_store(array $items): void
+{
+    nammu_fediverse_save_json_store(nammu_fediverse_inbox_queue_file(), ['items' => array_values($items)]);
+}
+
+function nammu_fediverse_enqueue_inbox_activity(array $payload): void
+{
+    nammu_fediverse_with_json_store_lock(nammu_fediverse_inbox_queue_file(), static function () use ($payload): void {
+        $items = nammu_fediverse_inbox_queue_store()['items'];
+        $items[] = [
+            'id' => trim((string) ($payload['id'] ?? '')),
+            'type' => trim((string) ($payload['type'] ?? '')),
+            'actor' => trim((string) ($payload['actor'] ?? '')),
+            'queued_at' => gmdate(DATE_ATOM),
+            'attempts' => 0,
+            'last_error' => '',
+            'payload' => $payload,
+        ];
+        nammu_fediverse_save_inbox_queue_store(array_slice($items, -2000));
+    });
+}
+
+/**
+ * Procesa la cola del inbox: lo que antes se hacía dentro de la petición HTTP (relays a seguidores,
+ * notificaciones de Update, Delete, mensajes...). Lo llama el propio proceso web tras haber cerrado la
+ * respuesta 202 y, como red de seguridad, el cron ligero. Un cerrojo evita que dos procesos trabajen a la vez.
+ */
+function nammu_fediverse_process_inbox_queue(array $config, int $limit = 20, int $timeBudgetSeconds = 45): array
+{
+    $limit = max(1, $limit);
+    $stats = ['processed' => 0, 'failed' => 0, 'dropped' => 0, 'remaining' => 0, 'skipped' => false];
+    $lockFile = nammu_fediverse_inbox_queue_file() . '.processing.lock';
+    nammu_ensure_directory(dirname($lockFile));
+    $lockHandle = @fopen($lockFile, 'c+');
+    if (!is_resource($lockHandle)) {
+        $stats['skipped'] = true;
+        return $stats;
+    }
+    if (!@flock($lockHandle, LOCK_EX | LOCK_NB)) {
+        @fclose($lockHandle);
+        $stats['skipped'] = true;
+        return $stats;
+    }
+    nammu_apply_shared_permissions($lockFile, 0664, dirname($lockFile));
+    $startedAt = microtime(true);
+    try {
+        $batch = nammu_fediverse_with_json_store_lock(nammu_fediverse_inbox_queue_file(), static function () use ($limit): array {
+            $items = nammu_fediverse_inbox_queue_store()['items'];
+            $batch = array_slice($items, 0, $limit);
+            if (!empty($batch)) {
+                nammu_fediverse_save_inbox_queue_store(array_slice($items, count($batch)));
+            }
+            return $batch;
+        });
+        $batch = is_array($batch) ? $batch : [];
+        $retry = [];
+        while (!empty($batch)) {
+            if ((microtime(true) - $startedAt) > max(1, $timeBudgetSeconds)) {
+                // Sin tiempo: lo que queda vuelve a la cola por delante, en su orden original.
+                $retry = array_merge($retry, $batch);
+                break;
+            }
+            $entry = array_shift($batch);
+            $payload = is_array($entry['payload'] ?? null) ? $entry['payload'] : [];
+            if (empty($payload)) {
+                $stats['dropped']++;
+                continue;
+            }
+            try {
+                nammu_fediverse_process_inbox_activity($payload, $config);
+                $stats['processed']++;
+            } catch (Throwable $exception) {
+                $entry['attempts'] = (int) ($entry['attempts'] ?? 0) + 1;
+                $entry['last_error'] = substr($exception->getMessage(), 0, 300);
+                if ($entry['attempts'] >= 5) {
+                    $stats['dropped']++;
+                    error_log('Nammu Fediverso: actividad del inbox descartada tras 5 intentos (' . ($entry['id'] ?? '') . '): ' . $entry['last_error']);
+                } else {
+                    $stats['failed']++;
+                    $retry[] = $entry;
+                }
+            }
+        }
+        $remaining = nammu_fediverse_with_json_store_lock(nammu_fediverse_inbox_queue_file(), static function () use ($retry): int {
+            $items = nammu_fediverse_inbox_queue_store()['items'];
+            if (!empty($retry)) {
+                $items = array_merge($retry, $items);
+                nammu_fediverse_save_inbox_queue_store($items);
+            }
+            return count($items);
+        });
+        $stats['remaining'] = (int) $remaining;
+    } finally {
+        @flock($lockHandle, LOCK_UN);
+        @fclose($lockHandle);
+    }
+    return $stats;
+}
+
+/**
+ * Envía la respuesta HTTP completa y cierra la conexión con el cliente, dejando el proceso vivo para seguir
+ * trabajando (procesar la cola del inbox). Con mod_php basta Content-Length + Connection: close y vaciar los
+ * búferes; con FPM además fastcgi_finish_request().
+ */
+function nammu_fediverse_finish_http_response(int $status, array $headers, string $body): void
+{
+    ignore_user_abort(true);
+    if (function_exists('session_status') && session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+    http_response_code($status);
+    foreach ($headers as $name => $value) {
+        header($name . ': ' . $value);
+    }
+    header('Content-Length: ' . strlen($body));
+    header('Connection: close');
+    echo $body;
+    while (ob_get_level() > 0) {
+        @ob_end_flush();
+    }
+    flush();
+    if (function_exists('fastcgi_finish_request')) {
+        @fastcgi_finish_request();
     }
 }
 
@@ -11740,12 +11916,29 @@ function nammu_fediverse_handle_inbox_payload(array $payload, array $config, arr
             'retry_after' => (int) ($verification['retry_after'] ?? 0),
         ];
     }
-    nammu_fediverse_store_inbox_activity($payload, [
+    $type = strtolower((string) ($payload['type'] ?? ''));
+    $stored = nammu_fediverse_store_inbox_activity($payload, [
         'verified' => true,
         'verification_error' => '',
         'signature_key_id' => (string) ($verification['key_id'] ?? ''),
         'signed_headers' => (string) ($verification['signed_headers'] ?? ''),
     ], $config);
+    if (!$stored) {
+        // Reenvío de algo ya recibido: se acepta sin volver a procesarlo.
+        return ['accepted' => true, 'type' => $type !== '' ? $type : 'unknown', 'verified' => true, 'duplicate' => true];
+    }
+    // La respuesta 202 sale ya; el trabajo (relays, notificaciones, Delete...) se hace desde la cola.
+    nammu_fediverse_enqueue_inbox_activity($payload);
+    return ['accepted' => true, 'type' => $type !== '' ? $type : 'unknown', 'verified' => true, 'queued' => true];
+}
+
+/**
+ * Trabajo asociado a una actividad ya verificada y guardada. Antes se ejecutaba dentro de la petición HTTP y
+ * retrasaba el 202 entre 12 y 20 segundos (hasta 42 POST a seguidores por cada respuesta), lo que hacía que
+ * los emisores reintentaran y duplicaran actividades.
+ */
+function nammu_fediverse_process_inbox_activity(array $payload, array $config): array
+{
     $type = strtolower((string) ($payload['type'] ?? ''));
     $actorId = trim((string) ($payload['actor'] ?? ''));
     $accepted = false;

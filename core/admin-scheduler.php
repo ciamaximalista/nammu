@@ -31,6 +31,15 @@ function admin_run_scheduled_tasks(): array {
     if ($published > 0 && function_exists('nammu_fediverse_deliver_local_items')) {
         $scheduledDeliveryStats = nammu_fediverse_deliver_local_items($config);
     }
+    if (function_exists('nammu_fediverse_process_inbox_queue')) {
+        $stepStartedAt = microtime(true);
+        $fediverseInboxQueueStats = nammu_fediverse_process_inbox_queue($config, 50, 40);
+        admin_cli_timing_log('scheduled', 'process_inbox_queue', $stepStartedAt, [
+            'processed' => (int) ($fediverseInboxQueueStats['processed'] ?? 0),
+            'failed' => (int) ($fediverseInboxQueueStats['failed'] ?? 0),
+            'remaining' => (int) ($fediverseInboxQueueStats['remaining'] ?? 0),
+        ]);
+    }
     if (function_exists('nammu_fediverse_refresh_following')) {
         $stepStartedAt = microtime(true);
         $fediverseStats = nammu_fediverse_refresh_following([

@@ -1156,12 +1156,18 @@ if ($routePath === '/ap/inbox') {
     }
     $result = nammu_fediverse_handle_inbox_payload($payload, $configData, nammu_fediverse_request_headers(), $rawInboxBody);
     $inboxStatus = !empty($result['accepted']) ? 202 : (int) ($result['http_status'] ?? 401);
-    http_response_code($inboxStatus);
+    $inboxHeaders = ['Content-Type' => 'application/activity+json; charset=UTF-8'];
     if ($inboxStatus === 503 && (int) ($result['retry_after'] ?? 0) > 0) {
-        header('Retry-After: ' . (int) $result['retry_after']);
+        $inboxHeaders['Retry-After'] = (string) (int) $result['retry_after'];
     }
-    header('Content-Type: application/activity+json; charset=UTF-8');
-    echo json_encode(['status' => 'accepted', 'result' => $result], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $inboxBody = (string) json_encode(['status' => !empty($result['accepted']) ? 'accepted' : 'rejected', 'result' => $result], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    // El 202 se envía de inmediato y la conexión se cierra; el trabajo pesado se hace después, ya sin el
+    // emisor esperando (y el cron ligero vacía lo que quede si este proceso no llega a todo).
+    nammu_fediverse_finish_http_response($inboxStatus, $inboxHeaders, $inboxBody);
+    if (!empty($result['queued'])) {
+        @set_time_limit(90);
+        nammu_fediverse_process_inbox_queue($configData, 10, 60);
+    }
     exit;
 }
 

@@ -7511,6 +7511,7 @@ function nammu_fediverse_repair_unresolved_announces(array $config, int $limit =
     $inboxById = null;
     $checked = 0;
     $repaired = 0;
+    $removed = 0;
     foreach ($order as $index) {
         if ($checked >= $limit) {
             break;
@@ -7545,6 +7546,17 @@ function nammu_fediverse_repair_unresolved_announces(array $config, int $limit =
         if ($announcedId === '' || $announcedId === $itemId) {
             continue;
         }
+        // El objeto impulsado ya no existe (404/410): el impulso no tiene nada que mostrar y se retira.
+        $cachedObject = nammu_fediverse_fetch_cache_peek($announcedId);
+        if (
+            is_array($cachedObject)
+            && in_array((int) ($cachedObject['status'] ?? 0), [404, 410], true)
+            && (int) ($cachedObject['expires_at'] ?? 0) > time()
+        ) {
+            unset($items[$index]);
+            $removed++;
+            continue;
+        }
         if (nammu_fediverse_fetch_retry_after_for_url($announcedId) > 0) {
             continue;
         }
@@ -7565,10 +7577,10 @@ function nammu_fediverse_repair_unresolved_announces(array $config, int $limit =
         $items[$index] = $normalized;
         $repaired++;
     }
-    if ($repaired > 0) {
+    if ($repaired > 0 || $removed > 0) {
         nammu_fediverse_save_timeline_store(array_values($items));
     }
-    return ['checked' => $checked, 'repaired' => $repaired];
+    return ['checked' => $checked, 'repaired' => $repaired, 'removed' => $removed];
 }
 
 function nammu_fediverse_refresh_followers(array $config): array

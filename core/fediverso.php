@@ -526,8 +526,16 @@ function nammu_fediverse_should_shared_cache_remote_url(string $url, ?array $con
 function nammu_fediverse_fetch_cache_store(): array
 {
     $file = nammu_fediverse_fetch_cache_file();
-    if (isset($GLOBALS['nammu_fediverse_json_store_cache']) && is_array($GLOBALS['nammu_fediverse_json_store_cache'])) {
-        unset($GLOBALS['nammu_fediverse_json_store_cache'][$file]);
+    // Sólo se relee del disco (2 MB) cuando el fichero ha cambiado; antes se reparseaba en cada consulta y una
+    // petición que consultaba la caché cientos de veces se iba a más de un segundo sólo en esto.
+    clearstatcache(true, $file);
+    $stamp = (string) @filemtime($file) . ':' . (string) @filesize($file);
+    $knownStamp = (string) ($GLOBALS['nammu_fediverse_fetch_cache_stamp'] ?? '');
+    if ($knownStamp === '' || $knownStamp !== $stamp) {
+        if (isset($GLOBALS['nammu_fediverse_json_store_cache']) && is_array($GLOBALS['nammu_fediverse_json_store_cache'])) {
+            unset($GLOBALS['nammu_fediverse_json_store_cache'][$file]);
+        }
+        $GLOBALS['nammu_fediverse_fetch_cache_stamp'] = $stamp;
     }
     $store = nammu_fediverse_load_json_store(nammu_fediverse_fetch_cache_file(), ['items' => []]);
     $store['items'] = is_array($store['items'] ?? null) ? $store['items'] : [];
@@ -4327,11 +4335,23 @@ function nammu_fediverse_remote_descendant_replies_for_known_replies(array $know
         $seenObjects[$objectKey] = true;
         $cacheKey = sha1($objectKey);
         if (!array_key_exists($cacheKey, $cache)) {
+            // Cada respuesta conocida cuesta tres peticiones (objeto, colección de respuestas y su página). Con
+            // 5 minutos de vida para todas, cada reconstrucción volvía a pedir ~100 URL a maximalismo.red y
+            // provocaba sus 429. Las respuestas recientes se siguen mirando cada 5 minutos; las antiguas, cada
+            // 6 o 24 horas.
+            $publishedAt = strtotime((string) ($reply['published'] ?? '')) ?: 0;
+            $replyAge = $publishedAt > 0 ? max(0, time() - $publishedAt) : 0;
+            $maxAge = 300;
+            if ($replyAge > 14 * 86400) {
+                $maxAge = 86400;
+            } elseif ($replyAge > 2 * 86400) {
+                $maxAge = 21600;
+            }
             $cache[$cacheKey] = nammu_fediverse_cached_remote_replies_for_item([
                 'id' => $objectId !== '' ? $objectId : $objectUrl,
                 'object_id' => $objectId !== '' ? $objectId : $objectUrl,
                 'url' => $objectUrl !== '' ? $objectUrl : $objectId,
-            ], $config, 300);
+            ], $config, $maxAge);
         }
         $children = is_array($cache[$cacheKey]) ? $cache[$cacheKey] : [];
         foreach ($children as $child) {
@@ -4476,12 +4496,62 @@ function nammu_fediverse_merge_thread_replies(array ...$replyGroups): array
     return $merged;
 }
 
+/**
+ * Una respuesta cuyo objeto ya no existe en su servidor (410 Gone, o 404 repetido) se considera borrada aunque
+ * nunca haya llegado la actividad Delete: hay servidores (Uanna) que no la envían y, como los hilos fusionan las
+ * respuestas ya conocidas, la respuesta se quedaba para siempre. Se apoya en la caché de fetch, que el cron
+ * alimenta al refrescar los hilos; no sale a la red.
+ */
+function nammu_fediverse_reply_object_is_gone(array $reply): bool
+{
+    foreach (['note_id', 'id', 'url'] as $field) {
+        $identifier = trim((string) ($reply[$field] ?? ''));
+        if ($identifier === '' || !preg_match('#^https?://#i', $identifier)) {
+            continue;
+        }
+        $identifier = (string) preg_replace('/#.*$/', '', $identifier);
+        $entry = nammu_fediverse_fetch_cache_peek($identifier);
+        if (!is_array($entry) || (int) ($entry['expires_at'] ?? 0) <= time()) {
+            continue;
+        }
+        $status = (int) ($entry['status'] ?? 0);
+        if ($status === 410) {
+            return true;
+        }
+        if ($status === 404 && $field !== 'url' && (int) ($entry['failure_count'] ?? 0) >= 2) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function nammu_fediverse_hide_gone_replies(array $replies): int
+{
+    $hidden = 0;
+    foreach ($replies as $reply) {
+        if (!is_array($reply) || !nammu_fediverse_reply_object_is_gone($reply)) {
+            continue;
+        }
+        $identifiers = [];
+        foreach (['note_id', 'id', 'url'] as $field) {
+            $identifier = trim((string) ($reply[$field] ?? ''));
+            if ($identifier !== '') {
+                $identifiers[] = $identifier;
+                $identifiers[] = (string) preg_replace('/#.*$/', '', $identifier);
+            }
+        }
+        nammu_fediverse_hide_deleted_remote_reply(array_values(array_unique($identifiers)));
+        $hidden++;
+    }
+    return $hidden;
+}
+
 function nammu_fediverse_filter_visible_replies(array $replies, ?array $hiddenLookup = null): array
 {
     $hiddenLookup = is_array($hiddenLookup) ? $hiddenLookup : nammu_fediverse_hidden_reply_lookup();
     $visible = [];
     foreach ($replies as $reply) {
-        if (!is_array($reply) || nammu_fediverse_is_hidden_reply($reply, $hiddenLookup)) {
+        if (!is_array($reply) || nammu_fediverse_is_hidden_reply($reply, $hiddenLookup) || nammu_fediverse_reply_object_is_gone($reply)) {
             continue;
         }
         $visible[] = $reply;
@@ -4859,6 +4929,9 @@ function nammu_fediverse_build_home_thread_payloads(array $localItems, array $co
             $mergedReplies,
             (array) ($threadPayloads[$localId]['replies'] ?? [])
         );
+        // Las respuestas borradas en origen (410/404 en la caché de fetch) se ocultan de forma permanente, igual
+        // que si hubiera llegado su Delete, para que no reaparezcan al fusionar con lo ya conocido.
+        nammu_fediverse_hide_gone_replies((array) ($threadPayloads[$localId]['replies'] ?? []));
         $threadPayloads[$localId]['replies'] = nammu_fediverse_filter_visible_replies((array) ($threadPayloads[$localId]['replies'] ?? []));
         $threadPayloads[$localId]['replies'] = nammu_fediverse_apply_reply_reaction_metrics((array) $threadPayloads[$localId]['replies'], $config);
         $threadPayloads[$localId]['replies'] = nammu_fediverse_annotate_reply_reply_counts((array) $threadPayloads[$localId]['replies']);
@@ -8636,8 +8709,34 @@ function nammu_fediverse_local_reaction_details(array $config): array
     return $details;
 }
 
-function nammu_fediverse_incoming_public_replies_by_object(array $config): array
+function nammu_fediverse_incoming_public_replies_by_object(array $config, ?bool $allowNetwork = null): array
 {
+    // En una petición pública (index.php sirviendo /ap/objects, /ap/replies, hilos...) no se sale a la red:
+    // esta función recorre todo el inbox y, con red, descarga objetos impulsados, padres de respuestas y
+    // actores; servir un objeto a un sitio hermano llegaba a tardar 13-40 s y el emisor lo daba por caído.
+    // Con red sólo desde el cron y el panel; en peticiones se usa lo que ya haya en la caché de fetch.
+    if ($allowNetwork === null) {
+        $allowNetwork = !defined('NAMMU_FEDIVERSE_PUBLIC_REQUEST');
+    }
+    static $memo = [];
+    $memoKey = ($allowNetwork ? 'net' : 'offline') . '|' . (string) @filemtime(nammu_fediverse_inbox_file());
+    if (isset($memo[$memoKey])) {
+        return $memo[$memoKey];
+    }
+    $fetchObjectJson = static function (string $url) use ($config, $allowNetwork): ?array {
+        // Los objetos impulsados y los padres de respuestas no cambian (una edición llega como Update), así que
+        // vale lo que haya en caché aunque haya caducado; sólo se descarga lo que no se ha visto nunca. Sin esto
+        // cada reconstrucción de la instantánea volvía a pedir los ~160 objetos impulsados a sus servidores.
+        $cached = nammu_fediverse_fetch_cache_usable_stale($url);
+        if (is_array($cached) || !$allowNetwork) {
+            return $cached;
+        }
+        $fetched = nammu_fediverse_signed_fetch_json($url, $config);
+        if (!is_array($fetched)) {
+            $fetched = nammu_fediverse_fetch_json($url);
+        }
+        return is_array($fetched) ? $fetched : null;
+    };
     $index = nammu_fediverse_local_items_index($config);
     $store = nammu_fediverse_load_json_store(nammu_fediverse_inbox_file(), ['activities' => []]);
     $activities = is_array($store['activities'] ?? null) ? $store['activities'] : [];
@@ -8676,16 +8775,13 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
     $grouped = [];
     $seenReplies = [];
     $fetchedParentTargets = [];
-    $appendFetchedParentReply = static function (string $target) use (&$pendingReplies, &$fetchedParentTargets, &$knownActorsById, $config): bool {
+    $appendFetchedParentReply = static function (string $target) use (&$pendingReplies, &$fetchedParentTargets, &$knownActorsById, $config, $allowNetwork, $fetchObjectJson): bool {
         $target = trim($target);
         if ($target === '' || isset($fetchedParentTargets[$target])) {
             return false;
         }
         $fetchedParentTargets[$target] = true;
-        $parentObject = nammu_fediverse_signed_fetch_json($target, $config);
-        if (!is_array($parentObject)) {
-            $parentObject = nammu_fediverse_fetch_json($target);
-        }
+        $parentObject = $fetchObjectJson($target);
         if (!is_array($parentObject) || strtolower(trim((string) ($parentObject['type'] ?? ''))) !== 'note') {
             return false;
         }
@@ -8700,7 +8796,7 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
         }
         $actorId = trim((string) ($parentObject['attributedTo'] ?? ''));
         $actor = $actorId !== '' && isset($knownActorsById[$actorId]) ? $knownActorsById[$actorId] : [];
-        if ($actorId !== '' && empty($actor)) {
+        if ($actorId !== '' && empty($actor) && $allowNetwork) {
             $resolvedActor = nammu_fediverse_resolve_actor($actorId, $config);
             $actor = is_array($resolvedActor) ? $resolvedActor : [];
         }
@@ -8741,10 +8837,7 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
         } elseif ($payloadType === 'announce' && is_string($payload['object'] ?? null)) {
             $announcedObjectUrl = trim((string) $payload['object']);
             if ($announcedObjectUrl !== '') {
-                $announcedObject = nammu_fediverse_signed_fetch_json($announcedObjectUrl, $config);
-                if (!is_array($announcedObject)) {
-                    $announcedObject = nammu_fediverse_fetch_json($announcedObjectUrl);
-                }
+                $announcedObject = $fetchObjectJson($announcedObjectUrl);
                 $object = is_array($announcedObject) ? $announcedObject : [];
             }
         }
@@ -8979,6 +9072,7 @@ function nammu_fediverse_incoming_public_replies_by_object(array $config): array
         });
     }
     unset($replies);
+    $memo[$memoKey] = $grouped;
     return $grouped;
 }
 

@@ -12,6 +12,8 @@ require_once __DIR__ . '/core/helpers.php';
 require_once __DIR__ . '/core/actualidad.php';
 require_once __DIR__ . '/core/fediverso.php';
 require_once __DIR__ . '/core/webmention.php';
+// Petición pública: las rutas ActivityPub y los hilos se sirven desde disco y caché, sin salir a la red.
+define('NAMMU_FEDIVERSE_PUBLIC_REQUEST', true);
 
 use Nammu\Core\ContentRepository;
 use Nammu\Core\Itinerary;

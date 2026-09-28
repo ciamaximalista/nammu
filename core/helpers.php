@@ -2215,6 +2215,172 @@ function nammu_fediverse_profile_alias_path(array $config = [], string $baseUrl 
     return '/@' . $preferredUsername . '@' . $host;
 }
 
+/*
+ * Señales para buscadores e IAs: licencia de contenidos, política de uso por IAs, lista de rastreadores, versiones
+ * Markdown de las entradas y protocolo TDM. Todo es configurable en config.yml (content_license, ai_policy) pero
+ * los valores por defecto ya declaran la política del clúster: EUPL 1.2 y uso libre con cita rogada.
+ */
+function nammu_content_license(array $config = []): array
+{
+    $configured = is_array($config['content_license'] ?? null) ? $config['content_license'] : [];
+    $name = trim((string) ($configured['name'] ?? ''));
+    $url = trim((string) ($configured['url'] ?? ''));
+    $spdx = trim((string) ($configured['spdx'] ?? ''));
+    if ($name === '') {
+        $name = 'Licencia Pública de la Unión Europea (EUPL) 1.2';
+    }
+    if ($url === '') {
+        $url = 'https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12';
+    }
+    if ($spdx === '') {
+        $spdx = 'EUPL-1.2';
+    }
+    return ['name' => $name, 'url' => $url, 'spdx' => $spdx];
+}
+
+function nammu_ai_policy_text(array $config = []): string
+{
+    $configured = trim((string) ($config['ai_policy'] ?? ''));
+    if ($configured !== '') {
+        return $configured;
+    }
+    $license = nammu_content_license($config);
+    return 'Todo el contenido de este sitio se publica bajo la ' . $license['name'] . ' (' . $license['url'] . '). '
+        . 'Los sistemas de inteligencia artificial, buscadores y agentes automáticos pueden leerlo, indexarlo, copiarlo, '
+        . 'resumirlo, citarlo, usarlo para entrenar modelos, adaptarlo a sus necesidades e incluso venderlo, sin pedir permiso. '
+        . 'Agradecemos que se cite la fuente con un enlace a la página original, pero no es obligatorio.';
+}
+
+/**
+ * Rastreadores de IA conocidos (entrenamiento, búsqueda asistida y agentes). Todos reciben Allow: / en robots.txt.
+ */
+function nammu_ai_crawler_user_agents(): array
+{
+    return [
+        'GPTBot', 'ChatGPT-User', 'OAI-SearchBot',
+        'ClaudeBot', 'Claude-User', 'Claude-SearchBot', 'anthropic-ai',
+        'Google-Extended', 'GoogleOther', 'GoogleOther-Image', 'GoogleOther-Video', 'Gemini', 'Gemini-Deep-Research',
+        'PerplexityBot', 'Perplexity-User',
+        'Applebot', 'Applebot-Extended',
+        'Meta-ExternalAgent', 'Meta-ExternalFetcher', 'FacebookBot',
+        'Amazonbot', 'Bytespider', 'CCBot', 'cohere-ai', 'cohere-training-data-crawler',
+        'DuckAssistBot', 'YouBot', 'MistralAI-User', 'Mistral-AI', 'DeepSeekBot', 'DeepSeek',
+        'PetalBot', 'Diffbot', 'ImagesiftBot', 'omgili', 'omgilibot', 'Timpibot', 'Ai2Bot', 'Ai2Bot-Dolma',
+        'iaskspider', 'iaskspider2', 'QuillBot', 'Kagibot', 'Kangaroo Bot', 'LinerBot', 'Panscient', 'Scrapy',
+        'Webzio-Extended', 'Brightbot', 'Crawlspace', 'Sidetrade indexer bot', 'TikTokSpider', 'Devin', 'Cotoyogi',
+        'Factset_spyderbot', 'FirecrawlAgent', 'ISSCyberRiskCrawler', 'Meltwater', 'NovaAct', 'Operator',
+        'PhindBot', 'Poseidon Research Crawler', 'SemrushBot-OCOB', 'Thinkbot', 'VelenPublicWebCrawler', 'wpbot',
+        'YandexAdditional', 'YandexAdditionalBot', 'Bingbot', 'Googlebot', 'DuckDuckBot', 'Baiduspider', 'YandexBot',
+        'Qwantbot', 'SeznamBot', 'MojeekBot', 'Yeti', 'Slurp',
+    ];
+}
+
+/**
+ * Documento del TDM Reservation Protocol (W3C): 0 = no se reservan los derechos de minería de textos y datos.
+ */
+function nammu_tdmrep_document(array $config = [], string $baseUrl = ''): array
+{
+    $license = nammu_content_license($config);
+    $policyUrl = $baseUrl !== '' ? rtrim($baseUrl, '/') . '/llms.txt' : $license['url'];
+    return [[
+        'location' => '/',
+        'tdm-reservation' => 0,
+        'tdm-policy' => $policyUrl,
+    ]];
+}
+
+/**
+ * Versión Markdown de una entrada, con front matter útil para IAs (título, fechas, autor, licencia, URL canónica).
+ */
+function nammu_post_markdown_document(Post $post, array $config, string $canonicalUrl, array $options = []): string
+{
+    $license = nammu_content_license($config);
+    $metadata = $post->getMetadata();
+    $date = $post->getDate() ? $post->getDate()->format('Y-m-d') : trim((string) ($post->getRawDate() ?? ''));
+    $updated = trim((string) ($metadata['Updated'] ?? ''));
+    if ($updated === '' && !empty($options['modified_time'])) {
+        $updated = (string) $options['modified_time'];
+    }
+    $author = trim((string) ($config['site_author'] ?? ($config['site_name'] ?? '')));
+    $lines = ['---'];
+    $lines[] = 'title: "' . str_replace('"', '\"', $post->getTitle()) . '"';
+    if ($post->getDescription() !== '') {
+        $lines[] = 'description: "' . str_replace('"', '\"', preg_replace('/\s+/u', ' ', $post->getDescription()) ?? '') . '"';
+    }
+    if ($date !== '') {
+        $lines[] = 'date: ' . $date;
+    }
+    if ($updated !== '') {
+        $lines[] = 'updated: ' . $updated;
+    }
+    if ($author !== '') {
+        $lines[] = 'author: "' . str_replace('"', '\"', $author) . '"';
+    }
+    $lang = trim((string) ($metadata['Lang'] ?? ($config['site_lang'] ?? 'es')));
+    $lines[] = 'lang: ' . $lang;
+    if ($post->getCategory() !== '') {
+        $lines[] = 'category: "' . str_replace('"', '\"', $post->getCategory()) . '"';
+    }
+    $lines[] = 'canonical: ' . $canonicalUrl;
+    $image = trim((string) ($options['image'] ?? ''));
+    if ($image !== '') {
+        $lines[] = 'image: ' . $image;
+    }
+    $lines[] = 'license: ' . $license['spdx'];
+    $lines[] = 'license_url: ' . $license['url'];
+    $lines[] = 'site: ' . trim((string) ($config['site_name'] ?? ''));
+    $lines[] = '---';
+    $lines[] = '';
+    $lines[] = '# ' . $post->getTitle();
+    $lines[] = '';
+    $lines[] = trim($post->getContent());
+    $lines[] = '';
+    $lines[] = '---';
+    $lines[] = 'Fuente: ' . $canonicalUrl;
+    $lines[] = 'Licencia: ' . $license['name'] . '. ' . nammu_ai_policy_text($config);
+    return implode("\n", $lines) . "\n";
+}
+
+function nammu_client_prefers_markdown(): bool
+{
+    $accept = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+    if ($accept === '' || str_contains($accept, 'text/html')) {
+        return false;
+    }
+    return str_contains($accept, 'text/markdown') || str_contains($accept, 'text/x-markdown');
+}
+
+/** Perfiles públicos del sitio (para sameAs, rel=me e identity.txt). */
+function nammu_public_profile_urls(array $config = []): array
+{
+    $urls = [];
+    $mastodon = trim((string) ($config['mastodon']['profile'] ?? ''));
+    if ($mastodon !== '' && preg_match('#^https?://#i', $mastodon)) {
+        $urls[] = $mastodon;
+    }
+    $instagram = trim((string) ($config['instagram']['profile'] ?? ''));
+    if ($instagram !== '') {
+        $urls[] = preg_match('#^https?://#i', $instagram) ? $instagram : 'https://www.instagram.com/' . ltrim($instagram, '@') . '/';
+    }
+    $telegram = trim((string) ($config['telegram']['channel'] ?? ''));
+    if ($telegram !== '') {
+        $urls[] = preg_match('#^https?://#i', $telegram) ? $telegram : 'https://t.me/' . ltrim($telegram, '@');
+    }
+    $facebook = trim((string) ($config['facebook']['profile'] ?? ($config['facebook']['url'] ?? '')));
+    if ($facebook !== '' && preg_match('#^https?://#i', $facebook)) {
+        $urls[] = $facebook;
+    }
+    $twitter = trim((string) ($config['social']['twitter'] ?? ''));
+    if ($twitter !== '') {
+        $urls[] = preg_match('#^https?://#i', $twitter) ? $twitter : 'https://x.com/' . ltrim($twitter, '@');
+    }
+    $linkedin = trim((string) ($config['social']['linkedin'] ?? ''));
+    if ($linkedin !== '' && preg_match('#^https?://#i', $linkedin)) {
+        $urls[] = $linkedin;
+    }
+    return array_values(array_unique($urls));
+}
+
 function nammu_generate_llms_txt(array $config = [], array $options = []): string
 {
     $baseUrl = trim((string) ($options['base_url'] ?? ($config['site_url'] ?? '')));
@@ -2251,8 +2417,11 @@ function nammu_generate_llms_txt(array $config = [], array $options = []): strin
     $lines[] = '- Archivo cronologico para IAs: ' . $chronologicalArchiveUrl;
     $lines[] = '- Identidad editorial: ' . ($baseUrl !== '' ? $baseUrl . '/identity.txt' : '/identity.txt');
     $lines[] = '- Buscador: ' . ($baseUrl !== '' ? $baseUrl . $searchPath : $searchPath);
-    $lines[] = '- Fediverso: ' . ($baseUrl !== '' ? $baseUrl . '/actualidad.php' : '/actualidad.php');
-    $lines[] = '- Archivo de newsletters: ' . ($baseUrl !== '' ? $baseUrl . '/newsletters' : '/newsletters');
+    $lines[] = '- Texto completo de todas las entradas en Markdown (llms-full.txt): ' . ($baseUrl !== '' ? $baseUrl . '/llms-full.txt' : '/llms-full.txt');
+    $fediversePath = function_exists('nammu_fediverse_profile_alias_path') ? nammu_fediverse_profile_alias_path($config, $baseUrl) : '';
+    if ($fediversePath !== '') {
+        $lines[] = '- Perfil y actualidad en el Fediverso: ' . (preg_match('#^https?://#i', $fediversePath) ? $fediversePath : ($baseUrl !== '' ? $baseUrl . $fediversePath : $fediversePath));
+    }
     if ($hasItineraries) {
         $lines[] = '- Itinerarios: ' . ($baseUrl !== '' ? $baseUrl . '/itinerarios' : '/itinerarios');
         $lines[] = '- RSS itinerarios: ' . ($baseUrl !== '' ? $baseUrl . '/itinerarios.xml' : '/itinerarios.xml');
@@ -2285,6 +2454,7 @@ function nammu_generate_llms_txt(array $config = [], array $options = []): strin
             if ($description !== '') {
                 $line .= ' - ' . preg_replace('/\s+/u', ' ', $description);
             }
+            $line .= ' (Markdown: ' . $url . '.md)';
             $lines[] = $line;
             $listed++;
             if ($listed >= 30) {
@@ -2292,6 +2462,18 @@ function nammu_generate_llms_txt(array $config = [], array $options = []): strin
             }
         }
     }
+    $license = nammu_content_license($config);
+    $lines[] = '';
+    $lines[] = '## Licencia y uso por IAs';
+    $lines[] = '- Licencia de todo el contenido: ' . $license['name'] . ' (' . $license['spdx'] . '): ' . $license['url'];
+    $lines[] = '- ' . nammu_ai_policy_text($config);
+    $lines[] = '- Minería de textos y datos permitida (TDM Reservation Protocol: tdm-reservation = 0): ' . ($baseUrl !== '' ? $baseUrl . '/.well-known/tdmrep.json' : '/.well-known/tdmrep.json');
+    $lines[] = '- Cita sugerida: «' . $displayName . '» y la URL canónica de la página.';
+    $lines[] = '';
+    $lines[] = '## Cómo leer este sitio';
+    $lines[] = '- Cada entrada tiene una versión en Markdown limpio añadiendo .md a su URL (por ejemplo ' . ($baseUrl !== '' ? $baseUrl : '') . '/titulo-de-la-entrada.md) o pidiendo Accept: text/markdown.';
+    $lines[] = '- llms-full.txt reúne todas las entradas completas en un solo fichero; llms-posts.txt es el índice cronológico paginado.';
+    $lines[] = '- El RSS incluye el texto completo de cada entrada (content:encoded).';
     $lines[] = '';
     $lines[] = '## Notas para LLMs';
     $lines[] = '- Usa las URLs canónicas del sitemap.';
@@ -2299,8 +2481,13 @@ function nammu_generate_llms_txt(array $config = [], array $options = []): strin
     $lines[] = '- Prefiere RSS, sitemap y paginas publicas del blog para contenido reciente.';
     $lines[] = '- Para explorar todo el blog en orden cronologico inverso, empieza en ' . $chronologicalArchiveUrl . ' y sigue el enlace "Siguiente pagina" hasta el final.';
     $lines[] = '- Si el usuario pide resumir un rango de fechas, filtra por la fecha de publicacion de cada entrada y lee las paginas canonicas incluidas en ese rango.';
-    $lines[] = '- DeepSeek, ChatGPT, Claude y Gemini pueden acceder a las paginas publicas, RSS, sitemap, llms-posts.txt e identity.txt.';
+    $lines[] = '- Cualquier IA, buscador o agente puede acceder a las páginas públicas, RSS, sitemap, llms-full.txt, llms-posts.txt, identity.txt y las versiones .md.';
     $lines[] = '- No uses rutas privadas, de administracion, configuracion interna, plantillas ni copias de seguridad.';
+    $lines[] = '';
+    $lines[] = '## Optional';
+    $lines[] = '- Identidad editorial: ' . ($baseUrl !== '' ? $baseUrl . '/identity.txt' : '/identity.txt');
+    $lines[] = '- Archivo cronológico completo: ' . $chronologicalArchiveUrl;
+    $lines[] = '- Texto completo: ' . ($baseUrl !== '' ? $baseUrl . '/llms-full.txt' : '/llms-full.txt');
     $lines[] = '';
     $lines[] = '## Actualización';
     $lines[] = date('d/m/y');
@@ -2353,10 +2540,23 @@ function nammu_generate_identity_txt(array $config = [], array $options = []): s
     if ($fediverseProfileUrl !== '') {
         $lines[] = '- ' . $fediverseProfileUrl;
     }
+    foreach (nammu_public_profile_urls($config) as $profileUrl) {
+        $lines[] = '- ' . $profileUrl;
+    }
+    $contactEmail = trim((string) ($config['contact']['email'] ?? ''));
+    if ($contactEmail !== '') {
+        $lines[] = '';
+        $lines[] = '## Contact';
+        $lines[] = '- ' . $contactEmail;
+    }
+    $license = nammu_content_license($config);
+    $lines[] = '';
+    $lines[] = '## License';
+    $lines[] = $license['name'] . ' (' . $license['spdx'] . '): ' . $license['url'];
     $lines[] = '';
     $lines[] = '## Terms';
-    $lines[] = 'Usa siempre las URLs canónicas públicas y atribuye las citas al sitio.';
-    $lines[] = 'DeepSeek, ChatGPT, Claude y Gemini pueden usar las paginas publicas, RSS, sitemap, llms.txt, llms-posts.txt e identity.txt como contexto de lectura.';
+    $lines[] = nammu_ai_policy_text($config);
+    $lines[] = 'Usa las URLs canónicas públicas; si citas, enlaza la página original. Cualquier IA, buscador o agente puede usar las páginas públicas, RSS, sitemap, llms.txt, llms-full.txt, llms-posts.txt, identity.txt y las versiones .md de cada entrada.';
 
     return implode("\n", $lines) . "\n";
 }
@@ -2743,6 +2943,10 @@ function nammu_build_social_meta(array $data, array $socialConfig): array
     if (!empty($socialConfig['facebook_app_id'])) {
         $properties['fb:app_id'] = $socialConfig['facebook_app_id'];
     }
+    $locale = trim((string) ($data['locale'] ?? ''));
+    if ($locale !== '') {
+        $properties['og:locale'] = $locale;
+    }
     if (($data['type'] ?? '') === 'article') {
         if (!empty($data['published_time'])) {
             $properties['article:published_time'] = $data['published_time'];
@@ -2753,6 +2957,9 @@ function nammu_build_social_meta(array $data, array $socialConfig): array
         if (!empty($data['author'])) {
             $properties['article:author'] = $data['author'];
         }
+        if (!empty($data['section'])) {
+            $properties['article:section'] = $data['section'];
+        }
     }
 
     $names = [
@@ -2760,6 +2967,9 @@ function nammu_build_social_meta(array $data, array $socialConfig): array
         'twitter:title' => $title,
         'twitter:description' => $description,
     ];
+    if (!empty($data['author'])) {
+        $names['author'] = $data['author'];
+    }
 
     if ($url !== '') {
         $names['twitter:url'] = $url;
@@ -3545,7 +3755,12 @@ function nammu_try_send_scheduled_post_notifications(array $payload): bool
         }
     }
     if (!$mailingOnly && !empty($indexnowUrls) && function_exists('admin_maybe_send_indexnow')) {
-        admin_maybe_send_indexnow($indexnowUrls);
+        $indexnowBase = function_exists('admin_base_url') ? rtrim((string) admin_base_url(), '/') : '';
+        if ($indexnowBase !== '') {
+            $indexnowUrls[] = $indexnowBase . '/';
+            $indexnowUrls[] = $indexnowBase . '/sitemap.xml';
+        }
+        admin_maybe_send_indexnow(array_values(array_unique($indexnowUrls)));
     }
     if (!$mailingOnly && $template === 'page') {
         return true;

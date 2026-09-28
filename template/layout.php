@@ -47,6 +47,26 @@ if ($webmentionEndpoint !== '' && !headers_sent()) {
     header('Link: <' . $webmentionEndpoint . '>; rel="webmention"', false);
 }
 $metaRobots = $metaRobots ?? '';
+if ($metaRobots === '') {
+    // Por defecto se invita a indexar todo y a mostrar fragmentos, imágenes y vídeos completos (Google, Bing, IAs).
+    $metaRobots = 'index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1';
+}
+$markdownAlternateUrl = trim((string) ($markdownAlternateUrl ?? ''));
+$activityPubObjectUrl = trim((string) ($activityPubObjectUrl ?? ''));
+$contentLicense = function_exists('nammu_content_license') ? nammu_content_license($layoutConfig) : [];
+$contentLicenseUrl = trim((string) ($contentLicense['url'] ?? ''));
+$publicProfileUrls = function_exists('nammu_public_profile_urls') ? nammu_public_profile_urls($layoutConfig) : [];
+if (!headers_sent()) {
+    // TDM Reservation Protocol (W3C): 0 = minería de textos y datos permitida. Y licencia y alternativas en cabeceras.
+    header('tdm-reservation: 0');
+    header('tdm-policy: ' . rtrim((string) ($baseUrl ?? ''), '/') . '/llms.txt');
+    if ($contentLicenseUrl !== '') {
+        header('Link: <' . $contentLicenseUrl . '>; rel="license"', false);
+    }
+    if ($markdownAlternateUrl !== '') {
+        header('Link: <' . $markdownAlternateUrl . '>; rel="alternate"; type="text/markdown"', false);
+    }
+}
 $themeGlobal = $theme['global'] ?? [];
 $cornerStyle = $theme['corners'] ?? ($themeGlobal['corners'] ?? 'rounded');
 $cornerClass = $cornerStyle === 'square' ? 'corners-square' : 'corners-rounded';
@@ -199,9 +219,11 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= htmlspecialchars($pageTitle !== '' ? "{$pageTitle} — {$siteTitle}" : $siteTitle, ENT_QUOTES, 'UTF-8') ?></title>
     <?php
-        $finalMetaDescription = $defaultMetaDescription !== '' ? $defaultMetaDescription : ($siteDescription ?? '');
-        if ($finalMetaDescription === '') {
-            $finalMetaDescription = $metaDescription ?? '';
+        // La descripción propia de cada página va primero; la global sólo como respaldo. Antes todas las páginas
+        // llevaban la misma meta description, que es lo peor para buscadores.
+        $finalMetaDescription = trim((string) ($metaDescription ?? ''));
+        if ($finalMetaDescription === '' || $finalMetaDescription === trim((string) ($siteDescription ?? ''))) {
+            $finalMetaDescription = $defaultMetaDescription !== '' ? $defaultMetaDescription : trim((string) ($siteDescription ?? ''));
         }
     ?>
     <?php if ($finalMetaDescription !== ''): ?>
@@ -210,6 +232,21 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
     <?php if ($metaRobots !== ''): ?>
         <meta name="robots" content="<?= htmlspecialchars($metaRobots, ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
+    <meta name="tdm-reservation" content="0">
+    <meta name="tdm-policy" content="<?= htmlspecialchars(rtrim((string) ($baseUrl ?? ''), '/') . '/llms.txt', ENT_QUOTES, 'UTF-8') ?>">
+    <?php if ($contentLicenseUrl !== ''): ?>
+        <link rel="license" href="<?= htmlspecialchars($contentLicenseUrl, ENT_QUOTES, 'UTF-8') ?>">
+        <meta name="license" content="<?= htmlspecialchars((string) ($contentLicense['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+    <?php endif; ?>
+    <?php if ($markdownAlternateUrl !== ''): ?>
+        <link rel="alternate" type="text/markdown" title="Versión Markdown" href="<?= htmlspecialchars($markdownAlternateUrl, ENT_QUOTES, 'UTF-8') ?>">
+    <?php endif; ?>
+    <?php if ($activityPubObjectUrl !== ''): ?>
+        <link rel="alternate" type="application/activity+json" title="Objeto ActivityPub de esta página" href="<?= htmlspecialchars($activityPubObjectUrl, ENT_QUOTES, 'UTF-8') ?>">
+    <?php endif; ?>
+    <?php foreach ($publicProfileUrls as $publicProfileUrl): ?>
+        <link rel="me" href="<?= htmlspecialchars($publicProfileUrl, ENT_QUOTES, 'UTF-8') ?>">
+    <?php endforeach; ?>
     <?php $headRssLinks = is_array($rssLinks ?? null) ? $rssLinks : [[
         'title' => $siteTitle . ' — RSS del sitio',
         'href' => $rssUrl,
@@ -230,6 +267,10 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
         <?php $fediverseConfig = function_exists('nammu_load_config') ? nammu_load_config() : []; ?>
         <link rel="alternate" type="application/activity+json" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — ActivityPub" href="<?= htmlspecialchars(nammu_fediverse_actor_url($fediverseConfig), ENT_QUOTES, 'UTF-8') ?>">
         <link rel="alternate" type="application/jrd+json" title="<?= htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') ?> — WebFinger" href="<?= htmlspecialchars(nammu_fediverse_base_url($fediverseConfig) . '/.well-known/webfinger?resource=' . rawurlencode(nammu_fediverse_acct_uri($fediverseConfig)), ENT_QUOTES, 'UTF-8') ?>">
+        <?php $fediverseCreatorAcct = nammu_fediverse_acct_uri($fediverseConfig); ?>
+        <?php if ($fediverseCreatorAcct !== ''): ?>
+            <meta name="fediverse:creator" content="<?= htmlspecialchars(str_starts_with($fediverseCreatorAcct, 'acct:') ? '@' . substr($fediverseCreatorAcct, 5) : $fediverseCreatorAcct, ENT_QUOTES, 'UTF-8') ?>">
+        <?php endif; ?>
     <?php endif; ?>
     <?php if ($fontLink): ?>
         <?php if (strpos($fontLink, 'fonts.googleapis.com') !== false): ?>

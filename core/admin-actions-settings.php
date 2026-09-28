@@ -291,6 +291,23 @@ if (isset($_POST['test_gsc'])) {
                 unset($config['site_lang']);
             }
             $config['eupl_notice'] = $eupl_notice;
+            $contentLicenseInput = [
+                'name' => trim((string) ($_POST['content_license_name'] ?? '')),
+                'url' => trim((string) ($_POST['content_license_url'] ?? '')),
+                'spdx' => trim((string) ($_POST['content_license_spdx'] ?? '')),
+            ];
+            $contentLicenseInput = array_filter($contentLicenseInput, static fn (string $value): bool => $value !== '');
+            if (!empty($contentLicenseInput)) {
+                $config['content_license'] = $contentLicenseInput;
+            } else {
+                unset($config['content_license']);
+            }
+            $aiPolicyInput = trim((string) ($_POST['ai_policy'] ?? ''));
+            if ($aiPolicyInput !== '') {
+                $config['ai_policy'] = $aiPolicyInput;
+            } else {
+                unset($config['ai_policy']);
+            }
             if (
                 $multi_instance_enabled === 'on'
                 || $multi_instance_cluster !== ''

@@ -39,6 +39,9 @@ class RssGenerator
     ): string
     {
         $items = [];
+        $feedConfig = function_exists('nammu_load_config') ? nammu_load_config() : [];
+        $feedAuthor = htmlspecialchars(trim((string) ($feedConfig['site_author'] ?? '')), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $feedLicense = function_exists('nammu_content_license') ? nammu_content_license($feedConfig) : [];
         foreach ($posts as $post) {
             $link = $this->normalizeUrl($urlResolver($post));
             $title = htmlspecialchars($post->getTitle(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -72,12 +75,17 @@ class RssGenerator
                 : gmdate(DATE_RSS);
 
             $guid = $link;
+            $categoryXml = '';
+            if ($post->getCategory() !== '') {
+                $categoryXml = "\n        <category>" . htmlspecialchars($post->getCategory(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</category>';
+            }
+            $creatorXml = $feedAuthor !== '' ? "\n        <dc:creator>{$feedAuthor}</dc:creator>" : '';
 
             $items[] = <<<XML
     <item>
         <title>{$title}</title>
         <link>{$link}</link>
-        <guid isPermaLink="true">{$guid}</guid>{$enclosureXml}
+        <guid isPermaLink="true">{$guid}</guid>{$enclosureXml}{$categoryXml}{$creatorXml}
         <pubDate>{$dateString}</pubDate>
         <description><![CDATA[{$description}]]></description>
         <content:encoded><![CDATA[{$contentForFeed}]]></content:encoded>
@@ -93,15 +101,19 @@ XML;
         $atomNamespace = $this->selfLink !== '' ? ' xmlns:atom="http://www.w3.org/2005/Atom"' : '';
         $atomLink = $this->selfLink !== '' ? "\n    <atom:link href=\"{$this->selfLink}\" rel=\"self\" type=\"application/rss+xml\" />" : '';
         $generator = "\n    <generator>Nammu</generator>";
+        $copyright = '';
+        if (!empty($feedLicense['name'])) {
+            $copyright = "\n    <copyright>" . htmlspecialchars((string) $feedLicense['name'] . ' — ' . (string) ($feedLicense['url'] ?? '') . '. Uso libre, también por IAs; se agradece la cita.', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</copyright>';
+        }
 
         return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"{$atomNamespace}>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/"{$atomNamespace}>
 <channel>
     <title>{$title}</title>
     <link>{$link}</link>
     <description>{$description}</description>
-    {$generator}{$language}{$atomLink}
+    {$generator}{$language}{$atomLink}{$copyright}
     <lastBuildDate>{$this->lastBuildDate($posts)}</lastBuildDate>
 {$itemsXml}
 </channel>

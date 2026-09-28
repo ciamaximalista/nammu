@@ -282,6 +282,8 @@ function get_settings() {
         'site_name' => $blogName,
         'site_url' => $siteUrl,
         'site_lang' => $siteLang,
+        'content_license' => is_array($config['content_license'] ?? null) ? $config['content_license'] : [],
+        'ai_policy' => trim((string) ($config['ai_policy'] ?? '')),
         'search_console' => $searchConsole,
         'bing_webmaster' => $bingWebmaster,
         'template' => [

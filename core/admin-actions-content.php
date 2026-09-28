@@ -394,7 +394,13 @@ if (isset($_POST['send_newsletter'])) {
                             $indexnowUrls[] = admin_public_podcast_url($slug);
                         }
                         if (!empty($indexnowUrls)) {
-                            admin_maybe_send_indexnow($indexnowUrls);
+                            // Con la entrada van también la portada y el sitemap, que cambian con cada publicación.
+                            $indexnowBase = function_exists('admin_base_url') ? rtrim((string) admin_base_url(), '/') : '';
+                            if ($indexnowBase !== '') {
+                                $indexnowUrls[] = $indexnowBase . '/';
+                                $indexnowUrls[] = $indexnowBase . '/sitemap.xml';
+                            }
+                            admin_maybe_send_indexnow(array_values(array_unique($indexnowUrls)));
                         }
                     }
                     if ($viewAfterSave) {

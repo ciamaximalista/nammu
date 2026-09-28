@@ -423,14 +423,14 @@ if ($isPageTemplate && $formattedDate !== '') {
     $bottomMetaText = 'Actualizado por última vez el ' . htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8') . '.';
 }
 ?>
-<article class="post instapaper_body<?= $isDraftPost ? ' post-draft' : '' ?><?= $isPrivatePage ? ' post-private' : '' ?>">
+<article class="post h-entry instapaper_body<?= $isDraftPost ? ' post-draft' : '' ?><?= $isPrivatePage ? ' post-private' : '' ?>">
     <?php if ($isDraftPost || $isPrivatePage): ?>
         <div class="draft-stamp" aria-hidden="true"><?= $isPrivatePage ? 'Zona Privada' : 'Borrador' ?></div>
     <?php endif; ?>
     <div class="post-header">
         <div class="post-brand instapaper_ignore">
             <?php if ($siteAuthor !== ''): ?>
-                <span class="post-brand-title"><?= $siteAuthor ?></span>
+                <span class="post-brand-title p-author"><?= $siteAuthor ?></span>
             <?php endif; ?>
             <?php if ($siteBlog !== ''): ?>
                 <span class="post-brand-sub"><?= $siteBlog ?></span>
@@ -444,7 +444,7 @@ if ($isPageTemplate && $formattedDate !== '') {
 <?php if ($showHeaderButtonsSingle && $isPageTemplate): ?>
     <div class="instapaper_ignore"><?= $headerButtonsHtml ?></div>
 <?php endif; ?>
-        <h1><?= htmlspecialchars($post->getTitle(), ENT_QUOTES, 'UTF-8') ?></h1>
+        <h1 class="p-name"><?= htmlspecialchars($post->getTitle(), ENT_QUOTES, 'UTF-8') ?></h1>
 <?php if (!$isPageTemplate && $topMetaText !== '' && empty($hideCategory)): ?>
     <div class="post-meta-band"><?= $topMetaText ?></div>
 <?php endif; ?>
@@ -479,7 +479,7 @@ if ($isPageTemplate && $formattedDate !== '') {
         ? nammu_contact_signature_items($contactSettings)
         : [];
     ?>
-    <div class="post-body">
+    <div class="post-body e-content">
         <?php if ($singleSubscriptionTop): ?>
             <div class="site-search-block placement-top site-subscription-block instapaper_ignore">
                 <?= $renderSubscriptionBox('variant-panel') ?>

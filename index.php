@@ -203,6 +203,24 @@ $orgJsonLd = [
 if (!empty($logoForJsonLd)) {
     $orgJsonLd['logo'] = $logoForJsonLd;
 }
+if ($homeDescription !== '') {
+    $orgJsonLd['description'] = $homeDescription;
+}
+$orgSameAs = nammu_public_profile_urls($configData);
+if (function_exists('nammu_fediverse_profile_alias_path')) {
+    $orgFediversePath = nammu_fediverse_profile_alias_path($configData, $publicBaseUrl);
+    if ($orgFediversePath !== '') {
+        $orgSameAs[] = preg_match('#^https?://#i', $orgFediversePath) ? $orgFediversePath : rtrim($publicBaseUrl, '/') . $orgFediversePath;
+    }
+}
+if (!empty($orgSameAs)) {
+    $orgJsonLd['sameAs'] = array_values(array_unique($orgSameAs));
+}
+$orgContactEmail = trim((string) ($configData['contact']['email'] ?? ''));
+if ($orgContactEmail !== '') {
+    $orgJsonLd['email'] = $orgContactEmail;
+}
+$contentLicenseForJsonLd = nammu_content_license($configData);
 $siteJsonLd = [
     '@context' => 'https://schema.org',
     '@type' => 'WebSite',
@@ -210,6 +228,9 @@ $siteJsonLd = [
     'url' => $publicBaseUrl !== '' ? $publicBaseUrl : $homeUrl,
     'description' => $homeDescription,
     'inLanguage' => $siteLang,
+    'license' => $contentLicenseForJsonLd['url'],
+    'isAccessibleForFree' => true,
+    'publisher' => ['@type' => 'Organization', 'name' => $siteNameForMeta],
 ];
 if ($publicBaseUrl !== '') {
     $siteJsonLd['potentialAction'] = [
@@ -502,6 +523,15 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
             continue;
         }
         $postTimestamp = $timestampFromPost($post);
+        $postUpdatedRaw = trim((string) ($post->getMetadata()['Updated'] ?? ''));
+        $postUpdatedTs = $postUpdatedRaw !== '' ? strtotime($postUpdatedRaw) : false;
+        if ($postUpdatedTs === false) {
+            $postSitemapFile = __DIR__ . '/content/' . $post->getSlug() . '.md';
+            $postUpdatedTs = is_file($postSitemapFile) ? (int) filemtime($postSitemapFile) : false;
+        }
+        if ($postUpdatedTs !== false && ($postTimestamp === null || $postUpdatedTs > $postTimestamp)) {
+            $postTimestamp = (int) $postUpdatedTs;
+        }
         $imageUrl = nammu_resolve_asset($post->getImage(), $publicBaseUrl);
         $pushEntry([
             'loc' => '/' . rawurlencode($post->getSlug()),
@@ -646,12 +676,6 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
             ? nammu_fediverse_profile_alias_path($config, $publicBaseUrl)
             : '/actualidad.php';
         $pushEntry([
-            'loc' => '/actualidad.php',
-            'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
-            'changefreq' => 'hourly',
-            'priority' => 0.6,
-        ]);
-        $pushEntry([
             'loc' => $fediverseProfileAliasPath,
             'lastmod' => $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null,
             'changefreq' => 'hourly',
@@ -659,74 +683,7 @@ $buildSitemapEntries = static function (array $posts, array $theme, string $publ
         ]);
     }
 
-    $analytics = function_exists('nammu_load_analytics') ? nammu_load_analytics() : [];
-    $searchesDaily = $analytics['searches']['daily'] ?? [];
-    $searchPageLastMod = $analytics['updated_at'] ?? null;
-    if (is_int($searchPageLastMod) && $searchPageLastMod > 0) {
-        $searchPageLastMod = gmdate('c', $searchPageLastMod);
-    } else {
-        $searchPageLastMod = $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null;
-    }
-    $pushEntry([
-        'loc' => '/buscar.php',
-        'lastmod' => $searchPageLastMod,
-        'changefreq' => 'weekly',
-        'priority' => 0.6,
-    ]);
-
-    $searchTermCounts = [];
-    $searchTermLatest = [];
-    $today = new DateTimeImmutable('now');
-    $startKey = $today->modify('-29 days')->format('Y-m-d');
-    foreach ($searchesDaily as $day => $payload) {
-        if (!is_string($day) || $day < $startKey) {
-            continue;
-        }
-        if (!is_array($payload)) {
-            continue;
-        }
-        foreach ($payload as $term => $termData) {
-            $termKey = trim((string) $term);
-            if ($termKey === '') {
-                continue;
-            }
-            $count = 0;
-            if (is_array($termData)) {
-                $count = (int) ($termData['count'] ?? 0);
-            } else {
-                $count = (int) $termData;
-            }
-            if ($count <= 0) {
-                continue;
-            }
-            $searchTermCounts[$termKey] = ($searchTermCounts[$termKey] ?? 0) + $count;
-            $dayTs = strtotime($day);
-            if ($dayTs !== false) {
-                $searchTermLatest[$termKey] = isset($searchTermLatest[$termKey])
-                    ? max($searchTermLatest[$termKey], $dayTs)
-                    : $dayTs;
-            }
-        }
-    }
-    if (!empty($searchTermCounts)) {
-        $searchList = [];
-        foreach ($searchTermCounts as $term => $count) {
-            $searchList[] = ['term' => $term, 'count' => $count];
-        }
-        usort($searchList, static fn(array $a, array $b): int => $b['count'] <=> $a['count']);
-        $searchList = array_slice($searchList, 0, 10);
-        foreach ($searchList as $item) {
-            $term = $item['term'];
-            $termLast = $searchTermLatest[$term] ?? null;
-            $pushEntry([
-                'loc' => '/buscar.php?q=' . rawurlencode($term),
-                'lastmod' => $termLast !== null ? gmdate('c', $termLast) : $searchPageLastMod,
-                'changefreq' => 'weekly',
-                'priority' => 0.5,
-            ]);
-        }
-    }
-
+    // El buscador y sus términos son noindex: no van al sitemap.
     if ($isAlphabeticalOrder) {
         $letterGroups = nammu_group_items_by_letter($posts);
         $pushEntry([
@@ -1397,6 +1354,44 @@ if ($routePath === '/identity.txt') {
     exit;
 }
 
+if ($routePath === '/.well-known/tdmrep.json') {
+    // TDM Reservation Protocol: declaramos que no reservamos derechos de minería de textos y datos.
+    header('Content-Type: application/json; charset=UTF-8');
+    header('Cache-Control: public, max-age=86400');
+    echo json_encode(nammu_tdmrep_document($config, $publicBaseUrl), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
+}
+
+if ($routePath === '/llms-full.txt') {
+    // Todas las entradas públicas completas, en Markdown con front matter, para IAs y agentes.
+    $llmsFullBase = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '';
+    $llmsFullLicense = nammu_content_license($config);
+    $llmsFullParts = [
+        '# ' . $siteNameForMeta . ' — texto completo',
+        '',
+        ($homeDescription !== '' ? $homeDescription . "\n\n" : '') . 'Licencia de todo el contenido: ' . $llmsFullLicense['name'] . ' (' . $llmsFullLicense['spdx'] . '): ' . $llmsFullLicense['url'],
+        nammu_ai_policy_text($config),
+        'Índice y contexto: ' . $llmsFullBase . '/llms.txt · Sitemap: ' . $llmsFullBase . '/sitemap.xml · Generado: ' . gmdate('c'),
+        '',
+    ];
+    foreach ($contentRepository->all() as $llmsFullPost) {
+        if (!$llmsFullPost instanceof Post || $llmsFullPost->isDraft()) {
+            continue;
+        }
+        $llmsFullCanonical = $llmsFullBase . '/' . rawurlencode($llmsFullPost->getSlug());
+        $llmsFullFile = __DIR__ . '/content/' . $llmsFullPost->getSlug() . '.md';
+        $llmsFullParts[] = "\n\n========================================\n";
+        $llmsFullParts[] = nammu_post_markdown_document($llmsFullPost, $config, $llmsFullCanonical, [
+            'image' => (string) (nammu_resolve_asset($llmsFullPost->getImage(), $publicBaseUrl) ?? ''),
+            'modified_time' => is_file($llmsFullFile) ? gmdate('Y-m-d', (int) filemtime($llmsFullFile)) : '',
+        ]);
+    }
+    header('Content-Type: text/markdown; charset=UTF-8');
+    header('Cache-Control: public, max-age=3600');
+    echo implode("\n", $llmsFullParts);
+    exit;
+}
+
 if ($routePath === '/robots.txt') {
     $configBase = '';
     if (isset($config) && is_array($config)) {
@@ -1419,26 +1414,20 @@ if ($routePath === '/robots.txt') {
         '/private/',
         '/newsletters',
     ];
-    $aiUserAgents = [
-        'GPTBot',
-        'ChatGPT-User',
-        'OAI-SearchBot',
-        'ClaudeBot',
-        'Claude-User',
-        'Claude-SearchBot',
-        'Google-Extended',
-        'GoogleOther',
-        'GoogleOther-Image',
-        'GoogleOther-Video',
-        'Gemini',
-        'DeepSeekBot',
-        'DeepSeek',
-    ];
+    $aiUserAgents = nammu_ai_crawler_user_agents();
+    $robotsLicense = nammu_content_license($config);
     $lines = [
-        '# Archivos de contexto para IAs',
+        '# ' . $siteNameForMeta . ' — todo el contenido es de libre uso para buscadores e IAs.',
+        '# Licencia: ' . $robotsLicense['name'] . ' (' . $robotsLicense['spdx'] . ') ' . $robotsLicense['url'],
+        '# Política de uso por IAs, índice y texto completo:',
         'LLM: ' . $llmsUrl,
+        'LLM-Full: ' . ($base !== '' ? $base . '/llms-full.txt' : '/llms-full.txt'),
         'LLM-Posts: ' . $llmsPostsUrl,
         'Identity: ' . $identityUrl,
+        'TDM-Policy: ' . ($base !== '' ? $base . '/.well-known/tdmrep.json' : '/.well-known/tdmrep.json'),
+        '',
+        '# Content Signals (https://contentsignals.org): permitimos búsqueda, uso como contexto en respuestas de IA y entrenamiento.',
+        'Content-Signal: search=yes, ai-input=yes, ai-train=yes',
         '',
     ];
     foreach ($aiUserAgents as $agent) {
@@ -1450,9 +1439,11 @@ if ($routePath === '/robots.txt') {
         $lines[] = '';
     }
     $lines[] = 'User-agent: *';
+    $lines[] = 'Allow: /';
     foreach ($blockedRobotPaths as $path) {
         $lines[] = 'Disallow: ' . $path;
     }
+    $lines[] = '';
     $lines[] = 'Sitemap: ' . $sitemapUrl;
     $robotsText = implode("\n", $lines) . "\n";
     header('Content-Type: text/plain; charset=UTF-8');
@@ -1629,12 +1620,36 @@ if (preg_match('#^/podcast/([^/]+)/?$#i', $routePath, $podcastEpisodeMatch)) {
             : '',
     ]);
 
+    $episodeJsonLd = [
+        '@context' => 'https://schema.org',
+        '@type' => 'PodcastEpisode',
+        'name' => $episodeTitle,
+        'url' => $episodeCanonical,
+        'description' => $episodeDescription,
+        'inLanguage' => $siteLang,
+        'license' => $contentLicenseForJsonLd['url'],
+        'isAccessibleForFree' => true,
+        'partOfSeries' => [
+            '@type' => 'PodcastSeries',
+            'name' => $siteNameForMeta . ' — Podcast',
+            'url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/podcast',
+        ],
+    ];
+    if ($episodeDateTs !== false) {
+        $episodeJsonLd['datePublished'] = gmdate('c', (int) $episodeDateTs);
+    }
+    if ($episodeImage) {
+        $episodeJsonLd['image'] = $episodeImage;
+    }
+    if ($audioUrl !== '') {
+        $episodeJsonLd['associatedMedia'] = ['@type' => 'AudioObject', 'contentUrl' => $audioUrl, 'encodingFormat' => 'audio/mpeg'];
+    }
     echo $renderer->render('layout', [
         'pageTitle' => $episodeTitle . ' — Podcast',
         'metaDescription' => $episodeDescription !== '' ? $episodeDescription : 'Episodio de podcast.',
         'content' => $content,
         'socialMeta' => $episodeSocialMeta,
-        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'jsonLd' => [$siteJsonLd, $orgJsonLd, $episodeJsonLd],
         'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
@@ -1691,12 +1706,22 @@ if (preg_match('#^/podcast/?$#i', $routePath) || ($isHomeRoute && $homeContentMo
         'image' => $podcastHomeImage,
         'site_name' => $siteNameForMeta,
     ], $socialConfig);
+    $podcastSeriesJsonLd = [
+        '@context' => 'https://schema.org',
+        '@type' => 'PodcastSeries',
+        'name' => $siteNameForMeta . ' — Podcast',
+        'url' => $canon,
+        'description' => $description,
+        'inLanguage' => $siteLang,
+        'license' => $contentLicenseForJsonLd['url'],
+        'webFeed' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/podcast.xml',
+    ];
     echo $renderer->render('layout', [
         'pageTitle' => ($isHomeRoute && $homeContentMode === 'podcast') ? '' : 'Podcast',
         'metaDescription' => $description,
         'content' => $content,
         'socialMeta' => $podcastMeta,
-        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'jsonLd' => [$siteJsonLd, $orgJsonLd, $podcastSeriesJsonLd],
         'pageLang' => $siteLang,
         'showLogo' => !($isHomeRoute && $homeContentMode === 'podcast'),
     ]);
@@ -2263,12 +2288,29 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
         ['name' => $itinerary->getTitle(), 'url' => $itineraryUrl],
         ['name' => $topic->getTitle(), 'url' => $topicUrl],
     ]);
+    $topicJsonLd = [
+        '@context' => 'https://schema.org',
+        '@type' => 'LearningResource',
+        'name' => $topic->getTitle(),
+        'description' => $topicDescription,
+        'url' => $topicUrl,
+        'inLanguage' => $siteLang,
+        'license' => $contentLicenseForJsonLd['url'],
+        'isAccessibleForFree' => true,
+        'learningResourceType' => 'Lesson',
+        'position' => (int) $topic->getNumber(),
+        'isPartOf' => ['@type' => 'Course', 'name' => $itinerary->getTitle(), 'url' => $itineraryUrl],
+        'provider' => ['@type' => 'Organization', 'name' => $siteNameForMeta],
+    ];
+    if ($topicImage) {
+        $topicJsonLd['image'] = $topicImage;
+    }
     echo $renderer->render('layout', [
         'pageTitle' => $topic->getTitle() . ' — ' . $itinerary->getTitle(),
         'metaDescription' => $topicDescription,
         'content' => $content,
         'socialMeta' => $topicSocialMeta,
-        'jsonLd' => [$siteJsonLd, $orgJsonLd, $breadcrumbJsonLd],
+        'jsonLd' => [$siteJsonLd, $orgJsonLd, $breadcrumbJsonLd, $topicJsonLd],
         'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
@@ -2768,12 +2810,34 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
         $bottomBoxes .= (string) ob_get_clean();
     }
     $content = $itineraryBody . $presentationQuizHtml . $topicsHtml . $bottomBoxes;
+    $courseJsonLd = [
+        '@context' => 'https://schema.org',
+        '@type' => 'Course',
+        'name' => $itinerary->getTitle(),
+        'description' => $itineraryDescription,
+        'url' => $buildItineraryUrl($itinerary),
+        'inLanguage' => $siteLang,
+        'license' => $contentLicenseForJsonLd['url'],
+        'isAccessibleForFree' => true,
+        'provider' => ['@type' => 'Organization', 'name' => $siteNameForMeta, 'url' => $publicBaseUrl !== '' ? $publicBaseUrl : $homeUrl],
+        'hasCourseInstance' => [['@type' => 'CourseInstance', 'courseMode' => 'online', 'courseWorkload' => 'PT' . max(1, count($topics)) . 'H']],
+        'numberOfLessons' => count($topics),
+        'syllabusSections' => array_values(array_map(static fn (array $summary): array => [
+            '@type' => 'Syllabus',
+            'name' => (string) ($summary['title'] ?? ''),
+            'description' => (string) ($summary['description'] ?? ''),
+            'url' => preg_replace('/[?&]p=[^&]*/', '', (string) ($summary['url'] ?? '')),
+        ], $topicSummaries)),
+    ];
+    if ($itineraryImage) {
+        $courseJsonLd['image'] = $itineraryImage;
+    }
     echo $renderer->render('layout', [
         'pageTitle' => $itinerary->getTitle(),
         'metaDescription' => $itineraryDescription,
         'content' => $content,
         'socialMeta' => $itinerarySocialMeta,
-        'jsonLd' => [$siteJsonLd, $orgJsonLd, $breadcrumbJsonLd],
+        'jsonLd' => [$siteJsonLd, $orgJsonLd, $breadcrumbJsonLd, $courseJsonLd],
         'pageLang' => $siteLang,
         'showLogo' => true,
     ]);
@@ -3225,6 +3289,14 @@ if ($currentPage < 1) {
 }
 
 if ($slug !== null && $slug !== '') {
+    // Versión Markdown: /{slug}.md o Accept: text/markdown. Pensada para IAs y agentes.
+    $wantsMarkdown = false;
+    if (preg_match('/^(.+)\.md$/i', $slug, $markdownSlugMatch) === 1) {
+        $slug = $markdownSlugMatch[1];
+        $wantsMarkdown = true;
+    } elseif (nammu_client_prefers_markdown()) {
+        $wantsMarkdown = true;
+    }
     $post = $contentRepository->findBySlug($slug);
     if (!$post) {
         $renderNotFound('Contenido no encontrado', 'La página solicitada no se encuentra disponible.', $routePath);
@@ -3233,6 +3305,28 @@ if ($slug !== null && $slug !== '') {
     $postVisibility = strtolower(trim((string) ($post->getMetadata()['Visibility'] ?? $post->getMetadata()['visibility'] ?? 'public')));
     if ($postTemplateName === 'page' && in_array($postVisibility, ['private', 'privada', '1', 'true', 'yes', 'on'], true) && !$isAdminLogged) {
         $renderNotFound('Contenido no encontrado', 'La página solicitada no se encuentra disponible.', $routePath);
+    }
+    if ($post->isDraft() && !$isAdminLogged && !(isset($_GET['preview']) && $_GET['preview'] === '1')) {
+        // Los borradores no se sirven al público ni a los rastreadores.
+        $renderNotFound('Contenido no encontrado', 'La página solicitada no se encuentra disponible.', $routePath);
+    }
+    if ($wantsMarkdown) {
+        if ($post->isDraft()) {
+            $renderNotFound('Contenido no encontrado', 'La página solicitada no se encuentra disponible.', $routePath);
+        }
+        $markdownCanonical = ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/' . rawurlencode($post->getSlug());
+        $markdownFile = __DIR__ . '/content/' . $post->getSlug() . '.md';
+        $markdownModified = is_file($markdownFile) ? (int) filemtime($markdownFile) : time();
+        header('Content-Type: text/markdown; charset=UTF-8');
+        header('Link: <' . $markdownCanonical . '>; rel="canonical"; type="text/html"', false);
+        header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $markdownModified) . ' GMT');
+        header('Cache-Control: public, max-age=3600');
+        header('Vary: Accept');
+        echo nammu_post_markdown_document($post, $config, $markdownCanonical, [
+            'image' => (string) (nammu_resolve_asset($post->getImage(), $publicBaseUrl) ?? ''),
+            'modified_time' => gmdate('Y-m-d', $markdownModified),
+        ]);
+        exit;
     }
 
     $documentData = $markdown->convertDocument($post->getContent());
@@ -3381,15 +3475,26 @@ if ($slug !== null && $slug !== '') {
         $postLang = $siteLang;
     }
     $publishedTime = $post->getDate() ? $post->getDate()->format('c') : '';
-    $modifiedTime = is_file($postFilePath) ? gmdate('c', filemtime($postFilePath)) : '';
+    $postUpdatedRaw = trim((string) ($post->getMetadata()['Updated'] ?? ''));
+    $postUpdatedTs = $postUpdatedRaw !== '' ? strtotime($postUpdatedRaw) : false;
+    $modifiedTime = $postUpdatedTs !== false
+        ? gmdate('c', (int) $postUpdatedTs)
+        : (is_file($postFilePath) ? gmdate('c', filemtime($postFilePath)) : '');
     $authorName = trim((string) ($configData['site_author'] ?? $siteNameForMeta));
+    $postIsPage = $postTemplateName === 'page';
+    $postWordCount = str_word_count(strip_tags($converted));
     $postJsonLd = [
         '@context' => 'https://schema.org',
-        '@type' => 'Article',
+        '@type' => $postIsPage ? 'WebPage' : 'BlogPosting',
         'headline' => $post->getTitle(),
+        'name' => $post->getTitle(),
         'description' => $postDescription,
-        'mainEntityOfPage' => $postCanonical,
+        'url' => $postCanonical,
+        'mainEntityOfPage' => ['@type' => 'WebPage', '@id' => $postCanonical],
         'inLanguage' => $postLang,
+        'license' => $contentLicenseForJsonLd['url'],
+        'isAccessibleForFree' => true,
+        'wordCount' => $postWordCount,
     ];
     if ($publishedTime !== '') {
         $postJsonLd['datePublished'] = $publishedTime;
@@ -3400,15 +3505,30 @@ if ($slug !== null && $slug !== '') {
     if ($postImage !== null && $postImage !== '') {
         $postJsonLd['image'] = $postImage;
     }
+    if ($post->getCategory() !== '') {
+        $postJsonLd['articleSection'] = $post->getCategory();
+        $postJsonLd['keywords'] = $post->getCategory();
+    }
     if ($authorName !== '') {
+        // Persona u organización: se puede fijar con site_author_type (person|organization); si no, se deduce del nombre.
+        $configuredAuthorType = strtolower(trim((string) ($configData['site_author_type'] ?? '')));
+        $authorLooksLikeOrganization = strcasecmp($authorName, $siteNameForMeta) === 0
+            || preg_match('/\b(fundaci[oó]n|asociaci[oó]n|cooperativa|s\.?\s?coop|colectivo|grupo|red|instituto|centro|ayuntamiento|universidad|editorial|revista|comunidad|plataforma|s\.?l\.?|s\.?a\.?|ong)\b/iu', $authorName) === 1;
         $postJsonLd['author'] = [
-            '@type' => 'Person',
+            '@type' => $configuredAuthorType === 'organization' || ($configuredAuthorType !== 'person' && $authorLooksLikeOrganization) ? 'Organization' : 'Person',
             'name' => $authorName,
+            'url' => $publicBaseUrl !== '' ? $publicBaseUrl : $homeUrl,
         ];
     }
     if (!empty($orgJsonLd)) {
-        $postJsonLd['publisher'] = $orgJsonLd;
+        $postPublisher = $orgJsonLd;
+        unset($postPublisher['@context']);
+        $postJsonLd['publisher'] = $postPublisher;
     }
+    $postBreadcrumbJsonLd = $buildBreadcrumbJsonLd(array_values(array_filter([
+        $post->getCategory() !== '' && !$postIsPage ? ['name' => $post->getCategory(), 'url' => ($publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') : '') . '/categoria/' . rawurlencode(nammu_slugify_label($post->getCategory()))] : null,
+        ['name' => $post->getTitle(), 'url' => $postCanonical],
+    ])));
     $postSocialMeta = nammu_build_social_meta([
         'type' => 'article',
         'title' => $post->getTitle(),
@@ -3419,16 +3539,28 @@ if ($slug !== null && $slug !== '') {
         'published_time' => $publishedTime,
         'modified_time' => $modifiedTime,
         'author' => $authorName,
+        'section' => $post->getCategory(),
+        'locale' => str_replace('-', '_', $postLang === 'es' ? 'es_ES' : $postLang),
     ], $socialConfig);
+    $postActivityPubUrl = '';
+    if (!$postIsPage && function_exists('nammu_fediverse_base_url')) {
+        $postActivityPubUrl = nammu_fediverse_base_url($configData) . '/ap/objects/' . rawurlencode($postTemplateName !== '' ? $postTemplateName : 'post') . '-' . rawurlencode($post->getSlug());
+    }
+    if (!headers_sent() && $modifiedTime !== '') {
+        header('Last-Modified: ' . gmdate('D, d M Y H:i:s', (int) strtotime($modifiedTime)) . ' GMT');
+    }
 
     echo $renderer->render('layout', [
         'pageTitle' => $post->getTitle(),
-        'metaDescription' => $post->getDescription() !== '' ? $post->getDescription() : $siteDescription,
+        'metaDescription' => $postDescription,
         'content' => $content,
         'socialMeta' => $postSocialMeta,
-        'jsonLd' => [$siteJsonLd, $orgJsonLd, $postJsonLd],
+        'jsonLd' => [$siteJsonLd, $orgJsonLd, $postJsonLd, $postBreadcrumbJsonLd],
         'pageLang' => $postLang,
         'showLogo' => true,
+        'metaRobots' => $post->isDraft() ? 'noindex, nofollow' : '',
+        'markdownAlternateUrl' => $postCanonical . '.md',
+        'activityPubObjectUrl' => $postActivityPubUrl,
     ]);
     exit;
 }

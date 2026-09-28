@@ -54,7 +54,7 @@ function admin_build_sitemap_entries(array $posts, array $theme, string $publicB
     };
     $settings = get_settings();
     $sortOrder = strtolower(trim((string) ($settings['sort_order'] ?? 'date')));
-    $isAlphabeticalOrder = $sortOrder === 'alphabetical';
+    $isAlphabeticalOrder = in_array($sortOrder, ['alpha', 'alphabetical'], true);
     $podcastItems = nammu_collect_podcast_items(NAMMU_ROOT . '/content', $publicBaseUrl);
     $hasPodcast = !empty($podcastItems);
 
@@ -99,6 +99,15 @@ function admin_build_sitemap_entries(array $posts, array $theme, string $publicB
             continue;
         }
         $postTimestamp = $timestampFromPost($post);
+        $postUpdatedRaw = trim((string) ($post->getMetadata()['Updated'] ?? ''));
+        $postUpdatedTs = $postUpdatedRaw !== '' ? strtotime($postUpdatedRaw) : false;
+        if ($postUpdatedTs === false) {
+            $postSitemapFile = NAMMU_ROOT . '/content/' . $post->getSlug() . '.md';
+            $postUpdatedTs = is_file($postSitemapFile) ? (int) filemtime($postSitemapFile) : false;
+        }
+        if ($postUpdatedTs !== false && ($postTimestamp === null || $postUpdatedTs > $postTimestamp)) {
+            $postTimestamp = (int) $postUpdatedTs;
+        }
         $imageUrl = nammu_resolve_asset($post->getImage(), $publicBaseUrl);
         $entries[] = [
             'loc' => '/' . rawurlencode($post->getSlug()),
@@ -237,66 +246,7 @@ function admin_build_sitemap_entries(array $posts, array $theme, string $publicB
         ];
     }
 
-    $analytics = function_exists('nammu_load_analytics') ? nammu_load_analytics() : [];
-    $searchesDaily = $analytics['searches']['daily'] ?? [];
-    $searchPageLastMod = $analytics['updated_at'] ?? null;
-    if (is_int($searchPageLastMod) && $searchPageLastMod > 0) {
-        $searchPageLastMod = gmdate('c', $searchPageLastMod);
-    } else {
-        $searchPageLastMod = $latestTimestamp !== null ? gmdate('c', $latestTimestamp) : null;
-    }
-    $entries[] = [
-        'loc' => '/buscar.php',
-        'lastmod' => $searchPageLastMod,
-        'changefreq' => 'weekly',
-        'priority' => 0.6,
-    ];
-
-    $searchTermCounts = [];
-    $searchTermLatest = [];
-    $today = new DateTimeImmutable('now');
-    $startKey = $today->modify('-29 days')->format('Y-m-d');
-    foreach ($searchesDaily as $day => $payload) {
-        if (!is_string($day) || $day < $startKey || !is_array($payload)) {
-            continue;
-        }
-        foreach ($payload as $term => $termData) {
-            $termKey = trim((string) $term);
-            if ($termKey === '') {
-                continue;
-            }
-            $count = is_array($termData) ? (int) ($termData['count'] ?? 0) : (int) $termData;
-            if ($count <= 0) {
-                continue;
-            }
-            $searchTermCounts[$termKey] = ($searchTermCounts[$termKey] ?? 0) + $count;
-            $dayTs = strtotime($day);
-            if ($dayTs !== false) {
-                $searchTermLatest[$termKey] = isset($searchTermLatest[$termKey])
-                    ? max($searchTermLatest[$termKey], $dayTs)
-                    : $dayTs;
-            }
-        }
-    }
-    if (!empty($searchTermCounts)) {
-        $searchList = [];
-        foreach ($searchTermCounts as $term => $count) {
-            $searchList[] = ['term' => $term, 'count' => $count];
-        }
-        usort($searchList, static fn(array $a, array $b): int => $b['count'] <=> $a['count']);
-        $searchList = array_slice($searchList, 0, 10);
-        foreach ($searchList as $item) {
-            $term = $item['term'];
-            $termLast = $searchTermLatest[$term] ?? null;
-            $entries[] = [
-                'loc' => '/buscar.php?q=' . rawurlencode($term),
-                'lastmod' => $termLast !== null ? gmdate('c', $termLast) : $searchPageLastMod,
-                'changefreq' => 'weekly',
-                'priority' => 0.5,
-            ];
-        }
-    }
-
+    // El buscador y sus términos son noindex: no van al sitemap.
     if ($isAlphabeticalOrder) {
         $letterGroups = nammu_group_items_by_letter($posts);
         $entries[] = [

@@ -17,7 +17,10 @@
     RewriteRule ^podcast\.xml$ index.php [L]
     RewriteRule ^llms\.txt$ index.php [L]
     RewriteRule ^llms-posts\.txt$ index.php [L]
+    RewriteRule ^llms-full\.txt$ index.php [L]
     RewriteRule ^identity\.txt$ index.php [L]
+    RewriteRule ^robots\.txt$ index.php [L]
+    RewriteRule ^\.well-known/tdmrep\.json$ index.php [L]
     RewriteRule ^itinerarios(/.*)?$ index.php [L]
     RewriteRule ^avisos/?$ avisos.php [L]
     RewriteRule ^correos/?$ correos.php [L]
@@ -40,10 +43,19 @@
 # Prevent file browsing
 Options -Indexes -MultiViews
 
+# Compresión de texto: menos bytes para rastreadores y lectores.
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/markdown text/css text/javascript application/javascript application/json application/ld+json application/xml application/rss+xml application/activity+json application/jrd+json image/svg+xml
+</IfModule>
+
 <IfModule mod_headers.c>
     Header append Vary Accept env=serve_webp
-    <FilesMatch "\.(?:css|js|mjs|json|xml|txt|svg|ico|gif|jpe?g|png|webp|avif|mp4|webm|ogv|mp3|wav|m4a|flac|pdf|woff2?|ttf|otf)$">
+    # Los XML y TXT (feeds, sitemap, robots, llms) cambian a menudo: no deben quedar un mes en caché.
+    <FilesMatch "\.(?:css|js|mjs|json|svg|ico|gif|jpe?g|png|webp|avif|mp4|webm|ogv|mp3|wav|m4a|flac|pdf|woff2?|ttf|otf)$">
         Header set Cache-Control "public, max-age=2592000, immutable"
+    </FilesMatch>
+    <FilesMatch "\.(?:xml|txt)$">
+        Header set Cache-Control "public, max-age=3600"
     </FilesMatch>
 </IfModule>
 
@@ -53,8 +65,8 @@ Options -Indexes -MultiViews
     ExpiresByType application/javascript "access plus 1 month"
     ExpiresByType text/javascript "access plus 1 month"
     ExpiresByType application/json "access plus 1 month"
-    ExpiresByType application/xml "access plus 1 month"
-    ExpiresByType application/rss+xml "access plus 1 month"
+    ExpiresByType application/xml "access plus 1 hour"
+    ExpiresByType application/rss+xml "access plus 1 hour"
     ExpiresByType image/jpeg "access plus 1 month"
     ExpiresByType image/png "access plus 1 month"
     ExpiresByType image/gif "access plus 1 month"

@@ -87,6 +87,10 @@ Nammu cabe en una carpeta. Se instala clonando un repositorio en cualquier hosti
 
 **Estadísticas y RGPD**
 
+- Señales para buscadores e IAs, todas automáticas: meta robots con `max-snippet:-1` y `max-image-preview:large`, descripción propia por página, JSON-LD (`WebSite` con búsqueda, `Organization` con `sameAs`, `BlogPosting`/`WebPage` con licencia, autor, fechas y categoría, `BreadcrumbList`, `Course` y `LearningResource` en itinerarios, `PodcastSeries`/`PodcastEpisode`), microformato `h-entry`, `rel=me`, `fediverse:creator`, `rel=alternate` al objeto ActivityPub y a la versión Markdown de cada entrada.
+- Licencia de los contenidos y política de uso por IAs (por defecto EUPL 1.2 y uso libre con cita rogada; configurable en Configuración): `rel=license` y `<meta name="license">` en cada página, cabecera `Link rel=license`, TDM Reservation Protocol (`tdm-reservation: 0` en cabeceras y `<meta>`, `/.well-known/tdmrep.json`), `Content-Signal: search=yes, ai-input=yes, ai-train=yes` y bloques `Allow: /` para todos los rastreadores de IA conocidos en `robots.txt` (dinámico), `<copyright>` en el RSS.
+- Ficheros para IAs: `llms.txt` (índice, licencia, cómo leer el sitio), `llms-full.txt` (todas las entradas completas en Markdown con front matter), `llms-posts.txt` (archivo cronológico paginado), `identity.txt` (identidad, perfiles, contacto, licencia). Cada entrada tiene versión Markdown en `/{slug}.md` o pidiendo `Accept: text/markdown`.
+- Sitemap con `lastmod` real (`Updated` o fecha del fichero) y sin el buscador (noindex); borradores con 404 para el público; IndexNow envía la entrada, la portada y el sitemap.
 - Dashboard propio sin cookies ni consentimiento: el visitante único del día es un hash de IP + navegador con una sal que cambia cada día y no se conserva (método Plausible); la página vista la envía un beacon JS a `/__estadisticas` con un descriptor firmado. Los bots se cuentan por User-Agent. Sin analítica de terceros.
 - Integración opcional con Google Search Console y Bing Webmaster Tools.
 

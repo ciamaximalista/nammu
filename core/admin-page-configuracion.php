@@ -112,6 +112,13 @@
         $contactSignature = ($contactSettings['signature'] ?? 'off') === 'on';
         $contactSignatureFields = is_array($contactSettings['signature_fields'] ?? null) ? $contactSettings['signature_fields'] : [];
         $euplNoticeEnabled = ($settings['eupl_notice'] ?? 'on') === 'on';
+        $contentLicenseSettings = is_array($settings['content_license'] ?? null) ? $settings['content_license'] : [];
+        $contentLicenseDefaults = function_exists('nammu_content_license') ? nammu_content_license([]) : ['name' => '', 'url' => '', 'spdx' => ''];
+        $contentLicenseName = trim((string) ($contentLicenseSettings['name'] ?? ''));
+        $contentLicenseUrl = trim((string) ($contentLicenseSettings['url'] ?? ''));
+        $contentLicenseSpdx = trim((string) ($contentLicenseSettings['spdx'] ?? ''));
+        $aiPolicyText = trim((string) ($settings['ai_policy'] ?? ''));
+        $aiPolicyDefault = function_exists('nammu_ai_policy_text') ? nammu_ai_policy_text([]) : '';
         $multiInstanceSettings = is_array($settings['multi_instance'] ?? null) ? $settings['multi_instance'] : [];
         $multiInstanceEnabled = ($multiInstanceSettings['enabled'] ?? 'off') === 'on';
         $multiInstanceCluster = trim((string) ($multiInstanceSettings['cluster'] ?? ''));
@@ -241,6 +248,32 @@
                 <div class="custom-control custom-checkbox">
                     <input type="checkbox" class="custom-control-input" id="eupl_notice" name="eupl_notice" <?= $euplNoticeEnabled ? 'checked' : '' ?>>
                     <label class="custom-control-label" for="eupl_notice">Mostrar la referencia a la licencia EUPL en el bloque de Nammu del pie</label>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h4 class="mt-0">Licencia de los contenidos y uso por IAs</h4>
+                    <p class="text-muted mb-3">Se declara en cada página (rel=license y datos estructurados), en robots.txt, llms.txt, identity.txt, el RSS y el protocolo TDM. Déjalo vacío para usar el valor por defecto del clúster: <?= htmlspecialchars((string) ($contentLicenseDefaults['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>.</p>
+                    <div class="form-row">
+                        <div class="form-group col-md-5">
+                            <label for="content_license_name">Nombre de la licencia</label>
+                            <input type="text" class="form-control" id="content_license_name" name="content_license_name" value="<?= htmlspecialchars($contentLicenseName, ENT_QUOTES, 'UTF-8') ?>" placeholder="<?= htmlspecialchars((string) ($contentLicenseDefaults['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                        </div>
+                        <div class="form-group col-md-5">
+                            <label for="content_license_url">URL del texto legal</label>
+                            <input type="url" class="form-control" id="content_license_url" name="content_license_url" value="<?= htmlspecialchars($contentLicenseUrl, ENT_QUOTES, 'UTF-8') ?>" placeholder="<?= htmlspecialchars((string) ($contentLicenseDefaults['url'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                        </div>
+                        <div class="form-group col-md-2">
+                            <label for="content_license_spdx">Código SPDX</label>
+                            <input type="text" class="form-control" id="content_license_spdx" name="content_license_spdx" value="<?= htmlspecialchars($contentLicenseSpdx, ENT_QUOTES, 'UTF-8') ?>" placeholder="<?= htmlspecialchars((string) ($contentLicenseDefaults['spdx'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                        </div>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="ai_policy">Política de uso por IAs y buscadores</label>
+                        <textarea class="form-control" id="ai_policy" name="ai_policy" rows="4" placeholder="<?= htmlspecialchars($aiPolicyDefault, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($aiPolicyText, ENT_QUOTES, 'UTF-8') ?></textarea>
+                        <small class="form-text text-muted">Texto que leen las IAs en llms.txt, identity.txt y las versiones Markdown. Vacío = texto por defecto (uso libre, cita rogada).</small>
+                    </div>
                 </div>
             </div>
 

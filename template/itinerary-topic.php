@@ -210,10 +210,15 @@ $topicPassed = in_array($topic->getSlug(), $progressPassed, true);
 $usageLogic = $usageLogic ?? Itinerary::USAGE_LOGIC_FREE;
 $quizRequired = $usageLogic === Itinerary::USAGE_LOGIC_ASSESSMENT && $quizAvailable;
 $ctaLocked = $quizRequired && !$topicPassed && $nextStep !== null;
-$shuffledQuestions = $quizQuestions;
+$shuffledQuestions = [];
+foreach (array_values($quizQuestions) as $questionIndex => $questionItem) {
+    $shuffledQuestions[] = ['index' => $questionIndex, 'question' => $questionItem];
+}
 if ($quizAvailable) {
     shuffle($shuffledQuestions);
 }
+$progressToken = trim((string) ($progressToken ?? ''));
+$quizEndpoint = trim((string) ($quizEndpoint ?? ''));
 ?>
 
 <?= $headerButtonsHtml ?>
@@ -226,28 +231,35 @@ if ($quizAvailable) {
         data-topic-slug="<?= htmlspecialchars($topic->getSlug(), ENT_QUOTES, 'UTF-8') ?>"
         data-min-correct="<?= (int) $minimumCorrect ?>"
         data-usage-logic="<?= htmlspecialchars($usageLogic, ENT_QUOTES, 'UTF-8') ?>"
+        data-quiz-endpoint="<?= htmlspecialchars($quizEndpoint, ENT_QUOTES, 'UTF-8') ?>"
+        data-progress-token="<?= htmlspecialchars($progressToken, ENT_QUOTES, 'UTF-8') ?>"
     >
         <div class="itinerary-quiz__header">
             <h2>Autoevaluación del tema</h2>
             <p>Debes acertar al menos <?= (int) $minimumCorrect ?> de <?= (int) $questionCount ?> preguntas para continuar.</p>
         </div>
         <div class="itinerary-quiz__body">
-            <?php foreach ($shuffledQuestions as $index => $question): ?>
+            <?php foreach ($shuffledQuestions as $index => $questionEntry): ?>
                 <?php
-                $answers = $question['answers'] ?? [];
+                $question = $questionEntry['question'];
+                $answers = [];
+                foreach (array_values((array) ($question['answers'] ?? [])) as $answerIndex => $answer) {
+                    $answers[] = ['index' => $answerIndex, 'answer' => $answer];
+                }
                 shuffle($answers);
                 ?>
-                <article class="itinerary-quiz__question" data-quiz-question>
+                <article class="itinerary-quiz__question" data-quiz-question data-question-index="<?= (int) $questionEntry['index'] ?>">
                     <h3>Pregunta <?= $index + 1 ?></h3>
                     <p><?= htmlspecialchars($question['text'] ?? '', ENT_QUOTES, 'UTF-8') ?></p>
                     <ul class="itinerary-quiz__answers">
-                        <?php foreach ($answers as $answerIndex => $answer): ?>
+                        <?php foreach ($answers as $answerEntry): ?>
+                            <?php $answer = $answerEntry['answer']; ?>
                             <li>
                                 <label>
                                     <input
                                         type="checkbox"
                                         data-quiz-answer
-                                        data-correct="<?= !empty($answer['correct']) ? '1' : '0' ?>"
+                                        data-answer-index="<?= (int) $answerEntry['index'] ?>"
                                         value="1"
                                     >
                                     <span><?= htmlspecialchars($answer['text'] ?? '', ENT_QUOTES, 'UTF-8') ?></span>
@@ -273,11 +285,12 @@ if ($quizAvailable) {
     data-usage-logic="<?= htmlspecialchars($usageLogic, ENT_QUOTES, 'UTF-8') ?>"
     data-requires-quiz="<?= $quizRequired ? '1' : '0' ?>"
     data-initial-passed="<?= $topicPassed ? '1' : '0' ?>"
+    data-progress-token="<?= htmlspecialchars($progressToken, ENT_QUOTES, 'UTF-8') ?>"
 >
     <div class="itinerary-topic-cta__wrapper">
         <div class="itinerary-topic-cta__info">
             <p class="itinerary-topic-cta__breadcrumbs">
-                <a href="<?= htmlspecialchars($itineraryUrl($itinerary), ENT_QUOTES, 'UTF-8') ?>">
+                <a href="<?= htmlspecialchars(trim((string) ($itineraryProgressUrl ?? '')) !== '' ? (string) $itineraryProgressUrl : $itineraryUrl($itinerary), ENT_QUOTES, 'UTF-8') ?>" data-topic-link>
                     <?= htmlspecialchars($itinerary->getTitle(), ENT_QUOTES, 'UTF-8') ?>
                 </a>
                 &rsaquo; Tema <?= (int) $topic->getNumber() ?>
@@ -310,6 +323,7 @@ if ($quizAvailable) {
                 <a
                     class="button button-secondary"
                     href="<?= htmlspecialchars($previousStep['url'], ENT_QUOTES, 'UTF-8') ?>"
+                    data-topic-link
                 >
                     <?= htmlspecialchars($previousStep['label'], ENT_QUOTES, 'UTF-8') ?>
                 </a>

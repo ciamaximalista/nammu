@@ -87,7 +87,7 @@ Nammu cabe en una carpeta. Se instala clonando un repositorio en cualquier hosti
 
 **Estadísticas y RGPD**
 
-- Dashboard propio; consentimiento de cookies obligatorio para humanos; sin analítica de terceros.
+- Dashboard propio sin cookies ni consentimiento: el visitante único del día es un hash de IP + navegador con una sal que cambia cada día y no se conserva (método Plausible); la página vista la envía un beacon JS a `/__estadisticas` con un descriptor firmado. Los bots se cuentan por User-Agent. Sin analítica de terceros.
 - Integración opcional con Google Search Console y Bing Webmaster Tools.
 
 **Redes sociales**
@@ -512,7 +512,7 @@ Tres atajos útiles:
 2. Elige la lógica: `free` (temas en cualquier orden), `sequential` (cada tema desbloquea el siguiente) o `assessment` (con evaluación).
 3. Añade temas: número, título, descripción, imagen, contenido Markdown y quiz opcional. Cada tema se puede duplicar o borrar desde la misma pestaña.
 
-El navegador del lector guarda por cookies los temas visitados y aprobados; “Comenzar itinerario” retoma el último progreso. El modal de estadísticas muestra lectores de la presentación, iniciados (quienes superaron el tema 1) y porcentaje por tema; **Poner estadísticas a cero** limpia `stats.json`.
+El progreso del lector (temas leídos y autoevaluaciones superadas) viaja en un token firmado (HMAC) que va en los enlaces entre temas (`?p=`) y se guarda en `localStorage`, sin cookies; en los modos secuencial y de evaluación el servidor sólo sirve un tema si el token prueba que el anterior está completado, y las autoevaluaciones se corrigen en el servidor (`/__autoevaluacion`), no en el navegador. “Comenzar itinerario” retoma el último progreso. El modal de estadísticas muestra lectores de la presentación, iniciados (quienes superaron el tema 1) y porcentaje por tema; **Poner estadísticas a cero** limpia `stats.json`.
 
 ### Fediverso en el día a día
 

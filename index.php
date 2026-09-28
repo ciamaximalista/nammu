@@ -47,6 +47,49 @@ if (preg_match('/^\/indexnow-([a-f0-9]+)\.txt$/i', $requestPath, $match)) {
     }
 }
 
+if ($requestPath === nammu_stats_beacon_path()) {
+    // Beacon de estadísticas sin cookies: la página vista llega con un descriptor firmado el mismo día.
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+        http_response_code(405);
+        header('Allow: POST');
+        exit;
+    }
+    http_response_code(204);
+    $beaconAgent = (string) ($_SERVER['HTTP_USER_AGENT'] ?? '');
+    if ($beaconAgent === '' || nammu_is_crawler_user_agent($beaconAgent)) {
+        exit;
+    }
+    $beaconRaw = (string) file_get_contents('php://input');
+    $beaconPayload = json_decode($beaconRaw, true);
+    if (!is_array($beaconPayload)) {
+        exit;
+    }
+    $beaconDescriptor = nammu_stats_beacon_descriptor_decode((string) ($beaconPayload['pv'] ?? ''));
+    if ($beaconDescriptor === null) {
+        exit;
+    }
+    $beaconPageUrl = trim((string) ($beaconPayload['url'] ?? ''));
+    $beaconHost = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    $beaconPageHost = $beaconPageUrl !== '' ? strtolower((string) parse_url($beaconPageUrl, PHP_URL_HOST)) : '';
+    if ($beaconPageHost !== '' && $beaconHost !== '' && $beaconPageHost !== preg_replace('/:\d+$/', '', $beaconHost)) {
+        exit;
+    }
+    $beaconQuery = [];
+    $beaconQueryString = $beaconPageUrl !== '' ? (string) parse_url($beaconPageUrl, PHP_URL_QUERY) : '';
+    if ($beaconQueryString !== '') {
+        parse_str($beaconQueryString, $beaconQuery);
+    }
+    $beaconReferrer = trim((string) ($beaconPayload['ref'] ?? ''));
+    if (strlen($beaconReferrer) > 2048 || !preg_match('#^https?://#i', $beaconReferrer)) {
+        $beaconReferrer = '';
+    }
+    nammu_record_visit($beaconReferrer, is_array($beaconQuery) ? $beaconQuery : []);
+    if ($beaconDescriptor['type'] !== '' && $beaconDescriptor['slug'] !== '') {
+        nammu_record_pageview_now($beaconDescriptor['type'], $beaconDescriptor['slug'], $beaconDescriptor['title']);
+    }
+    exit;
+}
+
 if ($requestPath === '/webmention') {
     $config = nammu_load_config();
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
@@ -797,17 +840,9 @@ $rejectedOriginDomains = is_array($configData['rejected_origins']['domains'] ?? 
     ? array_values(array_filter(array_map('strval', $configData['rejected_origins']['domains'])))
     : [];
 if (!$isAdminLogged && !empty($rejectedOriginDomains) && $isLikelyHumanVisitor()) {
-    $rejectedCookieName = 'nammu_rejected_origin';
-    $isRejectedVisitor = isset($_COOKIE[$rejectedCookieName]) && trim((string) $_COOKIE[$rejectedCookieName]) === '1';
-    if (!$isRejectedVisitor) {
-        $refererHost = trim((string) (parse_url((string) ($_SERVER['HTTP_REFERER'] ?? ''), PHP_URL_HOST) ?? ''));
-        $isRejectedVisitor = $hostMatchesRejectedOrigin($refererHost, $rejectedOriginDomains);
-        if ($isRejectedVisitor) {
-            nammu_set_cookie($rejectedCookieName, '1', time() + 31536000);
-            $_COOKIE[$rejectedCookieName] = '1';
-        }
-    }
-    if ($isRejectedVisitor) {
+    // Sin cookie: se comprueba el referer en cada petición. Sólo se rechaza la llegada directa desde el dominio vetado.
+    $refererHost = trim((string) (parse_url((string) ($_SERVER['HTTP_REFERER'] ?? ''), PHP_URL_HOST) ?? ''));
+    if ($hostMatchesRejectedOrigin($refererHost, $rejectedOriginDomains)) {
         $renderNotFound('Contenido no encontrado', 'La página solicitada no se encuentra disponible.', $routePath);
     }
 }
@@ -1902,6 +1937,128 @@ if ($categorySlugRequest !== null) {
     exit;
 }
 
+// Corrección de autoevaluaciones de itinerarios en el servidor. Recibe el token de progreso y las respuestas
+// (índices originales de pregunta y respuesta) y devuelve el resultado y un token nuevo con el paso superado.
+// Las respuestas correctas ya no viajan en el HTML.
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && preg_match('#^/itinerarios/([^/]+)(?:/([^/]+))?/__autoevaluacion/?$#i', $routePath, $matchItineraryQuiz)) {
+    header('Content-Type: application/json; charset=UTF-8');
+    $quizOrigin = trim((string) ($_SERVER['HTTP_ORIGIN'] ?? ''));
+    $quizOriginHost = $quizOrigin !== '' ? strtolower((string) parse_url($quizOrigin, PHP_URL_HOST)) : '';
+    $quizRequestHost = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    if ($quizOriginHost !== '' && $quizRequestHost !== '' && $quizOriginHost !== preg_replace('/:\d+$/', '', $quizRequestHost)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'origen_no_permitido'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $quizItinerarySlug = ItineraryRepository::normalizeSlug(rawurldecode($matchItineraryQuiz[1]));
+    $quizTopicSlug = isset($matchItineraryQuiz[2]) ? ItineraryRepository::normalizeSlug(rawurldecode($matchItineraryQuiz[2])) : '';
+    $quizItinerary = $itineraryRepository->find($quizItinerarySlug);
+    $quizStepKey = '__presentation';
+    $quizData = [];
+    if ($quizItinerary !== null) {
+        if ($quizTopicSlug === '') {
+            $quizData = $quizItinerary->hasQuiz() ? $quizItinerary->getQuiz() : [];
+        } else {
+            $quizTopic = $itineraryRepository->findTopic($quizItinerarySlug, $quizTopicSlug);
+            if ($quizTopic !== null && $quizTopic->hasTest()) {
+                $quizData = $quizTopic->getQuiz();
+                $quizStepKey = $quizTopic->getSlug();
+            }
+        }
+    }
+    if ($quizItinerary === null || empty($quizData['questions'])) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'error' => 'sin_autoevaluacion'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $quizRawBody = (string) file_get_contents('php://input');
+    $quizPayload = json_decode($quizRawBody, true);
+    if (!is_array($quizPayload)) {
+        $quizPayload = $_POST;
+    }
+    $quizAnswers = is_array($quizPayload['answers'] ?? null) ? $quizPayload['answers'] : [];
+    $quizProgress = nammu_get_itinerary_progress($quizItinerarySlug, (string) ($quizPayload[nammu_itinerary_progress_param()] ?? ''));
+    $quizResult = nammu_itinerary_grade_quiz($quizData, $quizAnswers);
+    if ($quizResult['passed']) {
+        if (!in_array($quizStepKey, $quizProgress['visited'], true)) {
+            $quizProgress['visited'][] = $quizStepKey;
+        }
+        if (!in_array($quizStepKey, $quizProgress['passed'], true)) {
+            $quizProgress['passed'][] = $quizStepKey;
+        }
+    }
+    echo json_encode([
+        'ok' => true,
+        'step' => $quizStepKey,
+        'correct' => (int) $quizResult['correct'],
+        'total' => (int) $quizResult['total'],
+        'minimum' => (int) $quizResult['minimum'],
+        'passed' => (bool) $quizResult['passed'],
+        'token' => nammu_itinerary_progress_token($quizItinerarySlug, $quizProgress),
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// Página que ve el alumno cuando intenta abrir un tema sin haber completado el paso anterior.
+$renderItineraryLocked = static function (Itinerary $itinerary, ItineraryTopic $topic, string $requiredStep, string $usageLogic, string $progressToken) use (
+    $renderer,
+    $buildItineraryUrl,
+    $buildItineraryTopicUrl,
+    $siteTitle,
+    $socialConfig,
+    $publicBaseUrl,
+    $homeImage,
+    $siteNameForMeta,
+    $siteJsonLd,
+    $orgJsonLd,
+    $siteLang
+): void {
+    http_response_code(403);
+    $itineraryUrl = nammu_itinerary_url_with_progress($buildItineraryUrl($itinerary), $progressToken);
+    $requiredTitle = 'la presentación del itinerario';
+    $requiredUrl = $itineraryUrl;
+    if ($requiredStep !== '__presentation') {
+        foreach ($itinerary->getTopics() as $candidate) {
+            if ($candidate->getSlug() === $requiredStep) {
+                $requiredTitle = '«' . $candidate->getTitle() . '»';
+                $requiredUrl = nammu_itinerary_url_with_progress($buildItineraryTopicUrl($itinerary, $candidate), $progressToken);
+                break;
+            }
+        }
+    }
+    $message = $usageLogic === Itinerary::USAGE_LOGIC_ASSESSMENT
+        ? 'Para abrir «' . $topic->getTitle() . '» tienes que leer antes ' . $requiredTitle . ' y superar su autoevaluación.'
+        : 'Para abrir «' . $topic->getTitle() . '» tienes que leer antes ' . $requiredTitle . '.';
+    $content = '<section class="itinerary-topic-cta" data-itinerary-locked data-itinerary-slug="' . htmlspecialchars($itinerary->getSlug(), ENT_QUOTES, 'UTF-8') . '" data-progress-token="' . htmlspecialchars($progressToken, ENT_QUOTES, 'UTF-8') . '">'
+        . '<div class="itinerary-topic-cta__wrapper"><div class="itinerary-topic-cta__info">'
+        . '<p class="itinerary-topic-cta__breadcrumbs"><a href="' . htmlspecialchars($itineraryUrl, ENT_QUOTES, 'UTF-8') . '" data-topic-link>' . htmlspecialchars($itinerary->getTitle(), ENT_QUOTES, 'UTF-8') . '</a> &rsaquo; Tema ' . (int) $topic->getNumber() . '</p>'
+        . '<h2>Este tema todavía está bloqueado</h2>'
+        . '<p>' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</p>'
+        . '<p>Si ya lo habías completado en este navegador, vuelve a entrar desde la página del itinerario: allí se recupera tu avance.</p>'
+        . '</div><div class="itinerary-topic-cta__actions">'
+        . '<a class="button button-primary" href="' . htmlspecialchars($requiredUrl, ENT_QUOTES, 'UTF-8') . '" data-topic-link>Ir al paso pendiente</a>'
+        . '<a class="button button-secondary" href="' . htmlspecialchars($itineraryUrl, ENT_QUOTES, 'UTF-8') . '" data-topic-link>Volver al itinerario</a>'
+        . '</div></div></section>';
+    $social = nammu_build_social_meta([
+        'type' => 'website',
+        'title' => $topic->getTitle() . ' — ' . $itinerary->getTitle(),
+        'description' => $message,
+        'url' => $buildItineraryTopicUrl($itinerary, $topic),
+        'image' => $homeImage,
+        'site_name' => $siteNameForMeta,
+    ], $socialConfig);
+    echo $renderer->render('layout', [
+        'pageTitle' => $topic->getTitle() . ' — ' . $itinerary->getTitle(),
+        'metaDescription' => $message,
+        'content' => $content,
+        'socialMeta' => $social,
+        'jsonLd' => [$siteJsonLd, $orgJsonLd],
+        'pageLang' => $siteLang,
+        'showLogo' => true,
+    ]);
+    exit;
+};
+
 if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItineraryTopic)) {
     $itinerarySlug = ItineraryRepository::normalizeSlug(rawurldecode($matchItineraryTopic[1]));
     $topicSlug = ItineraryRepository::normalizeSlug(rawurldecode($matchItineraryTopic[2]));
@@ -1916,16 +2073,29 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
         $renderNotFound('Tema no encontrado', 'Este tema no se encuentra disponible dentro del itinerario.', $routePath);
     }
     $usageLogic = $itinerary->getUsageLogic();
+    $progressToken = '';
     if ($previewMode) {
         $progressData = ['visited' => [], 'passed' => []];
         $usageLogic = Itinerary::USAGE_LOGIC_FREE;
     } else {
         $progressData = nammu_get_itinerary_progress($itinerary->getSlug());
+        $gateTopics = $itinerary->getTopics();
+        $gateOrderedSlugs = [];
+        $gateTopicsWithTest = [];
+        foreach ($gateTopics as $gateTopic) {
+            $gateOrderedSlugs[] = $gateTopic->getSlug();
+            if ($gateTopic->hasTest()) {
+                $gateTopicsWithTest[] = $gateTopic->getSlug();
+            }
+        }
+        $stepGate = nammu_itinerary_step_gate($gateOrderedSlugs, $topic->getSlug(), $usageLogic, $progressData, $itinerary->hasQuiz(), $gateTopicsWithTest);
+        if (empty($stepGate['allowed']) && !$isAdminLogged) {
+            $renderItineraryLocked($itinerary, $topic, (string) ($stepGate['required'] ?? ''), $usageLogic, nammu_itinerary_progress_token($itinerary->getSlug(), $progressData));
+        }
         $hadPresentation = in_array('__presentation', $progressData['visited'], true);
         $alreadyVisited = in_array($topic->getSlug(), $progressData['visited'], true);
         if (!$alreadyVisited) {
             $progressData['visited'][] = $topic->getSlug();
-            nammu_set_itinerary_progress($itinerary->getSlug(), $progressData);
             if ($hadPresentation) {
                 $incrementStart = $topic->getNumber() === 1;
                 try {
@@ -1947,6 +2117,7 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
                 nammu_record_itinerary_event($itinerary->getSlug(), 'complete');
             }
         }
+        $progressToken = nammu_itinerary_progress_token($itinerary->getSlug(), $progressData);
     }
     $documentData = $markdown->convertDocument($topic->getContent());
     $topicHtml = $documentData['html'];
@@ -1963,14 +2134,14 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
     $nextStep = null;
     if ($nextTopic !== null) {
         $nextStep = [
-            'url' => $buildItineraryTopicUrl($itinerary, $nextTopic),
+            'url' => nammu_itinerary_url_with_progress($buildItineraryTopicUrl($itinerary, $nextTopic), $progressToken),
             'label' => 'Pasar al siguiente tema',
         ];
     }
     $previousStep = null;
     if ($previousTopic !== null) {
         $previousStep = [
-            'url' => $buildItineraryTopicUrl($itinerary, $previousTopic),
+            'url' => nammu_itinerary_url_with_progress($buildItineraryTopicUrl($itinerary, $previousTopic), $progressToken),
             'label' => 'Volver al tema anterior',
         ];
     }
@@ -2074,6 +2245,9 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
         'quiz' => $previewMode ? [] : $topic->getQuiz(),
         'usageLogic' => $usageLogic,
         'progress' => $progressData,
+        'progressToken' => $progressToken,
+        'quizEndpoint' => $buildItineraryTopicUrl($itinerary, $topic) . '/__autoevaluacion',
+        'itineraryProgressUrl' => nammu_itinerary_url_with_progress($buildItineraryUrl($itinerary), $progressToken),
         'nextStep' => $nextStep,
         'previousStep' => $previousStep,
         'editButtonHref' => $isAdminLogged
@@ -2112,21 +2286,25 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
     $hadPresentation = in_array('__presentation', $itineraryProgress['visited'], true);
     if (!$hadPresentation) {
         $itineraryProgress['visited'][] = '__presentation';
-        nammu_set_itinerary_progress($itinerary->getSlug(), $itineraryProgress);
         nammu_record_itinerary_event($itinerary->getSlug(), 'start');
     }
+    if ($itinerary->getUsageLogic() === Itinerary::USAGE_LOGIC_ASSESSMENT && !$itinerary->hasQuiz() && !in_array('__presentation', $itineraryProgress['passed'], true)) {
+        // Sin autoevaluación de presentación, verla ya cuenta como superada.
+        $itineraryProgress['passed'][] = '__presentation';
+    }
+    $itineraryProgressToken = nammu_itinerary_progress_token($itinerary->getSlug(), $itineraryProgress);
     $documentData = $markdown->convertDocument($itinerary->getContent());
     $itineraryHtml = $documentData['html'];
     $topics = $itinerary->getTopics();
     $firstTopic = $itinerary->getFirstTopic();
-    $firstTopicUrl = $firstTopic ? $buildItineraryTopicUrl($itinerary, $firstTopic) : null;
-    $topicSummaries = array_map(function (ItineraryTopic $topic) use ($itinerary, $buildItineraryTopicUrl): array {
+    $firstTopicUrl = $firstTopic ? nammu_itinerary_url_with_progress($buildItineraryTopicUrl($itinerary, $firstTopic), $itineraryProgressToken) : null;
+    $topicSummaries = array_map(function (ItineraryTopic $topic) use ($itinerary, $buildItineraryTopicUrl, $itineraryProgressToken): array {
         return [
             'slug' => $topic->getSlug(),
             'title' => $topic->getTitle(),
             'description' => $topic->getDescription(),
             'number' => $topic->getNumber(),
-            'url' => $buildItineraryTopicUrl($itinerary, $topic),
+            'url' => nammu_itinerary_url_with_progress($buildItineraryTopicUrl($itinerary, $topic), $itineraryProgressToken),
             'image' => $topic->getImage(),
             'meta' => 'Tema ' . $topic->getNumber() . ' del itinerario «' . $itinerary->getTitle() . '»',
         ];
@@ -2213,9 +2391,9 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
     $usageLogic = $itinerary->getUsageLogic();
     $usageNotice = '';
     if ($usageLogic === Itinerary::USAGE_LOGIC_SEQUENTIAL) {
-        $usageNotice = 'Este itinerario usa cookies para asegurar que sigues el orden de temas creado por su autor. La información guardada en esas cookies se usa exclusivamenente para ese fin. Al iniciar el itinerario aceptas su uso.';
+        $usageNotice = 'Este itinerario sigue el orden de temas creado por su autor: cada tema se abre cuando has leído el anterior. Tu avance viaja en los enlaces entre temas y se guarda en tu navegador, sin cookies ni datos personales.';
     } elseif ($usageLogic === Itinerary::USAGE_LOGIC_ASSESSMENT) {
-        $usageNotice = 'Este itinerario usa cookies para asegurar que sigues el orden de temas creado por su autor y que  pasas las autoevaluaciones entre temas. La información guardada en esas cookies se usa exclusivamenente para esos fines. Al iniciar el itinerario aceptas su uso.';
+        $usageNotice = 'Este itinerario sigue el orden de temas creado por su autor: cada tema se abre cuando has leído el anterior y superado su autoevaluación. Tu avance viaja en los enlaces entre temas y se guarda en tu navegador, sin cookies ni datos personales.';
     }
     $presentationQuizHtml = '';
     $presentationQuizData = $itinerary->getQuiz();
@@ -2224,7 +2402,10 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
         if (!empty($presentationQuestions)) {
             $presentationQuestionCount = count($presentationQuestions);
             $presentationMinimum = $itinerary->getQuizMinimumCorrect();
-            $shuffledPresentationQuestions = $presentationQuestions;
+            $shuffledPresentationQuestions = [];
+            foreach (array_values($presentationQuestions) as $presentationQuestionIndex => $presentationQuestion) {
+                $shuffledPresentationQuestions[] = ['index' => $presentationQuestionIndex, 'question' => $presentationQuestion];
+            }
             shuffle($shuffledPresentationQuestions);
             ob_start(); ?>
             <section
@@ -2234,28 +2415,35 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
                 data-topic-slug="__presentation"
                 data-min-correct="<?= (int) $presentationMinimum ?>"
                 data-usage-logic="<?= htmlspecialchars($usageLogic, ENT_QUOTES, 'UTF-8') ?>"
+                data-quiz-endpoint="<?= htmlspecialchars($buildItineraryUrl($itinerary) . '/__autoevaluacion', ENT_QUOTES, 'UTF-8') ?>"
+                data-progress-token="<?= htmlspecialchars($itineraryProgressToken, ENT_QUOTES, 'UTF-8') ?>"
             >
                 <div class="itinerary-quiz__header">
                     <h2>Autoevaluación de la presentación del itinerario</h2>
                     <p>Debes acertar al menos <?= (int) $presentationMinimum ?> de <?= (int) $presentationQuestionCount ?> preguntas para avanzar.</p>
                 </div>
                 <div class="itinerary-quiz__body">
-                    <?php foreach ($shuffledPresentationQuestions as $index => $question): ?>
+                    <?php foreach ($shuffledPresentationQuestions as $index => $questionEntry): ?>
                         <?php
-                        $answers = $question['answers'] ?? [];
+                        $question = $questionEntry['question'];
+                        $answers = [];
+                        foreach (array_values((array) ($question['answers'] ?? [])) as $answerIndex => $answer) {
+                            $answers[] = ['index' => $answerIndex, 'answer' => $answer];
+                        }
                         shuffle($answers);
                         ?>
-                        <article class="itinerary-quiz__question" data-quiz-question>
+                        <article class="itinerary-quiz__question" data-quiz-question data-question-index="<?= (int) $questionEntry['index'] ?>">
                             <h3>Pregunta <?= $index + 1 ?></h3>
                             <p><?= htmlspecialchars($question['text'] ?? '', ENT_QUOTES, 'UTF-8') ?></p>
                             <ul class="itinerary-quiz__answers">
-                                <?php foreach ($answers as $answer): ?>
+                                <?php foreach ($answers as $answerEntry): ?>
+                                    <?php $answer = $answerEntry['answer']; ?>
                                     <li>
                                         <label>
                                             <input
                                                 type="checkbox"
                                                 data-quiz-answer
-                                                data-correct="<?= !empty($answer['correct']) ? '1' : '0' ?>"
+                                                data-answer-index="<?= (int) $answerEntry['index'] ?>"
                                                 value="1"
                                             >
                                             <span><?= htmlspecialchars($answer['text'] ?? '', ENT_QUOTES, 'UTF-8') ?></span>
@@ -2305,6 +2493,7 @@ if (preg_match('#^/itinerarios/([^/]+)/?$#i', $routePath, $matchItinerary)) {
             data-itinerary-slug="<?= htmlspecialchars($itinerary->getSlug(), ENT_QUOTES, 'UTF-8') ?>"
             data-usage-logic="<?= htmlspecialchars($usageLogic, ENT_QUOTES, 'UTF-8') ?>"
             data-presentation-quiz="<?= $presentationQuizAvailable ? '1' : '0' ?>"
+            data-progress-token="<?= htmlspecialchars($itineraryProgressToken, ENT_QUOTES, 'UTF-8') ?>"
         >
             <h2>Temas del itinerario</h2>
             <div class="itinerary-topics__list">
@@ -2669,20 +2858,21 @@ if (preg_match('#^/itinerarios/?$#i', $routePath) || ($isHomeRoute && $homeConte
 
 if (preg_match('#^/newsletters/?$#i', $routePath)) {
     header('X-Robots-Tag: noindex, nofollow');
-    if (session_status() !== PHP_SESSION_ACTIVE) {
-        @session_start();
-    }
-    $isAdmin = !empty($_SESSION['loggedin']);
+    // Sin abrir sesión a los visitantes (pondría la cookie PHPSESSID); la sesión de administración ya se reanuda
+    // al principio de index.php sólo cuando existe.
+    $isAdmin = $isAdminLogged;
     $accessEmail = '';
     $accessGranted = $isAdmin;
+    $newsletterAccessCarrier = '';
     if (!$accessGranted) {
-        $cookieAccess = function_exists('nammu_newsletter_get_access_cookie') ? nammu_newsletter_get_access_cookie() : null;
-        if (is_array($cookieAccess)) {
-            $cookieEmail = (string) ($cookieAccess['email'] ?? '');
-            $cookieToken = (string) ($cookieAccess['token'] ?? '');
-            if ($cookieEmail !== '' && $cookieToken !== '' && nammu_newsletter_validate_access($cookieEmail, $cookieToken)) {
+        $requestAccess = nammu_newsletter_request_access();
+        if (is_array($requestAccess)) {
+            $requestEmail = (string) ($requestAccess['email'] ?? '');
+            $requestToken = (string) ($requestAccess['token'] ?? '');
+            if ($requestEmail !== '' && $requestToken !== '' && nammu_newsletter_validate_access($requestEmail, $requestToken)) {
                 $accessGranted = true;
-                $accessEmail = $cookieEmail;
+                $accessEmail = $requestEmail;
+                $newsletterAccessCarrier = nammu_newsletter_access_carrier($requestEmail, $requestToken);
             }
         }
     }
@@ -2693,13 +2883,11 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
         ? nammu_newsletter_validate_access_entry($emailParam, $tokenParam)
         : null;
     if (!$accessGranted && is_array($validatedAccess)) {
-        $expires = (int) ($validatedAccess['expires_at'] ?? 0);
-        nammu_newsletter_set_access_cookie((string) ($validatedAccess['email'] ?? $emailParam), (string) ($validatedAccess['token'] ?? $tokenParam), $expires);
         $redirectTo = '/newsletters';
         if ($nextParam !== '' && str_starts_with($nextParam, '/newsletters')) {
             $redirectTo = $nextParam;
         }
-        header('Location: ' . $redirectTo);
+        header('Location: ' . nammu_newsletter_url_with_access($redirectTo, nammu_newsletter_access_carrier((string) ($validatedAccess['email'] ?? $emailParam), (string) ($validatedAccess['token'] ?? $tokenParam))));
         exit;
     }
     if (!$accessGranted) {
@@ -2777,6 +2965,7 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
         $formHtml .= '.newsletter-access-alert-info{background:#eef4ff;color:#1b4b7a;}';
         $formHtml .= '.newsletter-access-alert-success{background:#e6f4ea;color:#1f6f3d;}';
         $formHtml .= '.newsletter-access-alert-danger{background:#fdecea;color:#9b2c2c;}</style>';
+        $formHtml .= nammu_newsletter_access_script(false);
         echo $renderer->render('layout', [
             'pageTitle' => 'Newsletters',
             'metaDescription' => 'Archivo privado de newsletters.',
@@ -2810,7 +2999,9 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
         'newsletters' => $visibleNewsletters,
         'hasItineraries' => !empty($itineraryListing),
         'newsletterHeroImage' => $newsletterHeroImage,
+        'newsletterAccessCarrier' => $newsletterAccessCarrier,
     ]);
+    $content .= nammu_newsletter_access_script(true, $newsletterAccessCarrier);
     $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/newsletters' : '/newsletters';
     if (function_exists('nammu_record_pageview')) {
         nammu_record_pageview('pages', 'newsletters', 'Newsletters');
@@ -2831,20 +3022,21 @@ if (preg_match('#^/newsletters/?$#i', $routePath)) {
 
 if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
     header('X-Robots-Tag: noindex, nofollow');
-    if (session_status() !== PHP_SESSION_ACTIVE) {
-        @session_start();
-    }
-    $isAdmin = !empty($_SESSION['loggedin']);
+    // Sin abrir sesión a los visitantes (pondría la cookie PHPSESSID); la sesión de administración ya se reanuda
+    // al principio de index.php sólo cuando existe.
+    $isAdmin = $isAdminLogged;
     $accessEmail = '';
     $accessGranted = $isAdmin;
+    $newsletterAccessCarrier = '';
     if (!$accessGranted) {
-        $cookieAccess = function_exists('nammu_newsletter_get_access_cookie') ? nammu_newsletter_get_access_cookie() : null;
-        if (is_array($cookieAccess)) {
-            $cookieEmail = (string) ($cookieAccess['email'] ?? '');
-            $cookieToken = (string) ($cookieAccess['token'] ?? '');
-            if ($cookieEmail !== '' && $cookieToken !== '' && nammu_newsletter_validate_access($cookieEmail, $cookieToken)) {
+        $requestAccess = nammu_newsletter_request_access();
+        if (is_array($requestAccess)) {
+            $requestEmail = (string) ($requestAccess['email'] ?? '');
+            $requestToken = (string) ($requestAccess['token'] ?? '');
+            if ($requestEmail !== '' && $requestToken !== '' && nammu_newsletter_validate_access($requestEmail, $requestToken)) {
                 $accessGranted = true;
-                $accessEmail = $cookieEmail;
+                $accessEmail = $requestEmail;
+                $newsletterAccessCarrier = nammu_newsletter_access_carrier($requestEmail, $requestToken);
             }
         }
     }
@@ -2855,13 +3047,11 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
         ? nammu_newsletter_validate_access_entry($emailParam, $tokenParam)
         : null;
     if (!$accessGranted && is_array($validatedAccess)) {
-        $expires = (int) ($validatedAccess['expires_at'] ?? 0);
-        nammu_newsletter_set_access_cookie((string) ($validatedAccess['email'] ?? $emailParam), (string) ($validatedAccess['token'] ?? $tokenParam), $expires);
         $redirectTo = '/newsletters/' . rawurlencode($matchNewsletter[1]);
         if ($nextParam !== '' && str_starts_with($nextParam, '/newsletters')) {
             $redirectTo = $nextParam;
         }
-        header('Location: ' . $redirectTo);
+        header('Location: ' . nammu_newsletter_url_with_access($redirectTo, nammu_newsletter_access_carrier((string) ($validatedAccess['email'] ?? $emailParam), (string) ($validatedAccess['token'] ?? $tokenParam))));
         exit;
     }
     if (!$accessGranted) {
@@ -2940,6 +3130,7 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
         $formHtml .= '.newsletter-access-alert-info{background:#eef4ff;color:#1b4b7a;}';
         $formHtml .= '.newsletter-access-alert-success{background:#e6f4ea;color:#1f6f3d;}';
         $formHtml .= '.newsletter-access-alert-danger{background:#fdecea;color:#9b2c2c;}</style>';
+        $formHtml .= nammu_newsletter_access_script(false);
         echo $renderer->render('layout', [
             'pageTitle' => 'Newsletters',
             'metaDescription' => 'Archivo privado de newsletters.',
@@ -2982,7 +3173,13 @@ if (preg_match('#^/newsletters/([^/]+)/?$#i', $routePath, $matchNewsletter)) {
     if ($recipientEmail === '') {
         $recipientEmail = 'suscriptor@' . ($_SERVER['HTTP_HOST'] ?? 'example.com');
     }
+    if ($newsletterAccessCarrier !== '') {
+        $newslettersIndexUrlWithAccess = nammu_newsletter_url_with_access($newslettersIndexUrl, $newsletterAccessCarrier);
+        $GLOBALS['newslettersIndexUrl'] = $newslettersIndexUrlWithAccess;
+        $renderer->setGlobal('newslettersIndexUrl', $newslettersIndexUrlWithAccess);
+    }
     $newsletterContent = nammu_build_newsletter_html($config, $newsletterTitle, $newsletterHtml, $newsletterImage, $recipientEmail);
+    $newsletterContent .= nammu_newsletter_access_script(true, $newsletterAccessCarrier);
     $canon = $publicBaseUrl !== '' ? rtrim($publicBaseUrl, '/') . '/newsletters/' . rawurlencode($slug) : '/newsletters/' . rawurlencode($slug);
     if (function_exists('nammu_record_pageview')) {
         nammu_record_pageview('pages', 'newsletters/' . $slug, $newsletterTitle !== '' ? $newsletterTitle : ('Newsletter: ' . $slug));

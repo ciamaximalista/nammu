@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-session_start();
+// Sin sesión PHP: esta página no la usa y abrirla ponía la cookie PHPSESSID a todos los visitantes.
 
 require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
@@ -255,6 +255,21 @@ $renderer->setGlobal('postalUrl', $postalUrl);
 $renderer->setGlobal('postalLogoSvg', $postalLogoSvg);
 $renderer->setGlobal('footerLinks', $footerLinks);
 $renderer->setGlobal('hasItineraries', false);
+// La plantilla single necesita el resolutor de imágenes; sin él esta página daba un error 500.
+$renderer->setGlobal('resolveImage', function (?string $image) use ($publicBaseUrl): ?string {
+    if ($image === null || $image === '') {
+        return null;
+    }
+    if (preg_match('#^https?://#i', $image)) {
+        return $image;
+    }
+    $normalized = ltrim($image, '/');
+    if (str_starts_with($normalized, 'assets/')) {
+        $normalized = substr($normalized, 7);
+    }
+    $path = 'assets/' . ltrim($normalized, '/');
+    return $publicBaseUrl !== '' ? $publicBaseUrl . '/' . $path : '/' . $path;
+});
 
 $resetPost = new Nammu\Core\Post('correo-postal-reset', [
     'Title' => 'Restablecer contrasena',

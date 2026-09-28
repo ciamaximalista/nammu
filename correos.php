@@ -1,7 +1,11 @@
 <?php
 declare(strict_types=1);
 
-session_start();
+// La sesión sólo se abre si ya existe (cookie presente) o al enviar un formulario (inicio de sesión o registro).
+// Así los visitantes anónimos no reciben la cookie PHPSESSID.
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' || (isset($_COOKIE[session_name()]) && trim((string) $_COOKIE[session_name()]) !== '')) {
+    session_start();
+}
 
 require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';

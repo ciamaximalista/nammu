@@ -248,7 +248,6 @@
                         <h4 class="h6 text-uppercase text-muted mb-3 dashboard-card-title">Imagen 30 días</h4>
                         <p class="mb-2"><strong>Usuarios únicos humanos:</strong> <?= (int) $unique30Count ?></p>
                         <p class="mb-2"><strong>Objetos Fediverso:</strong> <?= (int) $image30FediverseObjectUnique ?> usuarios · <?= (int) $image30ViewsFediverseObjects ?> vistas</p>
-                        <p class="mb-2"><strong>Recurrentes (2+ días):</strong> <?= (int) $image30RecurringUsers ?> (<?= number_format($image30RecurringRate, 2, ',', '.') ?>%)</p>
                         <p class="mb-2"><strong>Vistas totales (posts + páginas + objetos Fediverso + itinerarios + newsletter + podcast):</strong> <?= (int) $image30TotalViews ?></p>
                         <p class="mb-2"><strong>Páginas por usuario:</strong> <?= number_format($image30PagesPerUser, 2, ',', '.') ?></p>
                         <p class="mb-0"><strong>Promedio diario:</strong> <?= number_format($image30DailyAverage, 2, ',', '.') ?> · <strong>Mediana:</strong> <?= number_format($image30DailyMedian, 2, ',', '.') ?> · <strong>Pico:</strong> <?= (int) $image30DailyPeak ?></p>

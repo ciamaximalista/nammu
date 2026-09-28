@@ -172,6 +172,32 @@ try {
     smoke_assert(is_file($root . '/itinerarios/ruta-prueba/index.md'), 'No se creo index.md del itinerario.');
     smoke_assert(is_file($root . '/itinerarios/ruta-prueba/index.quiz.json'), 'No se creo la autoevaluacion del itinerario.');
 
+    // Progreso de itinerarios sin cookies: token firmado, puerta de acceso y corrección en el servidor.
+    $progressToken = nammu_itinerary_progress_token('ruta-prueba', ['visited' => ['__presentation', 'tema-1'], 'passed' => ['tema-1']]);
+    smoke_assert($progressToken !== '' && substr_count($progressToken, '.') === 1, 'El token de progreso no tiene el formato esperado.');
+    $decodedProgress = nammu_itinerary_progress_from_token('ruta-prueba', $progressToken);
+    smoke_assert($decodedProgress === ['visited' => ['__presentation', 'tema-1'], 'passed' => ['tema-1']], 'El token de progreso no se verifica o no conserva los pasos.');
+    smoke_assert(nammu_itinerary_progress_from_token('otra-ruta', $progressToken) === ['visited' => [], 'passed' => []], 'Un token de otro itinerario no debe valer.');
+    smoke_assert(nammu_itinerary_progress_from_token('ruta-prueba', substr($progressToken, 0, -3) . 'abc') === ['visited' => [], 'passed' => []], 'Un token manipulado no debe valer.');
+    $gateOrder = ['tema-1', 'tema-2', 'tema-3'];
+    smoke_assert(empty(nammu_itinerary_step_gate($gateOrder, 'tema-3', 'sequential', $decodedProgress, false, [])['allowed']), 'El modo secuencial debe bloquear un tema sin haber leído el anterior.');
+    smoke_assert(!empty(nammu_itinerary_step_gate($gateOrder, 'tema-2', 'sequential', $decodedProgress, false, [])['allowed']), 'El modo secuencial debe abrir el tema siguiente al último leído.');
+    smoke_assert(empty(nammu_itinerary_step_gate($gateOrder, 'tema-2', 'assessment', ['visited' => ['__presentation', 'tema-1'], 'passed' => []], false, ['tema-1'])['allowed']), 'El modo evaluación debe exigir superar el test del tema anterior.');
+    smoke_assert(!empty(nammu_itinerary_step_gate($gateOrder, 'tema-3', 'free', [], true, [])['allowed']), 'El modo libre no debe bloquear nada.');
+    $gradedQuiz = nammu_itinerary_grade_quiz([
+        'minimum_correct' => 2,
+        'questions' => [
+            ['text' => 'a', 'answers' => [['text' => 'x', 'correct' => true], ['text' => 'y', 'correct' => false]]],
+            ['text' => 'b', 'answers' => [['text' => 'x', 'correct' => true], ['text' => 'y', 'correct' => true]]],
+        ],
+    ], [0 => [0], 1 => [0, 1]]);
+    smoke_assert($gradedQuiz['correct'] === 2 && $gradedQuiz['passed'] === true, 'La corrección de la autoevaluación no cuenta bien los aciertos.');
+    $gradedQuiz = nammu_itinerary_grade_quiz(['minimum_correct' => 2, 'questions' => [
+        ['text' => 'a', 'answers' => [['text' => 'x', 'correct' => true], ['text' => 'y', 'correct' => false]]],
+        ['text' => 'b', 'answers' => [['text' => 'x', 'correct' => true], ['text' => 'y', 'correct' => true]]],
+    ]], [0 => [0, 1], 1 => [0]]);
+    smoke_assert($gradedQuiz['correct'] === 0 && $gradedQuiz['passed'] === false, 'Una respuesta parcial o de más no debe contar como acierto.');
+
     $rssLinks = nammu_site_rss_links(
         ['site_name' => 'Sitio de prueba'],
         ['home' => ['content' => 'fediverse'], 'blog' => 'Sitio de prueba'],

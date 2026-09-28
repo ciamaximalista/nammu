@@ -106,6 +106,9 @@ if ($showHeaderButtons && function_exists('nammu_render_standard_header_buttons'
 <?php foreach ($newsletters as $newsletter): ?>
             <?php
             $url = $newslettersIndexUrl . '/' . rawurlencode((string) ($newsletter['slug'] ?? ''));
+            if (trim((string) ($newsletterAccessCarrier ?? '')) !== '' && function_exists('nammu_newsletter_url_with_access')) {
+                $url = nammu_newsletter_url_with_access($url, (string) $newsletterAccessCarrier);
+            }
             $cover = $newsletter['image'] ?? '';
             $cardClassParts = ['itinerary-card', 'style-' . $cardStyle];
             if ($cardStyle === 'full') {

@@ -206,22 +206,11 @@
 
 <?php
     $usageLogic = method_exists($itinerary, 'getUsageLogic') ? $itinerary->getUsageLogic() : 'free';
-    $usageReasons = [
-        'Hacer estadísticas para mejorar los itinerarios y reforzar o ajustar los temas con más abandonos.',
-    ];
-    if ($usageLogic === \Nammu\Core\Itinerary::USAGE_LOGIC_SEQUENTIAL || $usageLogic === \Nammu\Core\Itinerary::USAGE_LOGIC_ASSESSMENT) {
-        $usageReasons[] = 'Asegurarnos de que no se lea un tema sin haber leído el anterior cuando el itinerario requiere avanzar en orden.';
-    }
-    if ($usageLogic === \Nammu\Core\Itinerary::USAGE_LOGIC_ASSESSMENT) {
-        $usageReasons[] = 'Comprobar que se han superado las autoevaluaciones cuando el autor lo ha configurado así.';
-    }
     $usageNotice = '';
-    if (!empty($usageReasons)) {
-        $usageNotice = '<strong>Uso de cookies en este itinerario:</strong><ul class="mb-0">';
-        foreach ($usageReasons as $reason) {
-            $usageNotice .= '<li>' . htmlspecialchars($reason, ENT_QUOTES, 'UTF-8') . '</li>';
-        }
-        $usageNotice .= '</ul>';
+    if ($usageLogic === \Nammu\Core\Itinerary::USAGE_LOGIC_SEQUENTIAL) {
+        $usageNotice = htmlspecialchars('Este itinerario sigue el orden de temas creado por su autor: cada tema se abre cuando has leído el anterior. Tu avance viaja en los enlaces entre temas y se guarda en tu navegador, sin cookies ni datos personales.', ENT_QUOTES, 'UTF-8');
+    } elseif ($usageLogic === \Nammu\Core\Itinerary::USAGE_LOGIC_ASSESSMENT) {
+        $usageNotice = htmlspecialchars('Este itinerario sigue el orden de temas creado por su autor: cada tema se abre cuando has leído el anterior y superado su autoevaluación. Tu avance viaja en los enlaces entre temas y se guarda en tu navegador, sin cookies ni datos personales.', ENT_QUOTES, 'UTF-8');
     }
 ?>
 <?php if (!empty($topicSummaries)): ?>

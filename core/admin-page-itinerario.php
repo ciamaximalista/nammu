@@ -78,7 +78,7 @@
                                         </label>
                                     </div>
                                 <?php endforeach; ?>
-                                <small class="form-text text-muted">Si eliges las dos últimas opciones, informaremos al lector de que se usarán cookies.</small>
+                                <small class="form-text text-muted">Con las dos últimas opciones el servidor sólo sirve un tema cuando el anterior está completado. El avance viaja en los enlaces entre temas y se guarda en el navegador del lector, sin cookies.</small>
                             </div>
                             <?php $itineraryClassChoice = $itineraryFormData['class_choice'] ?? ''; ?>
                             <div class="form-group">

@@ -97,7 +97,6 @@ $isCrawler = $userAgent !== '' && (
         ? nammu_is_crawler_user_agent($userAgent)
         : (bool) preg_match('/\b(bot|crawl(?:er)?|spider)\b/i', $userAgent)
 );
-$statsConsentGiven = $isCrawler || (function_exists('nammu_has_stats_consent') ? nammu_has_stats_consent() : false);
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
 $basePath = parse_url($baseHref, PHP_URL_PATH) ?? '/';
 $normalizedBase = rtrim($basePath, '/');
@@ -142,8 +141,8 @@ if ($adsLink !== '' && $adsLinkLabel !== '') {
     $adsTitleHtml = '<a href="' . $adsLinkHref . '" class="nammu-ad-link" data-ad-link>' . htmlspecialchars($adsLinkLabel, ENT_QUOTES, 'UTF-8') . '</a>';
     $adsFooterLinkHtml = '<a href="' . $adsLinkHref . '" class="nammu-ad-link" data-ad-link>Visita ' . htmlspecialchars($adsLinkLabel, ENT_QUOTES, 'UTF-8') . '</a>';
 }
-$adsClosedToday = ($_COOKIE['nammu_ad_closed'] ?? '') === date('Y-m-d');
-$showAdsBanner = $adsEnabled && $adsHtml !== '' && !$adsClosedToday && !$isCrawler && $statsConsentGiven;
+$adsClosedToday = false; // El cierre del anuncio se recuerda en localStorage, desde el JS del banner.
+$showAdsBanner = $adsEnabled && $adsHtml !== '' && !$adsClosedToday && !$isCrawler;
 if ($adsScope === 'home' && !$isHome) {
     $showAdsBanner = false;
 }
@@ -167,26 +166,26 @@ if ($fediverseFloatingCtaEnabled && function_exists('nammu_fediverse_actor_url')
 }
 $serverDay = date('Y-m-d');
 $serverDayExpires = date(DATE_RFC2822, strtotime('today 23:59:59'));
-$serverConsentDate = date('Y-m-d');
-$serverConsentExpires = gmdate('D, d M Y H:i:s T', time() + 31536000);
-$serverYearExpires = gmdate('D, d M Y H:i:s T', time() + 31536000);
-$allowContentWithoutStatsConsent = false;
-if (
-    preg_match('#^/fediverso/[a-f0-9]{24}/?$#i', $requestPath) === 1
-    || preg_match('#^/@[^/]+@[^/]+/?$#', $requestPath) === 1
-    || $requestPath === '/actualidad.php'
-) {
-    $allowContentWithoutStatsConsent = true;
-}
 $contentOutput = $content;
-// El contenido publico debe estar disponible en el HTML aunque no haya consentimiento
-// de estadisticas; el consentimiento solo afecta al registro de visitas.
+// Estadísticas sin cookies: los bots se cuentan aquí por su User-Agent; las visitas humanas las envía el
+// navegador por el beacon (ver el script al final) con un descriptor firmado de la página vista.
+$statsBeaconDescriptor = '';
+$statsBeaconUrl = '';
 if ($isCrawler) {
     if (function_exists('nammu_record_bot_visit')) {
         nammu_record_bot_visit($userAgent);
     }
-} elseif (function_exists('nammu_record_visit')) {
-    nammu_record_visit();
+} elseif (function_exists('nammu_stats_beacon_descriptor')) {
+    $pendingPageview = function_exists('nammu_stats_pending_pageview') ? nammu_stats_pending_pageview() : null;
+    $statsBeaconDescriptor = nammu_stats_beacon_descriptor(
+        (string) ($pendingPageview['type'] ?? ''),
+        (string) ($pendingPageview['slug'] ?? ''),
+        (string) ($pendingPageview['title'] ?? '')
+    );
+    $statsBeaconUrl = ($searchBaseNormalized === '' ? '' : $searchBaseNormalized) . nammu_stats_beacon_path();
+}
+if (function_exists('nammu_expire_legacy_cookies')) {
+    nammu_expire_legacy_cookies();
 }
 if (!empty($theme['lang'])) {
     $pageLang = $theme['lang'];
@@ -474,72 +473,6 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
         }
         .callout-box p:last-child {
             margin-bottom: 0;
-        }
-        body.nammu-cookie-locked {
-            overflow: hidden;
-        }
-        body.nammu-cookie-locked .wrapper {
-            filter: blur(3px);
-            pointer-events: none;
-            user-select: none;
-        }
-        .nammu-cookie-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(10, 16, 24, 0.55);
-            z-index: 9999;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 1.5rem;
-        }
-        .nammu-cookie-overlay.is-visible {
-            display: flex;
-        }
-        .nammu-cookie-card {
-            width: min(720px, 92vw);
-            background: #ffffff;
-            color: #222;
-            border-radius: 18px;
-            padding: 2rem;
-            box-shadow: 0 24px 60px rgba(0,0,0,0.35);
-        }
-        .nammu-cookie-logo {
-            width: 68px;
-            height: 68px;
-            border-radius: 50%;
-            object-fit: cover;
-            display: block;
-            margin: 0 auto 1rem;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-        }
-        .nammu-cookie-card h2 {
-            margin-top: 0;
-            font-size: 1.6rem;
-        }
-        .nammu-cookie-card p {
-            margin: 0 0 1rem;
-        }
-        .nammu-cookie-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-            margin-top: 1.5rem;
-        }
-        .nammu-cookie-actions button {
-            border: none;
-            border-radius: 999px;
-            padding: 0.75rem 1.5rem;
-            font-weight: 700;
-            cursor: pointer;
-        }
-        .nammu-cookie-accept {
-            background: #1b8eed;
-            color: #fff;
-        }
-        .nammu-cookie-decline {
-            background: #e6e9ef;
-            color: #1b1b1b;
         }
         .embedded-video,
         .embedded-pdf {
@@ -1532,27 +1465,13 @@ $pageLang = htmlspecialchars($pageLang, ENT_QUOTES, 'UTF-8');
         }
     </style>
 </head>
-<?php $cookieLogo = $logoUrl !== null && $logoUrl !== '' ? $logoUrl : 'nammu.png'; ?>
 <?php
 $baseHost = '';
 if (!empty($baseUrl)) {
     $baseHost = parse_url((string) $baseUrl, PHP_URL_HOST) ?? '';
 }
 ?>
-<body class="<?= htmlspecialchars($cornerClass, ENT_QUOTES, 'UTF-8') ?><?= $statsConsentGiven ? '' : ' nammu-cookie-locked' ?>" data-server-year-expires="<?= htmlspecialchars($serverYearExpires, ENT_QUOTES, 'UTF-8') ?>">
-    <div class="nammu-cookie-overlay<?= $statsConsentGiven ? '' : ' is-visible' ?>" data-cookie-overlay data-server-date="<?= htmlspecialchars($serverConsentDate, ENT_QUOTES, 'UTF-8') ?>" data-server-expires="<?= htmlspecialchars($serverConsentExpires, ENT_QUOTES, 'UTF-8') ?>" aria-hidden="<?= $statsConsentGiven ? 'true' : 'false' ?>">
-        <div class="nammu-cookie-card" role="dialog" aria-modal="true" aria-labelledby="cookieNoticeTitle">
-            <img class="nammu-cookie-logo" src="<?= htmlspecialchars($cookieLogo, ENT_QUOTES, 'UTF-8') ?>" alt="Logo del blog">
-            <h2 id="cookieNoticeTitle">Uso de cookies para estadisticas</h2>
-            <p>Para cumplir con la RGPD, necesitamos tu consentimiento para usar cookies de estadistica.</p>
-            <p>Los datos se usan exclusivamente para medir visitas y mejorar el contenido. No se comparten con terceros.</p>
-            <p>Debes aceptar para continuar la lectura.</p>
-            <div class="nammu-cookie-actions">
-                <button type="button" class="nammu-cookie-accept" data-cookie-accept>Aceptar y continuar</button>
-                <button type="button" class="nammu-cookie-decline" data-cookie-decline>Salir</button>
-            </div>
-        </div>
-    </div>
+<body class="<?= htmlspecialchars($cornerClass, ENT_QUOTES, 'UTF-8') ?>">
     <div class="wrapper">
         <main>
             <?= $contentOutput ?>
@@ -1799,93 +1718,33 @@ if (!empty($baseUrl)) {
     <?php endif; ?>
     <script>
     (function() {
-        var overlay = document.querySelector('[data-cookie-overlay]');
-        var acceptBtn = document.querySelector('[data-cookie-accept]');
-        var declineBtn = document.querySelector('[data-cookie-decline]');
-        if (!overlay || !acceptBtn) {
-            return;
-        }
-        function hasConsent() {
-            return document.cookie.split(';').some(function(part) {
-                return part.trim().indexOf('nammu_stats_consent=1') === 0;
-            });
-        }
-        function setCookie(name, value, expires) {
-            if (expires) {
-                document.cookie = name + '=' + value + ';path=/;expires=' + expires + ';samesite=lax';
-                return;
-            }
-            document.cookie = name + '=' + value + ';path=/;max-age=31536000;samesite=lax';
-        }
-        function generateUid() {
-            if (window.crypto && window.crypto.getRandomValues) {
-                var bytes = new Uint8Array(16);
-                window.crypto.getRandomValues(bytes);
-                return Array.prototype.map.call(bytes, function(b) {
-                    return ('0' + b.toString(16)).slice(-2);
-                }).join('');
-            }
-            return Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2);
-        }
-        if (hasConsent()) {
-            overlay.classList.remove('is-visible');
-            overlay.setAttribute('aria-hidden', 'true');
-            return;
-        }
-        acceptBtn.addEventListener('click', function() {
-            var serverExpires = overlay.getAttribute('data-server-expires') || '';
-            var referrer = document.referrer || '';
-            if (referrer) {
-                setCookie('nammu_stats_referrer', encodeURIComponent(referrer), serverExpires);
-            }
-            setCookie('nammu_stats_consent', '1', serverExpires);
-            if (!document.cookie.split(';').some(function(part) { return part.trim().indexOf('nammu_stats_uid=') === 0; })) {
-                setCookie('nammu_stats_uid', generateUid(), serverExpires);
-            }
-            window.location.reload();
-        });
-        if (declineBtn) {
-            declineBtn.addEventListener('click', function() {
-                window.location.href = 'about:blank';
-            });
-        }
-    })();
-    </script>
-    <script>
-    (function() {
         var banner = document.querySelector('[data-ad-banner]');
         var closeBtn = document.querySelector('[data-ad-close]');
         if (!banner || !closeBtn) {
             return;
         }
         var serverDate = banner.getAttribute('data-server-date') || '';
-        var serverExpires = banner.getAttribute('data-server-expires') || '';
         var adLinkTarget = banner.getAttribute('data-ad-link-target') || '';
-        function hasConsent() {
-            return document.cookie.split(';').some(function(part) {
-                return part.trim().indexOf('nammu_stats_consent=1') === 0;
-            });
+        var closedKey = 'nammu_ad_closed';
+        function todayValue() {
+            if (serverDate !== '') {
+                return serverDate;
+            }
+            var now = new Date();
+            return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        }
+        try {
+            if (window.localStorage.getItem(closedKey) === todayValue()) {
+                banner.style.display = 'none';
+            }
+        } catch (e) {
         }
         function closeBanner() {
             banner.style.display = 'none';
-            if (!hasConsent()) {
-                return;
+            try {
+                window.localStorage.setItem(closedKey, todayValue());
+            } catch (e) {
             }
-            var value = serverDate || '';
-            var expiry = serverExpires || '';
-            if (value === '') {
-                var now = new Date();
-                var y = now.getFullYear();
-                var m = String(now.getMonth() + 1).padStart(2, '0');
-                var d = String(now.getDate()).padStart(2, '0');
-                value = y + '-' + m + '-' + d;
-            }
-            if (expiry === '') {
-                var localExpiry = new Date();
-                localExpiry.setHours(23, 59, 59, 999);
-                expiry = localExpiry.toUTCString();
-            }
-            document.cookie = 'nammu_ad_closed=' + value + ';path=/;expires=' + expiry + ';samesite=lax';
         }
         closeBtn.addEventListener('click', function() {
             closeBanner();
@@ -1936,12 +1795,6 @@ if (!empty($baseUrl)) {
         }
         var promptedKey = 'nammu_push_prompted';
         var promptCooldownDays = 16;
-
-        function hasConsent() {
-            return document.cookie.split(';').some(function(part) {
-                return part.trim().indexOf('nammu_stats_consent=1') === 0;
-            });
-        }
 
         function wasPrompted() {
             try {
@@ -2027,9 +1880,6 @@ if (!empty($baseUrl)) {
             });
         }
 
-        if (!hasConsent()) {
-            return;
-        }
         if (Notification.permission === 'granted') {
             trySubscribe();
             return;
@@ -2050,91 +1900,141 @@ if (!empty($baseUrl)) {
     </script>
     <script>
     (function() {
-        function buildCookieName(slug) {
+        // Progreso de itinerarios sin cookies: el servidor emite un token firmado (?p=) en cada página y en los
+        // enlaces entre temas; aquí sólo se guarda en localStorage para retomar otro día, se reescriben los
+        // enlaces con el token más completo y se envía la autoevaluación al servidor para corregirla.
+        var PARAM = 'p';
+        function normalizeSlug(slug) {
             var normalized = (slug || '').toString().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
-            if (!normalized) {
-                normalized = 'general';
-            }
-            return 'nammu_itinerary_progress_' + normalized;
+            return normalized || 'general';
         }
-        function readProgress(slug) {
-            var name = buildCookieName(slug) + '=';
-            var decoded = '';
-            document.cookie.split(';').forEach(function(part) {
-                var trimmed = part.trim();
-                if (trimmed.indexOf(name) === 0) {
-                    decoded = decodeURIComponent(trimmed.substring(name.length));
-                }
-            });
-            if (!decoded) {
-                return {visited: [], passed: []};
+        function storageKey(slug) {
+            return 'nammu_itinerary_token_' + normalizeSlug(slug);
+        }
+        function readStored(slug) {
+            try {
+                return window.localStorage.getItem(storageKey(slug)) || '';
+            } catch (e) {
+                return '';
+            }
+        }
+        function store(slug, token) {
+            if (!slug || !token) {
+                return;
             }
             try {
-                var parsed = JSON.parse(decoded);
+                window.localStorage.setItem(storageKey(slug), token);
+            } catch (e) {
+            }
+        }
+        function decodePayload(token) {
+            if (!token || token.indexOf('.') === -1) {
+                return null;
+            }
+            try {
+                var base64 = token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+                var binary = window.atob(base64);
+                var json = decodeURIComponent(Array.prototype.map.call(binary, function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                var parsed = JSON.parse(json);
                 return {
-                    visited: Array.isArray(parsed.visited) ? parsed.visited : [],
-                    passed: Array.isArray(parsed.passed) ? parsed.passed : []
+                    slug: parsed.i || '',
+                    visited: Array.isArray(parsed.v) ? parsed.v : [],
+                    passed: Array.isArray(parsed.p) ? parsed.p : []
                 };
             } catch (e) {
-                return {visited: [], passed: []};
+                return null;
             }
         }
-        function writeProgress(slug, data) {
-            var name = buildCookieName(slug);
-            var payload = encodeURIComponent(JSON.stringify(data));
-            var expires = document.body ? document.body.getAttribute('data-server-year-expires') : '';
-            if (expires) {
-                document.cookie = name + '=' + payload + ';path=/;expires=' + expires + ';samesite=lax';
+        function score(token) {
+            var payload = decodePayload(token);
+            return payload ? payload.visited.length + payload.passed.length : -1;
+        }
+        function urlToken() {
+            try {
+                return new URL(window.location.href).searchParams.get(PARAM) || '';
+            } catch (e) {
+                return '';
+            }
+        }
+        function withToken(url, token) {
+            if (!url || !token) {
+                return url;
+            }
+            try {
+                var parsed = new URL(url, window.location.href);
+                parsed.searchParams.set(PARAM, token);
+                return parsed.toString();
+            } catch (e) {
+                return url + (url.indexOf('?') === -1 ? '?' : '&') + PARAM + '=' + encodeURIComponent(token);
+            }
+        }
+        function cleanAddressBar() {
+            try {
+                var parsed = new URL(window.location.href);
+                if (parsed.searchParams.has(PARAM)) {
+                    parsed.searchParams.delete(PARAM);
+                    window.history.replaceState(null, '', parsed.toString());
+                }
+            } catch (e) {
+            }
+        }
+        function bestToken(slug, pageToken) {
+            var stored = readStored(slug);
+            var fromUrl = urlToken();
+            var candidates = [pageToken || '', fromUrl, stored];
+            var best = '';
+            candidates.forEach(function(candidate) {
+                var payload = decodePayload(candidate);
+                if (!payload || (payload.slug && payload.slug !== slug)) {
+                    return;
+                }
+                if (best === '' || score(candidate) > score(best)) {
+                    best = candidate;
+                }
+            });
+            return best;
+        }
+        var currentTokens = {};
+        function rewriteLinks(slug, token) {
+            if (!token) {
                 return;
             }
-            document.cookie = name + '=' + payload + ';path=/;max-age=31536000;samesite=lax';
+            document.querySelectorAll('[data-topic-link], [data-next-link]').forEach(function(link) {
+                var href = link.getAttribute('href') || link.getAttribute('data-original-href') || '';
+                if (!href || href.charAt(0) === '#') {
+                    return;
+                }
+                if (href.indexOf('/itinerarios/') === -1) {
+                    return;
+                }
+                var updated = withToken(href, token);
+                if (link.getAttribute('href')) {
+                    link.setAttribute('href', updated);
+                } else {
+                    link.setAttribute('data-original-href', updated);
+                }
+            });
         }
-        function ensureStructure(slug) {
-            var progress = readProgress(slug);
-            if (!Array.isArray(progress.visited)) {
-                progress.visited = [];
-            }
-            if (!Array.isArray(progress.passed)) {
-                progress.passed = [];
-            }
-            return progress;
-        }
-        function markVisited(slug, topic) {
-            if (!slug || !topic) {
+        function adoptToken(slug, token) {
+            if (!slug || !token) {
                 return;
             }
-            var progress = ensureStructure(slug);
-            if (progress.visited.indexOf(topic) === -1) {
-                progress.visited.push(topic);
-                writeProgress(slug, progress);
-            }
+            currentTokens[slug] = token;
+            store(slug, token);
+            rewriteLinks(slug, token);
         }
-        function markPassed(slug, topic) {
-            if (!slug || !topic) {
-                return;
-            }
-            var progress = ensureStructure(slug);
-            if (progress.passed.indexOf(topic) === -1) {
-                progress.passed.push(topic);
-                writeProgress(slug, progress);
-            }
-            return progress;
+        function progressFor(slug) {
+            var payload = decodePayload(currentTokens[slug] || readStored(slug));
+            return payload || {visited: [], passed: []};
         }
-
         function hasVisited(progress, topic) {
-            if (!topic) {
-                return true;
-            }
-            return progress.visited.indexOf(topic) !== -1;
+            return !topic || progress.visited.indexOf(topic) !== -1;
         }
-
         function hasPassed(progress, topic) {
-            if (!topic) {
-                return true;
-            }
-            return progress.passed.indexOf(topic) !== -1;
+            return !topic || progress.passed.indexOf(topic) !== -1;
         }
-
         function setLinkState(link, unlocked, disabledClass) {
             if (!link) {
                 return;
@@ -2143,8 +2043,6 @@ if (!empty($baseUrl)) {
                 var original = link.getAttribute('data-original-href');
                 if (original) {
                     link.setAttribute('href', original);
-                } else if (link.dataset.originalHref) {
-                    link.setAttribute('href', link.dataset.originalHref);
                 }
                 link.classList.remove('is-disabled');
                 if (disabledClass) {
@@ -2167,39 +2065,23 @@ if (!empty($baseUrl)) {
                 link.setAttribute('tabindex', '-1');
             }
         }
-
         function toggleTopicCard(card, unlocked) {
             var lockMessage = card.querySelector('[data-topic-lock-message]');
-            var links = card.querySelectorAll('[data-topic-link]');
-            if (unlocked) {
-                card.classList.remove('itinerary-topic-card--locked');
-                links.forEach(function(link) {
-                    setLinkState(link, true);
-                });
-                if (lockMessage) {
-                    lockMessage.style.display = 'none';
-                }
-            } else {
-                card.classList.add('itinerary-topic-card--locked');
-                links.forEach(function(link) {
-                    setLinkState(link, false);
-                });
-                if (lockMessage) {
-                    lockMessage.style.display = '';
-                }
+            card.classList.toggle('itinerary-topic-card--locked', !unlocked);
+            card.querySelectorAll('[data-topic-link]').forEach(function(link) {
+                setLinkState(link, unlocked);
+            });
+            if (lockMessage) {
+                lockMessage.style.display = unlocked ? 'none' : '';
             }
         }
-
         function applyTopicLocks(container) {
             var slug = container.getAttribute('data-itinerary-slug') || '';
-            if (!slug) {
-                return;
-            }
             var usageLogic = container.getAttribute('data-usage-logic') || 'free';
-            if (usageLogic === 'free') {
+            if (!slug || usageLogic === 'free') {
                 return;
             }
-            var progress = ensureStructure(slug);
+            var progress = progressFor(slug);
             var cards = container.querySelectorAll('[data-itinerary-topic]');
             if (!cards.length) {
                 return;
@@ -2207,148 +2089,156 @@ if (!empty($baseUrl)) {
             var usesAssessment = usageLogic === 'assessment';
             var baseUnlocked = usesAssessment ? hasPassed(progress, '__presentation') : hasVisited(progress, '__presentation');
             var highestCompletedIndex = -1;
-            var cardStates = [];
+            var states = [];
             cards.forEach(function(card, index) {
                 var topicSlug = card.getAttribute('data-topic-slug') || '';
                 var completed = usesAssessment ? hasPassed(progress, topicSlug) : hasVisited(progress, topicSlug);
                 if (completed && index > highestCompletedIndex) {
                     highestCompletedIndex = index;
                 }
-                cardStates.push({element: card, completed: completed});
+                states.push({element: card, completed: completed});
             });
             if (!baseUnlocked && highestCompletedIndex >= 0) {
                 baseUnlocked = true;
             }
             var maxUnlockedIndex = baseUnlocked ? Math.min(cards.length - 1, highestCompletedIndex + 1) : -1;
-            cardStates.forEach(function(entry, index) {
-                var unlocked = false;
-                if (entry.completed) {
-                    unlocked = true;
-                } else if (baseUnlocked && index === (highestCompletedIndex + 1) && index <= maxUnlockedIndex) {
-                    unlocked = true;
-                }
+            states.forEach(function(entry, index) {
+                var unlocked = entry.completed || (baseUnlocked && index === highestCompletedIndex + 1 && index <= maxUnlockedIndex);
                 toggleTopicCard(entry.element, unlocked);
             });
             var startLink = container.querySelector('[data-first-topic-link]');
             if (startLink) {
-                var firstUnlocked = baseUnlocked && maxUnlockedIndex >= 0;
-                setLinkState(startLink, firstUnlocked, 'button-disabled');
+                setLinkState(startLink, baseUnlocked && maxUnlockedIndex >= 0, 'button-disabled');
             }
         }
-
-        var quizBlocks = document.querySelectorAll('[data-itinerary-quiz]');
-        quizBlocks.forEach(function(quizBlock) {
+        // Adopta el mejor token disponible para cada itinerario presente en la página.
+        var hadTokenInUrl = urlToken() !== '';
+        document.querySelectorAll('[data-itinerary-quiz], [data-itinerary-topic-cta], [data-itinerary-topics], [data-itinerary-locked]').forEach(function(block) {
+            var slug = block.getAttribute('data-itinerary-slug') || '';
+            if (!slug || currentTokens[slug]) {
+                return;
+            }
+            var token = bestToken(slug, block.getAttribute('data-progress-token') || '');
+            if (token) {
+                adoptToken(slug, token);
+            }
+        });
+        if (hadTokenInUrl) {
+            cleanAddressBar();
+        }
+        document.querySelectorAll('[data-itinerary-quiz]').forEach(function(quizBlock) {
             var slug = quizBlock.getAttribute('data-itinerary-slug');
             var topic = quizBlock.getAttribute('data-topic-slug');
+            var endpoint = quizBlock.getAttribute('data-quiz-endpoint') || '';
             var minCorrect = parseInt(quizBlock.getAttribute('data-min-correct'), 10) || 1;
             var submitBtn = quizBlock.querySelector('[data-quiz-submit]');
             var resultBox = quizBlock.querySelector('[data-quiz-result]');
-            if (!slug || !topic || !submitBtn || !resultBox) {
+            if (!slug || !topic || !endpoint || !submitBtn || !resultBox) {
                 return;
             }
             submitBtn.addEventListener('click', function() {
-                var questions = quizBlock.querySelectorAll('[data-quiz-question]');
-                if (!questions.length) {
-                    return;
-                }
-                var correctCount = 0;
-                questions.forEach(function(question) {
-                    var answers = question.querySelectorAll('[data-quiz-answer]');
-                    var isCorrect = true;
-                    answers.forEach(function(answer) {
-                        var shouldBeChecked = answer.getAttribute('data-correct') === '1';
-                        var checked = answer.checked;
-                        if (shouldBeChecked !== checked) {
-                            isCorrect = false;
+                var answers = {};
+                quizBlock.querySelectorAll('[data-quiz-question]').forEach(function(question) {
+                    var questionIndex = question.getAttribute('data-question-index');
+                    if (questionIndex === null) {
+                        return;
+                    }
+                    var checked = [];
+                    question.querySelectorAll('[data-quiz-answer]').forEach(function(answer) {
+                        if (answer.checked) {
+                            checked.push(parseInt(answer.getAttribute('data-answer-index'), 10));
                         }
                     });
-                    if (isCorrect) {
-                        correctCount += 1;
-                    }
+                    answers[questionIndex] = checked;
                 });
-                var totalQuestions = questions.length;
-                var percentage = Math.round((correctCount / totalQuestions) * 100);
-                var passed = correctCount >= minCorrect;
-                var message = 'Has respondido correctamente el ' + percentage + '% (' + correctCount + ' de ' + totalQuestions + ' preguntas). ';
-                message += passed
-                    ? 'Has superado el mínimo establecido.'
-                    : 'No alcanzas el mínimo de ' + minCorrect + ' preguntas.';
-                resultBox.textContent = message;
-                resultBox.classList.toggle('text-success', passed);
-                resultBox.classList.toggle('text-danger', !passed);
-                if (passed) {
-                    markPassed(slug, topic);
-                    document.dispatchEvent(new CustomEvent('itineraryQuizPassed', {
-                        detail: {slug: slug, topic: topic}
-                    }));
-                }
+                submitBtn.disabled = true;
+                resultBox.textContent = 'Corrigiendo…';
+                resultBox.classList.remove('text-success', 'text-danger');
+                var body = {answers: answers};
+                body[PARAM] = currentTokens[slug] || readStored(slug) || '';
+                window.fetch(endpoint, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                    body: JSON.stringify(body)
+                }).then(function(response) {
+                    return response.json();
+                }).then(function(data) {
+                    submitBtn.disabled = false;
+                    if (!data || !data.ok) {
+                        resultBox.textContent = 'No se ha podido corregir la autoevaluación. Inténtalo de nuevo.';
+                        resultBox.classList.add('text-danger');
+                        return;
+                    }
+                    var total = data.total || 0;
+                    var percentage = total > 0 ? Math.round((data.correct / total) * 100) : 0;
+                    var message = 'Has respondido correctamente el ' + percentage + '% (' + data.correct + ' de ' + total + ' preguntas). ';
+                    message += data.passed
+                        ? 'Has superado el mínimo establecido.'
+                        : 'No alcanzas el mínimo de ' + (data.minimum || minCorrect) + ' preguntas.';
+                    resultBox.textContent = message;
+                    resultBox.classList.toggle('text-success', !!data.passed);
+                    resultBox.classList.toggle('text-danger', !data.passed);
+                    if (data.token) {
+                        adoptToken(slug, data.token);
+                    }
+                    if (data.passed) {
+                        document.dispatchEvent(new CustomEvent('itineraryQuizPassed', {
+                            detail: {slug: slug, topic: topic}
+                        }));
+                    }
+                }).catch(function() {
+                    submitBtn.disabled = false;
+                    resultBox.textContent = 'No se ha podido corregir la autoevaluación. Comprueba la conexión e inténtalo de nuevo.';
+                    resultBox.classList.add('text-danger');
+                });
             });
         });
-
         var ctaBlock = document.querySelector('[data-itinerary-topic-cta]');
         if (ctaBlock) {
-            var slug = ctaBlock.getAttribute('data-itinerary-slug');
-            var topic = ctaBlock.getAttribute('data-topic-slug');
-            var usageLogic = ctaBlock.getAttribute('data-usage-logic') || 'free';
+            var ctaSlug = ctaBlock.getAttribute('data-itinerary-slug');
+            var ctaTopic = ctaBlock.getAttribute('data-topic-slug');
             var requiresQuiz = ctaBlock.getAttribute('data-requires-quiz') === '1';
-            var initialPassed = ctaBlock.getAttribute('data-initial-passed') === '1';
+            var initialPassed = ctaBlock.getAttribute('data-initial-passed') === '1' || hasPassed(progressFor(ctaSlug), ctaTopic);
             var nextLink = ctaBlock.querySelector('[data-next-link]');
             var lockedNotice = ctaBlock.querySelector('[data-next-locked]');
-
-            markVisited(slug, topic);
-
+            var locked = requiresQuiz && !initialPassed;
             function setLocked(state) {
                 if (!nextLink) {
                     return;
                 }
+                nextLink.classList.toggle('button-disabled', state);
                 if (state) {
-                    nextLink.classList.add('button-disabled');
                     nextLink.setAttribute('aria-disabled', 'true');
                     nextLink.setAttribute('tabindex', '-1');
-                    if (lockedNotice) {
-                        lockedNotice.style.display = '';
-                    }
                 } else {
-                    nextLink.classList.remove('button-disabled');
                     nextLink.removeAttribute('aria-disabled');
                     nextLink.removeAttribute('tabindex');
-                    if (lockedNotice) {
-                        lockedNotice.style.display = 'none';
-                    }
+                }
+                if (lockedNotice) {
+                    lockedNotice.style.display = state ? '' : 'none';
                 }
             }
-
-            var locked = requiresQuiz && !initialPassed;
             setLocked(locked);
-
             if (nextLink) {
                 nextLink.addEventListener('click', function(event) {
-                    if (requiresQuiz && locked) {
+                    if (locked) {
                         event.preventDefault();
                     }
                 });
             }
-
             document.addEventListener('itineraryQuizPassed', function(event) {
-                if (!event.detail || event.detail.slug !== slug || event.detail.topic !== topic) {
+                if (!event.detail || event.detail.slug !== ctaSlug || event.detail.topic !== ctaTopic) {
                     return;
                 }
                 locked = false;
                 setLocked(false);
             });
         }
-
-        var topicContainers = document.querySelectorAll('[data-itinerary-topics]');
-        topicContainers.forEach(function(container) {
+        document.querySelectorAll('[data-itinerary-topics]').forEach(function(container) {
             var slug = container.getAttribute('data-itinerary-slug');
             if (!slug) {
                 return;
-            }
-            var usageLogic = container.getAttribute('data-usage-logic') || 'free';
-            var presentationQuiz = container.getAttribute('data-presentation-quiz') === '1';
-            markVisited(slug, '__presentation');
-            if (usageLogic === 'assessment' && !presentationQuiz) {
-                markPassed(slug, '__presentation');
             }
             applyTopicLocks(container);
             document.addEventListener('itineraryQuizPassed', function(event) {
@@ -2571,5 +2461,28 @@ if (!empty($baseUrl)) {
         scheduleRestack();
     })();
     </script>
+<?php if ($statsBeaconDescriptor !== '' && $statsBeaconUrl !== ''): ?>
+    <script>
+    (function() {
+        // Estadísticas sin cookies: una única petición con la página vista (descriptor firmado por el servidor),
+        // el referer y la URL. No se guarda nada en el navegador.
+        var payload = JSON.stringify({
+            pv: <?= json_encode($statsBeaconDescriptor, JSON_UNESCAPED_SLASHES) ?>,
+            ref: document.referrer || '',
+            url: window.location.href
+        });
+        var url = <?= json_encode($statsBeaconUrl, JSON_UNESCAPED_SLASHES) ?>;
+        try {
+            if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([payload], {type: 'application/json'}))) {
+                return;
+            }
+        } catch (e) {
+        }
+        if (window.fetch) {
+            window.fetch(url, {method: 'POST', keepalive: true, credentials: 'omit', headers: {'Content-Type': 'application/json'}, body: payload}).catch(function() {});
+        }
+    })();
+    </script>
+<?php endif; ?>
 </body>
 </html>

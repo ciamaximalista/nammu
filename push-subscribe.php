@@ -20,12 +20,6 @@ if (($settings['push_enabled'] ?? 'off') !== 'on') {
     exit;
 }
 
-if (function_exists('nammu_has_stats_consent') && !nammu_has_stats_consent()) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'error' => 'Consentimiento requerido.']);
-    exit;
-}
-
 $raw = (string) file_get_contents('php://input');
 $payload = json_decode($raw, true);
 if (!is_array($payload)) {

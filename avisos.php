@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-session_start();
+// Sin sesión PHP: esta página no la usa y abrirla ponía la cookie PHPSESSID a todos los visitantes.
 
 require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';

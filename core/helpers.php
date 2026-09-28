@@ -79,6 +79,10 @@ function nammu_backup_dir(array $config = [], ?string $root = null): string
     return $directory . '/' . $siteDirectory;
 }
 
+/**
+ * Nammu ya no escribe cookies a los visitantes. Esta función sólo se conserva para caducar las que quedaron en
+ * navegadores antiguos (nammu_expire_legacy_cookies) y para la sesión de administración.
+ */
 function nammu_set_cookie(string $name, string $value, int $expires, bool $httpOnly = true, string $sameSite = 'Lax'): void
 {
     $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
@@ -333,39 +337,131 @@ function nammu_route_path(): string
     return $path === '' ? '/' : $path;
 }
 
-function nammu_stats_consent_cookie_name(): string
+/*
+ * Estadísticas sin cookies (método Plausible, nativo en Nammu).
+ *
+ * No se escribe nada en el navegador ni se pide consentimiento. El visitante único del día es un hash de
+ * (sal del día + IP + navegador + sitio). La sal se genera cada día y no se conserva, así que el hash no se
+ * puede invertir ni enlazar con el de otro día; la IP nunca se guarda. La página vista la envía un JS mínimo
+ * (beacon) a /__estadisticas con un descriptor firmado por el servidor, de modo que sólo cuentan navegadores
+ * reales y no se pueden inventar páginas. Los bots se registran aparte, en el servidor, por su User-Agent.
+ */
+function nammu_analytics_salt_file_path(): string
 {
-    return 'nammu_stats_consent';
+    return dirname(__DIR__) . '/config/analytics-salt.json';
 }
 
-function nammu_stats_uid_cookie_name(): string
+function nammu_analytics_daily_salt(): string
 {
-    return 'nammu_stats_uid';
-}
-
-function nammu_has_stats_consent(): bool
-{
-    return ($_COOKIE[nammu_stats_consent_cookie_name()] ?? '') === '1';
-}
-
-function nammu_stats_uid(): ?string
-{
-    if (!nammu_has_stats_consent()) {
-        return null;
+    static $cached = null;
+    $today = date('Y-m-d');
+    if (is_array($cached) && ($cached['date'] ?? '') === $today && ($cached['salt'] ?? '') !== '') {
+        return (string) $cached['salt'];
     }
-    $cookieName = nammu_stats_uid_cookie_name();
-    $existing = trim((string) ($_COOKIE[$cookieName] ?? ''));
-    if ($existing !== '') {
-        return $existing;
+    $file = nammu_analytics_salt_file_path();
+    $stored = is_file($file) ? json_decode((string) @file_get_contents($file), true) : null;
+    if (is_array($stored) && ($stored['date'] ?? '') === $today && trim((string) ($stored['salt'] ?? '')) !== '') {
+        $cached = ['date' => $today, 'salt' => (string) $stored['salt']];
+        return (string) $stored['salt'];
     }
     try {
-        $uid = bin2hex(random_bytes(16));
+        $salt = bin2hex(random_bytes(32));
     } catch (Throwable $e) {
-        $uid = bin2hex(pack('N', time())) . bin2hex(pack('N', mt_rand(1, PHP_INT_MAX)));
+        $salt = hash('sha256', uniqid('', true) . mt_rand());
     }
-    nammu_set_cookie($cookieName, $uid, time() + 31536000);
-    $_COOKIE[$cookieName] = $uid;
-    return $uid;
+    nammu_ensure_directory(dirname($file));
+    $payload = json_encode(['date' => $today, 'salt' => $salt], JSON_UNESCAPED_SLASHES);
+    if (is_string($payload)) {
+        nammu_atomic_write_file($file, $payload);
+        nammu_apply_shared_permissions($file, 0640, dirname($file));
+    }
+    $cached = ['date' => $today, 'salt' => $salt];
+    return $salt;
+}
+
+function nammu_visitor_hash(?string $ip = null, ?string $userAgent = null): string
+{
+    $ip = trim((string) ($ip ?? ($_SERVER['REMOTE_ADDR'] ?? '')));
+    $userAgent = trim((string) ($userAgent ?? ($_SERVER['HTTP_USER_AGENT'] ?? '')));
+    $host = strtolower(trim((string) ($_SERVER['HTTP_HOST'] ?? '')));
+    return substr(hash('sha256', nammu_analytics_daily_salt() . '|' . $ip . '|' . $userAgent . '|' . $host), 0, 32);
+}
+
+function nammu_stats_beacon_path(): string
+{
+    return '/__estadisticas';
+}
+
+/**
+ * Descriptor firmado de la página vista que el navegador devuelve en el beacon. Sólo vale el día de su emisión.
+ */
+function nammu_stats_beacon_descriptor(string $type = '', string $slug = '', string $title = ''): string
+{
+    $payload = [
+        'd' => date('Y-m-d'),
+        't' => $type,
+        's' => $slug,
+        'n' => mb_substr($title, 0, 200, 'UTF-8'),
+    ];
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($json)) {
+        return '';
+    }
+    $encoded = nammu_base64url_encode($json);
+    return $encoded . '.' . nammu_base64url_encode(hash_hmac('sha256', $encoded, nammu_mailing_secret(), true));
+}
+
+function nammu_stats_beacon_descriptor_decode(string $descriptor): ?array
+{
+    $descriptor = trim($descriptor);
+    if ($descriptor === '' || strlen($descriptor) > 4096 || substr_count($descriptor, '.') !== 1) {
+        return null;
+    }
+    [$encoded, $signature] = explode('.', $descriptor, 2);
+    $expected = nammu_base64url_encode(hash_hmac('sha256', $encoded, nammu_mailing_secret(), true));
+    if ($encoded === '' || !hash_equals($expected, $signature)) {
+        return null;
+    }
+    $payload = json_decode(nammu_base64url_decode($encoded), true);
+    if (!is_array($payload) || ($payload['d'] ?? '') !== date('Y-m-d')) {
+        return null;
+    }
+    return [
+        'type' => (string) ($payload['t'] ?? ''),
+        'slug' => (string) ($payload['s'] ?? ''),
+        'title' => (string) ($payload['n'] ?? ''),
+    ];
+}
+
+function nammu_stats_pending_pageview(): ?array
+{
+    $pending = $GLOBALS['nammu_pending_pageview'] ?? null;
+    return is_array($pending) ? $pending : null;
+}
+
+/**
+ * Caduca las cookies que Nammu ponía antes (consentimiento, id de visitante, progreso de itinerarios, anuncio
+ * cerrado) en los navegadores que todavía las tengan. Se llama al pintar el layout.
+ */
+function nammu_expire_legacy_cookies(): void
+{
+    if (headers_sent() || empty($_COOKIE)) {
+        return;
+    }
+    foreach (array_keys($_COOKIE) as $name) {
+        $name = (string) $name;
+        if (
+            $name === 'nammu_stats_consent'
+            || $name === 'nammu_stats_uid'
+            || $name === 'nammu_stats_referrer'
+            || $name === 'nammu_ad_closed'
+            || $name === 'nammu_newsletter_access'
+            || $name === 'nammu_rejected_origin'
+            || str_starts_with($name, 'nammu_itinerary_progress_')
+        ) {
+            nammu_set_cookie($name, '', time() - 86400);
+        }
+    }
 }
 
 function nammu_analytics_file_path(): string
@@ -454,8 +550,45 @@ function nammu_atomic_write_file(string $file, string $payload): bool
     return true;
 }
 
-function nammu_load_analytics(): array
+/**
+ * Cerrojo de escritura de analytics.json. Cada registro hace leer-modificar-guardar sobre un JSON de varios MB;
+ * sin cerrojo, dos peticiones a la vez se pisaban y una perdía sus datos. Se toma al cargar "para actualizar"
+ * (nammu_load_analytics(true)) y se suelta al guardar o con nammu_analytics_unlock().
+ */
+function nammu_analytics_lock(): void
 {
+    if (!empty($GLOBALS['nammu_analytics_lock_handle'])) {
+        return;
+    }
+    $lockFile = nammu_analytics_file_path() . '.lock';
+    nammu_ensure_directory(dirname($lockFile));
+    $handle = @fopen($lockFile, 'c+');
+    if (!is_resource($handle)) {
+        return;
+    }
+    if (!@flock($handle, LOCK_EX)) {
+        @fclose($handle);
+        return;
+    }
+    nammu_apply_shared_permissions($lockFile, 0664, dirname($lockFile));
+    $GLOBALS['nammu_analytics_lock_handle'] = $handle;
+}
+
+function nammu_analytics_unlock(): void
+{
+    $handle = $GLOBALS['nammu_analytics_lock_handle'] ?? null;
+    if (is_resource($handle)) {
+        @flock($handle, LOCK_UN);
+        @fclose($handle);
+    }
+    $GLOBALS['nammu_analytics_lock_handle'] = null;
+}
+
+function nammu_load_analytics(bool $forUpdate = false): array
+{
+    if ($forUpdate) {
+        nammu_analytics_lock();
+    }
     $file = nammu_analytics_file_path();
     $lastGood = nammu_analytics_last_good_file_path();
     if (!is_file($file)) {
@@ -775,7 +908,7 @@ function nammu_record_bot_visit(string $userAgent): void
     if ($botName === '') {
         return;
     }
-    $data = nammu_load_analytics();
+    $data = nammu_load_analytics(true);
     $date = date('Y-m-d');
     if (!isset($data['bots']['daily'][$date])) {
         $data['bots']['daily'][$date] = [];
@@ -801,6 +934,7 @@ function nammu_save_analytics(array $data): void
     if (nammu_atomic_write_file($file, $payload)) {
         nammu_atomic_write_file($lastGood, $payload);
     }
+    nammu_analytics_unlock();
 }
 
 function nammu_analytics_touch_visit(array &$data, string $uid, string $date): bool
@@ -973,25 +1107,27 @@ function nammu_record_platform_visit(array &$data, string $uid, string $date): b
     return $changed;
 }
 
-function nammu_record_visit(): void
+/**
+ * Registra la visita (visitante único del día, plataforma y origen). Desde el beacon se pasan el referer y la
+ * query de la página real, porque la petición al endpoint no los lleva.
+ */
+function nammu_record_visit(?string $referrerOverride = null, ?array $queryOverride = null): void
 {
-    if (!nammu_has_stats_consent()) {
-        return;
-    }
     if (!empty($GLOBALS['nammu_analytics_visit_recorded'])) {
         return;
     }
-    $uid = nammu_stats_uid();
+    $uid = nammu_visitor_hash();
     if ($uid === null) {
         return;
     }
-    $data = nammu_load_analytics();
+    $data = nammu_load_analytics(true);
     $date = date('Y-m-d');
     $changed = nammu_analytics_touch_visit($data, $uid, $date);
     if (nammu_record_platform_visit($data, $uid, $date)) {
         $changed = true;
     }
-    $referrer = $_SERVER['HTTP_REFERER'] ?? '';
+    $referrer = $referrerOverride ?? ($_SERVER['HTTP_REFERER'] ?? '');
+    $query = $queryOverride ?? $_GET;
     $host = $_SERVER['HTTP_HOST'] ?? '';
     $isSelfReferrer = false;
     if ($referrer !== '') {
@@ -1002,19 +1138,8 @@ function nammu_record_visit(): void
             $isSelfReferrer = true;
         }
     }
-    if (($referrer === '' || $isSelfReferrer) && isset($_COOKIE['nammu_stats_referrer'])) {
-        $storedRef = trim((string) $_COOKIE['nammu_stats_referrer']);
-        if ($storedRef !== '') {
-            $decodedRef = urldecode($storedRef);
-            if ($decodedRef !== '') {
-                $referrer = $decodedRef;
-            }
-        }
-        nammu_set_cookie('nammu_stats_referrer', '', time() - 3600);
-        unset($_COOKIE['nammu_stats_referrer']);
-    }
-    $utmSource = strtolower(trim((string) ($_GET['utm_source'] ?? '')));
-    $utmMedium = strtolower(trim((string) ($_GET['utm_medium'] ?? '')));
+    $utmSource = strtolower(trim((string) ($query['utm_source'] ?? '')));
+    $utmMedium = strtolower(trim((string) ($query['utm_medium'] ?? '')));
     $sourceMap = [
         'email' => 'Suscriptores',
         'correo' => 'Suscriptores',
@@ -1129,20 +1254,28 @@ function nammu_record_visit(): void
     if ($changed) {
         $data['updated_at'] = time();
         nammu_save_analytics($data);
+    } else {
+        nammu_analytics_unlock();
     }
     $GLOBALS['nammu_analytics_visit_recorded'] = true;
 }
 
+/**
+ * Las rutas siguen llamando a esta función al pintar la página, pero ya no escribe: deja el descriptor pendiente
+ * para que el layout lo firme y el navegador lo devuelva por el beacon. Así sólo cuentan navegadores reales.
+ */
 function nammu_record_pageview(string $type, string $slug, string $title = ''): void
 {
-    if (!nammu_has_stats_consent()) {
-        return;
-    }
-    $uid = nammu_stats_uid();
+    $GLOBALS['nammu_pending_pageview'] = ['type' => $type, 'slug' => $slug, 'title' => $title];
+}
+
+function nammu_record_pageview_now(string $type, string $slug, string $title = ''): void
+{
+    $uid = nammu_visitor_hash();
     if ($uid === null) {
         return;
     }
-    $data = nammu_load_analytics();
+    $data = nammu_load_analytics(true);
     $date = date('Y-m-d');
     $changed = nammu_analytics_touch_visit($data, $uid, $date);
     $bucket = $type === 'pages' ? 'pages' : 'posts';
@@ -1185,10 +1318,10 @@ function nammu_record_pageview(string $type, string $slug, string $title = ''): 
 
 function nammu_record_internal_search(string $query): void
 {
-    if (!nammu_has_stats_consent()) {
+    if (nammu_is_crawler_user_agent((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''))) {
         return;
     }
-    $uid = nammu_stats_uid();
+    $uid = nammu_visitor_hash();
     if ($uid === null) {
         return;
     }
@@ -1210,7 +1343,7 @@ function nammu_record_internal_search(string $query): void
     } else {
         $query = substr($query, 0, 120);
     }
-    $data = nammu_load_analytics();
+    $data = nammu_load_analytics(true);
     $date = date('Y-m-d');
     $changed = nammu_analytics_touch_visit($data, $uid, $date);
     if (!isset($data['searches']['daily'][$date])) {
@@ -1239,14 +1372,14 @@ function nammu_record_internal_search(string $query): void
 
 function nammu_record_itinerary_event(string $slug, string $event): void
 {
-    if (!nammu_has_stats_consent()) {
+    if (nammu_is_crawler_user_agent((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''))) {
         return;
     }
-    $uid = nammu_stats_uid();
+    $uid = nammu_visitor_hash();
     if ($uid === null) {
         return;
     }
-    $data = nammu_load_analytics();
+    $data = nammu_load_analytics(true);
     $date = date('Y-m-d');
     $changed = nammu_analytics_touch_visit($data, $uid, $date);
     if (!isset($data['itineraries']['items'])) {
@@ -3668,78 +3801,175 @@ function nammu_letter_sort_weight(string $letter): int
     return $ord;
 }
 
-function nammu_itinerary_progress_cookie_name(string $slug): string
+/*
+ * Progreso de itinerarios sin cookies.
+ *
+ * El avance del alumno (temas leídos y autoevaluaciones superadas) viaja en un token firmado con HMAC que el
+ * servidor emite en cada página y añade a los enlaces entre temas (parámetro ?p=). El navegador lo guarda además
+ * en localStorage para retomar el itinerario otro día. No hay cookie: nada viaja solo con cada petición ni
+ * identifica al alumno; el token sólo dice qué pasos de un itinerario concreto se han completado y no se puede
+ * falsificar sin la clave del sitio.
+ */
+function nammu_itinerary_progress_param(): string
 {
-    $normalized = strtolower($slug);
-    $normalized = preg_replace('/[^a-z0-9-]+/i', '-', $normalized);
-    $normalized = trim((string) $normalized, '-');
-    if ($normalized === '') {
-        $normalized = 'general';
-    }
-    return 'nammu_itinerary_progress_' . $normalized;
+    return 'p';
 }
 
-function nammu_get_itinerary_progress(string $slug): array
+function nammu_itinerary_progress_secret(): string
 {
-    $cookieName = nammu_itinerary_progress_cookie_name($slug);
-    $raw = $_COOKIE[$cookieName] ?? '';
-    $default = [
-        'visited' => [],
-        'passed' => [],
-    ];
-    if (!is_string($raw) || trim($raw) === '') {
-        return $default;
-    }
-    $decoded = json_decode($raw, true);
-    if (!is_array($decoded)) {
-        return $default;
-    }
-    $visited = [];
-    foreach ($decoded['visited'] ?? [] as $value) {
-        $item = trim((string) $value);
-        if ($item !== '') {
-            $visited[$item] = true;
-        }
-    }
-    $passed = [];
-    foreach ($decoded['passed'] ?? [] as $value) {
-        $item = trim((string) $value);
-        if ($item !== '') {
-            $passed[$item] = true;
-        }
-    }
-    return [
-        'visited' => array_keys($visited),
-        'passed' => array_keys($passed),
-    ];
+    return hash_hmac('sha256', 'itinerary-progress-v1', nammu_mailing_secret());
 }
 
-function nammu_set_itinerary_progress(string $slug, array $progress): void
+function nammu_itinerary_progress_normalize(array $progress): array
 {
-    $visited = [];
-    foreach ($progress['visited'] ?? [] as $value) {
-        $item = trim((string) $value);
-        if ($item !== '') {
-            $visited[$item] = true;
+    $normalized = ['visited' => [], 'passed' => []];
+    foreach (['visited', 'passed'] as $key) {
+        $seen = [];
+        foreach ((array) ($progress[$key] ?? []) as $value) {
+            $item = trim((string) $value);
+            if ($item !== '' && !isset($seen[$item])) {
+                $seen[$item] = true;
+            }
         }
+        $normalized[$key] = array_keys($seen);
     }
-    $passed = [];
-    foreach ($progress['passed'] ?? [] as $value) {
-        $item = trim((string) $value);
-        if ($item !== '') {
-            $passed[$item] = true;
-        }
-    }
+    return $normalized;
+}
+
+function nammu_itinerary_progress_token(string $slug, array $progress): string
+{
+    $progress = nammu_itinerary_progress_normalize($progress);
     $payload = json_encode([
-        'visited' => array_keys($visited),
-        'passed' => array_keys($passed),
+        'i' => $slug,
+        'v' => $progress['visited'],
+        'p' => $progress['passed'],
+        't' => time(),
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($payload === false) {
-        return;
+    if (!is_string($payload)) {
+        return '';
     }
-    $cookieName = nammu_itinerary_progress_cookie_name($slug);
-    nammu_set_cookie($cookieName, $payload, time() + 31536000);
-    $_COOKIE[$cookieName] = $payload;
+    $encoded = nammu_base64url_encode($payload);
+    $signature = nammu_base64url_encode(hash_hmac('sha256', $encoded, nammu_itinerary_progress_secret(), true));
+    return $encoded . '.' . $signature;
+}
+
+function nammu_itinerary_progress_from_token(string $slug, ?string $token): array
+{
+    $empty = ['visited' => [], 'passed' => []];
+    $token = trim((string) $token);
+    if ($token === '' || strlen($token) > 8192 || substr_count($token, '.') !== 1) {
+        return $empty;
+    }
+    [$encoded, $signature] = explode('.', $token, 2);
+    if ($encoded === '' || $signature === '') {
+        return $empty;
+    }
+    $expected = nammu_base64url_encode(hash_hmac('sha256', $encoded, nammu_itinerary_progress_secret(), true));
+    if (!hash_equals($expected, $signature)) {
+        return $empty;
+    }
+    $decoded = json_decode(nammu_base64url_decode($encoded), true);
+    if (!is_array($decoded) || trim((string) ($decoded['i'] ?? '')) !== $slug) {
+        return $empty;
+    }
+    return nammu_itinerary_progress_normalize([
+        'visited' => (array) ($decoded['v'] ?? []),
+        'passed' => (array) ($decoded['p'] ?? []),
+    ]);
+}
+
+function nammu_itinerary_progress_request_token(): string
+{
+    $param = nammu_itinerary_progress_param();
+    $token = $_POST[$param] ?? ($_GET[$param] ?? '');
+    return is_string($token) ? trim($token) : '';
+}
+
+function nammu_get_itinerary_progress(string $slug, ?string $token = null): array
+{
+    return nammu_itinerary_progress_from_token($slug, $token ?? nammu_itinerary_progress_request_token());
+}
+
+function nammu_itinerary_url_with_progress(string $url, string $token): string
+{
+    $token = trim($token);
+    if ($token === '' || $url === '') {
+        return $url;
+    }
+    $separator = str_contains($url, '?') ? '&' : '?';
+    return $url . $separator . nammu_itinerary_progress_param() . '=' . rawurlencode($token);
+}
+
+/**
+ * Decide si el alumno puede abrir un tema según el modo del itinerario y su progreso verificado.
+ *
+ * @param string[] $orderedSlugs   slugs de los temas en orden
+ * @param string[] $topicsWithTest slugs de los temas que tienen autoevaluación
+ */
+function nammu_itinerary_step_gate(array $orderedSlugs, string $topicSlug, string $usageLogic, array $progress, bool $presentationHasQuiz, array $topicsWithTest): array
+{
+    $progress = nammu_itinerary_progress_normalize($progress);
+    $visited = array_flip($progress['visited']);
+    $passed = array_flip($progress['passed']);
+    if ($usageLogic !== 'sequential' && $usageLogic !== 'assessment') {
+        return ['allowed' => true, 'required' => ''];
+    }
+    if (isset($visited[$topicSlug]) || isset($passed[$topicSlug])) {
+        return ['allowed' => true, 'required' => ''];
+    }
+    $index = array_search($topicSlug, $orderedSlugs, true);
+    if ($index === false) {
+        return ['allowed' => true, 'required' => ''];
+    }
+    $previous = $index > 0 ? (string) $orderedSlugs[$index - 1] : '__presentation';
+    if (!isset($visited[$previous]) && !isset($passed[$previous])) {
+        return ['allowed' => false, 'required' => $previous];
+    }
+    if ($usageLogic === 'assessment') {
+        $previousHasTest = $previous === '__presentation' ? $presentationHasQuiz : in_array($previous, $topicsWithTest, true);
+        if ($previousHasTest && !isset($passed[$previous])) {
+            return ['allowed' => false, 'required' => $previous];
+        }
+    }
+    return ['allowed' => true, 'required' => ''];
+}
+
+/**
+ * Corrige una autoevaluación en el servidor. $answers es un mapa índice de pregunta => índices de respuesta marcados
+ * (índices originales del test, no del orden barajado). Una pregunta cuenta como acertada si el conjunto marcado
+ * coincide exactamente con el de respuestas correctas.
+ */
+function nammu_itinerary_grade_quiz(array $quiz, array $answers): array
+{
+    $questions = array_values((array) ($quiz['questions'] ?? []));
+    $total = count($questions);
+    if ($total === 0) {
+        return ['correct' => 0, 'total' => 0, 'minimum' => 0, 'passed' => false];
+    }
+    $minimum = (int) ($quiz['minimum_correct'] ?? $total);
+    $minimum = max(1, min($total, $minimum));
+    $correct = 0;
+    foreach ($questions as $questionIndex => $question) {
+        $expected = [];
+        foreach (array_values((array) ($question['answers'] ?? [])) as $answerIndex => $answer) {
+            if (!empty($answer['correct'])) {
+                $expected[] = (int) $answerIndex;
+            }
+        }
+        $given = [];
+        foreach ((array) ($answers[$questionIndex] ?? []) as $value) {
+            if (is_numeric($value)) {
+                $given[(int) $value] = true;
+            }
+        }
+        $given = array_keys($given);
+        sort($expected);
+        sort($given);
+        if ($expected === $given) {
+            $correct++;
+        }
+    }
+    return ['correct' => $correct, 'total' => $total, 'minimum' => $minimum, 'passed' => $correct >= $minimum];
 }
 
 function nammu_render_header_buttons(array $options): string
@@ -4044,10 +4274,6 @@ function nammu_newsletter_validate_access_entry(string $email, string $token): ?
     return $validEntry;
 }
 
-function nammu_newsletter_access_cookie_name(): string
-{
-    return 'nammu_newsletter_access';
-}
 
 function nammu_contact_settings_from_config(array $config): array
 {
@@ -4178,43 +4404,110 @@ function nammu_contact_footer_items(array $contact): array
     return $items;
 }
 
-function nammu_newsletter_set_access_cookie(string $email, string $token, int $expires): void
+/*
+ * Acceso al archivo de newsletters sin cookie. El enlace del email valida el token de un solo uso del almacén
+ * (newsletters-access.json, caduca en una hora) y a partir de ahí el acceso viaja como un portador firmado con
+ * HMAC en el parámetro ?acceso= de los enlaces del archivo; el navegador lo guarda en localStorage para volver
+ * mientras dure la validez. El servidor sigue comprobando cada vez el token contra el almacén.
+ */
+function nammu_newsletter_access_param(): string
 {
-    $payload = json_encode(['email' => $email, 'token' => $token, 'expires_at' => $expires], JSON_UNESCAPED_SLASHES);
-    if ($payload === false) {
-        return;
-    }
-    $encoded = base64_encode($payload);
-    nammu_set_cookie(nammu_newsletter_access_cookie_name(), $encoded, $expires);
-    $_COOKIE[nammu_newsletter_access_cookie_name()] = $encoded;
+    return 'acceso';
 }
 
-function nammu_newsletter_get_access_cookie(): ?array
+function nammu_newsletter_access_carrier(string $email, string $token): string
 {
-    $raw = $_COOKIE[nammu_newsletter_access_cookie_name()] ?? '';
-    if ($raw === '') {
+    $payload = json_encode(['e' => strtolower(trim($email)), 't' => trim($token)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($payload)) {
+        return '';
+    }
+    $encoded = nammu_base64url_encode($payload);
+    return $encoded . '.' . nammu_base64url_encode(hash_hmac('sha256', 'newsletter-access|' . $encoded, nammu_mailing_secret(), true));
+}
+
+function nammu_newsletter_access_from_carrier(?string $carrier): ?array
+{
+    $carrier = trim((string) $carrier);
+    if ($carrier === '' || strlen($carrier) > 2048 || substr_count($carrier, '.') !== 1) {
         return null;
     }
-    $decoded = base64_decode((string) $raw, true);
-    if ($decoded === false) {
+    [$encoded, $signature] = explode('.', $carrier, 2);
+    $expected = nammu_base64url_encode(hash_hmac('sha256', 'newsletter-access|' . $encoded, nammu_mailing_secret(), true));
+    if ($encoded === '' || !hash_equals($expected, $signature)) {
         return null;
     }
-    $data = json_decode($decoded, true);
-    if (!is_array($data)) {
-        return null;
-    }
-    $email = strtolower(trim((string) ($data['email'] ?? '')));
-    $token = trim((string) ($data['token'] ?? ''));
-    $expiresAt = array_key_exists('expires_at', $data) ? (int) ($data['expires_at'] ?? 0) : 0;
+    $data = json_decode(nammu_base64url_decode($encoded), true);
+    $email = is_array($data) ? strtolower(trim((string) ($data['e'] ?? ''))) : '';
+    $token = is_array($data) ? trim((string) ($data['t'] ?? '')) : '';
     if ($email === '' || $token === '') {
         return null;
     }
-    if ($expiresAt === 0 || $expiresAt <= time()) {
-        nammu_set_cookie(nammu_newsletter_access_cookie_name(), '', time() - 3600);
-        unset($_COOKIE[nammu_newsletter_access_cookie_name()]);
-        return null;
-    }
     return ['email' => $email, 'token' => $token];
+}
+
+function nammu_newsletter_request_access_carrier(): string
+{
+    $param = nammu_newsletter_access_param();
+    $value = $_POST[$param] ?? ($_GET[$param] ?? '');
+    return is_string($value) ? trim($value) : '';
+}
+
+/** Acceso al archivo que viaja en la petición actual (parámetro ?acceso=), ya verificado en firma. */
+function nammu_newsletter_request_access(): ?array
+{
+    return nammu_newsletter_access_from_carrier(nammu_newsletter_request_access_carrier());
+}
+
+function nammu_newsletter_url_with_access(string $url, string $carrier): string
+{
+    $carrier = trim($carrier);
+    if ($carrier === '' || $url === '') {
+        return $url;
+    }
+    return $url . (str_contains($url, '?') ? '&' : '?') . nammu_newsletter_access_param() . '=' . rawurlencode($carrier);
+}
+
+/**
+ * JS que acompaña al archivo de newsletters: guarda el portador en localStorage, limpia la barra de direcciones y,
+ * en la pantalla de acceso, reintenta con el portador guardado (o lo olvida si ya no vale).
+ */
+function nammu_newsletter_access_script(bool $granted, string $carrier = ''): string
+{
+    $param = json_encode(nammu_newsletter_access_param(), JSON_UNESCAPED_SLASHES);
+    $carrierJson = json_encode($carrier, JSON_UNESCAPED_SLASHES);
+    $grantedJson = $granted ? 'true' : 'false';
+    return <<<HTML
+<script>
+(function() {
+    var key = 'nammu_newsletter_access';
+    var param = {$param};
+    var granted = {$grantedJson};
+    var carrier = {$carrierJson};
+    var url;
+    try { url = new URL(window.location.href); } catch (e) { return; }
+    var inUrl = url.searchParams.get(param) || '';
+    if (granted) {
+        try { if (carrier) { window.localStorage.setItem(key, carrier); } } catch (e) {}
+        if (inUrl) {
+            url.searchParams.delete(param);
+            window.history.replaceState(null, '', url.toString());
+        }
+        return;
+    }
+    var stored = '';
+    try { stored = window.localStorage.getItem(key) || ''; } catch (e) {}
+    if (inUrl) {
+        // El servidor no ha aceptado el portador de la URL: si es el guardado, ya no vale.
+        try { if (stored === inUrl) { window.localStorage.removeItem(key); } } catch (e) {}
+        return;
+    }
+    if (stored) {
+        url.searchParams.set(param, stored);
+        window.location.replace(url.toString());
+    }
+})();
+</script>
+HTML;
 }
 
 function nammu_mailing_default_prefs(): array

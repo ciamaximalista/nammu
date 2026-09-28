@@ -21,6 +21,8 @@
     RewriteRule ^identity\.txt$ index.php [L]
     RewriteRule ^robots\.txt$ index.php [L]
     RewriteRule ^\.well-known/tdmrep\.json$ index.php [L]
+    RewriteRule ^itinerarios\.xml$ index.php [L]
+    RewriteRule ^noticias\.xml$ index.php [L]
     RewriteRule ^itinerarios(/.*)?$ index.php [L]
     RewriteRule ^avisos/?$ avisos.php [L]
     RewriteRule ^correos/?$ correos.php [L]

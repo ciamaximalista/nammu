@@ -55,3 +55,8 @@ backups/*
 !backups/.htaccess
 .codewhale/
 blog.xml
+
+# Ficheros de verificación de propiedad de buscadores: son de cada sitio, no del repositorio.
+google*.html
+BingSiteAuth.xml
+yandex_*.html

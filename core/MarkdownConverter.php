@@ -26,6 +26,7 @@ class MarkdownConverter
                 'has_manual_toc' => false,
             ];
         }
+        $markdown = $this->normalizeCodeFences($markdown);
 
         $lines = explode("\n", $markdown);
         $html = [];
@@ -346,6 +347,64 @@ class MarkdownConverter
             'toc_html' => $tocHtml,
             'has_manual_toc' => $tocRequested,
         ];
+    }
+
+    /**
+     * Tolera las vallas de código "a la ligera" que escribe mucha gente: ```comando``` en una sola línea,
+     * ```comando que sigue en la misma línea que la valla de apertura, y la valla de cierre pegada al final de
+     * la última línea de código. Todo se reescribe como bloques estándar (valla, código, valla) antes de parsear.
+     */
+    private function normalizeCodeFences(string $markdown): string
+    {
+        $out = [];
+        $inCode = false;
+        foreach (explode("\n", $markdown) as $line) {
+            $trimmed = trim($line);
+            if (!$inCode) {
+                if (preg_match('/^```[ \t]*(\S.*?)[ \t]*```$/', $trimmed, $match) === 1 && !str_starts_with($match[1], '`')) {
+                    $out[] = '```';
+                    $out[] = $match[1];
+                    $out[] = '```';
+                    continue;
+                }
+                if (preg_match('/^```(.*)$/', $trimmed, $match) === 1) {
+                    $rest = trim($match[1]);
+                    if ($rest === '' || preg_match('/^[A-Za-z0-9_+#.-]+$/', $rest) === 1) {
+                        // Valla estándar, con o sin lenguaje.
+                        $out[] = '```' . $rest;
+                        $inCode = true;
+                        continue;
+                    }
+                    // El código empieza en la misma línea que la valla.
+                    $out[] = '```';
+                    $inCode = true;
+                    if (preg_match('/^(.*?\S)[ \t]*```$/', $rest, $closing) === 1) {
+                        $out[] = $closing[1];
+                        $out[] = '```';
+                        $inCode = false;
+                    } else {
+                        $out[] = $rest;
+                    }
+                    continue;
+                }
+                $out[] = $line;
+                continue;
+            }
+            if ($trimmed === '```') {
+                $out[] = $line;
+                $inCode = false;
+                continue;
+            }
+            if (preg_match('/^(.*?\S)[ \t]*```$/', rtrim($line), $closing) === 1) {
+                // Valla de cierre pegada al final de la última línea de código.
+                $out[] = $closing[1];
+                $out[] = '```';
+                $inCode = false;
+                continue;
+            }
+            $out[] = $line;
+        }
+        return implode("\n", $out);
     }
 
     private function convertInline(string $text): string

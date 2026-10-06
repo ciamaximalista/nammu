@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
+// Rastreadores de reclamación de fotos y cosechadores de imágenes: 403 antes de hacer nada más.
+nammu_reject_blocked_crawler(nammu_load_config());
 require_once __DIR__ . '/core/admin-redes.php';
 require_once __DIR__ . '/core/actualidad.php';
 require_once __DIR__ . '/core/fediverso.php';

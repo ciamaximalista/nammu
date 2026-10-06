@@ -9,6 +9,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' || (isset($_COOKIE[session_
 
 require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
+// Rastreadores de reclamación de fotos y cosechadores de imágenes: 403 antes de hacer nada más.
+nammu_reject_blocked_crawler(nammu_load_config());
 require_once __DIR__ . '/core/postal.php';
 
 use Nammu\Core\ContentRepository;

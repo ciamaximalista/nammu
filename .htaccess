@@ -10,6 +10,14 @@
     RewriteCond %{REQUEST_FILENAME}.webp -f
     RewriteRule ^ %{REQUEST_URI}.webp [T=image/webp,E=serve_webp:1,L]
 
+    # Rastreadores de reclamación de fotos y cosechadores de imágenes: 403 a todo, también a las imágenes estáticas.
+    # La misma lista vive en nammu_blocked_crawler_patterns() (core/helpers.php); mantenlas iguales.
+    RewriteCond %{HTTP_USER_AGENT} (tphotobot|copytrack|picrights|pixsy|imagerights|lapixa|tineye|copyright[\s_-]?agent|permission[\s_-]?machine|fairlicensing|visual[\s_-]?rights|rights[\s_-]?agent|photoclaim|imageprotect|amilabs-interleaved-research) [NC]
+    RewriteRule ^ - [F,L]
+
+    # Sondeos de vulnerabilidades de WordPress: aquí no hay WordPress.
+    RewriteRule (^|/)(wp-login\.php|xmlrpc\.php|wp-admin(/.*)?|wp-content(/.*)?|wp-includes(/.*)?)$ - [F,L]
+
     # Friendly URLs and machine-readable files delegated to the front controller.
     RewriteRule ^rss\.xml$ index.php [L]
     RewriteRule ^blog\.xml$ index.php [L]

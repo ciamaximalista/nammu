@@ -1108,6 +1108,27 @@ function nammu_record_platform_visit(array &$data, string $uid, string $date): b
 }
 
 /**
+ * ¿Parece una navegación de un navegador real? Los navegadores modernos mandan Sec-Fetch-Dest: document al abrir
+ * una página; los scrapers (aunque falsifiquen el User-Agent) casi nunca. Si no hay cabeceras Sec-Fetch, al menos
+ * se exige Accept con text/html y un User-Agent que no sea de rastreador. Sirve para los registros que se hacen
+ * en el servidor sin pasar por el beacon (eventos de itinerarios, búsquedas internas).
+ */
+function nammu_request_looks_like_browser_navigation(): bool
+{
+    $userAgent = trim((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+    if ($userAgent === '' || nammu_is_crawler_user_agent($userAgent)) {
+        return false;
+    }
+    $secFetchDest = strtolower(trim((string) ($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '')));
+    $secFetchMode = strtolower(trim((string) ($_SERVER['HTTP_SEC_FETCH_MODE'] ?? '')));
+    if ($secFetchDest !== '' || $secFetchMode !== '') {
+        return $secFetchDest === 'document' && ($secFetchMode === '' || $secFetchMode === 'navigate');
+    }
+    $accept = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+    return str_contains($accept, 'text/html') && trim((string) ($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')) !== '';
+}
+
+/**
  * Registra la visita (visitante único del día, plataforma y origen). Desde el beacon se pasan el referer y la
  * query de la página real, porque la petición al endpoint no los lleva.
  */
@@ -1318,7 +1339,7 @@ function nammu_record_pageview_now(string $type, string $slug, string $title = '
 
 function nammu_record_internal_search(string $query): void
 {
-    if (nammu_is_crawler_user_agent((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''))) {
+    if (!nammu_request_looks_like_browser_navigation()) {
         return;
     }
     $uid = nammu_visitor_hash();
@@ -1345,7 +1366,7 @@ function nammu_record_internal_search(string $query): void
     }
     $data = nammu_load_analytics(true);
     $date = date('Y-m-d');
-    $changed = nammu_analytics_touch_visit($data, $uid, $date);
+    $changed = false; // visitantes sólo desde el beacon
     if (!isset($data['searches']['daily'][$date])) {
         $data['searches']['daily'][$date] = [];
     }
@@ -1372,7 +1393,7 @@ function nammu_record_internal_search(string $query): void
 
 function nammu_record_itinerary_event(string $slug, string $event): void
 {
-    if (nammu_is_crawler_user_agent((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''))) {
+    if (!nammu_request_looks_like_browser_navigation()) {
         return;
     }
     $uid = nammu_visitor_hash();
@@ -1381,7 +1402,9 @@ function nammu_record_itinerary_event(string $slug, string $event): void
     }
     $data = nammu_load_analytics(true);
     $date = date('Y-m-d');
-    $changed = nammu_analytics_touch_visit($data, $uid, $date);
+    // Los visitantes únicos sólo los cuenta el beacon (navegadores reales); aquí no se suman: un scraper sin JS
+    // que recorra itinerarios inflaba el total de visitantes sin dejar rastro en contenido, fuentes ni plataforma.
+    $changed = false;
     if (!isset($data['itineraries']['items'])) {
         $data['itineraries']['items'] = [];
     }
@@ -2254,6 +2277,72 @@ function nammu_ai_policy_text(array $config = []): string
 /**
  * Rastreadores de IA conocidos (entrenamiento, búsqueda asistida y agentes). Todos reciben Allow: / en robots.txt.
  */
+/**
+ * Rastreadores que no queremos: agencias de reclamación de fotos (recorren las imágenes de los sitios para
+ * cruzarlas con sus archivos y enviar requerimientos en masa) y cosechadores de imágenes. Se bloquean en
+ * Apache (.htaccess, incluidas las imágenes estáticas), en PHP (por si la instalación no usa .htaccess) y se
+ * les dice Disallow en robots.txt. Se pueden añadir más en config.yml: blocked_user_agents: [patrón, ...].
+ */
+function nammu_blocked_crawler_patterns(array $config = []): array
+{
+    $patterns = [
+        'tphotobot',            // crawler.estidraft.com: "checks whether photographs are being used without permission"
+        'copytrack',
+        'picrights',
+        'pixsy',
+        'imagerights',
+        'lapixa',
+        'tineye',
+        'copyrightagent',
+        'copyright agent',
+        'copyright-agent',
+        'permissionmachine',
+        'permission machine',
+        'fairlicensing',
+        'visualrights',
+        'visual rights',
+        'rightsagent',
+        'rights agent',
+        'photoclaim',
+        'imageprotect',
+        'amilabs-interleaved-research',
+    ];
+    foreach ((array) ($config['blocked_user_agents'] ?? []) as $extra) {
+        $extra = strtolower(trim((string) $extra));
+        if ($extra !== '') {
+            $patterns[] = $extra;
+        }
+    }
+    return array_values(array_unique($patterns));
+}
+
+function nammu_is_blocked_crawler_user_agent(string $userAgent, array $config = []): bool
+{
+    $userAgent = strtolower(trim($userAgent));
+    if ($userAgent === '') {
+        return false;
+    }
+    foreach (nammu_blocked_crawler_patterns($config) as $pattern) {
+        if ($pattern !== '' && str_contains($userAgent, $pattern)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** Corta la petición con un 403 si viene de un rastreador bloqueado. Llamar al principio de cada entrada pública. */
+function nammu_reject_blocked_crawler(array $config = []): void
+{
+    if (!nammu_is_blocked_crawler_user_agent((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), $config)) {
+        return;
+    }
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=UTF-8');
+    header('Cache-Control: no-store');
+    echo "403 Forbidden\n";
+    exit;
+}
+
 function nammu_ai_crawler_user_agents(): array
 {
     return [

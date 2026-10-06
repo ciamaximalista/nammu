@@ -9,6 +9,8 @@ error_reporting(E_ALL);
 
 require_once __DIR__ . '/core/bootstrap.php';
 require_once __DIR__ . '/core/helpers.php';
+// Rastreadores de reclamación de fotos y cosechadores de imágenes: 403 antes de hacer nada más.
+nammu_reject_blocked_crawler(nammu_load_config());
 require_once __DIR__ . '/core/actualidad.php';
 require_once __DIR__ . '/core/fediverso.php';
 require_once __DIR__ . '/core/webmention.php';
@@ -1444,6 +1446,12 @@ if ($routePath === '/robots.txt') {
         $lines[] = 'Disallow: ' . $path;
     }
     $lines[] = '';
+    $lines[] = '# Rastreadores de reclamación de fotos y cosechadores de imágenes: no son bienvenidos (y además se les devuelve 403).';
+    foreach (['tphotobot', 'Copytrack', 'PicRights', 'Pixsy', 'ImageRights', 'Lapixa', 'TinEye', 'CopyrightAgent', 'PermissionMachine', 'Fairlicensing', 'VisualRights', 'amilabs-interleaved-research'] as $blockedAgent) {
+        $lines[] = 'User-agent: ' . $blockedAgent;
+        $lines[] = 'Disallow: /';
+        $lines[] = '';
+    }
     $lines[] = 'Sitemap: ' . $sitemapUrl;
     $robotsText = implode("\n", $lines) . "\n";
     header('Content-Type: text/plain; charset=UTF-8');
@@ -2121,7 +2129,8 @@ if (preg_match('#^/itinerarios/([^/]+)/([^/]+)/?$#i', $routePath, $matchItinerar
         $alreadyVisited = in_array($topic->getSlug(), $progressData['visited'], true);
         if (!$alreadyVisited) {
             $progressData['visited'][] = $topic->getSlug();
-            if ($hadPresentation) {
+            if ($hadPresentation && nammu_request_looks_like_browser_navigation()) {
+                // Las estadísticas de itinerarios son de servidor: sólo cuentan navegaciones de navegadores reales.
                 $incrementStart = $topic->getNumber() === 1;
                 try {
                     $itineraryRepository->recordTopicStat($itinerary->getSlug(), $topic, $incrementStart);
